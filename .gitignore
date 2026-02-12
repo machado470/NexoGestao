@@ -1,38 +1,40 @@
-# Dependencies
+# deps
 node_modules/
 .pnpm-store/
 
-# Build
+# builds
 dist/
 build/
 coverage/
+*.tsbuildinfo
 
-# Environment
+# env / secrets
 .env
 .env.*
 !.env.example
+*.token
+token.txt
+colab_token.txt
+admin.token
+collab.token
+*.auth.json
 
-# OS
+# caches
+.cache/
+.turbo/
+.vscode/
 .DS_Store
-Thumbs.db
 
-# Logs
-logs/
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 *.log
 
-# Editor
-.vscode/
-.idea/
-*.swp
-*.swo
+# prisma
+/generated/prisma/
 
-# Prisma
-/generated/prisma
-
-# Cache / Local auth / tokens
-.cache/
-*.token
-
-# Backup files
-*.bak
+# OS
+Thumbs.db
 
