@@ -1,0 +1,246 @@
+{
+
+  "generatedAt": "2025-10-20T20:34:12.528Z",
+
+  "generatedAt": "2025-10-16T16:53:36.473Z",
+  "collisions": [
+    {
+      "normalised": ".env",
+      "paths": [
+        ".env",
+        "apps/api/.env",
+        "apps/api/apps/api/.env"
+      ]
+    },
+    {
+      "normalised": ".gitignore",
+      "paths": [
+        ".gitignore",
+        "apps/ui/.gitignore",
+        "apps/web/.gitignore"
+      ]
+    },
+    {
+      "normalised": "readme.md",
+      "paths": [
+        "README.md",
+        "apps/ui/README.md",
+        "apps/web/README.md"
+      ]
+    },
+    {
+      "normalised": "apps",
+      "paths": [
+        "apps",
+        "apps/api/apps"
+      ]
+    },
+    {
+      "normalised": "api",
+      "paths": [
+        "apps/api",
+        "apps/api/apps/api"
+      ]
+    },
+    {
+      "normalised": ".env.example",
+      "paths": [
+        "apps/api/.env.example",
+        "apps/web/.env.example",
+        "examples/env/.env.example"
+      ]
+    },
+    {
+      "normalised": "commitpush.sh",
+      "paths": [
+        "apps/api/commit-push.sh",
+        "commit-push.sh"
+      ]
+    },
+    {
+      "normalised": "package.json",
+      "paths": [
+        "apps/api/package.json",
+        "apps/ui/package.json",
+        "apps/web/package.json",
+        "package.json",
+        "packages/config/package.json",
+        "packages/content/package.json",
+        "packages/ui/package.json"
+      ]
+    },
+    {
+      "normalised": "prisma",
+      "paths": [
+        "apps/api/prisma",
+        "apps/api/src/prisma"
+      ]
+    },
+    {
+      "normalised": "migration.sql",
+      "paths": [
+        "apps/api/prisma/_backup/1760229608/20251010191904_add-auth-credentials/migration.sql",
+        "apps/api/prisma/_backup/1760229608/init_core_models/migration.sql",
+        "apps/api/prisma/migrations/20251012004056_init/migration.sql",
+        "apps/api/prisma/migrations/20251014173532_init_school/migration.sql"
+      ]
+    },
+    {
+      "normalised": "migrationlock.toml",
+      "paths": [
+        "apps/api/prisma/_backup/1760229608/migration_lock.toml",
+        "apps/api/prisma/migrations/migration_lock.toml"
+      ]
+    },
+    {
+      "normalised": "scripts",
+      "paths": [
+        "apps/api/scripts",
+        "scripts"
+      ]
+    },
+    {
+      "normalised": "src",
+      "paths": [
+        "apps/api/src",
+        "apps/ui/src",
+        "apps/web/src"
+      ]
+    },
+    {
+      "normalised": "dto",
+      "paths": [
+        "apps/api/src/alunos/dto",
+        "apps/api/src/instructor/dto",
+        "apps/api/src/instrutores/dto",
+        "apps/api/src/school/dto",
+        "apps/api/src/simulados/dto"
+      ]
+    },
+    {
+      "normalised": "tsconfig.json",
+      "paths": [
+        "apps/api/tsconfig.json",
+        "apps/ui/tsconfig.json",
+        "apps/web/tsconfig.json"
+      ]
+    },
+    {
+      "normalised": "ui",
+      "paths": [
+        "apps/ui",
+        "packages/ui"
+      ]
+    },
+    {
+      "normalised": "eslint.config.js",
+      "paths": [
+        "apps/ui/eslint.config.js",
+        "apps/web/eslint.config.js"
+      ]
+    },
+    {
+      "normalised": "index.html",
+      "paths": [
+        "apps/ui/index.html",
+        "apps/web/index.html"
+      ]
+    },
+    {
+      "normalised": "public",
+      "paths": [
+        "apps/ui/public",
+        "apps/web/public"
+      ]
+    },
+    {
+      "normalised": "vite.svg",
+      "paths": [
+        "apps/ui/public/vite.svg",
+        "apps/web/public/vite.svg"
+      ]
+    },
+    {
+      "normalised": "app.css",
+      "paths": [
+        "apps/ui/src/App.css",
+        "apps/web/src/App.css"
+      ]
+    },
+    {
+      "normalised": "app.tsx",
+      "paths": [
+        "apps/ui/src/App.tsx",
+        "apps/web/src/App.tsx"
+      ]
+    },
+    {
+      "normalised": "assets",
+      "paths": [
+        "apps/ui/src/assets",
+        "apps/web/src/assets"
+      ]
+    },
+    {
+      "normalised": "react.svg",
+      "paths": [
+        "apps/ui/src/assets/react.svg",
+        "apps/web/src/assets/react.svg"
+      ]
+    },
+    {
+      "normalised": "index.css",
+      "paths": [
+        "apps/ui/src/index.css",
+        "apps/web/src/index.css"
+      ]
+    },
+    {
+      "normalised": "main.tsx",
+      "paths": [
+        "apps/ui/src/main.tsx",
+        "apps/web/src/main.tsx"
+      ]
+    },
+    {
+      "normalised": "tsconfig.app.json",
+      "paths": [
+        "apps/ui/tsconfig.app.json",
+        "apps/web/tsconfig.app.json"
+      ]
+    },
+    {
+      "normalised": "tsconfig.node.json",
+      "paths": [
+        "apps/ui/tsconfig.node.json",
+        "apps/web/tsconfig.node.json"
+      ]
+    },
+    {
+      "normalised": "vite.config.ts",
+      "paths": [
+        "apps/ui/vite.config.ts",
+        "apps/web/vite.config.ts"
+      ]
+    }
+  ],
+  "mislocated": [],
+  "orphanPackages": [
+    {
+      "file": "packages/config/package.json",
+      "dependencies": 0,
+      "scripts": 0
+    },
+    {
+      "file": "packages/content/package.json",
+      "dependencies": 0,
+      "scripts": 0
+    },
+    {
+      "file": "packages/ui/package.json",
+      "dependencies": 0,
+      "scripts": 0
+    }
+  ],
+  "tsconfigIssues": []
+}

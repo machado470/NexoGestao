@@ -1,0 +1,339 @@
+{
+  "suggestions": [
+    {
+      "file": "apps/api/src/alunos/alunos.controller.ts",
+      "original": "./alunos.service",
+      "suggested": "./alunos.service.ts"
+    },
+    {
+      "file": "apps/api/src/alunos/alunos.controller.ts",
+      "original": "./alunos.dto",
+      "suggested": "./alunos.dto.ts"
+    },
+    {
+      "file": "apps/api/src/alunos/alunos.module.ts",
+      "original": "./alunos.controller",
+      "suggested": "./alunos.controller.ts"
+    },
+    {
+      "file": "apps/api/src/alunos/alunos.module.ts",
+      "original": "./alunos.service",
+      "suggested": "./alunos.service.ts"
+    },
+    {
+      "file": "apps/api/src/alunos/alunos.module.ts",
+      "original": "../prisma/prisma.module",
+      "suggested": "../prisma/prisma.module.ts"
+    },
+    {
+      "file": "apps/api/src/alunos/alunos.service.ts",
+      "original": "../prisma/prisma.service",
+      "suggested": "../prisma/prisma.service.ts"
+    },
+    {
+      "file": "apps/api/src/alunos/alunos.service.ts",
+      "original": "./alunos.dto",
+      "suggested": "./alunos.dto.ts"
+    },
+    {
+      "file": "apps/api/src/alunos/dto/update-aluno.dto.ts",
+      "original": "./create-aluno.dto",
+      "suggested": "./create-aluno.dto.ts"
+    },
+    {
+      "file": "apps/api/src/app.controller.ts",
+      "original": "./app.service",
+      "suggested": "./app.service.ts"
+    },
+    {
+      "file": "apps/api/src/app.controller.ts",
+      "original": "./auth/public.decorator",
+      "suggested": "./auth/public.decorator.ts"
+    },
+    {
+      "file": "apps/api/src/app.module.ts",
+      "original": "./alunos/alunos.module",
+      "suggested": "./alunos/alunos.module.ts"
+    },
+    {
+      "file": "apps/api/src/app.module.ts",
+      "original": "./prisma/prisma.module",
+      "suggested": "./prisma/prisma.module.ts"
+    },
+    {
+      "file": "apps/api/src/app.module.ts",
+      "original": "./health/health.controller",
+      "suggested": "./health/health.controller.ts"
+    },
+    {
+      "file": "apps/api/src/app.module.ts",
+      "original": "./school/school.module",
+      "suggested": "./school/school.module.ts"
+    },
+    {
+      "file": "apps/api/src/app.module.ts",
+      "original": "./instructor/instructor.module",
+      "suggested": "./instructor/instructor.module.ts"
+    },
+    {
+      "file": "apps/api/src/auth/auth.controller.ts",
+      "original": "./auth.service",
+      "suggested": "./auth.service.ts"
+    },
+    {
+      "file": "apps/api/src/auth/auth.controller.ts",
+      "original": "./guards/local-auth.guard",
+      "suggested": "./guards/local-auth.guard.ts"
+    },
+    {
+      "file": "apps/api/src/auth/auth.controller.ts",
+      "original": "./public.decorator",
+      "suggested": "./public.decorator.ts"
+    },
+    {
+      "file": "apps/api/src/auth/auth.module.ts",
+      "original": "../prisma/prisma.module",
+      "suggested": "../prisma/prisma.module.ts"
+    },
+    {
+      "file": "apps/api/src/auth/auth.module.ts",
+      "original": "./auth.controller",
+      "suggested": "./auth.controller.ts"
+    },
+    {
+      "file": "apps/api/src/auth/auth.module.ts",
+      "original": "./auth.service",
+      "suggested": "./auth.service.ts"
+    },
+    {
+      "file": "apps/api/src/auth/auth.module.ts",
+      "original": "./strategies/jwt.strategy",
+      "suggested": "./strategies/jwt.strategy.ts"
+    },
+    {
+      "file": "apps/api/src/auth/auth.module.ts",
+      "original": "./strategies/local.strategy",
+      "suggested": "./strategies/local.strategy.ts"
+    },
+    {
+      "file": "apps/api/src/auth/auth.service.ts",
+      "original": "../prisma/prisma.service",
+      "suggested": "../prisma/prisma.service.ts"
+    },
+    {
+      "file": "apps/api/src/auth/guards/jwt-auth.guard.ts",
+      "original": "../public.decorator",
+      "suggested": "../public.decorator.ts"
+    },
+    {
+      "file": "apps/api/src/auth/strategies/jwt.strategy.ts",
+      "original": "../auth.service",
+      "suggested": "../auth.service.ts"
+    },
+    {
+      "file": "apps/api/src/auth/strategies/local.strategy.ts",
+      "original": "../auth.service",
+      "suggested": "../auth.service.ts"
+    },
+    {
+      "file": "apps/api/src/instructor/instructor.controller.ts",
+      "original": "./instructor.service",
+      "suggested": "./instructor.service.ts"
+    },
+    {
+      "file": "apps/api/src/instructor/instructor.controller.ts",
+      "original": "./dto/instructor.dto",
+      "suggested": "./dto/instructor.dto.ts"
+    },
+    {
+      "file": "apps/api/src/instructor/instructor.module.ts",
+      "original": "./instructor.service",
+      "suggested": "./instructor.service.ts"
+    },
+    {
+      "file": "apps/api/src/instructor/instructor.module.ts",
+      "original": "./instructor.controller",
+      "suggested": "./instructor.controller.ts"
+    },
+    {
+      "file": "apps/api/src/instructor/instructor.module.ts",
+      "original": "../prisma/prisma.module",
+      "suggested": "../prisma/prisma.module.ts"
+    },
+    {
+      "file": "apps/api/src/instructor/instructor.service.ts",
+      "original": "../prisma/prisma.service",
+      "suggested": "../prisma/prisma.service.ts"
+    },
+    {
+      "file": "apps/api/src/instructor/instructor.service.ts",
+      "original": "./dto/instructor.dto",
+      "suggested": "./dto/instructor.dto.ts"
+    },
+    {
+      "file": "apps/api/src/instrutores/dto/update-instrutor.dto.ts",
+      "original": "./create-instrutor.dto",
+      "suggested": "./create-instrutor.dto.ts"
+    },
+    {
+      "file": "apps/api/src/instrutores/instrutores.controller.ts",
+      "original": "../auth/guards/jwt-auth.guard",
+      "suggested": "../auth/guards/jwt-auth.guard.ts"
+    },
+    {
+      "file": "apps/api/src/instrutores/instrutores.controller.ts",
+      "original": "./dto/create-instrutor.dto",
+      "suggested": "./dto/create-instrutor.dto.ts"
+    },
+    {
+      "file": "apps/api/src/instrutores/instrutores.controller.ts",
+      "original": "./dto/update-instrutor.dto",
+      "suggested": "./dto/update-instrutor.dto.ts"
+    },
+    {
+      "file": "apps/api/src/instrutores/instrutores.controller.ts",
+      "original": "./instrutores.service",
+      "suggested": "./instrutores.service.ts"
+    },
+    {
+      "file": "apps/api/src/instrutores/instrutores.module.ts",
+      "original": "./instrutores.controller",
+      "suggested": "./instrutores.controller.ts"
+    },
+    {
+      "file": "apps/api/src/instrutores/instrutores.module.ts",
+      "original": "./instrutores.service",
+      "suggested": "./instrutores.service.ts"
+    },
+    {
+      "file": "apps/api/src/instrutores/instrutores.service.ts",
+      "original": "../prisma/prisma.service",
+      "suggested": "../prisma/prisma.service.ts"
+    },
+    {
+      "file": "apps/api/src/instrutores/instrutores.service.ts",
+      "original": "./dto/create-instrutor.dto",
+      "suggested": "./dto/create-instrutor.dto.ts"
+    },
+    {
+      "file": "apps/api/src/instrutores/instrutores.service.ts",
+      "original": "./dto/update-instrutor.dto",
+      "suggested": "./dto/update-instrutor.dto.ts"
+    },
+    {
+      "file": "apps/api/src/main.ts",
+      "original": "./app.module",
+      "suggested": "./app.module.ts"
+    },
+    {
+      "file": "apps/api/src/prisma/prisma.module.ts",
+      "original": "./prisma.service",
+      "suggested": "./prisma.service.ts"
+    },
+    {
+      "file": "apps/api/src/school/school.controller.ts",
+      "original": "./school.service",
+      "suggested": "./school.service.ts"
+    },
+    {
+      "file": "apps/api/src/school/school.controller.ts",
+      "original": "./dto/school.dto",
+      "suggested": "./dto/school.dto.ts"
+    },
+    {
+      "file": "apps/api/src/school/school.module.ts",
+      "original": "./school.service",
+      "suggested": "./school.service.ts"
+    },
+    {
+      "file": "apps/api/src/school/school.module.ts",
+      "original": "./school.controller",
+      "suggested": "./school.controller.ts"
+    },
+    {
+      "file": "apps/api/src/school/school.service.ts",
+      "original": "../prisma/prisma.service",
+      "suggested": "../prisma/prisma.service.ts"
+    },
+    {
+      "file": "apps/api/src/school/school.service.ts",
+      "original": "./dto/school.dto",
+      "suggested": "./dto/school.dto.ts"
+    },
+    {
+      "file": "apps/api/src/simulados/dto/update-simulado.dto.ts",
+      "original": "./create-simulado.dto",
+      "suggested": "./create-simulado.dto.ts"
+    },
+    {
+      "file": "apps/api/src/simulados/simulados.controller.ts",
+      "original": "../auth/guards/jwt-auth.guard",
+      "suggested": "../auth/guards/jwt-auth.guard.ts"
+    },
+    {
+      "file": "apps/api/src/simulados/simulados.controller.ts",
+      "original": "./dto/create-simulado.dto",
+      "suggested": "./dto/create-simulado.dto.ts"
+    },
+    {
+      "file": "apps/api/src/simulados/simulados.controller.ts",
+      "original": "./dto/update-simulado.dto",
+      "suggested": "./dto/update-simulado.dto.ts"
+    },
+    {
+      "file": "apps/api/src/simulados/simulados.controller.ts",
+      "original": "./simulados.service",
+      "suggested": "./simulados.service.ts"
+    },
+    {
+      "file": "apps/api/src/simulados/simulados.module.ts",
+      "original": "./simulados.controller",
+      "suggested": "./simulados.controller.ts"
+    },
+    {
+      "file": "apps/api/src/simulados/simulados.module.ts",
+      "original": "./simulados.service",
+      "suggested": "./simulados.service.ts"
+    },
+    {
+      "file": "apps/api/src/simulados/simulados.service.ts",
+      "original": "../prisma/prisma.service",
+      "suggested": "../prisma/prisma.service.ts"
+    },
+    {
+      "file": "apps/api/src/simulados/simulados.service.ts",
+      "original": "./dto/create-simulado.dto",
+      "suggested": "./dto/create-simulado.dto.ts"
+    },
+    {
+      "file": "apps/api/src/simulados/simulados.service.ts",
+      "original": "./dto/update-simulado.dto",
+      "suggested": "./dto/update-simulado.dto.ts"
+    },
+    {
+      "file": "apps/api/src/stats/stats.controller.ts",
+      "original": "./stats.service",
+      "suggested": "./stats.service.ts"
+    },
+    {
+      "file": "apps/api/src/stats/stats.module.ts",
+      "original": "../prisma/prisma.module",
+      "suggested": "../prisma/prisma.module.ts"
+    },
+    {
+      "file": "apps/api/src/stats/stats.module.ts",
+      "original": "./stats.controller",
+      "suggested": "./stats.controller.ts"
+    },
+    {
+      "file": "apps/api/src/stats/stats.module.ts",
+      "original": "./stats.service",
+      "suggested": "./stats.service.ts"
+    },
+    {
+      "file": "apps/api/src/stats/stats.service.ts",
+      "original": "../prisma/prisma.service",
+      "suggested": "../prisma/prisma.service.ts"
+    }
+  ]
+}

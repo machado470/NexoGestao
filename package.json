@@ -1,0 +1,31 @@
+{
+  "name": "autoescola-sim",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "dev:api": "pnpm --filter ./apps/api dev",
+    "dev:web": "pnpm --filter ./apps/web dev",
+    "dev:all": "concurrently -n API,WEB -c blue,magenta \"pnpm dev:api\" \"pnpm dev:web\"",
+    "build:web": "pnpm --filter ./apps/web build",
+    "commit-push": "git add -A && git commit -m \"$npm_config_m\" || echo no-changes && git push origin $(git branch --show-current)",
+    "prisma:studio": "pnpm --filter ./apps/api prisma studio",
+    "prestart:full": "bash tools/check-docker.sh",
+    "free": "bash ./scripts/free-port.sh 3000",
+    "clean-start": "bash ./scripts/free-port.sh 3000 && pnpm run dev:api"
+  },
+  "prisma": {
+    "seed": "tsx apps/api/prisma/seed.ts"
+  },
+  "packageManager": "pnpm@8.15.4",
+  "devDependencies": {
+    "@prisma/client": "5.22.0",
+    "@types/node": "^20.19.21",
+    "concurrently": "^9.2.1",
+    "prisma": "5.22.0",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.20.6",
+    "turbo": "^2.6.1",
+    "typescript": "^5.9.3"
+  }
+}

@@ -1,0 +1,13 @@
+# Tipo(scope): assunto curto no imperativo
+# tipos: feat, fix, chore, refactor, docs, test, build, ci, perf, style
+# Ex:
+# feat(web): resultado do simulado com XP e medalhas
+# fix(api): corrige CORS para localhost:5173
+
+# Corpo opcional:
+# - O que mudou e por quê
+# - Contexto técnico
+# - Impacto / migrações
+
+# Rodapé opcional:
+# Closes: #123

@@ -1,0 +1,284 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  COLLABORATOR
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum CorrectiveStatus {
+  OPEN
+  AWAITING_REASSESSMENT
+  DONE
+}
+
+enum TimelineSeverity {
+  INFO
+  WARNING
+  CRITICAL
+  SUCCESS
+}
+
+enum ExceptionType {
+  VACATION
+  LEAVE
+  PAUSE
+}
+
+enum TrackStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum TrackItemType {
+  READING
+  ACTION
+  CHECKPOINT
+}
+
+model Organization {
+  id                 String   @id @default(uuid())
+  name               String
+  slug               String   @unique
+  requiresOnboarding Boolean  @default(true)
+  createdAt          DateTime @default(now())
+
+  users   User[]
+  persons Person[]
+  tracks  Track[]
+}
+
+model User {
+  id       String   @id @default(uuid())
+  email    String   @unique
+  password String?
+  role     UserRole
+
+  active          Boolean  @default(false)
+  inviteToken     String?  @unique
+  inviteExpiresAt DateTime?
+
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id])
+
+  person Person?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Person {
+  id     String  @id @default(uuid())
+  name   String
+  email  String?
+  role   String
+  active Boolean @default(true)
+
+  riskScore      Int       @default(0)
+  offboardedAt   DateTime?
+  offboardReason String?
+
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id])
+
+  userId String? @unique
+  user   User?   @relation(fields: [userId], references: [id])
+
+  assignments       Assignment[]
+  assessments       Assessment[]
+  correctiveActions CorrectiveAction[]
+  auditEvents       AuditEvent[]
+  timelineEvents    TimelineEvent[]
+  riskSnapshots     RiskSnapshot[]
+  exceptions        PersonException[]
+  itemCompletions   TrackItemCompletion[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model TimelineEvent {
+  id          String   @id @default(uuid())
+  action      String
+  personId    String?
+  description String?
+  metadata    Json?
+
+  createdAt DateTime @default(now())
+
+  person Person? @relation(fields: [personId], references: [id])
+
+  @@index([personId, createdAt])
+  @@index([action, createdAt])
+}
+
+model Track {
+  id          String      @id @default(uuid())
+  title       String
+  description String?
+  slug        String
+  version     Int         @default(1)
+  status      TrackStatus @default(DRAFT)
+
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  assignments Assignment[]
+  assessments Assessment[]
+  items       TrackItem[]
+
+  @@unique([slug, version, orgId])
+  @@index([orgId])
+}
+
+model TrackItem {
+  id       String        @id @default(uuid())
+  trackId String
+  title   String
+  content String?
+  type    TrackItemType
+  order   Int
+
+  createdAt DateTime @default(now())
+
+  track Track @relation(fields: [trackId], references: [id])
+  completions TrackItemCompletion[]
+
+  @@unique([trackId, order])
+}
+
+model TrackItemCompletion {
+  id           String   @id @default(uuid())
+  itemId       String
+  personId     String
+  assignmentId String
+
+  completedAt DateTime @default(now())
+
+  item       TrackItem  @relation(fields: [itemId], references: [id])
+  person     Person     @relation(fields: [personId], references: [id])
+  assignment Assignment @relation(fields: [assignmentId], references: [id])
+
+  @@unique([itemId, personId])
+}
+
+model Assignment {
+  id        String   @id @default(uuid())
+  personId  String
+  trackId   String
+
+  progress  Int       @default(0)
+  risk      RiskLevel @default(LOW)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  person Person @relation(fields: [personId], references: [id])
+  track  Track  @relation(fields: [trackId], references: [id])
+
+  assessments Assessment[]
+  completions TrackItemCompletion[]
+
+  @@unique([personId, trackId])
+}
+
+model Assessment {
+  id           String    @id @default(uuid())
+  assignmentId String
+  personId     String
+  trackId      String
+
+  score Int
+  risk  RiskLevel
+  notes String?
+
+  createdAt DateTime @default(now())
+
+  assignment Assignment @relation(fields: [assignmentId], references: [id])
+  person     Person     @relation(fields: [personId], references: [id])
+  track      Track      @relation(fields: [trackId], references: [id])
+}
+
+model CorrectiveAction {
+  id         String           @id @default(uuid())
+  personId   String
+  reason     String
+  status     CorrectiveStatus @default(OPEN)
+  resolvedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  person Person @relation(fields: [personId], references: [id])
+}
+
+model PersonException {
+  id        String        @id @default(uuid())
+  personId  String
+  type      ExceptionType
+  reason    String
+  startsAt  DateTime
+  endsAt    DateTime
+
+  processedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  person Person @relation(fields: [personId], references: [id])
+
+  @@index([personId, startsAt, endsAt])
+  @@index([endsAt, processedAt])
+}
+
+model AuditEvent {
+  id       String   @id @default(uuid())
+  personId String?
+  action   String
+  context  String?
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  person Person? @relation(fields: [personId], references: [id])
+
+  @@index([personId, createdAt])
+  @@index([action, createdAt])
+}
+
+model RiskSnapshot {
+  id        String   @id @default(uuid())
+  personId  String
+  score     Int
+  reason    String
+
+  createdAt DateTime @default(now())
+
+  person Person @relation(fields: [personId], references: [id])
+}
+
+model GovernanceRun {
+  id         String   @id @default(uuid())
+  evaluated  Int      @default(0)
+  warnings   Int      @default(0)
+  correctives Int     @default(0)
+  startedAt  DateTime
+  finishedAt DateTime
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+}

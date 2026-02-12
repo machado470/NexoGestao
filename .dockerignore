@@ -1,0 +1,8 @@
+node_modules
+.pnpm-store
+.git
+.gitignore
+.vscode
+dist
+apps/**/dist
+**/*.log

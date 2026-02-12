@@ -1,0 +1,12 @@
+export const executiveStats = [
+  { label: 'Colaboradores monitorados', value: 18 },
+  { label: 'Em risco alto', value: 4, danger: true },
+  { label: 'Trilhas obrigatórias', value: 7 },
+  { label: 'Pendências críticas', value: 3, danger: true },
+]
+
+export const peopleAtRisk = [
+  { name: 'Carlos Almeida', risk: 'Alto', level: 90 },
+  { name: 'Fernanda Souza', risk: 'Médio', level: 65 },
+  { name: 'João Pereira', risk: 'Alto', level: 88 },
+]
