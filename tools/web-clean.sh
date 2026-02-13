@@ -1,9 +1,17 @@
 #!/bin/bash
+set -euo pipefail
 
-set -e
+if [ "${I_KNOW_WHAT_IM_DOING:-0}" != "1" ]; then
+  echo "⛔ tools/web-clean.sh desabilitado por segurança."
+  echo "   Isso aqui APAGA pastas do apps/web/src."
+  echo
+  echo "   Para rodar de propósito:"
+  echo "   I_KNOW_WHAT_IM_DOING=1 bash tools/web-clean.sh"
+  exit 1
+fi
 
 echo "====================================="
-echo "   AUTOESCOLA WEB CLEANER v1"
+echo "   NEXOGESTAO WEB CLEANER v1"
 echo "====================================="
 
 BASE="apps/web/src"
@@ -16,7 +24,6 @@ MODULES=(
 
 echo "🧹 Limpando estrutura antiga..."
 
-# Remove módulos quebrados, duplicados, antigos
 rm -rf $BASE/modules
 rm -rf $BASE/hooks
 rm -rf $BASE/services
@@ -26,21 +33,17 @@ rm -rf $BASE/pages
 rm -rf $BASE/views
 
 echo "📁 Estrutura anterior limpa!"
-
 echo "📦 Criando estrutura nova..."
 
 mkdir -p $BASE/modules
 mkdir -p $BASE/router
 
-# Criar pastas dos módulos
 for MOD in "${MODULES[@]}"; do
   FOLDER=$(echo $MOD | cut -d: -f1)
   mkdir -p "$BASE/modules/$FOLDER"
 done
 
 echo "📚 Estrutura de módulos recriada!"
-
-
 echo "🔍 Movendo ou criando arquivos..."
 
 for MOD in "${MODULES[@]}"; do
@@ -48,8 +51,6 @@ for MOD in "${MODULES[@]}"; do
   FILE=$(echo $MOD | cut -d: -f2)
 
   TARGET="$BASE/modules/$FOLDER/$FILE"
-
-  # Procurar o arquivo pelo projeto inteiro
   FOUND=$(find apps/web/src -name "$FILE" 2>/dev/null | head -n 1)
 
   if [ -n "$FOUND" ]; then
@@ -104,5 +105,5 @@ tree $BASE/modules
 echo ""
 echo "====================================="
 echo "   LIMPEZA FINALIZADA COM SUCESSO!"
-echo "   Agora só editar os arquivos!"
+echo "   NexoGestao pronto para edição."
 echo "====================================="

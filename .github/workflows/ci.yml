@@ -1,51 +1,52 @@
-name: CI
+name: ci
 
 on:
   push:
-    branches: [main, develop, codex/*]
   pull_request:
-    branches: [main, develop]
 
 jobs:
-  build-test:
+  test:
     runs-on: ubuntu-latest
+
     services:
       postgres:
         image: postgres:15
-        ports:
-          - 5432:5432
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: autoescola
+          POSTGRES_DB: nexogestao
+        ports:
+          - 5432:5432
         options: >-
-          --health-cmd="pg_isready -U postgres"
-          --health-interval=10s
+          --health-cmd="pg_isready -U postgres -d nexogestao"
+          --health-interval=5s
           --health-timeout=5s
-          --health-retries=5
-
-    env:
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/autoescola?schema=public
+          --health-retries=20
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 8.15.4
+
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: pnpm
 
-      - name: Install pnpm
-        run: npm install -g pnpm
+      - name: Install
+        run: pnpm i
 
-      - name: Install dependencies
-        run: pnpm install
+      - name: Prisma generate
+        run: pnpm --filter ./apps/api exec prisma generate
 
-      - name: Prisma migrate
-        run: pnpm --filter @autoescola/api exec prisma migrate deploy
+      - name: Migrate deploy
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/nexogestao?schema=public
+        run: pnpm --filter ./apps/api exec prisma migrate deploy
 
-      - name: Build
-        run: pnpm build
-
-      - name: Run tests
-        run: pnpm test
+      - name: Seed
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/nexogestao?schema=public
+        run: pnpm --filter ./apps/api exec prisma db seed

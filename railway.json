@@ -1,26 +1,12 @@
 {
-  "$schema": "https://railway.app/railway.schema.json",
-  "name": "autoescola-sim",
-  "services": [
-    {
-      "name": "api",
-      "type": "web",
-      "source": {
-        "type": "docker",
-        "path": "apps/api",
-        "dockerfilePath": "Dockerfile"
-      },
-      "env": {
-        "DATABASE_URL": "",
-        "JWT_SECRET": "",
-        "JWT_EXPIRES_IN": "1h",
-        "API_PORT": "8080",
-        "CORS_ORIGINS": "https://autoescola-sim.vercel.app,http://localhost:5173"
+  "name": "nexogestao",
+  "environments": {
+    "production": {
+      "variables": {
+        "NODE_ENV": "production",
+        "API_PORT": "3000",
+        "CORS_ORIGINS": "http://localhost:5173"
       }
-    },
-    {
-      "name": "postgres",
-      "type": "postgresql"
     }
-  ]
+  }
 }

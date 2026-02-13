@@ -12,7 +12,7 @@ const steps = [
     step: '02',
     title: 'Atribuição de trilhas',
     description:
-      'Cada pessoa recebe trilhas de treinamento vinculadas à sua função, risco e histórico operacional.',
+      'Cada pessoa recebe trilhas vinculadas à sua função, risco e histórico operacional.',
   },
   {
     step: '03',
@@ -37,13 +37,11 @@ const steps = [
 export default function HowItWorks() {
   return (
     <section className="relative overflow-hidden">
-      {/* FUNDO */}
       <div className="absolute inset-0 -z-10 bg-gradient-to-b from-slate-950 via-black to-black" />
       <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_30%_20%,rgba(59,130,246,0.12),transparent_45%)]" />
 
       <SectionBase>
         <div className="max-w-7xl mx-auto px-6 py-32">
-          {/* CABEÇALHO */}
           <div className="max-w-3xl mb-24">
             <span className="inline-block mb-4 px-4 py-1.5 text-xs tracking-wider uppercase rounded-full border border-blue-400/20 text-blue-300 bg-blue-500/5">
               Ciclo operacional
@@ -52,19 +50,16 @@ export default function HowItWorks() {
             <h2 className="text-3xl md:text-4xl font-semibold text-white leading-tight">
               Um ciclo fechado.
               <br />
-              <span className="text-blue-400">
-                Sem atalhos. Sem exceções.
-              </span>
+              <span className="text-blue-400">Sem atalhos. Sem exceções.</span>
             </h2>
 
             <p className="mt-6 text-lg text-slate-300">
-              O JurisFlow não depende de boa vontade, lembretes manuais
-              ou fiscalização informal. O sistema conduz pessoas,
-              mede risco e exige ação de forma automática.
+              O NexoGestao não depende de boa vontade, lembretes manuais ou
+              fiscalização informal. O sistema conduz pessoas, mede risco e exige
+              ação de forma automática.
             </p>
           </div>
 
-          {/* STEPS */}
           <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
             {steps.map(s => (
               <Card

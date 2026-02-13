@@ -18,18 +18,12 @@ export default function CollaboratorLayout() {
       <header className="px-6 py-4">
         <Card className="flex items-center justify-between">
           <div>
-            <h1 className="text-lg font-semibold">
-              JurisFlow
-            </h1>
-            <p className="text-xs text-slate-400">
-              Área do colaborador
-            </p>
+            <h1 className="text-lg font-semibold">NexoGestao</h1>
+            <p className="text-xs text-slate-400">Área do colaborador</p>
           </div>
 
           <div className="text-right">
-            <div className="text-sm font-medium">
-              {loading ? '—' : me?.email}
-            </div>
+            <div className="text-sm font-medium">{loading ? '—' : me?.email}</div>
             <button
               onClick={handleLogout}
               className="text-xs text-slate-400 hover:underline"

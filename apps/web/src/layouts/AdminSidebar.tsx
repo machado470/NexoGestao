@@ -19,9 +19,7 @@ const links = [
 
 export default function AdminSidebar() {
   const { styles } = useTheme()
-  const [stats, setStats] = useState<PeopleStats | null>(
-    null,
-  )
+  const [stats, setStats] = useState<PeopleStats | null>(null)
 
   useEffect(() => {
     getExecutiveReport()
@@ -35,18 +33,10 @@ export default function AdminSidebar() {
     if (!stats) return null
 
     if (label === 'Dashboard' && stats.CRITICAL > 0) {
-      return (
-        <StatusBadge
-          label={`${stats.CRITICAL}`}
-          tone="critical"
-        />
-      )
+      return <StatusBadge label={`${stats.CRITICAL}`} tone="critical" />
     }
 
-    if (
-      label === 'Pessoas' &&
-      (stats.WARNING > 0 || stats.CRITICAL > 0)
-    ) {
+    if (label === 'Pessoas' && (stats.WARNING > 0 || stats.CRITICAL > 0)) {
       return (
         <StatusBadge
           label={`${stats.WARNING + stats.CRITICAL}`}
@@ -70,11 +60,9 @@ export default function AdminSidebar() {
     >
       <div className="px-6 py-6">
         <div className={`text-lg font-semibold ${styles.text}`}>
-          JurisFlow
+          NexoGestao
         </div>
-        <div className="text-xs opacity-60">
-          Gestão de risco jurídico
-        </div>
+        <div className="text-xs opacity-60">Governança operacional</div>
       </div>
 
       <nav className="flex-1 px-3">
@@ -105,9 +93,7 @@ export default function AdminSidebar() {
         </ul>
       </nav>
 
-      <div className="px-6 py-4 text-xs opacity-40">
-        © JurisFlow
-      </div>
+      <div className="px-6 py-4 text-xs opacity-40">© NexoGestao</div>
     </aside>
   )
 }

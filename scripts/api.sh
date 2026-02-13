@@ -2,8 +2,8 @@
 set -euo pipefail
 
 # ============================================================
-# JurisFlow API CLI
-# - Auto-login com cache de token
+# NexoGestao API CLI
+# - Auto-login com cache de token (com exp)
 # - Saída limpa (JSON) por padrão
 # - --raw mostra headers (debug)
 # - publish-latest <slug>: publica a última DRAFT daquele slug
@@ -12,11 +12,11 @@ set -euo pipefail
 
 API_URL="${API_URL:-http://localhost:3000}"
 CACHE_DIR="${CACHE_DIR:-.cache}"
-TOKEN_FILE="${TOKEN_FILE:-$CACHE_DIR/jurisflow.token}"
-AUTH_FILE="${AUTH_FILE:-$CACHE_DIR/jurisflow.auth.json}"
+TOKEN_FILE="${TOKEN_FILE:-$CACHE_DIR/nexogestao.token}"
+AUTH_FILE="${AUTH_FILE:-$CACHE_DIR/nexogestao.auth.json}"
 
-EMAIL="${JURISFLOW_EMAIL:-admin@demo.com}"
-PASSWORD="${JURISFLOW_PASSWORD:-demo}"
+EMAIL="${NX_EMAIL:-admin@demo.com}"
+PASSWORD="${NX_PASSWORD:-demo}"
 
 mkdir -p "$CACHE_DIR"
 
@@ -68,8 +68,8 @@ Flags:
 
 Env:
   API_URL=http://localhost:3000
-  JURISFLOW_EMAIL=admin@demo.com
-  JURISFLOW_PASSWORD=demo
+  NX_EMAIL=admin@demo.com
+  NX_PASSWORD=demo
 
 Dica:
   - "type" do add-item: READING | ACTION | CHECKPOINT
@@ -351,3 +351,4 @@ case "$cmd" in
     exit 1
     ;;
 esac
+

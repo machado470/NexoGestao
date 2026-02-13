@@ -1,85 +1,23 @@
-# JurisFlow — Checklist de Demo
+# NexoGestao — Checklist de Demo
 
-Este checklist garante que a demo do JurisFlow seja objetiva,
-segura e sem improvisos.
+Objetivo: mostrar governança operacional com dados reais (trilhas, execução, risco e auditoria).
 
----
+## Antes da demo
+- [ ] `bash scripts/core/run-project.sh` rodou sem erro
+- [ ] `/health` ok
+- [ ] Login com `admin@demo.com` / `demo` ok
+- [ ] Existe ao menos 1 trilha ACTIVE e 1 DRAFT
+- [ ] Existe ao menos 1 pessoa colaboradora com assignments
+- [ ] Há eventos na timeline/auditoria (não demo “vazia”)
 
-## 1️⃣ Antes da Demo (10 minutos antes)
+## Roteiro (7–10 min)
+- [ ] Mostrar lista de trilhas (/tracks)
+- [ ] Abrir uma trilha (detalhe)
+- [ ] Mostrar itens da trilha (track-items)
+- [ ] Atribuir trilha a uma pessoa (assign)
+- [ ] Executar fluxo do colaborador (start → next-item → complete-item)
+- [ ] Ver risco recalculado (no painel/endpoint correspondente)
+- [ ] Mostrar rastreabilidade (timeline/auditoria)
 
-- [ ] Usuário ADMIN criado
-- [ ] Organização configurada
-- [ ] Pelo menos 3 pessoas cadastradas
-  - 1 ADMIN
-  - 1 GESTOR
-  - 1 COLABORADOR
-- [ ] Pelo menos 2 trilhas criadas
-  - 1 completa
-  - 1 incompleta
-- [ ] Trilhas obrigatórias atribuídas
-- [ ] Pelo menos 1 pessoa em risco CRÍTICO
-
-Objetivo: o sistema precisa “falar sozinho”.
-
----
-
-## 2️⃣ Ordem das Telas (seguir exatamente)
-
-1. `/admin`
-2. `/admin/people`
-3. `/admin/assign-tracks`
-4. `/admin/people-risk`
-
-Não inverter.
-Não pular.
-
----
-
-## 3️⃣ Durante a Demo
-
-- [ ] Não explicar tudo
-- [ ] Deixar silêncio após mostrar risco
-- [ ] Não falar de preço antes do final
-- [ ] Não prometer feature futura
-
-Frases proibidas:
-- “Dá pra adaptar”
-- “Depois a gente vê”
-- “É só um MVP”
-
----
-
-## 4️⃣ Encerramento
-
-Pergunta final obrigatória:
-
-> “Isso resolveria algum problema hoje no seu escritório?”
-
-Depois:
-- ficar em silêncio
-- ouvir
-- anotar
-
----
-
-## 5️⃣ Se houver interesse
-
-- [ ] Apresentar valor do piloto
-- [ ] Mostrar acordo
-- [ ] Definir próximo contato
-
-Nunca fechar na pressão.
-
----
-
-## 6️⃣ Após a Demo
-
-- [ ] Anotar objeções
-- [ ] Anotar frases do cliente
-- [ ] Anotar confusões de uso
-
-Essas informações valem mais que código.
-
----
-
-Checklist concluído = demo profissional.
+## Fechamento
+- [ ] “Governança não se promete. Ela se executa.”

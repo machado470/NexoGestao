@@ -1,41 +1,36 @@
-name: Build API Docker image
+name: api-docker
 
 on:
-  workflow_dispatch:
-    inputs:
-      push:
-        description: 'Push image to GHCR'
-        required: false
-        default: 'false'
+  push:
+    branches: [ "main" ]
 
 jobs:
-  docker-build:
+  build-and-push:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Login to GitHub Container Registry
-        if: github.event.inputs.push == 'true'
+      - name: Login to GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ github.actor }}
+          username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build API image
-        uses: docker/build-push-action@v5
+      - name: Build & push
+        uses: docker/build-push-action@v6
         with:
-          context: apps/api
-          file: apps/api/Dockerfile
-          push: ${{ github.event.inputs.push == 'true' }}
-          tags: ghcr.io/${{ github.repository_owner }}/autoescola-api:latest
-          load: false
-
-      - name: Railway deploy (optional)
-        if: secrets.RAILWAY_TOKEN != ''
-        run: |
-          echo "Railway deploy token detected. Configure deployment steps here."
+          context: .
+          file: Dockerfile
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/nexogestao-api:latest

@@ -1,106 +1,34 @@
-# JurisFlow — Roteiro de Demo (10 minutos)
+# NexoGestao — Roteiro de Demo (10 minutos)
 
-## Objetivo da demo
-Demonstrar como o JurisFlow reduz risco operacional,
-padroniza treinamento e cria evidência de compliance interno.
+## 1) A tese (30s)
+O problema: operação depende de boa vontade, planilha e fiscalização informal.
+O resultado: erro repetido, risco humano invisível e auditoria fraca.
 
-Não é curso.
-É governança.
+O NexoGestao fecha o ciclo: **trilha → execução → evidência → risco → ação corretiva → auditoria**.
 
----
+## 2) Trilhas (2 min)
+- Listar trilhas
+- Abrir uma trilha e mostrar status (DRAFT/ACTIVE)
+- Mostrar versão/slug se existir (pra provar controle)
 
-## 1️⃣ Abertura (1 minuto)
+## 3) Itens e execução (3 min)
+- Listar itens da trilha
+- Atribuir trilha a uma pessoa
+- Rodar a jornada do colaborador:
+  - start
+  - next-item
+  - complete-item
 
-Frase de entrada (exata):
+Ponto-chave: **não existe “terminei mas ninguém viu”**. Tudo gera registro.
 
-“Hoje a maior parte dos erros jurídicos não acontece por má fé,
-mas por falta de padronização e controle interno.
-O JurisFlow resolve exatamente isso.”
+## 4) Risco humano (2 min)
+- Mostrar que risco é recalculado com base em comportamento real
+- Explicar: recorrência + gravidade + atraso + falhas → risco sobe
+- Se houver ações corretivas: mostrar que são geradas quando limites estouram
 
-Pausa. Não explique ainda.
+## 5) Auditoria (2 min)
+- Mostrar eventos registrados (timeline/audit)
+- Falar em defesa operacional: decisões explicáveis, rastreáveis e consistentes
 
----
-
-## 2️⃣ Dashboard Administrativo (2 minutos)
-
-/admin
-
-Explique:
-- “Aqui é o centro de controle do escritório.”
-- “Trilhas representam conhecimento obrigatório.”
-- “O sistema registra tentativas, bloqueios e auditoria.”
-
-Mostre rapidamente:
-- trilhas
-- bloqueio
-- auditoria
-
-Não aprofunde.
-
----
-
-## 3️⃣ Pessoas (2 minutos)
-
-/admin/people
-
-Explique:
-- “Aqui estão as pessoas do escritório.”
-- “Cada uma tem obrigações formais de conhecimento.”
-- “O risco não é subjetivo. É calculado.”
-
-Aponte a coluna **Risco**.
-Não justifique ainda.
-
----
-
-## 4️⃣ Atribuição de Trilhas (2 minutos)
-
-/admin/assign-tracks
-
-Explique:
-- “Aqui o gestor define o que é obrigatório.”
-- “Isso cria responsabilidade clara.”
-- “Não é sugestão. É obrigação registrada.”
-
-Mostre:
-- pessoa
-- trilha
-- obrigatória
-
-Frase-chave:
-“Isso aqui vira prova de treinamento.”
-
----
-
-## 5️⃣ Risco da Equipe (2 minutos)
-
-/admin/people-risk
-
-Explique:
-- “Aqui o sócio vê a situação real do escritório.”
-- “Quem está crítico aparece primeiro.”
-- “Sem achismo.”
-
-Silêncio.
-Deixe a tela falar.
-
----
-
-## 6️⃣ Fechamento (1 minuto)
-
-Frase final (exata):
-
-“O JurisFlow não impede erros,
-mas prova que o escritório fez tudo certo
-para evitá-los.”
-
-Espere a reação.
-Não fale de preço ainda.
-
----
-
-## Pergunta de encerramento
-
-“Isso resolveria algum problema hoje no seu escritório?”
-
-Pare.
+## 6) Fechamento (30s)
+“Governança não se promete. Ela se executa.”

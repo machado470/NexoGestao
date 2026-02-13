@@ -1,5 +1,6 @@
 #!/bin/bash
-echo "🚗 Iniciando frontend AutoEscola-Sim..."
+set -e
+
+echo "🚀 Iniciando frontend NexoGestao..."
 cd apps/web
 pnpm dev --host
-

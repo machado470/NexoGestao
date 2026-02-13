@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
 
 echo ">> Iniciando criação automática da estrutura do Next.js..."
 
@@ -19,7 +19,7 @@ cat << 'EOF' > src/components/ui/Navbar.tsx
 export default function Navbar() {
   return (
     <div className="p-4 bg-neutral-900 text-white font-semibold">
-      AutoEscola-Sim
+      NexoGestao
     </div>
   );
 }
@@ -63,7 +63,7 @@ export default function DashboardPage() {
   return (
     <div>
       <h1 className="text-3xl font-bold mb-2">Dashboard</h1>
-      <p>Bem-vindo ao painel da AutoEscola-Sim.</p>
+      <p>Bem-vindo ao painel do NexoGestao.</p>
     </div>
   );
 }

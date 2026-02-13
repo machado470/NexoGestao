@@ -1,45 +1,82 @@
-# JurisFlow — Risk & Compliance Engine
+# NexoGestao — Governance & Risk Engine
 
-Sistema de gestão de risco humano, treinamento por trilhas e auditoria contínua
-para ambientes profissionais (jurídico, compliance, operações).
+O **NexoGestao** é um motor de governança operacional com trilhas de execução,
+risco humano mensurável e auditoria contínua.
 
-Este projeto evoluiu a partir do AutoEscola-Sim e hoje funciona como um
-motor genérico de avaliação, risco e ações corretivas.
+Ele existe para transformar “processo no PowerPoint” em mecanismo rodando de verdade.
 
----
-
-## 🧠 O que o sistema faz
-
-- Gerencia **pessoas** (Person / User)
-- Atribui **trilhas de treinamento** (Tracks)
-- Avalia desempenho por **assignments e assessments**
-- Calcula **risco agregado**
-- Registra **eventos e auditoria**
-- Cria e acompanha **ações corretivas**
-- Gera **relatórios de risco**
-
-
-## 🧩 Arquitetura
-
-### Backend (NestJS + Prisma)
-- Persons / People
-- Assignments / Assessments
-- Risk Engine
-- Audit & Events
-- Corrective Actions
-- Reports
-
-### Frontend (React)
-- Admin Dashboard
-- Gestão de Pessoas
-- Trilhas
-- Auditoria
-- Relatórios
+Governança não é discurso.  
+É execução rastreável.
 
 ---
 
-## ▶️ Execução (desenvolvimento)
+## 🎯 Propósito
+
+Organizações falham não por falta de regras,
+mas por falta de execução consistente.
+
+O NexoGestao fecha o ciclo:
+
+trilha → execução → evidência → risco → ação corretiva → auditoria
+
+Sem planilha paralela.  
+Sem controle informal.  
+Sem “ninguém viu”.
+
+---
+
+## 🧠 Conceitos Centrais
+
+### Pessoas e papéis
+Cada usuário opera dentro de um contexto organizacional definido.  
+Permissões não são decorativas.
+
+### Trilhas de execução
+Conteúdos, rotinas e validações atribuídas conforme função, risco e histórico.
+
+### Execução registrada
+Nada avança sem evidência.  
+Cada item gera registro.
+
+### Risco humano
+Recalculado automaticamente com base em:
+- recorrência
+- gravidade
+- atrasos
+- falhas
+
+Risco não é opinião.
+
+### Ações corretivas
+Quando limites são ultrapassados, o sistema gera ações obrigatórias.
+
+Governança que não age vira relatório.
+
+### Auditoria contínua
+Linha do tempo defensável de decisões, execuções e eventos críticos.
+
+---
+
+## 🏗 Arquitetura
+
+Monorepo com:
+
+- `apps/api` → NestJS + Prisma + PostgreSQL
+- `apps/web` → React + Vite + Tailwind
+- Docker Compose (API + Postgres)
+- Seeds idempotentes
+- Jobs idempotentes
+- Backend como autoridade
+
+Princípio inegociável:
+
+> Nada de dados fake para demo.
+
+---
+
+## 🚀 Rodar localmente
+
+### 1. Instalar dependências
 
 ```bash
-pnpm dev:api
-pnpm dev:web
+pnpm install

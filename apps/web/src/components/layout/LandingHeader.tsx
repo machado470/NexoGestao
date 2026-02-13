@@ -14,11 +14,8 @@ export default function LandingHeader() {
       `}
     >
       <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-        <Link
-          to="/"
-          className={`font-semibold ${styles.textPrimary}`}
-        >
-          JurisFlow
+        <Link to="/" className={`font-semibold ${styles.textPrimary}`}>
+          NexoGestao
         </Link>
 
         <div className="flex items-center gap-3">

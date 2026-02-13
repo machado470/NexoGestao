@@ -8,9 +8,9 @@ const modules = [
       'Gestão clara de pessoas, papéis e responsabilidades. Cada usuário opera dentro de um contexto organizacional definido.',
   },
   {
-    title: 'Trilhas de treinamento',
+    title: 'Trilhas de execução',
     description:
-      'Conteúdos e avaliações atribuídos conforme função, risco e histórico. O aprendizado deixa de ser genérico.',
+      'Conteúdos, rotinas e validações atribuídos conforme função, risco e histórico. O padrão deixa de ser “cada um faz do seu jeito”.',
   },
   {
     title: 'Avaliações',
@@ -37,13 +37,11 @@ const modules = [
 export default function Modules() {
   return (
     <section className="relative overflow-hidden">
-      {/* FUNDO */}
       <div className="absolute inset-0 -z-10 bg-gradient-to-b from-black via-slate-950 to-slate-950" />
       <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_60%_30%,rgba(59,130,246,0.12),transparent_45%)]" />
 
       <SectionBase>
         <div className="max-w-7xl mx-auto px-6 py-32">
-          {/* CABEÇALHO */}
           <div className="max-w-3xl mb-24">
             <span className="inline-block mb-4 px-4 py-1.5 text-xs tracking-wider uppercase rounded-full border border-blue-400/20 text-blue-300 bg-blue-500/5">
               Estrutura do sistema
@@ -52,19 +50,16 @@ export default function Modules() {
             <h2 className="text-3xl md:text-4xl font-semibold text-white leading-tight">
               Um sistema completo.
               <br />
-              <span className="text-blue-400">
-                Sem módulos soltos ou decorativos.
-              </span>
+              <span className="text-blue-400">Sem módulos decorativos.</span>
             </h2>
 
             <p className="mt-6 text-lg text-slate-300">
-              Cada módulo do JurisFlow existe para sustentar decisões
-              reais, reduzir risco humano e garantir governança
-              contínua — sem dependência de controles paralelos.
+              Cada módulo do NexoGestao existe para sustentar decisões reais,
+              reduzir risco humano e garantir governança contínua — sem depender
+              de controles paralelos.
             </p>
           </div>
 
-          {/* GRID DE MÓDULOS */}
           <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
             {modules.map(m => (
               <Card

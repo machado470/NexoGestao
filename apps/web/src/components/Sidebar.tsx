@@ -13,7 +13,7 @@ const items = [
 export default function Sidebar() {
   return (
     <aside className="w-64 border-r border-slate-800 bg-slate-900">
-      <div className="p-6 font-bold text-lg">JurisFlow</div>
+      <div className="p-6 font-bold text-lg">NexoGestao</div>
 
       <nav className="px-4 space-y-1">
         {items.map(item => (
@@ -36,3 +36,4 @@ export default function Sidebar() {
     </aside>
   )
 }
+
