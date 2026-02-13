@@ -7,6 +7,7 @@ import Card from '../../components/base/Card'
 
 import { getMe } from '../../services/me'
 import { submitAssessment } from '../../services/assessments'
+import { useTheme } from '../../theme/useTheme'
 
 type Assignment = {
   id: string
@@ -16,43 +17,48 @@ type Assignment = {
   }
 }
 
+type MeResponse = {
+  assignments: Assignment[]
+}
+
 export default function AssessmentPage() {
+  const { styles } = useTheme()
   const { assignmentId } = useParams()
   const navigate = useNavigate()
 
   const [loading, setLoading] = useState(true)
-  const [assignment, setAssignment] =
-    useState<Assignment | null>(null)
+  const [assignment, setAssignment] = useState<Assignment | null>(null)
   const [score, setScore] = useState<number>(0)
   const [submitting, setSubmitting] = useState(false)
 
-  async function load() {
-    const data = await getMe()
-
-    const found = data.assignments.find(
-      (a: any) => a.id === assignmentId,
-    )
-
-    if (!found || found.status !== 'IN_PROGRESS') {
+  useEffect(() => {
+    if (!assignmentId) {
       navigate('/app', { replace: true })
       return
     }
 
-    setAssignment(found)
-    setLoading(false)
-  }
+    getMe()
+      .then((data: MeResponse) => {
+        const found = data.assignments.find(a => a.id === assignmentId)
 
-  useEffect(() => {
-    load()
-  }, [])
+        if (!found || found.status !== 'IN_PROGRESS') {
+          navigate('/app', { replace: true })
+          return
+        }
+
+        setAssignment(found)
+      })
+      .finally(() => setLoading(false))
+  }, [assignmentId, navigate])
 
   async function handleSubmit() {
+    if (!assignment) return
     if (score < 0 || score > 100) return
 
     setSubmitting(true)
 
     await submitAssessment({
-      assignmentId: assignment!.id,
+      assignmentId: assignment.id,
       score,
     })
 
@@ -62,9 +68,7 @@ export default function AssessmentPage() {
   if (loading || !assignment) {
     return (
       <CollaboratorShell>
-        <p className="text-sm opacity-60">
-          Carregando…
-        </p>
+        <p className={`text-sm ${styles.textMuted}`}>Carregando…</p>
       </CollaboratorShell>
     )
   }
@@ -87,20 +91,16 @@ export default function AssessmentPage() {
             min={0}
             max={100}
             value={score}
-            onChange={e =>
-              setScore(Number(e.target.value))
-            }
+            onChange={e => setScore(Number(e.target.value))}
             className="w-full px-3 py-2 rounded bg-white/10 border border-white/20"
           />
 
           <button
             disabled={submitting}
             onClick={handleSubmit}
-            className="w-full py-2 rounded bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50"
+            className={`w-full py-2 rounded disabled:opacity-50 ${styles.buttonPrimary}`}
           >
-            {submitting
-              ? 'Enviando…'
-              : 'Enviar avaliação'}
+            {submitting ? 'Enviando…' : 'Enviar avaliação'}
           </button>
         </div>
       </Card>

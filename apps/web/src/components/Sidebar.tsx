@@ -1,39 +1,32 @@
 import { NavLink } from 'react-router-dom'
+import { useTheme } from '../theme/useTheme'
 
-const items = [
-  { label: 'Visão Geral', to: '/admin' },
-  { label: 'Pessoas', to: '/admin/persons' },
-  { label: 'Pendências', to: '/admin/pending' },
-  // próximas evoluções naturais:
-  // { label: 'Trilhas', to: '/admin/tracks' },
-  // { label: 'Avaliações', to: '/admin/assessments' },
-  // { label: 'Ações Corretivas', to: '/admin/actions' },
-]
+type Item = {
+  label: string
+  to: string
+}
 
-export default function Sidebar() {
+export default function Sidebar({ items = [] }: { items?: Item[] }) {
+  const { styles } = useTheme()
+
   return (
-    <aside className="w-64 border-r border-slate-800 bg-slate-900">
-      <div className="p-6 font-bold text-lg">NexoGestao</div>
-
-      <nav className="px-4 space-y-1">
-        {items.map(item => (
+    <aside className={`rounded border ${styles.cardBorder} ${styles.cardBg} p-3`}>
+      <nav className="space-y-1">
+        {items.map(i => (
           <NavLink
-            key={item.to}
-            to={item.to}
-            end
+            key={i.to}
+            to={i.to}
             className={({ isActive }) =>
-              `block rounded px-4 py-2 text-sm ${
-                isActive
-                  ? 'bg-blue-600 text-white'
-                  : 'text-slate-300 hover:bg-slate-800'
-              }`
+              [
+                'block text-sm px-3 py-2 rounded',
+                isActive ? styles.buttonPrimary : 'opacity-80 hover:opacity-100',
+              ].join(' ')
             }
           >
-            {item.label}
+            {i.label}
           </NavLink>
         ))}
       </nav>
     </aside>
   )
 }
-

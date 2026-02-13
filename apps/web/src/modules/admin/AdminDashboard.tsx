@@ -5,9 +5,11 @@ import PageHeader from '../../components/base/PageHeader'
 import StatusBadge from '../../components/base/StatusBadge'
 
 import { useExecutiveDashboard } from '../../hooks/useExecutiveDashboard'
+import { useTheme } from '../../theme/useTheme'
 
 export default function AdminDashboard() {
   const navigate = useNavigate()
+  const { styles } = useTheme()
 
   const {
     loading,
@@ -47,23 +49,20 @@ export default function AdminDashboard() {
             </div>
 
             <p className="text-sm opacity-70">
-              Nenhuma pessoa está cadastrada.
-              Sem pessoas, o sistema não executa
-              trilhas, não avalia risco e não
-              produz decisões institucionais.
+              Nenhuma pessoa está cadastrada. Sem pessoas, o
+              sistema não executa trilhas, não avalia risco e
+              não produz decisões institucionais.
             </p>
 
             <p className="text-sm opacity-70">
-              O primeiro passo é cadastrar as
-              pessoas da organização.
+              O primeiro passo é cadastrar as pessoas da
+              organização.
             </p>
 
             <div className="pt-2">
               <button
-                onClick={() =>
-                  navigate('/admin/pessoas/nova')
-                }
-                className="rounded bg-blue-600 px-4 py-2 text-sm text-white"
+                onClick={() => navigate('/admin/pessoas/nova')}
+                className={`rounded px-4 py-2 text-sm ${styles.buttonPrimary}`}
               >
                 Cadastrar primeira pessoa
               </button>
@@ -142,27 +141,21 @@ export default function AdminDashboard() {
       {/* Indicadores */}
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
-          <div className="text-sm opacity-60">
-            Pessoas OK
-          </div>
+          <div className="text-sm opacity-60">Pessoas OK</div>
           <div className="text-2xl font-semibold">
             {peopleStats.OK}
           </div>
         </Card>
 
         <Card>
-          <div className="text-sm opacity-60">
-            Atenção
-          </div>
+          <div className="text-sm opacity-60">Atenção</div>
           <div className="text-2xl font-semibold">
             {warningCount}
           </div>
         </Card>
 
         <Card>
-          <div className="text-sm opacity-60">
-            Críticos
-          </div>
+          <div className="text-sm opacity-60">Críticos</div>
           <div className="text-2xl font-semibold text-rose-400">
             {criticalCount}
           </div>
@@ -186,8 +179,7 @@ export default function AdminDashboard() {
 
         {criticalPeople.length === 0 ? (
           <p className="text-sm opacity-70">
-            Nenhuma pessoa em estado crítico no
-            momento.
+            Nenhuma pessoa em estado crítico no momento.
           </p>
         ) : (
           <ul className="space-y-2 text-sm">

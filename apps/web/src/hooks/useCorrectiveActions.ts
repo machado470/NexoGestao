@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
-import { getCorrectiveActionsByPerson } from '../services/correctiveActions'
+import {
+  getCorrectiveActionsByPerson,
+  type CorrectiveAction,
+} from '../services/correctiveActions'
 
 export function useCorrectiveActions(personId?: string) {
-  const [actions, setActions] = useState<any[]>([])
+  const [actions, setActions] = useState<CorrectiveAction[]>([])
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(() => {
@@ -24,4 +27,3 @@ export function useCorrectiveActions(personId?: string) {
     reload: load,
   }
 }
-

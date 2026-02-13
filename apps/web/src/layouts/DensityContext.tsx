@@ -1,16 +1,11 @@
-import { createContext, useContext, useState } from 'react'
-
-export type Density = 'compact' | 'comfortable' | 'expanded'
-
-const DensityContext = createContext<{
-  density: Density
-  setDensity: (d: Density) => void
-} | null>(null)
+import type { ReactNode } from 'react'
+import { useState } from 'react'
+import { DensityContext, type Density } from './densityContext'
 
 export function DensityProvider({
   children,
 }: {
-  children: React.ReactNode
+  children: ReactNode
 }) {
   const [density, setDensity] = useState<Density>('comfortable')
 
@@ -19,12 +14,4 @@ export function DensityProvider({
       {children}
     </DensityContext.Provider>
   )
-}
-
-export function useDensity() {
-  const ctx = useContext(DensityContext)
-  if (!ctx) {
-    throw new Error('useDensity must be used inside DensityProvider')
-  }
-  return ctx
 }

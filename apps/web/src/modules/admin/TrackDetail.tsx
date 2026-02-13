@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 
 import PageHeader from '../../components/base/PageHeader'
@@ -26,23 +26,22 @@ export default function TrackDetailPage() {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
 
-  async function load() {
+  const load = useCallback(async () => {
     if (!id) return
 
-    const [trackData, itemsData] =
-      await Promise.all([
-        getTrack(id),
-        listTrackItems(id),
-      ])
+    const [trackData, itemsData] = await Promise.all([
+      getTrack(id),
+      listTrackItems(id),
+    ])
 
     setTrack(trackData)
     setItems(itemsData)
     setLoading(false)
-  }
+  }, [id])
 
   useEffect(() => {
     load()
-  }, [id])
+  }, [load])
 
   function confirmAction(message: string) {
     return window.confirm(message)
@@ -146,9 +145,7 @@ export default function TrackDetailPage() {
 
               {isDraft && (
                 <button
-                  onClick={() =>
-                    handleRemoveItem(i.id)
-                  }
+                  onClick={() => handleRemoveItem(i.id)}
                   className="text-xs px-2 py-1 rounded bg-rose-600 text-white"
                 >
                   Remover

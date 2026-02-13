@@ -9,6 +9,7 @@ import CollaboratorShell from '../../layouts/CollaboratorShell'
 
 import { getMe } from '../../services/me'
 import { startAssignment } from '../../services/assignments'
+import { useTheme } from '../../theme/ThemeProvider'
 
 type OperationalState = 'NORMAL' | 'RESTRICTED' | 'SUSPENDED'
 
@@ -29,6 +30,7 @@ type Assignment = {
 
 export default function CollaboratorDashboard() {
   const navigate = useNavigate()
+  const { styles } = useTheme()
 
   const [loading, setLoading] = useState(true)
   const [assignments, setAssignments] = useState<Assignment[]>([])
@@ -50,7 +52,7 @@ export default function CollaboratorDashboard() {
   if (loading) {
     return (
       <CollaboratorShell>
-        <p className="text-sm opacity-60">Carregando…</p>
+        <p className={`text-sm ${styles.textMuted}`}>Carregando…</p>
       </CollaboratorShell>
     )
   }
@@ -59,21 +61,18 @@ export default function CollaboratorDashboard() {
 
   return (
     <CollaboratorShell>
-      <PageHeader
-        title="Meu painel"
-        description="Suas trilhas e estado operacional"
-      />
+      <PageHeader title="Meu painel" description="Suas trilhas e estado operacional" />
 
       {/* 🧠 ESTADO OPERACIONAL */}
       <Card className="mb-4">
         <div className="flex items-center justify-between">
           <div>
-            <span className="text-sm opacity-60 block">
+            <span className={`text-sm block ${styles.textMuted}`}>
               Estado operacional
             </span>
 
             {operational.reason && (
-              <span className="text-xs opacity-50">
+              <span className={`text-xs ${styles.textMuted} opacity-80`}>
                 {operational.reason}
               </span>
             )}
@@ -95,10 +94,8 @@ export default function CollaboratorDashboard() {
       {/* 🕒 ACESSO À TIMELINE */}
       <div className="mb-6">
         <button
-          onClick={() =>
-            navigate('/collaborator/timeline')
-          }
-          className="text-xs text-blue-400 hover:text-blue-300 underline"
+          onClick={() => navigate('/collaborator/timeline')}
+          className={`text-xs underline ${styles.accent} opacity-90 hover:opacity-100`}
         >
           Ver histórico de ações
         </button>
@@ -111,7 +108,7 @@ export default function CollaboratorDashboard() {
         </h3>
 
         {assignments.length === 0 && (
-          <p className="text-sm opacity-50">
+          <p className={`text-sm ${styles.textMuted} opacity-80`}>
             Nenhuma trilha atribuída no momento.
           </p>
         )}
@@ -119,17 +116,13 @@ export default function CollaboratorDashboard() {
         {assignments.map(a => (
           <Card key={a.id}>
             <div className="flex items-center justify-between mb-2">
-              <span className="font-medium">
-                {a.track.title}
-              </span>
-              <span className="text-xs opacity-60">
-                {a.progress}%
-              </span>
+              <span className="font-medium">{a.track.title}</span>
+              <span className={`text-xs ${styles.textMuted}`}>{a.progress}%</span>
             </div>
 
             <div className="w-full h-2 bg-white/10 rounded overflow-hidden mb-3">
               <div
-                className="h-2 bg-blue-400 transition-all"
+                className="h-2 bg-[#F97316] transition-all"
                 style={{ width: `${a.progress}%` }}
               />
             </div>
@@ -140,7 +133,7 @@ export default function CollaboratorDashboard() {
                   await startAssignment(a.id)
                   load()
                 }}
-                className="text-xs px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-500"
+                className={`text-xs px-3 py-1 rounded ${styles.buttonPrimary}`}
               >
                 Iniciar trilha
               </button>
@@ -148,11 +141,7 @@ export default function CollaboratorDashboard() {
 
             {a.status === 'IN_PROGRESS' && canAct && (
               <button
-                onClick={() =>
-                  navigate(
-                    `/collaborator/assessment/${a.id}`,
-                  )
-                }
+                onClick={() => navigate(`/collaborator/assessment/${a.id}`)}
                 className="text-xs px-3 py-1 rounded bg-amber-600 text-white hover:bg-amber-500"
               >
                 Realizar avaliação
@@ -166,9 +155,7 @@ export default function CollaboratorDashboard() {
             )}
 
             {a.status === 'COMPLETED' && (
-              <p className="text-xs text-green-400">
-                Trilha concluída
-              </p>
+              <p className="text-xs text-green-400">Trilha concluída</p>
             )}
           </Card>
         ))}

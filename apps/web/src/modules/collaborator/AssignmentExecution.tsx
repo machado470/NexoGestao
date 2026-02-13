@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import api from '../../services/api'
 
@@ -24,12 +24,10 @@ export default function AssignmentExecution() {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
 
-  async function loadNext() {
+  const loadNext = useCallback(async () => {
     if (!id) return
 
-    const { data } = await api.get(
-      `/assignments/${id}/next-item`,
-    )
+    const { data } = await api.get(`/assignments/${id}/next-item`)
 
     if (!data) {
       navigate('/collaborator')
@@ -38,13 +36,13 @@ export default function AssignmentExecution() {
 
     setItem(data)
     setLoading(false)
-  }
+  }, [id, navigate])
 
-  async function start() {
+  const start = useCallback(async () => {
     if (!id) return
     await api.post(`/assignments/${id}/start`)
     await loadNext()
-  }
+  }, [id, loadNext])
 
   async function completeItem() {
     if (!id || !item) return
@@ -68,7 +66,7 @@ export default function AssignmentExecution() {
 
   useEffect(() => {
     start()
-  }, [id])
+  }, [start])
 
   if (loading || !item) {
     return (
@@ -94,22 +92,19 @@ export default function AssignmentExecution() {
         <div className="mt-6 space-y-4">
           {item.type === 'READING' && (
             <div className="text-sm leading-relaxed opacity-80">
-              {item.content ??
-                'Conteúdo de leitura não informado.'}
+              {item.content ?? 'Conteúdo de leitura não informado.'}
             </div>
           )}
 
           {item.type === 'ACTION' && (
             <div className="text-sm opacity-80">
-              Execute a ação descrita e confirme
-              quando finalizar.
+              Execute a ação descrita e confirme quando finalizar.
             </div>
           )}
 
           {item.type === 'CHECKPOINT' && (
             <div className="text-sm opacity-80">
-              Confirme que você compreendeu e
-              concluiu este ponto.
+              Confirme que você compreendeu e concluiu este ponto.
             </div>
           )}
 

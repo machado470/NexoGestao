@@ -4,7 +4,7 @@ export default function Footer() {
   return (
     <footer className="relative overflow-hidden">
       <div className="absolute inset-0 -z-10 bg-black" />
-      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_30%_0%,rgba(59,130,246,0.08),transparent_45%)]" />
+      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_30%_0%,rgba(249,115,22,0.08),transparent_45%)]" />
 
       <div className="max-w-7xl mx-auto px-6 py-16">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-10">
@@ -17,10 +17,7 @@ export default function Footer() {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-6 text-sm">
-            <Link
-              to="/login"
-              className="text-slate-300 hover:text-white transition"
-            >
+            <Link to="/login" className="text-slate-300 hover:text-white transition">
               Entrar no sistema
             </Link>
 

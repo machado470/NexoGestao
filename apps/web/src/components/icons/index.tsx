@@ -1,6 +1,11 @@
+import type { SVGProps } from 'react'
 import IconBase from '../base/IconBase'
 
-export function CheckIcon(props: any) {
+type IconProps = SVGProps<SVGSVGElement> & {
+  size?: number
+}
+
+export function CheckIcon(props: IconProps) {
   return (
     <IconBase {...props}>
       <path d="M20 6L9 17l-5-5" />
@@ -8,7 +13,7 @@ export function CheckIcon(props: any) {
   )
 }
 
-export function TrendUpIcon(props: any) {
+export function TrendUpIcon(props: IconProps) {
   return (
     <IconBase {...props}>
       <polyline points="3 17 9 11 13 15 21 7" />
@@ -17,7 +22,7 @@ export function TrendUpIcon(props: any) {
   )
 }
 
-export function ShieldIcon(props: any) {
+export function ShieldIcon(props: IconProps) {
   return (
     <IconBase {...props}>
       <path d="M12 2l7 4v6c0 5-3.5 9-7 10-3.5-1-7-5-7-10V6l7-4z" />
@@ -25,7 +30,7 @@ export function ShieldIcon(props: any) {
   )
 }
 
-export function AlertIcon(props: any) {
+export function AlertIcon(props: IconProps) {
   return (
     <IconBase {...props}>
       <path d="M12 9v4" />
@@ -35,7 +40,7 @@ export function AlertIcon(props: any) {
   )
 }
 
-export function ArrowRightIcon(props: any) {
+export function ArrowRightIcon(props: IconProps) {
   return (
     <IconBase {...props}>
       <line x1="5" y1="12" x2="19" y2="12" />

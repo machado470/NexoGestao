@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { useTheme } from '../../theme/ThemeProvider'
 
 export default function FeatureCard({
   icon,
@@ -11,6 +12,8 @@ export default function FeatureCard({
   title: string
   children: ReactNode
 }) {
+  const { styles } = useTheme()
+
   return (
     <div
       className="
@@ -30,7 +33,7 @@ export default function FeatureCard({
           pointer-events-none
           absolute inset-0
           rounded-2xl
-          bg-[radial-gradient(circle_at_25%_15%,rgba(59,130,246,0.22),transparent_55%)]
+          bg-[radial-gradient(circle_at_25%_15%,rgba(249,115,22,0.22),transparent_55%)]
           opacity-0
           group-hover:opacity-100
           transition-opacity duration-300
@@ -40,18 +43,18 @@ export default function FeatureCard({
       <div className="relative z-10 flex flex-col gap-5">
         <div className="flex items-center gap-4">
           <div
-            className="
+            className={`
               w-12 h-12
-              text-blue-400
+              ${styles.accent}
               transition-transform duration-300
               group-hover:scale-110
-            "
+            `}
           >
             {icon}
           </div>
 
           {eyebrow && (
-            <span className="text-xs uppercase tracking-wider text-blue-300">
+            <span className={`text-xs uppercase tracking-wider ${styles.textMuted}`}>
               {eyebrow}
             </span>
           )}

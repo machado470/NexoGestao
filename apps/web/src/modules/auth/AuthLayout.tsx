@@ -1,39 +1,43 @@
 import type { ReactNode } from 'react'
+import { useTheme } from '../../theme/useTheme'
 
 export default function AuthLayout({
   children,
 }: {
   children: ReactNode
 }) {
+  const { styles } = useTheme()
+
   return (
     <div
-      className="
-      min-h-screen
-      flex items-center justify-center
-      bg-gradient-to-br
-      from-[#0B1E33]
-      via-[#081A2D]
-      to-[#050F1C]
-      px-6
-    "
+      className={`
+        min-h-screen
+        flex items-center justify-center
+        px-6
+        ${styles.background}
+        ${styles.textPrimary}
+      `}
     >
       <div className="w-full max-w-5xl grid md:grid-cols-2 gap-12 items-center">
-        <div className="hidden md:block text-slate-200">
-          <h1 className="text-4xl font-semibold leading-tight">NexoGestao</h1>
-          <p className="mt-4 text-slate-400 max-w-md">
-            Governança operacional com trilhas, risco humano e auditoria para
-            times que precisam operar com dados reais.
+        <div className={`hidden md:block ${styles.textPrimary}`}>
+          <h1 className="text-4xl font-semibold leading-tight">
+            NexoGestao
+          </h1>
+
+          <p className={`mt-4 max-w-md ${styles.textMuted}`}>
+            Governança operacional com trilhas, risco humano e auditoria
+            para times que precisam operar com dados reais.
           </p>
         </div>
 
         <div
-          className="
-          bg-white/5
-          backdrop-blur
-          border border-white/10
-          rounded-2xl
-          p-8
-        "
+          className={`
+            rounded-2xl
+            border
+            p-8
+            ${styles.surface}
+            ${styles.border}
+          `}
         >
           {children}
         </div>

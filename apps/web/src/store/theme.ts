@@ -1,7 +1,14 @@
-import { create } from "zustand";
+import { create } from 'zustand'
 
-export const useThemeStore = create((set) => ({
-  theme: "light",
+type ThemeMode = 'light' | 'dark'
+
+type ThemeState = {
+  theme: ThemeMode
+  toggle: () => void
+}
+
+export const useThemeStore = create<ThemeState>(set => ({
+  theme: 'light',
   toggle: () =>
-    set((s: any) => ({ theme: s.theme === "light" ? "dark" : "light" })),
-}));
+    set(s => ({ theme: s.theme === 'light' ? 'dark' : 'light' })),
+}))

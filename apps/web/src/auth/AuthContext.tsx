@@ -1,16 +1,6 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import api from '../services/api'
-
-interface AuthContextType {
-  isAuthenticated: boolean
-  loading: boolean
-  login: (email: string, password: string) => Promise<boolean>
-  logout: () => void
-}
-
-const AuthContext = createContext<AuthContextType>(
-  {} as AuthContextType,
-)
+import { AuthContext } from './authContext'
 
 export function AuthProvider({
   children,
@@ -64,8 +54,3 @@ export function AuthProvider({
     </AuthContext.Provider>
   )
 }
-
-export function useAuth() {
-  return useContext(AuthContext)
-}
-

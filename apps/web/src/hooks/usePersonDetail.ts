@@ -1,24 +1,58 @@
 import { useEffect, useState } from 'react'
 import api from '../services/api'
 
+export type PersonDetail = {
+  id: string
+  name: string
+  department?: string | null
+  status: string
+}
+
+type State = {
+  person: PersonDetail | null
+  loading: boolean
+  error: string | null
+}
+
 export function usePersonDetail(personId?: string) {
-  const [person, setPerson] = useState<any>(null)
-  const [audit, setAudit] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const [state, setState] = useState<State>({
+    person: null,
+    loading: true,
+    error: null,
+  })
 
   useEffect(() => {
-    if (!personId) return
+    if (!personId) {
+      setState({ person: null, loading: false, error: null })
+      return
+    }
 
-    Promise.all([
-      api.get(`/people/${personId}`),
-      api.get(`/audit?personId=${personId}`),
-    ])
-      .then(([personRes, auditRes]) => {
-        setPerson(personRes.data)
-        setAudit(auditRes.data)
+    let alive = true
+
+    api
+      .get(`/people/${personId}`)
+      .then(res => {
+        if (!alive) return
+        setState({ person: res.data, loading: false, error: null })
       })
-      .finally(() => setLoading(false))
+      .catch(err => {
+        if (!alive) return
+        setState({
+          person: null,
+          loading: false,
+          error:
+            err?.response?.data?.error?.message ??
+            err?.message ??
+            'Erro ao carregar pessoa',
+        })
+      })
+
+    return () => {
+      alive = false
+    }
   }, [personId])
 
-  return { person, audit, loading }
+  return state
 }
+
+export default usePersonDetail

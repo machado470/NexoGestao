@@ -1,5 +1,6 @@
 import Card from '../../components/base/Card'
 import SectionBase from '../../components/layout/SectionBase'
+import { useTheme } from '../../theme/ThemeProvider'
 
 const modules = [
   {
@@ -35,22 +36,31 @@ const modules = [
 ]
 
 export default function Modules() {
+  const { styles } = useTheme()
+
   return (
     <section className="relative overflow-hidden">
       <div className="absolute inset-0 -z-10 bg-gradient-to-b from-black via-slate-950 to-slate-950" />
-      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_60%_30%,rgba(59,130,246,0.12),transparent_45%)]" />
+      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_60%_30%,rgba(249,115,22,0.12),transparent_45%)]" />
 
       <SectionBase>
         <div className="max-w-7xl mx-auto px-6 py-32">
           <div className="max-w-3xl mb-24">
-            <span className="inline-block mb-4 px-4 py-1.5 text-xs tracking-wider uppercase rounded-full border border-blue-400/20 text-blue-300 bg-blue-500/5">
+            <span
+              className={`
+                inline-block mb-4 px-4 py-1.5 text-xs tracking-wider uppercase rounded-full
+                ${styles.border}
+                ${styles.textMuted}
+                ${styles.surface}
+              `}
+            >
               Estrutura do sistema
             </span>
 
             <h2 className="text-3xl md:text-4xl font-semibold text-white leading-tight">
               Um sistema completo.
               <br />
-              <span className="text-blue-400">Sem módulos decorativos.</span>
+              <span className="text-[#F97316]">Sem módulos decorativos.</span>
             </h2>
 
             <p className="mt-6 text-lg text-slate-300">
@@ -82,7 +92,7 @@ export default function Modules() {
                   {m.description}
                 </p>
 
-                <div className="absolute inset-0 pointer-events-none rounded-2xl bg-blue-500/5 opacity-0 hover:opacity-100 transition" />
+                <div className="absolute inset-0 pointer-events-none rounded-2xl bg-[#F97316]/5 opacity-0 hover:opacity-100 transition" />
               </Card>
             ))}
           </div>

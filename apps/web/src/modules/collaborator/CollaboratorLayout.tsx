@@ -1,42 +1,35 @@
 import { Outlet, useNavigate } from 'react-router-dom'
-import { useAuth } from '../../auth/AuthContext'
-import { useMe } from '../../hooks/useMe'
-import Card from '../../components/base/Card'
+import { useAuth } from '../../auth/useAuth'
+import { useTheme } from '../../theme/useTheme'
 
 export default function CollaboratorLayout() {
+  const { styles } = useTheme()
   const { logout } = useAuth()
-  const { me, loading } = useMe()
   const navigate = useNavigate()
 
   function handleLogout() {
     logout()
-    navigate('/')
+    navigate('/login', { replace: true })
   }
 
   return (
-    <div className="min-h-screen">
-      <header className="px-6 py-4">
-        <Card className="flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-semibold">NexoGestao</h1>
-            <p className="text-xs text-slate-400">Área do colaborador</p>
-          </div>
+    <div className={`min-h-screen ${styles.background} ${styles.textPrimary}`}>
+      <div className="max-w-5xl mx-auto px-4 py-6">
+        <div className="flex items-center justify-between">
+          <div className="text-lg font-semibold">Colaborador</div>
 
-          <div className="text-right">
-            <div className="text-sm font-medium">{loading ? '—' : me?.email}</div>
-            <button
-              onClick={handleLogout}
-              className="text-xs text-slate-400 hover:underline"
-            >
-              Sair
-            </button>
-          </div>
-        </Card>
-      </header>
+          <button
+            onClick={handleLogout}
+            className={`text-xs rounded px-3 py-1 ${styles.buttonPrimary}`}
+          >
+            Sair
+          </button>
+        </div>
 
-      <main className="px-6 pb-10 max-w-5xl mx-auto">
-        <Outlet />
-      </main>
+        <div className="mt-6">
+          <Outlet />
+        </div>
+      </div>
     </div>
   )
 }

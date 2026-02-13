@@ -15,9 +15,11 @@ import {
 } from '../../services/tracks'
 
 import { useExecutiveDashboard } from '../../hooks/useExecutiveDashboard'
+import { useTheme } from '../../theme/ThemeProvider'
 
 export default function TracksPage() {
   const navigate = useNavigate()
+  const { styles } = useTheme()
 
   const [tracks, setTracks] = useState<TrackListItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -63,9 +65,7 @@ export default function TracksPage() {
     return (
       <SectionBase>
         <PageHeader title="Trilhas" />
-        <p className="mt-6 text-slate-400">
-          Carregando trilhas…
-        </p>
+        <p className="mt-6 text-slate-400">Carregando trilhas…</p>
       </SectionBase>
     )
   }
@@ -81,19 +81,15 @@ export default function TracksPage() {
       {!hasPeople && (
         <Card className="mt-6">
           <div className="space-y-2 max-w-xl">
-            <div className="font-medium">
-              Governança incompleta
-            </div>
+            <div className="font-medium">Governança incompleta</div>
 
             <p className="text-sm opacity-70">
-              Trilhas só produzem efeito quando
-              existem pessoas vinculadas.
+              Trilhas só produzem efeito quando existem pessoas vinculadas.
             </p>
 
             <p className="text-sm opacity-70">
-              Você pode criar e estruturar trilhas,
-              mas nenhuma execução ocorrerá até
-              que pessoas sejam cadastradas.
+              Você pode criar e estruturar trilhas, mas nenhuma execução ocorrerá
+              até que pessoas sejam cadastradas.
             </p>
           </div>
         </Card>
@@ -120,7 +116,7 @@ export default function TracksPage() {
         <button
           onClick={handleCreate}
           disabled={creating}
-          className="self-start rounded bg-blue-600 px-4 py-2 text-sm text-white disabled:opacity-50"
+          className={`self-start rounded px-4 py-2 text-sm disabled:opacity-50 ${styles.buttonPrimary}`}
         >
           Criar trilha (DRAFT)
         </button>
@@ -130,24 +126,18 @@ export default function TracksPage() {
       <div className="mt-8 space-y-4">
         {tracks.length === 0 ? (
           <Card>
-            <p className="text-sm opacity-70">
-              Nenhuma trilha criada até o momento.
-            </p>
+            <p className="text-sm opacity-70">Nenhuma trilha criada até o momento.</p>
           </Card>
         ) : (
           tracks.map(t => (
             <Card
               key={t.id}
               variant="clickable"
-              onClick={() =>
-                navigate(`/admin/trilhas/${t.id}`)
-              }
+              onClick={() => navigate(`/admin/trilhas/${t.id}`)}
             >
               <div className="flex items-center justify-between mb-3">
                 <div>
-                  <div className="font-medium">
-                    {t.title}
-                  </div>
+                  <div className="font-medium">{t.title}</div>
                   <div className="text-xs opacity-60">
                     v{t.version} · {t.peopleCount} pessoas
                   </div>
@@ -168,9 +158,7 @@ export default function TracksPage() {
               <div className="w-full h-2 rounded bg-white/10 overflow-hidden">
                 <div
                   className="h-2 rounded bg-emerald-400"
-                  style={{
-                    width: `${t.completionRate}%`,
-                  }}
+                  style={{ width: `${t.completionRate}%` }}
                 />
               </div>
 

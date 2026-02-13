@@ -1,14 +1,13 @@
-import useOrganization from '../hooks/useOrganization'
+import { useTheme } from '../theme/useTheme'
 
 export default function DemoBanner() {
-  const { get } = useOrganization()
-  const org = get()
-
-  if (!org) return null
+  const { styles } = useTheme()
 
   return (
-    <div className="p-3 bg-blue-600 text-white text-sm text-center">
-      Modo demonstração — {org.name}
+    <div className={`rounded px-3 py-2 text-sm border ${styles.cardBorder} ${styles.cardBg}`}>
+      <span className={styles.textMuted}>
+        Ambiente demo — dados de exemplo.
+      </span>
     </div>
   )
 }

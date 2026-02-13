@@ -13,17 +13,11 @@ function actionTone(action: string) {
     return 'border-amber-500/40 text-amber-400'
   }
 
-  if (
-    action.includes('CREATED') ||
-    action.includes('STARTED')
-  ) {
-    return 'border-blue-500/40 text-blue-400'
+  if (action.includes('CREATED') || action.includes('STARTED')) {
+    return 'border-[#F97316]/35 text-[#F97316]'
   }
 
-  if (
-    action.includes('COMPLETED') ||
-    action.includes('RESOLVED')
-  ) {
+  if (action.includes('COMPLETED') || action.includes('RESOLVED')) {
     return 'border-emerald-500/40 text-emerald-400'
   }
 
@@ -37,9 +31,7 @@ function humanizeAction(action: string) {
     .replace(/^\w/, c => c.toUpperCase())
 }
 
-export default function EventTimeline({
-  events,
-}: Props) {
+export default function EventTimeline({ events }: Props) {
   if (!events || events.length === 0) {
     return (
       <div className="text-sm text-slate-400">

@@ -1,8 +1,10 @@
 import PageHeader from '../../components/base/PageHeader'
 import Card from '../../components/base/Card'
 import useAssessment from '../../hooks/useAssessment'
+import { useTheme } from '../../theme/ThemeProvider'
 
 export default function Assessment() {
+  const { styles } = useTheme()
   const { submitAssessment, loading } = useAssessment()
 
   return (
@@ -21,7 +23,7 @@ export default function Assessment() {
             })
           }
           disabled={loading}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium hover:bg-blue-500 transition disabled:opacity-50"
+          className={`rounded-lg px-4 py-2 text-sm font-medium transition disabled:opacity-50 ${styles.buttonPrimary}`}
         >
           {loading ? 'Enviando…' : 'Enviar avaliação'}
         </button>

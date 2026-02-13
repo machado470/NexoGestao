@@ -1,89 +1,69 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-
 import PageHeader from '../../components/base/PageHeader'
 import Card from '../../components/base/Card'
-import { createPerson } from '../../services/persons'
+import SectionBase from '../../components/layout/SectionBase'
+import { useTheme } from '../../theme/ThemeProvider'
+import { createPerson } from '../../services/people'
 
 export default function PersonCreate() {
+  const { styles } = useTheme()
   const navigate = useNavigate()
 
   const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
-  const [role, setRole] =
-    useState<'ADMIN' | 'COLLABORATOR'>('COLLABORATOR')
-  const [loading, setLoading] = useState(false)
+  const [department, setDepartment] = useState('')
+  const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
+  async function save() {
+    if (!name.trim()) return
+
+    setSaving(true)
     setError(null)
 
     try {
-      setLoading(true)
-      const person = await createPerson({
-        name,
-        email,
-        role,
-      })
-
-      navigate(`/admin/pessoas/${person.id}`)
+      await createPerson({ name, department })
+      navigate('/admin/pessoas')
     } catch {
-      setError('Erro ao criar pessoa')
+      setError('Erro ao cadastrar pessoa')
     } finally {
-      setLoading(false)
+      setSaving(false)
     }
   }
 
   return (
-    <div className="space-y-8">
-      <PageHeader title="Criar pessoa" />
+    <SectionBase>
+      <PageHeader title="Cadastrar pessoa" description="Entrada institucional" />
 
-      <Card>
-        <form onSubmit={handleSubmit} className="space-y-4">
+      <Card className="mt-6 max-w-xl space-y-4">
+        <div>
+          <label className={`text-sm ${styles.textMuted}`}>Nome</label>
           <input
-            placeholder="Nome"
             value={name}
             onChange={e => setName(e.target.value)}
-            className="w-full rounded bg-slate-800 px-3 py-2 text-white"
+            className="w-full mt-1 rounded bg-white/10 border border-white/20 px-3 py-2 text-sm"
           />
+        </div>
 
+        <div>
+          <label className={`text-sm ${styles.textMuted}`}>Departamento</label>
           <input
-            placeholder="Email"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            className="w-full rounded bg-slate-800 px-3 py-2 text-white"
+            value={department}
+            onChange={e => setDepartment(e.target.value)}
+            className="w-full mt-1 rounded bg-white/10 border border-white/20 px-3 py-2 text-sm"
           />
+        </div>
 
-          <select
-            value={role}
-            onChange={e =>
-              setRole(e.target.value as any)
-            }
-            className="w-full rounded bg-slate-800 px-3 py-2 text-white"
-          >
-            <option value="COLLABORATOR">
-              Colaborador
-            </option>
-            <option value="ADMIN">
-              Administrador
-            </option>
-          </select>
+        {error && <p className="text-sm text-rose-400">{error}</p>}
 
-          {error && (
-            <div className="text-sm text-red-400">
-              {error}
-            </div>
-          )}
-
-          <button
-            disabled={loading}
-            className="rounded bg-blue-600 px-4 py-2 text-white"
-          >
-            {loading ? 'Criando…' : 'Criar pessoa'}
-          </button>
-        </form>
+        <button
+          disabled={saving}
+          onClick={save}
+          className={`rounded px-4 py-2 text-sm disabled:opacity-50 ${styles.buttonPrimary}`}
+        >
+          {saving ? 'Salvando…' : 'Cadastrar'}
+        </button>
       </Card>
-    </div>
+    </SectionBase>
   )
 }

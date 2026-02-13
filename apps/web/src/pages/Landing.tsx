@@ -1,23 +1,24 @@
-import { Link } from 'react-router-dom'
+import LayoutBase from '../components/layout/LayoutBase'
+import Hero from '../modules/landing/Hero'
+import Governance from '../modules/landing/Governance'
+import HowItWorks from '../modules/landing/HowItWorks'
+import Modules from '../modules/landing/Modules'
+import ExecutivePreview from '../modules/landing/ExecutivePreview'
+import Security from '../modules/landing/Security'
+import CTA from '../modules/landing/CTA'
+import Footer from '../modules/landing/Footer'
 
 export default function Landing() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-950 text-white">
-      <div className="text-center space-y-6">
-        <h1 className="text-4xl font-bold">NexoGestao</h1>
-
-        <p className="text-slate-400 max-w-md">
-          Governança operacional com trilhas, indicadores e ações corretivas
-          para times e operações.
-        </p>
-
-        <Link
-          to="/login"
-          className="inline-block bg-blue-600 px-6 py-3 rounded text-white"
-        >
-          Entrar no sistema
-        </Link>
-      </div>
-    </div>
+    <LayoutBase>
+      <Hero />
+      <Governance />
+      <HowItWorks />
+      <Modules />
+      <ExecutivePreview />
+      <Security />
+      <CTA />
+      <Footer />
+    </LayoutBase>
   )
 }

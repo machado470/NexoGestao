@@ -1,5 +1,6 @@
 import Card from '../../components/base/Card'
 import SectionBase from '../../components/layout/SectionBase'
+import { useTheme } from '../../theme/ThemeProvider'
 
 type KPI = {
   label: string
@@ -26,32 +27,39 @@ const kpis: KPI[] = [
 ]
 
 export default function ExecutivePreview() {
+  const { styles } = useTheme()
+
   return (
     <section className="relative overflow-hidden">
       {/* FUNDO */}
       <div className="absolute inset-0 -z-10 bg-gradient-to-b from-slate-950 via-black to-black" />
-      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_70%_30%,rgba(59,130,246,0.14),transparent_45%)]" />
+      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_70%_30%,rgba(249,115,22,0.14),transparent_45%)]" />
 
       <SectionBase>
         <div className="max-w-7xl mx-auto px-6 py-32">
           {/* CABEÇALHO */}
           <div className="max-w-3xl mb-24">
-            <span className="inline-block mb-4 px-4 py-1.5 text-xs tracking-wider uppercase rounded-full border border-blue-400/20 text-blue-300 bg-blue-500/5">
+            <span
+              className={`
+                inline-block mb-4 px-4 py-1.5 text-xs tracking-wider uppercase rounded-full
+                ${styles.border}
+                ${styles.textMuted}
+                ${styles.surface}
+              `}
+            >
               Visão executiva
             </span>
 
             <h2 className="text-3xl md:text-4xl font-semibold text-white leading-tight">
               Decisão orientada por dados.
               <br />
-              <span className="text-blue-400">
-                Não por sensação.
-              </span>
+              <span className="text-[#F97316]">Não por sensação.</span>
             </h2>
 
             <p className="mt-6 text-lg text-slate-300">
-              O painel executivo consolida risco humano, conformidade e
-              ações corretivas em um único lugar — com base em dados
-              operacionais reais.
+              O painel executivo consolida risco humano, conformidade e ações
+              corretivas em um único lugar — com base em dados operacionais
+              reais.
             </p>
           </div>
 
@@ -79,11 +87,9 @@ export default function ExecutivePreview() {
                   {k.value}
                 </div>
 
-                <div className="mt-3 text-sm text-slate-300">
-                  {k.hint}
-                </div>
+                <div className="mt-3 text-sm text-slate-300">{k.hint}</div>
 
-                <div className="absolute inset-0 pointer-events-none rounded-2xl bg-blue-500/5 opacity-0 hover:opacity-100 transition" />
+                <div className="absolute inset-0 pointer-events-none rounded-2xl bg-[#F97316]/5 opacity-0 hover:opacity-100 transition" />
               </Card>
             ))}
           </div>
@@ -104,28 +110,14 @@ export default function ExecutivePreview() {
                 <div className="text-sm uppercase tracking-wider text-slate-400">
                   Tendência de risco
                 </div>
-                <div className="text-xs text-blue-400">
-                  Últimos 90 dias
-                </div>
+                <div className="text-xs text-[#F97316]">Últimos 90 dias</div>
               </div>
 
               <svg viewBox="0 0 600 200" className="w-full h-40">
                 <defs>
-                  <linearGradient
-                    id="exec-line"
-                    x1="0"
-                    y1="0"
-                    x2="1"
-                    y2="0"
-                  >
-                    <stop
-                      offset="0%"
-                      stopColor="rgba(59,130,246,0.25)"
-                    />
-                    <stop
-                      offset="100%"
-                      stopColor="rgba(59,130,246,1)"
-                    />
+                  <linearGradient id="exec-line" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stopColor="rgba(249,115,22,0.25)" />
+                    <stop offset="100%" stopColor="rgba(249,115,22,1)" />
                   </linearGradient>
                 </defs>
 
@@ -147,19 +139,20 @@ export default function ExecutivePreview() {
               </svg>
 
               <p className="mt-4 text-sm text-slate-300">
-                Tendência ascendente indica aumento de risco por
-                recorrência de atrasos e falhas de execução.
+                Tendência ascendente indica aumento de risco por recorrência de
+                atrasos e falhas de execução.
               </p>
             </Card>
           </div>
 
           {/* DISCLAIMER */}
           <p className="mt-8 text-xs text-slate-400">
-            * Exemplo ilustrativo baseado no modelo real do painel
-            executivo do sistema.
+            * Exemplo ilustrativo baseado no modelo real do painel executivo do
+            sistema.
           </p>
         </div>
       </SectionBase>
     </section>
   )
 }
+

@@ -16,6 +16,23 @@ type AssessmentResult = {
   }
 }
 
+function getErrorMessage(err: unknown): string {
+  if (typeof err !== 'object' || err === null) {
+    return 'Erro ao enviar avaliação'
+  }
+
+  const anyErr = err as {
+    response?: { data?: { error?: { message?: string } } }
+    message?: string
+  }
+
+  return (
+    anyErr.response?.data?.error?.message ??
+    anyErr.message ??
+    'Erro ao enviar avaliação'
+  )
+}
+
 export default function useAssessment() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -31,11 +48,8 @@ export default function useAssessment() {
 
       const res = await api.post('/assessments', params)
       return res.data.data
-    } catch (err: any) {
-      setError(
-        err?.response?.data?.error?.message ||
-          'Erro ao enviar avaliação',
-      )
+    } catch (err: unknown) {
+      setError(getErrorMessage(err))
       throw err
     } finally {
       setLoading(false)

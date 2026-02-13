@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { useTheme } from '../../theme/ThemeProvider'
 
 export default function InfoCard({
   icon,
@@ -9,6 +10,8 @@ export default function InfoCard({
   title?: string
   children?: ReactNode
 }) {
+  const { styles } = useTheme()
+
   return (
     <div
       className="
@@ -27,7 +30,7 @@ export default function InfoCard({
           pointer-events-none
           absolute inset-0
           rounded-2xl
-          bg-[radial-gradient(circle_at_20%_10%,rgba(59,130,246,0.18),transparent_55%)]
+          bg-[radial-gradient(circle_at_20%_10%,rgba(249,115,22,0.18),transparent_55%)]
           opacity-0
           group-hover:opacity-100
           transition-opacity duration-300
@@ -37,12 +40,12 @@ export default function InfoCard({
       <div className="relative z-10 flex flex-col gap-5">
         {icon && (
           <div
-            className="
+            className={`
               w-12 h-12
-              text-blue-400
+              ${styles.accent}
               transition-transform duration-300
               group-hover:scale-110
-            "
+            `}
           >
             {icon}
           </div>

@@ -1,6 +1,15 @@
 export const theme = {
-  background: 'bg-slate-950',
-  surface: 'bg-slate-900/80 backdrop-blur',
+  background: `
+    bg-gradient-to-br
+    from-[#120A06]
+    via-[#0B0A0A]
+    to-[#070707]
+  `,
+  surface: `
+    bg-[#14110F]/80
+    backdrop-blur-xl
+    shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]
+  `,
   border: 'border-white/10',
 
   textPrimary: 'text-slate-100',
@@ -9,8 +18,7 @@ export const theme = {
   navHover: 'bg-white/5',
   navActive: 'bg-white/10',
 
-  accent: 'text-blue-500',
+  accent: 'text-[#F97316]',
 
-  buttonPrimary:
-    'bg-blue-600 text-white hover:bg-blue-500',
+  buttonPrimary: 'bg-[#F97316] text-black hover:bg-[#FB923C] disabled:opacity-50',
 }

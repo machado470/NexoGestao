@@ -1,25 +1,12 @@
-import type { ReactNode } from 'react'
-import { Navigate } from 'react-router-dom'
-import { useAuth } from '../auth/AuthContext'
-import { useMe } from '../hooks/useMe'
+import { Navigate, Outlet } from 'react-router-dom'
+import { useAuth } from '../auth/useAuth'
 
-export function RequireAdmin({
-  children,
-}: {
-  children: ReactNode
-}) {
-  const { isAuthenticated, loading: authLoading } = useAuth()
-  const { me, loading: meLoading } = useMe()
+export default function RequireAdmin() {
+  const { isAuthenticated, loading } = useAuth()
 
-  if (authLoading || meLoading) return null
+  if (loading) return null
+  if (!isAuthenticated) return <Navigate to="/login" replace />
 
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />
-  }
-
-  if (me?.role !== 'ADMIN') {
-    return <Navigate to="/" replace />
-  }
-
-  return <>{children}</>
+  // Se depois você tiver role/admin no token, valida aqui.
+  return <Outlet />
 }

@@ -1,12 +1,15 @@
 import { Link } from 'react-router-dom'
 import Card from '../../components/base/Card'
 import SectionBase from '../../components/layout/SectionBase'
+import { useTheme } from '../../theme/ThemeProvider'
 
 export default function CTA() {
+  const { styles } = useTheme()
+
   return (
     <section className="relative overflow-hidden">
       <div className="absolute inset-0 -z-10 bg-gradient-to-b from-black via-slate-950 to-slate-950" />
-      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_50%_30%,rgba(59,130,246,0.18),transparent_45%)]" />
+      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_50%_30%,rgba(249,115,22,0.18),transparent_45%)]" />
 
       <SectionBase>
         <div className="max-w-5xl mx-auto px-6 py-40">
@@ -23,7 +26,7 @@ export default function CTA() {
             <h2 className="text-3xl md:text-4xl font-semibold text-white leading-tight">
               Governança não se promete.
               <br />
-              <span className="text-blue-400">Ela se executa.</span>
+              <span className="text-[#F97316]">Ela se executa.</span>
             </h2>
 
             <p className="mt-6 text-lg text-slate-300 max-w-2xl mx-auto">
@@ -34,25 +37,25 @@ export default function CTA() {
             <div className="mt-14 flex flex-col sm:flex-row items-center justify-center gap-4">
               <a
                 href="#"
-                className="
+                className={`
                   px-10 py-4 rounded-xl
-                  bg-blue-600 text-white font-medium
-                  hover:bg-blue-500
+                  ${styles.buttonPrimary}
                   transition-all duration-200
-                  shadow-lg shadow-blue-600/25
-                "
+                  shadow-lg shadow-black/25
+                `}
               >
                 Solicitar acesso guiado
               </a>
 
               <Link
                 to="/login"
-                className="
+                className={`
                   px-10 py-4 rounded-xl
-                  border border-white/20 text-white
+                  ${styles.border}
+                  ${styles.textPrimary}
                   hover:bg-white/5
                   transition-all duration-200
-                "
+                `}
               >
                 Entrar no sistema
               </Link>

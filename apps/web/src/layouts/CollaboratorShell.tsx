@@ -1,43 +1,38 @@
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../auth/AuthContext'
-import { useMe } from '../hooks/useMe'
+import { useAuth } from '../auth/useAuth'
+import { useTheme } from '../theme/useTheme'
 
 export default function CollaboratorShell({
   children,
 }: {
   children: ReactNode
 }) {
+  const { styles } = useTheme()
   const { logout } = useAuth()
-  const { me, loading } = useMe()
   const navigate = useNavigate()
 
-  return (
-    <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100">
-      <header className="flex items-center justify-between px-6 py-4 border-b border-white/10">
-        <div>
-          <p className="text-sm font-semibold">NexoGestao</p>
-          <p className="text-xs opacity-60">Painel do colaborador</p>
-        </div>
+  function handleLogout() {
+    logout()
+    navigate('/login', { replace: true })
+  }
 
-        <div className="flex items-center gap-4">
-          <span className="text-xs opacity-60">
-            {loading ? '—' : me?.email}
-          </span>
+  return (
+    <div className={`min-h-screen ${styles.background} ${styles.textPrimary}`}>
+      <div className="max-w-5xl mx-auto px-4 py-6">
+        <div className="flex items-center justify-between">
+          <div className="text-lg font-semibold">Colaborador</div>
 
           <button
-            onClick={() => {
-              logout()
-              navigate('/login')
-            }}
-            className="text-xs px-3 py-1 rounded bg-white/5 hover:bg-white/10"
+            onClick={handleLogout}
+            className={`text-xs rounded px-3 py-1 ${styles.buttonPrimary}`}
           >
             Sair
           </button>
         </div>
-      </header>
 
-      <main className="flex-1 p-6">{children}</main>
+        <div className="mt-6">{children}</div>
+      </div>
     </div>
   )
 }

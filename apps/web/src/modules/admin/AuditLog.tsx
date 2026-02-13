@@ -7,7 +7,7 @@ type AuditEvent = {
   entityId: string
   action: string
   createdAt: string
-  meta?: any
+  meta?: unknown
 }
 
 export default function AuditLog() {
@@ -46,7 +46,7 @@ export default function AuditLog() {
               {new Date(log.createdAt).toLocaleString()}
             </div>
 
-            {log.meta && (
+            {log.meta !== undefined && (
               <pre className="mt-2 text-xs text-zinc-400">
                 {JSON.stringify(log.meta, null, 2)}
               </pre>

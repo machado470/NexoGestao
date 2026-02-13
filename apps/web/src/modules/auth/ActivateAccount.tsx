@@ -1,112 +1,120 @@
-import { useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
-import api from '../../services/api'
-import AuthLayout from './AuthLayout'
+import { useEffect, useState } from 'react'
+import { useSearchParams, Link } from 'react-router-dom'
+import Card from '../../components/base/Card'
+import SectionBase from '../../components/layout/SectionBase'
+import { useTheme } from '../../theme/ThemeProvider'
+import { activateAccount } from '../../services/auth'
 
 export default function ActivateAccount() {
-  const [params] = useSearchParams()
-  const navigate = useNavigate()
+  const { styles } = useTheme()
+  const [searchParams] = useSearchParams()
 
-  const token = params.get('token')
+  const token = searchParams.get('token') ?? ''
 
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
-  const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [ok, setOk] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
+  useEffect(() => {
     setError(null)
+  }, [password, confirm])
 
+  async function submit() {
     if (!token) {
-      setError('Convite inválido')
+      setError('Token inválido')
       return
     }
 
-    if (password.length < 6) {
-      setError('A senha deve ter pelo menos 6 caracteres')
+    if (!password || password.length < 6) {
+      setError('Senha deve ter pelo menos 6 caracteres')
       return
     }
 
     if (password !== confirm) {
-      setError('As senhas não coincidem')
+      setError('As senhas não conferem')
       return
     }
 
+    setLoading(true)
+    setError(null)
+
     try {
-      setLoading(true)
-
-      await api.post('/auth/activate', {
-        token,
-        password,
-      })
-
-      navigate('/login')
+      await activateAccount({ token, password })
+      setOk(true)
     } catch {
-      setError('Convite inválido ou expirado')
+      setError('Não foi possível ativar a conta')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <AuthLayout>
-      <h2 className="text-2xl font-semibold text-white mb-6">
-        Ativar conta
-      </h2>
+    <SectionBase>
+      <div className="max-w-lg mx-auto py-20">
+        <Card className="p-8">
+          <h1 className="text-xl font-semibold">Ativar conta</h1>
+          <p className={`mt-2 text-sm ${styles.textMuted}`}>
+            Defina sua senha para concluir a ativação.
+          </p>
 
-      <p className="text-sm text-slate-400 mb-6">
-        Defina sua senha para acessar o sistema.
-      </p>
+          {ok ? (
+            <div className="mt-6 space-y-4">
+              <p className="text-sm text-emerald-400">
+                Conta ativada com sucesso.
+              </p>
+              <Link to="/login" className={`text-sm underline ${styles.accent}`}>
+                Ir para login
+              </Link>
+            </div>
+          ) : (
+            <div className="mt-6 space-y-4">
+              <div>
+                <label className={`text-sm ${styles.textMuted}`}>
+                  Nova senha
+                </label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  className={`
+                    mt-1 w-full rounded-lg px-3 py-2 text-sm
+                    bg-white/10 border border-white/20
+                    focus:outline-none focus:ring-2 focus:ring-[#F97316]/40
+                  `}
+                />
+              </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <input
-          type="password"
-          placeholder="Nova senha"
-          value={password}
-          onChange={e => setPassword(e.target.value)}
-          required
-          className="
-            w-full rounded-lg bg-white/5
-            px-4 py-3 text-sm text-white
-            outline-none ring-1 ring-white/10
-            focus:ring-blue-500/40
-          "
-        />
+              <div>
+                <label className={`text-sm ${styles.textMuted}`}>
+                  Confirmar senha
+                </label>
+                <input
+                  type="password"
+                  value={confirm}
+                  onChange={e => setConfirm(e.target.value)}
+                  className={`
+                    mt-1 w-full rounded-lg px-3 py-2 text-sm
+                    bg-white/10 border border-white/20
+                    focus:outline-none focus:ring-2 focus:ring-[#F97316]/40
+                  `}
+                />
+              </div>
 
-        <input
-          type="password"
-          placeholder="Confirmar senha"
-          value={confirm}
-          onChange={e => setConfirm(e.target.value)}
-          required
-          className="
-            w-full rounded-lg bg-white/5
-            px-4 py-3 text-sm text-white
-            outline-none ring-1 ring-white/10
-            focus:ring-blue-500/40
-          "
-        />
+              {error && <p className="text-sm text-rose-400">{error}</p>}
 
-        {error && (
-          <div className="text-sm text-red-400">
-            {error}
-          </div>
-        )}
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="
-            w-full rounded-lg bg-blue-600
-            px-4 py-3 text-sm font-medium text-white
-            hover:bg-blue-500 transition
-            disabled:opacity-50
-          "
-        >
-          {loading ? 'Ativando…' : 'Ativar conta'}
-        </button>
-      </form>
-    </AuthLayout>
+              <button
+                onClick={submit}
+                disabled={loading}
+                className={`w-full rounded-lg px-4 py-2 text-sm transition disabled:opacity-50 ${styles.buttonPrimary}`}
+              >
+                {loading ? 'Ativando…' : 'Ativar conta'}
+              </button>
+            </div>
+          )}
+        </Card>
+      </div>
+    </SectionBase>
   )
 }

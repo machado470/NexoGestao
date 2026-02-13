@@ -1,47 +1,44 @@
-import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-
-import LayoutBase from '../../components/layout/LayoutBase'
-import Hero from './Hero'
-import Features from './Features'
-import CTA from './CTA'
-import { ThemeProvider } from '../../theme/ThemeProvider'
-import { useAuth } from '../../auth/AuthContext'
-import { useMe } from '../../hooks/useMe'
+import PageHeader from '../../components/base/PageHeader'
+import Card from '../../components/base/Card'
+import SectionBase from '../../components/layout/SectionBase'
+import { useAuth } from '../../auth/useAuth'
+import { useTheme } from '../../theme/useTheme'
 
 export default function LandingPage() {
   const navigate = useNavigate()
   const { isAuthenticated, loading: authLoading } = useAuth()
-  const { me, loading: meLoading } = useMe()
+  const { styles } = useTheme()
 
-  useEffect(() => {
-    if (authLoading || meLoading) return
-    if (!isAuthenticated || !me) return
-
-    if (me.role === 'ADMIN') {
+  function go() {
+    if (isAuthenticated) {
       navigate('/admin', { replace: true })
-      return
+    } else {
+      navigate('/login', { replace: true })
     }
-
-    navigate('/collaborator', { replace: true })
-  }, [authLoading, meLoading, isAuthenticated, me, navigate])
-
-  if (authLoading || meLoading) {
-    return null
-  }
-
-  if (isAuthenticated) {
-    // enquanto redireciona
-    return null
   }
 
   return (
-    <ThemeProvider forceTheme="blue">
-      <LayoutBase>
-        <Hero />
-        <Features />
-        <CTA />
-      </LayoutBase>
-    </ThemeProvider>
+    <SectionBase>
+      <PageHeader
+        title="NexoGestão"
+        description="Governança operacional sem teatro"
+      />
+
+      <Card className="mt-8 max-w-xl space-y-4">
+        <p className={`text-sm ${styles.textMuted}`}>
+          Cadastre pessoas, publique trilhas, execute e acompanhe
+          conformidade.
+        </p>
+
+        <button
+          disabled={authLoading}
+          onClick={go}
+          className={`w-full px-6 py-3 rounded disabled:opacity-50 ${styles.buttonPrimary}`}
+        >
+          {authLoading ? 'Carregando…' : 'Entrar'}
+        </button>
+      </Card>
+    </SectionBase>
   )
 }
