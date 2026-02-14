@@ -27,6 +27,15 @@ export class CorrectiveActionsService {
 
     if (!action) return null
 
+    const person = await this.prisma.person.findUnique({
+      where: { id: action.personId },
+      select: { orgId: true },
+    })
+
+    if (!person) {
+      throw new Error('CorrectiveActionsService.resolve(): person não encontrado')
+    }
+
     const resolvedAt = new Date()
 
     const resolved = await this.prisma.correctiveAction.update({
@@ -37,17 +46,15 @@ export class CorrectiveActionsService {
       },
     })
 
-    // ✅ Recalcula risco operacional (persiste Person.riskScore + RiskSnapshot + Timeline snapshot)
     const recalculatedScore = await this.risk.recalculatePersonRisk(
       action.personId,
       `Corretiva resolvida (${action.reason})`,
     )
 
-    // 🔄 Reavaliar estado operacional (fonte única)
     const newStatus = await this.operationalState.getStatus(action.personId)
 
-    // 🧾 Linha do tempo explicável (fechamento da corretiva)
     await this.timeline.log({
+      orgId: person.orgId,
       action: 'CORRECTIVE_ACTION_RESOLVED',
       personId: action.personId,
       description: action.reason,
@@ -62,11 +69,6 @@ export class CorrectiveActionsService {
     return resolved
   }
 
-  /**
-   * 🔁 Compatibilidade explícita (personId)
-   * - Usado pelo endpoint /corrective-actions/person/:personId/reassess
-   * - Resolve a última ação corretiva OPEN daquela pessoa (se existir)
-   */
   async processReassessment(personId: string) {
     const lastOpen = await this.prisma.correctiveAction.findFirst({
       where: {

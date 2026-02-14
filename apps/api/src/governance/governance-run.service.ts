@@ -15,6 +15,8 @@ export class GovernanceRunService {
 
   private startedAt: Date = new Date()
 
+  private currentOrgId: string | null = null
+
   constructor(
     @Inject(PrismaService)
     private readonly prisma: PrismaService,
@@ -23,11 +25,9 @@ export class GovernanceRunService {
     private readonly timeline: TimelineService,
   ) {}
 
-  /**
-   * ✅ IMPORTANTE: este service é singleton (provider do Nest).
-   * Então precisa RESETAR por ciclo, senão acumula pra sempre.
-   */
-  startRun() {
+  startRun(orgId: string) {
+    this.currentOrgId = orgId
+
     this.evaluated = 0
     this.warnings = 0
     this.correctives = 0
@@ -51,36 +51,35 @@ export class GovernanceRunService {
     this.correctives++
   }
 
-  recordOperationalStatus(params: {
-    state: OperationalStateValue
-    riskScore: number
-  }) {
+  recordOperationalStatus(params: { state: OperationalStateValue; riskScore: number }) {
     this.riskSum += params.riskScore
-
     if (params.state === 'RESTRICTED') this.restrictedCount++
     if (params.state === 'SUSPENDED') this.suspendedCount++
   }
 
-  async finish() {
+  async finish(orgId?: string) {
+    const resolvedOrgId = orgId ?? this.currentOrgId
+    if (!resolvedOrgId) {
+      throw new Error('GovernanceRunService.finish(): orgId não informado')
+    }
+
     const finishedAt = new Date()
-    const durationMs = Math.max(
-      0,
-      finishedAt.getTime() - this.startedAt.getTime(),
-    )
+    const durationMs = Math.max(0, finishedAt.getTime() - this.startedAt.getTime())
 
     const institutionalRiskScore =
-      this.evaluated === 0
-        ? 0
-        : Math.min(100, Math.round(this.riskSum / this.evaluated))
+      this.evaluated === 0 ? 0 : Math.min(100, Math.round(this.riskSum / this.evaluated))
 
-    const openCorrectivesCount =
-      await this.prisma.correctiveAction.count({
-        where: { status: 'OPEN' },
-      })
+    const openCorrectivesCount = await this.prisma.correctiveAction.count({
+      where: {
+        status: 'OPEN',
+        person: { orgId: resolvedOrgId },
+      },
+    })
 
-    // ✅ snapshot consultável (estado)
     await this.prisma.governanceRun.create({
       data: {
+        orgId: resolvedOrgId,
+
         evaluated: this.evaluated,
         warnings: this.warnings,
         correctives: this.correctives,
@@ -96,11 +95,13 @@ export class GovernanceRunService {
       },
     })
 
-    // ✅ trilha (história)
     await this.timeline.log({
+      orgId: resolvedOrgId,
       action: 'GOVERNANCE_RUN_COMPLETED',
       description: 'Ciclo de governança executado',
       metadata: {
+        orgId: resolvedOrgId,
+
         evaluated: this.evaluated,
         warnings: this.warnings,
         correctives: this.correctives,
@@ -117,6 +118,7 @@ export class GovernanceRunService {
     })
 
     return {
+      orgId: resolvedOrgId,
       evaluated: this.evaluated,
       warnings: this.warnings,
       correctives: this.correctives,

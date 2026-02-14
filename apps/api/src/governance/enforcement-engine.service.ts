@@ -24,31 +24,29 @@ export class EnforcementEngineService {
     private readonly run: GovernanceRunService,
   ) {}
 
-  async runForAllActivePeople() {
+  async runForOrg(orgId: string) {
     const persons = await this.prisma.person.findMany({
-      where: { active: true },
+      where: { active: true, orgId },
       select: { id: true },
     })
 
     for (const p of persons) {
-      await this.runForPerson(p.id)
+      await this.runForPerson(orgId, p.id)
     }
 
     return { evaluated: persons.length }
   }
 
-  private async runForPerson(personId: string) {
+  private async runForPerson(orgId: string, personId: string) {
     this.run.personEvaluated()
 
     const status = await this.operationalState.getStatus(personId)
 
-    // ✅ alimenta o score institucional + contadores de estado
     this.run.recordOperationalStatus({
       state: status.state,
       riskScore: status.riskScore,
     })
 
-    // ✅ exceção ativa = existe registro ainda não processado
     const hasActiveException =
       (await this.prisma.personException.count({
         where: { personId, processedAt: null },
@@ -65,6 +63,7 @@ export class EnforcementEngineService {
       this.run.warningRaised()
 
       await this.timeline.log({
+        orgId,
         action: 'OPERATIONAL_WARNING_RAISED',
         personId,
         description: decision.reason,
@@ -73,6 +72,7 @@ export class EnforcementEngineService {
           riskScore: status.riskScore,
         },
       })
+      return
     }
 
     if (decision.action === 'CREATE_CORRECTIVE_ACTION') {
@@ -84,27 +84,28 @@ export class EnforcementEngineService {
         },
       })
 
-      if (!exists) {
-        await this.prisma.correctiveAction.create({
-          data: {
-            personId,
-            reason: decision.reason,
-            status: 'OPEN',
-          },
-        })
+      if (exists) return
 
-        this.run.correctiveCreated()
-
-        await this.timeline.log({
-          action: 'CORRECTIVE_ACTION_CREATED',
+      await this.prisma.correctiveAction.create({
+        data: {
           personId,
-          description: decision.reason,
-          metadata: {
-            state: status.state,
-            riskScore: status.riskScore,
-          },
-        })
-      }
+          reason: decision.reason,
+          status: 'OPEN',
+        },
+      })
+
+      this.run.correctiveCreated()
+
+      await this.timeline.log({
+        orgId,
+        action: 'CORRECTIVE_ACTION_CREATED',
+        personId,
+        description: decision.reason,
+        metadata: {
+          state: status.state,
+          riskScore: status.riskScore,
+        },
+      })
     }
   }
 }

@@ -19,7 +19,7 @@ export class OperationalStateJob {
   async run() {
     const persons = await this.prisma.person.findMany({
       where: { active: true },
-      select: { id: true },
+      select: { id: true, orgId: true },
     })
 
     for (const p of persons) {
@@ -34,8 +34,8 @@ export class OperationalStateJob {
           ? 'WARNING'
           : 'NORMAL'
 
-      // 🔍 SENSOR: apenas registra o estado calculado
       await this.timeline.log({
+        orgId: p.orgId,
         action: 'OPERATIONAL_STATE_EVALUATED',
         personId: p.id,
         description: `Estado operacional recalculado: ${state}`,

@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Query,
+  Req,
   UseGuards,
 } from '@nestjs/common'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
@@ -15,21 +16,23 @@ export class GovernanceReadController {
   ) {}
 
   @Get('summary')
-  async summary() {
-    return this.read.getSummary()
+  async summary(@Req() req: any) {
+    return this.read.getSummary(req.user.orgId)
   }
 
   @Get('runs')
   async runs(
+    @Req() req: any,
     @Query('limit') limit?: string,
   ) {
     return this.read.listRuns(
+      req.user.orgId,
       limit ? Number(limit) : 20,
     )
   }
 
   @Get('runs/latest')
-  async latest() {
-    return this.read.getLatestRun()
+  async latest(@Req() req: any) {
+    return this.read.getLatestRun(req.user.orgId)
   }
 }

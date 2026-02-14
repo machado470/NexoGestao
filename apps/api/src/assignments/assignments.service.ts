@@ -29,14 +29,15 @@ export class AssignmentsService {
   async startAssignment(assignmentId: string) {
     const assignment = await this.prisma.assignment.findUnique({
       where: { id: assignmentId },
+      include: { person: { select: { orgId: true } } },
     })
 
     if (!assignment) {
       throw new NotFoundException('Assignment não encontrado')
     }
 
-    // ✅ "Start" é evento. Progresso é derivado de completions.
     await this.timeline.log({
+      orgId: assignment.person.orgId,
       action: 'ASSIGNMENT_STARTED',
       personId: assignment.personId,
       description: 'Execução da trilha iniciada',
@@ -46,9 +47,6 @@ export class AssignmentsService {
     return assignment
   }
 
-  /**
-   * 🧠 PRÓXIMO ITEM DA TRILHA
-   */
   async getNextItem(assignmentId: string) {
     const assignment = await this.prisma.assignment.findUnique({
       where: { id: assignmentId },
@@ -77,12 +75,6 @@ export class AssignmentsService {
     )
   }
 
-  /**
-   * ✅ CONCLUI ITEM DA TRILHA
-   * - Faz tudo em transação (completion + progress)
-   * - Calcula progress sempre pelo estado real do banco
-   * - Loga timeline do item e do término do assignment (100%)
-   */
   async completeItem(assignmentId: string, itemId: string) {
     if (!itemId || itemId.trim().length === 0) {
       throw new BadRequestException('itemId é obrigatório')
@@ -92,6 +84,7 @@ export class AssignmentsService {
       const assignment = await tx.assignment.findUnique({
         where: { id: assignmentId },
         include: {
+          person: { select: { orgId: true } },
           track: {
             include: {
               items: { orderBy: { order: 'asc' } },
@@ -149,6 +142,7 @@ export class AssignmentsService {
       })
 
       return {
+        orgId: assignment.person.orgId,
         personId: assignment.personId,
         progress,
         completedCount,
@@ -158,6 +152,7 @@ export class AssignmentsService {
     })
 
     await this.timeline.log({
+      orgId: result.orgId,
       action: 'TRACK_ITEM_COMPLETED',
       personId: result.personId,
       description: `Item concluído (${result.completedCount}/${result.totalItems})`,
@@ -170,6 +165,7 @@ export class AssignmentsService {
 
     if (result.finished) {
       await this.timeline.log({
+        orgId: result.orgId,
         action: 'ASSIGNMENT_COMPLETED',
         personId: result.personId,
         description: 'Trilha concluída (100%)',
@@ -187,17 +183,12 @@ export class AssignmentsService {
     }
   }
 
-  /**
-   * 🛠️ Recalcula progress a partir de completions (estado real do banco)
-   * Útil quando:
-   * - seed recria Assignment com progress 0
-   * - você insere completions via SQL
-   */
   async rebuildProgress(assignmentId: string) {
     const rebuilt = await this.prisma.$transaction(async tx => {
       const assignment = await tx.assignment.findUnique({
         where: { id: assignmentId },
         include: {
+          person: { select: { orgId: true } },
           track: { include: { items: true } },
           completions: true,
         },
@@ -215,10 +206,11 @@ export class AssignmentsService {
           finished: false,
           totalItems: 0,
           completedCount: 0,
+          personId: assignment.personId,
+          orgId: assignment.person.orgId,
         }
       }
 
-      // completions podem estar “fora de ordem”, mas contam (estado factual)
       const completedCount = new Set(
         assignment.completions.map(c => c.itemId),
       ).size
@@ -237,10 +229,12 @@ export class AssignmentsService {
         totalItems,
         completedCount,
         personId: assignment.personId,
+        orgId: assignment.person.orgId,
       }
     })
 
     await this.timeline.log({
+      orgId: (rebuilt as any).orgId,
       action: 'ASSIGNMENT_PROGRESS_REBUILT',
       personId: (rebuilt as any).personId ?? null,
       description: `Progress recalculado para ${rebuilt.progress}%`,
@@ -252,9 +246,9 @@ export class AssignmentsService {
       },
     })
 
-    // Se fechou 100% no rebuild, registra também como concluída (evento útil pro dashboard)
     if ((rebuilt as any).finished && (rebuilt as any).personId) {
       await this.timeline.log({
+        orgId: (rebuilt as any).orgId,
         action: 'ASSIGNMENT_COMPLETED',
         personId: (rebuilt as any).personId,
         description: 'Trilha concluída (100%)',

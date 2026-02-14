@@ -60,6 +60,7 @@ model Organization {
   users   User[]
   persons Person[]
   tracks  Track[]
+  runs    GovernanceRun[]
 }
 
 model User {
@@ -118,10 +119,15 @@ model TimelineEvent {
   description String?
   metadata    Json?
 
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id])
+
   createdAt DateTime @default(now())
 
   person Person? @relation(fields: [personId], references: [id])
 
+  @@index([orgId, createdAt])
+  @@index([orgId, action, createdAt])
   @@index([personId, createdAt])
   @@index([action, createdAt])
 }
@@ -149,11 +155,11 @@ model Track {
 
 model TrackItem {
   id       String        @id @default(uuid())
-  trackId String
-  title   String
-  content String?
-  type    TrackItemType
-  order   Int
+  trackId  String
+  title    String
+  content  String?
+  type     TrackItemType
+  order    Int
 
   createdAt DateTime @default(now())
 
@@ -272,23 +278,25 @@ model RiskSnapshot {
 }
 
 model GovernanceRun {
-  id          String   @id @default(uuid())
-  evaluated   Int      @default(0)
-  warnings    Int      @default(0)
-  correctives Int      @default(0)
+  id    String @id @default(uuid())
 
-  // ✅ métricas institucionais (observabilidade)
-  institutionalRiskScore Int @default(0) // 0..100 (média dos avaliados)
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id])
+
+  evaluated   Int @default(0)
+  warnings    Int @default(0)
+  correctives Int @default(0)
+
+  institutionalRiskScore Int @default(0)
   restrictedCount        Int @default(0)
   suspendedCount         Int @default(0)
   openCorrectivesCount   Int @default(0)
 
-  // ✅ tempo do ciclo
   durationMs Int @default(0)
 
   startedAt  DateTime
   finishedAt DateTime
   createdAt  DateTime @default(now())
 
-  @@index([createdAt])
+  @@index([orgId, createdAt])
 }

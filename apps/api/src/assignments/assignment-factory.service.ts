@@ -26,7 +26,6 @@ export class AssignmentFactoryService {
       throw new BadRequestException('Trilha não ativa')
     }
 
-    // Pega só pessoas válidas (COLLABORATOR + active + org)
     const people = await this.prisma.person.findMany({
       where: {
         id: { in: params.personIds ?? [] },
@@ -42,7 +41,6 @@ export class AssignmentFactoryService {
       return { assigned: 0 }
     }
 
-    // Transação: descobre existentes + cria só os novos
     const result = await this.prisma.$transaction(async tx => {
       const existing = await tx.assignment.findMany({
         where: {
@@ -65,13 +63,11 @@ export class AssignmentFactoryService {
         return { createdIds: [] as string[], createdCount: 0 }
       }
 
-      // createMany é rápido; skipDuplicates evita corrida
       await tx.assignment.createMany({
         data: toCreate,
         skipDuplicates: true,
       })
 
-      // Como createMany não retorna IDs, a gente reconsulta
       const created = await tx.assignment.findMany({
         where: {
           trackId: track.id,
@@ -86,10 +82,10 @@ export class AssignmentFactoryService {
       }
     })
 
-    // Timeline: só pra quem realmente foi atribuído agora
     await Promise.all(
       result.createdIds.map(personId =>
         this.timeline.log({
+          orgId: params.orgId,
           action: 'ASSIGNMENT_CREATED',
           personId,
           description: `Trilha "${track.title}" atribuída`,

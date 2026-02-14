@@ -39,7 +39,7 @@ export class AssessmentsService {
     const assignment = await this.prisma.assignment.findUnique({
       where: { id: params.assignmentId },
       include: {
-        person: true,
+        person: { select: { id: true, orgId: true } },
         track: true,
       },
     })
@@ -48,16 +48,12 @@ export class AssessmentsService {
       throw new NotFoundException('Assignment não encontrado')
     }
 
-    // ✅ Regra de domínio: só pode avaliar se trilha foi concluída
     if (assignment.progress < 100) {
       throw new BadRequestException(
         'Não é possível submeter avaliação: trilha ainda não concluída',
       )
     }
 
-    // ----------------------------
-    // 1️⃣ RISCO EDUCACIONAL (por score)
-    // ----------------------------
     const assessmentRisk: RiskLevel =
       params.score >= 80
         ? 'LOW'
@@ -67,9 +63,6 @@ export class AssessmentsService {
             ? 'HIGH'
             : 'CRITICAL'
 
-    // ----------------------------
-    // 2️⃣ CRIAR ASSESSMENT
-    // ----------------------------
     const assessment = await this.prisma.assessment.create({
       data: {
         score: params.score,
@@ -80,20 +73,13 @@ export class AssessmentsService {
       },
     })
 
-    // ----------------------------
-    // 3️⃣ Atualizar risco do assignment (progress é derivado)
-    // ----------------------------
     await this.prisma.assignment.update({
       where: { id: assignment.id },
       data: { risk: assessmentRisk },
     })
 
-    // ----------------------------
-    // 4️⃣ AÇÃO CORRETIVA (SE CRÍTICO) — idempotência básica
-    // - se já existe OPEN recente com a mesma razão, não cria outra
-    // ----------------------------
     if (assessmentRisk === 'CRITICAL') {
-      const windowMs = 1000 * 60 * 60 * 24 // 24h
+      const windowMs = 1000 * 60 * 60 * 24
       const since = new Date(Date.now() - windowMs)
 
       const existingOpen = await this.prisma.correctiveAction.findFirst({
@@ -122,6 +108,7 @@ export class AssessmentsService {
         })
 
         await this.timeline.log({
+          orgId: assignment.person.orgId,
           action: 'CORRECTIVE_ACTION_CREATED',
           personId: assignment.personId,
           description: created.reason,
@@ -135,7 +122,6 @@ export class AssessmentsService {
           },
         })
       } else {
-        // opcional: só registra auditoria explicando o “não criar duplicado”
         await this.audit.log({
           action: 'CORRECTIVE_ACTION_SKIPPED_DUPLICATE',
           personId: assignment.personId,
@@ -144,25 +130,17 @@ export class AssessmentsService {
       }
     }
 
-    // ----------------------------
-    // 5️⃣ RISCO OPERACIONAL (agregado) — depois da corretiva existir
-    // (RiskService agora é dono do snapshot + timeline do snapshot)
-    // ----------------------------
     const operationalScore = await this.risk.recalculatePersonRisk(
       assignment.personId,
       `Avaliação concluída (${params.score} pontos)`,
     )
 
-    // ----------------------------
-    // 6️⃣ AUDITORIA (assessment)
-    // ----------------------------
     await this.audit.log({
       action: 'ASSESSMENT_SUBMITTED',
       personId: assignment.personId,
       context: `Avaliação da trilha "${assignment.track.title}" concluída com score ${params.score}`,
     })
 
-    // mantém a injeção viva (caso queira usar depois sem “unused” em setups chatos)
     void this.corrective
     void operationalScore
 

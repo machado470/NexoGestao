@@ -45,6 +45,15 @@ import { GovernanceModule } from './governance/governance.module'
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+
+      // ✅ resolve o "DATABASE_URL sumiu" no pnpm dev:
+      // rodando dentro de apps/api, o .env real tá em ../../.env
+      envFilePath: [
+        '../../.env',
+        '../../.env.docker',
+        '.env',
+        '.env.docker',
+      ],
     }),
 
     // ✅ Scheduler global (1x só)

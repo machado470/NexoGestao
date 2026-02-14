@@ -35,6 +35,7 @@ export class OperationalStateGuard implements CanActivate {
     // 🚫 SUSPENDED: nada passa
     if (status.state === 'SUSPENDED') {
       await this.timeline.log({
+        orgId: user.orgId,
         action: 'OPERATIONAL_ACCESS_BLOCKED',
         personId: user.personId,
         description: 'Acesso bloqueado: usuário SUSPENDED',
@@ -68,6 +69,7 @@ export class OperationalStateGuard implements CanActivate {
 
       if (!allowed) {
         await this.timeline.log({
+          orgId: user.orgId,
           action: 'OPERATIONAL_ACCESS_BLOCKED',
           personId: user.personId,
           description: 'Acesso bloqueado: usuário RESTRICTED',

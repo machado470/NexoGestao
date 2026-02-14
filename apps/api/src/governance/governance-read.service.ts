@@ -8,23 +8,26 @@ export class GovernanceReadService {
     private readonly prisma: PrismaService,
   ) {}
 
-  async getLatestRun() {
+  async getLatestRun(orgId: string) {
     return this.prisma.governanceRun.findFirst({
+      where: { orgId },
       orderBy: { createdAt: 'desc' },
     })
   }
 
-  async listRuns(limit = 20) {
+  async listRuns(orgId: string, limit = 20) {
     return this.prisma.governanceRun.findMany({
+      where: { orgId },
       orderBy: { createdAt: 'desc' },
       take: limit,
     })
   }
 
-  async getSummary() {
-    const last = await this.getLatestRun()
+  async getSummary(orgId: string) {
+    const last = await this.getLatestRun(orgId)
 
     const trend = await this.prisma.governanceRun.findMany({
+      where: { orgId },
       orderBy: { createdAt: 'desc' },
       take: 7,
       select: {
@@ -57,13 +60,12 @@ export class GovernanceReadService {
       warnings: last.warnings,
       correctives: last.correctives,
 
-      institutionalRiskScore: (last as any).institutionalRiskScore ?? 0,
-      restrictedCount: (last as any).restrictedCount ?? 0,
-      suspendedCount: (last as any).suspendedCount ?? 0,
-      openCorrectivesCount: (last as any).openCorrectivesCount ?? 0,
-      durationMs: (last as any).durationMs ?? 0,
+      institutionalRiskScore: last.institutionalRiskScore,
+      restrictedCount: last.restrictedCount,
+      suspendedCount: last.suspendedCount,
+      openCorrectivesCount: last.openCorrectivesCount,
+      durationMs: last.durationMs,
 
-      // ordem cronológica (velho -> novo) pra gráfico
       trend: trend.reverse(),
     }
   }

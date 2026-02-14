@@ -1,24 +1,19 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { TemporalRiskService } from './temporal-risk.service'
+import { TimelineService } from '../timeline/timeline.service'
 
 @Injectable()
 export class RiskService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly temporalRisk: TemporalRiskService,
+    private readonly timeline: TimelineService,
   ) {}
 
-  /**
-   * Recalcula risco operacional (agregado) e persiste:
-   * - Person.riskScore (cache)
-   * - RiskSnapshot (histórico)
-   * - TimelineEvent RISK_SNAPSHOT_CREATED (trilha explicável)
-   */
   async recalculatePersonRisk(personId: string, reason?: string) {
     const score = await this.temporalRisk.calculate(personId)
 
-    // ✅ cache persistido (dashboard, ordenação, filtros, etc)
     await this.prisma.person.update({
       where: { id: personId },
       data: { riskScore: score },
@@ -32,6 +27,15 @@ export class RiskService {
   async snapshot(personId: string, score: number, reason?: string) {
     const finalReason = reason?.trim() ? reason.trim() : 'Reavaliação automática'
 
+    const person = await this.prisma.person.findUnique({
+      where: { id: personId },
+      select: { orgId: true },
+    })
+
+    if (!person) {
+      throw new Error('RiskService.snapshot(): person não encontrado')
+    }
+
     await this.prisma.riskSnapshot.create({
       data: {
         personId,
@@ -40,12 +44,11 @@ export class RiskService {
       },
     })
 
-    await this.prisma.timelineEvent.create({
-      data: {
-        personId,
-        action: 'RISK_SNAPSHOT_CREATED',
-        metadata: { score, reason: finalReason },
-      },
+    await this.timeline.log({
+      orgId: person.orgId,
+      personId,
+      action: 'RISK_SNAPSHOT_CREATED',
+      metadata: { score, reason: finalReason },
     })
   }
 }

@@ -39,9 +39,6 @@ export class PeopleService {
     })
   }
 
-  /**
-   * 🧠 ATO FUNDADOR DE UMA PESSOA
-   */
   async createPerson(params: {
     name: string
     role: string
@@ -50,9 +47,7 @@ export class PeopleService {
     createdBy: string
   }) {
     if (!params.name || !params.role) {
-      throw new BadRequestException(
-        'Nome e papel são obrigatórios',
-      )
+      throw new BadRequestException('Nome e papel são obrigatórios')
     }
 
     const person = await this.prisma.person.create({
@@ -66,15 +61,14 @@ export class PeopleService {
       },
     })
 
-    // 📜 AUDIT
     await this.audit.log({
       personId: person.id,
       action: 'PERSON_CREATED',
       context: `Criada por ADMIN ${params.createdBy}`,
     })
 
-    // 🧭 TIMELINE
     await this.timeline.log({
+      orgId: params.orgId,
       action: 'PERSON_CREATED',
       personId: person.id,
       description: 'Pessoa criada no sistema',
