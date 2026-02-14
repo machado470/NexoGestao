@@ -11,6 +11,7 @@ import { EnforcementController } from './enforcement.controller'
 import { GovernanceRunService } from './governance-run.service'
 import { GovernanceReadService } from './governance-read.service'
 import { GovernanceReadController } from './governance-read.controller'
+import { EnforcementScheduler } from './enforcement.scheduler'
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { GovernanceReadController } from './governance-read.controller'
     EnforcementPolicyService,
     EnforcementEngineService,
     EnforcementJob,
+    EnforcementScheduler,
     GovernanceRunService,
     GovernanceReadService,
   ],

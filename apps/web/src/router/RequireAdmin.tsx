@@ -2,11 +2,14 @@ import { Navigate, Outlet } from 'react-router-dom'
 import { useAuth } from '../auth/useAuth'
 
 export default function RequireAdmin() {
-  const { isAuthenticated, loading } = useAuth()
+  const { isAuthenticated, loading, user } = useAuth()
 
   if (loading) return null
   if (!isAuthenticated) return <Navigate to="/login" replace />
 
-  // Se depois você tiver role/admin no token, valida aqui.
+  if (user?.role !== 'ADMIN') {
+    return <Navigate to="/collaborator" replace />
+  }
+
   return <Outlet />
 }

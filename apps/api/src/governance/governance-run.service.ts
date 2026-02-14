@@ -1,13 +1,19 @@
 import { Injectable, Inject } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { TimelineService } from '../timeline/timeline.service'
+import type { OperationalStateValue } from '../people/operational-state.service'
 
 @Injectable()
 export class GovernanceRunService {
   private evaluated = 0
   private warnings = 0
   private correctives = 0
-  private startedAt = new Date()
+
+  private riskSum = 0
+  private restrictedCount = 0
+  private suspendedCount = 0
+
+  private startedAt: Date = new Date()
 
   constructor(
     @Inject(PrismaService)
@@ -16,6 +22,22 @@ export class GovernanceRunService {
     @Inject(TimelineService)
     private readonly timeline: TimelineService,
   ) {}
+
+  /**
+   * ✅ IMPORTANTE: este service é singleton (provider do Nest).
+   * Então precisa RESETAR por ciclo, senão acumula pra sempre.
+   */
+  startRun() {
+    this.evaluated = 0
+    this.warnings = 0
+    this.correctives = 0
+
+    this.riskSum = 0
+    this.restrictedCount = 0
+    this.suspendedCount = 0
+
+    this.startedAt = new Date()
+  }
 
   personEvaluated() {
     this.evaluated++
@@ -29,8 +51,32 @@ export class GovernanceRunService {
     this.correctives++
   }
 
+  recordOperationalStatus(params: {
+    state: OperationalStateValue
+    riskScore: number
+  }) {
+    this.riskSum += params.riskScore
+
+    if (params.state === 'RESTRICTED') this.restrictedCount++
+    if (params.state === 'SUSPENDED') this.suspendedCount++
+  }
+
   async finish() {
     const finishedAt = new Date()
+    const durationMs = Math.max(
+      0,
+      finishedAt.getTime() - this.startedAt.getTime(),
+    )
+
+    const institutionalRiskScore =
+      this.evaluated === 0
+        ? 0
+        : Math.min(100, Math.round(this.riskSum / this.evaluated))
+
+    const openCorrectivesCount =
+      await this.prisma.correctiveAction.count({
+        where: { status: 'OPEN' },
+      })
 
     // ✅ snapshot consultável (estado)
     await this.prisma.governanceRun.create({
@@ -38,6 +84,13 @@ export class GovernanceRunService {
         evaluated: this.evaluated,
         warnings: this.warnings,
         correctives: this.correctives,
+
+        institutionalRiskScore,
+        restrictedCount: this.restrictedCount,
+        suspendedCount: this.suspendedCount,
+        openCorrectivesCount,
+
+        durationMs,
         startedAt: this.startedAt,
         finishedAt,
       },
@@ -51,9 +104,29 @@ export class GovernanceRunService {
         evaluated: this.evaluated,
         warnings: this.warnings,
         correctives: this.correctives,
+
+        institutionalRiskScore,
+        restrictedCount: this.restrictedCount,
+        suspendedCount: this.suspendedCount,
+        openCorrectivesCount,
+
+        durationMs,
         startedAt: this.startedAt,
         finishedAt,
       },
     })
+
+    return {
+      evaluated: this.evaluated,
+      warnings: this.warnings,
+      correctives: this.correctives,
+      institutionalRiskScore,
+      restrictedCount: this.restrictedCount,
+      suspendedCount: this.suspendedCount,
+      openCorrectivesCount,
+      durationMs,
+      startedAt: this.startedAt,
+      finishedAt,
+    }
   }
 }

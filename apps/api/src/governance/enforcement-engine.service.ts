@@ -33,12 +33,20 @@ export class EnforcementEngineService {
     for (const p of persons) {
       await this.runForPerson(p.id)
     }
+
+    return { evaluated: persons.length }
   }
 
   private async runForPerson(personId: string) {
     this.run.personEvaluated()
 
     const status = await this.operationalState.getStatus(personId)
+
+    // ✅ alimenta o score institucional + contadores de estado
+    this.run.recordOperationalStatus({
+      state: status.state,
+      riskScore: status.riskScore,
+    })
 
     // ✅ exceção ativa = existe registro ainda não processado
     const hasActiveException =

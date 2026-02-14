@@ -5,6 +5,7 @@ import Card from '../../components/base/Card'
 import SectionBase from '../../components/layout/SectionBase'
 import { useTheme } from '../../theme/useTheme'
 import { useAuth } from '../../auth/useAuth'
+import { getMe } from '../../services/me'
 
 export default function Login() {
   const { styles } = useTheme()
@@ -23,22 +24,32 @@ export default function Login() {
 
     const ok = await login(email.trim(), password)
 
-    setSubmitting(false)
-
     if (!ok) {
+      setSubmitting(false)
       setError('Credenciais inválidas.')
       return
     }
 
-    navigate('/admin', { replace: true })
+    const me = await getMe()
+    setSubmitting(false)
+
+    if (me?.requiresOnboarding) {
+      navigate('/onboarding', { replace: true })
+      return
+    }
+
+    const role = me?.user?.role
+    if (role === 'ADMIN') {
+      navigate('/admin', { replace: true })
+      return
+    }
+
+    navigate('/collaborator', { replace: true })
   }
 
   return (
     <SectionBase>
-      <PageHeader
-        title="Acesso"
-        description="Entre com seu e-mail e senha"
-      />
+      <PageHeader title="Acesso" description="Entre com seu e-mail e senha" />
 
       <Card className="mt-8 max-w-md space-y-4">
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -65,9 +76,7 @@ export default function Login() {
             />
           </div>
 
-          {error && (
-            <div className="text-sm text-rose-400">{error}</div>
-          )}
+          {error && <div className="text-sm text-rose-400">{error}</div>}
 
           <button
             disabled={submitting}

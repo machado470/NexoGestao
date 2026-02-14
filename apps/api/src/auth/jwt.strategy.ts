@@ -9,14 +9,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey:
-        config.get<string>('JWT_SECRET') || 'dev-secret',
+      secretOrKey: config.get<string>('JWT_SECRET') || 'dev-secret',
     })
   }
 
   async validate(payload: any) {
     return {
-      userId: payload.sub,
+      sub: payload.sub,          // ✅ compat com MeController
+      userId: payload.sub,       // ✅ compat futura
       role: payload.role,
       orgId: payload.orgId,
       personId: payload.personId ?? null,

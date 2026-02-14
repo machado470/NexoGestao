@@ -272,10 +272,20 @@ model RiskSnapshot {
 }
 
 model GovernanceRun {
-  id         String   @id @default(uuid())
-  evaluated  Int      @default(0)
-  warnings   Int      @default(0)
-  correctives Int     @default(0)
+  id          String   @id @default(uuid())
+  evaluated   Int      @default(0)
+  warnings    Int      @default(0)
+  correctives Int      @default(0)
+
+  // ✅ métricas institucionais (observabilidade)
+  institutionalRiskScore Int @default(0) // 0..100 (média dos avaliados)
+  restrictedCount        Int @default(0)
+  suspendedCount         Int @default(0)
+  openCorrectivesCount   Int @default(0)
+
+  // ✅ tempo do ciclo
+  durationMs Int @default(0)
+
   startedAt  DateTime
   finishedAt DateTime
   createdAt  DateTime @default(now())
