@@ -178,7 +178,8 @@ export class ReportsService {
       }
     })
 
-    const timeline = await this.timeline.listGlobal()
+    // ✅ Multi-tenant correto: timeline sempre por org
+    const timeline = await this.timeline.listByOrg(orgId)
 
     return {
       peopleStats,

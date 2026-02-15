@@ -1,4 +1,4 @@
-import { Injectable, Inject } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 
 export type RiskContributor =
@@ -18,40 +18,30 @@ export type TemporalRiskResult = {
 
 @Injectable()
 export class TemporalRiskService {
-  constructor(
-    @Inject(PrismaService)
-    private readonly prisma: PrismaService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async calculate(personId: string): Promise<number> {
     const detailed = await this.calculateDetailed(personId)
     return detailed.score
   }
 
-  async calculateDetailed(
-    personId: string,
-  ): Promise<TemporalRiskResult> {
-    const openCorrectives =
-      await this.prisma.correctiveAction.count({
-        where: {
-          personId,
-          status: 'OPEN',
-        },
-      })
+  async calculateDetailed(personId: string): Promise<TemporalRiskResult> {
+    const openCorrectives = await this.prisma.correctiveAction.count({
+      where: {
+        personId,
+        status: 'OPEN',
+      },
+    })
 
-    const assignments =
-      await this.prisma.assignment.findMany({
-        where: { personId },
-        select: { progress: true },
-      })
+    const assignments = await this.prisma.assignment.findMany({
+      where: { personId },
+      select: { progress: true },
+    })
 
     const avgProgress =
       assignments.length === 0
         ? 100
-        : assignments.reduce(
-            (s, a) => s + a.progress,
-            0,
-          ) / assignments.length
+        : assignments.reduce((s, a) => s + a.progress, 0) / assignments.length
 
     let score = 0
     const contributors: RiskContributor[] = []

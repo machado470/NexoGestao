@@ -57,10 +57,11 @@ model Organization {
   requiresOnboarding Boolean  @default(true)
   createdAt          DateTime @default(now())
 
-  users   User[]
-  persons Person[]
-  tracks  Track[]
-  runs    GovernanceRun[]
+  users         User[]
+  persons       Person[]
+  tracks        Track[]
+  runs          GovernanceRun[]
+  timelineEvents TimelineEvent[] // ✅ relação inversa do TimelineEvent.org
 }
 
 model User {

@@ -1,4 +1,4 @@
-import { Injectable, Inject } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import {
   TemporalRiskService,
@@ -25,12 +25,8 @@ export type OperationalStateDetailed = OperationalState & {
 @Injectable()
 export class OperationalStateService {
   constructor(
-    @Inject(PrismaService)
     private readonly prisma: PrismaService,
-
-    @Inject(TemporalRiskService)
     private readonly temporalRisk: TemporalRiskService,
-
     private readonly repository: OperationalStateRepository,
   ) {}
 
@@ -46,9 +42,7 @@ export class OperationalStateService {
     return { state: this.toState(riskScore), riskScore }
   }
 
-  async getStatusDetailed(
-    personId: string,
-  ): Promise<OperationalStateDetailed> {
+  async getStatusDetailed(personId: string): Promise<OperationalStateDetailed> {
     const detailed = await this.temporalRisk.calculateDetailed(personId)
 
     return {

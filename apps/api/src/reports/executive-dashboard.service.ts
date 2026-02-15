@@ -1,64 +1,92 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
-import { OperationalStateService } from '../people/operational-state.service'
 
 @Injectable()
 export class ExecutiveDashboardService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly operationalState: OperationalStateService,
   ) {}
 
   async getOverview(orgId: string) {
-    const people = await this.prisma.person.findMany({
+    // Total de pessoas ativas na organização
+    const peopleTotal = await this.prisma.person.count({
       where: { orgId, active: true },
-      select: { id: true },
     })
 
-    let normal = 0
-    let warning = 0
-    let restricted = 0
-    let suspended = 0
+    // Último ciclo de governança
+    const lastRun = await this.prisma.governanceRun.findFirst({
+      where: { orgId },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        evaluated: true,
+        warnings: true,
+        correctives: true,
+        institutionalRiskScore: true,
+        restrictedCount: true,
+        suspendedCount: true,
+        openCorrectivesCount: true,
+        durationMs: true,
+        startedAt: true,
+        finishedAt: true,
+        createdAt: true,
+      },
+    })
 
-    let totalRisk = 0
+    // Tendência (últimos 14 ciclos)
+    const trend = await this.prisma.governanceRun.findMany({
+      where: { orgId },
+      orderBy: { createdAt: 'desc' },
+      take: 14,
+      select: {
+        createdAt: true,
+        institutionalRiskScore: true,
+        openCorrectivesCount: true,
+        restrictedCount: true,
+        suspendedCount: true,
+        evaluated: true,
+        durationMs: true,
+        finishedAt: true,
+      },
+    })
 
-    for (const p of people) {
-      const status = await this.operationalState.getStatus(p.id)
-
-      totalRisk += status.riskScore
-
-      if (status.state === 'NORMAL') normal++
-      if (status.state === 'WARNING') warning++
-      if (status.state === 'RESTRICTED') restricted++
-      if (status.state === 'SUSPENDED') suspended++
-    }
-
-    // ✅ corretivas APENAS desta org (via relação person)
-    const openCorrectives =
-      await this.prisma.correctiveAction.count({
-        where: {
-          status: 'OPEN',
-          person: { orgId },
+    if (!lastRun) {
+      return {
+        people: {
+          total: peopleTotal,
+          restricted: 0,
+          suspended: 0,
         },
-      })
+        risk: { average: 0 },
+        correctiveActions: { open: 0 },
+        lastRun: null,
+        trend,
+      }
+    }
 
     return {
       people: {
-        total: people.length,
-        normal,
-        warning,
-        restricted,
-        suspended,
+        total: peopleTotal,
+        restricted: lastRun.restrictedCount,
+        suspended: lastRun.suspendedCount,
       },
       risk: {
-        average:
-          people.length === 0
-            ? 0
-            : Math.round(totalRisk / people.length),
+        average: lastRun.institutionalRiskScore,
       },
       correctiveActions: {
-        open: openCorrectives,
+        open: lastRun.openCorrectivesCount,
       },
+      lastRun: {
+        createdAt: lastRun.createdAt,
+        startedAt: lastRun.startedAt,
+        finishedAt: lastRun.finishedAt,
+        durationMs: lastRun.durationMs,
+        evaluated: lastRun.evaluated,
+        warnings: lastRun.warnings,
+        correctives: lastRun.correctives,
+        institutionalRiskScore: lastRun.institutionalRiskScore,
+      },
+      trend,
     }
   }
 }
