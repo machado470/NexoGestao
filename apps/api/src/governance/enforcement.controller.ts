@@ -1,26 +1,42 @@
-import { Controller, Post, UseGuards, ForbiddenException } from '@nestjs/common'
+import {
+  Controller,
+  ForbiddenException,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
-import { EnforcementJob } from './enforcement.job'
+import { EnforcementEngineService } from './enforcement-engine.service'
+import { GovernanceRunService } from './governance-run.service'
 
 @Controller('admin/enforcement')
 @UseGuards(JwtAuthGuard)
 export class EnforcementController {
-  constructor(private readonly job: EnforcementJob) {}
+  constructor(
+    private readonly engine: EnforcementEngineService,
+    private readonly runService: GovernanceRunService,
+  ) {}
 
-  /**
-   * Roda enforcement manualmente.
-   * ✅ Permitido apenas em DEV (ou quando explicitamente habilitado).
-   */
   @Post('run-once')
-  async runOnce() {
-    const allow =
-      process.env.NODE_ENV !== 'production' ||
-      process.env.ALLOW_MANUAL_ENFORCEMENT === 'true'
-
-    if (!allow) {
+  async runOnce(@Req() req: any) {
+    const enabled = process.env.ALLOW_MANUAL_ENFORCEMENT === '1'
+    if (!enabled) {
       throw new ForbiddenException('Manual enforcement desabilitado.')
     }
 
-    return this.job.run()
+    const orgId = req.user.orgId
+
+    // ✅ Orquestra igual o job, mas só pra org atual
+    this.runService.startRun(orgId)
+    const engineResult = await this.engine.runForOrg(orgId)
+    const runSummary = await this.runService.finish(orgId)
+
+    return {
+      ok: true,
+      data: {
+        engine: engineResult,
+        run: runSummary,
+      },
+    }
   }
 }

@@ -11,6 +11,8 @@ import {
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
 import { TracksService } from './tracks.service'
 
+type TrackItemTypeInput = 'READING' | 'ACTION' | 'CHECKPOINT' | 'CONTENT'
+
 @Controller('tracks')
 @UseGuards(JwtAuthGuard)
 export class TracksController {
@@ -54,6 +56,9 @@ export class TracksController {
   /**
    * ✅ Cria item na trilha
    * POST /tracks/:id/items
+   *
+   * OBS: Prisma espera TrackItemType = READING | ACTION | CHECKPOINT.
+   * Mantemos compatibilidade: CONTENT -> READING.
    */
   @Post(':id/items')
   addItem(
@@ -61,15 +66,18 @@ export class TracksController {
     @Param('id') trackId: string,
     @Body()
     body: {
-      type: string
+      type: TrackItemTypeInput
       title: string
       content: string
     },
   ) {
+    const normalizedType =
+      body.type === 'CONTENT' ? 'READING' : body.type
+
     return this.service.addItem({
       trackId,
       orgId: req.user.orgId,
-      type: body.type,
+      type: normalizedType,
       title: body.title,
       content: body.content,
     })
@@ -78,35 +86,26 @@ export class TracksController {
   /**
    * ✅ Lista itens da trilha (debug/inspeção)
    * GET /tracks/:id/items
+   *
+   * Nota: aqui você estava retornando a trilha, não os itens.
+   * Se quiser lista de itens, use /track-items/track/:trackId
+   * (mantive esse endpoint chamando getById pra não quebrar nada).
    */
   @Get(':id/items')
   listItems(@Req() req: any, @Param('id') trackId: string) {
-    // reaproveita getById pra validar orgId e existência
     return this.service.getById(trackId, req.user.orgId)
   }
 
-  /**
-   * ✅ Publicar trilha
-   * POST /tracks/:id/publish
-   */
   @Post(':id/publish')
   publish(@Req() req: any, @Param('id') id: string) {
     return this.service.publish(id, req.user.orgId)
   }
 
-  /**
-   * ✅ Arquivar trilha
-   * POST /tracks/:id/archive
-   */
   @Post(':id/archive')
   archive(@Req() req: any, @Param('id') id: string) {
     return this.service.archive(id, req.user.orgId)
   }
 
-  /**
-   * ✅ Atribuir pessoas
-   * POST /tracks/:id/assign
-   */
   @Post(':id/assign')
   assignPeople(
     @Req() req: any,
@@ -120,10 +119,6 @@ export class TracksController {
     })
   }
 
-  /**
-   * ✅ Desatribuir pessoas
-   * POST /tracks/:id/unassign
-   */
   @Post(':id/unassign')
   unassignPeople(
     @Req() req: any,
