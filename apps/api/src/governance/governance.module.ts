@@ -3,6 +3,7 @@ import { PrismaModule } from '../prisma/prisma.module'
 import { TimelineModule } from '../timeline/timeline.module'
 import { AuditModule } from '../audit/audit.module'
 import { OperationalStateModule } from '../people/operational-state.module'
+import { RiskModule } from '../risk/risk.module'
 
 import { EnforcementPolicyService } from './enforcement-policy.service'
 import { EnforcementEngineService } from './enforcement-engine.service'
@@ -19,6 +20,7 @@ import { EnforcementScheduler } from './enforcement.scheduler'
     TimelineModule,
     AuditModule,
     OperationalStateModule,
+    RiskModule,
   ],
   providers: [
     EnforcementPolicyService,

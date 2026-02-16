@@ -1,13 +1,24 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
-import type { OperationalState } from './operational-state.service'
+import type { OperationalStateValue } from './operational-state.service'
+
+const VALID_STATES: OperationalStateValue[] = [
+  'NORMAL',
+  'WARNING',
+  'RESTRICTED',
+  'SUSPENDED',
+]
 
 @Injectable()
 export class OperationalStateRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getLastState(personId: string): Promise<OperationalState | null> {
-    const last = await this.prisma.auditEvent.findFirst({
+  private isOperationalStateValue(value: unknown): value is OperationalStateValue {
+    return typeof value === 'string' && (VALID_STATES as string[]).includes(value)
+  }
+
+  async getLastState(personId: string): Promise<OperationalStateValue | null> {
+    const last = await this.prisma.timelineEvent.findFirst({
       where: {
         personId,
         action: 'OPERATIONAL_STATE_CHANGED',
@@ -15,15 +26,14 @@ export class OperationalStateRepository {
       orderBy: { createdAt: 'desc' },
     })
 
-    if (!last || !last.metadata || typeof last.metadata !== 'object') {
+    if (!last?.metadata || typeof last.metadata !== 'object') {
       return null
     }
 
-    const state = (last.metadata as any).state
+    const meta = last.metadata as any
+    const to = meta.to ?? meta.state
 
-    if (state === 'NORMAL' || state === 'RESTRICTED' || state === 'SUSPENDED') {
-      return state
-    }
+    if (this.isOperationalStateValue(to)) return to
 
     return null
   }

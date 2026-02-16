@@ -4,6 +4,7 @@ import { EnforcementPolicyService } from './enforcement-policy.service'
 import { OperationalStateService } from '../people/operational-state.service'
 import { TimelineService } from '../timeline/timeline.service'
 import { GovernanceRunService } from './governance-run.service'
+import { RiskService } from '../risk/risk.service'
 
 @Injectable()
 export class EnforcementEngineService {
@@ -22,6 +23,9 @@ export class EnforcementEngineService {
 
     @Inject(GovernanceRunService)
     private readonly run: GovernanceRunService,
+
+    @Inject(RiskService)
+    private readonly risk: RiskService,
   ) {}
 
   async runForOrg(orgId: string) {
@@ -40,7 +44,12 @@ export class EnforcementEngineService {
   private async runForPerson(orgId: string, personId: string) {
     this.run.personEvaluated()
 
-    const status = await this.operationalState.getStatus(personId)
+    const sync = await this.operationalState.syncAndLogStateChange(
+      orgId,
+      personId,
+    )
+
+    const status = sync.status
 
     this.run.recordOperationalStatus({
       state: status.state,
@@ -60,6 +69,9 @@ export class EnforcementEngineService {
     if (decision.action === 'NONE') return
 
     if (decision.action === 'RAISE_WARNING') {
+      const enteredWarning = sync.changed && sync.to === 'WARNING'
+      if (!enteredWarning) return
+
       this.run.warningRaised()
 
       await this.timeline.log({
@@ -70,8 +82,11 @@ export class EnforcementEngineService {
         metadata: {
           state: status.state,
           riskScore: status.riskScore,
+          from: sync.from,
+          to: sync.to,
         },
       })
+
       return
     }
 
@@ -106,6 +121,8 @@ export class EnforcementEngineService {
           riskScore: status.riskScore,
         },
       })
+
+      await this.risk.recalculatePersonRisk(personId, 'CORRECTIVE_CREATED')
     }
   }
 }

@@ -1,12 +1,14 @@
 import { Injectable, BadRequestException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { TimelineService } from '../timeline/timeline.service'
+import { RiskService } from '../risk/risk.service'
 
 @Injectable()
 export class AssignmentFactoryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly timeline: TimelineService,
+    private readonly risk: RiskService,
   ) {}
 
   async assignPeopleToTrack(params: {
@@ -82,6 +84,7 @@ export class AssignmentFactoryService {
       }
     })
 
+    // Timeline: atribuição criada
     await Promise.all(
       result.createdIds.map(personId =>
         this.timeline.log({
@@ -91,6 +94,13 @@ export class AssignmentFactoryService {
           description: `Trilha "${track.title}" atribuída`,
           metadata: { trackId: track.id },
         }),
+      ),
+    )
+
+    // PUSH: recalc risco imediatamente (fecha o loop)
+    await Promise.all(
+      result.createdIds.map(personId =>
+        this.risk.recalculatePersonRisk(personId, 'ASSIGNMENT_CREATED'),
       ),
     )
 

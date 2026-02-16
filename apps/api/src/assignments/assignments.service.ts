@@ -5,12 +5,14 @@ import {
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { TimelineService } from '../timeline/timeline.service'
+import { RiskService } from '../risk/risk.service'
 
 @Injectable()
 export class AssignmentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly timeline: TimelineService,
+    private readonly risk: RiskService,
   ) {}
 
   async listOpenByPerson(personId: string) {
@@ -64,15 +66,9 @@ export class AssignmentsService {
       throw new NotFoundException('Assignment não encontrado')
     }
 
-    const completedItemIds = new Set(
-      assignment.completions.map(c => c.itemId),
-    )
+    const completedItemIds = new Set(assignment.completions.map(c => c.itemId))
 
-    return (
-      assignment.track.items.find(
-        item => !completedItemIds.has(item.id),
-      ) ?? null
-    )
+    return assignment.track.items.find(item => !completedItemIds.has(item.id)) ?? null
   }
 
   async completeItem(assignmentId: string, itemId: string) {
@@ -100,27 +96,19 @@ export class AssignmentsService {
 
       const totalItems = assignment.track.items.length
       if (totalItems === 0) {
-        throw new BadRequestException(
-          'Trilha inválida: não possui itens',
-        )
+        throw new BadRequestException('Trilha inválida: não possui itens')
       }
 
-      const completedItemIds = new Set(
-        assignment.completions.map(c => c.itemId),
-      )
+      const completedItemIds = new Set(assignment.completions.map(c => c.itemId))
 
       if (completedItemIds.has(itemId)) {
         throw new BadRequestException('Item já concluído')
       }
 
-      const nextItem = assignment.track.items.find(
-        item => !completedItemIds.has(item.id),
-      )
+      const nextItem = assignment.track.items.find(item => !completedItemIds.has(item.id))
 
       if (!nextItem || nextItem.id !== itemId) {
-        throw new BadRequestException(
-          'Este item não é o próximo da trilha',
-        )
+        throw new BadRequestException('Este item não é o próximo da trilha')
       }
 
       await tx.trackItemCompletion.create({
@@ -132,9 +120,7 @@ export class AssignmentsService {
       })
 
       const completedCount = completedItemIds.size + 1
-      const progress = Math.round(
-        (completedCount / totalItems) * 100,
-      )
+      const progress = Math.round((completedCount / totalItems) * 100)
 
       await tx.assignment.update({
         where: { id: assignment.id },
@@ -176,6 +162,9 @@ export class AssignmentsService {
       })
     }
 
+    // PUSH: recalc risco após progresso mudar
+    await this.risk.recalculatePersonRisk(result.personId, 'ASSIGNMENT_PROGRESS_UPDATED')
+
     return {
       completed: true,
       progress: result.progress,
@@ -211,10 +200,7 @@ export class AssignmentsService {
         }
       }
 
-      const completedCount = new Set(
-        assignment.completions.map(c => c.itemId),
-      ).size
-
+      const completedCount = new Set(assignment.completions.map(c => c.itemId)).size
       const progress = Math.round((completedCount / totalItems) * 100)
 
       await tx.assignment.update({
@@ -254,6 +240,11 @@ export class AssignmentsService {
         description: 'Trilha concluída (100%)',
         metadata: { assignmentId, progress: rebuilt.progress },
       })
+    }
+
+    // PUSH: recalc risco após rebuild
+    if ((rebuilt as any).personId) {
+      await this.risk.recalculatePersonRisk((rebuilt as any).personId, 'ASSIGNMENT_PROGRESS_REBUILT')
     }
 
     return rebuilt

@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common'
-import { PrismaService } from '../prisma/prisma.service'
 import {
   TemporalRiskService,
   TemporalRiskResult,
 } from '../risk/temporal-risk.service'
 import { OperationalStateRepository } from './operational-state.repository'
+import { TimelineService } from '../timeline/timeline.service'
 
 export type OperationalStateValue =
   | 'NORMAL'
@@ -22,12 +22,19 @@ export type OperationalStateDetailed = OperationalState & {
   factors: TemporalRiskResult['factors']
 }
 
+export type OperationalStateSyncResult = {
+  status: OperationalState
+  changed: boolean
+  from: OperationalStateValue | null
+  to: OperationalStateValue
+}
+
 @Injectable()
 export class OperationalStateService {
   constructor(
-    private readonly prisma: PrismaService,
     private readonly temporalRisk: TemporalRiskService,
     private readonly repository: OperationalStateRepository,
+    private readonly timeline: TimelineService,
   ) {}
 
   private toState(riskScore: number): OperationalStateValue {
@@ -51,5 +58,34 @@ export class OperationalStateService {
       contributors: detailed.contributors,
       factors: detailed.factors,
     }
+  }
+
+  async syncAndLogStateChange(
+    orgId: string,
+    personId: string,
+  ): Promise<OperationalStateSyncResult> {
+    const status = await this.getStatus(personId)
+    const last = await this.repository.getLastState(personId)
+
+    const to = status.state
+    const changed = last !== to
+
+    if (!changed) {
+      return { status, changed: false, from: last, to }
+    }
+
+    await this.timeline.log({
+      orgId,
+      action: 'OPERATIONAL_STATE_CHANGED',
+      personId,
+      description: `Estado operacional: ${last ?? 'N/A'} → ${to}`,
+      metadata: {
+        from: last,
+        to,
+        riskScore: status.riskScore,
+      },
+    })
+
+    return { status, changed: true, from: last, to }
   }
 }
