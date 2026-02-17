@@ -5,6 +5,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
   openssl \
   ca-certificates \
+  postgresql-client \
   && rm -rf /var/lib/apt/lists/*
 
 RUN npm install -g pnpm @nestjs/cli
@@ -16,6 +17,10 @@ COPY apps/web/package.json apps/web/package.json
 RUN pnpm install --frozen-lockfile
 
 COPY . .
+
+# 🔒 GARANTIA ABSOLUTA que o entrypoint é executável e sem CRLF
+RUN chmod +x /app/apps/api/docker-entrypoint.sh \
+  && sed -i 's/\r$//' /app/apps/api/docker-entrypoint.sh
 
 RUN pnpm --filter api prisma:generate
 RUN pnpm --filter api build
