@@ -57,11 +57,14 @@ model Organization {
   requiresOnboarding Boolean  @default(true)
   createdAt          DateTime @default(now())
 
-  users         User[]
-  persons       Person[]
-  tracks        Track[]
-  runs          GovernanceRun[]
-  timelineEvents TimelineEvent[] // ✅ relação inversa do TimelineEvent.org
+  users          User[]
+  persons        Person[]
+  tracks         Track[]
+  runs           GovernanceRun[]
+  timelineEvents TimelineEvent[]
+
+  // 🧩 NEXOGESTÃO OFICIAL
+  customers Customer[]
 }
 
 model User {
@@ -164,7 +167,7 @@ model TrackItem {
 
   createdAt DateTime @default(now())
 
-  track Track @relation(fields: [trackId], references: [id])
+  track       Track @relation(fields: [trackId], references: [id])
   completions TrackItemCompletion[]
 
   @@unique([trackId, order])
@@ -300,4 +303,25 @@ model GovernanceRun {
   createdAt  DateTime @default(now())
 
   @@index([orgId, createdAt])
+}
+
+//
+// 🧩 NEXOGESTÃO OFICIAL — Clientes (MVP)
+//
+model Customer {
+  id     String  @id @default(uuid())
+  orgId  String
+  org    Organization @relation(fields: [orgId], references: [id])
+
+  name   String
+  phone  String
+  email  String?
+  notes  String?
+  active Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orgId, createdAt])
+  @@index([orgId, active, createdAt])
 }

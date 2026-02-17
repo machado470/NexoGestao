@@ -41,6 +41,9 @@ import { ExceptionsModule } from './exceptions/exceptions.module'
 // 🧠 GOVERNANÇA OPERACIONAL
 import { GovernanceModule } from './governance/governance.module'
 
+// 🧩 NEXOGESTÃO OFICIAL — Clientes
+import { CustomersModule } from './customers/customers.module'
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -87,6 +90,9 @@ import { GovernanceModule } from './governance/governance.module'
     TimelineModule,
 
     ExceptionsModule,
+
+    // 🧩 NEXOGESTÃO OFICIAL — módulos operacionais
+    CustomersModule,
 
     // 🔥 MOTOR DE GOVERNANÇA
     GovernanceModule,

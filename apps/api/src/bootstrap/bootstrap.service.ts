@@ -75,19 +75,38 @@ export class BootstrapService {
       throw new ConflictException('Email já cadastrado')
     }
 
-    const baseSlug = this.slugify(orgName)
-    const slug = await this.uniqueOrgSlug(baseSlug)
-
     const passwordHash = await bcrypt.hash(password, 10)
 
     const created = await this.prisma.$transaction(async (tx) => {
-      const org = await tx.organization.create({
-        data: {
-          name: orgName,
-          slug,
-          requiresOnboarding: false,
-        },
+      // ✅ Regra: se já existe org institucional "default" (seed), usa ela.
+      // Evita criar "NexoGestão" duplicado.
+      let org = await tx.organization.findUnique({
+        where: { slug: 'default' },
       })
+
+      if (org) {
+        // opcional: quando bootstrap roda, onboarding deixa de ser obrigatório
+        org = await tx.organization.update({
+          where: { id: org.id },
+          data: {
+            // mantém o nome do seed se quiser; ou alinha com o orgName recebido
+            name: orgName || org.name,
+            requiresOnboarding: false,
+          },
+        })
+      } else {
+        // fallback: sem seed, cria org nova
+        const baseSlug = this.slugify(orgName)
+        const slug = await this.uniqueOrgSlug(baseSlug)
+
+        org = await tx.organization.create({
+          data: {
+            name: orgName,
+            slug,
+            requiresOnboarding: false,
+          },
+        })
+      }
 
       const user = await tx.user.create({
         data: {

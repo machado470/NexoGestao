@@ -26,6 +26,12 @@ services:
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/nexogestao?schema=public
       NODE_ENV: production
+
+      # Auto apply migrations when db is empty
+      AUTO_MIGRATE: "1"
+
+      # Optional: wait for postgres (seconds)
+      DB_WAIT_SECONDS: "40"
     depends_on:
       postgres:
         condition: service_healthy

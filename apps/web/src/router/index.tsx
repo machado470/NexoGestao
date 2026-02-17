@@ -17,6 +17,9 @@ import PersonCreate from '../modules/admin/PersonCreate'
 import AuditPage from '../modules/admin/AuditPage'
 import EvaluationsPage from '../modules/admin/EvaluationsPage'
 
+// 🧩 NEXOGESTÃO OFICIAL
+import CustomersPage from '../modules/admin/CustomersPage'
+
 import CollaboratorLayout from '../modules/collaborator/CollaboratorLayout'
 import CollaboratorDashboard from '../modules/collaborator/CollaboratorDashboard'
 import AssessmentPage from '../modules/collaborator/AssessmentPage'
@@ -48,6 +51,9 @@ export default function Router() {
           <Route path="trilhas/:id" element={<TrackDetail />} />
           <Route path="avaliacoes" element={<EvaluationsPage />} />
           <Route path="auditoria" element={<AuditPage />} />
+
+          {/* 🧩 NEXOGESTÃO OFICIAL */}
+          <Route path="clientes" element={<CustomersPage />} />
         </Route>
       </Route>
 
