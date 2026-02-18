@@ -1,73 +1,36 @@
 import { useEffect, useState } from 'react'
-
-import PageHeader from '../../components/base/PageHeader'
-import Card from '../../components/base/Card'
-
-import {
-  getExecutiveReport,
-  type ExecutiveReport,
-} from '../../services/reports'
+import { getExecutiveReport, getExecutiveMetrics } from '../../services/reports'
+import type { ExecutiveReport } from '../../services/reports'
 
 export default function Reports() {
   const [loading, setLoading] = useState(true)
-  const [data, setData] =
-    useState<ExecutiveReport | null>(null)
+  const [report, setReport] = useState<ExecutiveReport | null>(null)
+  const [metrics, setMetrics] = useState<any>(null)
 
   useEffect(() => {
-    async function load() {
-      try {
-        const report = await getExecutiveReport()
-        setData(report)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    load()
+    Promise.all([getExecutiveReport(), getExecutiveMetrics(30)])
+      .then(([r, m]) => {
+        setReport(r)
+        setMetrics(m)
+      })
+      .finally(() => setLoading(false))
   }, [])
 
-  if (loading) {
-    return (
-      <div className="text-sm opacity-60">
-        Carregando relatório…
-      </div>
-    )
-  }
-
-  if (!data) {
-    return (
-      <div className="text-sm opacity-60">
-        Nenhum dado disponível.
-      </div>
-    )
-  }
+  if (loading) return <div className="p-6">Carregando...</div>
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Relatório Executivo"
-        description="Indicadores consolidados de risco e ações."
-      />
+    <div className="p-6 space-y-4">
+      <h1 className="text-2xl font-semibold">Relatórios</h1>
 
-      <Card>
-        <div className="text-sm space-y-1">
-          <div>
-            Pessoas OK: {data.peopleStats.OK}
-          </div>
-          <div>
-            Pessoas em atenção:{' '}
-            {data.peopleStats.WARNING}
-          </div>
-          <div>
-            Pessoas críticas:{' '}
-            {data.peopleStats.CRITICAL}
-          </div>
-          <div>
-            Ações corretivas abertas:{' '}
-            {data.correctiveOpenCount}
-          </div>
-        </div>
-      </Card>
+      <div className="border rounded p-4">
+        <div className="text-sm font-semibold mb-2">Executive Report</div>
+        <pre className="text-xs overflow-auto">{JSON.stringify(report, null, 2)}</pre>
+      </div>
+
+      <div className="border rounded p-4">
+        <div className="text-sm font-semibold mb-2">Métricas (SLA)</div>
+        <pre className="text-xs overflow-auto">{JSON.stringify(metrics, null, 2)}</pre>
+      </div>
     </div>
   )
 }

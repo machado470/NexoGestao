@@ -14,7 +14,6 @@ import PersonDetailPage from '../modules/admin/PersonDetailPage';
 import PersonCreate from '../modules/admin/PersonCreate';
 import AuditPage from '../modules/admin/AuditPage';
 import EvaluationsPage from '../modules/admin/EvaluationsPage';
-// 🧩 NEXOGESTÃO OFICIAL
 import CustomersPage from '../modules/admin/CustomersPage';
 import CollaboratorLayout from '../modules/collaborator/CollaboratorLayout';
 import CollaboratorDashboard from '../modules/collaborator/CollaboratorDashboard';

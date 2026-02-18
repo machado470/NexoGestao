@@ -1,55 +1,26 @@
 import { useEffect, useState } from 'react'
-import api from '../services/api'
+import { getExecutiveReport } from '../services/reports'
+import type { ExecutiveReport, Urgency } from '../services/reports'
 
-export type PersonStatus =
-  | 'NORMAL'
-  | 'WARNING'
-  | 'RESTRICTED'
-  | 'SUSPENDED'
-  | 'CRITICAL'
-
-export type PersonOverview = {
-  id: string
-  name: string
-  department?: string | null
-  status: PersonStatus
-  riskScore: number
-}
-
-export type ExecutiveDashboardData = {
-  peopleStats: {
-    total: number
-    NORMAL: number
-    WARNING: number
-    RESTRICTED: number
-    SUSPENDED: number
-    CRITICAL: number
-  }
-  correctiveOpenCount: number
-  people: PersonOverview[]
-}
+// compat: arquivo antigo/imports antigos
+export type PersonStatus = Urgency
 
 export function useExecutiveDashboard() {
-  const [data, setData] = useState<ExecutiveDashboardData | null>(null)
+  const [data, setData] = useState<ExecutiveReport | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    api.get('/reports/executive-dashboard')
-      .then(res => setData(res.data))
+    getExecutiveReport()
+      .then(setData)
       .finally(() => setLoading(false))
   }, [])
 
   return {
     loading,
-    peopleStats: data?.peopleStats ?? {
-      total: 0,
-      NORMAL: 0,
-      WARNING: 0,
-      RESTRICTED: 0,
-      SUSPENDED: 0,
-      CRITICAL: 0
-    },
+    peopleStats: data?.peopleStats ?? { OK: 0, WARNING: 0, CRITICAL: 0 },
     correctiveOpenCount: data?.correctiveOpenCount ?? 0,
-    people: data?.people ?? []
+    people: data?.people ?? [],
+    tracks: data?.tracks ?? [],
+    timeline: data?.timeline ?? [],
   }
 }

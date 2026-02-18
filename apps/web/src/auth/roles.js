@@ -1,4 +1,4 @@
 export const roleLabels = {
-    partner: 'Sócio',
-    collaborator: 'Colaborador',
+    ADMIN: 'Admin',
+    COLLABORATOR: 'Colaborador',
 };

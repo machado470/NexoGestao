@@ -1,6 +1,6 @@
-export type Role = 'partner' | 'collaborator'
+export type UserRole = 'ADMIN' | 'COLLABORATOR'
 
-export const roleLabels: Record<Role, string> = {
-  partner: 'Sócio',
-  collaborator: 'Colaborador',
+export const roleLabels: Record<UserRole, string> = {
+  ADMIN: 'Admin',
+  COLLABORATOR: 'Colaborador',
 }

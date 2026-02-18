@@ -1,28 +1,19 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useEffect, useState } from 'react';
-import PageHeader from '../../components/base/PageHeader';
-import Card from '../../components/base/Card';
-import { getExecutiveReport, } from '../../services/reports';
+import { getExecutiveReport, getExecutiveMetrics } from '../../services/reports';
 export default function Reports() {
     const [loading, setLoading] = useState(true);
-    const [data, setData] = useState(null);
+    const [report, setReport] = useState(null);
+    const [metrics, setMetrics] = useState(null);
     useEffect(() => {
-        async function load() {
-            try {
-                const report = await getExecutiveReport();
-                setData(report);
-            }
-            finally {
-                setLoading(false);
-            }
-        }
-        load();
+        Promise.all([getExecutiveReport(), getExecutiveMetrics(30)])
+            .then(([r, m]) => {
+            setReport(r);
+            setMetrics(m);
+        })
+            .finally(() => setLoading(false));
     }, []);
-    if (loading) {
-        return (_jsx("div", { className: "text-sm opacity-60", children: "Carregando relat\u00F3rio\u2026" }));
-    }
-    if (!data) {
-        return (_jsx("div", { className: "text-sm opacity-60", children: "Nenhum dado dispon\u00EDvel." }));
-    }
-    return (_jsxs("div", { className: "space-y-6", children: [_jsx(PageHeader, { title: "Relat\u00F3rio Executivo", description: "Indicadores consolidados de risco e a\u00E7\u00F5es." }), _jsx(Card, { children: _jsxs("div", { className: "text-sm space-y-1", children: [_jsxs("div", { children: ["Pessoas OK: ", data.peopleStats.OK] }), _jsxs("div", { children: ["Pessoas em aten\u00E7\u00E3o:", ' ', data.peopleStats.WARNING] }), _jsxs("div", { children: ["Pessoas cr\u00EDticas:", ' ', data.peopleStats.CRITICAL] }), _jsxs("div", { children: ["A\u00E7\u00F5es corretivas abertas:", ' ', data.correctiveOpenCount] })] }) })] }));
+    if (loading)
+        return _jsx("div", { className: "p-6", children: "Carregando..." });
+    return (_jsxs("div", { className: "p-6 space-y-4", children: [_jsx("h1", { className: "text-2xl font-semibold", children: "Relat\u00F3rios" }), _jsxs("div", { className: "border rounded p-4", children: [_jsx("div", { className: "text-sm font-semibold mb-2", children: "Executive Report" }), _jsx("pre", { className: "text-xs overflow-auto", children: JSON.stringify(report, null, 2) })] }), _jsxs("div", { className: "border rounded p-4", children: [_jsx("div", { className: "text-sm font-semibold mb-2", children: "M\u00E9tricas (SLA)" }), _jsx("pre", { className: "text-xs overflow-auto", children: JSON.stringify(metrics, null, 2) })] })] }));
 }

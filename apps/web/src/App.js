@@ -1,6 +1,5 @@
 import { jsx as _jsx } from "react/jsx-runtime";
 import Router from './router';
-import { ThemeProvider } from './theme/ThemeProvider';
 import { useTheme } from './theme/useTheme';
 function ThemeCanvas() {
     const { styles } = useTheme();
@@ -11,5 +10,5 @@ function ThemeCanvas() {
       `, children: _jsx(Router, {}) }));
 }
 export default function App() {
-    return (_jsx(ThemeProvider, { children: _jsx(ThemeCanvas, {}) }));
+    return _jsx(ThemeCanvas, {});
 }
