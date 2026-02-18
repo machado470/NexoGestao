@@ -1,105 +1,57 @@
-import { useNavigate } from 'react-router-dom'
-
-import Card from '../../components/base/Card'
-import PageHeader from '../../components/base/PageHeader'
-import SectionBase from '../../components/layout/SectionBase'
-import StatusBadge from '../../components/base/StatusBadge'
-
 import { useExecutiveDashboard } from '../../hooks/useExecutiveDashboard'
-import { useTheme } from '../../theme/ThemeProvider'
-
-type PersonStatus = 'OK' | 'WARNING' | 'CRITICAL'
-
-function statusLabel(s: PersonStatus) {
-  if (s === 'CRITICAL') return 'Crítico'
-  if (s === 'WARNING') return 'Atenção'
-  return 'OK'
-}
-
-function statusTone(s: PersonStatus) {
-  if (s === 'CRITICAL') return 'critical'
-  if (s === 'WARNING') return 'warning'
-  return 'success'
-}
+import type { PersonStatus } from '../../hooks/useExecutiveDashboard'
 
 export default function PeoplePage() {
-  const navigate = useNavigate()
-  const { styles } = useTheme()
   const { loading, people } = useExecutiveDashboard()
 
   if (loading) {
-    return (
-      <SectionBase>
-        <PageHeader title="Pessoas" description="Fila institucional de decisão." />
-        <p className="mt-6 text-slate-400">Carregando pessoas…</p>
-      </SectionBase>
-    )
+    return <div className="p-6">Carregando...</div>
   }
-
-  /**
-   * 🔴 ESTADO VAZIO INSTITUCIONAL
-   * Sem pessoas = sem governança
-   */
-  if (people.length === 0) {
-    return (
-      <SectionBase>
-        <PageHeader title="Pessoas" description="Fila institucional de decisão." />
-
-        <Card className="mt-10">
-          <div className="space-y-4 max-w-xl">
-            <div className="text-lg font-semibold">Nenhuma pessoa cadastrada</div>
-
-            <p className="text-sm opacity-70">
-              Sem pessoas, o sistema não consegue aplicar trilhas, avaliar risco ou
-              exercer governança institucional.
-            </p>
-
-            <p className="text-sm opacity-70">
-              Cadastre a primeira pessoa para iniciar o ciclo operacional.
-            </p>
-
-            <div className="pt-2">
-              <button
-                onClick={() => navigate('/admin/pessoas/nova')}
-                className={`rounded px-4 py-2 text-sm ${styles.buttonPrimary}`}
-              >
-                Cadastrar primeira pessoa
-              </button>
-            </div>
-          </div>
-        </Card>
-      </SectionBase>
-    )
-  }
-
-  // 🔥 PRIORIDADE INSTITUCIONAL
-  const ordered = [...people].sort((a, b) => {
-    const weight = (s: PersonStatus) => (s === 'CRITICAL' ? 3 : s === 'WARNING' ? 2 : 1)
-    return weight(b.status) - weight(a.status)
-  })
 
   return (
-    <SectionBase>
-      <PageHeader title="Pessoas" description="Fila institucional de decisão." />
+    <div className="p-6 space-y-4">
+      <h1 className="text-2xl font-semibold">
+        Pessoas
+      </h1>
 
-      <div className="space-y-3 mt-8">
-        {ordered.map(p => (
-          <Card
+      <div className="space-y-3">
+        {people.map(p => (
+          <div
             key={p.id}
-            variant="clickable"
-            onClick={() => navigate(`/admin/pessoas/${p.id}`)}
+            className="border rounded p-4 flex justify-between"
           >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium">{p.name}</p>
-                <p className="text-sm text-slate-400">{p.department ?? '—'}</p>
+            <div>
+              <div className="font-medium">
+                {p.name}
               </div>
-
-              <StatusBadge label={statusLabel(p.status)} tone={statusTone(p.status)} />
+              <div className="text-sm opacity-70">
+                {p.department ?? '—'}
+              </div>
             </div>
-          </Card>
+
+            <StatusBadge status={p.status} />
+          </div>
         ))}
       </div>
-    </SectionBase>
+    </div>
+  )
+}
+
+function StatusBadge({ status }: { status: PersonStatus }) {
+  const color =
+    status === 'CRITICAL'
+      ? 'text-red-600'
+      : status === 'WARNING'
+      ? 'text-yellow-600'
+      : status === 'RESTRICTED'
+      ? 'text-orange-600'
+      : status === 'SUSPENDED'
+      ? 'text-red-800'
+      : 'text-green-600'
+
+  return (
+    <span className={`text-sm font-semibold ${color}`}>
+      {status}
+    </span>
   )
 }

@@ -1,82 +1,179 @@
-# NexoGestao — Governance & Risk Engine
+# NexoGestão — Plataforma Modular de Gestão Operacional
 
-O **NexoGestao** é um motor de governança operacional com trilhas de execução,
-risco humano mensurável e auditoria contínua.
+O **NexoGestão** é uma plataforma de gestão modular com integração via WhatsApp,
+focada em organizar operação, reduzir erro humano e automatizar comunicação.
 
-Ele existe para transformar “processo no PowerPoint” em mecanismo rodando de verdade.
+Ele conecta:
 
-Governança não é discurso.  
-É execução rastreável.
+cliente → operação → financeiro → execução → risco → histórico
+
+Sem planilhas paralelas.  
+Sem mensagem perdida.  
+Sem controle informal.
 
 ---
 
 ## 🎯 Propósito
 
-Organizações falham não por falta de regras,
-mas por falta de execução consistente.
+Pequenas e médias empresas não quebram por falta de cliente.
 
-O NexoGestao fecha o ciclo:
+Quebram por desorganização operacional.
 
-trilha → execução → evidência → risco → ação corretiva → auditoria
+O NexoGestão existe para:
 
-Sem planilha paralela.  
-Sem controle informal.  
-Sem “ninguém viu”.
+- Organizar operação
+- Padronizar execução
+- Automatizar comunicação
+- Reduzir risco humano
+- Registrar histórico real
 
----
-
-## 🧠 Conceitos Centrais
-
-### Pessoas e papéis
-Cada usuário opera dentro de um contexto organizacional definido.  
-Permissões não são decorativas.
-
-### Trilhas de execução
-Conteúdos, rotinas e validações atribuídas conforme função, risco e histórico.
-
-### Execução registrada
-Nada avança sem evidência.  
-Cada item gera registro.
-
-### Risco humano
-Recalculado automaticamente com base em:
-- recorrência
-- gravidade
-- atrasos
-- falhas
-
-Risco não é opinião.
-
-### Ações corretivas
-Quando limites são ultrapassados, o sistema gera ações obrigatórias.
-
-Governança que não age vira relatório.
-
-### Auditoria contínua
-Linha do tempo defensável de decisões, execuções e eventos críticos.
+Ele transforma rotina desorganizada em sistema estruturado.
 
 ---
 
-## 🏗 Arquitetura
+## 🧠 Conceito Central
 
-Monorepo com:
+O NexoGestão não é um ERP pesado.
 
-- `apps/api` → NestJS + Prisma + PostgreSQL
-- `apps/web` → React + Vite + Tailwind
-- Docker Compose (API + Postgres)
+Ele é um núcleo inteligente (NexoCore) com módulos conectados.
+
+Tudo gira em torno da operação real da empresa.
+
+---
+
+## 🏗 Estrutura Modular
+
+### 👥 Módulo Clientes
+- Cadastro completo
+- Histórico de atendimento
+- Relacionamento centralizado
+- Status ativo/inativo
+
+---
+
+### 📅 Módulo Agenda
+- Agendamentos
+- Lembretes automáticos
+- Confirmação via WhatsApp
+- Controle de comparecimento
+
+---
+
+### 🧾 Módulo Ordens de Serviço
+- Criação de O.S.
+- Registro de execução
+- Status da ordem
+- Histórico por cliente
+
+---
+
+### 💰 Módulo Financeiro
+- Registro de cobranças
+- Controle de pagamento
+- Envio automático de lembrete
+- Emissão de recibo digital
+
+---
+
+### 📦 Módulo Estoque (fase futura)
+- Controle de itens
+- Baixa automática por O.S.
+- Histórico de consumo
+
+---
+
+## 📲 Integração WhatsApp — "Meu Acessor"
+
+O WhatsApp não é suporte.
+É canal operacional.
+
+Funções previstas:
+
+- Confirmação de agendamento
+- Envio de recibo
+- Envio de link de pagamento
+- Lembrete de pagamento não agressivo
+- Confirmação de execução
+- Token de acesso único
+
+Comunicação automatizada, mas editável.
+
+---
+
+## 🧠 Núcleo Inteligente — NexoCore
+
+O NexoCore é o diferencial invisível.
+
+Ele calcula:
+
+- Risco operacional por cliente
+- Risco por colaborador
+- Risco por atraso
+- Frequência de falhas
+- Indicadores de recorrência
+
+Isso permite:
+
+- Alertas automáticos
+- Ajuste de prioridade
+- Decisão baseada em dados
+
+---
+
+## 🔁 Fluxo Operacional
+
+Cliente
+→ Agenda
+→ Ordem de Serviço
+→ Execução
+→ Financeiro
+→ Comunicação automática
+→ Histórico
+→ Risco recalculado
+
+
+Sem planilha paralela.
+Sem controle fora do sistema.
+
+---
+
+## 🎯 Público-Alvo Inicial
+
+Empresas de serviço:
+
+- Limpeza
+- Manutenção
+- Assistência técnica
+- Pequenas clínicas
+- Escritórios
+- Prestadores recorrentes
+
+Negócios que vivem no WhatsApp e planilha.
+
+---
+
+## 🏗 Arquitetura Técnica
+
+Monorepo:
+
+apps/
+api/ → NestJS + Prisma + PostgreSQL
+web/ → React + Vite + Tailwind
+
+
+Infra:
+
+- Docker Compose
+- PostgreSQL 15
 - Seeds idempotentes
-- Jobs idempotentes
 - Backend como autoridade
-
-Princípio inegociável:
-
-> Nada de dados fake para demo.
+- Multi-tenant
 
 ---
 
-## 🚀 Rodar localmente
+## 🚀 Rodar Localmente
 
-### 1. Instalar dependências
+### Instalar dependências
 
 ```bash
 pnpm install

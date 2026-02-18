@@ -1,15 +1,23 @@
-import { Controller, Get, Param } from '@nestjs/common'
+import { Controller, Get, UseGuards } from '@nestjs/common'
 import { PendingService } from './pending.service'
 
-@Controller('pending')
-export class PendingController {
-  constructor(
-    private readonly service: PendingService,
-  ) {}
+import { JwtAuthGuard } from '../auth/jwt-auth.guard'
+import { RolesGuard } from '../auth/guards/roles.guard'
+import { Roles } from '../auth/decorators/roles.decorator'
+import { Org } from '../auth/decorators/org.decorator'
 
-  // ADMIN / ORG
-  @Get(':orgId')
-  list(@Param('orgId') orgId: string) {
+@Controller('pending')
+@UseGuards(JwtAuthGuard, RolesGuard)
+export class PendingController {
+  constructor(private readonly service: PendingService) {}
+
+  /**
+   * 🔎 ADMIN / ORG
+   * orgId vem do token (multi-tenant blindado)
+   */
+  @Get('org')
+  @Roles('ADMIN')
+  listByOrg(@Org() orgId: string) {
     return this.service.listByOrg(orgId)
   }
 }

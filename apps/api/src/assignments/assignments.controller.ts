@@ -6,23 +6,32 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common'
+
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
+import { RolesGuard } from '../auth/guards/roles.guard'
+import { Roles } from '../auth/decorators/roles.decorator'
+import { Org } from '../auth/decorators/org.decorator'
+
 import { OperationalStateGuard } from '../people/operational-state.guard'
 import { AssignmentsService } from './assignments.service'
 
 @Controller('assignments')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class AssignmentsController {
   constructor(
     private readonly service: AssignmentsService,
   ) {}
 
   /**
-   * 📋 LISTAGEM POR PESSOA
+   * 📋 ADMIN: LISTAGEM POR PESSOA (ORG-SCOPED)
    */
   @Get('person/:personId')
-  async listByPerson(@Param('personId') personId: string) {
-    return this.service.listOpenByPerson(personId)
+  @Roles('ADMIN')
+  async listByPerson(
+    @Org() orgId: string,
+    @Param('personId') personId: string,
+  ) {
+    return this.service.listOpenByPersonInOrg(orgId, personId)
   }
 
   /**
@@ -60,7 +69,6 @@ export class AssignmentsController {
 
   /**
    * 🛠️ REBUILD PROGRESS
-   * Sincroniza Assignment.progress com TrackItemCompletion (útil após seed/testes/SQL).
    */
   @Post(':id/rebuild-progress')
   @UseGuards(OperationalStateGuard)

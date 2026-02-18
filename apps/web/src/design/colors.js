@@ -1,0 +1,28 @@
+export const colors = {
+    light: {
+        background: "#F7F7F7",
+        card: "#FFFFFF",
+        text: "#1A1A1A",
+        textSecondary: "#5A5A5A",
+        border: "#E6E6E6",
+        primary: "#2A73FF",
+        primaryHover: "#1F5ED6",
+        progressYellow: "#F2C94C",
+        progressGreen: "#27AE60",
+        progressPurple: "#9B51E0",
+        navIcon: "#4F4F4F",
+    },
+    dark: {
+        background: "#121212",
+        card: "#1E1E1E",
+        text: "#FFFFFF",
+        textSecondary: "#BDBDBD",
+        border: "#333333",
+        primary: "#2A73FF",
+        primaryHover: "#1F5ED6",
+        progressYellow: "#F2C94C",
+        progressGreen: "#27AE60",
+        progressPurple: "#BB86FC",
+        navIcon: "#BDBDBD",
+    },
+};

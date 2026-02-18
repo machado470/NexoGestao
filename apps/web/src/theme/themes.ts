@@ -1,137 +1,99 @@
-export type ThemeName = 'orange' | 'offwhite' | 'blue'
+export type ThemeName = 'orange' | 'offwhite'
 
 export type ThemeStyles = {
-  // legado (muito código usa isso)
+  background: string
   bg: string
+
+  text: string
+  textPrimary: string
+  textMuted: string
+  muted: string
+
   surface: string
   border: string
-  text: string
-  muted: string
+
+  card: string
+  cardBg: string
+  cardBorder: string
+
+  input: string
+
   accent: string
+  navHover: string
+
+  buttonPrimary: string
+  buttonSecondary: string
+
   chart: {
     primary: string
     success: string
     warning: string
     danger: string
   }
-
-  // “novo” (alguns layouts usam isso)
-  background: string
-  textPrimary: string
-  textMuted: string
-  navHover: string
-  navActive: string
-  buttonPrimary: string
-
-  // compat (card/panel)
-  cardBg: string
-  cardBorder: string
 }
 
 export const themes: Record<ThemeName, ThemeStyles> = {
   orange: {
-    bg: `
-      bg-gradient-to-br
-      from-[#120A06]
-      via-[#0B0A0A]
-      to-[#070707]
-    `,
-    surface: `
-      bg-[#14110F]/80
-      backdrop-blur-xl
-      shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]
-    `,
-    border: 'border-white/10',
-    text: 'text-slate-100',
-    muted: 'text-slate-400',
-    accent: 'text-[#F97316]',
+    background: 'bg-black',
+    bg: 'bg-black',
+
+    text: 'text-white',
+    textPrimary: 'text-white',
+    textMuted: 'text-zinc-400',
+    muted: 'text-zinc-400',
+
+    surface: 'bg-zinc-900',
+    border: 'border-zinc-800',
+
+    card: 'bg-zinc-900 border border-zinc-800',
+    cardBg: 'bg-zinc-900',
+    cardBorder: 'border-zinc-800',
+
+    input: 'bg-zinc-800 border border-zinc-700 text-white',
+
+    accent: 'text-orange-500',
+    navHover: 'text-orange-400',
+
+    buttonPrimary: 'bg-orange-500 hover:bg-orange-600 text-white',
+    buttonSecondary: 'bg-zinc-700 hover:bg-zinc-600 text-white',
+
     chart: {
-      primary: '#F97316',
-      success: '#4ADE80',
-      warning: '#FACC15',
-      danger: '#F87171',
-    },
-
-    background:
-      'bg-gradient-to-br from-[#120A06] via-[#0B0A0A] to-[#070707]',
-    textPrimary: 'text-slate-100',
-    textMuted: 'text-slate-400',
-    navHover: 'bg-white/5',
-    navActive: 'bg-white/10',
-    buttonPrimary:
-      'bg-[#F97316] text-black hover:bg-[#FB923C] disabled:opacity-50',
-
-    cardBg:
-      'bg-[#14110F]/80 backdrop-blur-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]',
-    cardBorder: 'border-white/10',
+      primary: '#f97316',
+      success: '#22c55e',
+      warning: '#f59e0b',
+      danger: '#ef4444'
+    }
   },
 
   offwhite: {
-    bg: `
-      bg-gradient-to-br
-      from-[#f6f3ec]
-      via-[#efeadd]
-      to-[#e6dfd2]
-    `,
-    surface: 'bg-white/95 shadow-[0_1px_2px_rgba(0,0,0,0.06)]',
-    border: 'border-black/10',
-    text: 'text-slate-900',
-    muted: 'text-slate-600',
-    accent: 'text-[#F97316]',
+    background: 'bg-white',
+    bg: 'bg-white',
+
+    text: 'text-zinc-900',
+    textPrimary: 'text-zinc-900',
+    textMuted: 'text-zinc-500',
+    muted: 'text-zinc-500',
+
+    surface: 'bg-white',
+    border: 'border-zinc-200',
+
+    card: 'bg-white border border-zinc-200',
+    cardBg: 'bg-white',
+    cardBorder: 'border-zinc-200',
+
+    input: 'bg-white border border-zinc-300 text-zinc-900',
+
+    accent: 'text-orange-600',
+    navHover: 'text-orange-500',
+
+    buttonPrimary: 'bg-orange-500 hover:bg-orange-600 text-white',
+    buttonSecondary: 'bg-zinc-200 hover:bg-zinc-300 text-zinc-900',
+
     chart: {
-      primary: '#F97316',
-      success: '#16A34A',
-      warning: '#D97706',
-      danger: '#DC2626',
-    },
-
-    background:
-      'bg-gradient-to-br from-[#f6f3ec] via-[#efeadd] to-[#e6dfd2]',
-    textPrimary: 'text-slate-900',
-    textMuted: 'text-slate-600',
-    navHover: 'bg-black/5',
-    navActive: 'bg-black/10',
-    buttonPrimary:
-      'bg-[#F97316] text-white hover:bg-[#FB923C] disabled:opacity-50',
-
-    cardBg: 'bg-white/95 shadow-[0_1px_2px_rgba(0,0,0,0.06)]',
-    cardBorder: 'border-black/10',
-  },
-
-  blue: {
-    bg: `
-      bg-gradient-to-br
-      from-[#0B1E33]
-      via-[#081A2D]
-      to-[#050F1C]
-    `,
-    surface: `
-      bg-[#0F2A44]/80
-      backdrop-blur-xl
-      shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]
-    `,
-    border: 'border-white/10',
-    text: 'text-slate-100',
-    muted: 'text-slate-400',
-    accent: 'text-[#F97316]',
-    chart: {
-      primary: '#38BDF8',
-      success: '#4ADE80',
-      warning: '#FACC15',
-      danger: '#F87171',
-    },
-
-    background:
-      'bg-gradient-to-br from-[#0B1E33] via-[#081A2D] to-[#050F1C]',
-    textPrimary: 'text-slate-100',
-    textMuted: 'text-slate-400',
-    navHover: 'bg-white/5',
-    navActive: 'bg-white/10',
-    buttonPrimary:
-      'bg-[#F97316] text-black hover:bg-[#FB923C] disabled:opacity-50',
-
-    cardBg:
-      'bg-[#0F2A44]/80 backdrop-blur-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]',
-    cardBorder: 'border-white/10',
-  },
+      primary: '#ea580c',
+      success: '#16a34a',
+      warning: '#d97706',
+      danger: '#dc2626'
+    }
+  }
 }

@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  ForbiddenException,
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { TimelineService } from '../timeline/timeline.service'
@@ -15,6 +16,10 @@ export class AssignmentsService {
     private readonly risk: RiskService,
   ) {}
 
+  /**
+   * ✅ USO INTERNO (ME)
+   * PersonId vem do token (seguro)
+   */
   async listOpenByPerson(personId: string) {
     return this.prisma.assignment.findMany({
       where: {
@@ -26,6 +31,27 @@ export class AssignmentsService {
       },
       orderBy: { createdAt: 'desc' },
     })
+  }
+
+  /**
+   * 🔒 ADMIN (ORG-SCOPED)
+   * impede atravessar multi-tenant via personId
+   */
+  async listOpenByPersonInOrg(orgId: string, personId: string) {
+    if (!orgId) throw new BadRequestException('orgId é obrigatório')
+    if (!personId) throw new BadRequestException('personId é obrigatório')
+
+    const person = await this.prisma.person.findFirst({
+      where: { id: personId, orgId },
+      select: { id: true },
+    })
+
+    if (!person) {
+      // não revela se existe em outra org
+      throw new ForbiddenException('Sem permissão para acessar esta pessoa.')
+    }
+
+    return this.listOpenByPerson(personId)
   }
 
   async startAssignment(assignmentId: string) {
@@ -162,7 +188,6 @@ export class AssignmentsService {
       })
     }
 
-    // PUSH: recalc risco após progresso mudar
     await this.risk.recalculatePersonRisk(result.personId, 'ASSIGNMENT_PROGRESS_UPDATED')
 
     return {
@@ -242,7 +267,6 @@ export class AssignmentsService {
       })
     }
 
-    // PUSH: recalc risco após rebuild
     if ((rebuilt as any).personId) {
       await this.risk.recalculatePersonRisk((rebuilt as any).personId, 'ASSIGNMENT_PROGRESS_REBUILT')
     }

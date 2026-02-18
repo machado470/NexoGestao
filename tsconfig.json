@@ -1,26 +1,7 @@
 {
-  "compilerOptions": {
-    "module": "commonjs",
-    "target": "es2017",
-    "moduleResolution": "node",
-    "sourceMap": true,
-    "removeComments": true,
-    "emitDecoratorMetadata": true,
-    "experimentalDecorators": true,
-    "strict": false,
-
-    "baseUrl": "./",
-    "paths": {
-      "*": ["*"]
-    },
-
-    "outDir": "./dist",
-    "rootDir": "./",
-
-    "skipLibCheck": true,
-    "esModuleInterop": true
-  },
-
-  "exclude": ["node_modules", "dist"]
+  "files": [],
+  "references": [
+    { "path": "./apps/api" },
+    { "path": "./apps/web" }
+  ]
 }
-

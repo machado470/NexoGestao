@@ -1,4 +1,5 @@
 {
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "module": "CommonJS",
     "moduleResolution": "node",
@@ -15,11 +16,7 @@
     "emitDecoratorMetadata": true,
 
     "strict": true,
-    "skipLibCheck": true,
-    "incremental": false,
-
-    "esModuleInterop": true,
-    "resolveJsonModule": true
+    "incremental": false
   },
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist"]
