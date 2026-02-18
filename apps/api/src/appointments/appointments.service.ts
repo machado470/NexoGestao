@@ -55,11 +55,22 @@ function addMinutes(d: Date, minutes: number): Date {
   return new Date(d.getTime() + minutes * 60 * 1000)
 }
 
-function durationMinutes(start: Date, end: Date | null): number {
-  if (!end) return DEFAULT_DURATION_MIN
+function durationMinutes(start: Date, end: Date): number {
   const ms = end.getTime() - start.getTime()
   if (ms <= 0) return DEFAULT_DURATION_MIN
   return Math.max(1, Math.round(ms / 60000))
+}
+
+function isOverlapDbViolation(err: any): boolean {
+  const msg = String(err?.message ?? '')
+  const code = String(err?.code ?? '')
+  // Postgres exclusion_violation = 23P01
+  return (
+    code === '23P01' ||
+    msg.includes('Appointment_no_overlap_per_org') ||
+    msg.toLowerCase().includes('exclusion') ||
+    msg.toLowerCase().includes('overlap')
+  )
 }
 
 @Injectable()
@@ -68,40 +79,6 @@ export class AppointmentsService {
     private readonly prisma: PrismaService,
     private readonly timeline: TimelineService,
   ) {}
-
-  private async findOverlap(params: {
-    orgId: string
-    excludeId?: string | null
-    startsAt: Date
-    endsAt: Date
-  }): Promise<{ id: string; customerId: string; startsAt: Date; endsAt: Date } | null> {
-    const orgId = params.orgId
-    const excludeId = params.excludeId ?? null
-    const startsAt = params.startsAt
-    const endsAt = params.endsAt
-
-    const rows = await this.prisma.$queryRaw<
-      Array<{ id: string; customerId: string; startsAt: Date; endsAt: Date }>
-    >`
-      SELECT
-        id,
-        "customerId",
-        "startsAt",
-        COALESCE("endsAt", "startsAt" + interval '${DEFAULT_DURATION_MIN} minutes') AS "endsAt"
-      FROM "Appointment"
-      WHERE "orgId" = ${orgId}
-        AND (${excludeId}::uuid IS NULL OR id <> ${excludeId}::uuid)
-        AND status <> 'CANCELED'
-        AND tsrange(
-              "startsAt",
-              COALESCE("endsAt", "startsAt" + interval '${DEFAULT_DURATION_MIN} minutes'),
-              '[)'
-            ) && tsrange(${startsAt}::timestamp, ${endsAt}::timestamp, '[)')
-      LIMIT 1;
-    `
-
-    return rows[0] ?? null
-  }
 
   async list(
     orgId: string,
@@ -190,62 +167,54 @@ export class AppointmentsService {
       where: { id: params.customerId, orgId: params.orgId },
       select: { id: true, name: true },
     })
-    if (!customer) {
-      throw new BadRequestException('Cliente inválido para este org')
-    }
+    if (!customer) throw new BadRequestException('Cliente inválido para este org')
 
-    const conflict = await this.findOverlap({
-      orgId: params.orgId,
-      excludeId: null,
-      startsAt,
-      endsAt,
-    })
-
-    if (conflict) {
-      await this.timeline.log({
-        orgId: params.orgId,
-        action: 'APPOINTMENT_CONFLICT_BLOCKED',
-        description: `Conflito de horário bloqueado (cliente: ${customer.name})`,
-        metadata: {
+    try {
+      const created = await this.prisma.appointment.create({
+        data: {
+          orgId: params.orgId,
           customerId: params.customerId,
-          attempted: { startsAt, endsAt, status },
-          conflictWith: conflict,
-          createdBy: params.createdBy,
+          startsAt,
+          endsAt,
+          status,
+          notes,
+        },
+        include: {
+          customer: { select: { id: true, name: true, phone: true } },
         },
       })
 
-      throw new ConflictException('Conflito de horário: já existe um agendamento nesse intervalo')
-    }
-
-    const created = await this.prisma.appointment.create({
-      data: {
+      await this.timeline.log({
         orgId: params.orgId,
-        customerId: params.customerId,
-        startsAt,
-        endsAt,
-        status,
-        notes,
-      },
-      include: {
-        customer: { select: { id: true, name: true, phone: true } },
-      },
-    })
+        action: 'APPOINTMENT_CREATED',
+        description: `Agendamento criado: ${created.customer.name}`,
+        metadata: {
+          appointmentId: created.id,
+          customerId: created.customerId,
+          createdBy: params.createdBy,
+          startsAt: created.startsAt,
+          endsAt: created.endsAt,
+          status: created.status,
+        },
+      })
 
-    await this.timeline.log({
-      orgId: params.orgId,
-      action: 'APPOINTMENT_CREATED',
-      description: `Agendamento criado: ${created.customer.name}`,
-      metadata: {
-        appointmentId: created.id,
-        customerId: created.customerId,
-        createdBy: params.createdBy,
-        startsAt: created.startsAt,
-        endsAt: created.endsAt,
-        status: created.status,
-      },
-    })
-
-    return created
+      return created
+    } catch (e: any) {
+      if (isOverlapDbViolation(e)) {
+        await this.timeline.log({
+          orgId: params.orgId,
+          action: 'APPOINTMENT_CONFLICT_BLOCKED',
+          description: `Conflito de horário bloqueado (DB) (cliente: ${customer.name})`,
+          metadata: {
+            customerId: params.customerId,
+            attempted: { startsAt, endsAt, status },
+            createdBy: params.createdBy,
+          },
+        })
+        throw new ConflictException('Conflito de horário: já existe um agendamento nesse intervalo')
+      }
+      throw e
+    }
   }
 
   async update(params: {
@@ -287,6 +256,7 @@ export class AppointmentsService {
         : undefined
 
     if (patchStartsAt === null) throw new BadRequestException('startsAt inválido')
+    if (patchEndsAt === null) throw new BadRequestException('endsAt inválido')
 
     if (typeof params.data.notes === 'string') {
       patch.notes = normalizeNotes(params.data.notes)
@@ -299,13 +269,15 @@ export class AppointmentsService {
 
     const finalStartsAt = (patchStartsAt ?? existing.startsAt) as Date
 
-    const existingDuration = durationMinutes(existing.startsAt, existing.endsAt)
+    const existingEndsAt = existing.endsAt as Date
+    const existingDuration = durationMinutes(existing.startsAt, existingEndsAt)
+
     const finalEndsAt =
       patchEndsAt !== undefined
         ? (patchEndsAt ?? addMinutes(finalStartsAt, DEFAULT_DURATION_MIN))
         : patchStartsAt
           ? addMinutes(finalStartsAt, existingDuration)
-          : (existing.endsAt ?? addMinutes(finalStartsAt, DEFAULT_DURATION_MIN))
+          : existingEndsAt
 
     if (finalEndsAt.getTime() <= finalStartsAt.getTime()) {
       throw new BadRequestException('endsAt não pode ser antes/igual a startsAt')
@@ -318,57 +290,51 @@ export class AppointmentsService {
       throw new BadRequestException('Nenhum campo para atualizar')
     }
 
-    const conflict = await this.findOverlap({
-      orgId: params.orgId,
-      excludeId: params.id,
-      startsAt: finalStartsAt,
-      endsAt: finalEndsAt,
-    })
+    try {
+      const result = await this.prisma.appointment.updateMany({
+        where: { id: params.id, orgId: params.orgId },
+        data: patch,
+      })
+      if (result.count === 0) throw new NotFoundException('Agendamento não encontrado')
 
-    if (conflict) {
+      const updated = await this.prisma.appointment.findFirst({
+        where: { id: params.id, orgId: params.orgId },
+        include: {
+          customer: { select: { id: true, name: true, phone: true } },
+        },
+      })
+      if (!updated) throw new NotFoundException('Agendamento não encontrado')
+
+      const statusChanged = patch.status && patch.status !== existing.status
+
       await this.timeline.log({
         orgId: params.orgId,
-        action: 'APPOINTMENT_CONFLICT_BLOCKED',
-        description: `Conflito de horário bloqueado (update)`,
+        action: statusChanged ? statusToAction(updated.status) : 'APPOINTMENT_UPDATED',
+        description: `Agendamento atualizado: ${updated.customer.name}`,
         metadata: {
-          appointmentId: params.id,
-          attempted: { startsAt: finalStartsAt, endsAt: finalEndsAt, status: patch.status },
-          conflictWith: conflict,
+          appointmentId: updated.id,
+          customerId: updated.customerId,
           updatedBy: params.updatedBy,
+          patch,
         },
       })
 
-      throw new ConflictException('Conflito de horário: já existe um agendamento nesse intervalo')
+      return updated
+    } catch (e: any) {
+      if (isOverlapDbViolation(e)) {
+        await this.timeline.log({
+          orgId: params.orgId,
+          action: 'APPOINTMENT_CONFLICT_BLOCKED',
+          description: `Conflito de horário bloqueado (DB) (update)`,
+          metadata: {
+            appointmentId: params.id,
+            attempted: { startsAt: finalStartsAt, endsAt: finalEndsAt, status: patch.status },
+            updatedBy: params.updatedBy,
+          },
+        })
+        throw new ConflictException('Conflito de horário: já existe um agendamento nesse intervalo')
+      }
+      throw e
     }
-
-    const result = await this.prisma.appointment.updateMany({
-      where: { id: params.id, orgId: params.orgId },
-      data: patch,
-    })
-    if (result.count === 0) throw new NotFoundException('Agendamento não encontrado')
-
-    const updated = await this.prisma.appointment.findFirst({
-      where: { id: params.id, orgId: params.orgId },
-      include: {
-        customer: { select: { id: true, name: true, phone: true } },
-      },
-    })
-    if (!updated) throw new NotFoundException('Agendamento não encontrado')
-
-    const statusChanged = patch.status && patch.status !== existing.status
-
-    await this.timeline.log({
-      orgId: params.orgId,
-      action: statusChanged ? statusToAction(updated.status) : 'APPOINTMENT_UPDATED',
-      description: `Agendamento atualizado: ${updated.customer.name}`,
-      metadata: {
-        appointmentId: updated.id,
-        customerId: updated.customerId,
-        updatedBy: params.updatedBy,
-        patch,
-      },
-    })
-
-    return updated
   }
 }
