@@ -11,7 +11,21 @@ type TimelineLogInput = {
 
 function pickActorUserId(metadata?: Record<string, any> | null): string | null {
   if (!metadata) return null
-  const v = metadata.updatedBy ?? metadata.createdBy
+
+  // ✅ padrão novo
+  const v1 = metadata.actorUserId
+  if (typeof v1 === 'string' && v1.trim()) return v1.trim()
+
+  // ✅ compat legado (já existe no sistema)
+  const v2 = metadata.updatedBy ?? metadata.createdBy
+  if (typeof v2 !== 'string') return null
+  const s = v2.trim()
+  return s ? s : null
+}
+
+function pickActorPersonId(metadata?: Record<string, any> | null): string | null {
+  if (!metadata) return null
+  const v = metadata.actorPersonId
   if (typeof v !== 'string') return null
   const s = v.trim()
   return s ? s : null
@@ -29,9 +43,23 @@ export class TimelineService {
       throw new Error('TimelineService.log(): orgId é obrigatório')
     }
 
-    // ✅ Auto-resolve autoria quando personId não vem, mas metadata tem createdBy/updatedBy
+    // ✅ 1) Se veio personId explícito, perfeito.
     let personId = input.personId ?? null
 
+    // ✅ 2) Se não veio, tenta metadata.actorPersonId (padrão novo) e valida no org
+    if (!personId) {
+      const actorPersonId = pickActorPersonId(input.metadata ?? null)
+
+      if (actorPersonId) {
+        const exists = await this.prisma.person.findFirst({
+          where: { id: actorPersonId, orgId: input.orgId },
+          select: { id: true },
+        })
+        if (exists?.id) personId = exists.id
+      }
+    }
+
+    // ✅ 3) Se ainda não veio, tenta resolver por userId (actorUserId / createdBy / updatedBy)
     if (!personId) {
       const actorUserId = pickActorUserId(input.metadata ?? null)
 
@@ -44,15 +72,12 @@ export class TimelineService {
           select: { id: true },
         })
 
-        if (person?.id) {
-          personId = person.id
-        }
+        if (person?.id) personId = person.id
       }
     }
 
     // ⚠️ Aviso (não quebra) para ações operacionais sem autoria
     if (!personId && String(input.action || '').startsWith('APPOINTMENT_')) {
-      // evita spam: só warn, sem criar outro timeline event
       console.warn(
         '[Timeline] APPOINTMENT_* sem personId. action=%s orgId=%s metadataKeys=%s',
         input.action,

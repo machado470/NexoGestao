@@ -64,7 +64,6 @@ function durationMinutes(start: Date, end: Date): number {
 function isOverlapDbViolation(err: any): boolean {
   const msg = String(err?.message ?? '')
   const code = String(err?.code ?? '')
-  // Postgres exclusion_violation = 23P01
   return (
     code === '23P01' ||
     msg.includes('Appointment_no_overlap_per_org') ||
@@ -99,8 +98,7 @@ export class AppointmentsService {
     if (filters.customerId) where.customerId = filters.customerId
 
     if (filters.status != null) {
-      if (!isStatus(filters.status))
-        throw new BadRequestException('status inválido')
+      if (!isStatus(filters.status)) throw new BadRequestException('status inválido')
       where.status = filters.status
     }
 
@@ -145,8 +143,7 @@ export class AppointmentsService {
     notes?: string
   }) {
     if (!params.orgId) throw new BadRequestException('orgId é obrigatório')
-    if (!params.customerId)
-      throw new BadRequestException('customerId é obrigatório')
+    if (!params.customerId) throw new BadRequestException('customerId é obrigatório')
 
     const startsAt = parseISODate('startsAt', params.startsAt)
     if (!startsAt) throw new BadRequestException('startsAt é obrigatório')
@@ -160,8 +157,7 @@ export class AppointmentsService {
 
     let status: AppointmentStatus = 'SCHEDULED'
     if (params.status != null) {
-      if (!isStatus(params.status))
-        throw new BadRequestException('status inválido')
+      if (!isStatus(params.status)) throw new BadRequestException('status inválido')
       status = params.status
     }
 
@@ -196,7 +192,14 @@ export class AppointmentsService {
         metadata: {
           appointmentId: created.id,
           customerId: created.customerId,
+
+          // ✅ padrão novo (oficial)
+          actorUserId: params.createdBy,
+          actorPersonId: params.personId,
+
+          // ✅ compat legado
           createdBy: params.createdBy,
+
           startsAt: created.startsAt,
           endsAt: created.endsAt,
           status: created.status,
@@ -213,13 +216,19 @@ export class AppointmentsService {
           description: `Conflito de horário bloqueado (DB) (cliente: ${customer.name})`,
           metadata: {
             customerId: params.customerId,
-            attempted: { startsAt, endsAt, status },
+
+            // ✅ padrão novo (oficial)
+            actorUserId: params.createdBy,
+            actorPersonId: params.personId,
+
+            // ✅ compat legado
             createdBy: params.createdBy,
+
+            attempted: { startsAt, endsAt, status },
           },
         })
-        throw new ConflictException(
-          'Conflito de horário: já existe um agendamento nesse intervalo',
-        )
+
+        throw new ConflictException('Conflito de horário: já existe um agendamento nesse intervalo')
       }
       throw e
     }
@@ -264,8 +273,7 @@ export class AppointmentsService {
         ? parseISODate('endsAt', params.data.endsAt)
         : undefined
 
-    if (patchStartsAt === null)
-      throw new BadRequestException('startsAt inválido')
+    if (patchStartsAt === null) throw new BadRequestException('startsAt inválido')
     if (patchEndsAt === null) throw new BadRequestException('endsAt inválido')
 
     if (typeof params.data.notes === 'string') {
@@ -273,8 +281,7 @@ export class AppointmentsService {
     }
 
     if (typeof params.data.status === 'string') {
-      if (!isStatus(params.data.status))
-        throw new BadRequestException('status inválido')
+      if (!isStatus(params.data.status)) throw new BadRequestException('status inválido')
       patch.status = params.data.status
     }
 
@@ -306,8 +313,7 @@ export class AppointmentsService {
         where: { id: params.id, orgId: params.orgId },
         data: patch,
       })
-      if (result.count === 0)
-        throw new NotFoundException('Agendamento não encontrado')
+      if (result.count === 0) throw new NotFoundException('Agendamento não encontrado')
 
       const updated = await this.prisma.appointment.findFirst({
         where: { id: params.id, orgId: params.orgId },
@@ -322,14 +328,19 @@ export class AppointmentsService {
       await this.timeline.log({
         orgId: params.orgId,
         personId: params.personId,
-        action: statusChanged
-          ? statusToAction(updated.status)
-          : 'APPOINTMENT_UPDATED',
+        action: statusChanged ? statusToAction(updated.status) : 'APPOINTMENT_UPDATED',
         description: `Agendamento atualizado: ${updated.customer.name}`,
         metadata: {
           appointmentId: updated.id,
           customerId: updated.customerId,
+
+          // ✅ padrão novo (oficial)
+          actorUserId: params.updatedBy,
+          actorPersonId: params.personId,
+
+          // ✅ compat legado
           updatedBy: params.updatedBy,
+
           patch,
         },
       })
@@ -344,17 +355,23 @@ export class AppointmentsService {
           description: `Conflito de horário bloqueado (DB) (update)`,
           metadata: {
             appointmentId: params.id,
+
+            // ✅ padrão novo (oficial)
+            actorUserId: params.updatedBy,
+            actorPersonId: params.personId,
+
+            // ✅ compat legado
+            updatedBy: params.updatedBy,
+
             attempted: {
               startsAt: finalStartsAt,
               endsAt: finalEndsAt,
               status: patch.status,
             },
-            updatedBy: params.updatedBy,
           },
         })
-        throw new ConflictException(
-          'Conflito de horário: já existe um agendamento nesse intervalo',
-        )
+
+        throw new ConflictException('Conflito de horário: já existe um agendamento nesse intervalo')
       }
       throw e
     }
