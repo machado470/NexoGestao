@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
@@ -79,11 +80,6 @@ export class AppointmentsService {
     const startsAt = params.startsAt
     const endsAt = params.endsAt
 
-    // Regra:
-    // - Conflito por ORG (uma agenda única do negócio)
-    // - Ignora CANCELED
-    // - Overlap: [start,end) intersecta [start2,end2)
-    // - Se endsAt nulo no banco (legado), assume +30min via COALESCE
     const rows = await this.prisma.$queryRaw<
       Array<{ id: string; customerId: string; startsAt: Date; endsAt: Date }>
     >`
@@ -190,7 +186,6 @@ export class AppointmentsService {
 
     const notes = normalizeNotes(params.notes)
 
-    // garante que customer existe e pertence ao org
     const customer = await this.prisma.customer.findFirst({
       where: { id: params.customerId, orgId: params.orgId },
       select: { id: true, name: true },
@@ -199,7 +194,6 @@ export class AppointmentsService {
       throw new BadRequestException('Cliente inválido para este org')
     }
 
-    // BLOQUEIO: conflito de horário na agenda do org
     const conflict = await this.findOverlap({
       orgId: params.orgId,
       excludeId: null,
@@ -220,7 +214,7 @@ export class AppointmentsService {
         },
       })
 
-      throw new BadRequestException('Conflito de horário: já existe um agendamento nesse intervalo')
+      throw new ConflictException('Conflito de horário: já existe um agendamento nesse intervalo')
     }
 
     const created = await this.prisma.appointment.create({
@@ -289,7 +283,7 @@ export class AppointmentsService {
 
     const patchEndsAt =
       typeof params.data.endsAt === 'string'
-        ? parseISODate('endsAt', params.data.endsAt) // pode virar null (interpreta como “auto”)
+        ? parseISODate('endsAt', params.data.endsAt)
         : undefined
 
     if (patchStartsAt === null) throw new BadRequestException('startsAt inválido')
@@ -303,11 +297,8 @@ export class AppointmentsService {
       patch.status = params.data.status
     }
 
-    // Intervalo final (sempre consistente)
     const finalStartsAt = (patchStartsAt ?? existing.startsAt) as Date
 
-    // se endsAt veio (até null), respeita “auto”
-    // se startsAt mudou e endsAt não veio, preserva duração anterior
     const existingDuration = durationMinutes(existing.startsAt, existing.endsAt)
     const finalEndsAt =
       patchEndsAt !== undefined
@@ -320,7 +311,6 @@ export class AppointmentsService {
       throw new BadRequestException('endsAt não pode ser antes/igual a startsAt')
     }
 
-    // Sempre persistir endsAt calculado (pra evitar null e facilitar conflito)
     patch.startsAt = finalStartsAt
     patch.endsAt = finalEndsAt
 
@@ -328,7 +318,6 @@ export class AppointmentsService {
       throw new BadRequestException('Nenhum campo para atualizar')
     }
 
-    // BLOQUEIO: conflito de horário na agenda do org (exceto o próprio)
     const conflict = await this.findOverlap({
       orgId: params.orgId,
       excludeId: params.id,
@@ -349,7 +338,7 @@ export class AppointmentsService {
         },
       })
 
-      throw new BadRequestException('Conflito de horário: já existe um agendamento nesse intervalo')
+      throw new ConflictException('Conflito de horário: já existe um agendamento nesse intervalo')
     }
 
     const result = await this.prisma.appointment.updateMany({

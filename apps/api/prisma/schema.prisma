@@ -71,7 +71,6 @@ model Organization {
   runs           GovernanceRun[]
   timelineEvents TimelineEvent[]
 
-  // 🧩 NEXOGESTÃO OFICIAL
   customers     Customer[]
   appointments  Appointment[]
 }
@@ -314,9 +313,6 @@ model GovernanceRun {
   @@index([orgId, createdAt])
 }
 
-//
-// 🧩 NEXOGESTÃO OFICIAL — Clientes (MVP)
-//
 model Customer {
   id     String  @id @default(uuid())
   orgId  String
@@ -337,9 +333,6 @@ model Customer {
   @@index([orgId, active, createdAt])
 }
 
-//
-// 🧩 NEXOGESTÃO OFICIAL — Agenda (MVP)
-//
 model Appointment {
   id         String            @id @default(uuid())
   orgId      String
@@ -349,7 +342,7 @@ model Appointment {
   customer   Customer          @relation(fields: [customerId], references: [id])
 
   startsAt   DateTime
-  endsAt     DateTime?
+  endsAt     DateTime
   status     AppointmentStatus @default(SCHEDULED)
   notes      String?
 
