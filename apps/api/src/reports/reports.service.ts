@@ -44,15 +44,15 @@ export class ReportsService {
   }): string {
     const parts: string[] = []
 
-    // progresso médio (se não for 100, tem algo pra fazer)
     if (factors.avgProgress < 100) {
       parts.push(`Progresso médio ${factors.avgProgress}% nas trilhas`)
     }
 
-    // corretivas abertas (se houver)
     if (factors.openCorrectives > 0) {
       const n = factors.openCorrectives
-      parts.push(`${n} corretiva${n === 1 ? '' : 's'} aberta${n === 1 ? '' : 's'}`)
+      parts.push(
+        `${n} corretiva${n === 1 ? '' : 's'} aberta${n === 1 ? '' : 's'}`,
+      )
     }
 
     if (parts.length === 0) return 'Sem pendências relevantes no momento'
@@ -63,13 +63,10 @@ export class ReportsService {
     personId: string,
     factors: { avgProgress: number; openCorrectives: number },
   ): Promise<NextAction> {
-    // Regra de ouro: corretiva aberta manda no fluxo (é “apagar incêndio” antes de estudar mais).
     if (factors.openCorrectives > 0) {
       return { type: 'RESOLVE_CORRECTIVE', count: factors.openCorrectives }
     }
 
-    // “Próxima ação” pragmática: existe assignment pendente? então é começar/continuar ele.
-    // (Start/Continue na UI é a mesma coisa: abrir o assignment e seguir o fluxo)
     const pending = await this.prisma.assignment.findFirst({
       where: {
         personId,
@@ -123,8 +120,6 @@ export class ReportsService {
 
       const reason = this.buildReason(os.factors)
 
-      // Só calcula nextAction se tem algum sinal de risco/pendência.
-      // (evita query extra em gente 100% ok)
       const nextAction =
         status === 'OK' &&
         os.factors.avgProgress === 100 &&
@@ -178,7 +173,6 @@ export class ReportsService {
       }
     })
 
-    // ✅ Multi-tenant correto: timeline sempre por org
     const timeline = await this.timeline.listByOrg(orgId)
 
     return {
@@ -190,7 +184,8 @@ export class ReportsService {
     }
   }
 
-  async getExecutiveMetrics(days = 30) {
-    return this.metrics.getCorrectiveActionsSLA(days)
+  // ✅ FIX: multi-tenant (orgId obrigatório) + dias opcional
+  async getExecutiveMetrics(orgId: string, days = 30) {
+    return this.metrics.getCorrectiveActionsSLA(orgId, days)
   }
 }
