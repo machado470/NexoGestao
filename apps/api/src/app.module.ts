@@ -44,6 +44,9 @@ import { GovernanceModule } from './governance/governance.module'
 // 🧩 NEXOGESTÃO OFICIAL — Clientes
 import { CustomersModule } from './customers/customers.module'
 
+// 🧩 NEXOGESTÃO OFICIAL — Agenda (Appointments)
+import { AppointmentsModule } from './appointments/appointments.module'
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -93,6 +96,7 @@ import { CustomersModule } from './customers/customers.module'
 
     // 🧩 NEXOGESTÃO OFICIAL — módulos operacionais
     CustomersModule,
+    AppointmentsModule,
 
     // 🔥 MOTOR DE GOVERNANÇA
     GovernanceModule,

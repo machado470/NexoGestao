@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, AppointmentStatus } from '@prisma/client'
 import * as bcrypt from 'bcryptjs'
 
 const prisma = new PrismaClient()
@@ -6,6 +6,12 @@ const prisma = new PrismaClient()
 function env(name: string, fallback = ''): string {
   const v = (process.env[name] ?? '').trim()
   return v || fallback
+}
+
+function hoursFromNow(h: number) {
+  const d = new Date()
+  d.setHours(d.getHours() + h)
+  return d
 }
 
 async function ensureOrg() {
@@ -104,6 +110,62 @@ async function ensureDemoCustomers(orgId: string) {
   }
 
   return createdCount
+}
+
+async function ensureDemoAppointments(orgId: string) {
+  const customers = await prisma.customer.findMany({
+    where: { orgId, active: true },
+    select: { id: true, name: true },
+    orderBy: { createdAt: 'asc' },
+    take: 20,
+  })
+
+  if (customers.length === 0) return 0
+
+  // 6 agendamentos distribuídos entre os customers
+  const plan: Array<{
+    customerIndex: number
+    startsAt: Date
+    durationMin: number
+    status: AppointmentStatus
+    notes: string
+  }> = [
+    { customerIndex: 0, startsAt: hoursFromNow(2), durationMin: 45, status: 'CONFIRMED', notes: 'Reunião inicial' },
+    { customerIndex: 1, startsAt: hoursFromNow(5), durationMin: 30, status: 'SCHEDULED', notes: 'Alinhamento rápido' },
+    { customerIndex: 2, startsAt: hoursFromNow(8), durationMin: 60, status: 'SCHEDULED', notes: 'Diagnóstico operacional' },
+    { customerIndex: 0, startsAt: hoursFromNow(26), durationMin: 30, status: 'CONFIRMED', notes: 'Revisão de semana' },
+    { customerIndex: 1, startsAt: hoursFromNow(30), durationMin: 45, status: 'CANCELED', notes: 'Cancelado pelo cliente' },
+    { customerIndex: 2, startsAt: hoursFromNow(-6), durationMin: 30, status: 'DONE', notes: 'Concluído' },
+  ]
+
+  let created = 0
+
+  for (const p of plan) {
+    const c = customers[Math.min(p.customerIndex, customers.length - 1)]
+    const endsAt = new Date(p.startsAt.getTime() + p.durationMin * 60 * 1000)
+
+    // evita duplicar (customer + startsAt)
+    const exists = await prisma.appointment.findFirst({
+      where: { orgId, customerId: c.id, startsAt: p.startsAt },
+      select: { id: true },
+    })
+    if (exists) continue
+
+    await prisma.appointment.create({
+      data: {
+        orgId,
+        customerId: c.id,
+        startsAt: p.startsAt,
+        endsAt,
+        status: p.status,
+        notes: p.notes,
+      },
+    })
+
+    created++
+  }
+
+  return created
 }
 
 async function ensureDemoCollaborators(orgId: string) {
@@ -301,6 +363,7 @@ async function main() {
 
   const admin = await ensureDemoAdmin(org.id)
   const customersCreated = await ensureDemoCustomers(org.id)
+  const appointmentsCreated = await ensureDemoAppointments(org.id)
 
   const collabs = await ensureDemoCollaborators(org.id)
   const tracks = await ensureDemoTracks(org.id)
@@ -314,6 +377,7 @@ async function main() {
   console.log(`👤 Admin DEMO: ${admin.created ? 'CRIADO' : 'JÁ EXISTIA'}`)
   console.log('🔑 Credenciais DEMO:', { email: admin.email, password: admin.password })
   console.log(`👥 Customers DEMO criados agora: ${customersCreated}`)
+  console.log(`📅 Appointments DEMO criados agora: ${appointmentsCreated}`)
   console.log(`👥 Collaborators DEMO criados agora: ${collabs.created} (total=${collabs.people.length})`)
   console.log(`📚 Tracks DEMO criadas agora: ${tracks.created} (total=${tracks.tracks.length})`)
   console.log(`🧷 Assignments DEMO criados agora: ${assignmentsCreated}`)

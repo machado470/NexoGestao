@@ -357,6 +357,7 @@ model Appointment {
   updatedAt  DateTime          @updatedAt
 
   @@index([orgId, startsAt])
+  @@index([orgId, startsAt, endsAt])
   @@index([orgId, status, startsAt])
   @@index([customerId, startsAt])
 }

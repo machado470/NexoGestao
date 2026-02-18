@@ -1,100 +1,133 @@
-#!/bin/sh
+#!/usr/bin/env sh
 set -e
 
-cd /app/apps/api
+log() {
+  echo "[nexogestao] $*"
+}
 
-echo "[nexogestao] starting api"
-echo "[nexogestao] NODE_ENV=${NODE_ENV:-unknown}"
+# -----------------------------------------------------------------------------
+# Resolve DB params:
+# - Prefer DB_* env vars if provided
+# - Otherwise parse DATABASE_URL (what docker-compose already provides)
+# -----------------------------------------------------------------------------
+DB_HOST="${DB_HOST:-}"
+DB_PORT="${DB_PORT:-}"
+DB_NAME="${DB_NAME:-}"
+DB_USER="${DB_USER:-}"
+DB_PASSWORD="${DB_PASSWORD:-}"
 
-AUTO_MIGRATE="${AUTO_MIGRATE:-0}"
-SEED_MODE="${SEED_MODE:-none}"        # demo|none
-FORCE_SEED="${FORCE_SEED:-0}"         # 1 força seed mesmo com schema
-schema="./prisma/schema.prisma"
+DATABASE_URL="${DATABASE_URL:-}"
 
+if [ -n "$DATABASE_URL" ]; then
+  # Parse via Node (reliable, avoids sed regex hell)
+  PARSED="$(node -e '
+    try {
+      const u = new URL(process.env.DATABASE_URL);
+      const host = u.hostname || "";
+      const port = u.port || "5432";
+      const user = decodeURIComponent(u.username || "");
+      const pass = decodeURIComponent(u.password || "");
+      const db = (u.pathname || "").replace(/^\//, "");
+      console.log([host, port, user, pass, db].join("|"));
+    } catch (e) {
+      process.exit(0);
+    }
+  ' 2>/dev/null || true)"
+
+  if [ -n "$PARSED" ]; then
+    P_HOST="$(echo "$PARSED" | cut -d'|' -f1)"
+    P_PORT="$(echo "$PARSED" | cut -d'|' -f2)"
+    P_USER="$(echo "$PARSED" | cut -d'|' -f3)"
+    P_PASS="$(echo "$PARSED" | cut -d'|' -f4)"
+    P_DB="$(echo "$PARSED" | cut -d'|' -f5)"
+
+    [ -z "$DB_HOST" ] && DB_HOST="$P_HOST"
+    [ -z "$DB_PORT" ] && DB_PORT="$P_PORT"
+    [ -z "$DB_USER" ] && DB_USER="$P_USER"
+    [ -z "$DB_PASSWORD" ] && DB_PASSWORD="$P_PASS"
+    [ -z "$DB_NAME" ] && DB_NAME="$P_DB"
+  fi
+fi
+
+# Hard defaults (only if still empty)
+DB_HOST="${DB_HOST:-postgres}"
+DB_PORT="${DB_PORT:-5432}"
+DB_NAME="${DB_NAME:-nexogestao}"
+DB_USER="${DB_USER:-postgres}"
+DB_PASSWORD="${DB_PASSWORD:-postgres}"
+
+# compat com docker-compose.yml
 DB_WAIT_SECONDS="${DB_WAIT_SECONDS:-40}"
 
-POSTGRES_HOST="${POSTGRES_HOST:-postgres}"
-POSTGRES_USER="${POSTGRES_USER:-postgres}"
-POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-postgres}"
-POSTGRES_DB="${POSTGRES_DB:-nexogestao}"
+# psql/pg_isready use this (avoid password prompt)
+export PGPASSWORD="$DB_PASSWORD"
+export PGCONNECT_TIMEOUT="${PGCONNECT_TIMEOUT:-5}"
 
-psql_ok() {
-  PGPASSWORD="$POSTGRES_PASSWORD" psql \
-    -h "$POSTGRES_HOST" \
-    -U "$POSTGRES_USER" \
-    -d "$POSTGRES_DB" \
-    -tAc "$1" 2>/dev/null
-}
+SEED_MODE="$(echo "${SEED_MODE:-none}" | tr '[:upper:]' '[:lower:]')"
+FORCE_SEED="${FORCE_SEED:-0}"
 
-has_schema() {
-  v="$(psql_ok "select 1 from information_schema.tables where table_schema='public' and table_name='_prisma_migrations' limit 1;")"
-  echo "$v" | tr -d ' \n\r' | grep -q "1"
-}
+# 1 = roda migrate deploy automaticamente quando banco está vazio/sem schema
+AUTO_MIGRATE="${AUTO_MIGRATE:-1}"
 
-run_seed_demo() {
-  echo "[nexogestao] SEED_MODE=demo -> running prisma db seed"
-  pnpm exec prisma db seed --schema "$schema"
-  echo "[nexogestao] seed demo applied"
-}
-
-echo "[nexogestao] waiting for postgres host=${POSTGRES_HOST} db=${POSTGRES_DB} (timeout=${DB_WAIT_SECONDS}s)..."
+log "NODE_ENV=${NODE_ENV:-}"
+log "db resolved host=${DB_HOST} port=${DB_PORT} db=${DB_NAME} user=${DB_USER}"
+log "waiting for postgres (timeout=${DB_WAIT_SECONDS}s)..."
 
 i=0
-while [ "$i" -lt "$DB_WAIT_SECONDS" ]; do
-  if psql_ok "select 1;" >/dev/null 2>&1; then
-    echo "[nexogestao] postgres is ready"
-    break
+while ! pg_isready -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" >/dev/null 2>&1; do
+  i=$((i + 1))
+  if [ "$i" -ge "$DB_WAIT_SECONDS" ]; then
+    log "postgres not ready after ${DB_WAIT_SECONDS}s"
+    exit 1
   fi
-  i=$((i+1))
   sleep 1
 done
 
-if [ "$i" -ge "$DB_WAIT_SECONDS" ]; then
-  echo "[nexogestao] ERROR: postgres did not respond in time"
-  exit 1
+log "postgres is ready"
+log "checking schema (_prisma_migrations)..."
+
+SCHEMA_EXISTS="$(psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -tAc \
+"select 1 from information_schema.tables where table_schema='public' and table_name='_prisma_migrations' limit 1;" \
+2>/dev/null | tr -d '[:space:]')"
+
+if [ "$SCHEMA_EXISTS" = "1" ]; then
+  log "schema detected"
+else
+  if [ "$AUTO_MIGRATE" = "1" ]; then
+    log "schema not detected -> running prisma migrate deploy"
+    pnpm prisma:migrate:deploy
+  else
+    log "schema not detected and AUTO_MIGRATE!=1 -> skipping migrate"
+  fi
 fi
 
-echo "[nexogestao] checking schema (_prisma_migrations)..."
-if has_schema; then
-  echo "[nexogestao] schema detected"
-  DB_WAS_EMPTY="0"
+should_seed_demo() {
+  # seed demo só quando banco ainda não tem customers
+  COUNT_CUSTOMERS="$(psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -tAc \
+"select count(*) from \"Customer\";" 2>/dev/null | tr -d '[:space:]')"
+
+  if [ -z "$COUNT_CUSTOMERS" ]; then
+    COUNT_CUSTOMERS="0"
+  fi
+
+  [ "$COUNT_CUSTOMERS" = "0" ]
+}
+
+if [ "$FORCE_SEED" = "1" ]; then
+  log "FORCE_SEED=1 -> running seed (SEED_MODE=${SEED_MODE})"
+  pnpm prisma:seed
 else
-  echo "[nexogestao] schema NOT detected (db likely empty)"
-  DB_WAS_EMPTY="1"
-
-  if [ "$AUTO_MIGRATE" = "1" ]; then
-    echo "[nexogestao] AUTO_MIGRATE=1 -> running prisma migrate deploy"
-    pnpm exec prisma migrate deploy --schema "$schema"
-
-    echo "[nexogestao] re-checking schema after migrate..."
-    if has_schema; then
-      echo "[nexogestao] migrations applied ok"
+  if [ "$SEED_MODE" = "demo" ]; then
+    if should_seed_demo; then
+      log "SEED_MODE=demo and db has no customers -> running seed"
+      pnpm prisma:seed
     else
-      echo "[nexogestao] ERROR: migrate finished but schema still not detected"
-      exit 1
+      log "SEED_MODE=demo but customers already exist -> skipping seed"
     fi
   else
-    echo "[nexogestao] ERROR: AUTO_MIGRATE=0 and schema missing"
-    echo "[nexogestao] HINT: run:"
-    echo "  docker compose run --rm --entrypoint sh api -lc 'cd /app/apps/api && pnpm exec prisma migrate deploy'"
-    echo "  docker compose run --rm --entrypoint sh api -lc 'cd /app/apps/api && pnpm exec prisma db seed'"
-    exit 1
+    log "SEED_MODE=${SEED_MODE} -> skipping seed"
   fi
 fi
 
-# ✅ Seed só quando DB era vazio, ou quando você força
-if [ "$SEED_MODE" = "demo" ]; then
-  if [ "$DB_WAS_EMPTY" = "1" ] || [ "$FORCE_SEED" = "1" ]; then
-    run_seed_demo
-  else
-    echo "[nexogestao] SEED_MODE=demo but schema exists -> skipping seed (set FORCE_SEED=1 to force)"
-  fi
-elif [ "$SEED_MODE" = "none" ]; then
-  echo "[nexogestao] SEED_MODE=none -> skipping seed"
-else
-  echo "[nexogestao] ERROR: invalid SEED_MODE=$SEED_MODE (use demo|none)"
-  exit 1
-fi
-
-echo "[nexogestao] starting node"
+log "starting node"
 exec node dist/main.js

@@ -44,6 +44,20 @@ function humanizeAction(action: string): string {
       return 'Cliente criado'
     case 'CUSTOMER_UPDATED':
       return 'Cliente atualizado'
+    case 'APPOINTMENT_CREATED':
+      return 'Agendamento criado'
+    case 'APPOINTMENT_UPDATED':
+      return 'Agendamento atualizado'
+    case 'APPOINTMENT_CONFIRMED':
+      return 'Agendamento confirmado'
+    case 'APPOINTMENT_CANCELED':
+      return 'Agendamento cancelado'
+    case 'APPOINTMENT_DONE':
+      return 'Agendamento concluído'
+    case 'APPOINTMENT_NO_SHOW':
+      return 'Falta no agendamento'
+    case 'APPOINTMENT_CONFLICT_BLOCKED':
+      return 'Conflito de horário bloqueado'
     case 'OPERATIONAL_STATE_CHANGED':
       return 'Estado operacional alterado'
     case 'OPERATIONAL_WARNING_RAISED':
