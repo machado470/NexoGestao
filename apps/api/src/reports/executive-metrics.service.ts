@@ -5,20 +5,21 @@ import { PrismaService } from '../prisma/prisma.service'
 export class ExecutiveMetricsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getCorrectiveActionsSLA(days = 30) {
+  async getCorrectiveActionsSLA(orgId: string, days = 30) {
     const since = new Date()
     since.setDate(since.getDate() - days)
 
-    const actions =
-      await this.prisma.correctiveAction.findMany({
-        where: {
-          createdAt: { gte: since },
-          resolvedAt: { not: null },
-        },
-      })
+    const actions = await this.prisma.correctiveAction.findMany({
+      where: {
+        createdAt: { gte: since },
+        resolvedAt: { not: null },
+        person: { orgId },
+      },
+    })
 
     if (actions.length === 0) {
       return {
+        orgId,
         windowDays: days,
         totalActions: 0,
         resolvedSamples: 0,
@@ -29,18 +30,15 @@ export class ExecutiveMetricsService {
     }
 
     const resolveTimes = actions.map(
-      a =>
-        (a.resolvedAt!.getTime() -
-          a.createdAt.getTime()) /
-        36e5,
+      a => (a.resolvedAt!.getTime() - a.createdAt.getTime()) / 36e5,
     )
 
     const avgResolveHours = Math.round(
-      resolveTimes.reduce((a, b) => a + b, 0) /
-        resolveTimes.length,
+      resolveTimes.reduce((a, b) => a + b, 0) / resolveTimes.length,
     )
 
     return {
+      orgId,
       windowDays: days,
       totalActions: actions.length,
       resolvedSamples: actions.length,
@@ -50,3 +48,4 @@ export class ExecutiveMetricsService {
     }
   }
 }
+
