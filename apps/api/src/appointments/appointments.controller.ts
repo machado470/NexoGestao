@@ -69,6 +69,7 @@ export class AppointmentsController {
     return this.appointments.create({
       orgId,
       createdBy: user?.sub ?? null,
+      personId: user?.personId ?? null,
       customerId: body.customerId,
       startsAt: body.startsAt,
       endsAt: body.endsAt,
@@ -88,6 +89,7 @@ export class AppointmentsController {
     return this.appointments.update({
       orgId,
       updatedBy: user?.sub ?? null,
+      personId: user?.personId ?? null,
       id,
       data: body,
     })
