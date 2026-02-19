@@ -1,4 +1,5 @@
-import { PrismaClient, AppointmentStatus } from '@prisma/client'
+// apps/api/prisma/seed.ts
+import { PrismaClient, AppointmentStatus, ServiceOrderStatus } from '@prisma/client'
 import * as bcrypt from 'bcryptjs'
 
 const prisma = new PrismaClient()
@@ -8,8 +9,26 @@ function env(name: string, fallback = ''): string {
   return v || fallback
 }
 
-function hoursFromNow(h: number) {
+/**
+ * Base de tempo determinística (por dia) para não quebrar o seed em reruns.
+ * - Se rodar de novo no mesmo dia, gera os MESMOS startsAt/endsAt
+ * - Evita conflito com constraint de no-overlap
+ */
+function seedDayBase(): Date {
+  const iso = env('SEED_DAY_BASE_ISO', '')
+  if (iso) {
+    const d = new Date(iso)
+    if (!Number.isNaN(d.getTime())) return d
+  }
+
+  // “Hoje” às 09:00:00.000 (timezone do container)
   const d = new Date()
+  d.setHours(9, 0, 0, 0)
+  return d
+}
+
+function addHours(base: Date, h: number) {
+  const d = new Date(base.getTime())
   d.setHours(d.getHours() + h)
   return d
 }
@@ -78,6 +97,23 @@ async function ensureDemoAdmin(orgId: string) {
   return { created: true, email, password, name }
 }
 
+async function getDemoAdminActor(orgId: string) {
+  const email = env('DEMO_ADMIN_EMAIL', 'admin@nexogestao.local').toLowerCase()
+
+  const user = await prisma.user.findFirst({
+    where: { orgId, email },
+    select: {
+      id: true,
+      person: { select: { id: true } },
+    },
+  })
+
+  return {
+    actorUserId: user?.id ?? null,
+    actorPersonId: user?.person?.id ?? null,
+  }
+}
+
 async function ensureDemoCustomers(orgId: string) {
   const customers = [
     { name: 'João Silva', phone: '5547999991111', email: 'joao@email.com' },
@@ -122,7 +158,9 @@ async function ensureDemoAppointments(orgId: string) {
 
   if (customers.length === 0) return 0
 
-  // 6 agendamentos distribuídos entre os customers
+  const base = seedDayBase()
+
+  // 6 agendamentos distribuídos entre os customers (determinísticos por dia)
   const plan: Array<{
     customerIndex: number
     startsAt: Date
@@ -130,12 +168,12 @@ async function ensureDemoAppointments(orgId: string) {
     status: AppointmentStatus
     notes: string
   }> = [
-    { customerIndex: 0, startsAt: hoursFromNow(2), durationMin: 45, status: 'CONFIRMED', notes: 'Reunião inicial' },
-    { customerIndex: 1, startsAt: hoursFromNow(5), durationMin: 30, status: 'SCHEDULED', notes: 'Alinhamento rápido' },
-    { customerIndex: 2, startsAt: hoursFromNow(8), durationMin: 60, status: 'SCHEDULED', notes: 'Diagnóstico operacional' },
-    { customerIndex: 0, startsAt: hoursFromNow(26), durationMin: 30, status: 'CONFIRMED', notes: 'Revisão de semana' },
-    { customerIndex: 1, startsAt: hoursFromNow(30), durationMin: 45, status: 'CANCELED', notes: 'Cancelado pelo cliente' },
-    { customerIndex: 2, startsAt: hoursFromNow(-6), durationMin: 30, status: 'DONE', notes: 'Concluído' },
+    { customerIndex: 0, startsAt: addHours(base, 2), durationMin: 45, status: 'CONFIRMED', notes: 'Reunião inicial' },
+    { customerIndex: 1, startsAt: addHours(base, 5), durationMin: 30, status: 'SCHEDULED', notes: 'Alinhamento rápido' },
+    { customerIndex: 2, startsAt: addHours(base, 8), durationMin: 60, status: 'SCHEDULED', notes: 'Diagnóstico operacional' },
+    { customerIndex: 0, startsAt: addHours(base, 26), durationMin: 30, status: 'CONFIRMED', notes: 'Revisão de semana' },
+    { customerIndex: 1, startsAt: addHours(base, 30), durationMin: 45, status: 'CANCELED', notes: 'Cancelado pelo cliente' },
+    { customerIndex: 2, startsAt: addHours(base, -6), durationMin: 30, status: 'DONE', notes: 'Concluído' },
   ]
 
   let created = 0
@@ -144,7 +182,7 @@ async function ensureDemoAppointments(orgId: string) {
     const c = customers[Math.min(p.customerIndex, customers.length - 1)]
     const endsAt = new Date(p.startsAt.getTime() + p.durationMin * 60 * 1000)
 
-    // evita duplicar (customer + startsAt)
+    // evita duplicar (org + customer + startsAt) — agora startsAt é determinístico no dia
     const exists = await prisma.appointment.findFirst({
       where: { orgId, customerId: c.id, startsAt: p.startsAt },
       select: { id: true },
@@ -345,6 +383,154 @@ async function ensureDemoAssignments(orgId: string, personIds: string[], trackId
   return created
 }
 
+function pickAssigneeId(collabIds: string[], seed: number) {
+  if (collabIds.length === 0) return null
+  const idx = Math.abs(seed) % collabIds.length
+  return collabIds[idx]
+}
+
+function shouldHaveAssignee(status: ServiceOrderStatus) {
+  return status === 'ASSIGNED' || status === 'IN_PROGRESS' || status === 'DONE'
+}
+
+function startedAtFor(base: Date, status: ServiceOrderStatus) {
+  if (status === 'IN_PROGRESS' || status === 'DONE') return addHours(base, -2)
+  return null
+}
+
+function finishedAtFor(base: Date, status: ServiceOrderStatus) {
+  if (status === 'DONE' || status === 'CANCELED') return addHours(base, -1)
+  return null
+}
+
+async function ensureDemoServiceOrders(orgId: string, actor: { actorUserId: string | null; actorPersonId: string | null }) {
+  const customers = await prisma.customer.findMany({
+    where: { orgId, active: true },
+    select: { id: true, name: true },
+    orderBy: { createdAt: 'asc' },
+    take: 10,
+  })
+  if (customers.length === 0) return 0
+
+  const collabs = await prisma.person.findMany({
+    where: { orgId, role: 'COLLABORATOR', active: true },
+    select: { id: true },
+    orderBy: { createdAt: 'asc' },
+    take: 50,
+  })
+  const collabIds = collabs.map(c => c.id)
+
+  const appts = await prisma.appointment.findMany({
+    where: { orgId },
+    select: { id: true, customerId: true, startsAt: true, status: true },
+    orderBy: { startsAt: 'asc' },
+    take: 50,
+  })
+
+  const base = seedDayBase()
+
+  const plan: Array<{
+    customerIndex: number
+    title: string
+    status: ServiceOrderStatus
+    useAppointment?: boolean
+  }> = [
+    { customerIndex: 0, title: 'O.S. — Limpeza / execução padrão', status: 'OPEN' },
+    { customerIndex: 1, title: 'O.S. — Revisão e checklist', status: 'ASSIGNED' },
+    { customerIndex: 2, title: 'O.S. — Atendimento no local', status: 'IN_PROGRESS', useAppointment: true },
+    { customerIndex: 0, title: 'O.S. — Finalização + evidência', status: 'DONE', useAppointment: true },
+  ]
+
+  function pickAppointmentId(customerId: string, desired: ServiceOrderStatus): string | null {
+    const byCustomer = appts.filter(a => a.customerId === customerId)
+    if (byCustomer.length === 0) return null
+
+    if (desired === 'DONE') {
+      const done = byCustomer.find(a => a.status === 'DONE')
+      if (done) return done.id
+    }
+
+    if (desired === 'IN_PROGRESS') {
+      const ok = byCustomer.find(a => a.status === 'CONFIRMED' || a.status === 'SCHEDULED')
+      if (ok) return ok.id
+    }
+
+    return byCustomer[0].id
+  }
+
+  let created = 0
+
+  for (let i = 0; i < plan.length; i++) {
+    const p = plan[i]
+    const c = customers[Math.min(p.customerIndex, customers.length - 1)]
+
+    const existing = await prisma.serviceOrder.findFirst({
+      where: { orgId, customerId: c.id, title: p.title },
+      select: { id: true },
+    })
+    if (existing) continue
+
+    let appointmentId: string | null = null
+    if (p.useAppointment) {
+      appointmentId = pickAppointmentId(c.id, p.status)
+    }
+
+    const assignedToPersonId =
+      shouldHaveAssignee(p.status) ? pickAssigneeId(collabIds, i + p.customerIndex * 10) : null
+
+    const so = await prisma.serviceOrder.create({
+      data: {
+        orgId,
+        customerId: c.id,
+        appointmentId,
+        assignedToPersonId,
+        title: p.title,
+        status: p.status,
+        priority: 2,
+
+        scheduledFor: appointmentId ? null : addHours(base, 10),
+
+        startedAt: startedAtFor(base, p.status),
+        finishedAt: finishedAtFor(base, p.status),
+      },
+      select: { id: true, title: true, customerId: true, appointmentId: true, assignedToPersonId: true, status: true, priority: true, scheduledFor: true },
+    })
+
+    // ✅ Loga timeline igual a API faria
+    await prisma.timelineEvent.create({
+      data: {
+        orgId,
+        action: 'SERVICE_ORDER_CREATED',
+        personId: actor.actorPersonId, // pode ser null — tudo bem
+        description: `O.S. criada (seed): ${so.title} (${c.name})`,
+        metadata: {
+          serviceOrderId: so.id,
+          customerId: so.customerId,
+          appointmentId: so.appointmentId,
+          assignedToPersonId: so.assignedToPersonId,
+          status: so.status,
+          priority: so.priority,
+          scheduledFor: so.scheduledFor,
+
+          // padrão novo
+          actorUserId: actor.actorUserId,
+          actorPersonId: actor.actorPersonId,
+
+          // compat legado
+          createdBy: actor.actorUserId,
+
+          seed: true,
+          seedSource: 'prisma/seed.ts',
+        },
+      },
+    })
+
+    created++
+  }
+
+  return created
+}
+
 async function main() {
   const seedMode = (process.env.SEED_MODE || 'none').toLowerCase()
 
@@ -362,6 +548,8 @@ async function main() {
   console.log('🌱 SEED_MODE=demo -> aplicando seed DEMO...')
 
   const admin = await ensureDemoAdmin(org.id)
+  const actor = await getDemoAdminActor(org.id)
+
   const customersCreated = await ensureDemoCustomers(org.id)
   const appointmentsCreated = await ensureDemoAppointments(org.id)
 
@@ -372,6 +560,7 @@ async function main() {
   const trackIds = tracks.tracks.map(t => t.id)
 
   const assignmentsCreated = await ensureDemoAssignments(org.id, personIds, trackIds)
+  const serviceOrdersCreated = await ensureDemoServiceOrders(org.id, actor)
 
   console.log('✅ Seed DEMO aplicado')
   console.log(`👤 Admin DEMO: ${admin.created ? 'CRIADO' : 'JÁ EXISTIA'}`)
@@ -381,6 +570,9 @@ async function main() {
   console.log(`👥 Collaborators DEMO criados agora: ${collabs.created} (total=${collabs.people.length})`)
   console.log(`📚 Tracks DEMO criadas agora: ${tracks.created} (total=${tracks.tracks.length})`)
   console.log(`🧷 Assignments DEMO criados agora: ${assignmentsCreated}`)
+  console.log(`🧾 ServiceOrders DEMO criadas agora: ${serviceOrdersCreated}`)
+  console.log('🎯 Seed actor:', actor)
+  console.log('🕒 Seed day base:', seedDayBase().toISOString())
 }
 
 main()
