@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   Post,
+  Req,
   UseGuards,
 } from '@nestjs/common'
 
@@ -11,9 +12,18 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
 import { Roles } from '../auth/decorators/roles.decorator'
 import { Org } from '../auth/decorators/org.decorator'
+import { User } from '../auth/decorators/user.decorator'
 
 import { OperationalStateGuard } from '../people/operational-state.guard'
 import { AssignmentsService } from './assignments.service'
+
+function isAdmin(user: any): boolean {
+  const roles = user?.roles
+  if (Array.isArray(roles)) return roles.includes('ADMIN')
+  const role = user?.role
+  if (typeof role === 'string') return role === 'ADMIN'
+  return false
+}
 
 @Controller('assignments')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -39,8 +49,19 @@ export class AssignmentsController {
    */
   @Post(':id/start')
   @UseGuards(OperationalStateGuard)
-  async start(@Param('id') id: string) {
-    return this.service.startAssignment(id)
+  async start(
+    @Param('id') id: string,
+    @Req() req: any,
+    @User() user: any,
+  ) {
+    const u = user ?? req?.user ?? null
+
+    return this.service.startAssignment(id, {
+      orgId: u?.orgId ?? null,
+      actorUserId: u?.userId ?? u?.sub ?? null,
+      actorPersonId: u?.personId ?? null,
+      isAdmin: isAdmin(u),
+    })
   }
 
   /**
@@ -48,8 +69,19 @@ export class AssignmentsController {
    */
   @Get(':id/next-item')
   @UseGuards(OperationalStateGuard)
-  async nextItem(@Param('id') id: string) {
-    return this.service.getNextItem(id)
+  async nextItem(
+    @Param('id') id: string,
+    @Req() req: any,
+    @User() user: any,
+  ) {
+    const u = user ?? req?.user ?? null
+
+    return this.service.getNextItem(id, {
+      orgId: u?.orgId ?? null,
+      actorUserId: u?.userId ?? u?.sub ?? null,
+      actorPersonId: u?.personId ?? null,
+      isAdmin: isAdmin(u),
+    })
   }
 
   /**
@@ -60,10 +92,20 @@ export class AssignmentsController {
   async completeItem(
     @Param('id') assignmentId: string,
     @Body() body: { itemId: string },
+    @Req() req: any,
+    @User() user: any,
   ) {
+    const u = user ?? req?.user ?? null
+
     return this.service.completeItem(
       assignmentId,
       body.itemId,
+      {
+        orgId: u?.orgId ?? null,
+        actorUserId: u?.userId ?? u?.sub ?? null,
+        actorPersonId: u?.personId ?? null,
+        isAdmin: isAdmin(u),
+      },
     )
   }
 
@@ -72,7 +114,18 @@ export class AssignmentsController {
    */
   @Post(':id/rebuild-progress')
   @UseGuards(OperationalStateGuard)
-  async rebuildProgress(@Param('id') assignmentId: string) {
-    return this.service.rebuildProgress(assignmentId)
+  async rebuildProgress(
+    @Param('id') assignmentId: string,
+    @Req() req: any,
+    @User() user: any,
+  ) {
+    const u = user ?? req?.user ?? null
+
+    return this.service.rebuildProgress(assignmentId, {
+      orgId: u?.orgId ?? null,
+      actorUserId: u?.userId ?? u?.sub ?? null,
+      actorPersonId: u?.personId ?? null,
+      isAdmin: isAdmin(u),
+    })
   }
 }

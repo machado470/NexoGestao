@@ -100,6 +100,10 @@ export class GovernanceRunService {
       action: 'GOVERNANCE_RUN_COMPLETED',
       description: 'Ciclo de governança executado',
       metadata: {
+        // ✅ ator do evento é o sistema (engine/job)
+        actorType: 'SYSTEM',
+        actor: 'GOVERNANCE_RUN',
+
         orgId: resolvedOrgId,
 
         evaluated: this.evaluated,

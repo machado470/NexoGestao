@@ -8,6 +8,27 @@ import { PrismaService } from '../prisma/prisma.service'
 import { TimelineService } from '../timeline/timeline.service'
 import { RiskService } from '../risk/risk.service'
 
+type ActorContext = {
+  orgId: string | null
+  actorUserId: string | null
+  actorPersonId: string | null
+  isAdmin: boolean
+}
+
+function actorMeta(actor?: ActorContext | null) {
+  const actorUserId = actor?.actorUserId ?? null
+  const actorPersonId = actor?.actorPersonId ?? null
+
+  return {
+    // ✅ padrão novo (oficial)
+    actorUserId,
+    actorPersonId,
+
+    // ✅ compat legado (quando fizer sentido)
+    updatedBy: actorUserId,
+  }
+}
+
 @Injectable()
 export class AssignmentsService {
   constructor(
@@ -54,7 +75,20 @@ export class AssignmentsService {
     return this.listOpenByPerson(personId)
   }
 
-  async startAssignment(assignmentId: string) {
+  private ensureActorCanAccessAssignment(
+    assignment: { personId: string },
+    actor?: ActorContext | null,
+  ) {
+    // Admin pode tudo
+    if (actor?.isAdmin) return
+
+    // Usuário normal só mexe no próprio assignment
+    if (actor?.actorPersonId && assignment.personId !== actor.actorPersonId) {
+      throw new ForbiddenException('Sem permissão para acessar este assignment.')
+    }
+  }
+
+  async startAssignment(assignmentId: string, actor?: ActorContext | null) {
     const assignment = await this.prisma.assignment.findUnique({
       where: { id: assignmentId },
       include: { person: { select: { orgId: true } } },
@@ -64,21 +98,29 @@ export class AssignmentsService {
       throw new NotFoundException('Assignment não encontrado')
     }
 
+    this.ensureActorCanAccessAssignment({ personId: assignment.personId }, actor)
+
     await this.timeline.log({
       orgId: assignment.person.orgId,
       action: 'ASSIGNMENT_STARTED',
       personId: assignment.personId,
       description: 'Execução da trilha iniciada',
-      metadata: { assignmentId },
+      metadata: {
+        assignmentId,
+        trackId: assignment.trackId,
+        progress: assignment.progress, // ✅ agora sempre vem (normalmente 0)
+        ...actorMeta(actor),
+      },
     })
 
     return assignment
   }
 
-  async getNextItem(assignmentId: string) {
+  async getNextItem(assignmentId: string, actor?: ActorContext | null) {
     const assignment = await this.prisma.assignment.findUnique({
       where: { id: assignmentId },
       include: {
+        person: { select: { orgId: true } },
         track: {
           include: {
             items: { orderBy: { order: 'asc' } },
@@ -92,12 +134,14 @@ export class AssignmentsService {
       throw new NotFoundException('Assignment não encontrado')
     }
 
+    this.ensureActorCanAccessAssignment({ personId: assignment.personId }, actor)
+
     const completedItemIds = new Set(assignment.completions.map(c => c.itemId))
 
     return assignment.track.items.find(item => !completedItemIds.has(item.id)) ?? null
   }
 
-  async completeItem(assignmentId: string, itemId: string) {
+  async completeItem(assignmentId: string, itemId: string, actor?: ActorContext | null) {
     if (!itemId || itemId.trim().length === 0) {
       throw new BadRequestException('itemId é obrigatório')
     }
@@ -119,6 +163,8 @@ export class AssignmentsService {
       if (!assignment) {
         throw new NotFoundException('Assignment não encontrado')
       }
+
+      this.ensureActorCanAccessAssignment({ personId: assignment.personId }, actor)
 
       const totalItems = assignment.track.items.length
       if (totalItems === 0) {
@@ -156,6 +202,7 @@ export class AssignmentsService {
       return {
         orgId: assignment.person.orgId,
         personId: assignment.personId,
+        trackId: assignment.trackId,
         progress,
         completedCount,
         totalItems,
@@ -171,7 +218,9 @@ export class AssignmentsService {
       metadata: {
         assignmentId,
         itemId,
+        trackId: result.trackId,
         progress: result.progress,
+        ...actorMeta(actor),
       },
     })
 
@@ -183,7 +232,9 @@ export class AssignmentsService {
         description: 'Trilha concluída (100%)',
         metadata: {
           assignmentId,
+          trackId: result.trackId,
           progress: result.progress,
+          ...actorMeta(actor),
         },
       })
     }
@@ -197,7 +248,7 @@ export class AssignmentsService {
     }
   }
 
-  async rebuildProgress(assignmentId: string) {
+  async rebuildProgress(assignmentId: string, actor?: ActorContext | null) {
     const rebuilt = await this.prisma.$transaction(async tx => {
       const assignment = await tx.assignment.findUnique({
         where: { id: assignmentId },
@@ -212,6 +263,8 @@ export class AssignmentsService {
         throw new NotFoundException('Assignment não encontrado')
       }
 
+      this.ensureActorCanAccessAssignment({ personId: assignment.personId }, actor)
+
       const totalItems = assignment.track.items.length
       if (totalItems === 0) {
         return {
@@ -222,6 +275,7 @@ export class AssignmentsService {
           completedCount: 0,
           personId: assignment.personId,
           orgId: assignment.person.orgId,
+          trackId: assignment.trackId,
         }
       }
 
@@ -241,6 +295,7 @@ export class AssignmentsService {
         completedCount,
         personId: assignment.personId,
         orgId: assignment.person.orgId,
+        trackId: assignment.trackId,
       }
     })
 
@@ -251,9 +306,11 @@ export class AssignmentsService {
       description: `Progress recalculado para ${rebuilt.progress}%`,
       metadata: {
         assignmentId,
+        trackId: (rebuilt as any).trackId ?? null,
         progress: rebuilt.progress,
         totalItems: (rebuilt as any).totalItems,
         completedCount: (rebuilt as any).completedCount,
+        ...actorMeta(actor),
       },
     })
 
@@ -263,12 +320,20 @@ export class AssignmentsService {
         action: 'ASSIGNMENT_COMPLETED',
         personId: (rebuilt as any).personId,
         description: 'Trilha concluída (100%)',
-        metadata: { assignmentId, progress: rebuilt.progress },
+        metadata: {
+          assignmentId,
+          trackId: (rebuilt as any).trackId ?? null,
+          progress: rebuilt.progress,
+          ...actorMeta(actor),
+        },
       })
     }
 
     if ((rebuilt as any).personId) {
-      await this.risk.recalculatePersonRisk((rebuilt as any).personId, 'ASSIGNMENT_PROGRESS_REBUILT')
+      await this.risk.recalculatePersonRisk(
+        (rebuilt as any).personId,
+        'ASSIGNMENT_PROGRESS_REBUILT',
+      )
     }
 
     return rebuilt
