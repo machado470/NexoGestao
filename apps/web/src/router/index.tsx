@@ -17,6 +17,7 @@ import PersonCreate from '../modules/admin/PersonCreate'
 import AuditPage from '../modules/admin/AuditPage'
 import EvaluationsPage from '../modules/admin/EvaluationsPage'
 import CustomersPage from '../modules/admin/CustomersPage'
+import ServiceOrdersPage from '../modules/admin/ServiceOrdersPage'
 
 import CollaboratorLayout from '../modules/collaborator/CollaboratorLayout'
 import CollaboratorDashboard from '../modules/collaborator/CollaboratorDashboard'
@@ -50,6 +51,7 @@ export default function Router() {
           <Route path="avaliacoes" element={<EvaluationsPage />} />
           <Route path="auditoria" element={<AuditPage />} />
           <Route path="clientes" element={<CustomersPage />} />
+          <Route path="os" element={<ServiceOrdersPage />} />
         </Route>
       </Route>
 

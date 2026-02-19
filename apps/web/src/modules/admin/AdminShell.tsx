@@ -39,6 +39,7 @@ export default function AdminShell() {
               <NavItem to="/admin/pessoas" label="Pessoas" />
               <NavItem to="/admin/trilhas" label="Trilhas" />
               <NavItem to="/admin/clientes" label="Clientes" />
+              <NavItem to="/admin/os" label="O.S." />
             </div>
           </div>
 

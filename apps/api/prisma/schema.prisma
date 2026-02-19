@@ -58,6 +58,14 @@ enum AppointmentStatus {
   NO_SHOW
 }
 
+enum ServiceOrderStatus {
+  OPEN
+  ASSIGNED
+  IN_PROGRESS
+  DONE
+  CANCELED
+}
+
 model Organization {
   id                 String   @id @default(uuid())
   name               String
@@ -73,6 +81,7 @@ model Organization {
 
   customers     Customer[]
   appointments  Appointment[]
+  serviceOrders ServiceOrder[]
 }
 
 model User {
@@ -119,6 +128,8 @@ model Person {
   riskSnapshots     RiskSnapshot[]
   exceptions        PersonException[]
   itemCompletions   TrackItemCompletion[]
+
+  serviceOrdersAssigned ServiceOrder[] @relation("ServiceOrderAssignedTo")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -197,12 +208,12 @@ model TrackItemCompletion {
 }
 
 model Assignment {
-  id        String   @id @default(uuid())
-  personId  String
-  trackId   String
+  id       String   @id @default(uuid())
+  personId String
+  trackId  String
 
-  progress  Int       @default(0)
-  risk      RiskLevel @default(LOW)
+  progress Int       @default(0)
+  risk     RiskLevel @default(LOW)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -246,12 +257,12 @@ model CorrectiveAction {
 }
 
 model PersonException {
-  id        String        @id @default(uuid())
-  personId  String
-  type      ExceptionType
-  reason    String
-  startsAt  DateTime
-  endsAt    DateTime
+  id       String        @id @default(uuid())
+  personId String
+  type     ExceptionType
+  reason   String
+  startsAt DateTime
+  endsAt   DateTime
 
   processedAt DateTime?
 
@@ -279,10 +290,10 @@ model AuditEvent {
 }
 
 model RiskSnapshot {
-  id        String   @id @default(uuid())
-  personId  String
-  score     Int
-  reason    String
+  id       String   @id @default(uuid())
+  personId String
+  score    Int
+  reason   String
 
   createdAt DateTime @default(now())
 
@@ -290,7 +301,7 @@ model RiskSnapshot {
 }
 
 model GovernanceRun {
-  id    String @id @default(uuid())
+  id String @id @default(uuid())
 
   orgId String
   org   Organization @relation(fields: [orgId], references: [id])
@@ -314,9 +325,9 @@ model GovernanceRun {
 }
 
 model Customer {
-  id     String  @id @default(uuid())
-  orgId  String
-  org    Organization @relation(fields: [orgId], references: [id])
+  id    String @id @default(uuid())
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id])
 
   name   String
   phone  String
@@ -324,7 +335,8 @@ model Customer {
   notes  String?
   active Boolean @default(true)
 
-  appointments Appointment[]
+  appointments  Appointment[]
+  serviceOrders ServiceOrder[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -334,23 +346,58 @@ model Customer {
 }
 
 model Appointment {
-  id         String            @id @default(uuid())
-  orgId      String
-  org        Organization      @relation(fields: [orgId], references: [id])
+  id    String @id @default(uuid())
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id])
 
   customerId String
-  customer   Customer          @relation(fields: [customerId], references: [id])
+  customer   Customer @relation(fields: [customerId], references: [id])
 
-  startsAt   DateTime
-  endsAt     DateTime
-  status     AppointmentStatus @default(SCHEDULED)
-  notes      String?
+  startsAt DateTime
+  endsAt   DateTime
+  status   AppointmentStatus @default(SCHEDULED)
+  notes    String?
 
-  createdAt  DateTime          @default(now())
-  updatedAt  DateTime          @updatedAt
+  serviceOrder ServiceOrder?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([orgId, startsAt])
   @@index([orgId, startsAt, endsAt])
   @@index([orgId, status, startsAt])
   @@index([customerId, startsAt])
+}
+
+model ServiceOrder {
+  id String @id @default(uuid())
+
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id])
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+
+  appointmentId String? @unique
+  appointment   Appointment? @relation(fields: [appointmentId], references: [id])
+
+  assignedToPersonId String?
+  assignedToPerson   Person? @relation("ServiceOrderAssignedTo", fields: [assignedToPersonId], references: [id])
+
+  title       String
+  description String?
+  status      ServiceOrderStatus @default(OPEN)
+  priority    Int @default(2) // 1 alta, 2 normal, 3 baixa
+
+  scheduledFor DateTime?
+  startedAt    DateTime?
+  finishedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orgId, createdAt])
+  @@index([orgId, status, createdAt])
+  @@index([orgId, customerId, createdAt])
+  @@index([orgId, scheduledFor])
 }
