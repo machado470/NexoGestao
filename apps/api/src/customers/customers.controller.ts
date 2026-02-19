@@ -57,6 +57,7 @@ export class CustomersController {
     return this.customers.create({
       orgId,
       createdBy: user?.userId ?? user?.sub ?? null,
+      personId: user?.personId ?? null,
       name: body.name,
       phone: body.phone,
       email: body.email,
@@ -75,6 +76,7 @@ export class CustomersController {
     return this.customers.update({
       orgId,
       updatedBy: user?.userId ?? user?.sub ?? null,
+      personId: user?.personId ?? null,
       id,
       data: body,
     })

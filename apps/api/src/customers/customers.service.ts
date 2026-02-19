@@ -43,6 +43,7 @@ export class CustomersService {
   async create(params: {
     orgId: string
     createdBy: string | null
+    personId: string | null
     name: string
     phone: string
     email?: string
@@ -83,8 +84,15 @@ export class CustomersService {
       orgId: params.orgId,
       action: 'CUSTOMER_CREATED',
       description: `Cliente criado: ${created.name}`,
+      personId: params.personId,
       metadata: {
         customerId: created.id,
+
+        // ✅ padrão novo (oficial)
+        actorUserId: params.createdBy,
+        actorPersonId: params.personId,
+
+        // ✅ compat legado
         createdBy: params.createdBy,
       },
     })
@@ -95,6 +103,7 @@ export class CustomersService {
   async update(params: {
     orgId: string
     updatedBy: string | null
+    personId: string | null
     id: string
     data: {
       name?: string
@@ -173,9 +182,17 @@ export class CustomersService {
       orgId: params.orgId,
       action: 'CUSTOMER_UPDATED',
       description: `Cliente atualizado: ${updated.name}`,
+      personId: params.personId,
       metadata: {
         customerId: updated.id,
+
+        // ✅ padrão novo (oficial)
+        actorUserId: params.updatedBy,
+        actorPersonId: params.personId,
+
+        // ✅ compat legado
         updatedBy: params.updatedBy,
+
         patch: data,
       },
     })
