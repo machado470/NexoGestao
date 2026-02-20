@@ -79,6 +79,9 @@ model Organization {
   runs           GovernanceRun[]
   timelineEvents TimelineEvent[]
 
+  // ✅ MV1 institucional
+  auditEvents AuditEvent[]
+
   customers     Customer[]
   appointments  Appointment[]
   serviceOrders ServiceOrder[]
@@ -275,8 +278,18 @@ model PersonException {
 }
 
 model AuditEvent {
-  id       String   @id @default(uuid())
+  id String @id @default(uuid())
+
+  // ⚠️ legado (compat). Continua existindo.
   personId String?
+
+  // ✅ MV1 institucional (multi-tenant + autoria + entidade)
+  orgId         String
+  actorUserId   String?
+  actorPersonId String?
+  entityType    String?
+  entityId      String?
+
   action   String
   context  String?
   metadata Json?
@@ -284,7 +297,10 @@ model AuditEvent {
   createdAt DateTime @default(now())
 
   person Person? @relation(fields: [personId], references: [id])
+  org    Organization @relation(fields: [orgId], references: [id])
 
+  @@index([orgId, createdAt])
+  @@index([orgId, action, createdAt])
   @@index([personId, createdAt])
   @@index([action, createdAt])
 }

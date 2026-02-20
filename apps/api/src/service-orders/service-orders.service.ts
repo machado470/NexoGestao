@@ -5,6 +5,8 @@ import {
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { TimelineService } from '../timeline/timeline.service'
+import { AuditService } from '../audit/audit.service'
+import { AUDIT_ACTIONS } from '../audit/audit.actions'
 import { ServiceOrderStatus } from '@prisma/client'
 
 function normalizeText(v?: string): string | null {
@@ -43,6 +45,7 @@ export class ServiceOrdersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly timeline: TimelineService,
+    private readonly audit: AuditService,
   ) {}
 
   async list(
@@ -58,10 +61,12 @@ export class ServiceOrdersService {
     const where: any = { orgId }
 
     if (filters.customerId) where.customerId = filters.customerId
-    if (filters.assignedToPersonId) where.assignedToPersonId = filters.assignedToPersonId
+    if (filters.assignedToPersonId)
+      where.assignedToPersonId = filters.assignedToPersonId
 
     if (filters.status != null) {
-      if (!isStatus(filters.status)) throw new BadRequestException('status inválido')
+      if (!isStatus(filters.status))
+        throw new BadRequestException('status inválido')
       where.status = filters.status
     }
 
@@ -72,7 +77,9 @@ export class ServiceOrdersService {
       include: {
         customer: { select: { id: true, name: true, phone: true } },
         assignedToPerson: { select: { id: true, name: true } },
-        appointment: { select: { id: true, startsAt: true, endsAt: true, status: true } },
+        appointment: {
+          select: { id: true, startsAt: true, endsAt: true, status: true },
+        },
       },
     })
   }
@@ -86,7 +93,9 @@ export class ServiceOrdersService {
       include: {
         customer: { select: { id: true, name: true, phone: true } },
         assignedToPerson: { select: { id: true, name: true } },
-        appointment: { select: { id: true, startsAt: true, endsAt: true, status: true } },
+        appointment: {
+          select: { id: true, startsAt: true, endsAt: true, status: true },
+        },
       },
     })
     if (!os) throw new NotFoundException('Ordem de serviço não encontrada')
@@ -106,7 +115,8 @@ export class ServiceOrdersService {
     assignedToPersonId?: string
   }) {
     if (!params.orgId) throw new BadRequestException('orgId é obrigatório')
-    if (!params.customerId) throw new BadRequestException('customerId é obrigatório')
+    if (!params.customerId)
+      throw new BadRequestException('customerId é obrigatório')
 
     const title = normalizeText(params.title)
     if (!title) throw new BadRequestException('title é obrigatório')
@@ -133,25 +143,31 @@ export class ServiceOrdersService {
     })
     if (!customer) throw new BadRequestException('Cliente inválido para este org')
 
-    // appointment opcional: valida org e customer
     if (params.appointmentId) {
       const appt = await this.prisma.appointment.findFirst({
         where: { id: params.appointmentId, orgId: params.orgId },
         select: { id: true, customerId: true },
       })
-      if (!appt) throw new BadRequestException('appointmentId inválido para este org')
+      if (!appt)
+        throw new BadRequestException('appointmentId inválido para este org')
       if (appt.customerId !== params.customerId) {
-        throw new BadRequestException('appointmentId não pertence ao mesmo customerId')
+        throw new BadRequestException(
+          'appointmentId não pertence ao mesmo customerId',
+        )
       }
     }
 
-    // assignedTo opcional: valida org
     if (params.assignedToPersonId) {
       const p = await this.prisma.person.findFirst({
-        where: { id: params.assignedToPersonId, orgId: params.orgId, active: true },
+        where: {
+          id: params.assignedToPersonId,
+          orgId: params.orgId,
+          active: true,
+        },
         select: { id: true },
       })
-      if (!p) throw new BadRequestException('assignedToPersonId inválido para este org')
+      if (!p)
+        throw new BadRequestException('assignedToPersonId inválido para este org')
     }
 
     const created = await this.prisma.serviceOrder.create({
@@ -169,15 +185,19 @@ export class ServiceOrdersService {
       include: {
         customer: { select: { id: true, name: true, phone: true } },
         assignedToPerson: { select: { id: true, name: true } },
-        appointment: { select: { id: true, startsAt: true, endsAt: true, status: true } },
+        appointment: {
+          select: { id: true, startsAt: true, endsAt: true, status: true },
+        },
       },
     })
+
+    const context = `O.S. criada: ${created.title} (${created.customer.name})`
 
     await this.timeline.log({
       orgId: params.orgId,
       personId: params.personId,
       action: 'SERVICE_ORDER_CREATED',
-      description: `O.S. criada: ${created.title} (${created.customer.name})`,
+      description: context,
       metadata: {
         serviceOrderId: created.id,
         customerId: created.customerId,
@@ -186,13 +206,29 @@ export class ServiceOrdersService {
         status: created.status,
         priority: created.priority,
         scheduledFor: created.scheduledFor,
-
-        // ✅ padrão novo (oficial)
         actorUserId: params.createdBy,
         actorPersonId: params.personId,
-
-        // ✅ compat legado
         createdBy: params.createdBy,
+      },
+    })
+
+    await this.audit.log({
+      orgId: params.orgId,
+      action: AUDIT_ACTIONS.SERVICE_ORDER_CREATED,
+      actorUserId: params.createdBy,
+      actorPersonId: params.personId,
+      personId: params.personId,
+      entityType: 'SERVICE_ORDER',
+      entityId: created.id,
+      context,
+      metadata: {
+        serviceOrderId: created.id,
+        customerId: created.customerId,
+        appointmentId: created.appointmentId,
+        assignedToPersonId: created.assignedToPersonId,
+        status: created.status,
+        priority: created.priority,
+        scheduledFor: created.scheduledFor,
       },
     })
 
@@ -239,7 +275,10 @@ export class ServiceOrdersService {
       patch.description = normalizeText(params.data.description)
     }
 
-    if (typeof params.data.priority === 'number' && Number.isFinite(params.data.priority)) {
+    if (
+      typeof params.data.priority === 'number' &&
+      Number.isFinite(params.data.priority)
+    ) {
       patch.priority = Math.min(5, Math.max(1, Math.floor(params.data.priority)))
     }
 
@@ -257,7 +296,8 @@ export class ServiceOrdersService {
     }
 
     if (typeof params.data.status === 'string') {
-      if (!isStatus(params.data.status)) throw new BadRequestException('status inválido')
+      if (!isStatus(params.data.status))
+        throw new BadRequestException('status inválido')
       patch.status = params.data.status
     }
 
@@ -270,7 +310,8 @@ export class ServiceOrdersService {
           where: { id: v.trim(), orgId: params.orgId, active: true },
           select: { id: true },
         })
-        if (!p) throw new BadRequestException('assignedToPersonId inválido para este org')
+        if (!p)
+          throw new BadRequestException('assignedToPersonId inválido para este org')
         patch.assignedToPersonId = v.trim()
       } else {
         throw new BadRequestException('assignedToPersonId inválido')
@@ -281,17 +322,10 @@ export class ServiceOrdersService {
       throw new BadRequestException('Nenhum campo para atualizar')
     }
 
-    // Regras de estado mínimas:
-    // - se atribuiu alguém e status era OPEN, vira ASSIGNED
-    if (
-      patch.assignedToPersonId &&
-      !patch.status &&
-      existing.status === 'OPEN'
-    ) {
+    if (patch.assignedToPersonId && !patch.status && existing.status === 'OPEN') {
       patch.status = 'ASSIGNED'
     }
 
-    // timestamps automáticos por status
     if (patch.status && patch.status !== existing.status) {
       if (patch.status === 'IN_PROGRESS') patch.startedAt = new Date()
       if (patch.status === 'DONE') patch.finishedAt = new Date()
@@ -302,19 +336,22 @@ export class ServiceOrdersService {
       where: { id: params.id, orgId: params.orgId },
       data: patch,
     })
-    if (result.count === 0) throw new NotFoundException('Ordem de serviço não encontrada')
+    if (result.count === 0)
+      throw new NotFoundException('Ordem de serviço não encontrada')
 
     const updated = await this.prisma.serviceOrder.findFirst({
       where: { id: params.id, orgId: params.orgId },
       include: {
         customer: { select: { id: true, name: true, phone: true } },
         assignedToPerson: { select: { id: true, name: true } },
-        appointment: { select: { id: true, startsAt: true, endsAt: true, status: true } },
+        appointment: {
+          select: { id: true, startsAt: true, endsAt: true, status: true },
+        },
       },
     })
     if (!updated) throw new NotFoundException('Ordem de serviço não encontrada')
 
-    const statusChanged = patch.status && patch.status !== existing.status
+    const statusChanged = !!patch.status && patch.status !== existing.status
 
     await this.timeline.log({
       orgId: params.orgId,
@@ -327,14 +364,40 @@ export class ServiceOrdersService {
         appointmentId: updated.appointmentId,
         assignedToPersonId: updated.assignedToPersonId,
         status: updated.status,
-
-        // ✅ padrão novo (oficial)
         actorUserId: params.updatedBy,
         actorPersonId: params.personId,
-
-        // ✅ compat legado
         updatedBy: params.updatedBy,
+        patch,
+      },
+    })
 
+    const assignedChanged =
+      patch.assignedToPersonId !== undefined &&
+      patch.assignedToPersonId !== existing.assignedToPersonId
+
+    let auditAction: string = AUDIT_ACTIONS.SERVICE_ORDER_UPDATED
+    if (statusChanged) auditAction = AUDIT_ACTIONS.SERVICE_ORDER_STATUS_CHANGED
+    else if (assignedChanged) auditAction = AUDIT_ACTIONS.SERVICE_ORDER_ASSIGNED_CHANGED
+
+    await this.audit.log({
+      orgId: params.orgId,
+      action: auditAction,
+      actorUserId: params.updatedBy,
+      actorPersonId: params.personId,
+      personId: params.personId,
+      entityType: 'SERVICE_ORDER',
+      entityId: updated.id,
+      context: `O.S. atualizada: ${updated.title} (${updated.customer.name})`,
+      metadata: {
+        serviceOrderId: updated.id,
+        before: {
+          status: existing.status,
+          assignedToPersonId: existing.assignedToPersonId,
+        },
+        after: {
+          status: updated.status,
+          assignedToPersonId: updated.assignedToPersonId,
+        },
         patch,
       },
     })

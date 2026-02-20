@@ -6,6 +6,8 @@ import {
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { TimelineService } from '../timeline/timeline.service'
+import { AuditService } from '../audit/audit.service'
+import { AUDIT_ACTIONS } from '../audit/audit.actions'
 import { AppointmentStatus } from '@prisma/client'
 
 const DEFAULT_DURATION_MIN = 30
@@ -77,6 +79,7 @@ export class AppointmentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly timeline: TimelineService,
+    private readonly audit: AuditService,
   ) {}
 
   async list(
@@ -184,11 +187,13 @@ export class AppointmentsService {
         },
       })
 
+      const context = `Agendamento criado: ${created.customer.name}`
+
       await this.timeline.log({
         orgId: params.orgId,
         personId: params.personId,
         action: 'APPOINTMENT_CREATED',
-        description: `Agendamento criado: ${created.customer.name}`,
+        description: context,
         metadata: {
           appointmentId: created.id,
           customerId: created.customerId,
@@ -206,14 +211,35 @@ export class AppointmentsService {
         },
       })
 
+      await this.audit.log({
+        orgId: params.orgId,
+        action: AUDIT_ACTIONS.APPOINTMENT_CREATED,
+        actorUserId: params.createdBy,
+        actorPersonId: params.personId,
+        personId: params.personId,
+        entityType: 'APPOINTMENT',
+        entityId: created.id,
+        context,
+        metadata: {
+          appointmentId: created.id,
+          customerId: created.customerId,
+          startsAt: created.startsAt,
+          endsAt: created.endsAt,
+          status: created.status,
+          notes: created.notes,
+        },
+      })
+
       return created
     } catch (e: any) {
       if (isOverlapDbViolation(e)) {
+        const context = `Conflito de horário bloqueado (DB) (cliente: ${customer.name})`
+
         await this.timeline.log({
           orgId: params.orgId,
           personId: params.personId,
           action: 'APPOINTMENT_CONFLICT_BLOCKED',
-          description: `Conflito de horário bloqueado (DB) (cliente: ${customer.name})`,
+          description: context,
           metadata: {
             customerId: params.customerId,
 
@@ -224,6 +250,21 @@ export class AppointmentsService {
             // ✅ compat legado
             createdBy: params.createdBy,
 
+            attempted: { startsAt, endsAt, status },
+          },
+        })
+
+        await this.audit.log({
+          orgId: params.orgId,
+          action: AUDIT_ACTIONS.APPOINTMENT_CONFLICT_BLOCKED,
+          actorUserId: params.createdBy,
+          actorPersonId: params.personId,
+          personId: params.personId,
+          entityType: 'APPOINTMENT',
+          entityId: null,
+          context,
+          metadata: {
+            customerId: params.customerId,
             attempted: { startsAt, endsAt, status },
           },
         })
@@ -257,6 +298,7 @@ export class AppointmentsService {
         startsAt: true,
         endsAt: true,
         customerId: true,
+        notes: true,
       },
     })
     if (!existing) throw new NotFoundException('Agendamento não encontrado')
@@ -323,13 +365,15 @@ export class AppointmentsService {
       })
       if (!updated) throw new NotFoundException('Agendamento não encontrado')
 
-      const statusChanged = patch.status && patch.status !== existing.status
+      const statusChanged = !!patch.status && patch.status !== existing.status
+
+      const context = `Agendamento atualizado: ${updated.customer.name}`
 
       await this.timeline.log({
         orgId: params.orgId,
         personId: params.personId,
         action: statusChanged ? statusToAction(updated.status) : 'APPOINTMENT_UPDATED',
-        description: `Agendamento atualizado: ${updated.customer.name}`,
+        description: context,
         metadata: {
           appointmentId: updated.id,
           customerId: updated.customerId,
@@ -345,14 +389,43 @@ export class AppointmentsService {
         },
       })
 
+      await this.audit.log({
+        orgId: params.orgId,
+        action: statusChanged
+          ? AUDIT_ACTIONS.APPOINTMENT_STATUS_CHANGED
+          : AUDIT_ACTIONS.APPOINTMENT_UPDATED,
+        actorUserId: params.updatedBy,
+        actorPersonId: params.personId,
+        personId: params.personId,
+        entityType: 'APPOINTMENT',
+        entityId: updated.id,
+        context,
+        metadata: {
+          appointmentId: updated.id,
+          customerId: updated.customerId,
+          before: existing,
+          after: {
+            id: updated.id,
+            status: updated.status,
+            startsAt: updated.startsAt,
+            endsAt: updated.endsAt,
+            customerId: updated.customerId,
+            notes: updated.notes,
+          },
+          patch,
+        },
+      })
+
       return updated
     } catch (e: any) {
       if (isOverlapDbViolation(e)) {
+        const context = `Conflito de horário bloqueado (DB) (update)`
+
         await this.timeline.log({
           orgId: params.orgId,
           personId: params.personId,
           action: 'APPOINTMENT_CONFLICT_BLOCKED',
-          description: `Conflito de horário bloqueado (DB) (update)`,
+          description: context,
           metadata: {
             appointmentId: params.id,
 
@@ -363,6 +436,25 @@ export class AppointmentsService {
             // ✅ compat legado
             updatedBy: params.updatedBy,
 
+            attempted: {
+              startsAt: finalStartsAt,
+              endsAt: finalEndsAt,
+              status: patch.status,
+            },
+          },
+        })
+
+        await this.audit.log({
+          orgId: params.orgId,
+          action: AUDIT_ACTIONS.APPOINTMENT_CONFLICT_BLOCKED,
+          actorUserId: params.updatedBy,
+          actorPersonId: params.personId,
+          personId: params.personId,
+          entityType: 'APPOINTMENT',
+          entityId: params.id,
+          context,
+          metadata: {
+            appointmentId: params.id,
             attempted: {
               startsAt: finalStartsAt,
               endsAt: finalEndsAt,

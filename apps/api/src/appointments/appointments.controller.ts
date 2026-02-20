@@ -68,12 +68,12 @@ export class AppointmentsController {
   ) {
     return this.appointments.create({
       orgId,
-      createdBy: user?.sub ?? null,
+      createdBy: user?.userId ?? user?.sub ?? null,
       personId: user?.personId ?? null,
       customerId: body.customerId,
       startsAt: body.startsAt,
       endsAt: body.endsAt,
-      status: body.status,
+      status: body.status as any,
       notes: body.notes,
     })
   }
@@ -88,10 +88,10 @@ export class AppointmentsController {
   ) {
     return this.appointments.update({
       orgId,
-      updatedBy: user?.sub ?? null,
+      updatedBy: user?.userId ?? user?.sub ?? null,
       personId: user?.personId ?? null,
       id,
-      data: body,
+      data: body as any,
     })
   }
 }

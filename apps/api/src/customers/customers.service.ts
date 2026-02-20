@@ -5,6 +5,8 @@ import {
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { TimelineService } from '../timeline/timeline.service'
+import { AuditService } from '../audit/audit.service'
+import { AUDIT_ACTIONS } from '../audit/audit.actions'
 
 function normalizeEmail(v?: string): string | null {
   const s = (v ?? '').trim().toLowerCase()
@@ -22,6 +24,7 @@ export class CustomersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly timeline: TimelineService,
+    private readonly audit: AuditService,
   ) {}
 
   async list(orgId: string) {
@@ -80,10 +83,12 @@ export class CustomersService {
       },
     })
 
+    const context = `Cliente criado: ${created.name}`
+
     await this.timeline.log({
       orgId: params.orgId,
       action: 'CUSTOMER_CREATED',
-      description: `Cliente criado: ${created.name}`,
+      description: context,
       personId: params.personId,
       metadata: {
         customerId: created.id,
@@ -94,6 +99,24 @@ export class CustomersService {
 
         // ✅ compat legado
         createdBy: params.createdBy,
+      },
+    })
+
+    await this.audit.log({
+      orgId: params.orgId,
+      action: AUDIT_ACTIONS.CUSTOMER_CREATED,
+      actorUserId: params.createdBy,
+      actorPersonId: params.personId,
+      personId: params.personId,
+      entityType: 'CUSTOMER',
+      entityId: created.id,
+      context,
+      metadata: {
+        customerId: created.id,
+        name: created.name,
+        phone: created.phone,
+        email: created.email,
+        active: created.active,
       },
     })
 
@@ -116,11 +139,18 @@ export class CustomersService {
     if (!params.orgId) throw new BadRequestException('orgId é obrigatório')
     if (!params.id) throw new BadRequestException('id é obrigatório')
 
-    const exists = await this.prisma.customer.findFirst({
+    const before = await this.prisma.customer.findFirst({
       where: { id: params.id, orgId: params.orgId },
-      select: { id: true, name: true, email: true },
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        email: true,
+        notes: true,
+        active: true,
+      },
     })
-    if (!exists) throw new NotFoundException('Cliente não encontrado')
+    if (!before) throw new NotFoundException('Cliente não encontrado')
 
     const data: any = {}
 
@@ -139,7 +169,7 @@ export class CustomersService {
     if (typeof params.data.email === 'string') {
       const v = normalizeEmail(params.data.email)
 
-      if (v && v !== exists.email) {
+      if (v && v !== before.email) {
         const dup = await this.prisma.customer.findFirst({
           where: { orgId: params.orgId, email: v, NOT: { id: params.id } },
           select: { id: true },
@@ -178,10 +208,12 @@ export class CustomersService {
     })
     if (!updated) throw new NotFoundException('Cliente não encontrado')
 
+    const context = `Cliente atualizado: ${updated.name}`
+
     await this.timeline.log({
       orgId: params.orgId,
       action: 'CUSTOMER_UPDATED',
-      description: `Cliente atualizado: ${updated.name}`,
+      description: context,
       personId: params.personId,
       metadata: {
         customerId: updated.id,
@@ -193,6 +225,35 @@ export class CustomersService {
         // ✅ compat legado
         updatedBy: params.updatedBy,
 
+        patch: data,
+      },
+    })
+
+    const activeChanged =
+      data.active !== undefined && data.active !== before.active
+
+    await this.audit.log({
+      orgId: params.orgId,
+      action: activeChanged
+        ? AUDIT_ACTIONS.CUSTOMER_ACTIVE_CHANGED
+        : AUDIT_ACTIONS.CUSTOMER_UPDATED,
+      actorUserId: params.updatedBy,
+      actorPersonId: params.personId,
+      personId: params.personId,
+      entityType: 'CUSTOMER',
+      entityId: updated.id,
+      context,
+      metadata: {
+        customerId: updated.id,
+        before,
+        after: {
+          id: updated.id,
+          name: updated.name,
+          phone: updated.phone,
+          email: updated.email,
+          notes: updated.notes,
+          active: updated.active,
+        },
         patch: data,
       },
     })
