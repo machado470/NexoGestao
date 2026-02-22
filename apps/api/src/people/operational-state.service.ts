@@ -65,7 +65,7 @@ export class OperationalStateService {
     personId: string,
   ): Promise<OperationalStateSyncResult> {
     const status = await this.getStatus(personId)
-    const last = await this.repository.getLastState(personId)
+    const last = await this.repository.getLastState({ orgId, personId })
 
     const to = status.state
     const changed = last !== to

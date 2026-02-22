@@ -14,21 +14,8 @@ import { Org } from '../auth/decorators/org.decorator'
 import { User } from '../auth/decorators/user.decorator'
 
 import { CustomersService } from './customers.service'
-
-type CreateCustomerDTO = {
-  name: string
-  phone: string
-  email?: string
-  notes?: string
-}
-
-type UpdateCustomerDTO = {
-  name?: string
-  phone?: string
-  email?: string
-  notes?: string
-  active?: boolean
-}
+import { CreateCustomerDto } from './dto/create-customer.dto'
+import { UpdateCustomerDto } from './dto/update-customer.dto'
 
 @Controller('customers')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -52,12 +39,15 @@ export class CustomersController {
   create(
     @Org() orgId: string,
     @User() user: any,
-    @Body() body: CreateCustomerDTO,
+    @Body() body: CreateCustomerDto,
   ) {
+    const actorUserId = user?.userId ?? null
+    const actorPersonId = user?.personId ?? null
+
     return this.customers.create({
       orgId,
-      createdBy: user?.userId ?? user?.sub ?? null,
-      personId: user?.personId ?? null,
+      createdBy: actorUserId,
+      personId: actorPersonId,
       name: body.name,
       phone: body.phone,
       email: body.email,
@@ -71,12 +61,15 @@ export class CustomersController {
     @Org() orgId: string,
     @User() user: any,
     @Param('id') id: string,
-    @Body() body: UpdateCustomerDTO,
+    @Body() body: UpdateCustomerDto,
   ) {
+    const actorUserId = user?.userId ?? null
+    const actorPersonId = user?.personId ?? null
+
     return this.customers.update({
       orgId,
-      updatedBy: user?.userId ?? user?.sub ?? null,
-      personId: user?.personId ?? null,
+      updatedBy: actorUserId,
+      personId: actorPersonId,
       id,
       data: body,
     })

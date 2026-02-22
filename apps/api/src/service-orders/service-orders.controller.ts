@@ -15,25 +15,8 @@ import { Org } from '../auth/decorators/org.decorator'
 import { User } from '../auth/decorators/user.decorator'
 
 import { ServiceOrdersService } from './service-orders.service'
-
-type CreateServiceOrderDTO = {
-  customerId: string
-  title: string
-  description?: string
-  priority?: number
-  scheduledFor?: string
-  appointmentId?: string
-  assignedToPersonId?: string
-}
-
-type UpdateServiceOrderDTO = {
-  title?: string
-  description?: string
-  priority?: number
-  scheduledFor?: string
-  status?: 'OPEN' | 'ASSIGNED' | 'IN_PROGRESS' | 'DONE' | 'CANCELED'
-  assignedToPersonId?: string | null
-}
+import { CreateServiceOrderDto } from './dto/create-service-order.dto'
+import { UpdateServiceOrderDto } from './dto/update-service-order.dto'
 
 @Controller('service-orders')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -66,12 +49,15 @@ export class ServiceOrdersController {
   create(
     @Org() orgId: string,
     @User() user: any,
-    @Body() body: CreateServiceOrderDTO,
+    @Body() body: CreateServiceOrderDto,
   ) {
+    const actorUserId = user?.userId ?? null
+    const actorPersonId = user?.personId ?? null
+
     return this.serviceOrders.create({
       orgId,
-      createdBy: user?.sub ?? null,
-      personId: user?.personId ?? null,
+      createdBy: actorUserId,
+      personId: actorPersonId,
       customerId: body.customerId,
       title: body.title,
       description: body.description,
@@ -88,12 +74,15 @@ export class ServiceOrdersController {
     @Org() orgId: string,
     @User() user: any,
     @Param('id') id: string,
-    @Body() body: UpdateServiceOrderDTO,
+    @Body() body: UpdateServiceOrderDto,
   ) {
+    const actorUserId = user?.userId ?? null
+    const actorPersonId = user?.personId ?? null
+
     return this.serviceOrders.update({
       orgId,
-      updatedBy: user?.sub ?? null,
-      personId: user?.personId ?? null,
+      updatedBy: actorUserId,
+      personId: actorPersonId,
       id,
       data: body as any,
     })

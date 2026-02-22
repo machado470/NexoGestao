@@ -6,6 +6,7 @@ RUN apt-get update && apt-get install -y \
   openssl \
   ca-certificates \
   postgresql-client \
+  curl \
   && rm -rf /var/lib/apt/lists/*
 
 RUN npm install -g pnpm @nestjs/cli

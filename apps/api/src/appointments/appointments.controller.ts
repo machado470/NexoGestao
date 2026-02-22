@@ -15,21 +15,8 @@ import { Org } from '../auth/decorators/org.decorator'
 import { User } from '../auth/decorators/user.decorator'
 
 import { AppointmentsService } from './appointments.service'
-
-type CreateAppointmentDTO = {
-  customerId: string
-  startsAt: string
-  endsAt?: string
-  status?: 'SCHEDULED' | 'CONFIRMED' | 'CANCELED' | 'DONE' | 'NO_SHOW'
-  notes?: string
-}
-
-type UpdateAppointmentDTO = {
-  startsAt?: string
-  endsAt?: string
-  status?: 'SCHEDULED' | 'CONFIRMED' | 'CANCELED' | 'DONE' | 'NO_SHOW'
-  notes?: string
-}
+import { CreateAppointmentDto } from './dto/create-appointment.dto'
+import { UpdateAppointmentDto } from './dto/update-appointment.dto'
 
 @Controller('appointments')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -64,12 +51,15 @@ export class AppointmentsController {
   create(
     @Org() orgId: string,
     @User() user: any,
-    @Body() body: CreateAppointmentDTO,
+    @Body() body: CreateAppointmentDto,
   ) {
+    const actorUserId = user?.userId ?? null
+    const actorPersonId = user?.personId ?? null
+
     return this.appointments.create({
       orgId,
-      createdBy: user?.userId ?? user?.sub ?? null,
-      personId: user?.personId ?? null,
+      createdBy: actorUserId,
+      personId: actorPersonId,
       customerId: body.customerId,
       startsAt: body.startsAt,
       endsAt: body.endsAt,
@@ -84,12 +74,15 @@ export class AppointmentsController {
     @Org() orgId: string,
     @User() user: any,
     @Param('id') id: string,
-    @Body() body: UpdateAppointmentDTO,
+    @Body() body: UpdateAppointmentDto,
   ) {
+    const actorUserId = user?.userId ?? null
+    const actorPersonId = user?.personId ?? null
+
     return this.appointments.update({
       orgId,
-      updatedBy: user?.userId ?? user?.sub ?? null,
-      personId: user?.personId ?? null,
+      updatedBy: actorUserId,
+      personId: actorPersonId,
       id,
       data: body as any,
     })

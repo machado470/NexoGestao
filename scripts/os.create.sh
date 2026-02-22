@@ -12,8 +12,11 @@ if [ -z "$CUSTOMER_ID" ]; then
   exit 1
 fi
 
-curl -s -X POST "$API_URL/service-orders" \
-  -H "$AUTH" \
-  -H 'Content-Type: application/json' \
-  -d "{\"customerId\":\"$CUSTOMER_ID\",\"title\":\"$TITLE\",\"priority\":$PRIORITY}" \
-| jq
+RESP="$(
+  curl -s -X POST "$API_URL/service-orders" \
+    -H "$AUTH" \
+    -H 'Content-Type: application/json' \
+    -d "{\"customerId\":\"$CUSTOMER_ID\",\"title\":\"$TITLE\",\"priority\":$PRIORITY}"
+)"
+
+echo "$RESP" | jq .

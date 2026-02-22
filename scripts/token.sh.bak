@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+API_URL="${API_URL:-http://localhost:3000}"
+
+need_bin() {
+  command -v "$1" >/dev/null 2>&1 || {
+    echo "❌ Faltando dependency: $1" >&2
+    exit 1
+  }
+}
+
+need_bin curl
+need_bin jq
+
+try_login() {
+  local email="$1"
+  local password="$2"
+
+  local resp token
+  resp="$(
+    curl -s -X POST "$API_URL/auth/login" \
+      -H 'Content-Type: application/json' \
+      -d "{\"email\":\"$email\",\"password\":\"$password\"}"
+  )"
+
+  # aceita token em .token OU .data.token
+  token="$(
+    echo "$resp" | jq -r '.token // .data.token // empty' 2>/dev/null || true
+  )"
+
+  if [ -n "$token" ] && [ "$token" != "null" ]; then
+    echo "$token"
+    return 0
+  fi
+
+  # se falhou, devolve resp para debug
+  echo "$resp" > /tmp/nx_last_login_resp.json
+  return 1
+}
+
+# prioridade: env explícito
+NX_EMAIL="${NX_EMAIL:-}"
+NX_PASSWORD="${NX_PASSWORD:-}"
+
+TOKEN=""
+
+if [ -n "$NX_EMAIL" ] && [ -n "$NX_PASSWORD" ]; then
+  if TOKEN="$(try_login "$NX_EMAIL" "$NX_PASSWORD")"; then
+    :
+  else
+    echo "❌ Falha ao gerar token com NX_EMAIL/NX_PASSWORD." >&2
+    cat /tmp/nx_last_login_resp.json | jq . || cat /tmp/nx_last_login_resp.json
+    exit 1
+  fi
+else
+  # fallback: candidatos comuns do projeto
+  candidates=(
+    "admin@demo.com|demo"
+    "admin@nexogestao.local|Admin@123456"
+    "admin@demo.com|Admin@123456"
+    "admin@nexogestao.local|demo"
+  )
+
+  for pair in "${candidates[@]}"; do
+    email="${pair%%|*}"
+    pass="${pair#*|}"
+    if TOKEN="$(try_login "$email" "$pass")"; then
+      # exporta também quais creds funcionaram (sem senha)
+      export NX_EMAIL="$email"
+      break
+    fi
+  done
+
+  if [ -z "$TOKEN" ]; then
+    echo "❌ Falha ao gerar token. Nenhuma credencial padrão funcionou." >&2
+    echo "👉 Dica: liste usuários no banco e defina NX_EMAIL/NX_PASSWORD." >&2
+    cat /tmp/nx_last_login_resp.json | jq . || cat /tmp/nx_last_login_resp.json
+    exit 1
+  fi
+fi
+
+export API_URL
+export TOKEN
+export AUTH="Authorization: Bearer $TOKEN"
+
+echo "API_URL=$API_URL"
+echo "NX_EMAIL=${NX_EMAIL:-<auto>}"
+echo "TOKEN exportado (primeiros 25 chars): ${TOKEN:0:25}..."

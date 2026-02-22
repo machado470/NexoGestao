@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core'
 import { AppModule } from './app.module'
 import { ApiResponseInterceptor } from './common/http/api-response.interceptor'
 import { ApiExceptionFilter } from './common/http/api-exception.filter'
+import { ValidationPipe } from '@nestjs/common'
 
 function parseCorsOrigins(raw?: string): string[] {
   const v = (raw ?? '').trim()
@@ -19,6 +20,18 @@ async function bootstrap() {
 
     app.useGlobalInterceptors(new ApiResponseInterceptor())
     app.useGlobalFilters(new ApiExceptionFilter())
+
+    // ✅ validação real (DTOs com class-validator)
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true, // remove campos desconhecidos
+        forbidNonWhitelisted: true, // erro se mandar campo extra
+        transform: true, // transforma types básicos (string->number quando fizer sentido)
+        transformOptions: {
+          enableImplicitConversion: true,
+        },
+      }),
+    )
 
     const origins = parseCorsOrigins(process.env.CORS_ORIGINS)
 

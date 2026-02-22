@@ -8,6 +8,7 @@ import { TimelineService } from '../timeline/timeline.service'
 import { AuditService } from '../audit/audit.service'
 import { AUDIT_ACTIONS } from '../audit/audit.actions'
 import { ServiceOrderStatus } from '@prisma/client'
+import { OperationalStateService } from '../people/operational-state.service'
 
 function normalizeText(v?: string): string | null {
   const s = (v ?? '').trim()
@@ -46,7 +47,30 @@ export class ServiceOrdersService {
     private readonly prisma: PrismaService,
     private readonly timeline: TimelineService,
     private readonly audit: AuditService,
+    private readonly operationalState: OperationalStateService,
   ) {}
+
+  private async syncOperationalForPeople(orgId: string, personIds: Array<string | null | undefined>) {
+    const unique = Array.from(
+      new Set(personIds.filter((x): x is string => typeof x === 'string' && x.trim().length > 0)),
+    )
+
+    if (unique.length === 0) return
+
+    for (const pid of unique) {
+      try {
+        await this.operationalState.syncAndLogStateChange(orgId, pid)
+      } catch (err) {
+        // não derruba fluxo de O.S. por causa de risco/estado
+        console.warn(
+          '[ServiceOrders] Falha ao sync operacional. orgId=%s personId=%s err=%s',
+          orgId,
+          pid,
+          err instanceof Error ? err.message : String(err),
+        )
+      }
+    }
+  }
 
   async list(
     orgId: string,
@@ -232,6 +256,9 @@ export class ServiceOrdersService {
       },
     })
 
+    // ✅ sincroniza estado operacional do responsável (se existir)
+    await this.syncOperationalForPeople(params.orgId, [created.assignedToPersonId])
+
     return created
   }
 
@@ -401,6 +428,20 @@ export class ServiceOrdersService {
         patch,
       },
     })
+
+    // ✅ REGRAS de sync operacional:
+    // - Se mudou responsável: recalcula o antigo e o novo
+    // - Se mudou status: recalcula o responsável atual (se existir)
+    const impacted: Array<string | null> = []
+
+    if (assignedChanged) {
+      impacted.push(existing.assignedToPersonId ?? null)
+      impacted.push(updated.assignedToPersonId ?? null)
+    } else if (statusChanged) {
+      impacted.push(updated.assignedToPersonId ?? null)
+    }
+
+    await this.syncOperationalForPeople(params.orgId, impacted)
 
     return updated
   }

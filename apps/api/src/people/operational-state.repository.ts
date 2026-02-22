@@ -17,10 +17,14 @@ export class OperationalStateRepository {
     return typeof value === 'string' && (VALID_STATES as string[]).includes(value)
   }
 
-  async getLastState(personId: string): Promise<OperationalStateValue | null> {
+  async getLastState(params: {
+    orgId: string
+    personId: string
+  }): Promise<OperationalStateValue | null> {
     const last = await this.prisma.timelineEvent.findFirst({
       where: {
-        personId,
+        orgId: params.orgId,
+        personId: params.personId,
         action: 'OPERATIONAL_STATE_CHANGED',
       },
       orderBy: { createdAt: 'desc' },
