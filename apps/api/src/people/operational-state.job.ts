@@ -34,18 +34,27 @@ export class OperationalStateJob {
       select: { id: true, orgId: true },
     })
 
+    let evaluated = 0
+    let changed = 0
+
     for (const p of persons) {
-      // RiskService retorna NUMBER (score)
+      evaluated++
+
       const riskScore = await this.risk.recalculatePersonRisk(
         p.id,
         'OPERATIONAL_STATE_JOB',
       )
 
       const nextState = deriveState(riskScore)
-      const lastState = await this.repo.getLastState(p.id)
 
-      // Anti-spam: só registra quando muda
+      const lastState = await this.repo.getLastState({
+        orgId: p.orgId,
+        personId: p.id,
+      })
+
       if (lastState && lastState === nextState) continue
+
+      changed++
 
       await this.timeline.log({
         orgId: p.orgId,
@@ -60,5 +69,9 @@ export class OperationalStateJob {
         },
       })
     }
+
+    console.log(
+      `[OperationalStateJob] evaluated=${evaluated} changed=${changed} at=${new Date().toISOString()}`,
+    )
   }
 }

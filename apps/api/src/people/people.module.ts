@@ -7,21 +7,19 @@ import { RiskModule } from '../risk/risk.module'
 import { PeopleService } from './people.service'
 import { PeopleController } from './people.controller'
 
-import { OperationalStateService } from './operational-state.service'
-import { OperationalStateRepository } from './operational-state.repository'
+// ✅ importa o módulo correto (traz service/repo/guard/job/scheduler)
+import { OperationalStateModule } from './operational-state.module'
 
 @Module({
-  imports: [PrismaModule, AuditModule, TimelineModule, RiskModule],
-  providers: [
-    PeopleService,
-    OperationalStateService,
-    OperationalStateRepository,
+  imports: [
+    PrismaModule,
+    AuditModule,
+    TimelineModule,
+    RiskModule,
+    OperationalStateModule,
   ],
+  providers: [PeopleService],
   controllers: [PeopleController],
-  exports: [
-    PeopleService,
-    OperationalStateService,
-    OperationalStateRepository,
-  ],
+  exports: [PeopleService],
 })
 export class PeopleModule {}
