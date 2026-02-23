@@ -66,6 +66,21 @@ enum ServiceOrderStatus {
   CANCELED
 }
 
+enum ChargeStatus {
+  PENDING
+  PAID
+  OVERDUE
+  CANCELED
+}
+
+enum PaymentMethod {
+  PIX
+  CASH
+  CARD
+  TRANSFER
+  OTHER
+}
+
 model Organization {
   id                 String   @id @default(uuid())
   name               String
@@ -78,13 +93,13 @@ model Organization {
   tracks         Track[]
   runs           GovernanceRun[]
   timelineEvents TimelineEvent[]
-
-  // ✅ MV1 institucional
-  auditEvents AuditEvent[]
+  auditEvents    AuditEvent[]
 
   customers     Customer[]
   appointments  Appointment[]
   serviceOrders ServiceOrder[]
+  charges       Charge[]
+  payments      Payment[]
 }
 
 model User {
@@ -93,8 +108,8 @@ model User {
   password String?
   role     UserRole
 
-  active          Boolean  @default(false)
-  inviteToken     String?  @unique
+  active          Boolean   @default(false)
+  inviteToken     String?   @unique
   inviteExpiresAt DateTime?
 
   orgId String
@@ -136,10 +151,13 @@ model Person {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([orgId, createdAt])
+  @@index([orgId, active, createdAt])
 }
 
 model TimelineEvent {
-  id          String   @id @default(uuid())
+  id          String  @id @default(uuid())
   action      String
   personId    String?
   description String?
@@ -177,26 +195,28 @@ model Track {
 
   @@unique([slug, version, orgId])
   @@index([orgId])
+  @@index([orgId, status, createdAt])
 }
 
 model TrackItem {
-  id       String        @id @default(uuid())
-  trackId  String
-  title    String
-  content  String?
-  type     TrackItemType
-  order    Int
+  id      String        @id @default(uuid())
+  trackId String
+  title   String
+  content String?
+  type    TrackItemType
+  order   Int
 
   createdAt DateTime @default(now())
 
-  track       Track @relation(fields: [trackId], references: [id])
+  track       Track                 @relation(fields: [trackId], references: [id])
   completions TrackItemCompletion[]
 
   @@unique([trackId, order])
+  @@index([trackId, order])
 }
 
 model TrackItemCompletion {
-  id           String   @id @default(uuid())
+  id           String @id @default(uuid())
   itemId       String
   personId     String
   assignmentId String
@@ -208,10 +228,12 @@ model TrackItemCompletion {
   assignment Assignment @relation(fields: [assignmentId], references: [id])
 
   @@unique([itemId, personId])
+  @@index([personId, completedAt])
+  @@index([assignmentId, completedAt])
 }
 
 model Assignment {
-  id       String   @id @default(uuid())
+  id       String @id @default(uuid())
   personId String
   trackId  String
 
@@ -228,10 +250,12 @@ model Assignment {
   completions TrackItemCompletion[]
 
   @@unique([personId, trackId])
+  @@index([personId, createdAt])
+  @@index([trackId, createdAt])
 }
 
 model Assessment {
-  id           String    @id @default(uuid())
+  id           String @id @default(uuid())
   assignmentId String
   personId     String
   trackId      String
@@ -245,6 +269,10 @@ model Assessment {
   assignment Assignment @relation(fields: [assignmentId], references: [id])
   person     Person     @relation(fields: [personId], references: [id])
   track      Track      @relation(fields: [trackId], references: [id])
+
+  @@index([personId, createdAt])
+  @@index([trackId, createdAt])
+  @@index([assignmentId, createdAt])
 }
 
 model CorrectiveAction {
@@ -257,6 +285,9 @@ model CorrectiveAction {
   createdAt DateTime @default(now())
 
   person Person @relation(fields: [personId], references: [id])
+
+  @@index([personId, status, createdAt])
+  @@index([status, createdAt])
 }
 
 model PersonException {
@@ -283,7 +314,7 @@ model AuditEvent {
   // ⚠️ legado (compat). Continua existindo.
   personId String?
 
-  // ✅ MV1 institucional (multi-tenant + autoria + entidade)
+  // ✅ institucional (multi-tenant + autoria + entidade)
   orgId         String
   actorUserId   String?
   actorPersonId String?
@@ -296,7 +327,7 @@ model AuditEvent {
 
   createdAt DateTime @default(now())
 
-  person Person? @relation(fields: [personId], references: [id])
+  person Person?      @relation(fields: [personId], references: [id])
   org    Organization @relation(fields: [orgId], references: [id])
 
   @@index([orgId, createdAt])
@@ -306,7 +337,7 @@ model AuditEvent {
 }
 
 model RiskSnapshot {
-  id       String   @id @default(uuid())
+  id       String @id @default(uuid())
   personId String
   score    Int
   reason   String
@@ -314,6 +345,8 @@ model RiskSnapshot {
   createdAt DateTime @default(now())
 
   person Person @relation(fields: [personId], references: [id])
+
+  @@index([personId, createdAt])
 }
 
 model GovernanceRun {
@@ -341,7 +374,7 @@ model GovernanceRun {
 }
 
 model Customer {
-  id    String @id @default(uuid())
+  id    String       @id @default(uuid())
   orgId String
   org   Organization @relation(fields: [orgId], references: [id])
 
@@ -353,16 +386,18 @@ model Customer {
 
   appointments  Appointment[]
   serviceOrders ServiceOrder[]
+  charges       Charge[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([orgId, createdAt])
   @@index([orgId, active, createdAt])
+  @@index([orgId, email])
 }
 
 model Appointment {
-  id    String @id @default(uuid())
+  id    String       @id @default(uuid())
   orgId String
   org   Organization @relation(fields: [orgId], references: [id])
 
@@ -394,7 +429,7 @@ model ServiceOrder {
   customerId String
   customer   Customer @relation(fields: [customerId], references: [id])
 
-  appointmentId String? @unique
+  appointmentId String?      @unique
   appointment   Appointment? @relation(fields: [appointmentId], references: [id])
 
   assignedToPersonId String?
@@ -403,11 +438,13 @@ model ServiceOrder {
   title       String
   description String?
   status      ServiceOrderStatus @default(OPEN)
-  priority    Int @default(2) // 1 alta, 2 normal, 3 baixa
+  priority    Int                @default(2)
 
   scheduledFor DateTime?
   startedAt    DateTime?
   finishedAt   DateTime?
+
+  charges Charge[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -416,4 +453,59 @@ model ServiceOrder {
   @@index([orgId, status, createdAt])
   @@index([orgId, customerId, createdAt])
   @@index([orgId, scheduledFor])
+  @@index([assignedToPersonId, createdAt])
+}
+
+model Charge {
+  id String @id @default(uuid())
+
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id])
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+
+  serviceOrderId String?
+  serviceOrder   ServiceOrder? @relation(fields: [serviceOrderId], references: [id])
+
+  amountCents Int
+  currency    String @default("BRL")
+
+  status  ChargeStatus @default(PENDING)
+  dueDate DateTime
+
+  paidAt DateTime?
+  notes  String?
+
+  payments Payment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orgId, createdAt])
+  @@index([orgId, status, dueDate])
+  @@index([customerId, createdAt])
+  @@index([serviceOrderId, createdAt])
+}
+
+model Payment {
+  id String @id @default(uuid())
+
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id])
+
+  chargeId String
+  charge   Charge @relation(fields: [chargeId], references: [id])
+
+  amountCents Int
+  method      PaymentMethod
+  paidAt      DateTime      @default(now())
+  notes       String?
+  externalRef String?
+
+  createdAt DateTime @default(now())
+
+  @@index([orgId, createdAt])
+  @@index([chargeId, createdAt])
+  @@index([orgId, paidAt])
 }

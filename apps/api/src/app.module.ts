@@ -50,13 +50,13 @@ import { AppointmentsModule } from './appointments/appointments.module'
 // 🧩 NEXOGESTÃO OFICIAL — Ordens de Serviço (O.S.)
 import { ServiceOrdersModule } from './service-orders/service-orders.module'
 
+// 💰 NEXOGESTÃO OFICIAL — Financeiro
+import { FinanceModule } from './finance/finance.module'
+
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-
-      // ✅ resolve o "DATABASE_URL sumiu" no pnpm dev:
-      // rodando dentro de apps/api, o .env real tá em ../../.env
       envFilePath: [
         '../../.env',
         '../../.env.docker',
@@ -65,13 +65,11 @@ import { ServiceOrdersModule } from './service-orders/service-orders.module'
       ],
     }),
 
-    // ✅ Scheduler global (1x só)
     ScheduleModule.forRoot(),
 
     PrismaModule,
     HealthModule,
 
-    // ✅ precisa estar cedo (rota pública)
     BootstrapModule,
 
     AuthModule,
@@ -97,12 +95,13 @@ import { ServiceOrdersModule } from './service-orders/service-orders.module'
 
     ExceptionsModule,
 
-    // 🧩 NEXOGESTÃO OFICIAL — módulos operacionais
+    // 🧩 Operacional
     CustomersModule,
     AppointmentsModule,
     ServiceOrdersModule,
+    FinanceModule,
 
-    // 🔥 MOTOR DE GOVERNANÇA
+    // 🔥 Governança
     GovernanceModule,
   ],
 })
