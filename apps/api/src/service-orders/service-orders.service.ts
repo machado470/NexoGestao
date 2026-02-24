@@ -9,6 +9,7 @@ import { AuditService } from '../audit/audit.service'
 import { AUDIT_ACTIONS } from '../audit/audit.actions'
 import { ServiceOrderStatus } from '@prisma/client'
 import { OperationalStateService } from '../people/operational-state.service'
+import { FinanceService } from '../finance/finance.service'
 
 function normalizeText(v?: string): string | null {
   const s = (v ?? '').trim()
@@ -48,11 +49,19 @@ export class ServiceOrdersService {
     private readonly timeline: TimelineService,
     private readonly audit: AuditService,
     private readonly operationalState: OperationalStateService,
+    private readonly finance: FinanceService,
   ) {}
 
-  private async syncOperationalForPeople(orgId: string, personIds: Array<string | null | undefined>) {
+  private async syncOperationalForPeople(
+    orgId: string,
+    personIds: Array<string | null | undefined>,
+  ) {
     const unique = Array.from(
-      new Set(personIds.filter((x): x is string => typeof x === 'string' && x.trim().length > 0)),
+      new Set(
+        personIds.filter(
+          (x): x is string => typeof x === 'string' && x.trim().length > 0,
+        ),
+      ),
     )
 
     if (unique.length === 0) return
@@ -274,6 +283,10 @@ export class ServiceOrdersService {
       scheduledFor?: string
       status?: ServiceOrderStatus
       assignedToPersonId?: string | null
+
+      // 💰 Finance (MVP): usados ao concluir O.S.
+      amountCents?: number
+      dueDate?: string
     }
   }) {
     if (!params.orgId) throw new BadRequestException('orgId é obrigatório')
@@ -289,6 +302,10 @@ export class ServiceOrdersService {
       },
     })
     if (!existing) throw new NotFoundException('Ordem de serviço não encontrada')
+
+    // Captura inputs de financeiro (não entram no patch do ServiceOrder)
+    const amountCents = params.data.amountCents
+    const dueDate = params.data.dueDate
 
     const patch: any = {}
 
@@ -346,6 +363,8 @@ export class ServiceOrdersService {
     }
 
     if (Object.keys(patch).length === 0) {
+      // permite chamar update apenas para enviar amountCents/dueDate? não.
+      // mantém disciplina: update precisa mexer em algo de O.S.
       throw new BadRequestException('Nenhum campo para atualizar')
     }
 
@@ -383,7 +402,9 @@ export class ServiceOrdersService {
     await this.timeline.log({
       orgId: params.orgId,
       personId: params.personId,
-      action: statusChanged ? statusToAction(updated.status) : 'SERVICE_ORDER_UPDATED',
+      action: statusChanged
+        ? statusToAction(updated.status)
+        : 'SERVICE_ORDER_UPDATED',
       description: `O.S. atualizada: ${updated.title} (${updated.customer.name})`,
       metadata: {
         serviceOrderId: updated.id,
@@ -404,7 +425,8 @@ export class ServiceOrdersService {
 
     let auditAction: string = AUDIT_ACTIONS.SERVICE_ORDER_UPDATED
     if (statusChanged) auditAction = AUDIT_ACTIONS.SERVICE_ORDER_STATUS_CHANGED
-    else if (assignedChanged) auditAction = AUDIT_ACTIONS.SERVICE_ORDER_ASSIGNED_CHANGED
+    else if (assignedChanged)
+      auditAction = AUDIT_ACTIONS.SERVICE_ORDER_ASSIGNED_CHANGED
 
     await this.audit.log({
       orgId: params.orgId,
@@ -428,6 +450,28 @@ export class ServiceOrdersService {
         patch,
       },
     })
+
+    // ✅ Se virou DONE, tenta garantir cobrança (idempotente).
+    if (statusChanged && updated.status === 'DONE') {
+      try {
+        await this.finance.ensureChargeForServiceOrderDone({
+          orgId: params.orgId,
+          serviceOrderId: updated.id,
+          actorUserId: params.updatedBy,
+          actorPersonId: params.personId,
+          amountCents,
+          dueDate,
+        })
+      } catch (err) {
+        // NÃO derruba conclusão da O.S. por causa do financeiro.
+        console.warn(
+          '[ServiceOrders] Falha ao criar cobrança ao concluir O.S. orgId=%s soId=%s err=%s',
+          params.orgId,
+          updated.id,
+          err instanceof Error ? err.message : String(err),
+        )
+      }
+    }
 
     // ✅ REGRAS de sync operacional:
     // - Se mudou responsável: recalcula o antigo e o novo

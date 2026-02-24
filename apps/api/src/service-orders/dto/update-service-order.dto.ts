@@ -1,4 +1,13 @@
-import { IsIn, IsInt, IsOptional, IsString, Max, Min, MaxLength, ValidateIf } from 'class-validator'
+import {
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+  MaxLength,
+  ValidateIf,
+} from 'class-validator'
 
 const SERVICE_ORDER_STATUSES = [
   'OPEN',
@@ -39,4 +48,17 @@ export class UpdateServiceOrderDto {
   @ValidateIf((_, v) => typeof v === 'string')
   @IsString()
   assignedToPersonId?: string | null
+
+  // 💰 Finance (MVP): valor da cobrança ao concluir a O.S.
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(1_000_000_000)
+  amountCents?: number
+
+  // 💰 Finance (MVP): vencimento da cobrança (ISO string).
+  // Se não vier e a cobrança for criada, usamos default +3 dias.
+  @IsOptional()
+  @IsString()
+  dueDate?: string
 }
