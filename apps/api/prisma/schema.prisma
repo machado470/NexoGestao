@@ -81,6 +81,36 @@ enum PaymentMethod {
   OTHER
 }
 
+//
+// WhatsApp (Meu Acessor) — Operacional, Logado, Idempotente
+//
+enum MessageChannel {
+  WHATSAPP
+}
+
+enum WhatsAppMessageStatus {
+  QUEUED
+  SENDING
+  SENT
+  FAILED
+  CANCELED
+}
+
+enum WhatsAppEntityType {
+  APPOINTMENT
+  SERVICE_ORDER
+  CHARGE
+}
+
+enum WhatsAppMessageType {
+  APPOINTMENT_CONFIRMATION
+  REMIND_24H
+  PAYMENT_LINK
+  PAYMENT_REMINDER
+  RECEIPT
+  EXECUTION_CONFIRMATION
+}
+
 model Organization {
   id                 String   @id @default(uuid())
   name               String
@@ -100,6 +130,10 @@ model Organization {
   serviceOrders ServiceOrder[]
   charges       Charge[]
   payments      Payment[]
+
+  // WhatsApp (Meu Acessor)
+  whatsAppTemplates WhatsAppTemplate[]
+  whatsAppMessages  WhatsAppMessage[]
 }
 
 model User {
@@ -388,6 +422,9 @@ model Customer {
   serviceOrders ServiceOrder[]
   charges       Charge[]
 
+  // WhatsApp (histórico por cliente)
+  whatsAppMessages WhatsAppMessage[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -508,4 +545,79 @@ model Payment {
   @@index([orgId, createdAt])
   @@index([chargeId, createdAt])
   @@index([orgId, paidAt])
+}
+
+//
+// WhatsApp (Meu Acessor) — Templates e Log de Mensagens
+//
+
+model WhatsAppTemplate {
+  id String @id @default(uuid())
+
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id])
+
+  channel MessageChannel @default(WHATSAPP)
+
+  // key controlada (ex: APPOINTMENT_CONFIRMATION)
+  key  String
+  name String
+  body String
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([orgId, key])
+  @@index([orgId, channel, isActive])
+  @@index([orgId, createdAt])
+}
+
+model WhatsAppMessage {
+  id String @id @default(uuid())
+
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id])
+
+  // histórico por cliente (sempre que possível)
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+
+  channel MessageChannel @default(WHATSAPP)
+
+  entityType WhatsAppEntityType
+  entityId   String
+
+  messageType WhatsAppMessageType
+
+  // idempotência REAL: única por (org + tipo + entidade + bucket de tempo)
+  messageKey String @unique
+
+  status WhatsAppMessageStatus @default(QUEUED)
+
+  toPhone      String
+  templateKey  String?
+  renderedText String
+
+  provider          String  @default("mock")
+  providerMessageId String?
+
+  // claim/lock para processamento concorrente seguro
+  lockedAt DateTime?
+  lockedBy String?
+
+  errorCode    String?
+  errorMessage String?
+
+  createdAt DateTime @default(now())
+  sentAt    DateTime?
+
+  metadata Json?
+
+  @@index([orgId, status, createdAt])
+  @@index([customerId, createdAt])
+  @@index([orgId, messageType, createdAt])
+  @@index([orgId, entityType, entityId])
+  @@index([orgId, status, lockedAt, createdAt])
 }

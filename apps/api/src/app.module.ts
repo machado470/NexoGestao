@@ -53,6 +53,9 @@ import { ServiceOrdersModule } from './service-orders/service-orders.module'
 // 💰 NEXOGESTÃO OFICIAL — Financeiro
 import { FinanceModule } from './finance/finance.module'
 
+// 📲 WhatsApp — Meu Acessor (infra + dispatcher)
+import { WhatsAppModule } from './whatsapp/whatsapp.module'
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -100,6 +103,9 @@ import { FinanceModule } from './finance/finance.module'
     AppointmentsModule,
     ServiceOrdersModule,
     FinanceModule,
+
+    // 📲 WhatsApp (jobs + serviço)
+    WhatsAppModule,
 
     // 🔥 Governança
     GovernanceModule,
