@@ -29,7 +29,7 @@ export class FinanceController {
   async listCharges(@Req() req: any, @Query() query: ChargesQueryDto) {
     const orgId = req.user.orgId
     const data = await this.finance.listCharges(orgId, query)
-    return { ok: true, data }
+    return { ok: true, data } // data agora é { items, meta }
   }
 
   @Get('charges/:id')

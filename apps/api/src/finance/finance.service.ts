@@ -6,8 +6,16 @@ import {
 import { PrismaService } from '../prisma/prisma.service'
 import { TimelineService } from '../timeline/timeline.service'
 import { AuditService } from '../audit/audit.service'
+import { AUDIT_ACTIONS } from '../audit/audit.actions'
 import { $Enums } from '@prisma/client'
 import { ChargesQueryDto } from './dto/charges-query.dto'
+
+function isUuidLike(s: string): boolean {
+  // UUID v4/v1 “parecido” (bom o suficiente pra decidir equals vs contains)
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+    s,
+  )
+}
 
 @Injectable()
 export class FinanceService {
@@ -164,12 +172,14 @@ export class FinanceService {
         customerId,
         amountCents,
         dueDate: finalDueDate.toISOString(),
+        actorUserId: input.actorUserId ?? null,
+        actorPersonId: input.actorPersonId ?? null,
       },
     })
 
     await this.audit.log({
       orgId: input.orgId,
-      action: 'CHARGE_CREATED',
+      action: AUDIT_ACTIONS.CHARGE_CREATED,
       actorUserId: input.actorUserId ?? null,
       actorPersonId: input.actorPersonId ?? null,
       personId: input.actorPersonId ?? null,
@@ -189,68 +199,107 @@ export class FinanceService {
     method: $Enums.PaymentMethod
     amountCents: number
   }) {
-    const charge = await this.prisma.charge.findFirst({
-      where: { id: input.chargeId, orgId: input.orgId },
-      select: { id: true, amountCents: true, status: true },
+    const now = new Date()
+
+    return this.prisma.$transaction(async (tx) => {
+      const charge = await tx.charge.findFirst({
+        where: { id: input.chargeId, orgId: input.orgId },
+        select: { id: true, amountCents: true, status: true },
+      })
+
+      if (!charge) throw new NotFoundException('Cobrança não encontrada')
+      if (charge.status === 'PAID') return { alreadyPaid: true }
+
+      if (input.amountCents !== charge.amountCents) {
+        throw new BadRequestException('Valor do pagamento diferente da cobrança')
+      }
+
+      const payment = await tx.payment.create({
+        data: {
+          orgId: input.orgId,
+          chargeId: charge.id,
+          amountCents: input.amountCents,
+          method: input.method,
+          paidAt: now,
+        },
+        select: { id: true },
+      })
+
+      await tx.charge.update({
+        where: { id: charge.id },
+        data: {
+          status: 'PAID',
+          paidAt: now,
+        },
+      })
+
+      // Timeline (ATÔMICO)
+      await tx.timelineEvent.create({
+        data: {
+          orgId: input.orgId,
+          action: 'CHARGE_PAID',
+          personId: input.actorPersonId ?? null,
+          description: `Cobrança paga (${input.method})`,
+          metadata: {
+            chargeId: charge.id,
+            paymentId: payment.id,
+            amountCents: input.amountCents,
+            method: input.method,
+            actorUserId: input.actorUserId ?? null,
+            actorPersonId: input.actorPersonId ?? null,
+          },
+        },
+      })
+
+      // Audit: CHARGE_PAID (ATÔMICO)
+      await tx.auditEvent.create({
+        data: {
+          orgId: input.orgId,
+          action: AUDIT_ACTIONS.CHARGE_PAID,
+          actorUserId: input.actorUserId ?? null,
+          actorPersonId: input.actorPersonId ?? null,
+          personId: input.actorPersonId ?? null, // legado
+          entityType: 'CHARGE',
+          entityId: charge.id,
+          context: 'Cobrança marcada como paga',
+          metadata: {
+            paymentId: payment.id,
+            method: input.method,
+            amountCents: input.amountCents,
+          },
+        },
+      })
+
+      // Audit: PAYMENT_CREATED (ATÔMICO)
+      await tx.auditEvent.create({
+        data: {
+          orgId: input.orgId,
+          action: AUDIT_ACTIONS.PAYMENT_CREATED,
+          actorUserId: input.actorUserId ?? null,
+          actorPersonId: input.actorPersonId ?? null,
+          personId: input.actorPersonId ?? null, // legado
+          entityType: 'PAYMENT',
+          entityId: payment.id,
+          context: 'Pagamento criado',
+          metadata: {
+            chargeId: charge.id,
+            method: input.method,
+            amountCents: input.amountCents,
+          },
+        },
+      })
+
+      return { paymentId: payment.id }
     })
-
-    if (!charge) throw new NotFoundException('Cobrança não encontrada')
-
-    if (charge.status === 'PAID') return { alreadyPaid: true }
-
-    if (input.amountCents !== charge.amountCents) {
-      throw new BadRequestException('Valor do pagamento diferente da cobrança')
-    }
-
-    const payment = await this.prisma.payment.create({
-      data: {
-        orgId: input.orgId,
-        chargeId: charge.id,
-        amountCents: input.amountCents,
-        method: input.method,
-        paidAt: new Date(),
-      },
-      select: { id: true },
-    })
-
-    await this.prisma.charge.update({
-      where: { id: charge.id },
-      data: {
-        status: 'PAID',
-        paidAt: new Date(),
-      },
-    })
-
-    await this.timeline.log({
-      orgId: input.orgId,
-      personId: input.actorPersonId,
-      action: 'CHARGE_PAID',
-      description: `Cobrança paga (${input.method})`,
-      metadata: {
-        chargeId: charge.id,
-        amountCents: input.amountCents,
-        method: input.method,
-      },
-    })
-
-    await this.audit.log({
-      orgId: input.orgId,
-      action: 'CHARGE_PAID',
-      actorUserId: input.actorUserId,
-      actorPersonId: input.actorPersonId,
-      personId: input.actorPersonId,
-      entityType: 'CHARGE',
-      entityId: charge.id,
-      context: 'Cobrança marcada como paga',
-    })
-
-    return { paymentId: payment.id }
   }
 
   async listCharges(orgId: string, query?: ChargesQueryDto) {
     const status = query?.status
     const rawLimit = query?.limit
     const q = (query?.q ?? '').trim()
+    const cursor = (query?.cursor ?? '').trim() || undefined
+    const orderBy = query?.orderBy ?? 'createdAt'
+    const direction = query?.direction ?? 'desc'
 
     // limit: default 50, range 0..100
     let limit = 50
@@ -263,29 +312,75 @@ export class FinanceService {
       limit = rawLimit
     }
 
-    if (limit === 0) return []
+    if (limit === 0) {
+      return {
+        items: [],
+        meta: {
+          limit,
+          orderBy,
+          direction,
+          hasMore: false,
+          nextCursor: null,
+        },
+      }
+    }
 
+    // ✅ cursor inválido = 400 (evita UI “silenciosa”)
+    if (cursor) {
+      const exists = await this.prisma.charge.findFirst({
+        where: { id: cursor, orgId },
+        select: { id: true },
+      })
+      if (!exists) throw new BadRequestException('cursor inválido')
+    }
+
+    // where base
     const where: any = {
       orgId,
       ...(status ? { status } : {}),
-      ...(q
-        ? {
-            OR: [
-              { customer: { name: { contains: q, mode: 'insensitive' } } },
-              { customer: { phone: { contains: q } } },
-              { serviceOrder: { title: { contains: q, mode: 'insensitive' } } },
-              { id: { contains: q } },
-              { customerId: { contains: q } },
-              { serviceOrderId: { contains: q } },
-            ],
-          }
-        : {}),
     }
 
-    return this.prisma.charge.findMany({
+    // q inteligente: UUID -> equals, humano -> contains
+    if (q) {
+      const uuid = isUuidLike(q)
+
+      where.OR = [
+        { customer: { name: { contains: q, mode: 'insensitive' } } },
+        { customer: { phone: { contains: q } } },
+        { serviceOrder: { title: { contains: q, mode: 'insensitive' } } },
+      ]
+
+      if (uuid) {
+        where.OR.push({ id: { equals: q } })
+        where.OR.push({ customerId: { equals: q } })
+        where.OR.push({ serviceOrderId: { equals: q } })
+      }
+    }
+
+    // orderBy + tie-breaker por id (pra paginação não “pular/duplicar”)
+    const order: any[] = []
+    if (orderBy === 'amountCents') {
+      order.push({ amountCents: direction })
+      order.push({ createdAt: 'desc' })
+      order.push({ id: 'desc' })
+    } else if (orderBy === 'dueDate') {
+      order.push({ dueDate: direction })
+      order.push({ createdAt: 'desc' })
+      order.push({ id: 'desc' })
+    } else {
+      order.push({ createdAt: direction })
+      order.push({ id: 'desc' })
+    }
+
+    // Paginação por cursor (cursor = id da última charge)
+    // Técnica: take = limit + 1 para saber hasMore
+    const take = limit + 1
+
+    const rows = await this.prisma.charge.findMany({
       where,
-      orderBy: { createdAt: 'desc' },
-      take: limit,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      orderBy: order,
+      take,
       select: {
         id: true,
         serviceOrderId: true,
@@ -302,6 +397,24 @@ export class FinanceService {
         },
       },
     })
+
+    const hasMore = rows.length > limit
+    const items = hasMore ? rows.slice(0, limit) : rows
+
+    // ✅ CORREÇÃO: só retorna nextCursor se realmente houver próxima página
+    const nextCursor =
+      hasMore && items.length ? items[items.length - 1].id : null
+
+    return {
+      items,
+      meta: {
+        limit,
+        orderBy,
+        direction,
+        hasMore,
+        nextCursor,
+      },
+    }
   }
 
   async getCharge(orgId: string, id: string) {

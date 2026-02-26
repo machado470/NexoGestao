@@ -1,5 +1,10 @@
 // apps/api/prisma/seed.ts
-import { PrismaClient, AppointmentStatus, ServiceOrderStatus } from '@prisma/client'
+import {
+  PrismaClient,
+  AppointmentStatus,
+  ServiceOrderStatus,
+  PaymentMethod,
+} from '@prisma/client'
 import * as bcrypt from 'bcryptjs'
 
 const prisma = new PrismaClient()
@@ -30,6 +35,12 @@ function seedDayBase(): Date {
 function addHours(base: Date, h: number) {
   const d = new Date(base.getTime())
   d.setHours(d.getHours() + h)
+  return d
+}
+
+function addDays(base: Date, days: number) {
+  const d = new Date(base.getTime())
+  d.setDate(d.getDate() + days)
   return d
 }
 
@@ -403,7 +414,10 @@ function finishedAtFor(base: Date, status: ServiceOrderStatus) {
   return null
 }
 
-async function ensureDemoServiceOrders(orgId: string, actor: { actorUserId: string | null; actorPersonId: string | null }) {
+async function ensureDemoServiceOrders(
+  orgId: string,
+  actor: { actorUserId: string | null; actorPersonId: string | null },
+) {
   const customers = await prisma.customer.findMany({
     where: { orgId, active: true },
     select: { id: true, name: true },
@@ -418,7 +432,7 @@ async function ensureDemoServiceOrders(orgId: string, actor: { actorUserId: stri
     orderBy: { createdAt: 'asc' },
     take: 50,
   })
-  const collabIds = collabs.map(c => c.id)
+  const collabIds = collabs.map((c) => c.id)
 
   const appts = await prisma.appointment.findMany({
     where: { orgId },
@@ -442,16 +456,16 @@ async function ensureDemoServiceOrders(orgId: string, actor: { actorUserId: stri
   ]
 
   function pickAppointmentId(customerId: string, desired: ServiceOrderStatus): string | null {
-    const byCustomer = appts.filter(a => a.customerId === customerId)
+    const byCustomer = appts.filter((a) => a.customerId === customerId)
     if (byCustomer.length === 0) return null
 
     if (desired === 'DONE') {
-      const done = byCustomer.find(a => a.status === 'DONE')
+      const done = byCustomer.find((a) => a.status === 'DONE')
       if (done) return done.id
     }
 
     if (desired === 'IN_PROGRESS') {
-      const ok = byCustomer.find(a => a.status === 'CONFIRMED' || a.status === 'SCHEDULED')
+      const ok = byCustomer.find((a) => a.status === 'CONFIRMED' || a.status === 'SCHEDULED')
       if (ok) return ok.id
     }
 
@@ -493,7 +507,16 @@ async function ensureDemoServiceOrders(orgId: string, actor: { actorUserId: stri
         startedAt: startedAtFor(base, p.status),
         finishedAt: finishedAtFor(base, p.status),
       },
-      select: { id: true, title: true, customerId: true, appointmentId: true, assignedToPersonId: true, status: true, priority: true, scheduledFor: true },
+      select: {
+        id: true,
+        title: true,
+        customerId: true,
+        appointmentId: true,
+        assignedToPersonId: true,
+        status: true,
+        priority: true,
+        scheduledFor: true,
+      },
     })
 
     // ✅ Loga timeline igual a API faria
@@ -531,6 +554,143 @@ async function ensureDemoServiceOrders(orgId: string, actor: { actorUserId: stri
   return created
 }
 
+/**
+ * ✅ FINANCE DEMO:
+ * - cria charges realistas (PENDING/OVERDUE/PAID/CANCELED)
+ * - cria payments para PAID
+ * - tudo determinístico por dia
+ */
+async function ensureDemoFinance(
+  orgId: string,
+  actor: { actorUserId: string | null; actorPersonId: string | null },
+) {
+  const base = seedDayBase()
+
+  const serviceOrders = await prisma.serviceOrder.findMany({
+    where: { orgId },
+    select: { id: true, customerId: true, title: true, status: true, finishedAt: true, createdAt: true },
+    orderBy: { createdAt: 'asc' },
+    take: 50,
+  })
+
+  if (serviceOrders.length === 0) return { chargesCreated: 0, paymentsCreated: 0 }
+
+  // plano determinístico: espalha status e valores
+  const moneyPlan = [
+    { amountCents: 8900, status: 'PENDING' as const, dueDaysFromBase: +3, pay: false },
+    { amountCents: 15900, status: 'PENDING' as const, dueDaysFromBase: +7, pay: false },
+    { amountCents: 29900, status: 'OVERDUE' as const, dueDaysFromBase: -5, pay: false },
+    { amountCents: 4900, status: 'OVERDUE' as const, dueDaysFromBase: -2, pay: false },
+    { amountCents: 15000, status: 'PAID' as const, dueDaysFromBase: +1, pay: true },
+    { amountCents: 25000, status: 'PAID' as const, dueDaysFromBase: -1, pay: true },
+    { amountCents: 12000, status: 'CANCELED' as const, dueDaysFromBase: +4, pay: false },
+    { amountCents: 7600, status: 'PENDING' as const, dueDaysFromBase: +10, pay: false },
+    { amountCents: 19900, status: 'PAID' as const, dueDaysFromBase: +2, pay: true },
+    { amountCents: 9900, status: 'OVERDUE' as const, dueDaysFromBase: -10, pay: false },
+  ]
+
+  let chargesCreated = 0
+  let paymentsCreated = 0
+
+  for (let i = 0; i < moneyPlan.length; i++) {
+    const p = moneyPlan[i]
+    const so = serviceOrders[i % serviceOrders.length]
+
+    // evita duplicar: 1 charge por serviceOrder (demo)
+    const existing = await prisma.charge.findFirst({
+      where: { orgId, serviceOrderId: so.id },
+      select: { id: true, status: true },
+    })
+    if (existing) continue
+
+    const dueDate = addDays(base, p.dueDaysFromBase)
+
+    // createdAt “realista” (espalha no tempo)
+    const createdAt = addHours(base, -(24 + i * 3))
+
+    const created = await prisma.charge.create({
+      data: {
+        orgId,
+        serviceOrderId: so.id,
+        customerId: so.customerId,
+        amountCents: p.amountCents,
+        status: p.status as any,
+        dueDate,
+        createdAt,
+      },
+      select: { id: true },
+    })
+
+    chargesCreated++
+
+    await prisma.timelineEvent.create({
+      data: {
+        orgId,
+        action: 'CHARGE_CREATED',
+        personId: actor.actorPersonId,
+        description: `Cobrança criada (seed) para ${so.title}`,
+        metadata: {
+          chargeId: created.id,
+          serviceOrderId: so.id,
+          customerId: so.customerId,
+          amountCents: p.amountCents,
+          status: p.status,
+          dueDate: dueDate.toISOString(),
+          actorUserId: actor.actorUserId,
+          actorPersonId: actor.actorPersonId,
+          seed: true,
+          seedSource: 'prisma/seed.ts',
+        },
+      },
+    })
+
+    // se PAID: cria payment + marca paidAt
+    if (p.pay) {
+      const paidAt = addHours(base, -(2 + i)) // determinístico
+
+      const payment = await prisma.payment.create({
+        data: {
+          orgId,
+          chargeId: created.id,
+          amountCents: p.amountCents,
+          method: PaymentMethod.PIX,
+          paidAt,
+        },
+        select: { id: true },
+      })
+
+      await prisma.charge.update({
+        where: { id: created.id },
+        data: { status: 'PAID' as any, paidAt },
+      })
+
+      paymentsCreated++
+
+      await prisma.timelineEvent.create({
+        data: {
+          orgId,
+          action: 'CHARGE_PAID',
+          personId: actor.actorPersonId,
+          description: `Cobrança paga (seed) via PIX`,
+          metadata: {
+            chargeId: created.id,
+            paymentId: payment.id,
+            amountCents: p.amountCents,
+            method: 'PIX',
+            paidAt: paidAt.toISOString(),
+            actorUserId: actor.actorUserId,
+            actorPersonId: actor.actorPersonId,
+            seed: true,
+            seedSource: 'prisma/seed.ts',
+          },
+        },
+      })
+    }
+  }
+
+  return { chargesCreated, paymentsCreated }
+}
+
 async function main() {
   const seedMode = (process.env.SEED_MODE || 'none').toLowerCase()
 
@@ -556,11 +716,13 @@ async function main() {
   const collabs = await ensureDemoCollaborators(org.id)
   const tracks = await ensureDemoTracks(org.id)
 
-  const personIds = collabs.people.map(p => p.id)
-  const trackIds = tracks.tracks.map(t => t.id)
+  const personIds = collabs.people.map((p) => p.id)
+  const trackIds = tracks.tracks.map((t) => t.id)
 
   const assignmentsCreated = await ensureDemoAssignments(org.id, personIds, trackIds)
   const serviceOrdersCreated = await ensureDemoServiceOrders(org.id, actor)
+
+  const finance = await ensureDemoFinance(org.id, actor)
 
   console.log('✅ Seed DEMO aplicado')
   console.log(`👤 Admin DEMO: ${admin.created ? 'CRIADO' : 'JÁ EXISTIA'}`)
@@ -571,6 +733,8 @@ async function main() {
   console.log(`📚 Tracks DEMO criadas agora: ${tracks.created} (total=${tracks.tracks.length})`)
   console.log(`🧷 Assignments DEMO criados agora: ${assignmentsCreated}`)
   console.log(`🧾 ServiceOrders DEMO criadas agora: ${serviceOrdersCreated}`)
+  console.log(`💸 Charges DEMO criadas agora: ${finance.chargesCreated}`)
+  console.log(`💰 Payments DEMO criados agora: ${finance.paymentsCreated}`)
   console.log('🎯 Seed actor:', actor)
   console.log('🕒 Seed day base:', seedDayBase().toISOString())
 }
