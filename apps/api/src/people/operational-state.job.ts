@@ -31,11 +31,18 @@ export class OperationalStateJob {
   async run() {
     const persons = await this.prisma.person.findMany({
       where: { active: true },
-      select: { id: true, orgId: true },
+      select: {
+        id: true,
+        orgId: true,
+        operationalState: true,
+        operationalRiskScore: true,
+        operationalStateUpdatedAt: true,
+      },
     })
 
     let evaluated = 0
     let changed = 0
+    const now = new Date()
 
     for (const p of persons) {
       evaluated++
@@ -52,22 +59,40 @@ export class OperationalStateJob {
         personId: p.id,
       })
 
-      if (lastState && lastState === nextState) continue
+      const snapshotOk =
+        p.operationalState === nextState &&
+        p.operationalRiskScore === riskScore &&
+        p.operationalStateUpdatedAt !== null
+
+      if (lastState && lastState === nextState && snapshotOk) continue
 
       changed++
 
-      await this.timeline.log({
-        orgId: p.orgId,
-        action: 'OPERATIONAL_STATE_CHANGED',
-        personId: p.id,
-        description: `Estado operacional: ${(lastState ?? 'UNKNOWN')} → ${nextState}`,
-        metadata: {
-          from: lastState ?? 'UNKNOWN',
-          to: nextState,
-          riskScore,
-          source: 'OPERATIONAL_STATE_JOB',
-        },
-      })
+      if (!snapshotOk) {
+        await this.prisma.person.update({
+          where: { id: p.id },
+          data: {
+            operationalState: nextState,
+            operationalRiskScore: riskScore,
+            operationalStateUpdatedAt: now,
+          },
+        })
+      }
+
+      if (!lastState || lastState !== nextState) {
+        await this.timeline.log({
+          orgId: p.orgId,
+          action: 'OPERATIONAL_STATE_CHANGED',
+          personId: p.id,
+          description: `Estado operacional: ${lastState ?? 'UNKNOWN'} → ${nextState}`,
+          metadata: {
+            from: lastState ?? 'UNKNOWN',
+            to: nextState,
+            riskScore,
+            source: 'OPERATIONAL_STATE_JOB',
+          },
+        })
+      }
     }
 
     console.log(

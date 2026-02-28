@@ -5,7 +5,6 @@ import { RiskModule } from './risk/risk.module'
 import { GovernanceModule } from './governance/governance.module'
 import { OperationalStateModule } from './people/operational-state.module'
 
-import { EnforcementJob } from './governance/enforcement.job'
 import { OperationalStateJob } from './people/operational-state.job'
 
 @Module({
@@ -17,7 +16,6 @@ import { OperationalStateJob } from './people/operational-state.job'
     OperationalStateModule,
   ],
   providers: [
-    EnforcementJob,
     OperationalStateJob,
   ],
 })

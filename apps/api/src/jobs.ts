@@ -3,7 +3,6 @@ import { NestFactory } from '@nestjs/core'
 import { JobsModule } from './jobs.module'
 import { EnforcementJob } from './governance/enforcement.job'
 import { OperationalStateJob } from './people/operational-state.job'
-import { GovernanceRunService } from './governance/governance-run.service'
 
 async function run() {
   console.log('⚙️  JOBS — bootstrap iniciado')
@@ -15,7 +14,6 @@ async function run() {
   try {
     const operationalStateJob = app.get(OperationalStateJob)
     const enforcementJob = app.get(EnforcementJob)
-    const governanceRun = app.get(GovernanceRunService)
 
     console.log('▶️  OperationalStateJob iniciado')
     await operationalStateJob.run()
@@ -24,8 +22,6 @@ async function run() {
     console.log('▶️  EnforcementJob iniciado')
     await enforcementJob.run()
     console.log('✅ EnforcementJob finalizado')
-
-    await governanceRun.finish()
 
     console.log('🎉 JOBS finalizados com sucesso')
 

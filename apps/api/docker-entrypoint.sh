@@ -37,21 +37,11 @@ done
 echo "[nexogestao] postgres is ready"
 
 # ===============================
-# MIGRATIONS (robusto)
+# MIGRATIONS (CORRETO)
 # ===============================
-
 if [ "$AUTO_MIGRATE" = "1" ]; then
-  echo "[nexogestao] checking schema via to_regclass..."
-
-  HAS_MIGRATIONS="$(psql "${DATABASE_URL}" -tAc "select to_regclass('public._prisma_migrations') is not null;" 2>/dev/null || echo "f")"
-  HAS_MIGRATIONS="$(echo "$HAS_MIGRATIONS" | tr -d '[:space:]')"
-
-  if [ "$HAS_MIGRATIONS" = "t" ]; then
-    echo "[nexogestao] schema detected"
-  else
-    echo "[nexogestao] schema not detected -> running prisma:migrate:deploy"
-    pnpm run prisma:migrate:deploy
-  fi
+  echo "[nexogestao] AUTO_MIGRATE=1 -> running prisma:migrate:deploy"
+  pnpm run prisma:migrate:deploy
 else
   echo "[nexogestao] AUTO_MIGRATE=0 -> skipping migrations"
 fi
@@ -59,7 +49,6 @@ fi
 # ===============================
 # SEED CONTROLADO
 # ===============================
-
 if [ "${SEED_MODE:-}" = "demo" ]; then
   echo "[nexogestao] SEED_MODE=demo -> running seed"
   pnpm run prisma:seed || echo "[nexogestao] seed failed"

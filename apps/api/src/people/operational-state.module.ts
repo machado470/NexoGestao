@@ -20,6 +20,7 @@ import { OperationalStateScheduler } from './operational-state.scheduler'
   ],
   exports: [
     OperationalStateService,
+    OperationalStateRepository, // ✅ necessário pro JobsModule injetar no OperationalStateJob
     OperationalStateGuard,
     OperationalStateJob, // ✅ IMPORTANTÍSSIMO
   ],

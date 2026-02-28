@@ -100,7 +100,6 @@ export class GovernanceRunService {
       action: 'GOVERNANCE_RUN_COMPLETED',
       description: 'Ciclo de governança executado',
       metadata: {
-        // ✅ ator do evento é o sistema (engine/job)
         actorType: 'SYSTEM',
         actor: 'GOVERNANCE_RUN',
 
@@ -132,6 +131,64 @@ export class GovernanceRunService {
       openCorrectivesCount,
       durationMs,
       startedAt: this.startedAt,
+      finishedAt,
+    }
+  }
+
+  // ✅ NOVO: permite o GovernanceRunJob fechar um run por agregados (sem depender do engine)
+  async finishWithAggregates(params: {
+    orgId: string
+    evaluated: number
+    warnings: number
+    correctives: number
+    institutionalRiskScore: number
+    restrictedCount: number
+    suspendedCount: number
+    openCorrectivesCount: number
+  }) {
+    // se ninguém chamou startRun, ainda assim dá pra finalizar coerente
+    const startedAt = this.currentOrgId === params.orgId ? this.startedAt : new Date()
+    const finishedAt = new Date()
+    const durationMs = Math.max(0, finishedAt.getTime() - startedAt.getTime())
+
+    await this.prisma.governanceRun.create({
+      data: {
+        orgId: params.orgId,
+
+        evaluated: params.evaluated,
+        warnings: params.warnings,
+        correctives: params.correctives,
+
+        institutionalRiskScore: params.institutionalRiskScore,
+        restrictedCount: params.restrictedCount,
+        suspendedCount: params.suspendedCount,
+        openCorrectivesCount: params.openCorrectivesCount,
+
+        durationMs,
+        startedAt,
+        finishedAt,
+      },
+    })
+
+    await this.timeline.log({
+      orgId: params.orgId,
+      action: 'GOVERNANCE_RUN_COMPLETED',
+      description: 'Ciclo de governança executado',
+      metadata: {
+        actorType: 'SYSTEM',
+        actor: 'GOVERNANCE_RUN',
+        ...params,
+        durationMs,
+        startedAt,
+        finishedAt,
+        source: 'GOVERNANCE_RUN_JOB',
+      },
+    })
+
+    return {
+      ...params,
+      durationMs,
+      startedAt,
       finishedAt,
     }
   }

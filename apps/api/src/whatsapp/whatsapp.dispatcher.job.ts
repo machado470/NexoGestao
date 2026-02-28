@@ -15,42 +15,54 @@ export class WhatsAppDispatcherJob {
   // roda a cada 10 segundos (dev-friendly)
   @Cron(CronExpression.EVERY_10_SECONDS)
   async dispatchQueued() {
+    // kill-switch pra dev/ambiente
+    if (process.env.DISABLE_WHATSAPP_SCHEDULE === '1') return
+
     const workerId = `api-${process.pid}`
 
-    const claimed = await this.whatsApp.claimQueued({ limit: 50, workerId })
-    if (claimed.length === 0) return
+    try {
+      const claimed = await this.whatsApp.claimQueued({ limit: 50, workerId })
+      if (claimed.length === 0) return
 
-    this.logger.log(`dispatching ${claimed.length} claimed whatsapp message(s) worker=${workerId}`)
+      this.logger.log(
+        `dispatching ${claimed.length} claimed whatsapp message(s) worker=${workerId}`,
+      )
 
-    for (const m of claimed) {
-      try {
-        const res = await this.provider.send({
-          toPhone: m.toPhone,
-          text: m.renderedText,
-        })
-
-        if (res.ok) {
-          await this.whatsApp.markSent({
-            id: m.id,
-            provider: res.provider,
-            providerMessageId: res.providerMessageId,
+      for (const m of claimed) {
+        try {
+          const res = await this.provider.send({
+            toPhone: m.toPhone,
+            text: m.renderedText,
           })
-        } else {
+
+          if (res.ok) {
+            await this.whatsApp.markSent({
+              id: m.id,
+              provider: res.provider,
+              providerMessageId: res.providerMessageId,
+            })
+          } else {
+            await this.whatsApp.markFailed({
+              id: m.id,
+              provider: res.provider,
+              errorCode: res.errorCode,
+              errorMessage: res.errorMessage,
+            })
+          }
+        } catch (err: any) {
           await this.whatsApp.markFailed({
             id: m.id,
-            provider: res.provider,
-            errorCode: res.errorCode,
-            errorMessage: res.errorMessage,
+            provider: 'internal',
+            errorCode: 'UNEXPECTED',
+            errorMessage: err?.message ?? 'unexpected error',
           })
         }
-      } catch (err: any) {
-        await this.whatsApp.markFailed({
-          id: m.id,
-          provider: 'internal',
-          errorCode: 'UNEXPECTED',
-          errorMessage: err?.message ?? 'unexpected error',
-        })
       }
+    } catch (err: any) {
+      // Importante: cron não deve “gritar” e nem derrubar fluxo do app
+      this.logger.warn(
+        `dispatchQueued failed worker=${workerId} err=${err?.code ?? ''} msg=${err?.message ?? err}`,
+      )
     }
   }
 }

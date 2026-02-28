@@ -25,11 +25,38 @@ type QueueMessageInput = {
   metadata?: any
 }
 
+function isPrismaP1017(err: any): boolean {
+  return err?.code === 'P1017' || String(err?.message ?? '').includes('closed the connection')
+}
+
 @Injectable()
 export class WhatsAppService {
   private readonly logger = new Logger(WhatsAppService.name)
 
   constructor(private readonly prisma: PrismaService) {}
+
+  private async reconnectIfNeeded(err: any) {
+    if (!isPrismaP1017(err)) return false
+
+    this.logger.warn(
+      `[P1017] DB connection closed. Reconnecting Prisma...`,
+    )
+
+    try {
+      await this.prisma.$disconnect()
+    } catch {}
+
+    try {
+      await this.prisma.$connect()
+      this.logger.warn(`[P1017] Prisma reconnected.`)
+      return true
+    } catch (e: any) {
+      this.logger.error(
+        `[P1017] Prisma reconnect failed: ${e?.message ?? e}`,
+      )
+      return false
+    }
+  }
 
   /**
    * Enfileira mensagem (QUEUED) com idempotência real.
@@ -85,50 +112,69 @@ export class WhatsAppService {
    * Claim concorrente seguro.
    * NÃO usa RETURNING m.* para evitar erro:
    * "cached plan must not change result type"
+   *
+   * 🔒 Robustez: se der P1017, faz reconnect e tenta 1x novamente.
    */
   async claimQueued(params: { limit?: number; workerId: string }) {
     const limit = params.limit ?? 50
     const workerId = params.workerId
 
-    const claimedIds = await this.prisma.$transaction(async (tx) => {
-      const rows = await tx.$queryRawUnsafe<Array<{ id: string }>>(
-        `
-        WITH picked AS (
-          SELECT id
-          FROM "WhatsAppMessage"
-          WHERE status = 'QUEUED'
-          ORDER BY "createdAt" ASC
-          FOR UPDATE SKIP LOCKED
-          LIMIT $1
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const claimedIds = await this.prisma.$transaction(async (tx) => {
+          const rows = await tx.$queryRawUnsafe<Array<{ id: string }>>(
+            `
+            WITH picked AS (
+              SELECT id
+              FROM "WhatsAppMessage"
+              WHERE status = 'QUEUED'
+              ORDER BY "createdAt" ASC
+              FOR UPDATE SKIP LOCKED
+              LIMIT $1
+            )
+            UPDATE "WhatsAppMessage" m
+            SET
+              status = 'SENDING',
+              "lockedAt" = NOW(),
+              "lockedBy" = $2
+            FROM picked
+            WHERE m.id = picked.id
+            RETURNING m.id;
+            `,
+            limit,
+            workerId,
+          )
+
+          return rows.map((r) => r.id)
+        })
+
+        if (claimedIds.length === 0) return []
+
+        const claimed = await this.prisma.whatsAppMessage.findMany({
+          where: { id: { in: claimedIds } },
+          orderBy: { createdAt: 'asc' },
+        })
+
+        this.logger.log(
+          `claimed ${claimed.length} whatsapp message(s) worker=${workerId}`,
         )
-        UPDATE "WhatsAppMessage" m
-        SET
-          status = 'SENDING',
-          "lockedAt" = NOW(),
-          "lockedBy" = $2
-        FROM picked
-        WHERE m.id = picked.id
-        RETURNING m.id;
-        `,
-        limit,
-        workerId,
-      )
 
-      return rows.map((r) => r.id)
-    })
+        return claimed
+      } catch (err: any) {
+        const reconnected = await this.reconnectIfNeeded(err)
 
-    if (claimedIds.length === 0) return []
+        if (reconnected && attempt === 1) {
+          this.logger.warn(
+            `[claimQueued] retry after reconnect worker=${workerId}`,
+          )
+          continue
+        }
 
-    const claimed = await this.prisma.whatsAppMessage.findMany({
-      where: { id: { in: claimedIds } },
-      orderBy: { createdAt: 'asc' },
-    })
+        throw err
+      }
+    }
 
-    this.logger.log(
-      `claimed ${claimed.length} whatsapp message(s) worker=${workerId}`,
-    )
-
-    return claimed
+    return []
   }
 
   async findQueued(limit = 50) {

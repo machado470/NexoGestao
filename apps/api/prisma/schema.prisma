@@ -82,6 +82,16 @@ enum PaymentMethod {
 }
 
 //
+// ✅ Operational State snapshot (rápido pra dashboard/filtros)
+//
+enum OperationalStateValue {
+  NORMAL
+  WARNING
+  RESTRICTED
+  SUSPENDED
+}
+
+//
 // WhatsApp (Meu Acessor) — Operacional, Logado, Idempotente
 //
 enum MessageChannel {
@@ -166,6 +176,11 @@ model Person {
   offboardedAt   DateTime?
   offboardReason String?
 
+  // ✅ snapshot do estado operacional (pra UI/relatórios)
+  operationalState          OperationalStateValue @default(NORMAL)
+  operationalRiskScore      Int                   @default(0)
+  operationalStateUpdatedAt DateTime?
+
   orgId String
   org   Organization @relation(fields: [orgId], references: [id])
 
@@ -188,6 +203,9 @@ model Person {
 
   @@index([orgId, createdAt])
   @@index([orgId, active, createdAt])
+
+  // ✅ index útil pra listar “quem está RESTRICTED/SUSPENDED”
+  @@index([orgId, operationalState, operationalRiskScore, operationalStateUpdatedAt])
 }
 
 model TimelineEvent {
