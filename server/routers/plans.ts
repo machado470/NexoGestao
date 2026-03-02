@@ -1,4 +1,4 @@
-import { router, protectedProcedure, publicProcedure } from "../_core/trpc";
+import { router, publicProcedure, protectedProcedure } from "../_core/trpc";
 import { z } from "zod";
 import {
   getAllPlans,
@@ -195,27 +195,77 @@ export const plansRouter = router({
       return features.includes(input.feature);
     }),
 
+  // Check if limit is reached
+  checkLimit: protectedProcedure
+    .input(z.object({ 
+      resource: z.enum(["clients", "appointments", "serviceOrders", "charges", "people"]),
+      count: z.number().int().optional() // Current count (if not provided, will fetch from usage)
+    }))
+    .query(async ({ ctx, input }) => {
+      const plan = await getActivePlan(ctx.user.organizationId);
+      if (!plan) {
+        return { canCreate: false, reason: "No active plan found" };
+      }
+
+      // If plan is enterprise, no limits
+      if (plan.name === "enterprise") {
+        return { canCreate: true, reason: "Enterprise plan - unlimited" };
+      }
+
+      const usage = await getPlanUsage(ctx.user.organizationId);
+      
+      let currentCount = input.count ?? 0;
+      let limit = -1;
+
+      switch (input.resource) {
+        case "clients":
+          currentCount = usage?.clientsCount ?? 0;
+          limit = plan.maxClients ?? -1;
+          break;
+        case "appointments":
+          currentCount = usage?.appointmentsCount ?? 0;
+          limit = plan.maxAppointments ?? -1;
+          break;
+        case "serviceOrders":
+          currentCount = usage?.serviceOrdersCount ?? 0;
+          limit = plan.maxServiceOrders ?? -1;
+          break;
+        case "charges":
+          currentCount = usage?.chargesCount ?? 0;
+          limit = plan.maxCharges ?? -1;
+          break;
+        case "people":
+          currentCount = usage?.peopleCount ?? 0;
+          limit = plan.maxPeople ?? -1;
+          break;
+      }
+
+      // -1 means unlimited
+      if (limit === -1) {
+        return { canCreate: true, reason: "Unlimited", currentCount, limit };
+      }
+
+      const canCreate = currentCount < limit;
+      return {
+        canCreate,
+        reason: canCreate 
+          ? `You have ${limit - currentCount} slots remaining` 
+          : `Limit of ${limit} ${input.resource} reached. Upgrade your plan.`,
+        currentCount,
+        limit,
+        remaining: Math.max(0, limit - currentCount),
+      };
+    }),
+
   // Get transactions
   getTransactions: protectedProcedure
     .input(
       z.object({
-        page: z.number().int().positive().default(1),
-        limit: z.number().int().positive().default(10),
+        page: z.number().int().default(1),
+        limit: z.number().int().default(10),
       })
     )
     .query(async ({ ctx, input }) => {
-      const transactions = await getTransactionsByOrg(ctx.user.organizationId);
-      const total = transactions.length;
-      const offset = (input.page - 1) * input.limit;
-
-      return {
-        data: transactions.slice(offset, offset + input.limit),
-        pagination: {
-          page: input.page,
-          limit: input.limit,
-          total,
-          pages: Math.ceil(total / input.limit),
-        },
-      };
+      return await getTransactionsByOrg(ctx.user.organizationId, input.page, input.limit);
     }),
 });

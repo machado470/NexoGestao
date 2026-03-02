@@ -829,11 +829,12 @@ export async function createTransaction(data: any) {
   return result[0];
 }
 
-export async function getTransactionsByOrg(organizationId: number) {
+export async function getTransactionsByOrg(organizationId: number, page: number = 1, limit: number = 10) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   
-  return await db.select().from(transactions).where(eq(transactions.organizationId, organizationId)).orderBy((t) => t.createdAt);
+  const offset = (page - 1) * limit;
+  return await db.select().from(transactions).where(eq(transactions.organizationId, organizationId)).orderBy((t) => t.createdAt).limit(limit).offset(offset);
 }
 
 export async function updateTransaction(id: number, data: any) {
