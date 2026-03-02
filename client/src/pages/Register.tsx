@@ -3,7 +3,44 @@ import { useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { TermsModal } from "@/components/TermsModal";
-import { Loader, AlertCircle, CheckCircle, Mail, Lock, Building2, User, ArrowRight, Check } from "lucide-react";
+import { Loader, AlertCircle, CheckCircle, Mail, Lock, Building2, User, ArrowRight, Check, X } from "lucide-react";
+
+// Função para validar força de senha
+function getPasswordStrength(password: string) {
+  let strength = 0;
+  const feedback = [];
+
+  if (!password) return { strength: 0, feedback: [] };
+
+  // Comprimento
+  if (password.length >= 8) strength += 1;
+  else feedback.push("Mínimo 8 caracteres");
+
+  if (password.length >= 12) strength += 1;
+  else if (password.length >= 8) feedback.push("Use 12+ caracteres para mais segurança");
+
+  // Maiúsculas
+  if (/[A-Z]/.test(password)) strength += 1;
+  else feedback.push("Adicione letras maiúsculas");
+
+  // Minúsculas
+  if (/[a-z]/.test(password)) strength += 1;
+  else feedback.push("Adicione letras minúsculas");
+
+  // Números
+  if (/[0-9]/.test(password)) strength += 1;
+  else feedback.push("Adicione números");
+
+  // Caracteres especiais
+  if (/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) strength += 1;
+  else feedback.push("Adicione caracteres especiais (!@#$%^&*)");
+
+  return {
+    strength: Math.min(strength, 5),
+    feedback,
+    isStrong: strength >= 4,
+  };
+}
 
 export default function Register() {
   const [, navigate] = useLocation();
@@ -19,6 +56,7 @@ export default function Register() {
     agreeTerms: false,
   });
   const [localError, setLocalError] = useState<string | null>(null);
+  const passwordStrength = getPasswordStrength(formData.password);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
@@ -42,8 +80,8 @@ export default function Register() {
       return;
     }
 
-    if (formData.password.length < 8) {
-      setLocalError("A senha deve ter no mínimo 8 caracteres");
+    if (!passwordStrength.isStrong) {
+      setLocalError("A senha não é forte o suficiente. Siga as recomendações acima");
       return;
     }
 
@@ -192,9 +230,45 @@ export default function Register() {
                     className="w-full pl-12 pr-4 py-3 border border-gray-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
                   />
                 </div>
-                <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
-                  Mínimo 8 caracteres
-                </p>
+
+                {/* Password Strength Indicator */}
+                {formData.password && (
+                  <div className="mt-3 space-y-2">
+                    {/* Strength Bar */}
+                    <div className="flex gap-1">
+                      {[1, 2, 3, 4, 5].map((level) => (
+                        <div
+                          key={level}
+                          className={`h-1.5 flex-1 rounded-full transition-colors ${
+                            level <= passwordStrength.strength
+                              ? level <= 2
+                                ? "bg-red-500"
+                                : level <= 3
+                                ? "bg-yellow-500"
+                                : "bg-green-500"
+                              : "bg-gray-300 dark:bg-gray-600"
+                          }`}
+                        />
+                      ))}
+                    </div>
+
+                    {/* Feedback */}
+                    <div className="space-y-1">
+                      {passwordStrength.feedback.map((item, idx) => (
+                        <div key={idx} className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+                          <X className="w-3 h-3 text-red-500" />
+                          {item}
+                        </div>
+                      ))}
+                      {passwordStrength.isStrong && (
+                        <div className="flex items-center gap-2 text-xs text-green-600 dark:text-green-400">
+                          <Check className="w-3 h-3" />
+                          Senha forte!
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Confirm Password */}
@@ -213,18 +287,23 @@ export default function Register() {
                     className="w-full pl-12 pr-4 py-3 border border-gray-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
                   />
                 </div>
+                {formData.confirmPassword && formData.password === formData.confirmPassword && (
+                  <p className="text-xs text-green-600 dark:text-green-400 mt-2 flex items-center gap-1">
+                    <Check className="w-3 h-3" /> Senhas coincidem
+                  </p>
+                )}
               </div>
 
-              {/* Terms Checkbox */}
-              <div className="flex items-start gap-3 pt-2">
+              {/* Terms */}
+              <div className="flex items-start gap-3">
                 <input
                   type="checkbox"
                   name="agreeTerms"
                   checked={formData.agreeTerms}
                   onChange={handleChange}
-                  className="w-5 h-5 rounded-lg border-2 border-gray-300 dark:border-slate-600 text-orange-500 focus:ring-2 focus:ring-orange-500 focus:ring-offset-0 dark:focus:ring-offset-slate-800 cursor-pointer mt-1"
+                  className="w-5 h-5 rounded border-gray-300 dark:border-slate-600 text-orange-500 focus:ring-orange-500 mt-1 cursor-pointer"
                 />
-                <label className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                <label className="text-sm text-gray-600 dark:text-gray-400">
                   Concordo com os{" "}
                   <button
                     type="button"
@@ -232,8 +311,8 @@ export default function Register() {
                     className="text-orange-600 dark:text-orange-400 hover:underline font-semibold"
                   >
                     Termos de Serviço
-                  </button>{" "}
-                  e{" "}
+                  </button>
+                  {" "}e{" "}
                   <button
                     type="button"
                     onClick={() => setShowTermsModal("privacy")}
@@ -248,7 +327,7 @@ export default function Register() {
               <Button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white py-3 font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 mt-8"
+                className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 disabled:opacity-50 text-white py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2"
               >
                 {loading ? (
                   <>
@@ -257,52 +336,33 @@ export default function Register() {
                   </>
                 ) : (
                   <>
-                    Criar Conta
-                    <ArrowRight className="w-5 h-5" />
+                    Criar Conta <ArrowRight className="w-5 h-5" />
                   </>
                 )}
               </Button>
+
+              {/* Login Link */}
+              <p className="text-center text-sm text-gray-600 dark:text-gray-400">
+                Já tem conta?{" "}
+                <button
+                  type="button"
+                  onClick={() => navigate("/login")}
+                  className="text-orange-600 dark:text-orange-400 hover:underline font-semibold"
+                >
+                  Faça login
+                </button>
+              </p>
             </form>
-
-            {/* Divider */}
-            <div className="relative my-8">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300 dark:border-slate-600"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white dark:bg-slate-800 text-gray-600 dark:text-gray-400">
-                  Ou
-                </span>
-              </div>
-            </div>
-
-            {/* Login Link */}
-            <p className="text-center text-gray-600 dark:text-gray-400">
-              Já tem conta?{" "}
-              <button
-                onClick={() => navigate("/login")}
-                className="text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 font-semibold transition"
-              >
-                Entrar agora
-              </button>
-            </p>
           </div>
-
-          {/* Footer */}
-          <p className="text-center text-xs text-gray-600 dark:text-gray-400 mt-8">
-            Seus dados são protegidos com criptografia de ponta a ponta
-          </p>
         </div>
       </div>
 
       {/* Terms Modal */}
-      {showTermsModal && (
-        <TermsModal
-          isOpen={true}
-          type={showTermsModal}
-          onClose={() => setShowTermsModal(null)}
-        />
-      )}
+      <TermsModal
+        isOpen={showTermsModal !== null}
+        type={showTermsModal || "terms"}
+        onClose={() => setShowTermsModal(null)}
+      />
     </>
   );
 }
