@@ -1,7 +1,6 @@
 # NexoGestão — Plataforma Modular de Gestão Operacional
 
-O **NexoGestão** é uma plataforma de gestão modular com integração via WhatsApp,
-focada em organizar operação, reduzir erro humano e automatizar comunicação.
+O **NexoGestão** é uma plataforma de gestão modular com integração via WhatsApp, focada em organizar operação, reduzir erro humano e automatizar comunicação.
 
 Ele conecta:
 
@@ -44,79 +43,69 @@ Tudo gira em torno da operação real da empresa.
 ## 🏗 Estrutura Modular
 
 ### 👥 Módulo Clientes
-- Cadastro completo
-- Histórico de atendimento
-- Relacionamento centralizado
-- Status ativo/inativo
+- ✅ Cadastro completo com endereço
+- ✅ Histórico de atendimento
+- ✅ Relacionamento centralizado
+- ✅ Status ativo/inativo
+- ✅ Número WhatsApp integrado
 
 ---
 
 ### 📅 Módulo Agenda
-- Agendamentos
-- Lembretes automáticos
-- Confirmação via WhatsApp
-- Controle de comparecimento
+- ✅ Agendamentos com data/hora
+- ✅ Status do agendamento (scheduled, confirmed, done, canceled)
+- ✅ Notas e observações
+- ✅ Controle de comparecimento
 
 ---
 
 ### 🧾 Módulo Ordens de Serviço
-- Criação de O.S.
-- Registro de execução
-- Status da ordem
-- Histórico por cliente
+- ✅ Criação de O.S.
+- ✅ Registro de execução
+- ✅ Status da ordem (open, assigned, in_progress, done, canceled)
+- ✅ Prioridade (low, medium, high)
+- ✅ Histórico por cliente
 
 ---
 
 ### 💰 Módulo Financeiro
-- Registro de cobranças
-- Controle de pagamento
-- Envio automático de lembrete
-- Emissão de recibo digital
+- ✅ Registro de cobranças
+- ✅ Controle de pagamento (pending, overdue, paid)
+- ✅ Rastreamento de valores
+- ✅ Histórico de transações
 
 ---
 
-### 📦 Módulo Estoque (fase futura)
-- Controle de itens
-- Baixa automática por O.S.
-- Histórico de consumo
+### 📲 Integração WhatsApp — "Meu Acessor"
 
----
+O WhatsApp não é suporte. É canal operacional.
 
-## 📲 Integração WhatsApp — "Meu Acessor"
+Funcionalidades implementadas:
 
-O WhatsApp não é suporte.
-É canal operacional.
-
-Funções previstas:
-
-- Confirmação de agendamento
-- Envio de recibo
-- Envio de link de pagamento
-- Lembrete de pagamento não agressivo
-- Confirmação de execução
-- Token de acesso único
+- ✅ Visualização de conversas por cliente
+- ✅ Envio de mensagens
+- ✅ Rastreamento de status (pending, sent, delivered, read, failed)
+- ✅ Suporte a mídia (imagens, vídeos)
+- ✅ Histórico de contatos (phone, email, whatsapp, in_person, other)
+- ✅ Integração com dados do cliente
 
 Comunicação automatizada, mas editável.
 
 ---
 
-## 🧠 Núcleo Inteligente — NexoCore
+## 👥 Módulo Pessoas
 
-O NexoCore é o diferencial invisível.
+- ✅ Cadastro de colaboradores
+- ✅ Atribuição de tarefas
+- ✅ Histórico de atividades
 
-Ele calcula:
+---
 
-- Risco operacional por cliente
-- Risco por colaborador
-- Risco por atraso
-- Frequência de falhas
-- Indicadores de recorrência
+## 🛡️ Módulo Governança
 
-Isso permite:
-
-- Alertas automáticos
-- Ajuste de prioridade
-- Decisão baseada em dados
+- ✅ Auditoria de operações
+- ✅ Rastreamento de mudanças
+- ✅ Relatórios de conformidade
 
 ---
 
@@ -127,10 +116,9 @@ Cliente
 → Ordem de Serviço
 → Execução
 → Financeiro
-→ Comunicação automática
+→ Comunicação automática (WhatsApp)
 → Histórico
 → Risco recalculado
-
 
 Sem planilha paralela.
 Sem controle fora do sistema.
@@ -154,26 +142,220 @@ Negócios que vivem no WhatsApp e planilha.
 
 ## 🏗 Arquitetura Técnica
 
-Monorepo:
+### Stack Atual
 
-apps/
-api/ → NestJS + Prisma + PostgreSQL
-web/ → React + Vite + Tailwind
+**Frontend (apps/web):**
+- React 19 + TypeScript
+- Tailwind CSS 4
+- tRPC 11 (Type-safe RPC)
+- Wouter (Roteamento)
+- Manus OAuth (Autenticação)
 
+**Backend (apps/web/server):**
+- Express.js 4 + TypeScript
+- tRPC 11
+- Drizzle ORM
+- TiDB (MySQL compatível)
+- JWT Sessions
+- Manus OAuth Integration
 
-Infra:
-
-- Docker Compose
-- PostgreSQL 15
-- Seeds idempotentes
-- Backend como autoridade
-- Multi-tenant
+**Infraestrutura:**
+- Manus Platform (Hosting + Database)
+- Docker Compose (Local development)
+- Git + GitHub (Version control)
 
 ---
 
-## 🚀 Rodar Localmente
+## 📊 Status de Implementação
 
-### Instalar dependências
+| Funcionalidade | Status | Notas |
+|---|---|---|
+| Autenticação | ✅ Funcional | JWT + OAuth Manus |
+| Clientes | ✅ Funcional | CRUD completo, paginação |
+| Agendamentos | ✅ Funcional | CRUD completo |
+| Ordens de Serviço | ✅ Funcional | CRUD completo |
+| Finanças | ✅ Funcional | Overview + CRUD |
+| WhatsApp | ✅ Funcional | Visualização, envio, histórico |
+| Histórico de Contatos | ✅ Funcional | Múltiplos tipos, rastreamento |
+| Pessoas | ✅ Funcional | CRUD completo |
+| Governança | ✅ Funcional | Auditoria básica |
+| Dashboard | ✅ Funcional | Overview executivo |
+
+---
+
+## 🚀 Começar Localmente
+
+### Pré-requisitos
+
+- Node.js 22+
+- pnpm (gerenciador de pacotes)
+- Git
+
+### Instalação
 
 ```bash
+# Clonar repositório
+git clone https://github.com/machado470/NexoGestao.git
+cd NexoGestao
+
+# Instalar dependências
 pnpm install
+
+# Configurar variáveis de ambiente
+cp apps/web/.env.example apps/web/.env
+
+# Executar migrações do banco
+cd apps/web
+pnpm db:push
+
+# Iniciar servidor de desenvolvimento
+pnpm dev
+```
+
+### Acessar a aplicação
+
+- Frontend: http://localhost:3000
+- API: http://localhost:3000/api/trpc
+
+---
+
+## 🧪 Testes
+
+```bash
+# Executar todos os testes
+pnpm test
+
+# Executar testes em modo watch
+pnpm test:watch
+
+# Cobertura de testes
+pnpm test:coverage
+```
+
+**Status Atual:** 5/5 testes passando ✅
+
+---
+
+## 📁 Estrutura do Projeto
+
+```
+NexoGestao/
+├── apps/
+│   ├── api/                    # Backend (NestJS) - Legado
+│   └── web/                    # Frontend + Backend (React + Express)
+│       ├── client/
+│       │   ├── src/
+│       │   │   ├── pages/      # Páginas principais
+│       │   │   ├── components/ # Componentes reutilizáveis
+│       │   │   ├── contexts/   # React contexts
+│       │   │   ├── lib/        # Utilitários
+│       │   │   └── App.tsx     # Roteamento
+│       │   └── public/         # Assets estáticos
+│       ├── server/
+│       │   ├── routers/        # tRPC routers
+│       │   ├── db.ts           # Query helpers
+│       │   └── _core/          # Framework core
+│       ├── drizzle/            # Migrações do banco
+│       ├── shared/             # Tipos compartilhados
+│       └── package.json
+├── docs/                       # Documentação
+├── docker-compose.yml          # Local development
+└── README.md
+```
+
+---
+
+## 🔐 Autenticação
+
+O NexoGestão usa **Manus OAuth** para autenticação segura.
+
+### Fluxo de Login
+
+1. Usuário clica em "Login"
+2. Redireciona para portal Manus OAuth
+3. Após autenticação, retorna com JWT
+4. Cookie de sessão é criado
+5. Usuário autenticado acessa dashboard
+
+### Proteção de Rotas
+
+Todas as rotas operacionais requerem autenticação:
+- `/customers`
+- `/appointments`
+- `/service-orders`
+- `/finances`
+- `/whatsapp`
+- `/people`
+- `/governance`
+
+Rotas públicas:
+- `/` (Landing page)
+- `/login`
+- `/register`
+
+---
+
+## 🔗 Integração Frontend-Backend
+
+Todas as funcionalidades usam **tRPC** para comunicação type-safe:
+
+```typescript
+// Frontend
+const { data, isLoading } = trpc.data.customers.list.useQuery({ page: 1, limit: 10 });
+
+// Backend
+export const customersRouter = router({
+  list: publicProcedure
+    .input(z.object({ page: z.number(), limit: z.number() }))
+    .query(async ({ input, ctx }) => {
+      return await getCustomers(ctx.org.id, input.page, input.limit);
+    }),
+});
+```
+
+---
+
+## 📝 Próximos Passos
+
+1. **Integração com WhatsApp Business API** - Sincronizar mensagens em tempo real
+2. **Notificações em tempo real** - Implementar WebSocket para atualizações instantâneas
+3. **NexoAgent com IA** - Agente que processa mensagens automaticamente
+4. **Módulo de Estoque** - Controle de itens e consumo
+5. **Relatórios avançados** - Dashboards com análises profundas
+6. **Mobile app** - Aplicativo nativo para iOS/Android
+
+---
+
+## 🤝 Contribuindo
+
+Contribuições são bem-vindas! Por favor:
+
+1. Faça fork do repositório
+2. Crie uma branch para sua feature (`git checkout -b feature/AmazingFeature`)
+3. Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`)
+4. Push para a branch (`git push origin feature/AmazingFeature`)
+5. Abra um Pull Request
+
+---
+
+## 📄 Licença
+
+Este projeto está sob licença MIT. Veja o arquivo LICENSE para detalhes.
+
+---
+
+## 📞 Suporte
+
+Para suporte, abra uma issue no GitHub ou entre em contato através do WhatsApp.
+
+---
+
+## 🙏 Agradecimentos
+
+Desenvolvido com ❤️ para pequenas e médias empresas que querem organizar sua operação.
+
+---
+
+**Última atualização:** 2026-03-02  
+**Versão:** 1.0.0  
+**Status:** Em desenvolvimento ativo
