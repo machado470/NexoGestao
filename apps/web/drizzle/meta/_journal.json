@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1772410618425,
+      "tag": "0000_steady_lady_deathstrike",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1772410983153,
+      "tag": "0001_strange_blackheart",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1772411996296,
+      "tag": "0002_dear_rhino",
+      "breakpoints": true
+    }
+  ]
+}
