@@ -4,6 +4,9 @@ import { getDb } from "../db";
 import { organizations, accounts, users } from "../../drizzle/schema";
 import { eq } from "drizzle-orm";
 import * as bcrypt from "bcrypt";
+import { sdk } from "../_core/sdk";
+import { COOKIE_NAME } from "@shared/const";
+import { getSessionCookieOptions } from "../_core/cookies";
 
 export const authRouter = router({
   // Registro de nova organização
@@ -16,7 +19,7 @@ export const authRouter = router({
         password: z.string().min(8, "Senha deve ter pelo menos 8 caracteres"),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       try {
         const db = await getDb();
         if (!db) {
@@ -54,6 +57,18 @@ export const authRouter = router({
           status: "active",
         });
 
+        // Criar sessão JWT e definir cookie
+        const sessionToken = await sdk.createSessionToken(
+          `org_${orgId}`,
+          { name: input.adminName }
+        );
+        
+        const cookieOptions = getSessionCookieOptions(ctx.req);
+        ctx.res.cookie(COOKIE_NAME, sessionToken, {
+          ...cookieOptions,
+          maxAge: 1000 * 60 * 60 * 24 * 365, // 1 ano
+        });
+
         return {
           success: true,
           message: "Organização criada com sucesso!",
@@ -74,7 +89,7 @@ export const authRouter = router({
         password: z.string(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       try {
         const db = await getDb();
         if (!db) {
@@ -99,6 +114,36 @@ export const authRouter = router({
         if (!isPasswordValid) {
           throw new Error("Email ou senha incorretos");
         }
+
+        // Criar ou atualizar usuário na tabela users
+        const openId = `org_${organization.id}`;
+        await db.insert(users)
+          .values({
+            openId,
+            name: organization.adminName,
+            email: organization.email,
+            loginMethod: "email",
+            role: "admin",
+          })
+          .onDuplicateKeyUpdate({
+            set: {
+              name: organization.adminName,
+              email: organization.email,
+              lastSignedIn: new Date(),
+            },
+          });
+
+        // Criar sessão JWT e definir cookie
+        const sessionToken = await sdk.createSessionToken(
+          openId,
+          { name: organization.adminName }
+        );
+        
+        const cookieOptions = getSessionCookieOptions(ctx.req);
+        ctx.res.cookie(COOKIE_NAME, sessionToken, {
+          ...cookieOptions,
+          maxAge: 1000 * 60 * 60 * 24 * 365, // 1 ano
+        });
 
         return {
           success: true,

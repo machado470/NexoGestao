@@ -19,6 +19,7 @@ import FinancesPage from "./pages/FinancesPage";
 import PeoplePage from "./pages/PeoplePage";
 import GovernancePage from "./pages/GovernancePage";
 import ExecutiveDashboard from "./pages/ExecutiveDashboard";
+import WhatsAppPage from "./pages/WhatsAppPage";
 import { Loader } from "lucide-react";
 
 // Componente para proteger rotas autenticadas
@@ -91,6 +92,9 @@ function Router() {
       )} />
       <Route path="/executive-dashboard" component={() => (
         <ProtectedRoute component={() => <MainLayout><ExecutiveDashboard /></MainLayout>} />
+      )} />
+      <Route path="/whatsapp" component={() => (
+        <ProtectedRoute component={() => <MainLayout><WhatsAppPage /></MainLayout>} />
       )} />
       <Route path="/404" component={NotFound} />
       {/* Final fallback route */}

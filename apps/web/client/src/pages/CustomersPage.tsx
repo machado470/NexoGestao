@@ -7,6 +7,7 @@ import { Plus, Loader, Users } from "lucide-react";
 import { CreateCustomerModal } from "@/components/CreateCustomerModal";
 import { EditCustomerModal } from "@/components/EditCustomerModal";
 import { ConfirmDeleteModal } from "@/components/ConfirmDeleteModal";
+import { ContactHistoryModal } from "@/components/ContactHistoryModal";
 import { toast } from "sonner";
 
 interface Customer {
@@ -166,6 +167,21 @@ export default function CustomersPage() {
                     >
                       {value === 1 ? "Ativo" : "Inativo"}
                     </span>
+                  ),
+                },
+                {
+                  key: "id" as any,
+                  label: "Contatos",
+                  render: (_, row: any) => (
+                    <ContactHistoryModal
+                      customerId={row.id}
+                      customerName={row.name}
+                      trigger={
+                        <Button variant="outline" size="sm" className="text-xs">
+                          Ver Historico
+                        </Button>
+                      }
+                    />
                   ),
                 },
               ]}

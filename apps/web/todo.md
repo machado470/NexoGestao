@@ -94,15 +94,41 @@
 - [x] Atualizar menu do Dashboard para apontar para dashboard executivo
 - [x] Todos os 5 testes continuam passando
 
+## Fase 7: Paginação (CONCLUIDA)
+- [x] Criar componente Pagination reutilizável
+- [x] Adicionar suporte de paginação no backend (page, limit)
+- [x] Integrar paginação em CustomersPage
+- [x] Integrar paginação em AppointmentsPage
+- [x] Integrar paginação em ServiceOrdersPage
+- [x] Integrar paginação em FinancesPage
+- [x] Todos os 5 testes continuam passando
+
+## Fase 8: Rastreamento de Contatos e Endereço
+- [ ] Expandir schema de customers com campos de endereço (rua, número, complemento, CEP, cidade, estado)
+- [ ] Criar tabela de contact_history para rastreamento de contatos
+- [ ] Criar endpoints para listar histórico de contatos
+- [ ] Atualizar CreateCustomerModal com campos de endereço
+- [ ] Atualizar EditCustomerModal com campos de endereço
+- [ ] Criar componente de histórico de contatos na página de clientes
+
+## Fase 9: Funções do Nexo Agent (WhatsApp)
+- [ ] Verificar endpoints de WhatsApp disponíveis no backend
+- [ ] Implementar envio de mensagens via WhatsApp
+- [ ] Implementar templates de mensagens
+- [ ] Criar interface para enviar mensagens aos clientes
+- [ ] Integrar notificações de mensagens recebidas
+
+## Fase 10: Correção de Bugs
+- [ ] Corrigir erro de carregamento ao sair do perfil
+- [ ] Investigar logs de erro
+- [ ] Testar fluxo completo de navegação
+
 ## Próximas Melhorias
 - [ ] Email verification and password recovery
 - [ ] Real-time notifications system
-- [ ] WhatsApp integration for automated messages
-- [ ] Sync with real NexoGestao API when available
 - [ ] Export data to PDF/Excel
 - [ ] User profile management
 - [ ] Organization settings and customization
-- [ ] Role-based access control (RBAC)
 - [ ] Audit logs for all operations
 - [ ] API rate limiting and security
 

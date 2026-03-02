@@ -19,6 +19,7 @@ import {
   Shield,
   Settings,
   ChevronRight,
+  MessageCircle,
 } from "lucide-react";
 
 interface MainLayoutProps {
@@ -42,6 +43,7 @@ export function MainLayout({ children }: MainLayoutProps) {
     { id: "appointments", label: "Agendamentos", icon: Calendar, route: "/appointments" },
     { id: "service-orders", label: "Ordens de Serviço", icon: Briefcase, route: "/service-orders" },
     { id: "finance", label: "Financeiro", icon: DollarSign, route: "/finances" },
+    { id: "whatsapp", label: "WhatsApp", icon: MessageCircle, route: "/whatsapp" },
     { id: "people", label: "Pessoas", icon: Users, route: "/people" },
     { id: "governance", label: "Governança", icon: Shield, route: "/governance" },
   ] as const;

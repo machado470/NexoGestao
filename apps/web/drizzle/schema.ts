@@ -32,7 +32,7 @@ export const organizations = mysqlTable("organizations", {
   name: varchar("name", { length: 255 }).notNull(),
   email: varchar("email", { length: 320 }).notNull().unique(),
   adminName: varchar("adminName", { length: 255 }).notNull(),
-  password: varchar("password", { length: 255 }).notNull(),
+  password: text("password").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

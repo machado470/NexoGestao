@@ -21,7 +21,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const registerMutation = trpc.auth.register.useMutation();
   const loginMutation = trpc.auth.login.useMutation();
   const logoutMutation = trpc.session.logout.useMutation();
-  const meQuery = trpc.session.me.useQuery();
+  const meQuery = trpc.session.me.useQuery(undefined, {
+    retry: false,
+    staleTime: Infinity,
+  });
 
   const register = useCallback(
     async (email: string, password: string, orgName: string, adminName: string = "Admin") => {
@@ -35,8 +38,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           adminName,
         });
         console.log("Registro bem-sucedido:", result);
-        // Armazenar dados da organização
-        localStorage.setItem("organization", JSON.stringify(result));
+        // Refetch meQuery para obter dados da sessão
+        await meQuery.refetch();
       } catch (err) {
         const error = err instanceof Error ? err : new Error("Erro ao registrar");
         setError(error);
@@ -45,7 +48,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLoading(false);
       }
     },
-    [registerMutation]
+    [registerMutation, meQuery]
   );
 
   const login = useCallback(
@@ -58,8 +61,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           password,
         });
         console.log("Login bem-sucedido:", result);
-        setUser(result.organization);
-        localStorage.setItem("organization", JSON.stringify(result.organization));
+        // Refetch meQuery para obter dados da sessão
+        await meQuery.refetch();
       } catch (err) {
         const error = err instanceof Error ? err : new Error("Erro ao fazer login");
         setError(error);
@@ -68,7 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLoading(false);
       }
     },
-    [loginMutation]
+    [loginMutation, meQuery]
   );
 
   const logout = useCallback(async () => {
@@ -76,53 +79,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(true);
       await logoutMutation.mutateAsync();
       setUser(null);
-      localStorage.removeItem("organization");
+      // Refetch meQuery para limpar dados da sessão
+      await meQuery.refetch();
     } catch (err) {
       console.error("Erro ao fazer logout:", err);
     } finally {
       setLoading(false);
     }
-  }, [logoutMutation]);
+  }, [logoutMutation, meQuery]);
 
-  // Verificar sessão do servidor ao carregar
+  // Sincronizar estado do usuário com dados da query
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        // Primeiro, tenta verificar a sessão do servidor
-        if (meQuery.data) {
-          setUser(meQuery.data);
-          setLoading(false);
-        } else if (meQuery.isLoading) {
-          // Ainda carregando
-          setLoading(true);
-        } else {
-          // Sem dados do servidor, verifica localStorage como fallback
-          const storedOrg = localStorage.getItem("organization");
-          if (storedOrg) {
-            try {
-              setUser(JSON.parse(storedOrg));
-            } catch (err) {
-              console.error("Erro ao restaurar organização:", err);
-              setUser(null);
-            }
-          } else {
-            setUser(null);
-          }
-          setLoading(false);
-        }
-      } catch (err) {
-        console.error("Erro ao verificar autenticação:", err);
+    if (!meQuery.isLoading) {
+      if (meQuery.data) {
+        setUser(meQuery.data);
+      } else {
         setUser(null);
-        setLoading(false);
       }
-    };
-    
-    checkAuth();
-  }, [meQuery.data, meQuery.isLoading]);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+  }, [meQuery.isLoading, meQuery.data]);
 
   const value: AuthContextType = {
     user,
-    loading: loading || meQuery.isLoading || registerMutation.isPending || loginMutation.isPending,
+    loading: loading || meQuery.isLoading,
     error: error || meQuery.error || registerMutation.error || loginMutation.error,
     register,
     login,
