@@ -515,3 +515,79 @@ export async function calculateCollaboratorEarnings(
 
   return result[0] || { totalEarned: 0, totalDiscounts: 0, totalHours: 0, trackingCount: 0 };
 }
+
+// ===== Expenses =====
+import { InsertExpense, expenses, InsertInvoice, invoices } from "../drizzle/schema";
+
+export async function createExpense(data: InsertExpense) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  return await db.insert(expenses).values(data);
+}
+
+export async function getExpensesByOrg(organizationId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  return await db.select().from(expenses).where(eq(expenses.organizationId, organizationId));
+}
+
+export async function getExpenseById(id: number) {
+  const db = await getDb();
+  if (!db) return null;
+  
+  const result = await db.select().from(expenses).where(eq(expenses.id, id)).limit(1);
+  return result.length > 0 ? result[0] : null;
+}
+
+export async function updateExpense(id: number, data: Partial<InsertExpense>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  return await db.update(expenses).set(data).where(eq(expenses.id, id));
+}
+
+export async function deleteExpense(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  return await db.delete(expenses).where(eq(expenses.id, id));
+}
+
+// ===== Invoices =====
+export async function createInvoice(data: InsertInvoice) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  return await db.insert(invoices).values(data);
+}
+
+export async function getInvoicesByOrg(organizationId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  return await db.select().from(invoices).where(eq(invoices.organizationId, organizationId));
+}
+
+export async function getInvoiceById(id: number) {
+  const db = await getDb();
+  if (!db) return null;
+  
+  const result = await db.select().from(invoices).where(eq(invoices.id, id)).limit(1);
+  return result.length > 0 ? result[0] : null;
+}
+
+export async function updateInvoice(id: number, data: Partial<InsertInvoice>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  return await db.update(invoices).set(data).where(eq(invoices.id, id));
+}
+
+export async function deleteInvoice(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  return await db.delete(invoices).where(eq(invoices.id, id));
+}

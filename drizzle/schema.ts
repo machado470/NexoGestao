@@ -108,6 +108,7 @@ export const serviceOrders = mysqlTable("serviceOrders", {
   startedAt: timestamp("startedAt"),
   finishedAt: timestamp("finishedAt"),
   notes: text("notes"),
+  amount: int("amount").default(0).notNull(), // Valor em centavos
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -246,3 +247,37 @@ export const discounts = mysqlTable("discounts", {
 
 export type Discount = typeof discounts.$inferSelect;
 export type InsertDiscount = typeof discounts.$inferInsert;
+
+// Expenses table (Despesas)
+export const expenses = mysqlTable("expenses", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull(),
+  description: varchar("description", { length: 255 }).notNull(),
+  amount: int("amount").notNull(), // Valor em centavos
+  date: timestamp("date").defaultNow().notNull(),
+  category: varchar("category", { length: 100 }).notNull(), // e.g., Aluguel, Salários, Marketing, etc.
+  paymentMethod: varchar("paymentMethod", { length: 100 }),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Expense = typeof expenses.$inferSelect;
+export type InsertExpense = typeof expenses.$inferInsert;
+
+// Invoices table (Notas Fiscais)
+export const invoices = mysqlTable("invoices", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull(),
+  chargeId: int("chargeId"),
+  invoiceNumber: varchar("invoiceNumber", { length:  50 }).notNull(),
+  issueDate: timestamp("issueDate").defaultNow().notNull(),
+  amount: int("amount").notNull(),
+  status: mysqlEnum("status", ["issued", "cancelled", "pending"]).default("issued").notNull(),
+  pdfUrl: text("pdfUrl"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Invoice = typeof invoices.$inferSelect;
+export type InsertInvoice = typeof invoices.$inferInsert;

@@ -16,6 +16,7 @@ import {
   getServiceOrderById,
   updateServiceOrder,
   deleteServiceOrder,
+  createCharge,
 } from "../db";
 
 export const dataRouter = router({
@@ -189,6 +190,7 @@ export const dataRouter = router({
           status: z.enum(["OPEN", "ASSIGNED", "IN_PROGRESS", "DONE", "CANCELED"]).default("OPEN"),
           assignedTo: z.string().optional(),
           notes: z.string().optional(),
+          amount: z.number().default(0),
         })
       )
       .mutation(async ({ input, ctx }) => {
@@ -202,6 +204,7 @@ export const dataRouter = router({
           status: input.status,
           assignedTo: input.assignedTo,
           notes: input.notes,
+          amount: Math.round(input.amount * 100),
         });
       }),
 
@@ -245,11 +248,35 @@ export const dataRouter = router({
           status: z.enum(["OPEN", "ASSIGNED", "IN_PROGRESS", "DONE", "CANCELED"]).optional(),
           assignedTo: z.string().optional(),
           notes: z.string().optional(),
+          amount: z.number().optional(),
         })
       )
       .mutation(async ({ input }) => {
-        const { id, ...data } = input;
-        return await updateServiceOrder(id, data);
+        const { id, amount, ...data } = input;
+        const updateData: any = { ...data };
+        if (amount !== undefined) {
+          updateData.amount = Math.round(amount * 100);
+        }
+        
+        const result = await updateServiceOrder(id, updateData);
+        
+        // Se a OS foi finalizada, cria uma cobrança automaticamente
+        if (input.status === "DONE") {
+          const os = await getServiceOrderById(id);
+          if (os && os.amount > 0) {
+            await createCharge({
+              organizationId: os.organizationId,
+              customerId: os.customerId,
+              description: `OS #${os.id}: ${os.title}`,
+              amount: os.amount,
+              dueDate: new Date(),
+              status: "PENDING",
+              notes: `Gerado automaticamente a partir da finalização da OS #${os.id}`,
+            });
+          }
+        }
+        
+        return result;
       }),
 
     delete: protectedProcedure
