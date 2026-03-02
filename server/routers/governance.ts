@@ -31,7 +31,7 @@ export const governanceRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
-        const orgId = ctx.user?.id || 1;
+        const orgId = ctx.user?.organizationId || 1;
         return await createGovernance({
           organizationId: orgId,
           customerId: input.customerId,
@@ -48,10 +48,30 @@ export const governanceRouter = router({
         });
       }),
 
-    list: protectedProcedure.query(async ({ ctx }) => {
-      const orgId = ctx.user?.id || 1;
-      return await getGovernanceByOrg(orgId);
-    }),
+    list: protectedProcedure
+      .input(
+        z.object({
+          page: z.number().int().positive().default(1),
+          limit: z.number().int().positive().default(10),
+        })
+      )
+      .query(async ({ input, ctx }) => {
+        const orgId = ctx.user?.organizationId || 1;
+        const allGovernance = await getGovernanceByOrg(orgId);
+        const total = allGovernance.length;
+        const pages = Math.ceil(total / input.limit);
+        const start = (input.page - 1) * input.limit;
+        const data = allGovernance.slice(start, start + input.limit);
+        return {
+          data,
+          pagination: {
+            page: input.page,
+            limit: input.limit,
+            total,
+            pages,
+          },
+        };
+      }),
 
     getById: protectedProcedure
       .input(z.object({ id: z.number() }))
@@ -89,8 +109,15 @@ export const governanceRouter = router({
       }),
 
     // ===== Risk Analysis =====
-    riskSummary: protectedProcedure.query(async ({ ctx }) => {
-      const orgId = ctx.user?.id || 1;
+    riskSummary: protectedProcedure
+      .input(
+        z.object({
+          page: z.number().int().positive().default(1),
+          limit: z.number().int().positive().default(100),
+        })
+      )
+      .query(async ({ ctx }) => {
+      const orgId = ctx.user?.organizationId || 1;
       const allGovernance = await getGovernanceByOrg(orgId);
 
       const critical = allGovernance.filter((g) => g.riskLevel === "critical").length;
@@ -114,8 +141,15 @@ export const governanceRouter = router({
       };
     }),
 
-    riskDistribution: protectedProcedure.query(async ({ ctx }) => {
-      const orgId = ctx.user?.id || 1;
+    riskDistribution: protectedProcedure
+      .input(
+        z.object({
+          page: z.number().int().positive().default(1),
+          limit: z.number().int().positive().default(100),
+        })
+      )
+      .query(async ({ ctx }) => {
+      const orgId = ctx.user?.organizationId || 1;
       const allGovernance = await getGovernanceByOrg(orgId);
 
       const distribution = [
@@ -144,8 +178,15 @@ export const governanceRouter = router({
       return distribution.filter((d) => d.value > 0);
     }),
 
-    complianceDistribution: protectedProcedure.query(async ({ ctx }) => {
-      const orgId = ctx.user?.id || 1;
+    complianceDistribution: protectedProcedure
+      .input(
+        z.object({
+          page: z.number().int().positive().default(1),
+          limit: z.number().int().positive().default(100),
+        })
+      )
+      .query(async ({ ctx }) => {
+      const orgId = ctx.user?.organizationId || 1;
       const allGovernance = await getGovernanceByOrg(orgId);
 
       const distribution = [

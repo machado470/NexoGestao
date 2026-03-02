@@ -58,7 +58,6 @@ export function CreateAppointmentModal({
       title: formData.title,
       description: formData.description,
       startsAt: new Date(formData.startsAt),
-      endsAt: formData.endsAt ? new Date(formData.endsAt) : undefined,
       status: formData.status,
       notes: formData.notes,
     });

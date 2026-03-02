@@ -43,11 +43,11 @@ export default function WhatsAppPage() {
 
   // Carregar conversas quando clientes mudam
   useEffect(() => {
-    if (customersQuery.data?.data) {
-      const convos = customersQuery.data.data.map((customer: any) => ({
+    if (customersQuery.data && Array.isArray(customersQuery.data)) {
+      const convos = customersQuery.data.map((customer: any) => ({
         customerId: customer.id,
         customerName: customer.name,
-        whatsappNumber: customer.whatsappNumber,
+        whatsappNumber: customer.phone,
         messages: [],
       }));
       setConversations(convos);

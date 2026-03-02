@@ -88,9 +88,13 @@ export default function Login() {
                   Manter-me conectado
                 </span>
               </label>
-              <a href="#" className="text-sm text-orange-500 hover:text-orange-600">
+              <button
+                type="button"
+                onClick={() => navigate("/forgot-password")}
+                className="text-sm text-orange-500 hover:text-orange-600 font-medium"
+              >
                 Esqueceu a senha?
-              </a>
+              </button>
             </div>
 
             <Button

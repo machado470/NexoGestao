@@ -44,15 +44,19 @@ export default function AppointmentsPage() {
   useEffect(() => {
     if (listAppointments.data) {
       const response = listAppointments.data as unknown as PaginatedResponse;
-      setAppointments(response.data);
-      setPagination(response.pagination);
+      if (response && response.data && response.pagination) {
+        setAppointments(response.data);
+        setPagination(response.pagination);
+      }
     }
   }, [listAppointments.data]);
 
   useEffect(() => {
     if (listCustomers.data) {
       const response = listCustomers.data as any;
-      setCustomers(response.data || []);
+      if (response && response.data && Array.isArray(response.data)) {
+        setCustomers(response.data);
+      }
     }
   }, [listCustomers.data]);
 

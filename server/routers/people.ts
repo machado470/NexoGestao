@@ -32,7 +32,7 @@ export const peopleRouter = router({
           });
         }
 
-        const orgId = ctx.user?.id || 1;
+        const orgId = ctx.user?.organizationId || 1;
         return await createPerson({
           organizationId: orgId,
           name: input.name,
@@ -45,10 +45,30 @@ export const peopleRouter = router({
         });
       }),
 
-    list: protectedProcedure.query(async ({ ctx }) => {
-      const orgId = ctx.user?.id || 1;
-      return await getPeopleByOrg(orgId);
-    }),
+    list: protectedProcedure
+      .input(
+        z.object({
+          page: z.number().int().positive().default(1),
+          limit: z.number().int().positive().default(10),
+        })
+      )
+      .query(async ({ input, ctx }) => {
+        const orgId = ctx.user?.organizationId || 1;
+        const allPeople = await getPeopleByOrg(orgId);
+        const total = allPeople.length;
+        const pages = Math.ceil(total / input.limit);
+        const start = (input.page - 1) * input.limit;
+        const data = allPeople.slice(start, start + input.limit);
+        return {
+          data,
+          pagination: {
+            page: input.page,
+            limit: input.limit,
+            total,
+            pages,
+          },
+        };
+      }),
 
     getById: protectedProcedure
       .input(z.object({ id: z.number() }))
@@ -98,7 +118,7 @@ export const peopleRouter = router({
 
     // ===== Statistics =====
     stats: protectedProcedure.query(async ({ ctx }) => {
-      const orgId = ctx.user?.id || 1;
+      const orgId = ctx.user?.organizationId || 1;
       const allPeople = await getPeopleByOrg(orgId);
 
       const active = allPeople.filter((p) => p.status === "active");
@@ -123,7 +143,7 @@ export const peopleRouter = router({
 
     // ===== Role Distribution =====
     roleDistribution: protectedProcedure.query(async ({ ctx }) => {
-      const orgId = ctx.user?.id || 1;
+      const orgId = ctx.user?.organizationId || 1;
       const allPeople = await getPeopleByOrg(orgId);
 
       const distribution = [
@@ -154,7 +174,7 @@ export const peopleRouter = router({
 
     // ===== Department Distribution =====
     departmentDistribution: protectedProcedure.query(async ({ ctx }) => {
-      const orgId = ctx.user?.id || 1;
+      const orgId = ctx.user?.organizationId || 1;
       const allPeople = await getPeopleByOrg(orgId);
 
       const departments: Record<string, number> = {};

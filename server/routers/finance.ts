@@ -22,7 +22,7 @@ export const financeRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
-        const orgId = ctx.user?.id || 1;
+        const orgId = ctx.user?.organizationId || 1;
         return await createCharge({
           organizationId: orgId,
           customerId: input.customerId,
@@ -34,10 +34,30 @@ export const financeRouter = router({
         });
       }),
 
-    list: protectedProcedure.query(async ({ ctx }) => {
-      const orgId = ctx.user?.id || 1;
-      return await getChargesByOrg(orgId);
-    }),
+    list: protectedProcedure
+      .input(
+        z.object({
+          page: z.number().int().positive().default(1),
+          limit: z.number().int().positive().default(10),
+        })
+      )
+      .query(async ({ input, ctx }) => {
+        const orgId = ctx.user?.organizationId || 1;
+        const allCharges = await getChargesByOrg(orgId);
+        const total = allCharges.length;
+        const pages = Math.ceil(total / input.limit);
+        const start = (input.page - 1) * input.limit;
+        const data = allCharges.slice(start, start + input.limit);
+        return {
+          data,
+          pagination: {
+            page: input.page,
+            limit: input.limit,
+            total,
+            pages,
+          },
+        };
+      }),
 
     getById: protectedProcedure
       .input(z.object({ id: z.number() }))
@@ -73,8 +93,15 @@ export const financeRouter = router({
       }),
 
     // ===== Statistics =====
-    stats: protectedProcedure.query(async ({ ctx }) => {
-      const orgId = ctx.user?.id || 1;
+    stats: protectedProcedure
+      .input(
+        z.object({
+          page: z.number().int().positive().default(1),
+          limit: z.number().int().positive().default(100),
+        })
+      )
+      .query(async ({ ctx }) => {
+      const orgId = ctx.user?.organizationId || 1;
       const allCharges = await getChargesByOrg(orgId);
 
       const now = new Date();
@@ -101,8 +128,15 @@ export const financeRouter = router({
     }),
 
     // ===== Revenue by Month =====
-    revenueByMonth: protectedProcedure.query(async ({ ctx }) => {
-      const orgId = ctx.user?.id || 1;
+    revenueByMonth: protectedProcedure
+      .input(
+        z.object({
+          page: z.number().int().positive().default(1),
+          limit: z.number().int().positive().default(100),
+        })
+      )
+      .query(async ({ ctx }) => {
+      const orgId = ctx.user?.organizationId || 1;
       const allCharges = await getChargesByOrg(orgId);
       const paidCharges = allCharges.filter((c) => c.status === "PAID");
 

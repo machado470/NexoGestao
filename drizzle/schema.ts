@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, decimal } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, decimal, boolean } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -13,6 +13,7 @@ export const users = mysqlTable("users", {
   id: int("id").autoincrement().primaryKey(),
   /** Manus OAuth identifier (openId) returned from the OAuth callback. Unique per user. */
   openId: varchar("openId", { length: 64 }).notNull().unique(),
+  organizationId: int("organizationId").notNull().default(1), // Default organization
   name: text("name"),
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
@@ -102,12 +103,14 @@ export const serviceOrders = mysqlTable("serviceOrders", {
   customerId: int("customerId").notNull(),
   title: varchar("title", { length: 255 }).notNull(),
   description: text("description"),
+  amount: decimal("amount", { precision: 10, scale: 2 }), // Valor estimado da ordem de serviço
   priority: mysqlEnum("priority", ["LOW", "MEDIUM", "HIGH", "URGENT"]).default("MEDIUM").notNull(),
   status: mysqlEnum("status", ["OPEN", "ASSIGNED", "IN_PROGRESS", "DONE", "CANCELED"]).default("OPEN").notNull(),
   assignedTo: varchar("assignedTo", { length: 255 }),
   startedAt: timestamp("startedAt"),
   finishedAt: timestamp("finishedAt"),
   notes: text("notes"),
+  chargeId: int("chargeId"), // Referência à cobrança criada automaticamente
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -246,3 +249,114 @@ export const discounts = mysqlTable("discounts", {
 
 export type Discount = typeof discounts.$inferSelect;
 export type InsertDiscount = typeof discounts.$inferInsert;
+
+// Launches table (Lançamentos - Receitas e Despesas)
+export const launches = mysqlTable("launches", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull(),
+  chargeId: int("chargeId"), // Referência a cobrança (se for receita)
+  type: mysqlEnum("type", ["income", "expense"]).notNull(), // Tipo: receita ou despesa
+  category: varchar("category", { length: 100 }).notNull(), // Categoria (ex: Salário, Aluguel, Venda)
+  description: varchar("description", { length: 255 }).notNull(), // Descrição
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(), // Valor em reais
+  dueDate: timestamp("dueDate").notNull(), // Data de vencimento
+  paidDate: timestamp("paidDate"), // Data de pagamento (null se não pago)
+  status: mysqlEnum("status", ["pending", "paid", "overdue", "canceled"]).default("pending").notNull(),
+  paymentMethod: varchar("paymentMethod", { length: 50 }), // Método de pagamento (dinheiro, cartão, transferência, etc)
+  notes: text("notes"), // Observações
+  createdBy: int("createdBy"), // ID do usuário que criou
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Launch = typeof launches.$inferSelect;
+export type InsertLaunch = typeof launches.$inferInsert;
+
+// Invoices table (Notas Fiscais)
+export const invoices = mysqlTable("invoices", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull(),
+  chargeId: int("chargeId"), // Referência a cobrança
+  customerId: int("customerId").notNull(), // Cliente
+  invoiceNumber: varchar("invoiceNumber", { length: 50 }).notNull().unique(),
+  seriesNumber: varchar("seriesNumber", { length: 20 }),
+  description: text("description"),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  issueDate: timestamp("issueDate").notNull(),
+  dueDate: timestamp("dueDate"),
+  status: mysqlEnum("status", ["draft", "issued", "paid", "canceled"]).default("draft").notNull(),
+  pdfUrl: text("pdfUrl"), // URL do PDF armazenado
+  notes: text("notes"),
+  createdBy: int("createdBy"), // Usuário que criou
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Invoice = typeof invoices.$inferSelect;
+export type InsertInvoice = typeof invoices.$inferInsert;
+
+// Expenses table (Despesas)
+export const expenses = mysqlTable("expenses", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull(),
+  category: varchar("category", { length: 100 }).notNull(), // Categoria (Aluguel, Salário, etc)
+  description: varchar("description", { length: 255 }).notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  dueDate: timestamp("dueDate").notNull(),
+  paidDate: timestamp("paidDate"), // Data de pagamento
+  status: mysqlEnum("status", ["pending", "paid", "overdue", "canceled"]).default("pending").notNull(),
+  paymentMethod: varchar("paymentMethod", { length: 50 }), // Método de pagamento
+  notes: text("notes"),
+  createdBy: int("createdBy"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Expense = typeof expenses.$inferSelect;
+export type InsertExpense = typeof expenses.$inferInsert;
+
+
+// Referrals table (Sistema de Referência)
+export const referrals = mysqlTable("referrals", {
+  id: int("id").autoincrement().primaryKey(),
+  referrerId: int("referrerId").notNull(), // Usuário que fez a referência
+  referredId: int("referredId"), // Usuário referenciado (pode ser null se ainda não se cadastrou)
+  referralCode: varchar("referralCode", { length: 50 }).notNull().unique(), // Código único de referência
+  referralEmail: varchar("referralEmail", { length: 255 }), // Email da pessoa referenciada
+  status: mysqlEnum("status", ["pending", "completed", "canceled"]).default("pending").notNull(),
+  creditAmount: decimal("creditAmount", { precision: 10, scale: 2 }).default("0"), // Crédito ganho
+  creditClaimed: boolean("creditClaimed").default(false), // Se o crédito foi utilizado
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  completedAt: timestamp("completedAt"), // Data de conclusão
+});
+export type Referral = typeof referrals.$inferSelect;
+export type InsertReferral = typeof referrals.$inferInsert;
+
+// Credits table (Créditos do sistema)
+export const credits = mysqlTable("credits", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  source: varchar("source", { length: 100 }).notNull(), // "referral", "promotion", "admin", etc
+  sourceId: int("sourceId"), // ID da referência ou promoção
+  description: text("description"),
+  used: boolean("used").default(false),
+  usedAt: timestamp("usedAt"),
+  expiresAt: timestamp("expiresAt"), // Data de expiração
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type Credit = typeof credits.$inferSelect;
+export type InsertCredit = typeof credits.$inferInsert;
+
+// Password Reset Tokens
+export const passwordResetTokens = mysqlTable("passwordResetTokens", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  token: varchar("token", { length: 255 }).notNull().unique(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  used: boolean("used").default(false),
+  usedAt: timestamp("usedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
+export type InsertPasswordResetToken = typeof passwordResetTokens.$inferInsert;

@@ -1,7 +1,7 @@
-import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { InsertUser, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
+import { eq, and, gt, lt, sql } from "drizzle-orm";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -387,7 +387,7 @@ export async function deleteWhatsappMessage(id: number) {
 
 // ===== Service Tracking =====
 import { InsertServiceTracking, serviceTracking, InsertDiscount, discounts, organizations } from "../drizzle/schema";
-import { and, gte, lte, sql } from "drizzle-orm";
+import { gte, lte } from "drizzle-orm";
 
 export async function createServiceTracking(data: InsertServiceTracking) {
   const db = await getDb();
@@ -514,4 +514,146 @@ export async function calculateCollaboratorEarnings(
     .where(whereCondition);
 
   return result[0] || { totalEarned: 0, totalDiscounts: 0, totalHours: 0, trackingCount: 0 };
+}
+
+
+// ===== Referrals =====
+import { referrals, credits, passwordResetTokens, InsertReferral, InsertCredit, InsertPasswordResetToken } from "../drizzle/schema";
+
+export async function createReferral(data: InsertReferral) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(referrals).values(data);
+  return result;
+}
+
+export async function getReferralByCode(code: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.select().from(referrals).where(eq(referrals.referralCode, code)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getReferralsByUserId(userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return await db.select().from(referrals).where(eq(referrals.referrerId, userId));
+}
+
+export async function updateReferral(id: number, data: Partial<InsertReferral>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.update(referrals).set(data).where(eq(referrals.id, id));
+  return result;
+}
+
+export async function getReferralStats(userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const userReferrals = await db.select().from(referrals).where(eq(referrals.referrerId, userId));
+  const completedReferrals = userReferrals.filter(r => r.status === 'completed').length;
+  const totalCredits = userReferrals.reduce((sum, r) => sum + (Number(r.creditAmount) || 0), 0);
+  const claimedCredits = userReferrals.filter(r => r.creditClaimed).reduce((sum, r) => sum + (Number(r.creditAmount) || 0), 0);
+  
+  return {
+    totalReferrals: userReferrals.length,
+    completedReferrals,
+    totalCredits,
+    claimedCredits,
+    availableCredits: totalCredits - claimedCredits,
+  };
+}
+
+// ===== Credits =====
+export async function createCredit(data: InsertCredit) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(credits).values(data);
+  return result;
+}
+
+export async function getCreditsByUserId(userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return await db.select().from(credits).where(eq(credits.userId, userId));
+}
+
+export async function getUserCreditsBalance(userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const userCredits = await db.select().from(credits).where(eq(credits.userId, userId));
+  const total = userCredits.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+  const used = userCredits.filter(c => c.used).reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+  
+  return {
+    total,
+    used,
+    available: total - used,
+  };
+}
+
+export async function useCredit(creditId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.update(credits).set({ used: true, usedAt: new Date() }).where(eq(credits.id, creditId));
+  return result;
+}
+
+// ===== Password Reset =====
+export async function createPasswordResetToken(data: InsertPasswordResetToken) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(passwordResetTokens).values(data);
+  return result;
+}
+
+export async function getPasswordResetToken(token: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.select().from(passwordResetTokens).where(eq(passwordResetTokens.token, token)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function markPasswordResetTokenAsUsed(tokenId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.update(passwordResetTokens).set({ used: true, usedAt: new Date() }).where(eq(passwordResetTokens.id, tokenId));
+  return result;
+}
+
+export async function getValidPasswordResetToken(token: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const result = await db.select().from(passwordResetTokens).where(
+    and(
+      eq(passwordResetTokens.token, token),
+      eq(passwordResetTokens.used, false),
+      gt(passwordResetTokens.expiresAt, new Date())
+    )
+  ).limit(1);
+  
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function deleteExpiredPasswordResetTokens() {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.delete(passwordResetTokens).where(lt(passwordResetTokens.expiresAt, new Date()));
+  return result;
+}
+
+
+export async function getUserByEmail(email: string) {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot get user: database not available");
+    return undefined;
+  }
+
+  const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
+
+  return result.length > 0 ? result[0] : undefined;
 }

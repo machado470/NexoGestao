@@ -272,3 +272,55 @@
 html {
   scroll-behavior: smooth;
 }
+
+/* Custom Scrollbar - Estilo consistente (Desktop only) */
+@media (min-width: 768px) {
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #f97316;
+    border-radius: 4px;
+    transition: background 0.3s ease;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #ea580c;
+  }
+
+  .dark ::-webkit-scrollbar-thumb {
+    background: #60a5fa;
+  }
+
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background: #3b82f6;
+  }
+}
+
+/* Mobile - Hide scrollbar */
+@media (max-width: 767px) {
+  ::-webkit-scrollbar {
+    display: none;
+  }
+  
+  * {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+/* Firefox Scrollbar */
+* {
+  scrollbar-color: #f97316 transparent;
+  scrollbar-width: thin;
+}
+
+.dark * {
+  scrollbar-color: #60a5fa transparent;
+}

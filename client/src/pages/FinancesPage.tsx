@@ -45,15 +45,22 @@ export default function FinancesPage() {
   const [charges, setCharges] = useState<Charge[]>([]);
   const [stats, setStats] = useState<FinanceStats | null>(null);
   const [monthlyRevenue, setMonthlyRevenue] = useState<MonthlyRevenue[]>([]);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, pages: 1 });
 
   // Queries
-  const listCharges = trpc.finance.charges.list.useQuery(undefined);
-  const chargeStats = trpc.finance.charges.stats.useQuery(undefined);
-  const revenueData = trpc.finance.charges.revenueByMonth.useQuery(undefined);
+  const listCharges = trpc.finance.charges.list.useQuery({ page, limit });
+  const chargeStats = trpc.finance.charges.stats.useQuery({ page: 1, limit: 100 });
+  const revenueData = trpc.finance.charges.revenueByMonth.useQuery({ page: 1, limit: 100 });
 
   useEffect(() => {
     if (listCharges.data) {
-      setCharges(listCharges.data as unknown as Charge[]);
+      const response = listCharges.data as any;
+      if (response && response.data && response.pagination) {
+        setCharges(response.data);
+        setPagination(response.pagination);
+      }
     }
   }, [listCharges.data]);
 

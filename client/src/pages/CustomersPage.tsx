@@ -46,8 +46,10 @@ export default function CustomersPage() {
   useEffect(() => {
     if (listCustomers.data) {
       const response = listCustomers.data as unknown as PaginatedResponse;
-      setCustomers(response.data);
-      setPagination(response.pagination);
+      if (response && response.data && response.pagination) {
+        setCustomers(response.data);
+        setPagination(response.pagination);
+      }
     }
   }, [listCustomers.data]);
 

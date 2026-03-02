@@ -12,7 +12,7 @@ export const dashboardRouter = router({
   dashboard: router({
     // ===== Main KPIs =====
     kpis: protectedProcedure.query(async ({ ctx }) => {
-      const orgId = ctx.user?.id || 1;
+      const orgId = ctx.user?.organizationId || 1;
 
       // Get all data
       const customers = await getCustomersByOrg(orgId);
@@ -95,7 +95,7 @@ export const dashboardRouter = router({
 
     // ===== Revenue Trend (Last 12 months) =====
     revenueTrend: protectedProcedure.query(async ({ ctx }) => {
-      const orgId = ctx.user?.id || 1;
+      const orgId = ctx.user?.organizationId || 1;
       const charges = await getChargesByOrg(orgId);
 
       // Group by month
@@ -142,7 +142,7 @@ export const dashboardRouter = router({
 
     // ===== Appointment Status Distribution =====
     appointmentDistribution: protectedProcedure.query(async ({ ctx }) => {
-      const orgId = ctx.user?.id || 1;
+      const orgId = ctx.user?.organizationId || 1;
       const appointments = await getAppointmentsByOrg(orgId);
 
       const distribution = [
@@ -168,7 +168,7 @@ export const dashboardRouter = router({
 
     // ===== Charge Status Distribution =====
     chargeDistribution: protectedProcedure.query(async ({ ctx }) => {
-      const orgId = ctx.user?.id || 1;
+      const orgId = ctx.user?.organizationId || 1;
       const charges = await getChargesByOrg(orgId);
 
       const distribution = [
@@ -194,7 +194,7 @@ export const dashboardRouter = router({
 
     // ===== Recent Activities =====
     recentActivities: protectedProcedure.query(async ({ ctx }) => {
-      const orgId = ctx.user?.id || 1;
+      const orgId = ctx.user?.organizationId || 1;
 
       const appointments = await getAppointmentsByOrg(orgId);
       const charges = await getChargesByOrg(orgId);
@@ -231,7 +231,7 @@ export const dashboardRouter = router({
 
     // ===== Performance Metrics =====
     performanceMetrics: protectedProcedure.query(async ({ ctx }) => {
-      const orgId = ctx.user?.id || 1;
+      const orgId = ctx.user?.organizationId || 1;
 
       const appointments = await getAppointmentsByOrg(orgId);
       const charges = await getChargesByOrg(orgId);

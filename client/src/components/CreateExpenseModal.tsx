@@ -4,63 +4,59 @@ import { Button } from "@/components/ui/button";
 import { X, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-interface CreateServiceOrderModalProps {
+interface CreateExpenseModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  customers: Array<{ id: number; name: string }>;
 }
 
-export function CreateServiceOrderModal({
+export function CreateExpenseModal({
   isOpen,
   onClose,
   onSuccess,
-  customers,
-}: CreateServiceOrderModalProps) {
+}: CreateExpenseModalProps) {
   const [formData, setFormData] = useState({
-    customerId: "",
-    title: "",
     description: "",
     amount: "",
-    priority: "MEDIUM" as const,
-    assignedTo: "",
+    category: "other",
+    dueDate: new Date().toISOString().split("T")[0],
+    paymentMethod: "",
     notes: "",
   });
 
-  const createServiceOrder = trpc.data.serviceOrders.create.useMutation({
+  const createExpense = trpc.expenses.create.useMutation({
     onSuccess: () => {
-      toast.success("Ordem de serviço criada com sucesso!");
+      toast.success("Despesa criada com sucesso!");
       setFormData({
-        customerId: "",
-        title: "",
         description: "",
         amount: "",
-        priority: "MEDIUM",
-        assignedTo: "",
+        category: "other",
+        dueDate: new Date().toISOString().split("T")[0],
+        paymentMethod: "",
         notes: "",
       });
       onSuccess();
       onClose();
     },
     onError: (error) => {
-      toast.error(error.message || "Erro ao criar ordem de serviço");
+      toast.error(error.message || "Erro ao criar despesa");
     },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.customerId || !formData.title) {
-      toast.error("Cliente e título são obrigatórios");
+    if (!formData.description || !formData.amount || !formData.dueDate) {
+      toast.error("Preencha todos os campos obrigatórios");
       return;
     }
-    createServiceOrder.mutate({
-      customerId: parseInt(formData.customerId),
-      title: formData.title,
+
+    createExpense.mutate({
       description: formData.description,
-      amount: formData.amount ? parseFloat(formData.amount) : undefined,
-      priority: formData.priority,
-      assignedTo: formData.assignedTo,
-      notes: formData.notes,
+      amount: parseFloat(formData.amount),
+      category: formData.category,
+      dueDate: new Date(formData.dueDate),
+      paymentMethod: formData.paymentMethod || undefined,
+      notes: formData.notes || undefined,
     });
   };
 
@@ -68,10 +64,10 @@ export function CreateServiceOrderModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 w-full max-w-md">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-            Nova Ordem de Serviço
+            Nova Despesa
           </h2>
           <button
             onClick={onClose}
@@ -84,105 +80,80 @@ export function CreateServiceOrderModal({
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Cliente *
-            </label>
-            <select
-              value={formData.customerId}
-              onChange={(e) =>
-                setFormData({ ...formData, customerId: e.target.value })
-              }
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-            >
-              <option value="">Selecione um cliente</option>
-              {customers.map((customer) => (
-                <option key={customer.id} value={customer.id}>
-                  {customer.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Título *
+              Descrição *
             </label>
             <input
               type="text"
-              value={formData.title}
-              onChange={(e) =>
-                setFormData({ ...formData, title: e.target.value })
-              }
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-              placeholder="Título da ordem de serviço"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Descrição
-            </label>
-            <textarea
               value={formData.description}
               onChange={(e) =>
                 setFormData({ ...formData, description: e.target.value })
               }
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-              placeholder="Descrição do serviço"
-              rows={3}
+              placeholder="Descrição da despesa"
             />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Prioridade
-              </label>
-              <select
-                value={formData.priority}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    priority: e.target.value as any,
-                  })
-                }
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-              >
-                <option value="LOW">Baixa</option>
-                <option value="MEDIUM">Média</option>
-                <option value="HIGH">Alta</option>
-                <option value="URGENT">Urgente</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Valor (R$)
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                value={formData.amount}
-                onChange={(e) =>
-                  setFormData({ ...formData, amount: e.target.value })
-                }
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-                placeholder="0.00"
-              />
-            </div>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Atribuído a
+              Categoria *
+            </label>
+            <select
+              value={formData.category}
+              onChange={(e) =>
+                setFormData({ ...formData, category: e.target.value })
+              }
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+            >
+              <option value="supplies">Suprimentos</option>
+              <option value="travel">Viagem</option>
+              <option value="utilities">Utilidades</option>
+              <option value="maintenance">Manutenção</option>
+              <option value="other">Outros</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Valor (R$) *
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              value={formData.amount}
+              onChange={(e) =>
+                setFormData({ ...formData, amount: e.target.value })
+              }
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+              placeholder="0.00"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Data de Vencimento *
+            </label>
+            <input
+              type="date"
+              value={formData.dueDate}
+              onChange={(e) =>
+                setFormData({ ...formData, dueDate: e.target.value })
+              }
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Método de Pagamento
             </label>
             <input
               type="text"
-              value={formData.assignedTo}
+              value={formData.paymentMethod}
               onChange={(e) =>
-                setFormData({ ...formData, assignedTo: e.target.value })
+                setFormData({ ...formData, paymentMethod: e.target.value })
               }
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-              placeholder="Nome do responsável"
+              placeholder="Ex: Cartão, Boleto, PIX"
             />
           </div>
 
@@ -196,8 +167,8 @@ export function CreateServiceOrderModal({
                 setFormData({ ...formData, notes: e.target.value })
               }
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-              placeholder="Observações adicionais"
-              rows={2}
+              placeholder="Observações"
+              rows={3}
             />
           </div>
 
@@ -212,16 +183,16 @@ export function CreateServiceOrderModal({
             </Button>
             <Button
               type="submit"
-              disabled={createServiceOrder.isPending}
+              disabled={createExpense.isPending}
               className="flex-1 bg-orange-500 hover:bg-orange-600 text-white"
             >
-              {createServiceOrder.isPending ? (
+              {createExpense.isPending ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Criando...
                 </>
               ) : (
-                "Criar Ordem"
+                "Criar Despesa"
               )}
             </Button>
           </div>

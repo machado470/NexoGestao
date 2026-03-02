@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
+import { getDb } from "../db";
+import { charges } from "../../drizzle/schema";
 import {
   createCustomer,
   getCustomersByOrg,
@@ -31,7 +33,7 @@ export const dataRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
-        const orgId = ctx.user?.id || 1;
+        const orgId = ctx.user?.organizationId || 1;
         return await createCustomer({
           organizationId: orgId,
           name: input.name,
@@ -49,24 +51,25 @@ export const dataRouter = router({
           limit: z.number().int().positive().default(10),
         })
       )
-      .query(async ({ ctx, input }) => {
-        const orgId = ctx.user?.id || 1;
+      .query(async ({ input, ctx }) => {
+        const orgId = ctx.user?.organizationId || 1;
         const allCustomers = await getCustomersByOrg(orgId);
         const total = allCustomers.length;
-        const offset = (input.page - 1) * input.limit;
-        const data = allCustomers.slice(offset, offset + input.limit);
+        const pages = Math.ceil(total / input.limit);
+        const start = (input.page - 1) * input.limit;
+        const data = allCustomers.slice(start, start + input.limit);
         return {
           data,
           pagination: {
             page: input.page,
             limit: input.limit,
             total,
-            pages: Math.ceil(total / input.limit),
+            pages,
           },
         };
       }),
 
-    getById: protectedProcedure
+    get: protectedProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ input }) => {
         return await getCustomerById(input.id);
@@ -76,7 +79,7 @@ export const dataRouter = router({
       .input(
         z.object({
           id: z.number(),
-          name: z.string().min(1).optional(),
+          name: z.string().optional(),
           email: z.string().email().optional(),
           phone: z.string().optional(),
           notes: z.string().optional(),
@@ -100,25 +103,23 @@ export const dataRouter = router({
     create: protectedProcedure
       .input(
         z.object({
-          customerId: z.number().min(1, "Cliente é obrigatório"),
-          title: z.string().min(1, "Título é obrigatório"),
+          customerId: z.number(),
+          title: z.string().min(1),
           description: z.string().optional(),
           startsAt: z.date(),
-          endsAt: z.date().optional(),
-          status: z.enum(["SCHEDULED", "CONFIRMED", "CANCELED", "DONE", "NO_SHOW"]).default("SCHEDULED"),
+          status: z.enum(["SCHEDULED", "CONFIRMED", "CANCELED", "DONE", "NO_SHOW"]).optional(),
           notes: z.string().optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
-        const orgId = ctx.user?.id || 1;
+        const orgId = ctx.user?.organizationId || 1;
         return await createAppointment({
           organizationId: orgId,
           customerId: input.customerId,
           title: input.title,
           description: input.description,
           startsAt: input.startsAt,
-          endsAt: input.endsAt,
-          status: input.status,
+          status: input.status || "SCHEDULED",
           notes: input.notes,
         });
       }),
@@ -130,24 +131,25 @@ export const dataRouter = router({
           limit: z.number().int().positive().default(10),
         })
       )
-      .query(async ({ ctx, input }) => {
-        const orgId = ctx.user?.id || 1;
+      .query(async ({ input, ctx }) => {
+        const orgId = ctx.user?.organizationId || 1;
         const allAppointments = await getAppointmentsByOrg(orgId);
         const total = allAppointments.length;
-        const offset = (input.page - 1) * input.limit;
-        const data = allAppointments.slice(offset, offset + input.limit);
+        const pages = Math.ceil(total / input.limit);
+        const start = (input.page - 1) * input.limit;
+        const data = allAppointments.slice(start, start + input.limit);
         return {
           data,
           pagination: {
             page: input.page,
             limit: input.limit,
             total,
-            pages: Math.ceil(total / input.limit),
+            pages,
           },
         };
       }),
 
-    getById: protectedProcedure
+    get: protectedProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ input }) => {
         return await getAppointmentById(input.id);
@@ -157,17 +159,18 @@ export const dataRouter = router({
       .input(
         z.object({
           id: z.number(),
-          title: z.string().min(1).optional(),
+          title: z.string().optional(),
           description: z.string().optional(),
           startsAt: z.date().optional(),
-          endsAt: z.date().optional(),
           status: z.enum(["SCHEDULED", "CONFIRMED", "CANCELED", "DONE", "NO_SHOW"]).optional(),
           notes: z.string().optional(),
         })
       )
       .mutation(async ({ input }) => {
-        const { id, ...data } = input;
-        return await updateAppointment(id, data);
+        const { id, startsAt, ...data } = input;
+        const updateData: any = data;
+        if (startsAt) updateData.startsAt = startsAt;
+        return await updateAppointment(id, updateData);
       }),
 
     delete: protectedProcedure
@@ -182,26 +185,27 @@ export const dataRouter = router({
     create: protectedProcedure
       .input(
         z.object({
-          customerId: z.number().min(1, "Cliente é obrigatório"),
-          title: z.string().min(1, "Título é obrigatório"),
+          customerId: z.number(),
+          title: z.string().min(1),
           description: z.string().optional(),
-          priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).default("MEDIUM"),
-          status: z.enum(["OPEN", "ASSIGNED", "IN_PROGRESS", "DONE", "CANCELED"]).default("OPEN"),
+          amount: z.number().optional(),
+          priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).optional(),
           assignedTo: z.string().optional(),
           notes: z.string().optional(),
         })
       )
-      .mutation(async ({ input, ctx }) => {
-        const orgId = ctx.user?.id || 1;
+      .mutation(async ({ input, ctx }: any) => {
+        const orgId = ctx.user?.organizationId || 1;
         return await createServiceOrder({
           organizationId: orgId,
           customerId: input.customerId,
           title: input.title,
           description: input.description,
-          priority: input.priority,
-          status: input.status,
+          amount: input.amount,
+          priority: input.priority || "MEDIUM",
           assignedTo: input.assignedTo,
           notes: input.notes,
+          status: "OPEN",
         });
       }),
 
@@ -212,24 +216,12 @@ export const dataRouter = router({
           limit: z.number().int().positive().default(10),
         })
       )
-      .query(async ({ ctx, input }) => {
-        const orgId = ctx.user?.id || 1;
-        const allServiceOrders = await getServiceOrdersByOrg(orgId);
-        const total = allServiceOrders.length;
-        const offset = (input.page - 1) * input.limit;
-        const data = allServiceOrders.slice(offset, offset + input.limit);
-        return {
-          data,
-          pagination: {
-            page: input.page,
-            limit: input.limit,
-            total,
-            pages: Math.ceil(total / input.limit),
-          },
-        };
+      .query(async ({ input, ctx }) => {
+        const orgId = ctx.user?.organizationId || 1;
+        return await getServiceOrdersByOrg(orgId);
       }),
 
-    getById: protectedProcedure
+    get: protectedProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ input }) => {
         return await getServiceOrderById(input.id);
@@ -241,15 +233,47 @@ export const dataRouter = router({
           id: z.number(),
           title: z.string().min(1).optional(),
           description: z.string().optional(),
+          amount: z.number().optional(),
           priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).optional(),
           status: z.enum(["OPEN", "ASSIGNED", "IN_PROGRESS", "DONE", "CANCELED"]).optional(),
           assignedTo: z.string().optional(),
           notes: z.string().optional(),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }: any) => {
         const { id, ...data } = input;
-        return await updateServiceOrder(id, data);
+        const db = await getDb();
+        if (!db) throw new Error("Database not available");
+
+        // Get the current ServiceOrder to check if status is changing to DONE
+        const currentOrder = await getServiceOrderById(id);
+        if (!currentOrder) throw new Error("ServiceOrder not found");
+
+        // Update the ServiceOrder
+        const result = await updateServiceOrder(id, data);
+
+        // Auto-create charge when ServiceOrder is completed
+        if (data.status === "DONE" && currentOrder.status !== "DONE" && currentOrder.amount) {
+          const orgId = ctx.user?.organizationId || 1;
+          
+          // Create a charge with the ServiceOrder amount
+          const chargeResult = await db.insert(charges).values({
+            organizationId: orgId,
+            customerId: currentOrder.customerId,
+            description: `Cobranca - ${currentOrder.title}`,
+            amount: Math.round(parseFloat(currentOrder.amount.toString()) * 100), // Convert to cents
+            dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
+            status: "PENDING",
+            notes: `Gerada automaticamente da Ordem de Servico #${id}`,
+          });
+
+          // Update ServiceOrder with the chargeId
+          if (chargeResult && (chargeResult as any).insertId) {
+            await updateServiceOrder(id, { chargeId: (chargeResult as any).insertId });
+          }
+        }
+
+        return result;
       }),
 
     delete: protectedProcedure

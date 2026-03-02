@@ -12,6 +12,11 @@ import { dashboardRouter } from "./routers/dashboard";
 import { contactRouter } from "./routers/contact";
 import { whatsappWebhookRouter } from "./routers/whatsapp-webhook";
 import { serviceTrackingRouter } from "./routers/service-tracking";
+import { launchesRouter } from "./routers/launches";
+import { invoicesRouter } from "./routers/invoices";
+import { expensesRouter } from "./routers/expenses";
+import { referralsRouter } from "./routers/referrals";
+import { passwordResetRouter } from "./routers/password-reset";
 
 export const appRouter = router({
   system: systemRouter,
@@ -25,6 +30,11 @@ export const appRouter = router({
   contact: contactRouter,
   whatsappWebhook: whatsappWebhookRouter,
   serviceTracking: serviceTrackingRouter,
+  launches: launchesRouter,
+  invoices: invoicesRouter,
+  expenses: expensesRouter,
+  referrals: referralsRouter,
+  passwordReset: passwordResetRouter,
   session: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {

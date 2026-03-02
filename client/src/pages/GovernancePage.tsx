@@ -62,16 +62,23 @@ export default function GovernancePage() {
   const [summary, setSummary] = useState<RiskSummary | null>(null);
   const [riskDistribution, setRiskDistribution] = useState<RiskDistribution[]>([]);
   const [complianceDistribution, setComplianceDistribution] = useState<RiskDistribution[]>([]);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, pages: 1 });
 
   // Queries
-  const listGovernance = trpc.governance.governance.list.useQuery(undefined);
-  const governanceSummary = trpc.governance.governance.riskSummary.useQuery(undefined);
-  const riskData = trpc.governance.governance.riskDistribution.useQuery(undefined);
-  const complianceData = trpc.governance.governance.complianceDistribution.useQuery(undefined);
+  const listGovernance = trpc.governance.governance.list.useQuery({ page, limit });
+  const governanceSummary = trpc.governance.governance.riskSummary.useQuery({ page: 1, limit: 100 });
+  const riskData = trpc.governance.governance.riskDistribution.useQuery({ page: 1, limit: 100 });
+  const complianceData = trpc.governance.governance.complianceDistribution.useQuery({ page: 1, limit: 100 });
 
   useEffect(() => {
     if (listGovernance.data) {
-      setGovernance(listGovernance.data as unknown as GovernanceRecord[]);
+      const response = listGovernance.data as any;
+      if (response && response.data && response.pagination) {
+        setGovernance(response.data);
+        setPagination(response.pagination);
+      }
     }
   }, [listGovernance.data]);
 
