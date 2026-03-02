@@ -193,7 +193,6 @@ export const dataRouter = router({
           priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).optional(),
           assignedTo: z.string().optional(),
           notes: z.string().optional(),
-          amount: z.number().default(0),
         })
       )
       .mutation(async ({ input, ctx }: any) => {
@@ -240,7 +239,6 @@ export const dataRouter = router({
           status: z.enum(["OPEN", "ASSIGNED", "IN_PROGRESS", "DONE", "CANCELED"]).optional(),
           assignedTo: z.string().optional(),
           notes: z.string().optional(),
-          amount: z.number().optional(),
         })
       )
       .mutation(async ({ input, ctx }: any) => {

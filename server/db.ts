@@ -518,7 +518,7 @@ export async function calculateCollaboratorEarnings(
 
 
 // ===== Referrals =====
-import { referrals, credits, passwordResetTokens, InsertReferral, InsertCredit, InsertPasswordResetToken } from "../drizzle/schema";
+import { referrals, credits, passwordResetTokens, InsertReferral, InsertCredit, InsertPasswordResetToken, expenses, invoices } from "../drizzle/schema";
 
 export async function createReferral(data: InsertReferral) {
   const db = await getDb();
@@ -656,4 +656,96 @@ export async function getUserByEmail(email: string) {
   const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
 
   return result.length > 0 ? result[0] : undefined;
+}
+
+
+// ===== Expenses (Despesas) =====
+export async function createExpense(data: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.insert(expenses).values(data);
+  const result = await db.select().from(expenses).where(eq(expenses.organizationId, data.organizationId)).orderBy((t) => t.id).limit(1);
+  return result[0];
+}
+
+export async function getExpensesByOrg(organizationId: number) {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot get expenses: database not available");
+    return [];
+  }
+
+  const result = await db.select().from(expenses).where(eq(expenses.organizationId, organizationId));
+  return result;
+}
+
+export async function getExpenseById(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const result = await db.select().from(expenses).where(eq(expenses.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function updateExpense(id: number, data: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.update(expenses).set(data).where(eq(expenses.id, id));
+  const result = await db.select().from(expenses).where(eq(expenses.id, id)).limit(1);
+  return result[0];
+}
+
+export async function deleteExpense(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  return await db.delete(expenses).where(eq(expenses.id, id));
+}
+
+
+// ===== Invoices (Notas Fiscais) =====
+export async function createInvoice(data: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.insert(invoices).values(data);
+  const result = await db.select().from(invoices).where(eq(invoices.organizationId, data.organizationId)).orderBy((t) => t.id).limit(1);
+  return result[0];
+}
+
+export async function getInvoicesByOrg(organizationId: number) {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot get invoices: database not available");
+    return [];
+  }
+
+  const result = await db.select().from(invoices).where(eq(invoices.organizationId, organizationId));
+  return result;
+}
+
+export async function getInvoiceById(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const result = await db.select().from(invoices).where(eq(invoices.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function updateInvoice(id: number, data: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.update(invoices).set(data).where(eq(invoices.id, id));
+  const result = await db.select().from(invoices).where(eq(invoices.id, id)).limit(1);
+  return result[0];
+}
+
+export async function deleteInvoice(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  return await db.delete(invoices).where(eq(invoices.id, id));
 }

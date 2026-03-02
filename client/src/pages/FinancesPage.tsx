@@ -1,18 +1,13 @@
 import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
-import { DataTable } from "@/components/DataTable";
-import { Plus, Loader, TrendingUp, DollarSign, AlertCircle, CheckCircle, Receipt, FileText, ArrowUpCircle, ArrowDownCircle } from "lucide-react";
+import { Plus, Loader, TrendingUp, DollarSign, AlertCircle, CheckCircle } from "lucide-react";
 import { CreateChargeModal } from "@/components/CreateChargeModal";
 import { EditChargeModal } from "@/components/EditChargeModal";
-import { CreateExpenseModal } from "@/components/CreateExpenseModal";
-import { CreateInvoiceModal } from "@/components/CreateInvoiceModal";
-import { EditExpenseModal } from "@/components/EditExpenseModal";
-import { EditInvoiceModal } from "@/components/EditInvoiceModal";
 import { ConfirmDeleteModal } from "@/components/ConfirmDeleteModal";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 
 interface Charge {
   id: number;
@@ -26,27 +21,6 @@ interface Charge {
   createdAt: Date;
 }
 
-interface Expense {
-  id: number;
-  description: string;
-  amount: number;
-  date: Date;
-  category: string;
-  paymentMethod: string | null;
-  notes: string | null;
-  createdAt: Date;
-}
-
-interface Invoice {
-  id: number;
-  invoiceNumber: string;
-  issueDate: Date;
-  amount: number;
-  status: "issued" | "cancelled" | "pending";
-  pdfUrl: string | null;
-  createdAt: Date;
-}
-
 interface FinanceStats {
   totalCharges: number;
   totalPending: number;
@@ -55,93 +29,61 @@ interface FinanceStats {
   totalPendingAmount: number;
   totalPaidAmount: number;
   totalOverdueAmount: number;
-  totalExpensesAmount: number;
-  netProfit: number;
   totalAmount: number;
 }
 
-interface MonthlyData {
+interface MonthlyRevenue {
   month: string;
   revenue: number;
-  expenses: number;
-  profit: number;
 }
 
 export default function FinancesPage() {
-  const [activeTab, setActiveTab] = useState("revenue");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedChargeId, setSelectedChargeId] = useState<number | null>(null);
   const [charges, setCharges] = useState<Charge[]>([]);
-  const [stats, setStats] = useState<FinanceStats | null>(null);
-  const [monthlyRevenue, setMonthlyRevenue] = useState<MonthlyRevenue[]>([]);
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, pages: 1 });
 
   // Queries
-  const listCharges = trpc.finance.charges.list.useQuery({ page, limit });
-  const chargeStats = trpc.finance.charges.stats.useQuery({ page: 1, limit: 100 });
-  const revenueData = trpc.finance.charges.revenueByMonth.useQuery({ page: 1, limit: 100 });
+  const listChargesQuery = trpc.finance.charges.list.useQuery({ page, limit });
+  const statsQuery = trpc.finance.stats.useQuery({ page: 1, limit: 100 });
+  const revenueQuery = trpc.finance.revenueByMonth.useQuery({ page: 1, limit: 100 });
 
+  // Update charges when data changes
   useEffect(() => {
-    if (listCharges.data) {
-      const response = listCharges.data as any;
+    if (listChargesQuery.data) {
+      const response = listChargesQuery.data as any;
       if (response && response.data && response.pagination) {
         setCharges(response.data);
         setPagination(response.pagination);
       }
     }
-  }, [listCharges.data]);
+  }, [listChargesQuery.data]);
 
+  // Show error toast
   useEffect(() => {
-    if (chargeStats.data) {
-      setStats(chargeStats.data as FinanceStats);
+    if (listChargesQuery.error) {
+      toast.error("Erro ao carregar cobranças: " + listChargesQuery.error.message);
     }
-  }, [chargeStats.data]);
+  }, [listChargesQuery.error]);
 
-  useEffect(() => {
-    if (revenueData.data) {
-      setMonthlyRevenue(revenueData.data as MonthlyRevenue[]);
-    }
-  }, [revenueData.data]);
-
-  useEffect(() => {
-    if (listCharges.error) {
-      toast.error("Erro ao carregar cobranças: " + listCharges.error.message);
-    }
-  }, [listCharges.error]);
-
-  const handleCreateSuccess = () => {
-    void listCharges.refetch();
-    void listExpenses.refetch();
-    void listInvoices.refetch();
-    void financeStats.refetch();
-    void monthlyData.refetch();
+  const handleRefresh = () => {
+    void listChargesQuery.refetch();
+    void statsQuery.refetch();
+    void revenueQuery.refetch();
   };
 
-  const deleteCharge = trpc.finance.charges.delete.useMutation({
+  const deleteChargeMutation = trpc.finance.charges.delete.useMutation({
     onSuccess: () => {
       toast.success("Cobrança deletada com sucesso!");
       handleRefresh();
       setShowDeleteModal(false);
     },
-  });
-
-  const deleteExpense = trpc.finance.expenses.delete.useMutation({
-    onSuccess: () => {
-      toast.success("Despesa deletada com sucesso!");
-      handleRefresh();
-      setShowDeleteModal(false);
-    },
-  });
-
-  const deleteInvoice = trpc.finance.invoices.delete.useMutation({
-    onSuccess: () => {
-      toast.success("Nota fiscal deletada com sucesso!");
-      handleRefresh();
-      setShowDeleteModal(false);
+    onError: (error) => {
+      toast.error("Erro ao deletar cobrança: " + error.message);
     },
   });
 
@@ -158,199 +100,273 @@ export default function FinancesPage() {
 
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
-      PENDING: "bg-yellow-100 text-yellow-800",
-      PAID: "bg-green-100 text-green-800",
-      OVERDUE: "bg-red-100 text-red-800",
-      issued: "bg-blue-100 text-blue-800",
-      cancelled: "bg-gray-100 text-gray-800",
+      PENDING: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
+      PAID: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
+      OVERDUE: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
+      CANCELED: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400",
     };
     return colors[status] || "bg-gray-100 text-gray-800";
   };
 
-  const revenueColumns = [
-    { key: "description", label: "Descrição", sortable: true },
-    { key: "amount", label: "Valor", render: (v: number) => formatCurrency(v) },
-    { key: "dueDate", label: "Vencimento", render: (v: Date) => formatDate(v) },
-    { key: "status", label: "Status", render: (v: string) => (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(v)}`}>{v}</span>
-    )},
-  ];
-
-  const expenseColumns = [
-    { key: "description", label: "Descrição", sortable: true },
-    { key: "amount", label: "Valor", render: (v: number) => formatCurrency(v) },
-    { key: "category", label: "Categoria" },
-    { key: "date", label: "Data", render: (v: Date) => formatDate(v) },
-  ];
-
-  const invoiceColumns = [
-    { key: "invoiceNumber", label: "Nº Nota", sortable: true },
-    { key: "amount", label: "Valor", render: (v: number) => formatCurrency(v) },
-    { key: "issueDate", label: "Emissão", render: (v: Date) => formatDate(v) },
-    { key: "status", label: "Status", render: (v: string) => (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(v)}`}>{v}</span>
-    )},
-  ];
-
-  const stats = financeStats.data;
+  const stats = statsQuery.data;
+  const monthlyData = revenueQuery.data || [];
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Finanças</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">Gestão completa de receitas, despesas e notas fiscais</p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Financeiro</h1>
+          <p className="text-gray-600 dark:text-gray-400">Gerencie cobranças, despesas e notas fiscais</p>
         </div>
-        <Button onClick={() => setShowCreateModal(true)} className="bg-orange-500 hover:bg-orange-600 text-white">
-          <Plus className="w-4 h-4 mr-2" />
-          {activeTab === "revenue" ? "Nova Cobrança" : activeTab === "expenses" ? "Nova Despesa" : "Nova Nota Fiscal"}
+        <Button onClick={() => setShowCreateModal(true)} className="gap-2">
+          <Plus className="w-4 h-4" />
+          Nova Cobrança
         </Button>
       </div>
 
-      {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border-l-4 border-green-500">
-            <div className="flex justify-between items-center">
-              <div>
-                <p className="text-sm text-gray-600">Receita Total (Paga)</p>
-                <p className="text-2xl font-bold text-green-600 mt-1">{formatCurrency(stats.totalPaidAmount)}</p>
-              </div>
-              <ArrowUpCircle className="w-8 h-8 text-green-500 opacity-20" />
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Total Charges */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border-l-4 border-blue-500">
+          <div className="flex justify-between items-center">
+            <div>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Total de Cobranças</p>
+              <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
+                {stats?.totalCharges || 0}
+              </h3>
             </div>
-          </div>
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border-l-4 border-red-500">
-            <div className="flex justify-between items-center">
-              <div>
-                <p className="text-sm text-gray-600">Despesas Totais</p>
-                <p className="text-2xl font-bold text-red-600 mt-1">{formatCurrency(stats.totalExpensesAmount)}</p>
-              </div>
-              <ArrowDownCircle className="w-8 h-8 text-red-500 opacity-20" />
-            </div>
-          </div>
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border-l-4 border-blue-500">
-            <div className="flex justify-between items-center">
-              <div>
-                <p className="text-sm text-gray-600">Lucro Líquido</p>
-                <p className="text-2xl font-bold text-blue-600 mt-1">{formatCurrency(stats.netProfit)}</p>
-              </div>
-              <TrendingUp className="w-8 h-8 text-blue-500 opacity-20" />
-            </div>
-          </div>
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border-l-4 border-yellow-500">
-            <div className="flex justify-between items-center">
-              <div>
-                <p className="text-sm text-gray-600">A Receber (Pendente)</p>
-                <p className="text-2xl font-bold text-yellow-600 mt-1">{formatCurrency(stats.totalPendingAmount)}</p>
-              </div>
-              <AlertCircle className="w-8 h-8 text-yellow-500 opacity-20" />
-            </div>
+            <DollarSign className="w-8 h-8 text-blue-500 opacity-20" />
           </div>
         </div>
-      )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold mb-4">Fluxo de Caixa</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <AreaChart data={monthlyData.data}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="month" />
-              <YAxis />
-              <Tooltip formatter={(v: number) => formatCurrency(v * 100)} />
-              <Legend />
-              <Area type="monotone" dataKey="revenue" stroke="#10b981" fill="#10b981" fillOpacity={0.1} name="Receita" />
-              <Area type="monotone" dataKey="expenses" stroke="#ef4444" fill="#ef4444" fillOpacity={0.1} name="Despesa" />
-            </AreaChart>
-          </ResponsiveContainer>
+        {/* Pending Amount */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border-l-4 border-yellow-500">
+          <div className="flex justify-between items-center">
+            <div>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Pendente</p>
+              <h3 className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
+                {formatCurrency(stats?.totalPendingAmount || 0)}
+              </h3>
+            </div>
+            <AlertCircle className="w-8 h-8 text-yellow-500 opacity-20" />
+          </div>
         </div>
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold mb-4">Comparativo Mensal</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={monthlyData.data}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="month" />
-              <YAxis />
-              <Tooltip formatter={(v: number) => formatCurrency(v * 100)} />
-              <Legend />
-              <Bar dataKey="revenue" fill="#10b981" name="Receita" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="expenses" fill="#ef4444" name="Despesa" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+
+        {/* Paid Amount */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border-l-4 border-green-500">
+          <div className="flex justify-between items-center">
+            <div>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Recebido</p>
+              <h3 className="text-2xl font-bold text-green-600 dark:text-green-400">
+                {formatCurrency(stats?.totalPaidAmount || 0)}
+              </h3>
+            </div>
+            <CheckCircle className="w-8 h-8 text-green-500 opacity-20" />
+          </div>
+        </div>
+
+        {/* Overdue Amount */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border-l-4 border-red-500">
+          <div className="flex justify-between items-center">
+            <div>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Vencido</p>
+              <h3 className="text-2xl font-bold text-red-600 dark:text-red-400">
+                {formatCurrency(stats?.totalOverdueAmount || 0)}
+              </h3>
+            </div>
+            <TrendingUp className="w-8 h-8 text-red-500 opacity-20" />
+          </div>
         </div>
       </div>
 
-      <Tabs defaultValue="revenue" onValueChange={setActiveTab} className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <TabsList className="mb-6">
-          <TabsTrigger value="revenue" className="flex items-center gap-2">
-            <TrendingUp className="w-4 h-4" /> Receitas
-          </TabsTrigger>
-          <TabsTrigger value="expenses" className="flex items-center gap-2">
-            <ArrowDownCircle className="w-4 h-4" /> Despesas
-          </TabsTrigger>
-          <TabsTrigger value="invoices" className="flex items-center gap-2">
-            <FileText className="w-4 h-4" /> Notas Fiscais
-          </TabsTrigger>
+      {/* Tabs */}
+      <Tabs defaultValue="charges" className="w-full">
+        <TabsList>
+          <TabsTrigger value="charges">Cobranças</TabsTrigger>
+          <TabsTrigger value="revenue">Receita por Mês</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="revenue">
-          <DataTable columns={revenueColumns} data={listCharges.data || []} loading={listCharges.isLoading} onEdit={(item) => { setSelectedId(item.id); setShowEditModal(true); }} onDelete={(item) => { setSelectedId(item.id); setShowDeleteModal(true); }} />
+        {/* Charges Tab */}
+        <TabsContent value="charges" className="space-y-4">
+          {listChargesQuery.isLoading ? (
+            <div className="flex justify-center items-center h-64">
+              <Loader className="w-8 h-8 animate-spin text-orange-500" />
+            </div>
+          ) : charges.length > 0 ? (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 dark:bg-gray-700">
+                    <tr>
+                      <th className="text-left py-3 px-4 font-medium text-gray-700 dark:text-gray-300">
+                        Descrição
+                      </th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-700 dark:text-gray-300">
+                        Valor
+                      </th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-700 dark:text-gray-300">
+                        Vencimento
+                      </th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-700 dark:text-gray-300">
+                        Status
+                      </th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-700 dark:text-gray-300">
+                        Ações
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {charges.map((charge) => (
+                      <tr
+                        key={charge.id}
+                        className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                      >
+                        <td className="py-3 px-4 text-gray-900 dark:text-white">
+                          {charge.description}
+                        </td>
+                        <td className="py-3 px-4 text-gray-600 dark:text-gray-400 font-semibold">
+                          {formatCurrency(charge.amount)}
+                        </td>
+                        <td className="py-3 px-4 text-gray-600 dark:text-gray-400">
+                          {formatDate(charge.dueDate)}
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(charge.status)}`}>
+                            {charge.status}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedChargeId(charge.id);
+                              setShowEditModal(true);
+                            }}
+                          >
+                            Editar
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedChargeId(charge.id);
+                              setShowDeleteModal(true);
+                            }}
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            Deletar
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination */}
+              <div className="flex justify-between items-center p-4 border-t border-gray-100 dark:border-gray-700">
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Página {pagination.page} de {pagination.pages} ({pagination.total} total)
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={pagination.page <= 1}
+                    onClick={() => setPage(Math.max(1, page - 1))}
+                  >
+                    Anterior
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={pagination.page >= pagination.pages}
+                    onClick={() => setPage(page + 1)}
+                  >
+                    Próximo
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <DollarSign className="w-12 h-12 text-gray-400 dark:text-gray-600 mx-auto mb-3 opacity-50" />
+              <p className="text-gray-600 dark:text-gray-400">
+                Nenhuma cobrança registrada. Crie a primeira!
+              </p>
+            </div>
+          )}
         </TabsContent>
-        <TabsContent value="expenses">
-          <DataTable columns={expenseColumns} data={listExpenses.data || []} loading={listExpenses.isLoading} onEdit={(item) => { setSelectedId(item.id); setShowEditModal(true); }} onDelete={(item) => { setSelectedId(item.id); setShowDeleteModal(true); }} />
-        </TabsContent>
-        <TabsContent value="invoices">
-          <DataTable columns={invoiceColumns} data={listInvoices.data || []} loading={listInvoices.isLoading} onEdit={(item) => { setSelectedId(item.id); setShowEditModal(true); }} onDelete={(item) => { setSelectedId(item.id); setShowDeleteModal(true); }} />
+
+        {/* Revenue Tab */}
+        <TabsContent value="revenue" className="space-y-4">
+          {revenueQuery.isLoading ? (
+            <div className="flex justify-center items-center h-64">
+              <Loader className="w-8 h-8 animate-spin text-orange-500" />
+            </div>
+          ) : monthlyData.length > 0 ? (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                Receita por Mês
+              </h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={monthlyData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" />
+                  <YAxis />
+                  <Tooltip formatter={(value: any) => formatCurrency(value)} />
+                  <Legend />
+                  <Bar dataKey="revenue" fill="#10b981" name="Receita" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <TrendingUp className="w-12 h-12 text-gray-400 dark:text-gray-600 mx-auto mb-3 opacity-50" />
+              <p className="text-gray-600 dark:text-gray-400">
+                Nenhum dado de receita disponível
+              </p>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
 
       {/* Modals */}
       <CreateChargeModal
-        isOpen={showCreateModal && activeTab === "revenue"}
+        isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         onSuccess={handleRefresh}
       />
-      <CreateExpenseModal
-        isOpen={showCreateModal && activeTab === "expenses"}
-        onClose={() => setShowCreateModal(false)}
-        onSuccess={handleRefresh}
-      />
-      <CreateInvoiceModal
-        isOpen={showCreateModal && activeTab === "invoices"}
-        onClose={() => setShowCreateModal(false)}
-        onSuccess={handleRefresh}
-      />
-      <EditChargeModal
-        isOpen={showEditModal && activeTab === "revenue"}
-        onClose={() => setShowEditModal(false)}
-        onSuccess={handleRefresh}
-        chargeId={selectedId}
-      />
-      <EditExpenseModal
-        isOpen={showEditModal && activeTab === "expenses"}
-        onClose={() => setShowEditModal(false)}
-        onSuccess={handleRefresh}
-        expenseId={selectedId}
-      />
-      <EditInvoiceModal
-        isOpen={showEditModal && activeTab === "invoices"}
-        onClose={() => setShowEditModal(false)}
-        onSuccess={handleRefresh}
-        invoiceId={selectedId}
-      />
-      <ConfirmDeleteModal
-        isOpen={showDeleteModal}
-        title={`Deletar ${activeTab === "revenue" ? "Cobrança" : activeTab === "expenses" ? "Despesa" : "Nota Fiscal"}`}
-        message="Tem certeza que deseja deletar este item? Esta ação não pode ser desfeita."
-        isLoading={deleteCharge.isPending || deleteExpense.isPending || deleteInvoice.isPending}
-        onConfirm={() => {
-          if (selectedId) {
-            if (activeTab === "revenue") deleteCharge.mutate({ id: selectedId });
-            else if (activeTab === "expenses") deleteExpense.mutate({ id: selectedId });
-            else if (activeTab === "invoices") deleteInvoice.mutate({ id: selectedId });
-          }
-        }}
-        onCancel={() => setShowDeleteModal(false)}
-      />
+
+      {selectedChargeId && (
+        <EditChargeModal
+          isOpen={showEditModal}
+          onClose={() => {
+            setShowEditModal(false);
+            setSelectedChargeId(null);
+          }}
+          chargeId={selectedChargeId}
+          onSuccess={handleRefresh}
+        />
+      )}
+
+      {selectedChargeId && (
+        <ConfirmDeleteModal
+          isOpen={showDeleteModal}
+          onCancel={() => {
+            setShowDeleteModal(false);
+            setSelectedChargeId(null);
+          }}
+          onConfirm={() => {
+            deleteChargeMutation.mutate({ id: selectedChargeId });
+          }}
+          title="Deletar Cobrança"
+          message="Tem certeza que deseja deletar esta cobrança?"
+          isLoading={deleteChargeMutation.isPending}
+        />
+      )}
     </div>
   );
 }

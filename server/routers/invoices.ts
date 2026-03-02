@@ -170,7 +170,7 @@ export const invoicesRouter = router({
     }),
 
   // Get invoice by ID
-  get: protectedProcedure
+  getById: protectedProcedure
     .input(z.object({ id: z.number().int() }))
     .query(async ({ ctx, input }: any) => {
       const db = await getDb();

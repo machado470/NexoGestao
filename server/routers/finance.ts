@@ -103,15 +103,15 @@ export const financeRouter = router({
       }),
   }),
 
-    // ===== Statistics =====
-    stats: protectedProcedure
-      .input(
-        z.object({
-          page: z.number().int().positive().default(1),
-          limit: z.number().int().positive().default(100),
-        })
-      )
-      .query(async ({ ctx }) => {
+  // ===== Statistics =====
+  stats: protectedProcedure
+    .input(
+      z.object({
+        page: z.number().int().positive().default(1),
+        limit: z.number().int().positive().default(100),
+      })
+    )
+    .query(async ({ ctx }) => {
       const orgId = ctx.user?.organizationId || 1;
       const allCharges = await getChargesByOrg(orgId);
 
@@ -138,15 +138,15 @@ export const financeRouter = router({
       };
     }),
 
-    // ===== Revenue by Month =====
-    revenueByMonth: protectedProcedure
-      .input(
-        z.object({
-          page: z.number().int().positive().default(1),
-          limit: z.number().int().positive().default(100),
-        })
-      )
-      .query(async ({ ctx }) => {
+  // ===== Revenue by Month =====
+  revenueByMonth: protectedProcedure
+    .input(
+      z.object({
+        page: z.number().int().positive().default(1),
+        limit: z.number().int().positive().default(100),
+      })
+    )
+    .query(async ({ ctx }) => {
       const orgId = ctx.user?.organizationId || 1;
       const allCharges = await getChargesByOrg(orgId);
       const paidCharges = allCharges.filter((c) => c.status === "PAID");
@@ -159,12 +159,65 @@ export const financeRouter = router({
           month: "short",
           year: "numeric",
         });
+        monthlyRevenue[monthKey] = (monthlyRevenue[monthKey] || 0) + (charge.amount || 0);
+      });
+
+      return Object.entries(monthlyRevenue).map(([month, revenue]) => ({
+        month,
+        revenue: revenue / 100,
+      }));
+    }),
+
+  // ===== Expenses (Despesas) =====
+  expenses: router({
+    create: protectedProcedure
+      .input(
+        z.object({
+          description: z.string().min(1, "Descrição é obrigatória"),
+          amount: z.number().min(1, "Valor deve ser maior que 0"),
+          date: z.date(),
+          category: z.string().min(1, "Categoria é obrigatória"),
+          paymentMethod: z.string().optional(),
+          notes: z.string().optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const orgId = ctx.user?.organizationId || 1;
+        return await createExpense({
+          organizationId: orgId,
+          description: input.description,
+          amount: Math.round(input.amount * 100),
+          date: input.date,
+          category: input.category,
+          paymentMethod: input.paymentMethod,
+          notes: input.notes,
+        });
       }),
 
-    list: protectedProcedure.query(async ({ ctx }) => {
-      const orgId = ctx.user?.id || 1;
-      return await getExpensesByOrg(orgId);
-    }),
+    list: protectedProcedure
+      .input(
+        z.object({
+          page: z.number().int().positive().default(1),
+          limit: z.number().int().positive().default(10),
+        })
+      )
+      .query(async ({ input, ctx }) => {
+        const orgId = ctx.user?.organizationId || 1;
+        const allExpenses = await getExpensesByOrg(orgId);
+        const total = allExpenses.length;
+        const pages = Math.ceil(total / input.limit);
+        const start = (input.page - 1) * input.limit;
+        const data = allExpenses.slice(start, start + input.limit);
+        return {
+          data,
+          pagination: {
+            page: input.page,
+            limit: input.limit,
+            total,
+            pages,
+          },
+        };
+      }),
 
     getById: protectedProcedure
       .input(z.object({ id: z.number() }))
@@ -214,7 +267,7 @@ export const financeRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
-        const orgId = ctx.user?.id || 1;
+        const orgId = ctx.user?.organizationId || 1;
         return await createInvoice({
           organizationId: orgId,
           chargeId: input.chargeId,
@@ -226,10 +279,30 @@ export const financeRouter = router({
         });
       }),
 
-    list: protectedProcedure.query(async ({ ctx }) => {
-      const orgId = ctx.user?.id || 1;
-      return await getInvoicesByOrg(orgId);
-    }),
+    list: protectedProcedure
+      .input(
+        z.object({
+          page: z.number().int().positive().default(1),
+          limit: z.number().int().positive().default(10),
+        })
+      )
+      .query(async ({ input, ctx }) => {
+        const orgId = ctx.user?.organizationId || 1;
+        const allInvoices = await getInvoicesByOrg(orgId);
+        const total = allInvoices.length;
+        const pages = Math.ceil(total / input.limit);
+        const start = (input.page - 1) * input.limit;
+        const data = allInvoices.slice(start, start + input.limit);
+        return {
+          data,
+          pagination: {
+            page: input.page,
+            limit: input.limit,
+            total,
+            pages,
+          },
+        };
+      }),
 
     getById: protectedProcedure
       .input(z.object({ id: z.number() }))
@@ -262,68 +335,5 @@ export const financeRouter = router({
       .mutation(async ({ input }) => {
         return await deleteInvoice(input.id);
       }),
-  }),
-
-  // ===== Statistics & Reports =====
-  stats: protectedProcedure.query(async ({ ctx }) => {
-    const orgId = ctx.user?.id || 1;
-    const allCharges = await getChargesByOrg(orgId);
-    const allExpenses = await getExpensesByOrg(orgId);
-
-    const now = new Date();
-    const pendingCharges = allCharges.filter((c) => c.status === "PENDING");
-    const paidCharges = allCharges.filter((c) => c.status === "PAID");
-    const overdueCharges = allCharges.filter(
-      (c) => c.status === "PENDING" && new Date(c.dueDate) < now
-    );
-
-    const totalPendingAmount = pendingCharges.reduce((sum, c) => sum + (c.amount || 0), 0);
-    const totalPaidAmount = paidCharges.reduce((sum, c) => sum + (c.amount || 0), 0);
-    const totalOverdueAmount = overdueCharges.reduce((sum, c) => sum + (c.amount || 0), 0);
-    const totalExpensesAmount = allExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
-
-    return {
-      totalCharges: allCharges.length,
-      totalPending: pendingCharges.length,
-      totalPaid: paidCharges.length,
-      totalOverdue: overdueCharges.length,
-      totalPendingAmount,
-      totalPaidAmount,
-      totalOverdueAmount,
-      totalExpensesAmount,
-      netProfit: totalPaidAmount - totalExpensesAmount,
-      totalAmount: totalPendingAmount + totalPaidAmount,
-    };
-  }),
-
-  revenueByMonth: protectedProcedure.query(async ({ ctx }) => {
-    const orgId = ctx.user?.id || 1;
-    const allCharges = await getChargesByOrg(orgId);
-    const allExpenses = await getExpensesByOrg(orgId);
-    
-    const paidCharges = allCharges.filter((c) => c.status === "PAID");
-
-    const monthlyData: Record<string, { revenue: number; expenses: number }> = {};
-
-    paidCharges.forEach((charge) => {
-      const date = new Date(charge.paidDate || charge.createdAt);
-      const monthKey = date.toLocaleString("pt-BR", { month: "short", year: "numeric" });
-      if (!monthlyData[monthKey]) monthlyData[monthKey] = { revenue: 0, expenses: 0 };
-      monthlyData[monthKey].revenue += (charge.amount || 0);
-    });
-
-    allExpenses.forEach((expense) => {
-      const date = new Date(expense.date || expense.createdAt);
-      const monthKey = date.toLocaleString("pt-BR", { month: "short", year: "numeric" });
-      if (!monthlyData[monthKey]) monthlyData[monthKey] = { revenue: 0, expenses: 0 };
-      monthlyData[monthKey].expenses += (expense.amount || 0);
-    });
-
-    return Object.entries(monthlyData).map(([month, data]) => ({
-      month,
-      revenue: data.revenue / 100,
-      expenses: data.expenses / 100,
-      profit: (data.revenue - data.expenses) / 100,
-    }));
   }),
 });

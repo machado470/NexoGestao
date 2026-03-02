@@ -21,11 +21,11 @@ export function EditInvoiceModal({
     invoiceNumber: "",
     issueDate: "",
     amount: "",
-    status: "issued" as "issued" | "cancelled" | "pending",
+    status: "issued" as "draft" | "issued" | "paid" | "canceled",
     pdfUrl: "",
   });
 
-  const { data: invoice, isLoading } = trpc.finance.invoices.getById.useQuery(
+  const { data: invoice, isLoading } = trpc.invoices.getById.useQuery(
     { id: invoiceId as number },
     { enabled: !!invoiceId && isOpen }
   );
@@ -35,14 +35,14 @@ export function EditInvoiceModal({
       setFormData({
         invoiceNumber: invoice.invoiceNumber,
         issueDate: new Date(invoice.issueDate).toISOString().split('T')[0],
-        amount: (invoice.amount / 100).toString(),
-        status: invoice.status,
+        amount: (Number(invoice.amount) / 100).toString(),
+        status: (invoice.status as "draft" | "issued" | "paid" | "canceled") || "issued",
         pdfUrl: invoice.pdfUrl || "",
       });
     }
   }, [invoice]);
 
-  const updateInvoice = trpc.finance.invoices.update.useMutation({
+  const updateInvoice = trpc.invoices.update.useMutation({
     onSuccess: () => {
       toast.success("Nota fiscal atualizada com sucesso!");
       onSuccess();
@@ -65,11 +65,10 @@ export function EditInvoiceModal({
 
     updateInvoice.mutate({
       id: invoiceId,
-      invoiceNumber: formData.invoiceNumber,
-      issueDate: new Date(formData.issueDate),
-      amount,
-      status: formData.status,
-      pdfUrl: formData.pdfUrl || undefined,
+      amount: Math.round(amount * 100),
+      status: formData.status as "draft" | "issued" | "paid" | "canceled",
+      dueDate: new Date(formData.issueDate),
+      notes: "",
     });
   };
 
@@ -125,12 +124,13 @@ export function EditInvoiceModal({
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
               <select
                 value={formData.status}
-                onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
+                onChange={(e) => setFormData({ ...formData, status: e.target.value as "draft" | "issued" | "paid" | "canceled" })}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
               >
+                <option value="draft">Rascunho</option>
                 <option value="issued">Emitida</option>
-                <option value="pending">Pendente</option>
-                <option value="cancelled">Cancelada</option>
+                <option value="paid">Paga</option>
+                <option value="canceled">Cancelada</option>
               </select>
             </div>
 
