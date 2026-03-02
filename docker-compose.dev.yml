@@ -1,0 +1,51 @@
+services:
+  postgres:
+    image: postgres:15
+    container_name: nexogestao_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: nexogestao
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d nexogestao"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nexogestao_api
+    env_file:
+      - .env.docker
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/nexogestao?schema=public
+      NODE_ENV: development
+
+      AUTO_MIGRATE: "1"
+      DB_WAIT_SECONDS: "40"
+
+      # opcional: habilita seed demo se quiser
+      # SEED_MODE: "demo"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
+    # DEV: bind mount do código
+    volumes:
+      - ./apps/api:/app/apps/api
+
+    # DEV: usa o mesmo entrypoint (migrate/seed), mas roda watch via command
+    entrypoint: ["/app/apps/api/docker-entrypoint.sh"]
+    command: ["pnpm", "run", "dev"]
+
+volumes:
+  pgdata:
