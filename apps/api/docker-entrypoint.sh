@@ -1,60 +1,83 @@
 #!/usr/bin/env sh
-set -eu
+set -e
 
-echo "[nexogestao] NODE_ENV=${NODE_ENV:-}"
-echo "[nexogestao] DATABASE_URL=<hidden>"
+log() {
+  echo "[nexogestao] $*"
+}
 
-APP_DIR="$(cd "$(dirname "$0")" && pwd)"
-echo "[nexogestao] app dir=${APP_DIR}"
+APP_DIR="/app/apps/api"
+DIST_MAIN="$APP_DIR/dist/main.js"
+
+log "NODE_ENV=${NODE_ENV:-}"
+log "DATABASE_URL=${DATABASE_URL:+<hidden>}"
+log "app dir=$APP_DIR"
 
 cd "$APP_DIR"
 
+# ---- quick filesystem diagnostics
+log "pwd=$(pwd)"
+log "ls -la (app dir):"
+ls -la | sed -n "1,120p" || true
+
+# ---- wait for postgres
 DB_WAIT_SECONDS="${DB_WAIT_SECONDS:-40}"
-AUTO_MIGRATE="${AUTO_MIGRATE:-1}"
 
-DB_HOST="$(echo "${DATABASE_URL:-}" | sed -n 's|.*@\([^:/?]*\).*|\1|p' | head -n 1)"
-DB_PORT="$(echo "${DATABASE_URL:-}" | sed -n 's|.*:\([0-9]\+\)/.*|\1|p' | head -n 1)"
-DB_NAME="$(echo "${DATABASE_URL:-}" | sed -n 's|.*/\([^?]*\)\?.*|\1|p' | head -n 1)"
+# Resolve DB params from DATABASE_URL
+# expected: postgresql://user:pass@host:port/db?schema=public
+DB_URL="${DATABASE_URL:-}"
+DB_HOST="$(echo "$DB_URL" | sed -n 's|.*@\(.*\):.*|\1|p')"
+DB_PORT="$(echo "$DB_URL" | sed -n 's|.*:\([0-9]\+\)/.*|\1|p')"
+DB_NAME="$(echo "$DB_URL" | sed -n 's|.*/\([^?]*\).*|\1|p')"
+DB_USER="$(echo "$DB_URL" | sed -n 's|.*//\([^:]*\):.*|\1|p')"
 
-DB_HOST="${DB_HOST:-postgres}"
-DB_PORT="${DB_PORT:-5432}"
-DB_NAME="${DB_NAME:-nexogestao}"
-DB_USER="${POSTGRES_USER:-postgres}"
-
-echo "[nexogestao] db resolved host=${DB_HOST} port=${DB_PORT} db=${DB_NAME} user=${DB_USER}"
-echo "[nexogestao] waiting for postgres (timeout=${DB_WAIT_SECONDS}s)..."
+log "db resolved host=${DB_HOST:-postgres} port=${DB_PORT:-5432} db=${DB_NAME:-nexogestao} user=${DB_USER:-postgres}"
+log "waiting for postgres (timeout=${DB_WAIT_SECONDS}s)..."
 
 i=0
-until pg_isready -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" >/dev/null 2>&1; do
-  i=$((i+1))
-  if [ "$i" -ge "$DB_WAIT_SECONDS" ]; then
-    echo "[nexogestao] postgres not ready after ${DB_WAIT_SECONDS}s"
-    exit 1
+while [ "$i" -lt "$DB_WAIT_SECONDS" ]; do
+  if pg_isready -h "${DB_HOST:-postgres}" -p "${DB_PORT:-5432}" -U "${DB_USER:-postgres}" -d "${DB_NAME:-nexogestao}" >/dev/null 2>&1; then
+    log "postgres is ready"
+    break
   fi
+  i=$((i+1))
   sleep 1
 done
 
-echo "[nexogestao] postgres is ready"
-
-# ===============================
-# MIGRATIONS (CORRETO)
-# ===============================
-if [ "$AUTO_MIGRATE" = "1" ]; then
-  echo "[nexogestao] AUTO_MIGRATE=1 -> running prisma:migrate:deploy"
+# ---- migrations
+if [ "${AUTO_MIGRATE:-0}" = "1" ]; then
+  log "AUTO_MIGRATE=1 -> running prisma:migrate:deploy"
   pnpm run prisma:migrate:deploy
 else
-  echo "[nexogestao] AUTO_MIGRATE=0 -> skipping migrations"
+  log "AUTO_MIGRATE disabled"
 fi
 
-# ===============================
-# SEED CONTROLADO
-# ===============================
-if [ "${SEED_MODE:-}" = "demo" ]; then
-  echo "[nexogestao] SEED_MODE=demo -> running seed"
-  pnpm run prisma:seed || echo "[nexogestao] seed failed"
+# ---- seed
+if [ "${SEED_MODE:-}" != "" ]; then
+  log "seed enabled (SEED_MODE=$SEED_MODE) -> running prisma:seed"
+  pnpm run prisma:seed
 else
-  echo "[nexogestao] seed disabled"
+  log "seed disabled"
 fi
 
-echo "[nexogestao] starting node"
-exec node dist/main.js
+# ---- if a command was provided, run it (DEV mode, custom commands, etc.)
+if [ "$#" -gt 0 ]; then
+  log "exec custom command: $*"
+  exec "$@"
+fi
+
+# ---- otherwise, default to production start (dist)
+if [ ! -f "$DIST_MAIN" ]; then
+  log "dist missing: $DIST_MAIN"
+  log "attempting build inside container..."
+  pnpm run build
+fi
+
+if [ ! -f "$DIST_MAIN" ]; then
+  log "FATAL: still missing $DIST_MAIN"
+  log "tree dist (if exists):"
+  find "$APP_DIR" -maxdepth 3 -type d -name dist -print -exec ls -la {} \; || true
+  exit 1
+fi
+
+log "starting node: $DIST_MAIN"
+exec node "$DIST_MAIN"

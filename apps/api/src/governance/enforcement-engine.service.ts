@@ -1,10 +1,20 @@
 import { Injectable, Inject } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { TimelineService } from '../timeline/timeline.service'
-import { RiskService } from '../risk/risk.service'
-import { GovernanceRunService } from './governance-run.service'
 import { EnforcementPolicyService } from './enforcement-policy.service'
+<<<<<<< Updated upstream
 import type { OperationalStateValue } from '@prisma/client'
+=======
+import { OperationalStateValue } from '@prisma/client'
+
+export type EnforcementRunResult = {
+  evaluated: number
+  warnings: number
+  correctivesCreated: number
+  restrictedCount: number
+  suspendedCount: number
+}
+>>>>>>> Stashed changes
 
 @Injectable()
 export class EnforcementEngineService {
@@ -17,15 +27,21 @@ export class EnforcementEngineService {
 
     @Inject(TimelineService)
     private readonly timeline: TimelineService,
-
-    @Inject(GovernanceRunService)
-    private readonly run: GovernanceRunService,
-
-    @Inject(RiskService)
-    private readonly risk: RiskService,
   ) {}
 
-  async runForOrg(orgId: string) {
+  /**
+   * Engine NÃO gerencia GovernanceRunService pra evitar dependência circular.
+   * Ele só executa e devolve um resumo; Controller/Job cuidam do runService.
+   */
+  async runForOrg(orgId: string): Promise<EnforcementRunResult> {
+    const result: EnforcementRunResult = {
+      evaluated: 0,
+      warnings: 0,
+      correctivesCreated: 0,
+      restrictedCount: 0,
+      suspendedCount: 0,
+    }
+
     const people = await this.prisma.person.findMany({
       where: { orgId, active: true },
       select: {
@@ -37,6 +53,7 @@ export class EnforcementEngineService {
     })
 
     for (const p of people) {
+<<<<<<< Updated upstream
       this.run.personEvaluated()
 
       // ✅ risco canônico que alimenta policy
@@ -46,27 +63,38 @@ export class EnforcementEngineService {
       )
 
       // ✅ exceções (por enquanto false)
+=======
+      result.evaluated++
+
+      const riskScore = p.operationalRiskScore
+>>>>>>> Stashed changes
       const hasActiveException = await this.hasActiveException(p.id)
 
       const decision = this.policy.decide({
         riskScore,
-        status: p.operationalState as unknown,
+        status: p.operationalState,
         hasActiveException,
         orgId: p.orgId,
         personId: p.id,
         source: 'ENFORCEMENT_ENGINE',
       })
 
+<<<<<<< Updated upstream
       // ✅ contabiliza pro GovernanceRun
       this.run.recordOperationalStatus({
         state: decision.nextState as any,
         riskScore,
       })
+=======
+      // contagem do “estado alvo” (pós decisão)
+      if (decision.nextState === 'RESTRICTED') result.restrictedCount++
+      if (decision.nextState === 'SUSPENDED') result.suspendedCount++
+>>>>>>> Stashed changes
 
       if (decision.action === 'NONE') continue
 
       if (decision.action === 'RAISE_WARNING') {
-        this.run.warningRaised()
+        result.warnings++
 
         await this.timeline.log({
           orgId: p.orgId,
@@ -93,20 +121,24 @@ export class EnforcementEngineService {
       }
 
       if (decision.action === 'CREATE_CORRECTIVE_ACTION') {
-        this.run.correctiveCreated()
-
-        await this.ensureCorrectiveAction({
+        const created = await this.ensureCorrectiveAction({
           personId: p.id,
           reason: decision.reason,
           riskScore,
-          nextState: decision.nextState as any,
+          nextState: decision.nextState,
         })
 
+<<<<<<< Updated upstream
         await this.setPersonStateIfChanged({
           personId: p.id,
           nextState: decision.nextState as any,
           riskScore,
         })
+=======
+        if (!created) continue
+
+        result.correctivesCreated++
+>>>>>>> Stashed changes
 
         await this.timeline.log({
           orgId: p.orgId,
@@ -121,10 +153,10 @@ export class EnforcementEngineService {
             hasActiveException,
           },
         })
-
-        continue
       }
     }
+
+    return result
   }
 
   private async setPersonStateIfChanged(params: {
@@ -154,37 +186,41 @@ export class EnforcementEngineService {
   }
 
   private async hasActiveException(personId: string): Promise<boolean> {
-    void personId
-    return false
+    const rows = await this.prisma.$queryRaw<Array<{ active: boolean }>>`
+      select exists (
+        select 1
+        from "PersonException" pe
+        where pe."personId" = ${personId}
+          and now() between pe."startsAt" and pe."endsAt"
+      ) as active
+    `
+    return Boolean(rows?.[0]?.active)
   }
 
   private async ensureCorrectiveAction(params: {
     personId: string
     reason: string
     riskScore: number
-    nextState: any
-  }) {
-    const open = await this.prisma.correctiveAction.findFirst({
+    nextState: OperationalStateValue
+  }): Promise<boolean> {
+    const active = await this.prisma.correctiveAction.findFirst({
       where: {
-        status: 'OPEN',
         personId: params.personId,
+        status: { in: ['OPEN', 'AWAITING_REASSESSMENT'] },
       },
       select: { id: true },
     })
 
-    if (open) return
+    if (active) return false
 
     await this.prisma.correctiveAction.create({
       data: {
         personId: params.personId,
         status: 'OPEN',
         reason: params.reason,
-        metadata: {
-          riskScore: params.riskScore,
-          nextState: params.nextState,
-          source: 'ENFORCEMENT_ENGINE',
-        },
-      } as any,
+      },
     })
+
+    return true
   }
 }

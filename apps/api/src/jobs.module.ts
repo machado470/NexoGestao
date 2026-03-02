@@ -1,22 +1,15 @@
 import { Module } from '@nestjs/common'
-import { PrismaModule } from './prisma/prisma.module'
-import { TimelineModule } from './timeline/timeline.module'
-import { RiskModule } from './risk/risk.module'
+import { ScheduleModule } from '@nestjs/schedule'
 import { GovernanceModule } from './governance/governance.module'
-import { OperationalStateModule } from './people/operational-state.module'
-
-import { OperationalStateJob } from './people/operational-state.job'
+import { EnforcementScheduler } from './governance/enforcement.scheduler'
 
 @Module({
   imports: [
-    PrismaModule,
-    TimelineModule,
-    RiskModule,
+    ScheduleModule.forRoot(),
     GovernanceModule,
-    OperationalStateModule,
   ],
   providers: [
-    OperationalStateJob,
+    EnforcementScheduler,
   ],
 })
 export class JobsModule {}

@@ -47,10 +47,8 @@ export class OperationalStateJob {
     for (const p of persons) {
       evaluated++
 
-      const riskScore = await this.risk.recalculatePersonRisk(
-        p.id,
-        'OPERATIONAL_STATE_JOB',
-      )
+      // ✅ calculate-only: sem RiskSnapshot, sem spam na timeline
+      const riskScore = await this.risk.calculatePersonRisk(p.id)
 
       const nextState = deriveState(riskScore)
 

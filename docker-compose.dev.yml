@@ -25,13 +25,13 @@ services:
       - .env.docker
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/nexogestao?schema=public
-      NODE_ENV: production
+      NODE_ENV: development
 
-      # Auto apply migrations when db is empty
       AUTO_MIGRATE: "1"
-
-      # Optional: wait for postgres (seconds)
       DB_WAIT_SECONDS: "40"
+
+      # opcional: habilita seed demo se quiser
+      # SEED_MODE: "demo"
     depends_on:
       postgres:
         condition: service_healthy
@@ -39,8 +39,13 @@ services:
       - "3000:3000"
     restart: unless-stopped
 
-    # PROD: usa o entrypoint dentro da imagem (ele já faz migrate/seed/check dist)
+    # DEV: bind mount do código
+    volumes:
+      - ./apps/api:/app/apps/api
+
+    # DEV: usa o mesmo entrypoint (migrate/seed), mas roda watch via command
     entrypoint: ["/app/apps/api/docker-entrypoint.sh"]
+    command: ["pnpm", "run", "dev"]
 
 volumes:
   pgdata:
