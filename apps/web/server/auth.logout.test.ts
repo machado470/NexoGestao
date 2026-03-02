@@ -41,12 +41,12 @@ function createAuthContext(): { ctx: TrpcContext; clearedCookies: CookieCall[] }
   return { ctx, clearedCookies };
 }
 
-describe("auth.logout", () => {
+describe("session.logout", () => {
   it("clears the session cookie and reports success", async () => {
     const { ctx, clearedCookies } = createAuthContext();
     const caller = appRouter.createCaller(ctx);
 
-    const result = await caller.auth.logout();
+    const result = await caller.session.logout();
 
     expect(result).toEqual({ success: true });
     expect(clearedCookies).toHaveLength(1);

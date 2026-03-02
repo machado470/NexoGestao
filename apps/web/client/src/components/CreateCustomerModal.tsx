@@ -34,10 +34,29 @@ export function CreateCustomerModal({
     },
   });
 
+  const validateEmail = (email: string): boolean => {
+    if (!email) return true; // Email é opcional
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const validatePhone = (phone: string): boolean => {
+    const phoneRegex = /^[0-9\s\-\(\)]+$/;
+    return phoneRegex.test(phone);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.phone) {
       toast.error("Nome e telefone são obrigatórios");
+      return;
+    }
+    if (!validatePhone(formData.phone)) {
+      toast.error("Telefone inválido");
+      return;
+    }
+    if (!validateEmail(formData.email)) {
+      toast.error("Email inválido");
       return;
     }
     createCustomer.mutate(formData);
@@ -86,6 +105,7 @@ export function CreateCustomerModal({
               onChange={(e) =>
                 setFormData({ ...formData, email: e.target.value })
               }
+              pattern="[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
               placeholder="email@example.com"
             />
@@ -101,6 +121,7 @@ export function CreateCustomerModal({
               onChange={(e) =>
                 setFormData({ ...formData, phone: e.target.value })
               }
+              pattern="[0-9\s\-\(\)]+"
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
               placeholder="(11) 99999-9999"
             />

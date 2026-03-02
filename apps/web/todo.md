@@ -12,16 +12,19 @@
 - [x] Create Service Order Modal component
 - [x] Integrated modals into Dashboard
 - [x] Unit tests for CRUD operations (customers, appointments, service orders)
+- [x] Fixed logout test (session.logout instead of auth.logout)
+- [x] Implemented bcrypt for password hashing
+- [x] Added email and phone validation in forms
+- [x] Fixed imports in Dashboard (useAuth hook)
+- [x] Verified database schema synchronization
 
 ## In Progress
 - [ ] Implement data tables to display created records
-- [ ] Add form validation using react-hook-form
 - [ ] Create Finance/Charges management section
 - [ ] Create People/Collaborators management section
 - [ ] Create Governance section with risk scoring
 
 ## Pending Features
-- [ ] Add bcrypt for password hashing
 - [ ] Data visualization with Recharts (revenue trends, appointment distribution, risk scores)
 - [ ] Email verification and password recovery
 - [ ] Real-time notifications system

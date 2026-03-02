@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import {
   Menu,
@@ -21,10 +21,11 @@ import {
   AlertCircle,
   TrendingUp,
 } from "lucide-react";
-import { useTheme } from "@/contexts/ThemeContext";
+
 import { CreateCustomerModal } from "@/components/CreateCustomerModal";
 import { CreateAppointmentModal } from "@/components/CreateAppointmentModal";
 import { CreateServiceOrderModal } from "@/components/CreateServiceOrderModal";
+import { useTheme } from "@/contexts/ThemeContext";
 
 export default function Dashboard() {
   const [, navigate] = useLocation();

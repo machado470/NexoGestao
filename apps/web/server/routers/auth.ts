@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getDb } from "../db";
 import { organizations, accounts, users } from "../../drizzle/schema";
 import { eq } from "drizzle-orm";
+import * as bcrypt from "bcrypt";
 
 export const authRouter = router({
   // Registro de nova organização
@@ -33,12 +34,15 @@ export const authRouter = router({
           throw new Error("Este email já está registrado");
         }
 
+        // Hash da senha
+        const hashedPassword = await bcrypt.hash(input.password, 10);
+
         // Criar organização
         const result = await db.insert(organizations).values({
           name: input.orgName,
           email: input.email,
           adminName: input.adminName,
-          password: input.password, // TODO: Hash password em produção
+          password: hashedPassword,
         });
 
         // Obter o ID da organização criada
@@ -90,8 +94,9 @@ export const authRouter = router({
 
         const organization = org[0];
 
-        // Verificar senha (TODO: usar bcrypt em produção)
-        if (organization.password !== input.password) {
+        // Verificar senha com bcrypt
+        const isPasswordValid = await bcrypt.compare(input.password, organization.password);
+        if (!isPasswordValid) {
           throw new Error("Email ou senha incorretos");
         }
 
