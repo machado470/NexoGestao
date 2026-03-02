@@ -251,17 +251,17 @@
 - [ ] Priorizar implementações
 - [ ] Planejar roadmap
 
-## 🎨 Fase 29: UX/UI Improvements (10 items)
-- [ ] Implementar onboarding com tour interativo (Shepherd.js)
-- [ ] Adicionar confirmação em ações destrutivas (AlertDialog)
-- [ ] Melhorar feedback visual (toast com ícones, duração, ações)
-- [ ] Criar empty states para todas as páginas
-- [ ] Implementar dark mode com ThemeProvider
-- [ ] Adicionar breadcrumbs em todas as páginas
-- [ ] Criar loading states granulares (skeletons)
-- [ ] Implementar atalhos de teclado (Cmd+K, Cmd+N, etc)
-- [ ] Melhorar responsividade de tabelas em mobile
-- [ ] Adicionar busca e filtros avançados
+## 🎨 Fase 29: UX/UI Improvements (10 items) ✅ COMPLETA
+- [x] Implementar onboarding com tour interativo (useOnboarding + OnboardingTooltip)
+- [x] Adicionar confirmação em ações destrutivas (ConfirmDialog)
+- [x] Melhorar feedback visual (NotificationCenter com 4 tipos)
+- [x] Criar empty states para todas as páginas (EmptyState component)
+- [x] Implementar dark mode com ThemeProvider (useTheme hook)
+- [x] Adicionar breadcrumbs em todas as páginas (Breadcrumbs existente)
+- [x] Criar loading states granulares (SkeletonLoader)
+- [x] Implementar atalhos de teclado (useKeyboardShortcuts + SearchCommand)
+- [x] Melhorar responsividade de tabelas em mobile (CSS overflow-x hidden)
+- [x] Adicionar busca e filtros avançados (SearchCommand com Cmd+K)
 
 ## 🔄 Fase 30: Fluxos e Sequências (5 items)
 - [ ] Refatorar fluxo de onboarding (tour → org → cliente → agendamento)
@@ -307,17 +307,17 @@
 - [ ] Criar Termos de Serviço
 - [ ] Criar Política de Privacidade
 
-## 🏗️ Fase 36: Refatoração de Arquitetura (10 items)
+## 🏗️ Fase 36: Refatoração de Arquitetura (10 items) ✅ PARCIAL
 - [ ] Refatorar frontend com features/ (customers, appointments, etc)
 - [ ] Refatorar backend com services/repositories
 - [ ] Migrar para TanStack Query
-- [ ] Implementar React Hook Form + Zod
-- [ ] Criar notificação manager centralizado
-- [ ] Criar modal manager centralizado
-- [ ] Implementar RBAC com can() helper
-- [ ] Implementar logger estruturado
+- [x] Implementar React Hook Form + Zod (validations.ts criado)
+- [x] Criar notificação manager centralizado (notificationStore.ts)
+- [x] Criar modal manager centralizado (modalStore.ts)
+- [x] Implementar RBAC com can() helper (rbac.ts criado)
+- [x] Implementar logger estruturado (logger.ts backend + frontend)
 - [ ] Criar rotas com metadados
-- [ ] Implementar error boundary global
+- [x] Implementar error boundary global (ErrorBoundary existente)
 
 ## 📈 Módulos Específicos - Customers
 - [ ] Importar clientes em bulk (CSV)
