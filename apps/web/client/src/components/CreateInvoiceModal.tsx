@@ -4,63 +4,64 @@ import { Button } from "@/components/ui/button";
 import { X, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-interface CreateServiceOrderModalProps {
+interface CreateInvoiceModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
   customers: Array<{ id: number; name: string }>;
 }
 
-export function CreateServiceOrderModal({
+export function CreateInvoiceModal({
   isOpen,
   onClose,
   onSuccess,
   customers,
-}: CreateServiceOrderModalProps) {
+}: CreateInvoiceModalProps) {
   const [formData, setFormData] = useState({
     customerId: "",
-    title: "",
+    invoiceNumber: "",
     description: "",
     amount: "",
-    priority: "MEDIUM" as const,
-    assignedTo: "",
+    issueDate: new Date().toISOString().split("T")[0],
+    dueDate: "",
     notes: "",
   });
 
-  const createServiceOrder = trpc.data.serviceOrders.create.useMutation({
+  const createInvoice = trpc.invoices.create.useMutation({
     onSuccess: () => {
-      toast.success("Ordem de serviço criada com sucesso!");
+      toast.success("Nota Fiscal criada com sucesso!");
       setFormData({
         customerId: "",
-        title: "",
+        invoiceNumber: "",
         description: "",
         amount: "",
-        priority: "MEDIUM",
-        assignedTo: "",
+        issueDate: new Date().toISOString().split("T")[0],
+        dueDate: "",
         notes: "",
       });
       onSuccess();
       onClose();
     },
     onError: (error) => {
-      toast.error(error.message || "Erro ao criar ordem de serviço");
+      toast.error(error.message || "Erro ao criar nota fiscal");
     },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.customerId || !formData.title) {
-      toast.error("Cliente e título são obrigatórios");
+    if (!formData.customerId || !formData.invoiceNumber || !formData.amount || !formData.issueDate) {
+      toast.error("Preencha todos os campos obrigatórios");
       return;
     }
-    createServiceOrder.mutate({
+
+    createInvoice.mutate({
       customerId: parseInt(formData.customerId),
-      title: formData.title,
-      description: formData.description,
-      amount: formData.amount ? parseFloat(formData.amount) : undefined,
-      priority: formData.priority,
-      assignedTo: formData.assignedTo,
-      notes: formData.notes,
+      invoiceNumber: formData.invoiceNumber,
+      description: formData.description || undefined,
+      amount: parseFloat(formData.amount),
+      issueDate: new Date(formData.issueDate),
+      dueDate: formData.dueDate ? new Date(formData.dueDate) : undefined,
+      notes: formData.notes || undefined,
     });
   };
 
@@ -71,7 +72,7 @@ export function CreateServiceOrderModal({
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-            Nova Ordem de Serviço
+            Nova Nota Fiscal
           </h2>
           <button
             onClick={onClose}
@@ -104,16 +105,16 @@ export function CreateServiceOrderModal({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Título *
+              Número da NF *
             </label>
             <input
               type="text"
-              value={formData.title}
+              value={formData.invoiceNumber}
               onChange={(e) =>
-                setFormData({ ...formData, title: e.target.value })
+                setFormData({ ...formData, invoiceNumber: e.target.value })
               }
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-              placeholder="Título da ordem de serviço"
+              placeholder="Ex: 001"
             />
           </div>
 
@@ -121,68 +122,58 @@ export function CreateServiceOrderModal({
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Descrição
             </label>
-            <textarea
+            <input
+              type="text"
               value={formData.description}
               onChange={(e) =>
                 setFormData({ ...formData, description: e.target.value })
               }
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-              placeholder="Descrição do serviço"
-              rows={3}
+              placeholder="Descrição da nota fiscal"
             />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Prioridade
-              </label>
-              <select
-                value={formData.priority}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    priority: e.target.value as any,
-                  })
-                }
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-              >
-                <option value="LOW">Baixa</option>
-                <option value="MEDIUM">Média</option>
-                <option value="HIGH">Alta</option>
-                <option value="URGENT">Urgente</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Valor (R$)
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                value={formData.amount}
-                onChange={(e) =>
-                  setFormData({ ...formData, amount: e.target.value })
-                }
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-                placeholder="0.00"
-              />
-            </div>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Atribuído a
+              Valor (R$) *
             </label>
             <input
-              type="text"
-              value={formData.assignedTo}
+              type="number"
+              step="0.01"
+              value={formData.amount}
               onChange={(e) =>
-                setFormData({ ...formData, assignedTo: e.target.value })
+                setFormData({ ...formData, amount: e.target.value })
               }
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-              placeholder="Nome do responsável"
+              placeholder="0.00"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Data de Emissão *
+            </label>
+            <input
+              type="date"
+              value={formData.issueDate}
+              onChange={(e) =>
+                setFormData({ ...formData, issueDate: e.target.value })
+              }
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Data de Vencimento
+            </label>
+            <input
+              type="date"
+              value={formData.dueDate}
+              onChange={(e) =>
+                setFormData({ ...formData, dueDate: e.target.value })
+              }
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
             />
           </div>
 
@@ -196,8 +187,8 @@ export function CreateServiceOrderModal({
                 setFormData({ ...formData, notes: e.target.value })
               }
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-              placeholder="Observações adicionais"
-              rows={2}
+              placeholder="Observações"
+              rows={3}
             />
           </div>
 
@@ -212,16 +203,16 @@ export function CreateServiceOrderModal({
             </Button>
             <Button
               type="submit"
-              disabled={createServiceOrder.isPending}
+              disabled={createInvoice.isPending}
               className="flex-1 bg-orange-500 hover:bg-orange-600 text-white"
             >
-              {createServiceOrder.isPending ? (
+              {createInvoice.isPending ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Criando...
                 </>
               ) : (
-                "Criar Ordem"
+                "Criar Nota Fiscal"
               )}
             </Button>
           </div>

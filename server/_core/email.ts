@@ -1,6 +1,6 @@
 /**
  * Email service for sending emails
- * Mock implementation that stores emails in memory
+ * Currently uses a simple implementation that logs emails
  * In production, integrate with SendGrid, AWS SES, or similar service
  */
 
@@ -11,88 +11,35 @@ export interface EmailOptions {
   text?: string;
 }
 
-export interface StoredEmail extends EmailOptions {
-  id: string;
-  timestamp: Date;
-  status: 'sent' | 'failed';
-}
-
-// In-memory storage for emails (for development/testing)
-const emailStorage: StoredEmail[] = [];
-
 /**
  * Send email
- * Mock implementation that stores emails and logs them
- * In production, integrate with real email service
+ * TODO: Integrate with real email service (SendGrid, AWS SES, etc.)
  */
 export async function sendEmail(options: EmailOptions): Promise<boolean> {
   try {
-    const emailId = `email_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const storedEmail: StoredEmail = {
-      ...options,
-      id: emailId,
-      timestamp: new Date(),
-      status: 'sent',
-    };
-
-    // Store email in memory
-    emailStorage.push(storedEmail);
-
     // Log email for development
-    console.log(`\n[Email] ✅ Email enviado com sucesso!`);
-    console.log(`[Email] ID: ${emailId}`);
-    console.log(`[Email] Para: ${options.to}`);
-    console.log(`[Email] Assunto: ${options.subject}`);
-    console.log(`[Email] Timestamp: ${storedEmail.timestamp.toISOString()}`);
-    console.log(`[Email] Status: ${storedEmail.status}\n`);
+    console.log("[Email] Sending email to:", options.to);
+    console.log("[Email] Subject:", options.subject);
+    console.log("[Email] HTML:", options.html);
 
-    // TODO: Implement real email sending with SendGrid
-    // if (process.env.SENDGRID_API_KEY) {
-    //   const sgMail = require('@sendgrid/mail');
-    //   sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-    //   await sgMail.send({
-    //     to: options.to,
-    //     from: process.env.SENDER_EMAIL || 'noreply@nexogestao.com',
-    //     subject: options.subject,
-    //     html: options.html,
-    //     text: options.text,
-    //   });
-    // }
+    // TODO: Implement real email sending
+    // Example with SendGrid:
+    // const sgMail = require('@sendgrid/mail');
+    // sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+    // await sgMail.send({
+    //   to: options.to,
+    //   from: process.env.SENDER_EMAIL || 'noreply@nexogestao.com',
+    //   subject: options.subject,
+    //   html: options.html,
+    //   text: options.text,
+    // });
 
+    // For now, return success (in production, this should actually send)
     return true;
   } catch (error) {
-    console.error("[Email] ❌ Falha ao enviar email:", error);
+    console.error("[Email] Failed to send email:", error);
     return false;
   }
-}
-
-/**
- * Get all stored emails (for development/testing)
- */
-export function getStoredEmails(): StoredEmail[] {
-  return emailStorage;
-}
-
-/**
- * Get email by ID (for development/testing)
- */
-export function getEmailById(id: string): StoredEmail | undefined {
-  return emailStorage.find(email => email.id === id);
-}
-
-/**
- * Get emails for a specific recipient (for development/testing)
- */
-export function getEmailsByRecipient(to: string): StoredEmail[] {
-  return emailStorage.filter(email => email.to === to);
-}
-
-/**
- * Clear all stored emails (for development/testing)
- */
-export function clearStoredEmails(): void {
-  emailStorage.length = 0;
-  console.log('[Email] Todos os emails armazenados foram limpos');
 }
 
 /**

@@ -23,7 +23,7 @@ export function GlobalSearch() {
   const customersQuery = trpc.data.customers.list.useQuery({ page: 1, limit: 1000 }, { enabled: false });
   const appointmentsQuery = trpc.data.appointments.list.useQuery({ page: 1, limit: 1000 }, { enabled: false });
   const serviceOrdersQuery = trpc.data.serviceOrders.list.useQuery({ page: 1, limit: 1000 }, { enabled: false });
-  const chargesQuery = trpc.finance.charges.list.useQuery(undefined, { enabled: false });
+  const chargesQuery = trpc.finance.charges.list.useQuery({ page: 1, limit: 1000 }, { enabled: false });
 
   useEffect(() => {
     if (query.length < 2) {
@@ -100,7 +100,8 @@ export function GlobalSearch() {
 
       // Search in charges
       if (charges.data) {
-        charges.data.forEach((charge: any) => {
+        const chargesList = (charges.data as any).data || charges.data || [];
+        chargesList.forEach((charge: any) => {
           if (charge.description?.toLowerCase().includes(searchTerm)) {
             foundResults.push({
               id: charge.id,

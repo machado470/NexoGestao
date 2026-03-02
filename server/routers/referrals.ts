@@ -70,7 +70,7 @@ export const referralsRouter = router({
     }),
 
   // ===== Get Referral Stats =====
-  getStats: protectedProcedure
+  stats: protectedProcedure
     .input(
       z.object({
         page: z.number().int().positive().default(1),

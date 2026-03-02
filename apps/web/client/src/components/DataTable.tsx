@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from "react";
-import { ChevronUp, ChevronDown, Search, Trash2, Edit2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import { ChevronUp, ChevronDown, Search, Trash2, Edit2, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export interface Column<T> {
@@ -8,6 +8,7 @@ export interface Column<T> {
   width?: string;
   sortable?: boolean;
   render?: (value: any, row: T) => React.ReactNode;
+  hidden?: boolean; // Ocultar em mobile
 }
 
 export interface DataTableProps<T> {
@@ -36,6 +37,7 @@ export function DataTable<T extends { id?: number | string }>({
     direction: "asc" | "desc";
   } | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [expandedRow, setExpandedRow] = useState<number | string | null | undefined>(null);
 
   // Filtrar dados baseado na busca
   const filteredData = useMemo(() => {
@@ -77,6 +79,15 @@ export function DataTable<T extends { id?: number | string }>({
     });
   };
 
+  // Colunas visíveis (não ocultas)
+  const visibleColumns = useMemo(
+    () => columns.filter((col) => !col.hidden),
+    [columns]
+  );
+
+  // Coluna primária (primeira coluna visível)
+  const primaryColumn = visibleColumns[0];
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -101,12 +112,12 @@ export function DataTable<T extends { id?: number | string }>({
         </div>
       )}
 
-      {/* Table */}
-      <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+      {/* Desktop Table */}
+      <div className="hidden md:block overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
         <table className="w-full">
           <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
             <tr>
-              {columns.map((column) => (
+              {visibleColumns.map((column) => (
                 <th
                   key={String(column.key)}
                   className={`px-4 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white ${
@@ -143,7 +154,7 @@ export function DataTable<T extends { id?: number | string }>({
             {sortedData.length === 0 ? (
               <tr>
                 <td
-                  colSpan={columns.length + (onEdit || onDelete ? 1 : 0)}
+                  colSpan={visibleColumns.length + (onEdit || onDelete ? 1 : 0)}
                   className="px-4 py-8 text-center text-gray-600 dark:text-gray-400"
                 >
                   {emptyMessage}
@@ -155,7 +166,7 @@ export function DataTable<T extends { id?: number | string }>({
                   key={row.id || rowIndex}
                   className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
                 >
-                  {columns.map((column) => (
+                  {visibleColumns.map((column) => (
                     <td
                       key={String(column.key)}
                       className={`px-4 py-3 text-sm text-gray-900 dark:text-gray-100 ${
@@ -198,12 +209,84 @@ export function DataTable<T extends { id?: number | string }>({
         </table>
       </div>
 
-      {/* Footer Info */}
-      {sortedData.length > 0 && (
-        <div className="text-sm text-gray-600 dark:text-gray-400">
-          Mostrando {sortedData.length} de {data.length} registros
-        </div>
-      )}
+      {/* Mobile Card View */}
+      <div className="md:hidden space-y-4">
+        {sortedData.length === 0 ? (
+          <div className="text-center py-8 text-gray-600 dark:text-gray-400">
+            {emptyMessage}
+          </div>
+        ) : (
+          sortedData.map((row, rowIndex) => (
+            <div
+              key={row.id || rowIndex}
+              className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden"
+            >
+              {/* Card Header - Primary Column */}
+              <button
+                onClick={() =>
+                  setExpandedRow(expandedRow === row.id ? null : (row.id || null))
+                }
+                className="w-full px-4 py-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+              >
+                <div className="flex-1 text-left min-w-0">
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                    {primaryColumn?.render
+                      ? primaryColumn.render(row[primaryColumn.key], row)
+                      : String(row[primaryColumn.key] || "-")}
+                  </p>
+                </div>
+                <ChevronRight
+                  className={`w-5 h-5 text-gray-400 transition-transform flex-shrink-0 ml-2 ${
+                    expandedRow === row.id ? "rotate-90" : ""
+                  }`}
+                />
+              </button>
+
+              {/* Card Content - Expanded */}
+              {expandedRow === row.id && (
+                <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-4 bg-gray-50 dark:bg-gray-700/50 space-y-3">
+                  {visibleColumns.slice(1).map((column) => (
+                    <div key={String(column.key)} className="flex justify-between items-start gap-2">
+                      <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                        {column.label}
+                      </span>
+                      <span className="text-sm text-gray-900 dark:text-white text-right">
+                        {column.render
+                          ? column.render(row[column.key], row)
+                          : String(row[column.key] || "-")}
+                      </span>
+                    </div>
+                  ))}
+
+                  {/* Actions */}
+                  {(onEdit || onDelete) && (
+                    <div className="flex gap-2 pt-3 border-t border-gray-200 dark:border-gray-600">
+                      {onEdit && (
+                        <button
+                          onClick={() => onEdit(row)}
+                          className="flex-1 px-3 py-2 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded text-sm font-medium hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors flex items-center justify-center gap-2"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                          Editar
+                        </button>
+                      )}
+                      {onDelete && (
+                        <button
+                          onClick={() => onDelete(row)}
+                          className="flex-1 px-3 py-2 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded text-sm font-medium hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors flex items-center justify-center gap-2"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Deletar
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 }

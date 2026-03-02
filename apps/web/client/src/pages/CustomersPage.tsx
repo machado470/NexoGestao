@@ -37,8 +37,8 @@ export default function CustomersPage() {
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(10);
-  const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, pages: 1 });
+  const [limit, setLimit] = useState(20);
+  const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, pages: 1 });
 
   // Queries
   const listCustomers = trpc.data.customers.list.useQuery({ page, limit });
@@ -46,8 +46,10 @@ export default function CustomersPage() {
   useEffect(() => {
     if (listCustomers.data) {
       const response = listCustomers.data as unknown as PaginatedResponse;
-      setCustomers(response.data);
-      setPagination(response.pagination);
+      if (response && response.data && response.pagination) {
+        setCustomers(response.data);
+        setPagination(response.pagination);
+      }
     }
   }, [listCustomers.data]);
 

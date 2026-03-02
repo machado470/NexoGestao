@@ -34,8 +34,8 @@ export default function AppointmentsPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [customers, setCustomers] = useState<Array<{ id: number; name: string }>>([]);
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(10);
-  const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, pages: 1 });
+  const [limit, setLimit] = useState(20);
+  const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, pages: 1 });
 
   // Queries
   const listAppointments = trpc.data.appointments.list.useQuery({ page, limit });
@@ -44,15 +44,19 @@ export default function AppointmentsPage() {
   useEffect(() => {
     if (listAppointments.data) {
       const response = listAppointments.data as unknown as PaginatedResponse;
-      setAppointments(response.data);
-      setPagination(response.pagination);
+      if (response && response.data && response.pagination) {
+        setAppointments(response.data);
+        setPagination(response.pagination);
+      }
     }
   }, [listAppointments.data]);
 
   useEffect(() => {
     if (listCustomers.data) {
       const response = listCustomers.data as any;
-      setCustomers(response.data || []);
+      if (response && response.data && Array.isArray(response.data)) {
+        setCustomers(response.data);
+      }
     }
   }, [listCustomers.data]);
 

@@ -15,9 +15,9 @@ export function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
-  const chargesQuery = trpc.finance.charges.list.useQuery(undefined, { enabled: false });
+  const chargesQuery = trpc.finance.charges.list.useQuery({ page: 1, limit: 1000 }, { enabled: false });
   const appointmentsQuery = trpc.data.appointments.list.useQuery({ page: 1, limit: 1000 }, { enabled: false });
-  const governanceQuery = trpc.governance.governance.list.useQuery(undefined, { enabled: false });
+  const governanceQuery = trpc.governance.governance.list.useQuery({ page: 1, limit: 1000 }, { enabled: false });
 
   useEffect(() => {
     const loadNotifications = async () => {
@@ -71,7 +71,8 @@ export function NotificationBell() {
 
     // Check for high-risk governance records
     if (governanceQuery.data) {
-      const criticalRisks = (governanceQuery.data || []).filter(
+      const governanceData = (governanceQuery.data as any)?.data || [];
+      const criticalRisks = governanceData.filter(
         (record: any) => record.riskLevel === "CRITICAL"
       );
       if (criticalRisks.length > 0) {

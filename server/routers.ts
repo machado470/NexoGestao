@@ -17,14 +17,11 @@ import { invoicesRouter } from "./routers/invoices";
 import { expensesRouter } from "./routers/expenses";
 import { referralsRouter } from "./routers/referrals";
 import { passwordResetRouter } from "./routers/password-reset";
-import { plansRouter } from "./routers/plans";
-import { customersPrismaRouter } from "./routers/customers-prisma";
 
 export const appRouter = router({
   system: systemRouter,
   nexo: nexoProxyRouter,
   auth: authRouter,
-  customersPrisma: customersPrismaRouter,
   data: dataRouter,
   finance: financeRouter,
   people: peopleRouter,
@@ -38,7 +35,6 @@ export const appRouter = router({
   expenses: expensesRouter,
   referrals: referralsRouter,
   passwordReset: passwordResetRouter,
-  plans: plansRouter,
   session: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {

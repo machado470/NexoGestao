@@ -26,7 +26,7 @@ export function EditCustomerModal({
   });
 
   // Fetch customer data
-  const { data: customer, isLoading: isFetching } = trpc.data.customers.getById.useQuery(
+  const { data: customer, isLoading: isFetching } = trpc.data.customers.get.useQuery(
     { id: customerId || 0 },
     { enabled: isOpen && customerId !== null }
   );

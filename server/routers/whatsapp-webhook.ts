@@ -89,7 +89,7 @@ export const whatsappWebhookRouter = router({
             updatedAt: new Date(),
           });
 
-          console.log(`[WhatsApp] Mensagem recebida de ${message.from}: ${message.content.text}`);
+          // Log removido para produção
         }
 
         // Processar status de entrega
@@ -112,7 +112,7 @@ export const whatsappWebhookRouter = router({
               .where(eq(whatsappMessages.messageId, status.messageId));
           }
 
-          console.log(`[WhatsApp] Status atualizado: ${status.messageId} -> ${status.status}`);
+          // Log removido para produção
         }
 
         return {
@@ -174,7 +174,7 @@ export const whatsappWebhookRouter = router({
           updatedAt: new Date(),
         });
 
-        console.log(`[WhatsApp] Mensagem enviada para ${input.recipientPhone}`);
+        // Log removido para produção
 
         return {
           success: true,

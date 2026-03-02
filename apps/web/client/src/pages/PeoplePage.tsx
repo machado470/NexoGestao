@@ -81,16 +81,23 @@ export default function PeoplePage() {
   const [stats, setStats] = useState<PeopleStats | null>(null);
   const [roleDistribution, setRoleDistribution] = useState<RoleDistribution[]>([]);
   const [departmentDistribution, setDepartmentDistribution] = useState<DepartmentDistribution[]>([]);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(20);
+  const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, pages: 1 });
 
   // Queries
-  const listPeople = trpc.people.people.list.useQuery(undefined);
+  const listPeople = trpc.people.people.list.useQuery({ page, limit });
   const peopleStats = trpc.people.people.stats.useQuery(undefined);
   const roleData = trpc.people.people.roleDistribution.useQuery(undefined);
   const deptData = trpc.people.people.departmentDistribution.useQuery(undefined);
 
   useEffect(() => {
     if (listPeople.data) {
-      setPeople(listPeople.data as unknown as Person[]);
+      const response = listPeople.data as any;
+      if (response && response.data && response.pagination) {
+        setPeople(response.data);
+        setPagination(response.pagination);
+      }
     }
   }, [listPeople.data]);
 

@@ -1,346 +1,240 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
-import { DataTable } from "@/components/DataTable";
-import { Plus, Loader, AlertTriangle, CheckCircle, AlertCircle, TrendingUp } from "lucide-react";
-import { toast } from "sonner";
-import { BarChart, Bar, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell, LineChart, Line } from "recharts";
-
-interface GovernanceRecord {
-  id: number;
-  customerId: number | null;
-  appointmentId: number | null;
-  serviceOrderId: number | null;
-  chargeId: number | null;
-  riskScore: number;
-  riskLevel: "low" | "medium" | "high" | "critical";
-  complianceStatus: "compliant" | "warning" | "non_compliant";
-  issues: string | null;
-  recommendations: string | null;
-  notes: string | null;
-  lastEvaluated: Date;
-  evaluatedBy: string | null;
-}
-
-interface RiskSummary {
-  total: number;
-  riskDistribution: {
-    critical: number;
-    high: number;
-    medium: number;
-    low: number;
-  };
-  complianceDistribution: {
-    compliant: number;
-    warning: number;
-    nonCompliant: number;
-  };
-  averageRiskScore: number;
-}
-
-interface RiskDistribution {
-  name: string;
-  value: number;
-  fill: string;
-}
-
-const RISK_COLORS: Record<string, string> = {
-  critical: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
-  high: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400",
-  medium: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
-  low: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-};
-
-const COMPLIANCE_COLORS: Record<string, string> = {
-  compliant: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-  warning: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
-  non_compliant: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
-};
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Loader2, AlertCircle, CheckCircle, AlertTriangle } from "lucide-react";
 
 export default function GovernancePage() {
-  const [governance, setGovernance] = useState<GovernanceRecord[]>([]);
-  const [summary, setSummary] = useState<RiskSummary | null>(null);
-  const [riskDistribution, setRiskDistribution] = useState<RiskDistribution[]>([]);
-  const [complianceDistribution, setComplianceDistribution] = useState<RiskDistribution[]>([]);
+  const [page, setPage] = useState(1);
+  const limit = 20;
 
   // Queries
-  const listGovernance = trpc.governance.governance.list.useQuery(undefined);
-  const governanceSummary = trpc.governance.governance.riskSummary.useQuery(undefined);
-  const riskData = trpc.governance.governance.riskDistribution.useQuery(undefined);
-  const complianceData = trpc.governance.governance.complianceDistribution.useQuery(undefined);
+  const governanceList = trpc.governance.governance.list.useQuery({ page, limit });
+  const riskSummary = trpc.governance.governance.riskSummary.useQuery({ page: 1, limit: 100 });
+  const riskDistribution = trpc.governance.governance.riskDistribution.useQuery({ page: 1, limit: 100 });
+  const complianceDistribution = trpc.governance.governance.complianceDistribution.useQuery({ page: 1, limit: 100 });
 
-  useEffect(() => {
-    if (listGovernance.data) {
-      setGovernance(listGovernance.data as unknown as GovernanceRecord[]);
+  const getRiskColor = (level: string) => {
+    switch (level) {
+      case "critical":
+        return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400";
+      case "high":
+        return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400";
+      case "medium":
+        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400";
+      case "low":
+        return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400";
+      default:
+        return "bg-gray-100 text-gray-800";
     }
-  }, [listGovernance.data]);
+  };
 
-  useEffect(() => {
-    if (governanceSummary.data) {
-      setSummary(governanceSummary.data as RiskSummary);
+  const getComplianceColor = (status: string) => {
+    switch (status) {
+      case "compliant":
+        return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400";
+      case "warning":
+        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400";
+      case "non_compliant":
+        return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400";
+      default:
+        return "bg-gray-100 text-gray-800";
     }
-  }, [governanceSummary.data]);
+  };
 
-  useEffect(() => {
-    if (riskData.data) {
-      setRiskDistribution(riskData.data as RiskDistribution[]);
+  const getRiskIcon = (level: string) => {
+    switch (level) {
+      case "critical":
+        return <AlertCircle className="w-4 h-4 text-red-600" />;
+      case "high":
+        return <AlertTriangle className="w-4 h-4 text-orange-600" />;
+      case "medium":
+        return <AlertTriangle className="w-4 h-4 text-yellow-600" />;
+      case "low":
+        return <CheckCircle className="w-4 h-4 text-green-600" />;
+      default:
+        return null;
     }
-  }, [riskData.data]);
+  };
 
-  useEffect(() => {
-    if (complianceData.data) {
-      setComplianceDistribution(complianceData.data as RiskDistribution[]);
-    }
-  }, [complianceData.data]);
-
-  useEffect(() => {
-    if (listGovernance.error) {
-      toast.error("Erro ao carregar governança: " + listGovernance.error.message);
-    }
-  }, [listGovernance.error]);
-
-  const columns = [
-    {
-      key: "riskScore" as const,
-      label: "Score de Risco",
-      sortable: true,
-      render: (value: number) => (
-        <div className="flex items-center gap-2">
-          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 max-w-xs">
-            <div
-              className={`h-2 rounded-full ${
-                value >= 80
-                  ? "bg-red-500"
-                  : value >= 60
-                  ? "bg-orange-500"
-                  : value >= 40
-                  ? "bg-yellow-500"
-                  : "bg-green-500"
-              }`}
-              style={{ width: `${value}%` }}
-            />
-          </div>
-          <span className="font-semibold">{value}</span>
-        </div>
-      ),
-    },
-    {
-      key: "riskLevel" as const,
-      label: "Nível de Risco",
-      render: (value: string) => (
-        <span className={`px-2 py-1 rounded-full text-xs font-medium ${RISK_COLORS[value]}`}>
-          {value === "critical"
-            ? "Crítico"
-            : value === "high"
-            ? "Alto"
-            : value === "medium"
-            ? "Médio"
-            : "Baixo"}
-        </span>
-      ),
-    },
-    {
-      key: "complianceStatus" as const,
-      label: "Status de Conformidade",
-      render: (value: string) => (
-        <span className={`px-2 py-1 rounded-full text-xs font-medium ${COMPLIANCE_COLORS[value]}`}>
-          {value === "compliant"
-            ? "Conforme"
-            : value === "warning"
-            ? "Aviso"
-            : "Não Conforme"}
-        </span>
-      ),
-    },
-    {
-      key: "lastEvaluated" as const,
-      label: "Última Avaliação",
-      render: (value: Date) => new Date(value).toLocaleDateString("pt-BR"),
-    },
-  ];
-
-  if (listGovernance.isLoading && governance.length === 0) {
+  if (governanceList.isLoading || riskSummary.isLoading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <Loader className="w-8 h-8 animate-spin text-orange-500" />
+      <div className="flex items-center justify-center h-screen">
+        <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-            Governança
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
-            Análise de risco e conformidade em tempo real
-          </p>
-        </div>
+    <div className="space-y-6 p-6">
+      <div>
+        <h1 className="text-3xl font-bold">Governança</h1>
+        <p className="text-gray-600 dark:text-gray-400">Análise de riscos e conformidade</p>
       </div>
 
       {/* Summary Cards */}
-      {summary && (
+      {riskSummary.data && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border-l-4 border-blue-500">
-            <div className="flex justify-between items-center">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Score Médio de Risco</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-white mt-2">
-                  {summary.averageRiskScore}
-                </p>
-              </div>
-              <TrendingUp className="w-8 h-8 text-blue-500 opacity-20" />
-            </div>
-          </div>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Total de Avaliações</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{riskSummary.data.total}</div>
+            </CardContent>
+          </Card>
 
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border-l-4 border-red-500">
-            <div className="flex justify-between items-center">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Críticos</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-white mt-2">
-                  {summary.riskDistribution.critical}
-                </p>
-              </div>
-              <AlertTriangle className="w-8 h-8 text-red-500 opacity-20" />
-            </div>
-          </div>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Risco Médio</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{riskSummary.data.averageRiskScore}</div>
+              <p className="text-xs text-gray-500">em 100</p>
+            </CardContent>
+          </Card>
 
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border-l-4 border-orange-500">
-            <div className="flex justify-between items-center">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Altos</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-white mt-2">
-                  {summary.riskDistribution.high}
-                </p>
-              </div>
-              <AlertCircle className="w-8 h-8 text-orange-500 opacity-20" />
-            </div>
-          </div>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Críticos</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-red-600">{riskSummary.data.riskDistribution.critical}</div>
+            </CardContent>
+          </Card>
 
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border-l-4 border-green-500">
-            <div className="flex justify-between items-center">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Conformes</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-white mt-2">
-                  {summary.complianceDistribution.compliant}
-                </p>
-              </div>
-              <CheckCircle className="w-8 h-8 text-green-500 opacity-20" />
-            </div>
-          </div>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Conforme</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">{riskSummary.data.complianceDistribution.compliant}</div>
+            </CardContent>
+          </Card>
         </div>
       )}
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Risk Distribution */}
-        {riskDistribution.length > 0 && (
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              Distribuição de Risco
-            </h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={riskDistribution}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, value }) => `${name}: ${value}`}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
+      {/* Risk Distribution */}
+      {riskDistribution.data && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Distribuição de Riscos</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {riskDistribution.data.map((item: any) => (
+                <div key={item.name} className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="w-4 h-4 rounded"
+                      style={{ backgroundColor: item.fill }}
+                    />
+                    <span className="text-sm">{item.name}</span>
+                  </div>
+                  <span className="font-semibold">{item.value}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Governance List */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Avaliações de Governança</CardTitle>
+          <CardDescription>
+            Página {page} de {governanceList.data?.pagination.pages || 1}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {governanceList.data?.data && governanceList.data.data.length > 0 ? (
+            <div className="space-y-4">
+              {governanceList.data.data.map((governance: any) => (
+                <div
+                  key={governance.id}
+                  className="border rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition"
                 >
-                  {riskDistribution.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.fill} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-
-        {/* Compliance Distribution */}
-        {complianceDistribution.length > 0 && (
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              Distribuição de Conformidade
-            </h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={complianceDistribution}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, value }) => `${name}: ${value}`}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {complianceDistribution.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.fill} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-      </div>
-
-      {/* Table */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-          Registros de Governança
-        </h3>
-        <DataTable
-          columns={columns}
-          data={governance}
-          loading={false}
-          searchable={true}
-          searchFields={["riskLevel", "complianceStatus"]}
-          emptyMessage="Nenhum registro de governança. Comece a avaliar riscos."
-        />
-      </div>
-
-      {/* Risk Alerts */}
-      {governance.filter((g) => g.riskLevel === "critical" || g.riskLevel === "high").length > 0 && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6">
-          <h3 className="text-lg font-semibold text-red-900 dark:text-red-400 mb-4 flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5" />
-            Alertas de Risco
-          </h3>
-          <div className="space-y-3">
-            {governance
-              .filter((g) => g.riskLevel === "critical" || g.riskLevel === "high")
-              .slice(0, 5)
-              .map((record) => (
-                <div key={record.id} className="flex items-start gap-3 pb-3 border-b border-red-200 dark:border-red-800 last:border-0">
-                  <div className="flex-1">
-                    <p className="font-semibold text-gray-900 dark:text-white">
-                      {record.riskLevel === "critical" ? "🔴 CRÍTICO" : "🟠 ALTO"} - Score: {record.riskScore}
-                    </p>
-                    {record.issues && (
-                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                        {JSON.parse(record.issues).join(", ")}
-                      </p>
-                    )}
-                    {record.recommendations && (
-                      <p className="text-sm text-gray-700 dark:text-gray-300 mt-1 font-medium">
-                        Recomendação: {JSON.parse(record.recommendations).join(", ")}
-                      </p>
-                    )}
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        {getRiskIcon(governance.riskLevel)}
+                        <h3 className="font-semibold">
+                          Avaliação #{governance.id}
+                        </h3>
+                      </div>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        <Badge className={getRiskColor(governance.riskLevel)}>
+                          Risco: {governance.riskLevel}
+                        </Badge>
+                        <Badge className={getComplianceColor(governance.complianceStatus)}>
+                          {governance.complianceStatus === "compliant"
+                            ? "Conforme"
+                            : governance.complianceStatus === "warning"
+                            ? "Aviso"
+                            : "Não Conforme"}
+                        </Badge>
+                      </div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                        <p>Pontuação de Risco: {governance.riskScore}/100</p>
+                        {governance.evaluatedBy && (
+                          <p>Avaliado por: {governance.evaluatedBy}</p>
+                        )}
+                      </div>
+                      {governance.issues && governance.issues.length > 0 && (
+                        <div className="mt-2 text-sm">
+                          <p className="font-medium text-red-600">Problemas:</p>
+                          <ul className="list-disc list-inside">
+                            {governance.issues.map((issue: string, idx: number) => (
+                              <li key={idx}>{issue}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {governance.recommendations && governance.recommendations.length > 0 && (
+                        <div className="mt-2 text-sm">
+                          <p className="font-medium text-blue-600">Recomendações:</p>
+                          <ul className="list-disc list-inside">
+                            {governance.recommendations.map((rec: string, idx: number) => (
+                              <li key={idx}>{rec}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
-          </div>
-        </div>
-      )}
+
+              {/* Pagination */}
+              <div className="flex justify-between items-center mt-6">
+                <Button
+                  onClick={() => setPage(Math.max(1, page - 1))}
+                  disabled={page === 1}
+                  variant="outline"
+                >
+                  Anterior
+                </Button>
+                <span className="text-sm text-gray-600">
+                  Página {page} de {governanceList.data.pagination.pages}
+                </span>
+                <Button
+                  onClick={() => setPage(page + 1)}
+                  disabled={page >= governanceList.data.pagination.pages}
+                  variant="outline"
+                >
+                  Próxima
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              Nenhuma avaliação de governança encontrada
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

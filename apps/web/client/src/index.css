@@ -1,8 +1,7 @@
 @import "tailwindcss";
-@import "tw-animate-css";
-
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
 @import url('https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css');
+@import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -146,8 +145,18 @@
   * {
     @apply border-border outline-ring/50;
   }
-  body {
+  html, body {
     @apply bg-background text-foreground;
+    width: 100%;
+  }
+  
+  /* Remover scroll horizontal apenas em mobile */
+  @media (max-width: 768px) {
+    html, body {
+      overflow-x: hidden;
+    }
+  }
+  body {
     font-family: 'Poppins', sans-serif;
   }
   button:not(:disabled),
@@ -271,4 +280,56 @@
 /* Smooth scrolling */
 html {
   scroll-behavior: smooth;
+}
+
+/* Custom Scrollbar - Estilo consistente (Desktop only) */
+@media (min-width: 768px) {
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #f97316;
+    border-radius: 4px;
+    transition: background 0.3s ease;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #ea580c;
+  }
+
+  .dark ::-webkit-scrollbar-thumb {
+    background: #60a5fa;
+  }
+
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background: #3b82f6;
+  }
+}
+
+/* Mobile - Hide scrollbar */
+@media (max-width: 767px) {
+  ::-webkit-scrollbar {
+    display: none;
+  }
+  
+  * {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+/* Firefox Scrollbar */
+* {
+  scrollbar-color: #f97316 transparent;
+  scrollbar-width: thin;
+}
+
+.dark * {
+  scrollbar-color: #60a5fa transparent;
 }
