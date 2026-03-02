@@ -82,7 +82,13 @@ class Logger {
         break;
     }
 
-    // TODO: Send to logging service (Sentry, DataDog, etc)
+    // Enviar para serviço de logging em produção
+    if (level === 'error' && !this.isDevelopment) {
+      // TODO: Configurar SENTRY_DSN no .env
+      // if (process.env.SENTRY_DSN) {
+      //   Sentry.captureException(error || new Error(message));
+      // }
+    }
   }
 
   debug(message: string, data?: Record<string, any>) {

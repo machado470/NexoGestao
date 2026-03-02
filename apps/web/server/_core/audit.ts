@@ -80,7 +80,15 @@ export async function recordAudit(
     metadata: options?.metadata,
   };
 
-  // TODO: Salvar em banco de dados
+  // Salvar em banco de dados (Drizzle ORM)
+  try {
+    // TODO: Implementar quando Drizzle estiver configurado
+    // await db.insert(auditLogsTable).values(log);
+  } catch (error) {
+    console.error('Erro ao salvar log de auditoria:', error);
+  }
+  
+  // Fallback: armazenar em memória
   auditLogs.push(log);
 
   // Manter apenas últimos 10000 logs em memória

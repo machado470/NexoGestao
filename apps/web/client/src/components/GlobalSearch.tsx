@@ -40,8 +40,9 @@ export function GlobalSearch() {
       appointmentsQuery.refetch(),
       serviceOrdersQuery.refetch(),
       chargesQuery.refetch(),
-    ]).then(([customers, appointments, serviceOrders, charges]) => {
-      const foundResults: SearchResult[] = [];
+    ])
+      .then(([customers, appointments, serviceOrders, charges]) => {
+        const foundResults: SearchResult[] = [];
 
       // Search in customers
       if (customers.data) {
@@ -117,7 +118,11 @@ export function GlobalSearch() {
 
       setResults(foundResults.slice(0, 8)); // Limit to 8 results
       setIsSearching(false);
-    });
+      })
+      .catch((error) => {
+        console.error('Erro ao buscar resultados de pesquisa:', error);
+        setIsSearching(false);
+      });
   }, [query]);
 
   useEffect(() => {

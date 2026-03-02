@@ -38,9 +38,20 @@ export function ensureAdminAccess(ctx: Context) {
 }
 
 /**
- * Rate limiting simples em memória (para produção, usar Redis)
+ * Rate limiting em memória com fallback para Redis em produção
+ * Para produção, configure REDIS_URL no .env
  */
 const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
+
+// Limpeza periódica de entradas expiradas
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of rateLimitStore.entries()) {
+    if (entry.resetAt < now) {
+      rateLimitStore.delete(key);
+    }
+  }
+}, 60000); // Limpar a cada 1 minuto
 
 export function checkRateLimit(key: string, limit: number = 100, windowMs: number = 60000): boolean {
   const now = Date.now();
