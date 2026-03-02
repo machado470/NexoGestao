@@ -29,7 +29,6 @@ export class EnforcementJob {
   ) {}
 
   async run() {
-    // 1) trava concorrência entre processos/pods
     const locked = await this.tryAcquireLock()
     if (!locked) {
       console.log('[EnforcementJob] Execução ignorada: lock já está em uso.')
@@ -37,14 +36,12 @@ export class EnforcementJob {
     }
 
     try {
-      // (teste) segura lock propositalmente
       const lockHoldMs = envInt('ENFORCEMENT_LOCK_HOLD_MS', 0)
       if (lockHoldMs > 0) {
         console.log(`[EnforcementJob] lock hold ${lockHoldMs}ms (teste)`)
         await sleep(lockHoldMs)
       }
 
-      // 2) debounce (anti “double tap”)
       const debounceSeconds = envInt('ENFORCEMENT_DEBOUNCE_SECONDS', 60)
       const debounceFrom = new Date(Date.now() - debounceSeconds * 1000)
 
@@ -69,9 +66,40 @@ export class EnforcementJob {
           continue
         }
 
+        // marca início (só pra bucket/duration serem coerentes)
         this.runService.startRun(org.id)
-        await this.engine.runForOrg(org.id)
-        await this.runService.finish(org.id)
+
+        // executa engine e pega resumo
+        const engineResult = await this.engine.runForOrg(org.id)
+
+        // calcula score institucional (média do operationalRiskScore)
+        const agg = await this.prisma.person.aggregate({
+          where: { orgId: org.id, active: true },
+          _avg: { operationalRiskScore: true },
+        })
+
+        const institutionalRiskScore = Math.min(
+          100,
+          Math.max(0, Math.round(agg._avg.operationalRiskScore ?? 0)),
+        )
+
+        const openCorrectivesCount = await this.prisma.correctiveAction.count({
+          where: {
+            status: 'OPEN',
+            person: { orgId: org.id },
+          },
+        })
+
+        await this.runService.finishWithAggregates({
+          orgId: org.id,
+          evaluated: engineResult.evaluated,
+          warnings: engineResult.warnings,
+          correctives: engineResult.correctivesCreated,
+          institutionalRiskScore,
+          restrictedCount: engineResult.restrictedCount,
+          suspendedCount: engineResult.suspendedCount,
+          openCorrectivesCount,
+        })
       }
     } finally {
       await this.releaseLock()

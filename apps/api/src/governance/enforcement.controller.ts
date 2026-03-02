@@ -4,8 +4,10 @@ import {
   Post,
   Req,
   UseGuards,
+  Inject,
 } from '@nestjs/common'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
+import { PrismaService } from '../prisma/prisma.service'
 import { EnforcementEngineService } from './enforcement-engine.service'
 import { GovernanceRunService } from './governance-run.service'
 
@@ -21,6 +23,9 @@ function envBool(name: string, fallback = false): boolean {
 @UseGuards(JwtAuthGuard)
 export class EnforcementController {
   constructor(
+    @Inject(PrismaService)
+    private readonly prisma: PrismaService,
+
     private readonly engine: EnforcementEngineService,
     private readonly runService: GovernanceRunService,
   ) {}
@@ -35,8 +40,36 @@ export class EnforcementController {
     const orgId = req.user.orgId
 
     this.runService.startRun(orgId)
+
     const engineResult = await this.engine.runForOrg(orgId)
-    const runSummary = await this.runService.finish(orgId)
+
+    const agg = await this.prisma.person.aggregate({
+      where: { orgId, active: true },
+      _avg: { operationalRiskScore: true },
+    })
+
+    const institutionalRiskScore = Math.min(
+      100,
+      Math.max(0, Math.round(agg._avg.operationalRiskScore ?? 0)),
+    )
+
+    const openCorrectivesCount = await this.prisma.correctiveAction.count({
+      where: {
+        status: 'OPEN',
+        person: { orgId },
+      },
+    })
+
+    const runSummary = await this.runService.finishWithAggregates({
+      orgId,
+      evaluated: engineResult.evaluated,
+      warnings: engineResult.warnings,
+      correctives: engineResult.correctivesCreated,
+      institutionalRiskScore,
+      restrictedCount: engineResult.restrictedCount,
+      suspendedCount: engineResult.suspendedCount,
+      openCorrectivesCount,
+    })
 
     return {
       ok: true,

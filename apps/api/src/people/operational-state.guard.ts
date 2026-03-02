@@ -22,7 +22,12 @@ export class OperationalStateGuard implements CanActivate {
     const req = context.switchToHttp().getRequest()
     const user = req.user
 
-    // Admin puro ou usuário sem pessoa vinculada
+    // ✅ Admin nunca é bloqueado (operação precisa funcionar)
+    if (user?.role === 'ADMIN') {
+      return true
+    }
+
+    // Usuário sem pessoa vinculada (ex: token técnico / futuro)
     if (!user || !user.personId) {
       return true
     }
@@ -50,7 +55,7 @@ export class OperationalStateGuard implements CanActivate {
       throw new ForbiddenException('Usuário suspenso temporariamente.')
     }
 
-    // 🟡 WARNING: tudo passa
+    // 🟡 WARNING: tudo passa (por enquanto)
     if (status.state === 'WARNING') {
       return true
     }
@@ -81,9 +86,7 @@ export class OperationalStateGuard implements CanActivate {
           },
         })
 
-        throw new ForbiddenException(
-          'Ação bloqueada até regularização das pendências.',
-        )
+        throw new ForbiddenException('Ação bloqueada até regularização das pendências.')
       }
 
       return true

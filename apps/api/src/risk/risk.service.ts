@@ -11,6 +11,18 @@ export class RiskService {
     private readonly timeline: TimelineService,
   ) {}
 
+  /**
+   * ✅ Calculate-only (sem persistência, sem snapshot)
+   * Use em jobs que só precisam do número para derivar estado/snapshot operacional.
+   */
+  async calculatePersonRisk(personId: string) {
+    return this.temporalRisk.calculate(personId)
+  }
+
+  /**
+   * ✅ Recalcula + persiste (riskScore + RiskSnapshot + timeline)
+   * Use quando o risco mudou por evento real (pagamento, no-show, atraso, etc).
+   */
   async recalculatePersonRisk(personId: string, reason?: string) {
     const score = await this.temporalRisk.calculate(personId)
 

@@ -5,49 +5,59 @@ import {
   Param,
   Body,
   UseGuards,
-  Req,
   Query,
 } from '@nestjs/common'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
+import { RolesGuard } from '../auth/guards/roles.guard'
+import { Roles } from '../auth/decorators/roles.decorator'
+import { Org } from '../auth/decorators/org.decorator'
+import { User } from '../auth/decorators/user.decorator'
+
+import { OperationalStateGuard } from '../people/operational-state.guard'
+
 import { FinanceService } from './finance.service'
 import { CreatePaymentDto } from './dto/create-payment.dto'
 import { ChargesQueryDto } from './dto/charges-query.dto'
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, OperationalStateGuard)
 @Controller('finance')
 export class FinanceController {
   constructor(private readonly finance: FinanceService) {}
 
   @Get('overview')
-  async overview(@Req() req: any) {
-    const orgId = req.user.orgId
+  @Roles('ADMIN')
+  async overview(@Org() orgId: string) {
     const data = await this.finance.overview(orgId)
     return { ok: true, data }
   }
 
   @Get('charges')
-  async listCharges(@Req() req: any, @Query() query: ChargesQueryDto) {
-    const orgId = req.user.orgId
+  @Roles('ADMIN')
+  async listCharges(
+    @Org() orgId: string,
+    @Query() query: ChargesQueryDto,
+  ) {
     const data = await this.finance.listCharges(orgId, query)
-    return { ok: true, data } // data agora é { items, meta }
+    return { ok: true, data } // data = { items, meta }
   }
 
   @Get('charges/:id')
-  async getCharge(@Req() req: any, @Param('id') id: string) {
-    const orgId = req.user.orgId
+  @Roles('ADMIN')
+  async getCharge(@Org() orgId: string, @Param('id') id: string) {
     const data = await this.finance.getCharge(orgId, id)
     return { ok: true, data }
   }
 
   @Post('charges/:chargeId/pay')
+  @Roles('ADMIN')
   async payCharge(
-    @Req() req: any,
+    @Org() orgId: string,
+    @User() user: any,
     @Param('chargeId') chargeId: string,
     @Body() body: CreatePaymentDto,
   ) {
-    const orgId = req.user.orgId
-    const actorUserId = req.user.sub
-    const actorPersonId = req.user.personId
+    const actorUserId = user?.userId ?? user?.sub ?? null
+    const actorPersonId = user?.personId ?? null
 
     const data = await this.finance.payCharge({
       orgId,

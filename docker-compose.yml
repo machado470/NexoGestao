@@ -38,6 +38,8 @@ services:
     ports:
       - "3000:3000"
     restart: unless-stopped
+
+    # PROD: usa o entrypoint dentro da imagem (ele já faz migrate/seed/check dist)
     entrypoint: ["/app/apps/api/docker-entrypoint.sh"]
 
 volumes:
