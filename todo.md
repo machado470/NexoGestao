@@ -250,3 +250,111 @@
 - [ ] Identificar gaps no sistema
 - [ ] Priorizar implementações
 - [ ] Planejar roadmap
+
+## 🎨 Fase 29: UX/UI Improvements (10 items)
+- [ ] Implementar onboarding com tour interativo (Shepherd.js)
+- [ ] Adicionar confirmação em ações destrutivas (AlertDialog)
+- [ ] Melhorar feedback visual (toast com ícones, duração, ações)
+- [ ] Criar empty states para todas as páginas
+- [ ] Implementar dark mode com ThemeProvider
+- [ ] Adicionar breadcrumbs em todas as páginas
+- [ ] Criar loading states granulares (skeletons)
+- [ ] Implementar atalhos de teclado (Cmd+K, Cmd+N, etc)
+- [ ] Melhorar responsividade de tabelas em mobile
+- [ ] Adicionar busca e filtros avançados
+
+## 🔄 Fase 30: Fluxos e Sequências (5 items)
+- [ ] Refatorar fluxo de onboarding (tour → org → cliente → agendamento)
+- [ ] Melhorar fluxo de agendamento (disponibilidade → confirmação → SMS)
+- [ ] Implementar fluxo de cobrança automática
+- [ ] Criar fluxo de governança (avaliação → score → relatório)
+- [ ] Implementar fluxo de relatórios (período → métricas → PDF → email)
+
+## 📊 Fase 31: Formatos e Padrões (7 items)
+- [ ] Padronizar respostas de API (ApiResponse<T>)
+- [ ] Padronizar paginação (PaginatedResponse<T>)
+- [ ] Padronizar tratamento de erros (ErrorCode enum)
+- [ ] Padronizar datas (ISO 8601 backend, pt-BR frontend)
+- [ ] Padronizar moeda (centavos backend, reais frontend)
+- [ ] Padronizar enums (CustomerStatus, AppointmentStatus, etc)
+- [ ] Implementar slugs em URLs
+
+## 🗄️ Fase 32: Arquitetura de Dados (6 items)
+- [ ] Adicionar soft delete (deletedAt field)
+- [ ] Implementar versionamento de dados (audit tables)
+- [ ] Adicionar relacionamentos explícitos (Drizzle relations)
+- [ ] Criar índices de performance
+- [ ] Adicionar constraints (unique, not null)
+- [ ] Implementar denormalização estratégica
+
+## ⚡ Fase 33: Performance Optimization (5 items)
+- [ ] Implementar caching em memória com TTL
+- [ ] Adicionar lazy loading de dados
+- [ ] Configurar compressão gzip
+- [ ] Implementar DataLoader para batch queries
+- [ ] Implementar cursor-based pagination
+
+## 🔌 Fase 34: Integrações Críticas (5 items)
+- [ ] Integrar SendGrid para email real
+- [ ] Integrar Twilio para SMS/WhatsApp
+- [ ] Integrar Stripe para pagamentos
+- [ ] Integrar Google Calendar
+- [ ] Integrar Slack para notificações
+
+## ✅ Fase 35: Compliance e Segurança (4 items)
+- [ ] Implementar LGPD (direito ao esquecimento)
+- [ ] Adicionar consentimento de dados
+- [ ] Criar Termos de Serviço
+- [ ] Criar Política de Privacidade
+
+## 🏗️ Fase 36: Refatoração de Arquitetura (10 items)
+- [ ] Refatorar frontend com features/ (customers, appointments, etc)
+- [ ] Refatorar backend com services/repositories
+- [ ] Migrar para TanStack Query
+- [ ] Implementar React Hook Form + Zod
+- [ ] Criar notificação manager centralizado
+- [ ] Criar modal manager centralizado
+- [ ] Implementar RBAC com can() helper
+- [ ] Implementar logger estruturado
+- [ ] Criar rotas com metadados
+- [ ] Implementar error boundary global
+
+## 📈 Módulos Específicos - Customers
+- [ ] Importar clientes em bulk (CSV)
+- [ ] Exportar clientes (CSV, PDF)
+- [ ] Duplicar cliente
+- [ ] Mesclar clientes duplicados
+- [ ] Histórico de alterações
+- [ ] Notas privadas por cliente
+- [ ] Tags/categorias
+- [ ] Scoring de valor (LTV)
+
+## 📅 Módulos Específicos - Appointments
+- [ ] Calendário visual (drag & drop)
+- [ ] Disponibilidade por serviço
+- [ ] Confirmação automática
+- [ ] Lembretes automáticos (SMS, email, WhatsApp)
+- [ ] Cancelamento automático se não confirmado
+- [ ] Rescheduling fácil
+- [ ] Buffer time entre agendamentos
+- [ ] Bloqueios de horário
+
+## 💰 Módulos Específicos - Finance
+- [ ] Cobrança automática (Stripe, PIX, boleto)
+- [ ] Planos de pagamento
+- [ ] Desconto por pagamento antecipado
+- [ ] Juros por atraso
+- [ ] Relatório de fluxo de caixa
+- [ ] Previsão de receita
+- [ ] Conciliação bancária
+- [ ] Nota fiscal eletrônica
+
+## 🎯 Módulos Específicos - Governance
+- [ ] Dashboard de riscos
+- [ ] Alertas de risco em tempo real
+- [ ] Plano de ação automático
+- [ ] Acompanhamento de ações corretivas
+- [ ] Relatório de conformidade
+- [ ] Histórico de avaliações
+- [ ] Benchmarking com outras orgs
+- [ ] Previsão de risco

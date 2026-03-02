@@ -29,6 +29,7 @@ import ReferralsPage from "./pages/ReferralsPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import { Loader } from "lucide-react";
+import { NotificationCenter } from "./components/NotificationCenter";
 
 // Componente para proteger rotas autenticadas
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
@@ -146,6 +147,7 @@ function App() {
           <TooltipProvider>
             <Toaster />
             <Router />
+            <NotificationCenter />
           </TooltipProvider>
         </ThemeProvider>
       </AuthProvider>
