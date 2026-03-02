@@ -18,14 +18,83 @@
 - [x] Fixed imports in Dashboard (useAuth hook)
 - [x] Verified database schema synchronization
 
-## In Progress
-- [ ] Implement data tables to display created records
-- [ ] Create Finance/Charges management section
-- [ ] Create People/Collaborators management section
-- [ ] Create Governance section with risk scoring
+## Fase 1: Tabelas de Dados (CONCLUÍDA)
+- [x] Criar componente DataTable reutilizável
+- [x] Criar página CustomersPage com tabela de clientes
+- [x] Criar página AppointmentsPage com tabela de agendamentos
+- [x] Criar página ServiceOrdersPage com tabela de ordens de serviço
+- [x] Integrar rotas no App.tsx
+- [x] Adicionar navegação no Dashboard para as novas páginas
+- [x] Implementar busca e filtro nas tabelas
+- [x] Implementar ordenação nas colunas
+- [x] Adicionar estatísticas nas páginas de dados
 
-## Pending Features
-- [ ] Data visualization with Recharts (revenue trends, appointment distribution, risk scores)
+## Fase 2: CRUD Completo (CONCLUIDA)
+- [x] Criar endpoints UPDATE no backend
+- [x] Criar endpoints DELETE no backend
+- [x] Criar endpoints getById no backend
+- [x] Implementar EditCustomerModal no frontend
+- [x] Implementar ConfirmDeleteModal reutilizavel
+- [x] Integrar edicao e exclusao na CustomersPage
+- [x] Atualizar DataTable com acoes de edicao/exclusao
+- [x] Testes passando (5/5)
+
+## Fase 3: Finanças (CONCLUIDA)
+- [x] Criar schema de charges/cobranças
+- [x] Criar endpoints CRUD de charges (create, list, getById, update, delete)
+- [x] Criar endpoints de estatísticas (stats, revenueByMonth)
+- [x] Implementar página de Finanças com tabela de charges
+- [x] Adicionar gráficos de receita com Recharts (BarChart, PieChart)
+- [x] Criar CreateChargeModal
+- [x] Criar EditChargeModal
+- [x] Integrar rota /finances no App.tsx
+- [x] Adicionar link de finanças no menu do Dashboard
+
+## Fase 4: Pessoas (CONCLUIDA)
+- [x] Criar schema de pessoas/colaboradores com roles (admin, manager, collaborator, viewer)
+- [x] Criar endpoints CRUD de pessoas (create, list, getById, update, delete)
+- [x] Criar endpoints de estatísticas (stats, roleDistribution, departmentDistribution)
+- [x] Implementar página de Pessoas com tabela e gráficos
+- [x] Criar CreatePersonModal
+- [x] Criar EditPersonModal
+- [x] Integrar rota /people no App.tsx
+- [x] Adicionar link de Pessoas no menu do Dashboard
+- [x] Implementar controle de acesso por função (role-based access control)
+- [x] Todos os 5 testes continuam passando
+
+## Fase 5: Governança (CONCLUIDA)
+- [x] Criar schema de governança com riskScore, riskLevel, complianceStatus
+- [x] Criar endpoints CRUD de governança (create, list, getById, update, delete)
+- [x] Implementar autoScore com análise inteligente de risco
+- [x] Criar endpoints de estatísticas (riskSummary, riskDistribution, complianceDistribution)
+- [x] Implementar página de Governança com:
+  - 4 cards de resumo (Score Médio, Críticos, Altos, Conformes)
+  - Gráfico de pizza de distribuição de risco
+  - Gráfico de pizza de distribuição de conformidade
+  - Tabela completa com busca e filtro
+  - Seção de alertas de risco
+- [x] Integrar rota /governance no App.tsx
+- [x] Adicionar link de Governança no menu do Dashboard
+- [x] Todos os 5 testes continuam passando
+
+## Fase 6: Dashboard Executivo (CONCLUIDA)
+- [x] Criar router de dashboard com endpoints de KPIs
+- [x] Implementar endpoints de tendências de receita (12 meses)
+- [x] Implementar endpoints de distribuição de agendamentos
+- [x] Implementar endpoints de distribuição de cobranças
+- [x] Implementar endpoints de métricas de performance
+- [x] Criar página ExecutiveDashboard com:
+  - 5 cards de KPIs principais (Clientes, Agendamentos, Ordens, Receita, Risco)
+  - Gráfico de linha (LineChart) de tendência de receita
+  - Gráfico de pizza (PieChart) de distribuição de agendamentos
+  - Gráfico de pizza (PieChart) de distribuição de cobranças
+  - Seção de métricas de performance com barras de progresso
+  - Seção de análise de receita com breakdown
+- [x] Integrar rota /executive-dashboard no App.tsx
+- [x] Atualizar menu do Dashboard para apontar para dashboard executivo
+- [x] Todos os 5 testes continuam passando
+
+## Próximas Melhorias
 - [ ] Email verification and password recovery
 - [ ] Real-time notifications system
 - [ ] WhatsApp integration for automated messages

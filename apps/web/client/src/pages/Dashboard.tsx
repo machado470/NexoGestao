@@ -59,15 +59,15 @@ export default function Dashboard() {
   };
 
   const menuItems = [
-    { id: "overview", label: "Visão Geral", icon: BarChart3 },
-    { id: "customers", label: "Clientes", icon: Users },
-    { id: "appointments", label: "Agendamentos", icon: Calendar },
-    { id: "service-orders", label: "Ordens de Serviço", icon: Briefcase },
-    { id: "finance", label: "Financeiro", icon: DollarSign },
-    { id: "people", label: "Pessoas", icon: Users },
-    { id: "governance", label: "Governança", icon: Shield },
-    { id: "settings", label: "Configurações", icon: Settings },
-  ];
+    { id: "overview", label: "Visão Geral", icon: BarChart3, route: "/executive-dashboard" },
+    { id: "customers", label: "Clientes", icon: Users, route: "/customers" },
+    { id: "appointments", label: "Agendamentos", icon: Calendar, route: "/appointments" },
+    { id: "service-orders", label: "Ordens de Serviço", icon: Briefcase, route: "/service-orders" },
+    { id: "finance", label: "Financeiro", icon: DollarSign, route: "/finances" },
+    { id: "people", label: "Pessoas", icon: Users, route: "/people" },
+    { id: "governance", label: "Governança", icon: Shield, route: "/governance" },
+    { id: "settings", label: "Configurações", icon: Settings, route: "#" },
+  ] as const;
 
   return (
     <div className={`flex h-screen bg-gray-50 dark:bg-gray-900 ${theme === "dark" ? "dark" : ""}`}>
@@ -88,22 +88,31 @@ export default function Dashboard() {
         {/* Menu */}
         <nav className="flex-1 py-4">
           <ul className="space-y-2 px-2">
-            {menuItems.map((item) => (
-              <li key={item.id}>
-                <button
-                  onClick={() => setActiveTab(item.id)}
-                  className={`w-full flex items-center p-3 rounded-lg transition-colors ${
-                    activeTab === item.id
-                      ? "bg-orange-500 text-white"
-                      : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                  }`}
-                  title={item.label}
-                >
-                  <item.icon className="w-5 h-5" />
-                  {sidebarOpen && <span className="ml-3">{item.label}</span>}
-                </button>
-              </li>
-            ))}
+            {menuItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <li key={item.id}>
+                  <button
+                    onClick={() => {
+                      if (item.route && item.route !== "#") {
+                        navigate(item.route);
+                      } else {
+                        setActiveTab(item.id);
+                      }
+                    }}
+                    className={`w-full flex items-center p-3 rounded-lg transition-colors ${
+                      activeTab === item.id
+                        ? "bg-orange-500 text-white"
+                        : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    }`}
+                    title={item.label}
+                  >
+                    <Icon className="w-5 h-5" />
+                    {sidebarOpen && <span className="ml-3">{item.label}</span>}
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         </nav>
 

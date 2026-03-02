@@ -106,3 +106,62 @@ export const serviceOrders = mysqlTable("serviceOrders", {
 
 export type ServiceOrder = typeof serviceOrders.$inferSelect;
 export type InsertServiceOrder = typeof serviceOrders.$inferInsert;
+
+// Charges table (Cobranças)
+export const charges = mysqlTable("charges", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull(),
+  customerId: int("customerId").notNull(),
+  description: varchar("description", { length: 255 }).notNull(),
+  amount: int("amount").notNull(), // Valor em centavos (ex: 10000 = R$ 100,00)
+  dueDate: timestamp("dueDate").notNull(),
+  paidDate: timestamp("paidDate"),
+  status: mysqlEnum("status", ["PENDING", "PAID", "OVERDUE", "CANCELED"]).default("PENDING").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Charge = typeof charges.$inferSelect;
+export type InsertCharge = typeof charges.$inferInsert;
+
+// People table (Pessoas/Colaboradores)
+export const people = mysqlTable("people", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  email: varchar("email", { length: 320 }).notNull(),
+  phone: varchar("phone", { length: 20 }),
+  role: mysqlEnum("role", ["admin", "manager", "collaborator", "viewer"]).default("collaborator").notNull(),
+  department: varchar("department", { length: 255 }),
+  status: mysqlEnum("status", ["active", "inactive", "suspended"]).default("active").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Person = typeof people.$inferSelect;
+export type InsertPerson = typeof people.$inferInsert;
+
+// Governance table (Governança)
+export const governance = mysqlTable("governance", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull(),
+  customerId: int("customerId"),
+  appointmentId: int("appointmentId"),
+  serviceOrderId: int("serviceOrderId"),
+  chargeId: int("chargeId"),
+  riskScore: int("riskScore").default(0).notNull(),
+  riskLevel: mysqlEnum("riskLevel", ["low", "medium", "high", "critical"]).default("low").notNull(),
+  complianceStatus: mysqlEnum("complianceStatus", ["compliant", "warning", "non_compliant"]).default("compliant").notNull(),
+  issues: text("issues"),
+  recommendations: text("recommendations"),
+  lastEvaluated: timestamp("lastEvaluated").defaultNow().notNull(),
+  evaluatedBy: varchar("evaluatedBy", { length: 255 }),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Governance = typeof governance.$inferSelect;
+export type InsertGovernance = typeof governance.$inferInsert;

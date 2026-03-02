@@ -5,12 +5,20 @@ import { publicProcedure, router } from "./_core/trpc";
 import { nexoProxyRouter } from "./routers/nexo-proxy";
 import { authRouter } from "./routers/auth";
 import { dataRouter } from "./routers/data";
+import { financeRouter } from "./routers/finance";
+import { peopleRouter } from "./routers/people";
+import { governanceRouter } from "./routers/governance";
+import { dashboardRouter } from "./routers/dashboard";
 
 export const appRouter = router({
   system: systemRouter,
   nexo: nexoProxyRouter,
   auth: authRouter,
   data: dataRouter,
+  finance: financeRouter,
+  people: peopleRouter,
+  governance: governanceRouter,
+  dashboard: dashboardRouter,
   session: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
