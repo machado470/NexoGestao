@@ -1,5 +1,5 @@
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import { InsertUser, users, plans, subscriptions, transactions, planUsage } from "../drizzle/schema";
 import { ENV } from './_core/env';
 import { eq, and, gt, lt, sql } from "drizzle-orm";
 
@@ -748,4 +748,135 @@ export async function deleteInvoice(id: number) {
   if (!db) throw new Error("Database not available");
   
   return await db.delete(invoices).where(eq(invoices.id, id));
+}
+
+
+// ===== Plans =====
+export async function createPlan(data: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.insert(plans).values(data);
+  const result = await db.select().from(plans).where(eq(plans.name, data.name)).limit(1);
+  return result[0];
+}
+
+export async function getAllPlans() {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  return await db.select().from(plans).orderBy(plans.id);
+}
+
+export async function getPlanById(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const result = await db.select().from(plans).where(eq(plans.id, id)).limit(1);
+  return result[0];
+}
+
+export async function getPlanByName(name: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const result = await db.select().from(plans).where(eq(plans.name, name)).limit(1);
+  return result[0];
+}
+
+// ===== Subscriptions =====
+export async function createSubscription(data: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.insert(subscriptions).values(data);
+  const result = await db.select().from(subscriptions).where(eq(subscriptions.organizationId, data.organizationId)).orderBy((t) => t.id).limit(1);
+  return result[0];
+}
+
+export async function getSubscriptionByOrg(organizationId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const result = await db.select().from(subscriptions).where(eq(subscriptions.organizationId, organizationId)).limit(1);
+  return result[0];
+}
+
+export async function updateSubscription(id: number, data: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.update(subscriptions).set(data).where(eq(subscriptions.id, id));
+  const result = await db.select().from(subscriptions).where(eq(subscriptions.id, id)).limit(1);
+  return result[0];
+}
+
+export async function cancelSubscription(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.update(subscriptions).set({ status: "canceled" }).where(eq(subscriptions.id, id));
+  return { success: true };
+}
+
+// ===== Transactions =====
+export async function createTransaction(data: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.insert(transactions).values(data);
+  const result = await db.select().from(transactions).where(eq(transactions.organizationId, data.organizationId)).orderBy((t) => t.id).limit(1);
+  return result[0];
+}
+
+export async function getTransactionsByOrg(organizationId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  return await db.select().from(transactions).where(eq(transactions.organizationId, organizationId)).orderBy((t) => t.createdAt);
+}
+
+export async function updateTransaction(id: number, data: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.update(transactions).set(data).where(eq(transactions.id, id));
+  const result = await db.select().from(transactions).where(eq(transactions.id, id)).limit(1);
+  return result[0];
+}
+
+// ===== Plan Usage =====
+export async function getPlanUsage(organizationId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const result = await db.select().from(planUsage).where(eq(planUsage.organizationId, organizationId)).limit(1);
+  return result[0];
+}
+
+export async function updatePlanUsage(organizationId: number, data: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const existing = await getPlanUsage(organizationId);
+  if (existing) {
+    await db.update(planUsage).set(data).where(eq(planUsage.organizationId, organizationId));
+  } else {
+    await db.insert(planUsage).values({ organizationId, ...data });
+  }
+  return await getPlanUsage(organizationId);
+}
+
+// ===== Helper: Get Active Plan for Organization =====
+export async function getActivePlan(organizationId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const subscription = await getSubscriptionByOrg(organizationId);
+  if (!subscription || subscription.status !== "active") {
+    // Return free plan as default
+    return await getPlanByName("free");
+  }
+  
+  return await getPlanById(subscription.planId);
 }

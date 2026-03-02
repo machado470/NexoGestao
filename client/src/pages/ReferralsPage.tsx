@@ -11,7 +11,7 @@ export default function ReferralsPage() {
 
   // Queries
   const generateCodeMutation = trpc.referrals.generateCode.useMutation();
-  const statsQuery = trpc.referrals.stats.useQuery({ page: 1, limit: 100 });
+  const statsQuery = trpc.referrals.getStats.useQuery({ page: 1, limit: 100 });
   const referralsQuery = trpc.referrals.list.useQuery({ page: 1, limit: 10 });
   const creditsQuery = trpc.referrals.getBalance.useQuery();
 

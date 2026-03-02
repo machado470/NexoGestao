@@ -17,6 +17,7 @@ import { invoicesRouter } from "./routers/invoices";
 import { expensesRouter } from "./routers/expenses";
 import { referralsRouter } from "./routers/referrals";
 import { passwordResetRouter } from "./routers/password-reset";
+import { plansRouter } from "./routers/plans";
 
 export const appRouter = router({
   system: systemRouter,
@@ -35,6 +36,7 @@ export const appRouter = router({
   expenses: expensesRouter,
   referrals: referralsRouter,
   passwordReset: passwordResetRouter,
+  plans: plansRouter,
   session: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {

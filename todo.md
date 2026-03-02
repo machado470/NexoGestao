@@ -221,3 +221,32 @@
 - [ ] Implementar geração de relatório de clientes em PDF
 - [ ] Implementar geração de relatório de cobranças em PDF
 - [ ] Implementar geração de relatório de receita em PDF
+
+
+## Fase 26: Teste Completo de Funcionalidades (EM PROGRESSO)
+- [ ] Testar fluxo de login/cadastro
+- [ ] Testar criação de clientes
+- [ ] Testar agendamentos
+- [ ] Testar ordens de serviço
+- [ ] Testar cobranças/financeiro
+- [ ] Testar referências
+- [ ] Testar recuperação de senha
+- [ ] Testar governança
+- [ ] Testar notificações
+- [ ] Testar responsividade mobile
+
+## Fase 27: Sistema de Pagamento (PLANEJADO)
+- [ ] Analisar sistema de pagamento da Manus
+- [ ] Criar tabela de planos (free, pro, enterprise)
+- [ ] Criar tabela de assinaturas
+- [ ] Criar tabela de transações
+- [ ] Implementar checkout de planos
+- [ ] Integrar Stripe (ou payment gateway)
+- [ ] Implementar validação de plano ativo
+- [ ] Implementar cancelamento de assinatura
+- [ ] Implementar renovação automática
+
+## Fase 28: Funcionalidades Faltantes (PLANEJADO)
+- [ ] Identificar gaps no sistema
+- [ ] Priorizar implementações
+- [ ] Planejar roadmap

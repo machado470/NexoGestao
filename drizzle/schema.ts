@@ -1,4 +1,5 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, decimal, boolean } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, decimal, boolean, json } from "drizzle-orm/mysql-core";
+import { sql } from "drizzle-orm";
 
 /**
  * Core user table backing auth flow.
@@ -360,3 +361,72 @@ export const passwordResetTokens = mysqlTable("passwordResetTokens", {
 });
 export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
 export type InsertPasswordResetToken = typeof passwordResetTokens.$inferInsert;
+
+
+// ===== Plans (Planos) =====
+export const plans = mysqlTable("plans", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 100 }).notNull(), // "free", "pro", "enterprise"
+  displayName: varchar("displayName", { length: 100 }).notNull(), // "Plano Gratuito", "Plano Pro", etc
+  description: text("description"),
+  priceMonthly: decimal("priceMonthly", { precision: 10, scale: 2 }).default("0"), // 0 for free
+  priceYearly: decimal("priceYearly", { precision: 10, scale: 2 }),
+  maxClients: int("maxClients").notNull(), // -1 for unlimited
+  maxAppointments: int("maxAppointments").notNull(),
+  maxServiceOrders: int("maxServiceOrders").notNull(),
+  maxCharges: int("maxCharges").notNull(),
+  maxPeople: int("maxPeople").notNull(),
+  features: json("features").$type<string[]>().default(sql`json_array()`), // ["whatsapp", "invoices", "reports"]
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type Plan = typeof plans.$inferSelect;
+export type InsertPlan = typeof plans.$inferInsert;
+
+// ===== Subscriptions (Assinaturas) =====
+export const subscriptions = mysqlTable("subscriptions", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull(),
+  planId: int("planId").notNull(),
+  status: mysqlEnum("status", ["active", "canceled", "expired", "pending"]).default("active").notNull(),
+  startDate: timestamp("startDate").notNull(),
+  endDate: timestamp("endDate"),
+  autoRenew: boolean("autoRenew").default(true),
+  billingCycle: mysqlEnum("billingCycle", ["monthly", "yearly"]).default("monthly"),
+  stripeSubscriptionId: varchar("stripeSubscriptionId", { length: 255 }), // Stripe subscription ID
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type Subscription = typeof subscriptions.$inferSelect;
+export type InsertSubscription = typeof subscriptions.$inferInsert;
+
+// ===== Transactions (Transações) =====
+export const transactions = mysqlTable("transactions", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull(),
+  subscriptionId: int("subscriptionId"),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  currency: varchar("currency", { length: 3 }).default("BRL"),
+  status: mysqlEnum("status", ["pending", "completed", "failed", "refunded"]).default("pending"),
+  paymentMethod: varchar("paymentMethod", { length: 50 }), // "stripe", "mercado_pago", "credit"
+  stripePaymentIntentId: varchar("stripePaymentIntentId", { length: 255 }),
+  description: text("description"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type Transaction = typeof transactions.$inferSelect;
+export type InsertTransaction = typeof transactions.$inferInsert;
+
+// ===== Plan Usage Tracking =====
+export const planUsage = mysqlTable("planUsage", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull(),
+  clientsCount: int("clientsCount").default(0),
+  appointmentsCount: int("appointmentsCount").default(0),
+  serviceOrdersCount: int("serviceOrdersCount").default(0),
+  chargesCount: int("chargesCount").default(0),
+  peopleCount: int("peopleCount").default(0),
+  lastUpdated: timestamp("lastUpdated").defaultNow().onUpdateNow(),
+});
+export type PlanUsage = typeof planUsage.$inferSelect;
+export type InsertPlanUsage = typeof planUsage.$inferInsert;

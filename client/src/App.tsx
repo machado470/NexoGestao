@@ -27,6 +27,7 @@ import ExpensesPage from "./pages/ExpensesPage";
 import ReferralsPage from "./pages/ReferralsPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
+import PlansPage from "./pages/PlansPage";
 import { Loader } from "lucide-react";
 
 // Componente para proteger rotas autenticadas
@@ -129,6 +130,7 @@ function Router() {
       )} />
       <Route path="/forgot-password" component={() => <PublicRoute component={ForgotPasswordPage} />} />
       <Route path="/reset-password" component={() => <PublicRoute component={ResetPasswordPage} />} />
+      <Route path="/plans" component={() => <ProtectedRoute component={PlansPage} />} />
       <Route path="/about" component={() => <About />} />
       <Route path="/404" component={NotFound} />
       {/* Final fallback route */}
