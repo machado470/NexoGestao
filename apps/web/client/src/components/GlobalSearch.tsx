@@ -20,9 +20,9 @@ export function GlobalSearch() {
   const [isSearching, setIsSearching] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
 
-  const customersQuery = trpc.data.customers.list.useQuery(undefined, { enabled: false });
-  const appointmentsQuery = trpc.data.appointments.list.useQuery(undefined, { enabled: false });
-  const serviceOrdersQuery = trpc.data.serviceOrders.list.useQuery(undefined, { enabled: false });
+  const customersQuery = trpc.data.customers.list.useQuery({ page: 1, limit: 1000 }, { enabled: false });
+  const appointmentsQuery = trpc.data.appointments.list.useQuery({ page: 1, limit: 1000 }, { enabled: false });
+  const serviceOrdersQuery = trpc.data.serviceOrders.list.useQuery({ page: 1, limit: 1000 }, { enabled: false });
   const chargesQuery = trpc.finance.charges.list.useQuery(undefined, { enabled: false });
 
   useEffect(() => {
@@ -45,7 +45,8 @@ export function GlobalSearch() {
 
       // Search in customers
       if (customers.data) {
-        customers.data.forEach((customer: any) => {
+        const customersList = (customers.data as any).data || customers.data || [];
+        customersList.forEach((customer: any) => {
           if (
             customer.name.toLowerCase().includes(searchTerm) ||
             customer.email?.toLowerCase().includes(searchTerm) ||
@@ -65,7 +66,8 @@ export function GlobalSearch() {
 
       // Search in appointments
       if (appointments.data) {
-        appointments.data.forEach((apt: any) => {
+        const appointmentsList = (appointments.data as any).data || appointments.data || [];
+        appointmentsList.forEach((apt: any) => {
           if (apt.title?.toLowerCase().includes(searchTerm)) {
             foundResults.push({
               id: apt.id,
@@ -81,7 +83,8 @@ export function GlobalSearch() {
 
       // Search in service orders
       if (serviceOrders.data) {
-        serviceOrders.data.forEach((order: any) => {
+        const serviceOrdersList = (serviceOrders.data as any).data || serviceOrders.data || [];
+        serviceOrdersList.forEach((order: any) => {
           if (order.title.toLowerCase().includes(searchTerm)) {
             foundResults.push({
               id: order.id,

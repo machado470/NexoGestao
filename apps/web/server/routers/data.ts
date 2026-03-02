@@ -42,10 +42,29 @@ export const dataRouter = router({
         });
       }),
 
-    list: protectedProcedure.query(async ({ ctx }) => {
-      const orgId = ctx.user?.id || 1;
-      return await getCustomersByOrg(orgId);
-    }),
+    list: protectedProcedure
+      .input(
+        z.object({
+          page: z.number().int().positive().default(1),
+          limit: z.number().int().positive().default(10),
+        })
+      )
+      .query(async ({ ctx, input }) => {
+        const orgId = ctx.user?.id || 1;
+        const allCustomers = await getCustomersByOrg(orgId);
+        const total = allCustomers.length;
+        const offset = (input.page - 1) * input.limit;
+        const data = allCustomers.slice(offset, offset + input.limit);
+        return {
+          data,
+          pagination: {
+            page: input.page,
+            limit: input.limit,
+            total,
+            pages: Math.ceil(total / input.limit),
+          },
+        };
+      }),
 
     getById: protectedProcedure
       .input(z.object({ id: z.number() }))
@@ -104,10 +123,29 @@ export const dataRouter = router({
         });
       }),
 
-    list: protectedProcedure.query(async ({ ctx }) => {
-      const orgId = ctx.user?.id || 1;
-      return await getAppointmentsByOrg(orgId);
-    }),
+    list: protectedProcedure
+      .input(
+        z.object({
+          page: z.number().int().positive().default(1),
+          limit: z.number().int().positive().default(10),
+        })
+      )
+      .query(async ({ ctx, input }) => {
+        const orgId = ctx.user?.id || 1;
+        const allAppointments = await getAppointmentsByOrg(orgId);
+        const total = allAppointments.length;
+        const offset = (input.page - 1) * input.limit;
+        const data = allAppointments.slice(offset, offset + input.limit);
+        return {
+          data,
+          pagination: {
+            page: input.page,
+            limit: input.limit,
+            total,
+            pages: Math.ceil(total / input.limit),
+          },
+        };
+      }),
 
     getById: protectedProcedure
       .input(z.object({ id: z.number() }))
@@ -167,10 +205,29 @@ export const dataRouter = router({
         });
       }),
 
-    list: protectedProcedure.query(async ({ ctx }) => {
-      const orgId = ctx.user?.id || 1;
-      return await getServiceOrdersByOrg(orgId);
-    }),
+    list: protectedProcedure
+      .input(
+        z.object({
+          page: z.number().int().positive().default(1),
+          limit: z.number().int().positive().default(10),
+        })
+      )
+      .query(async ({ ctx, input }) => {
+        const orgId = ctx.user?.id || 1;
+        const allServiceOrders = await getServiceOrdersByOrg(orgId);
+        const total = allServiceOrders.length;
+        const offset = (input.page - 1) * input.limit;
+        const data = allServiceOrders.slice(offset, offset + input.limit);
+        return {
+          data,
+          pagination: {
+            page: input.page,
+            limit: input.limit,
+            total,
+            pages: Math.ceil(total / input.limit),
+          },
+        };
+      }),
 
     getById: protectedProcedure
       .input(z.object({ id: z.number() }))

@@ -326,3 +326,60 @@ export async function deleteGovernance(id: number) {
   
   return await db.delete(governance).where(eq(governance.id, id));
 }
+
+
+// ===== Contact History =====
+import { InsertContactHistory, contactHistory } from "../drizzle/schema";
+import { desc } from "drizzle-orm";
+
+export async function createContactHistory(data: InsertContactHistory) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  return await db.insert(contactHistory).values(data);
+}
+
+export async function getContactHistoryByCustomer(customerId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  return await db.select().from(contactHistory).where(eq(contactHistory.customerId, customerId)).orderBy(desc(contactHistory.createdAt));
+}
+
+export async function deleteContactHistory(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  return await db.delete(contactHistory).where(eq(contactHistory.id, id));
+}
+
+// ===== WhatsApp Messages =====
+import { InsertWhatsappMessage, whatsappMessages } from "../drizzle/schema";
+
+export async function createWhatsappMessage(data: InsertWhatsappMessage) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  return await db.insert(whatsappMessages).values(data);
+}
+
+export async function getWhatsappMessagesByCustomer(customerId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  return await db.select().from(whatsappMessages).where(eq(whatsappMessages.customerId, customerId)).orderBy(desc(whatsappMessages.createdAt));
+}
+
+export async function updateWhatsappMessageStatus(id: number, status: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  return await db.update(whatsappMessages).set({ status: status as any }).where(eq(whatsappMessages.id, id));
+}
+
+export async function deleteWhatsappMessage(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  return await db.delete(whatsappMessages).where(eq(whatsappMessages.id, id));
+}

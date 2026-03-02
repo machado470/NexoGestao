@@ -9,6 +9,7 @@ import { financeRouter } from "./routers/finance";
 import { peopleRouter } from "./routers/people";
 import { governanceRouter } from "./routers/governance";
 import { dashboardRouter } from "./routers/dashboard";
+import { contactRouter } from "./routers/contact";
 
 export const appRouter = router({
   system: systemRouter,
@@ -19,6 +20,7 @@ export const appRouter = router({
   people: peopleRouter,
   governance: governanceRouter,
   dashboard: dashboardRouter,
+  contact: contactRouter,
   session: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {

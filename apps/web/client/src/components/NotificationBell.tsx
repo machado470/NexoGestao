@@ -16,7 +16,7 @@ export function NotificationBell() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
   const chargesQuery = trpc.finance.charges.list.useQuery(undefined, { enabled: false });
-  const appointmentsQuery = trpc.data.appointments.list.useQuery(undefined, { enabled: false });
+  const appointmentsQuery = trpc.data.appointments.list.useQuery({ page: 1, limit: 1000 }, { enabled: false });
   const governanceQuery = trpc.governance.governance.list.useQuery(undefined, { enabled: false });
 
   useEffect(() => {
@@ -32,7 +32,8 @@ export function NotificationBell() {
 
       // Check for overdue charges
       if (chargesQuery.data) {
-      const overdueCharges = (chargesQuery.data || []).filter(
+      const chargesList = (chargesQuery.data as any).data || chargesQuery.data || [];
+      const overdueCharges = chargesList.filter(
         (charge: any) => charge.status === "OVERDUE"
       );
       if (overdueCharges.length > 0) {
@@ -51,7 +52,8 @@ export function NotificationBell() {
     if (appointmentsQuery.data) {
       const now = new Date();
       const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-      const upcomingAppointments = (appointmentsQuery.data || []).filter((apt: any) => {
+      const appointmentsList = (appointmentsQuery.data as any).data || appointmentsQuery.data || [];
+      const upcomingAppointments = appointmentsList.filter((apt: any) => {
         const aptDate = new Date(apt.startsAt);
         return aptDate > now && aptDate <= tomorrow;
       });

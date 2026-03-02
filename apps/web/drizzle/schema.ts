@@ -60,6 +60,14 @@ export const customers = mysqlTable("customers", {
   name: varchar("name", { length: 255 }).notNull(),
   email: varchar("email", { length: 320 }),
   phone: varchar("phone", { length: 20 }).notNull(),
+  street: varchar("street", { length: 255 }),
+  number: varchar("number", { length: 20 }),
+  complement: varchar("complement", { length: 255 }),
+  zipCode: varchar("zipCode", { length: 10 }),
+  city: varchar("city", { length: 100 }),
+  state: varchar("state", { length: 2 }),
+  country: varchar("country", { length: 100 }).default("Brasil"),
+  whatsappNumber: varchar("whatsappNumber", { length: 20 }),
   notes: text("notes"),
   active: int("active").default(1).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -165,3 +173,39 @@ export const governance = mysqlTable("governance", {
 
 export type Governance = typeof governance.$inferSelect;
 export type InsertGovernance = typeof governance.$inferInsert;
+
+// Contact History table (Rastreamento de Contatos)
+export const contactHistory = mysqlTable("contactHistory", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull(),
+  customerId: int("customerId").notNull(),
+  contactType: mysqlEnum("contactType", ["phone", "email", "whatsapp", "in_person", "other"]).notNull(),
+  subject: varchar("subject", { length: 255 }).notNull(),
+  description: text("description"),
+  notes: text("notes"),
+  contactedBy: varchar("contactedBy", { length: 255 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type ContactHistory = typeof contactHistory.$inferSelect;
+export type InsertContactHistory = typeof contactHistory.$inferInsert;
+
+// WhatsApp Messages table (Mensagens WhatsApp)
+export const whatsappMessages = mysqlTable("whatsappMessages", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull(),
+  customerId: int("customerId").notNull(),
+  messageId: varchar("messageId", { length: 255 }).unique(),
+  direction: mysqlEnum("direction", ["inbound", "outbound"]).notNull(),
+  content: text("content").notNull(),
+  status: mysqlEnum("status", ["pending", "sent", "delivered", "read", "failed"]).default("pending").notNull(),
+  senderNumber: varchar("senderNumber", { length: 20 }),
+  receiverNumber: varchar("receiverNumber", { length: 20 }),
+  mediaUrl: text("mediaUrl"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type WhatsappMessage = typeof whatsappMessages.$inferSelect;
+export type InsertWhatsappMessage = typeof whatsappMessages.$inferInsert;

@@ -43,6 +43,13 @@
       "when": 1772417683249,
       "tag": "0005_rapid_absorbing_man",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1772420581947,
+      "tag": "0006_massive_the_executioner",
+      "breakpoints": true
     }
   ]
 }

@@ -42,12 +42,13 @@ export function CreateChargeModal({
   });
 
   // Fetch customers
-  const { data: customers = [] } = trpc.data.customers.list.useQuery(undefined);
+  const { data: customersResponse } = trpc.data.customers.list.useQuery({ page: 1, limit: 1000 });
+  const customers = (customersResponse as any)?.data || [];
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.customerId) {
+    if (!formData.customerId || formData.customerId === "0") {
       toast.error("Cliente é obrigatório");
       return;
     }
