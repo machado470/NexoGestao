@@ -1,5 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, decimal, boolean, json } from "drizzle-orm/mysql-core";
-import { sql } from "drizzle-orm";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, decimal, boolean } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -18,6 +17,7 @@ export const users = mysqlTable("users", {
   name: text("name"),
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
+  profilePicture: varchar("profilePicture", { length: 512 }),
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -362,71 +362,113 @@ export const passwordResetTokens = mysqlTable("passwordResetTokens", {
 export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
 export type InsertPasswordResetToken = typeof passwordResetTokens.$inferInsert;
 
-
-// ===== Plans (Planos) =====
-export const plans = mysqlTable("plans", {
+// Promotions table (Promoções para anúncios fallback)
+export const promotions = mysqlTable("promotions", {
   id: int("id").autoincrement().primaryKey(),
-  name: varchar("name", { length: 100 }).notNull(), // "free", "pro", "enterprise"
-  displayName: varchar("displayName", { length: 100 }).notNull(), // "Plano Gratuito", "Plano Pro", etc
-  description: text("description"),
-  priceMonthly: decimal("priceMonthly", { precision: 10, scale: 2 }).default("0"), // 0 for free
-  priceYearly: decimal("priceYearly", { precision: 10, scale: 2 }),
-  maxClients: int("maxClients").notNull(), // -1 for unlimited
-  maxAppointments: int("maxAppointments").notNull(),
-  maxServiceOrders: int("maxServiceOrders").notNull(),
-  maxCharges: int("maxCharges").notNull(),
-  maxPeople: int("maxPeople").notNull(),
-  features: json("features").$type<string[]>().default(sql`json_array()`), // ["whatsapp", "invoices", "reports"]
+  organizationId: int("organizationId").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description").notNull(),
+  image: text("image"), // URL da imagem
+  icon: varchar("icon", { length: 50 }), // Nome do ícone (ex: "Zap", "Star", "Gift")
+  color: varchar("color", { length: 20 }).default("orange-500"), // Cor do gradiente (ex: "orange-500", "blue-500")
+  ctaText: varchar("ctaText", { length: 100 }).notNull(), // Texto do botão CTA
+  ctaLink: text("ctaLink"), // Link do CTA
+  priority: int("priority").default(0).notNull(), // Prioridade de exibição
+  active: boolean("active").default(true).notNull(),
+  startDate: timestamp("startDate"), // Data de início da promoção
+  endDate: timestamp("endDate"), // Data de término da promoção
+  createdBy: int("createdBy"), // Usuário que criou
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
-export type Plan = typeof plans.$inferSelect;
-export type InsertPlan = typeof plans.$inferInsert;
 
-// ===== Subscriptions (Assinaturas) =====
+export type Promotion = typeof promotions.$inferSelect;
+export type InsertPromotion = typeof promotions.$inferInsert;
+
+
+// WhatsApp Integration Configuration
+export const whatsappConfigs = mysqlTable("whatsappConfigs", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull(),
+  apiKey: text("apiKey").notNull(), // Encrypted API Key
+  phoneNumberId: varchar("phoneNumberId", { length: 100 }).notNull(),
+  businessAccountId: varchar("businessAccountId", { length: 100 }).notNull(),
+  webhookUrl: text("webhookUrl"),
+  verifyToken: varchar("verifyToken", { length: 255 }),
+  isConnected: boolean("isConnected").default(false),
+  lastSyncedAt: timestamp("lastSyncedAt"),
+  createdBy: int("createdBy"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type WhatsappConfig = typeof whatsappConfigs.$inferSelect;
+export type InsertWhatsappConfig = typeof whatsappConfigs.$inferInsert;
+
+// WhatsApp Automations
+export const whatsappAutomations = mysqlTable("whatsappAutomations", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull(),
+  whatsappConfigId: int("whatsappConfigId").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  triggerType: mysqlEnum("triggerType", [
+    "appointment_confirmed",
+    "appointment_reminder",
+    "appointment_canceled",
+    "service_order_created",
+    "service_order_completed",
+    "invoice_created",
+    "invoice_paid",
+    "custom_message"
+  ]).notNull(),
+  triggerCondition: text("triggerCondition"), // JSON with conditions
+  responseMessage: text("responseMessage").notNull(), // Template message with {{variables}}
+  isActive: boolean("isActive").default(true),
+  executionCount: int("executionCount").default(0),
+  lastExecutedAt: timestamp("lastExecutedAt"),
+  createdBy: int("createdBy"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type WhatsappAutomation = typeof whatsappAutomations.$inferSelect;
+export type InsertWhatsappAutomation = typeof whatsappAutomations.$inferInsert;
+
+// WhatsApp Automation Logs
+export const whatsappAutomationLogs = mysqlTable("whatsappAutomationLogs", {
+  id: int("id").autoincrement().primaryKey(),
+  automationId: int("automationId").notNull(),
+  organizationId: int("organizationId").notNull(),
+  triggeredBy: varchar("triggeredBy", { length: 100 }), // Entity ID that triggered (appointment, order, etc)
+  recipientPhoneNumber: varchar("recipientPhoneNumber", { length: 20 }).notNull(),
+  messageSent: text("messageSent"),
+  status: mysqlEnum("status", ["success", "failed", "pending"]).default("pending").notNull(),
+  errorMessage: text("errorMessage"),
+  whatsappMessageId: varchar("whatsappMessageId", { length: 100 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type WhatsappAutomationLog = typeof whatsappAutomationLogs.$inferSelect;
+export type InsertWhatsappAutomationLog = typeof whatsappAutomationLogs.$inferInsert;
+
+
+// Subscriptions table (para Stripe)
 export const subscriptions = mysqlTable("subscriptions", {
   id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
   organizationId: int("organizationId").notNull(),
-  planId: int("planId").notNull(),
-  status: mysqlEnum("status", ["active", "canceled", "expired", "pending"]).default("active").notNull(),
-  startDate: timestamp("startDate").notNull(),
-  endDate: timestamp("endDate"),
-  autoRenew: boolean("autoRenew").default(true),
-  billingCycle: mysqlEnum("billingCycle", ["monthly", "yearly"]).default("monthly"),
-  stripeSubscriptionId: varchar("stripeSubscriptionId", { length: 255 }), // Stripe subscription ID
+  stripeCustomerId: varchar("stripeCustomerId", { length: 255 }).notNull(),
+  stripeSubscriptionId: varchar("stripeSubscriptionId", { length: 255 }).notNull().unique(),
+  planId: varchar("planId", { length: 50 }).notNull(), // starter, professional, enterprise
+  status: varchar("status", { length: 50 }).notNull(), // active, past_due, canceled, etc
+  currentPeriodStart: timestamp("currentPeriodStart").notNull(),
+  currentPeriodEnd: timestamp("currentPeriodEnd").notNull(),
+  cancelAtPeriodEnd: int("cancelAtPeriodEnd").default(0).notNull(),
+  canceledAt: timestamp("canceledAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
+
 export type Subscription = typeof subscriptions.$inferSelect;
 export type InsertSubscription = typeof subscriptions.$inferInsert;
-
-// ===== Transactions (Transações) =====
-export const transactions = mysqlTable("transactions", {
-  id: int("id").autoincrement().primaryKey(),
-  organizationId: int("organizationId").notNull(),
-  subscriptionId: int("subscriptionId"),
-  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
-  currency: varchar("currency", { length: 3 }).default("BRL"),
-  status: mysqlEnum("status", ["pending", "completed", "failed", "refunded"]).default("pending"),
-  paymentMethod: varchar("paymentMethod", { length: 50 }), // "stripe", "mercado_pago", "credit"
-  stripePaymentIntentId: varchar("stripePaymentIntentId", { length: 255 }),
-  description: text("description"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
-export type Transaction = typeof transactions.$inferSelect;
-export type InsertTransaction = typeof transactions.$inferInsert;
-
-// ===== Plan Usage Tracking =====
-export const planUsage = mysqlTable("planUsage", {
-  id: int("id").autoincrement().primaryKey(),
-  organizationId: int("organizationId").notNull(),
-  clientsCount: int("clientsCount").default(0),
-  appointmentsCount: int("appointmentsCount").default(0),
-  serviceOrdersCount: int("serviceOrdersCount").default(0),
-  chargesCount: int("chargesCount").default(0),
-  peopleCount: int("peopleCount").default(0),
-  lastUpdated: timestamp("lastUpdated").defaultNow().onUpdateNow(),
-});
-export type PlanUsage = typeof planUsage.$inferSelect;
-export type InsertPlanUsage = typeof planUsage.$inferInsert;

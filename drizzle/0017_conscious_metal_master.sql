@@ -1,0 +1,1 @@
+ALTER TABLE `users` ADD `profilePicture` varchar(512);
