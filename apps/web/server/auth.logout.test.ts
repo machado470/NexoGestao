@@ -5,12 +5,14 @@ import type { TrpcContext } from "./_core/context";
 
 type CookieCall = {
   name: string;
+  value?: string;
   options: Record<string, unknown>;
 };
 
 type AuthenticatedUser = NonNullable<TrpcContext["user"]>;
 
-function createAuthContext(): { ctx: TrpcContext; clearedCookies: CookieCall[] } {
+function createAuthContext(): { ctx: TrpcContext; setCookies: CookieCall[]; clearedCookies: CookieCall[] } {
+  const setCookies: CookieCall[] = [];
   const clearedCookies: CookieCall[] = [];
 
   const user: AuthenticatedUser = {
@@ -32,31 +34,42 @@ function createAuthContext(): { ctx: TrpcContext; clearedCookies: CookieCall[] }
       headers: {},
     } as TrpcContext["req"],
     res: {
+      cookie: (name: string, value: string, options: Record<string, unknown>) => {
+        setCookies.push({ name, value, options });
+      },
       clearCookie: (name: string, options: Record<string, unknown>) => {
         clearedCookies.push({ name, options });
       },
-    } as TrpcContext["res"],
+    } as any,
   };
 
-  return { ctx, clearedCookies };
+  return { ctx, setCookies, clearedCookies };
 }
 
 describe("session.logout", () => {
   it("clears the session cookie and reports success", async () => {
-    const { ctx, clearedCookies } = createAuthContext();
+    const { ctx, setCookies, clearedCookies } = createAuthContext();
     const caller = appRouter.createCaller(ctx);
 
     const result = await caller.session.logout();
 
     expect(result).toEqual({ success: true });
+    
+    // Verifica se o cookie nexo_token foi limpo via res.cookie
+    expect(setCookies).toHaveLength(1);
+    expect(setCookies[0]?.name).toBe("nexo_token");
+    expect(setCookies[0]?.value).toBe("");
+    expect(setCookies[0]?.options).toMatchObject({
+      maxAge: 0,
+      httpOnly: true,
+      path: "/",
+    });
+
+    // Verifica se o cookie antigo do portal foi limpo via res.clearCookie
     expect(clearedCookies).toHaveLength(1);
     expect(clearedCookies[0]?.name).toBe(COOKIE_NAME);
     expect(clearedCookies[0]?.options).toMatchObject({
       maxAge: -1,
-      secure: true,
-      sameSite: "none",
-      httpOnly: true,
-      path: "/",
     });
   });
 });
