@@ -16,11 +16,15 @@ import { User } from '../auth/decorators/user.decorator'
 import { CustomersService } from './customers.service'
 import { CreateCustomerDto } from './dto/create-customer.dto'
 import { UpdateCustomerDto } from './dto/update-customer.dto'
+import { QuotasService } from '../quotas/quotas.service'
 
 @Controller('customers')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class CustomersController {
-  constructor(private readonly customers: CustomersService) {}
+  constructor(
+    private readonly customers: CustomersService,
+    private readonly quotas: QuotasService,
+  ) {}
 
   @Get()
   @Roles('ADMIN')
@@ -36,11 +40,14 @@ export class CustomersController {
 
   @Post()
   @Roles('ADMIN')
-  create(
+  async create(
     @Org() orgId: string,
     @User() user: any,
     @Body() body: CreateCustomerDto,
   ) {
+    // Validar quota antes de criar
+    await this.quotas.validateQuota(orgId, 'CREATE_CUSTOMER')
+
     const actorUserId = user?.userId ?? null
     const actorPersonId = user?.personId ?? null
 

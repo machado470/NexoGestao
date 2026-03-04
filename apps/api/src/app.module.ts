@@ -52,9 +52,13 @@ import { ServiceOrdersModule } from './service-orders/service-orders.module'
 
 // 💰 NEXOGESTÃO OFICIAL — Financeiro
 import { FinanceModule } from './finance/finance.module'
+import { PaymentsModule } from './payments/payments.module'
 
 // 📲 WhatsApp — Meu Acessor (infra + dispatcher)
 import { WhatsAppModule } from './whatsapp/whatsapp.module'
+
+// 📧 E-mail
+import { EmailModule } from './email/email.module'
 
 @Module({
   imports: [
@@ -98,14 +102,18 @@ import { WhatsAppModule } from './whatsapp/whatsapp.module'
 
     ExceptionsModule,
 
-    // 🧩 Operacional
+    // 💰 Operacional
     CustomersModule,
     AppointmentsModule,
     ServiceOrdersModule,
     FinanceModule,
+    PaymentsModule,
 
     // 📲 WhatsApp (jobs + serviço)
     WhatsAppModule,
+
+    // 📧 E-mail
+    EmailModule,
 
     // 🔥 Governança
     GovernanceModule,
