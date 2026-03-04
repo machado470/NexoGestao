@@ -11,12 +11,16 @@ RUN apt-get update && apt-get install -y \
 
 RUN npm install -g pnpm @nestjs/cli
 
+# manifests do workspace
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/api/package.json apps/api/package.json
-COPY apps/web/package.json apps/web/package.json
+
+# ✅ patches precisam existir antes do install (pnpm patchedDependencies)
+COPY patches ./patches
 
 RUN pnpm install --frozen-lockfile
 
+# resto do repo
 COPY . .
 
 # 🔒 GARANTIA ABSOLUTA que o entrypoint é executável e sem CRLF

@@ -2,9 +2,6 @@ import { Injectable, Inject } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { TimelineService } from '../timeline/timeline.service'
 import { EnforcementPolicyService } from './enforcement-policy.service'
-<<<<<<< Updated upstream
-import type { OperationalStateValue } from '@prisma/client'
-=======
 import { OperationalStateValue } from '@prisma/client'
 
 export type EnforcementRunResult = {
@@ -14,7 +11,6 @@ export type EnforcementRunResult = {
   restrictedCount: number
   suspendedCount: number
 }
->>>>>>> Stashed changes
 
 @Injectable()
 export class EnforcementEngineService {
@@ -53,43 +49,26 @@ export class EnforcementEngineService {
     })
 
     for (const p of people) {
-<<<<<<< Updated upstream
-      this.run.personEvaluated()
-
-      // ✅ risco canônico que alimenta policy
-      const riskScore = await this.risk.recalculatePersonRisk(
-        p.id,
-        'ENFORCEMENT_ENGINE',
-      )
-
-      // ✅ exceções (por enquanto false)
-=======
       result.evaluated++
 
-      const riskScore = p.operationalRiskScore
->>>>>>> Stashed changes
+      // Fonte canônica (por enquanto): score já persistido no Person
+      const riskScore = Number(p.operationalRiskScore ?? 0)
+
+      // exceções (por enquanto via tabela PersonException)
       const hasActiveException = await this.hasActiveException(p.id)
 
       const decision = this.policy.decide({
         riskScore,
-        status: p.operationalState,
+        status: (p.operationalState ?? OperationalStateValue.NORMAL) as any,
         hasActiveException,
         orgId: p.orgId,
         personId: p.id,
         source: 'ENFORCEMENT_ENGINE',
       })
 
-<<<<<<< Updated upstream
-      // ✅ contabiliza pro GovernanceRun
-      this.run.recordOperationalStatus({
-        state: decision.nextState as any,
-        riskScore,
-      })
-=======
       // contagem do “estado alvo” (pós decisão)
       if (decision.nextState === 'RESTRICTED') result.restrictedCount++
       if (decision.nextState === 'SUSPENDED') result.suspendedCount++
->>>>>>> Stashed changes
 
       if (decision.action === 'NONE') continue
 
@@ -110,7 +89,7 @@ export class EnforcementEngineService {
           },
         })
 
-        // ✅ aplica estado se mudou
+        // aplica estado/score se mudou
         await this.setPersonStateIfChanged({
           personId: p.id,
           nextState: decision.nextState as any,
@@ -125,20 +104,17 @@ export class EnforcementEngineService {
           personId: p.id,
           reason: decision.reason,
           riskScore,
-          nextState: decision.nextState,
+          nextState: decision.nextState as any,
         })
 
-<<<<<<< Updated upstream
+        if (created) result.correctivesCreated++
+
+        // aplica estado/score se mudou (independente de já ter corrective aberto)
         await this.setPersonStateIfChanged({
           personId: p.id,
           nextState: decision.nextState as any,
           riskScore,
         })
-=======
-        if (!created) continue
-
-        result.correctivesCreated++
->>>>>>> Stashed changes
 
         await this.timeline.log({
           orgId: p.orgId,
@@ -151,6 +127,7 @@ export class EnforcementEngineService {
             riskScore,
             nextState: decision.nextState,
             hasActiveException,
+            correctiveCreated: created,
           },
         })
       }
@@ -171,8 +148,8 @@ export class EnforcementEngineService {
 
     if (!current) return
 
-    const stateChanged = current.operationalState !== params.nextState
-    const scoreChanged = (current.operationalRiskScore ?? 0) !== params.riskScore
+    const stateChanged = (current.operationalState ?? null) !== params.nextState
+    const scoreChanged = Number(current.operationalRiskScore ?? 0) !== params.riskScore
 
     if (!stateChanged && !scoreChanged) return
 
