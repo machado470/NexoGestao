@@ -81,7 +81,7 @@ export class MeController {
     const org = await this.prisma.organization.findUnique({
       where: { id: orgId },
       select: { requiresOnboarding: true },
-    })
+    }) as any
 
     const rawAssignments = personId
       ? await this.assignments.listOpenByPerson(

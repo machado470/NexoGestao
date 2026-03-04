@@ -2,6 +2,7 @@ import { Injectable, Logger, BadRequestException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { PrismaService } from '../prisma/prisma.service'
 import { EmailService } from '../email/email.service'
+import { ChargeStatus } from '@prisma/client'
 
 interface CreateCheckoutSessionDto {
   customerId: string
@@ -110,8 +111,7 @@ export class PaymentsService {
           },
           data: {
             status: 'PAID',
-            paidDate: new Date(),
-            paidAmount: charge.amount_received,
+            paidAt: new Date(),
           },
         })
 
@@ -140,8 +140,8 @@ export class PaymentsService {
         data: {
           orgId,
           customerId,
-          amount,
-          description,
+          amountCents: amount,
+          notes: description,
           status: 'PENDING',
           dueDate,
           createdAt: new Date(),
@@ -168,7 +168,7 @@ export class PaymentsService {
       const charges = await this.prisma.charge.findMany({
         where: {
           orgId,
-          ...(status && { status }),
+          ...(status && { status: status as ChargeStatus }),
         },
         include: {
           customer: true,
@@ -188,14 +188,13 @@ export class PaymentsService {
   /**
    * Marca uma cobrança como paga manualmente
    */
-  async markChargeAsPaid(chargeId: string, paymentMethod: string = 'manual'): Promise<void> {
+  async markChargeAsPaid(chargeId: string, _paymentMethod: string = 'manual'): Promise<void> {
     try {
       await this.prisma.charge.update({
         where: { id: chargeId },
         data: {
           status: 'PAID',
-          paidDate: new Date(),
-          paymentMethod,
+          paidAt: new Date(),
         },
       })
 
@@ -236,7 +235,7 @@ export class PaymentsService {
           await this.email.sendOverdueChargeNotification(
             charge.customer.email,
             charge.customer.name,
-            charge.amount,
+            charge.amountCents,
             charge.dueDate,
           )
         }

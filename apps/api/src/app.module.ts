@@ -1,6 +1,9 @@
 import { Module } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
 import { ScheduleModule } from '@nestjs/schedule'
+import { ClsModule, ClsService } from 'nestjs-cls'
+import { APP_INTERCEPTOR } from '@nestjs/core'
+import { OrgContextInterceptor } from './auth/org-context.interceptor'
 
 import { PrismaModule } from './prisma/prisma.module'
 import { HealthModule } from './health/health.module'
@@ -77,6 +80,11 @@ import { DashboardModule } from './dashboard/dashboard.module'
 
     ScheduleModule.forRoot(),
 
+    ClsModule.forRoot({
+      global: true,
+      middleware: { mount: true },
+    }),
+
     PrismaModule,
     HealthModule,
 
@@ -123,6 +131,12 @@ import { DashboardModule } from './dashboard/dashboard.module'
 
     // 📊 Dashboard Executivo
     DashboardModule,
+  ],
+  providers: [
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: OrgContextInterceptor,
+    },
   ],
 })
 export class AppModule {}

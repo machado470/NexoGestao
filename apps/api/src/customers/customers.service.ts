@@ -7,17 +7,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { TimelineService } from '../timeline/timeline.service'
 import { AuditService } from '../audit/audit.service'
 import { AUDIT_ACTIONS } from '../audit/audit.actions'
-
-function normalizeEmail(v?: string): string | null {
-  const s = (v ?? '').trim().toLowerCase()
-  return s ? s : null
-}
-
-function normalizePhone(v?: string): string {
-  // mantém só dígitos (WhatsApp/telefone)
-  const digits = (v ?? '').replace(/\D/g, '').trim()
-  return digits
-}
+import { normalizeEmail, normalizePhone } from '@nexogestao/common'
 
 @Injectable()
 export class CustomersService {
@@ -27,17 +17,16 @@ export class CustomersService {
     private readonly audit: AuditService,
   ) {}
 
-  async list(orgId: string) {
+  async list(_orgId: string) {
     return this.prisma.customer.findMany({
-      where: { orgId },
       orderBy: { createdAt: 'desc' },
       take: 200,
     })
   }
 
-  async get(orgId: string, id: string) {
+  async get(_orgId: string, id: string) {
     const customer = await this.prisma.customer.findFirst({
-      where: { id, orgId },
+      where: { id },
     })
     if (!customer) throw new NotFoundException('Cliente não encontrado')
     return customer
@@ -64,7 +53,7 @@ export class CustomersService {
     // se veio email, não deixa duplicar por org
     if (email) {
       const exists = await this.prisma.customer.findFirst({
-        where: { orgId: params.orgId, email },
+        where: { email },
         select: { id: true },
       })
       if (exists) {
@@ -74,13 +63,12 @@ export class CustomersService {
 
     const created = await this.prisma.customer.create({
       data: {
-        orgId: params.orgId,
         name,
         phone,
         email,
         notes,
         active: true,
-      },
+      } as any,
     })
 
     const context = `Cliente criado: ${created.name}`
@@ -140,7 +128,7 @@ export class CustomersService {
     if (!params.id) throw new BadRequestException('id é obrigatório')
 
     const before = await this.prisma.customer.findFirst({
-      where: { id: params.id, orgId: params.orgId },
+      where: { id: params.id },
       select: {
         id: true,
         name: true,
@@ -171,7 +159,7 @@ export class CustomersService {
 
       if (v && v !== before.email) {
         const dup = await this.prisma.customer.findFirst({
-          where: { orgId: params.orgId, email: v, NOT: { id: params.id } },
+          where: { email: v, NOT: { id: params.id } },
           select: { id: true },
         })
         if (dup) throw new BadRequestException('Já existe um cliente com este e-mail')
@@ -193,9 +181,9 @@ export class CustomersService {
       throw new BadRequestException('Nenhum campo para atualizar')
     }
 
-    // 🔒 multi-tenant blindado: where inclui orgId
+    // 🔒 multi-tenant blindado: o middleware injeta o orgId no where
     const result = await this.prisma.customer.updateMany({
-      where: { id: params.id, orgId: params.orgId },
+      where: { id: params.id },
       data,
     })
 
@@ -204,7 +192,7 @@ export class CustomersService {
     }
 
     const updated = await this.prisma.customer.findFirst({
-      where: { id: params.id, orgId: params.orgId },
+      where: { id: params.id },
     })
     if (!updated) throw new NotFoundException('Cliente não encontrado')
 

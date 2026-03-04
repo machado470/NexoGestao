@@ -31,9 +31,8 @@ function isStatus(v: any): v is AppointmentStatus {
   return (
     v === 'SCHEDULED' ||
     v === 'CONFIRMED' ||
-    v === 'IN_PROGRESS' ||
-    v === 'COMPLETED' ||
-    v === 'CANCELLED' ||
+    v === 'CANCELED' ||
+    v === 'DONE' ||
     v === 'NO_SHOW'
   )
 }
@@ -42,14 +41,13 @@ function statusToAction(status: AppointmentStatus): string {
   switch (status) {
     case 'CONFIRMED':
       return 'APPOINTMENT_CONFIRMED'
-    case 'CANCELLED':
+    case 'CANCELED':
       return 'APPOINTMENT_CANCELED'
-    case 'COMPLETED':
+    case 'DONE':
       return 'APPOINTMENT_DONE'
     case 'NO_SHOW':
       return 'APPOINTMENT_NO_SHOW'
     case 'SCHEDULED':
-    case 'IN_PROGRESS':
     default:
       return 'APPOINTMENT_UPDATED'
   }
@@ -85,7 +83,7 @@ export class AppointmentsService {
   ) {}
 
   async list(
-    orgId: string,
+    _orgId: string,
     filters: {
       from?: string
       to?: string
@@ -93,12 +91,10 @@ export class AppointmentsService {
       customerId?: string
     },
   ) {
-    if (!orgId) throw new BadRequestException('orgId é obrigatório')
-
     const from = parseISODate('from', filters.from)
     const to = parseISODate('to', filters.to)
 
-    const where: any = { orgId }
+    const where: any = {}
 
     if (filters.customerId) where.customerId = filters.customerId
 
@@ -123,12 +119,11 @@ export class AppointmentsService {
     })
   }
 
-  async get(orgId: string, id: string) {
-    if (!orgId) throw new BadRequestException('orgId é obrigatório')
+  async get(_orgId: string, id: string) {
     if (!id) throw new BadRequestException('id é obrigatório')
 
     const appt = await this.prisma.appointment.findFirst({
-      where: { id, orgId },
+      where: { id },
       include: {
         customer: { select: { id: true, name: true, phone: true } },
       },
@@ -169,7 +164,7 @@ export class AppointmentsService {
     const notes = normalizeNotes(params.notes)
 
     const customer = await this.prisma.customer.findFirst({
-      where: { id: params.customerId, orgId: params.orgId },
+      where: { id: params.customerId },
       select: { id: true, name: true },
     })
     if (!customer) throw new BadRequestException('Cliente inválido para este org')
@@ -177,17 +172,16 @@ export class AppointmentsService {
     try {
       const created = await this.prisma.appointment.create({
         data: {
-          orgId: params.orgId,
           customerId: params.customerId,
           startsAt,
           endsAt,
           status,
           notes,
-        },
+        } as any,
         include: {
           customer: { select: { id: true, name: true, phone: true } },
         },
-      })
+      }) as any
 
       const context = `Agendamento criado: ${created.customer.name}`
 
@@ -293,7 +287,7 @@ export class AppointmentsService {
     if (!params.id) throw new BadRequestException('id é obrigatório')
 
     const existing = await this.prisma.appointment.findFirst({
-      where: { id: params.id, orgId: params.orgId },
+      where: { id: params.id },
       select: {
         id: true,
         status: true,
@@ -354,13 +348,13 @@ export class AppointmentsService {
 
     try {
       const result = await this.prisma.appointment.updateMany({
-        where: { id: params.id, orgId: params.orgId },
+        where: { id: params.id },
         data: patch,
       })
       if (result.count === 0) throw new NotFoundException('Agendamento não encontrado')
 
       const updated = await this.prisma.appointment.findFirst({
-        where: { id: params.id, orgId: params.orgId },
+        where: { id: params.id },
         include: {
           customer: { select: { id: true, name: true, phone: true } },
         },

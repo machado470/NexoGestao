@@ -10,7 +10,6 @@ export class DashboardService {
    */
   async getMetrics(orgId: string) {
     const now = new Date()
-    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
 
     const [
       totalCustomers,
@@ -23,9 +22,9 @@ export class DashboardService {
       paidRevenue,
       pendingRevenue,
     ] = await Promise.all([
-      // Total de clientes
+      // Total de clientes ativos
       this.prisma.customer.count({
-        where: { orgId, status: 'ACTIVE' },
+        where: { orgId, active: true },
       }),
 
       // Total de ordens de serviço
@@ -45,7 +44,7 @@ export class DashboardService {
       this.prisma.serviceOrder.count({
         where: {
           orgId,
-          status: 'COMPLETED',
+          status: 'DONE',
         },
       }),
 
@@ -64,7 +63,7 @@ export class DashboardService {
       this.prisma.correctiveAction.count({
         where: {
           person: {
-            org: { id: orgId },
+            orgId,
           },
           status: 'OPEN',
         },
@@ -250,9 +249,8 @@ export class DashboardService {
       openCount,
       assignedCount,
       inProgressCount,
-      completedCount,
-      cancelledCount,
-      onHoldCount,
+      doneCount,
+      canceledCount,
     ] = await Promise.all([
       this.prisma.serviceOrder.count({
         where: { orgId, status: 'OPEN' },
@@ -264,13 +262,10 @@ export class DashboardService {
         where: { orgId, status: 'IN_PROGRESS' },
       }),
       this.prisma.serviceOrder.count({
-        where: { orgId, status: 'COMPLETED' },
+        where: { orgId, status: 'DONE' },
       }),
       this.prisma.serviceOrder.count({
-        where: { orgId, status: 'CANCELLED' },
-      }),
-      this.prisma.serviceOrder.count({
-        where: { orgId, status: 'ON_HOLD' },
+        where: { orgId, status: 'CANCELED' },
       }),
     ])
 
@@ -278,9 +273,8 @@ export class DashboardService {
       open: openCount,
       assigned: assignedCount,
       inProgress: inProgressCount,
-      completed: completedCount,
-      cancelled: cancelledCount,
-      onHold: onHoldCount,
+      completed: doneCount,
+      cancelled: canceledCount,
     }
   }
 
@@ -292,9 +286,7 @@ export class DashboardService {
       pendingCount,
       paidCount,
       overdueCount,
-      cancelledCount,
-      refundedCount,
-      partialCount,
+      canceledCount,
     ] = await Promise.all([
       this.prisma.charge.count({
         where: { orgId, status: 'PENDING' },
@@ -306,13 +298,7 @@ export class DashboardService {
         where: { orgId, status: 'OVERDUE' },
       }),
       this.prisma.charge.count({
-        where: { orgId, status: 'CANCELLED' },
-      }),
-      this.prisma.charge.count({
-        where: { orgId, status: 'REFUNDED' },
-      }),
-      this.prisma.charge.count({
-        where: { orgId, status: 'PARTIAL' },
+        where: { orgId, status: 'CANCELED' },
       }),
     ])
 
@@ -320,9 +306,7 @@ export class DashboardService {
       pending: pendingCount,
       paid: paidCount,
       overdue: overdueCount,
-      cancelled: cancelledCount,
-      refunded: refundedCount,
-      partial: partialCount,
+      cancelled: canceledCount,
     }
   }
 }
