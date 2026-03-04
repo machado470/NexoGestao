@@ -1,222 +1,113 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { trpc } from "@/lib/trpc";
-import { Button } from "@/components/ui/button";
-import { X, Loader2 } from "lucide-react";
-import { toast } from "sonner";
 
-interface CreateInvoiceModalProps {
-  isOpen: boolean;
+type Props = {
+  open: boolean;
   onClose: () => void;
-  onSuccess: () => void;
-  customers: Array<{ id: number; name: string }>;
-}
+  onCreated?: () => void;
+};
 
-export function CreateInvoiceModal({
-  isOpen,
-  onClose,
-  onSuccess,
-  customers,
-}: CreateInvoiceModalProps) {
+export default function CreateInvoiceModal({ open, onClose, onCreated }: Props) {
+  const createMutation = trpc.invoices.create.useMutation();
+
   const [formData, setFormData] = useState({
     customerId: "",
     invoiceNumber: "",
-    description: "",
     amount: "",
-    issueDate: new Date().toISOString().split("T")[0],
+    issueDate: "",
     dueDate: "",
     notes: "",
   });
 
-  const createInvoice = trpc.invoices.create.useMutation({
-    onSuccess: () => {
-      toast.success("Nota Fiscal criada com sucesso!");
-      setFormData({
-        customerId: "",
-        invoiceNumber: "",
-        description: "",
-        amount: "",
-        issueDate: new Date().toISOString().split("T")[0],
-        dueDate: "",
-        notes: "",
-      });
-      onSuccess();
-      onClose();
-    },
-    onError: (error) => {
-      toast.error(error.message || "Erro ao criar nota fiscal");
-    },
-  });
+  if (!open) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.customerId || !formData.invoiceNumber || !formData.amount || !formData.issueDate) {
-      toast.error("Preencha todos os campos obrigatórios");
-      return;
-    }
+  const submit = async () => {
+    const customerId = parseInt(formData.customerId || "0", 10);
+    const amount = parseFloat(formData.amount || "0");
+    if (!customerId || !formData.invoiceNumber || !amount || !formData.issueDate || !formData.dueDate) return;
 
-    createInvoice.mutate({
-      customerId: parseInt(formData.customerId),
-      invoiceNumber: formData.invoiceNumber,
-      description: formData.description || undefined,
-      amount: parseFloat(formData.amount),
+    await createMutation.mutateAsync({
+      customerId,
+      number: formData.invoiceNumber, // ✅ backend espera "number"
+      amount,
       issueDate: new Date(formData.issueDate),
-      dueDate: formData.dueDate ? new Date(formData.dueDate) : undefined,
-      notes: formData.notes || undefined,
+      dueDate: new Date(formData.dueDate),
+      notes: formData.notes ? formData.notes : undefined,
+      status: "DRAFT",
     });
+
+    onCreated?.();
+    onClose();
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-            Nova Nota Fiscal
-          </h2>
-          <button
-            onClick={onClose}
-            className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
-          >
-            <X className="w-5 h-5" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-zinc-900">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Nova Fatura</h2>
+          <button onClick={onClose} className="text-sm opacity-70 hover:opacity-100">
+            Fechar
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Cliente *
-            </label>
-            <select
-              value={formData.customerId}
-              onChange={(e) =>
-                setFormData({ ...formData, customerId: e.target.value })
-              }
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-            >
-              <option value="">Selecione um cliente</option>
-              {customers.map((customer) => (
-                <option key={customer.id} value={customer.id}>
-                  {customer.name}
-                </option>
-              ))}
-            </select>
-          </div>
+        <div className="space-y-3">
+          <input
+            className="w-full rounded-lg border p-2 dark:bg-zinc-950"
+            placeholder="Customer ID"
+            value={formData.customerId}
+            onChange={(e) => setFormData((s) => ({ ...s, customerId: e.target.value }))}
+          />
+          <input
+            className="w-full rounded-lg border p-2 dark:bg-zinc-950"
+            placeholder="Número"
+            value={formData.invoiceNumber}
+            onChange={(e) => setFormData((s) => ({ ...s, invoiceNumber: e.target.value }))}
+          />
+          <input
+            className="w-full rounded-lg border p-2 dark:bg-zinc-950"
+            placeholder="Valor (ex: 120.50)"
+            value={formData.amount}
+            onChange={(e) => setFormData((s) => ({ ...s, amount: e.target.value }))}
+          />
+          <input
+            type="date"
+            className="w-full rounded-lg border p-2 dark:bg-zinc-950"
+            value={formData.issueDate}
+            onChange={(e) => setFormData((s) => ({ ...s, issueDate: e.target.value }))}
+          />
+          <input
+            type="date"
+            className="w-full rounded-lg border p-2 dark:bg-zinc-950"
+            value={formData.dueDate}
+            onChange={(e) => setFormData((s) => ({ ...s, dueDate: e.target.value }))}
+          />
+          <textarea
+            className="w-full rounded-lg border p-2 dark:bg-zinc-950"
+            placeholder="Notas (opcional)"
+            value={formData.notes}
+            onChange={(e) => setFormData((s) => ({ ...s, notes: e.target.value }))}
+          />
+        </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Número da NF *
-            </label>
-            <input
-              type="text"
-              value={formData.invoiceNumber}
-              onChange={(e) =>
-                setFormData({ ...formData, invoiceNumber: e.target.value })
-              }
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-              placeholder="Ex: 001"
-            />
-          </div>
+        <div className="mt-5 flex gap-2">
+          <button
+            onClick={submit}
+            disabled={createMutation.isPending}
+            className="flex-1 rounded-lg bg-black px-4 py-2 text-white disabled:opacity-50 dark:bg-white dark:text-black"
+          >
+            {createMutation.isPending ? "Salvando..." : "Criar"}
+          </button>
+          <button
+            onClick={onClose}
+            className="rounded-lg border px-4 py-2 dark:border-zinc-700"
+          >
+            Cancelar
+          </button>
+        </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Descrição
-            </label>
-            <input
-              type="text"
-              value={formData.description}
-              onChange={(e) =>
-                setFormData({ ...formData, description: e.target.value })
-              }
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-              placeholder="Descrição da nota fiscal"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Valor (R$) *
-            </label>
-            <input
-              type="number"
-              step="0.01"
-              value={formData.amount}
-              onChange={(e) =>
-                setFormData({ ...formData, amount: e.target.value })
-              }
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-              placeholder="0.00"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Data de Emissão *
-            </label>
-            <input
-              type="date"
-              value={formData.issueDate}
-              onChange={(e) =>
-                setFormData({ ...formData, issueDate: e.target.value })
-              }
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Data de Vencimento
-            </label>
-            <input
-              type="date"
-              value={formData.dueDate}
-              onChange={(e) =>
-                setFormData({ ...formData, dueDate: e.target.value })
-              }
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Notas
-            </label>
-            <textarea
-              value={formData.notes}
-              onChange={(e) =>
-                setFormData({ ...formData, notes: e.target.value })
-              }
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-              placeholder="Observações"
-              rows={3}
-            />
-          </div>
-
-          <div className="flex gap-3 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              className="flex-1"
-            >
-              Cancelar
-            </Button>
-            <Button
-              type="submit"
-              disabled={createInvoice.isPending}
-              className="flex-1 bg-orange-500 hover:bg-orange-600 text-white"
-            >
-              {createInvoice.isPending ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Criando...
-                </>
-              ) : (
-                "Criar Nota Fiscal"
-              )}
-            </Button>
-          </div>
-        </form>
+        {createMutation.error ? (
+          <p className="mt-3 text-sm text-red-500">Erro ao criar fatura.</p>
+        ) : null}
       </div>
     </div>
   );

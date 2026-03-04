@@ -1,116 +1,130 @@
-import React, { createContext, useCallback, useEffect, useState } from "react";
+import React, { createContext, useCallback, useEffect, useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
+import type { AppRouter } from "../../../server/routers";
+import type { inferRouterOutputs } from "@trpc/server";
+
+type RouterOutputs = inferRouterOutputs<AppRouter>;
+type SessionMeOutput = RouterOutputs["session"]["me"]; // pode ser null (se sem cookie/sem sessão)
+type SessionPayload = Exclude<SessionMeOutput, null>;
+type SessionUser = SessionPayload["data"]["user"];
 
 interface AuthContextType {
-  user: any | null;
+  user: SessionUser | null;
   loading: boolean;
-  error: any | null;
+  error: unknown | null;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, orgName: string, adminName?: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   isAuthenticated: boolean;
+  refresh: () => Promise<void>;
+  payload: SessionMeOutput; // útil pra acessar operational/pending/assignments
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<any | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
+  const [localLoading, setLocalLoading] = useState(false);
+  const [localError, setLocalError] = useState<unknown | null>(null);
 
-  const registerMutation = trpc.auth.register.useMutation();
-  const loginMutation = trpc.auth.login.useMutation();
-  const logoutMutation = trpc.session.logout.useMutation();
+  // Fonte única de verdade da sessão
   const meQuery = trpc.session.me.useQuery(undefined, {
     retry: false,
-    staleTime: Infinity,
+    refetchOnWindowFocus: false,
   });
 
-  const register = useCallback(
-    async (email: string, password: string, orgName: string, adminName: string = "Admin") => {
-      try {
-        setLoading(true);
-        setError(null);
-        const result = await registerMutation.mutateAsync({
-          email,
-          password,
-          orgName,
-          adminName,
-        });
-        console.log("Registro bem-sucedido:", result);
-        // Refetch meQuery para obter dados da sessão
-        await meQuery.refetch();
-      } catch (err) {
-        const error = err instanceof Error ? err : new Error("Erro ao registrar");
-        setError(error);
-        throw error;
-      } finally {
-        setLoading(false);
-      }
-    },
-    [registerMutation, meQuery]
-  );
+  // Login via proxy (define cookie httpOnly)
+  const loginMutation = trpc.nexo.auth.login.useMutation();
+
+  // Logout limpa cookie
+  const logoutMutation = trpc.session.logout.useMutation();
+
+  const refresh = useCallback(async () => {
+    await meQuery.refetch();
+  }, [meQuery]);
 
   const login = useCallback(
     async (email: string, password: string) => {
+      setLocalLoading(true);
+      setLocalError(null);
+
       try {
-        setLoading(true);
-        setError(null);
-        const result = await loginMutation.mutateAsync({
-          email,
-          password,
-        });
-        console.log("Login bem-sucedido:", result);
-        // Refetch meQuery para obter dados da sessão
+        await loginMutation.mutateAsync({ email, password });
         await meQuery.refetch();
       } catch (err) {
-        const error = err instanceof Error ? err : new Error("Erro ao fazer login");
-        setError(error);
-        throw error;
+        setLocalError(err);
+        throw err;
       } finally {
-        setLoading(false);
+        setLocalLoading(false);
       }
     },
     [loginMutation, meQuery]
   );
 
   const logout = useCallback(async () => {
+    setLocalLoading(true);
+    setLocalError(null);
+
     try {
-      setLoading(true);
       await logoutMutation.mutateAsync();
-      setUser(null);
-      // Refetch meQuery para limpar dados da sessão
       await meQuery.refetch();
     } catch (err) {
-      console.error("Erro ao fazer logout:", err);
+      setLocalError(err);
     } finally {
-      setLoading(false);
+      setLocalLoading(false);
     }
   }, [logoutMutation, meQuery]);
 
-  // Sincronizar estado do usuário com dados da query
-  useEffect(() => {
-    if (!meQuery.isLoading) {
-      if (meQuery.data) {
-        setUser(meQuery.data);
-      } else {
-        setUser(null);
-      }
-      setLoading(false);
-    } else {
-      setLoading(true);
-    }
-  }, [meQuery.isLoading, meQuery.data]);
+  // session.me retorna { ok, data: {...} } | null
+  const payload: SessionMeOutput = meQuery.data ?? null;
 
-  const value: AuthContextType = {
+  const user: SessionUser | null = useMemo(() => {
+    if (!payload) return null;
+    return payload.data?.user ?? null;
+  }, [payload]);
+
+  const value: AuthContextType = useMemo(() => {
+    return {
+      user,
+      payload,
+      loading:
+        localLoading ||
+        meQuery.isLoading ||
+        loginMutation.isPending ||
+        logoutMutation.isPending,
+      error:
+        localError ||
+        meQuery.error ||
+        loginMutation.error ||
+        logoutMutation.error ||
+        null,
+      login,
+      logout,
+      isAuthenticated: Boolean(user),
+      refresh,
+    };
+  }, [
     user,
-    loading: loading || meQuery.isLoading,
-    error: error || meQuery.error || registerMutation.error || loginMutation.error,
-    register,
+    payload,
+    localLoading,
+    localError,
+    meQuery.isLoading,
+    meQuery.error,
+    loginMutation.isPending,
+    loginMutation.error,
+    logoutMutation.isPending,
+    logoutMutation.error,
     login,
     logout,
-    isAuthenticated: !!user,
-  };
+    refresh,
+  ]);
+
+  // Guarda payload completo da sessão (user + operational + pending + etc)
+  useEffect(() => {
+    try {
+      localStorage.setItem("manus-runtime-user-info", JSON.stringify(payload));
+    } catch {
+      // ignore
+    }
+  }, [payload]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

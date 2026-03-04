@@ -1,202 +1,105 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { trpc } from "@/lib/trpc";
-import { Button } from "@/components/ui/button";
-import { X, Loader2 } from "lucide-react";
-import { toast } from "sonner";
 
-interface CreateExpenseModalProps {
-  isOpen: boolean;
+type Props = {
+  open: boolean;
   onClose: () => void;
-  onSuccess: () => void;
-}
+  onCreated?: () => void;
+};
 
-export function CreateExpenseModal({
-  isOpen,
-  onClose,
-  onSuccess,
-}: CreateExpenseModalProps) {
+export default function CreateExpenseModal({ open, onClose, onCreated }: Props) {
+  const createMutation = trpc.expenses.create.useMutation();
+
   const [formData, setFormData] = useState({
     description: "",
     amount: "",
-    category: "other",
-    dueDate: new Date().toISOString().split("T")[0],
-    paymentMethod: "",
+    category: "",
+    dueDate: "", // UI pode continuar chamando de dueDate, mas no payload vira "date"
     notes: "",
   });
 
-  const createExpense = trpc.expenses.create.useMutation({
-    onSuccess: () => {
-      toast.success("Despesa criada com sucesso!");
-      setFormData({
-        description: "",
-        amount: "",
-        category: "other",
-        dueDate: new Date().toISOString().split("T")[0],
-        paymentMethod: "",
-        notes: "",
-      });
-      onSuccess();
-      onClose();
-    },
-    onError: (error) => {
-      toast.error(error.message || "Erro ao criar despesa");
-    },
-  });
+  if (!open) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.description || !formData.amount || !formData.dueDate) {
-      toast.error("Preencha todos os campos obrigatórios");
-      return;
-    }
+  const submit = async () => {
+    const amount = parseFloat(formData.amount || "0");
+    if (!formData.description || !formData.category || !formData.dueDate || !amount) return;
 
-    createExpense.mutate({
+    await createMutation.mutateAsync({
       description: formData.description,
-      amount: parseFloat(formData.amount),
+      amount,
       category: formData.category,
-      dueDate: new Date(formData.dueDate),
-      paymentMethod: formData.paymentMethod || undefined,
-      notes: formData.notes || undefined,
+      date: new Date(formData.dueDate), // ✅ backend espera "date"
+      notes: formData.notes ? formData.notes : undefined,
     });
+
+    onCreated?.();
+    onClose();
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 w-full max-w-md">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-            Nova Despesa
-          </h2>
-          <button
-            onClick={onClose}
-            className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
-          >
-            <X className="w-5 h-5" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-zinc-900">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Nova Despesa</h2>
+          <button onClick={onClose} className="text-sm opacity-70 hover:opacity-100">
+            Fechar
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Descrição *
-            </label>
-            <input
-              type="text"
-              value={formData.description}
-              onChange={(e) =>
-                setFormData({ ...formData, description: e.target.value })
-              }
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-              placeholder="Descrição da despesa"
-            />
-          </div>
+        <div className="space-y-3">
+          <input
+            className="w-full rounded-lg border p-2 dark:bg-zinc-950"
+            placeholder="Descrição"
+            value={formData.description}
+            onChange={(e) => setFormData((s) => ({ ...s, description: e.target.value }))}
+          />
+          <input
+            className="w-full rounded-lg border p-2 dark:bg-zinc-950"
+            placeholder="Categoria"
+            value={formData.category}
+            onChange={(e) => setFormData((s) => ({ ...s, category: e.target.value }))}
+          />
+          <input
+            className="w-full rounded-lg border p-2 dark:bg-zinc-950"
+            placeholder="Valor (ex: 120.50)"
+            value={formData.amount}
+            onChange={(e) => setFormData((s) => ({ ...s, amount: e.target.value }))}
+          />
+          <input
+            type="date"
+            className="w-full rounded-lg border p-2 dark:bg-zinc-950"
+            value={formData.dueDate}
+            onChange={(e) => setFormData((s) => ({ ...s, dueDate: e.target.value }))}
+          />
+          <textarea
+            className="w-full rounded-lg border p-2 dark:bg-zinc-950"
+            placeholder="Notas (opcional)"
+            value={formData.notes}
+            onChange={(e) => setFormData((s) => ({ ...s, notes: e.target.value }))}
+          />
+        </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Categoria *
-            </label>
-            <select
-              value={formData.category}
-              onChange={(e) =>
-                setFormData({ ...formData, category: e.target.value })
-              }
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-            >
-              <option value="supplies">Suprimentos</option>
-              <option value="travel">Viagem</option>
-              <option value="utilities">Utilidades</option>
-              <option value="maintenance">Manutenção</option>
-              <option value="other">Outros</option>
-            </select>
-          </div>
+        <div className="mt-5 flex gap-2">
+          <button
+            onClick={submit}
+            disabled={createMutation.isPending}
+            className="flex-1 rounded-lg bg-black px-4 py-2 text-white disabled:opacity-50 dark:bg-white dark:text-black"
+          >
+            {createMutation.isPending ? "Salvando..." : "Criar"}
+          </button>
+          <button
+            onClick={onClose}
+            className="rounded-lg border px-4 py-2 dark:border-zinc-700"
+          >
+            Cancelar
+          </button>
+        </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Valor (R$) *
-            </label>
-            <input
-              type="number"
-              step="0.01"
-              value={formData.amount}
-              onChange={(e) =>
-                setFormData({ ...formData, amount: e.target.value })
-              }
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-              placeholder="0.00"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Data de Vencimento *
-            </label>
-            <input
-              type="date"
-              value={formData.dueDate}
-              onChange={(e) =>
-                setFormData({ ...formData, dueDate: e.target.value })
-              }
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Método de Pagamento
-            </label>
-            <input
-              type="text"
-              value={formData.paymentMethod}
-              onChange={(e) =>
-                setFormData({ ...formData, paymentMethod: e.target.value })
-              }
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-              placeholder="Ex: Cartão, Boleto, PIX"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Notas
-            </label>
-            <textarea
-              value={formData.notes}
-              onChange={(e) =>
-                setFormData({ ...formData, notes: e.target.value })
-              }
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-              placeholder="Observações"
-              rows={3}
-            />
-          </div>
-
-          <div className="flex gap-3 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              className="flex-1"
-            >
-              Cancelar
-            </Button>
-            <Button
-              type="submit"
-              disabled={createExpense.isPending}
-              className="flex-1 bg-orange-500 hover:bg-orange-600 text-white"
-            >
-              {createExpense.isPending ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Criando...
-                </>
-              ) : (
-                "Criar Despesa"
-              )}
-            </Button>
-          </div>
-        </form>
+        {createMutation.error ? (
+          <p className="mt-3 text-sm text-red-500">
+            Erro ao criar despesa.
+          </p>
+        ) : null}
       </div>
     </div>
   );

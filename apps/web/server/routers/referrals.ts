@@ -1,30 +1,47 @@
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
-import { db } from "../db";
+import { nexoFetch } from "../_core/nexoClient";
+
+const paginationInput = z.object({
+  page: z.number().int().positive().default(1),
+  limit: z.number().int().positive().default(20),
+});
 
 export const referralsRouter = router({
   list: protectedProcedure
     .input(
-      z.object({
-        page: z.number().int().positive().default(1),
-        limit: z.number().int().positive().default(20),
-      })
+      paginationInput
+        .extend({
+          status: z.enum(["PENDING", "CONFIRMED", "PAID"]).optional(),
+          q: z.string().optional(),
+        })
+        .optional()
     )
     .query(async ({ input, ctx }) => {
-      const orgId = ctx.user?.organizationId || 1;
-      const allReferrals = await db.query.referrals.findMany({
-        where: (referrals, { eq }) => eq(referrals.organizationId, orgId),
+      const page = input?.page ?? 1;
+      const limit = input?.limit ?? 20;
+
+      const params = new URLSearchParams();
+      params.set("page", String(page));
+      params.set("limit", String(limit));
+      if (input?.status) params.set("status", input.status);
+      if (input?.q) params.set("q", input.q);
+
+      const raw = await nexoFetch<any>(ctx.req, `/referrals?${params.toString()}`, {
+        method: "GET",
       });
 
-      const total = allReferrals.length;
-      const pages = Math.ceil(total / input.limit);
-      const start = (input.page - 1) * input.limit;
-      const data = allReferrals.slice(start, start + input.limit);
+      const payload = raw?.data ?? raw;
+      const data = payload?.data ?? payload ?? [];
+      const pagination =
+        payload?.pagination ?? {
+          page,
+          limit,
+          total: Array.isArray(data) ? data.length : 0,
+          pages: 1,
+        };
 
-      return {
-        data,
-        pagination: { page: input.page, limit: input.limit, total, pages },
-      };
+      return { data, pagination };
     }),
 
   create: protectedProcedure
@@ -41,68 +58,104 @@ export const referralsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const orgId = ctx.user?.organizationId || 1;
-      return await db.referrals.create({
-        data: {
-          organizationId: orgId,
-          referrerName: input.referrerName,
-          referrerEmail: input.referrerEmail,
-          referrerPhone: input.referrerPhone,
-          referredName: input.referredName,
-          referredEmail: input.referredEmail,
-          referredPhone: input.referredPhone,
-          creditAmount: input.creditAmount ? Math.round(input.creditAmount * 100) : 0,
-          status: input.status,
-          createdBy: ctx.user?.id,
-        },
+      const raw = await nexoFetch<any>(ctx.req, `/referrals`, {
+        method: "POST",
+        body: JSON.stringify(input),
       });
+
+      return raw?.data ?? raw;
     }),
 
   update: protectedProcedure
     .input(
       z.object({
-        id: z.number(),
+        id: z.number().int().positive(),
         status: z.enum(["PENDING", "CONFIRMED", "PAID"]).optional(),
         creditAmount: z.number().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const orgId = ctx.user?.organizationId || 1;
-      const { id, ...data } = input;
+      const { id, ...rest } = input;
 
-      return await db.referrals.update({
-        where: { id, organizationId: orgId },
-        data: {
-          ...data,
-          creditAmount: data.creditAmount ? Math.round(data.creditAmount * 100) : undefined,
-        },
+      const raw = await nexoFetch<any>(ctx.req, `/referrals/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(rest),
       });
+
+      return raw?.data ?? raw;
     }),
 
   delete: protectedProcedure
-    .input(z.object({ id: z.number() }))
+    .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ input, ctx }) => {
-      const orgId = ctx.user?.organizationId || 1;
-      return await db.referrals.delete({
-        where: { id: input.id, organizationId: orgId },
+      const raw = await nexoFetch<any>(ctx.req, `/referrals/${input.id}`, {
+        method: "DELETE",
       });
+
+      return raw?.data ?? raw;
     }),
 
-  summary: protectedProcedure.query(async ({ ctx }) => {
-    const orgId = ctx.user?.organizationId || 1;
-    const allReferrals = await db.query.referrals.findMany({
-      where: (referrals, { eq }) => eq(referrals.organizationId, orgId),
+  summary: protectedProcedure
+    .input(z.object({}).optional())
+    .query(async ({ ctx }) => {
+      const raw = await nexoFetch<any>(ctx.req, `/referrals/summary`, {
+        method: "GET",
+      });
+
+      return raw?.data ?? raw;
+    }),
+
+  /**
+   * O front antigo pedia isso:
+   * trpc.referrals.generateCode.useMutation()
+   *
+   * Nest (esperado): POST /referrals/generate-code
+   */
+  generateCode: protectedProcedure
+    .input(z.object({}).optional())
+    .mutation(async ({ ctx }) => {
+      const raw = await nexoFetch<any>(ctx.req, `/referrals/generate-code`, {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+
+      return raw?.data ?? raw;
+    }),
+
+  /**
+   * O front antigo pedia:
+   * trpc.referrals.stats.useQuery({ page, limit })
+   *
+   * Nest (esperado): GET /referrals/stats?page=&limit=
+   */
+  stats: protectedProcedure
+    .input(paginationInput.optional())
+    .query(async ({ input, ctx }) => {
+      const page = input?.page ?? 1;
+      const limit = input?.limit ?? 100;
+
+      const params = new URLSearchParams();
+      params.set("page", String(page));
+      params.set("limit", String(limit));
+
+      const raw = await nexoFetch<any>(ctx.req, `/referrals/stats?${params.toString()}`, {
+        method: "GET",
+      });
+
+      return raw?.data ?? raw;
+    }),
+
+  /**
+   * O front antigo pedia:
+   * trpc.referrals.getBalance.useQuery()
+   *
+   * Nest (esperado): GET /referrals/balance
+   */
+  getBalance: protectedProcedure.query(async ({ ctx }) => {
+    const raw = await nexoFetch<any>(ctx.req, `/referrals/balance`, {
+      method: "GET",
     });
 
-    const totalCredit = allReferrals.reduce((sum, r) => sum + (r.creditAmount || 0), 0);
-    const confirmed = allReferrals.filter((r) => r.status === "CONFIRMED").length;
-    const paid = allReferrals.filter((r) => r.status === "PAID").length;
-
-    return {
-      totalCredit,
-      count: allReferrals.length,
-      confirmed,
-      paid,
-    };
+    return raw?.data ?? raw;
   }),
 });

@@ -1,8 +1,61 @@
 import { publicProcedure, router } from "../_core/trpc";
 import { z } from "zod";
+import cookie from "cookie";
 
 // URL da API do NexoGestao - usar variável de ambiente ou localhost
-const NEXO_API_URL = process.env.NEXO_API_URL || "http://localhost:3001";
+// IMPORTANTE: API (Nest) é 3000. O BFF (apps/web) pode ser 3001+.
+const NEXO_API_URL = process.env.NEXO_API_URL || "http://localhost:3000";
+
+// Cookie onde vamos guardar o JWT do backend (Nest)
+const NEXO_TOKEN_COOKIE = "nexo_token";
+
+type CtxLike = {
+  req: { headers: Record<string, any> };
+  res: any;
+};
+
+function getTokenFromCookie(ctx: CtxLike): string | null {
+  const raw = ctx?.req?.headers?.cookie;
+  if (!raw || typeof raw !== "string") return null;
+
+  const parsed = cookie.parse(raw);
+  const token = parsed?.[NEXO_TOKEN_COOKIE];
+  if (!token) return null;
+
+  return token;
+}
+
+function getAuthHeader(ctx: CtxLike): string | null {
+  const h = ctx?.req?.headers?.authorization;
+  if (typeof h === "string" && h.trim().length > 0) return h;
+
+  const token = getTokenFromCookie(ctx);
+  if (!token) return null;
+
+  return `Bearer ${token}`;
+}
+
+function setTokenCookie(ctx: CtxLike, token: string) {
+  // Express res.cookie existe (não precisa cookie-parser)
+  ctx.res.cookie(NEXO_TOKEN_COOKIE, token, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    // 7 dias
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  });
+}
+
+function clearTokenCookie(ctx: CtxLike) {
+  ctx.res.cookie(NEXO_TOKEN_COOKIE, "", {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 0,
+  });
+}
 
 async function nexoFetch(path: string, options: RequestInit = {}) {
   const url = `${NEXO_API_URL}${path}`;
@@ -61,29 +114,43 @@ export const nexoProxyRouter = router({
           password: z.string(),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         try {
-          return await nexoFetch("/auth/login", {
+          const result = await nexoFetch("/auth/login", {
             method: "POST",
             body: JSON.stringify({
               email: input.email,
               password: input.password,
             }),
           });
+
+          // Salva token em cookie httpOnly pro browser mandar automaticamente depois
+          const token = result?.data?.token;
+          if (typeof token === "string" && token.length > 0) {
+            setTokenCookie(ctx as any, token);
+          }
+
+          return result;
         } catch (error: any) {
           console.error("[Nexo Proxy] Login failed:", error.message);
           throw new Error(`Falha ao fazer login: ${error.message}`);
         }
       }),
 
+    logout: publicProcedure.mutation(async ({ ctx }) => {
+      clearTokenCookie(ctx as any);
+      return { ok: true } as const;
+    }),
+
+    // ⚠️ IMPORTANTE:
+    // O backend NÃO tem /auth/me (deu 404). O "me" está no controller apps/api/src/me/me.controller.ts.
+    // Então o endpoint correto é /me.
     me: publicProcedure.query(async ({ ctx }) => {
       try {
-        const authHeader = ctx.req.headers.authorization;
-        if (!authHeader) {
-          throw new Error("Token não fornecido");
-        }
+        const authHeader = getAuthHeader(ctx as any);
+        if (!authHeader) throw new Error("Token não fornecido");
 
-        return await nexoFetch("/auth/me", {
+        return await nexoFetch("/me", {
           method: "GET",
           headers: {
             Authorization: authHeader,
@@ -100,11 +167,9 @@ export const nexoProxyRouter = router({
   customers: router({
     list: publicProcedure.query(async ({ ctx }) => {
       try {
-        const authHeader = ctx.req.headers.authorization;
+        const authHeader = getAuthHeader(ctx as any);
         const headers: Record<string, string> = {};
-        if (authHeader) {
-          headers.Authorization = authHeader;
-        }
+        if (authHeader) headers.Authorization = authHeader;
 
         return await nexoFetch("/customers", {
           method: "GET",
@@ -126,11 +191,9 @@ export const nexoProxyRouter = router({
       )
       .mutation(async ({ input, ctx }) => {
         try {
-          const authHeader = ctx.req.headers.authorization;
+          const authHeader = getAuthHeader(ctx as any);
           const headers: Record<string, string> = {};
-          if (authHeader) {
-            headers.Authorization = authHeader;
-          }
+          if (authHeader) headers.Authorization = authHeader;
 
           return await nexoFetch("/customers", {
             method: "POST",
@@ -148,11 +211,9 @@ export const nexoProxyRouter = router({
   appointments: router({
     list: publicProcedure.query(async ({ ctx }) => {
       try {
-        const authHeader = ctx.req.headers.authorization;
+        const authHeader = getAuthHeader(ctx as any);
         const headers: Record<string, string> = {};
-        if (authHeader) {
-          headers.Authorization = authHeader;
-        }
+        if (authHeader) headers.Authorization = authHeader;
 
         return await nexoFetch("/appointments", {
           method: "GET",
@@ -169,11 +230,9 @@ export const nexoProxyRouter = router({
   serviceOrders: router({
     list: publicProcedure.query(async ({ ctx }) => {
       try {
-        const authHeader = ctx.req.headers.authorization;
+        const authHeader = getAuthHeader(ctx as any);
         const headers: Record<string, string> = {};
-        if (authHeader) {
-          headers.Authorization = authHeader;
-        }
+        if (authHeader) headers.Authorization = authHeader;
 
         return await nexoFetch("/service-orders", {
           method: "GET",
@@ -190,11 +249,9 @@ export const nexoProxyRouter = router({
   finance: router({
     overview: publicProcedure.query(async ({ ctx }) => {
       try {
-        const authHeader = ctx.req.headers.authorization;
+        const authHeader = getAuthHeader(ctx as any);
         const headers: Record<string, string> = {};
-        if (authHeader) {
-          headers.Authorization = authHeader;
-        }
+        if (authHeader) headers.Authorization = authHeader;
 
         return await nexoFetch("/finance/overview", {
           method: "GET",
@@ -211,11 +268,9 @@ export const nexoProxyRouter = router({
   admin: router({
     overview: publicProcedure.query(async ({ ctx }) => {
       try {
-        const authHeader = ctx.req.headers.authorization;
+        const authHeader = getAuthHeader(ctx as any);
         const headers: Record<string, string> = {};
-        if (authHeader) {
-          headers.Authorization = authHeader;
-        }
+        if (authHeader) headers.Authorization = authHeader;
 
         return await nexoFetch("/admin/overview", {
           method: "GET",

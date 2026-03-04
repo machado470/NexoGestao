@@ -3,7 +3,7 @@
  * Marca registros como deletados sem remover do banco
  */
 
-import { db } from '@/server/db';
+import { db } from "../db";
 
 export async function softDelete(
   table: string,
@@ -23,7 +23,7 @@ export async function softDelete(
   await recordAudit({
     entityType: table,
     entityId: id,
-    action: 'DELETE',
+    action: "DELETE",
     userId,
     organizationId,
     changes: { deletedAt: now },
@@ -40,8 +40,10 @@ export async function softDeleteMany(
 
   // Atualizar múltiplos registros
   await db.execute(
-    `UPDATE ${table} SET deletedAt = ? WHERE id IN (${ids.map(() => '?').join(',')}) AND organizationId = ?`,
-    [...ids, now, organizationId]
+    `UPDATE ${table} SET deletedAt = ? WHERE id IN (${ids
+      .map(() => "?")
+      .join(",")}) AND organizationId = ?`,
+    [now, ...ids, organizationId]
   );
 
   // Registrar cada deletação na auditoria
@@ -49,7 +51,7 @@ export async function softDeleteMany(
     await recordAudit({
       entityType: table,
       entityId: id,
-      action: 'DELETE',
+      action: "DELETE",
       userId,
       organizationId,
       changes: { deletedAt: now },
@@ -73,7 +75,7 @@ export async function restore(
   await recordAudit({
     entityType: table,
     entityId: id,
-    action: 'RESTORE',
+    action: "RESTORE",
     userId,
     organizationId,
     changes: { deletedAt: null },
@@ -90,7 +92,7 @@ export async function permanentlyDelete(
   await recordAudit({
     entityType: table,
     entityId: id,
-    action: 'PERMANENT_DELETE',
+    action: "PERMANENT_DELETE",
     userId,
     organizationId,
   });
@@ -108,7 +110,7 @@ export async function permanentlyDelete(
 export async function recordAudit(data: {
   entityType: string;
   entityId: number;
-  action: 'CREATE' | 'UPDATE' | 'DELETE' | 'RESTORE' | 'PERMANENT_DELETE';
+  action: "CREATE" | "UPDATE" | "DELETE" | "RESTORE" | "PERMANENT_DELETE";
   userId: number;
   organizationId: number;
   changes?: Record<string, any>;
@@ -144,7 +146,7 @@ export async function getAuditHistory(
 
   return logs.map((log: any) => ({
     ...log,
-    changes: JSON.parse(log.changes || '{}'),
+    changes: JSON.parse(log.changes || "{}"),
   }));
 }
 

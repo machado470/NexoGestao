@@ -1,172 +1,139 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
-import { Button } from "@/components/ui/button";
-import { X, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Loader2, X } from "lucide-react";
 
-interface CreateCustomerModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSuccess: () => void;
-}
+type Props = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onCreated?: () => Promise<void> | void;
+};
 
-export function CreateCustomerModal({
-  isOpen,
-  onClose,
-  onSuccess,
-}: CreateCustomerModalProps) {
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    notes: "",
-  });
+export default function CreateCustomerModal({ open, onOpenChange, onCreated }: Props) {
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
 
-  const createCustomer = trpc.data.customers.create.useMutation({
-    onSuccess: () => {
+  const createCustomer = trpc.nexo.customers.create.useMutation();
+
+  const canSubmit = useMemo(() => {
+    return name.trim().length > 0 && phone.trim().length > 0;
+  }, [name, phone]);
+
+  const reset = () => {
+    setName("");
+    setPhone("");
+    setEmail("");
+  };
+
+  const close = () => {
+    onOpenChange(false);
+  };
+
+  const submit = async () => {
+    if (!canSubmit) {
+      toast.error("Nome e telefone são obrigatórios.");
+      return;
+    }
+
+    try {
+      await createCustomer.mutateAsync({
+        name: name.trim(),
+        phone: phone.trim(),
+        email: email.trim().length ? email.trim() : undefined,
+      });
+
       toast.success("Cliente criado com sucesso!");
-      setFormData({ name: "", email: "", phone: "", notes: "" });
-      onSuccess();
-      onClose();
-    },
-    onError: (error) => {
-      toast.error(error.message || "Erro ao criar cliente");
-    },
-  });
-
-  const validateEmail = (email: string): boolean => {
-    if (!email) return true; // Email é opcional
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
+      reset();
+      close();
+      await onCreated?.();
+    } catch (err: any) {
+      toast.error("Falha ao criar cliente: " + (err?.message ?? "erro"));
+    }
   };
 
-  const validatePhone = (phone: string): boolean => {
-    const phoneRegex = /^[0-9\s\-\(\)]+$/;
-    return phoneRegex.test(phone);
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.name || !formData.phone) {
-      toast.error("Nome e telefone são obrigatórios");
-      return;
-    }
-    if (!validatePhone(formData.phone)) {
-      toast.error("Telefone inválido");
-      return;
-    }
-    if (!validateEmail(formData.email)) {
-      toast.error("Email inválido");
-      return;
-    }
-    createCustomer.mutate(formData);
-  };
-
-  if (!isOpen) return null;
+  if (!open) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 w-full max-w-md">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+      <div className="absolute inset-0 bg-black/40" onClick={close} />
+
+      <div className="relative w-full max-w-lg rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-xl">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-700">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
             Novo Cliente
           </h2>
           <button
-            onClick={onClose}
-            className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+            type="button"
+            onClick={close}
+            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4 text-gray-700 dark:text-gray-300" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="p-5 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Nome *
             </label>
             <input
-              type="text"
-              value={formData.name}
-              onChange={(e) =>
-                setFormData({ ...formData, name: e.target.value })
-              }
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-              placeholder="Nome do cliente"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              placeholder="Ex: Cliente Demo"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Email
-            </label>
-            <input
-              type="email"
-              value={formData.email}
-              onChange={(e) =>
-                setFormData({ ...formData, email: e.target.value })
-              }
-              pattern="[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-              placeholder="email@example.com"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Telefone *
             </label>
             <input
-              type="tel"
-              value={formData.phone}
-              onChange={(e) =>
-                setFormData({ ...formData, phone: e.target.value })
-              }
-              pattern="[0-9\s\-\(\)]+"
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-              placeholder="(11) 99999-9999"
+              value={phone}
+              onChange={e => setPhone(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              placeholder="Ex: +5547999999999"
             />
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              Dica: pode mandar com +55 ou só números. O backend normaliza.
+            </p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Notas
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Email (opcional)
             </label>
-            <textarea
-              value={formData.notes}
-              onChange={(e) =>
-                setFormData({ ...formData, notes: e.target.value })
-              }
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-              placeholder="Observações sobre o cliente"
-              rows={3}
+            <input
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              placeholder="cliente@demo.com"
             />
           </div>
+        </div>
 
-          <div className="flex gap-3 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              className="flex-1"
-            >
-              Cancelar
-            </Button>
-            <Button
-              type="submit"
-              disabled={createCustomer.isPending}
-              className="flex-1 bg-orange-500 hover:bg-orange-600 text-white"
-            >
-              {createCustomer.isPending ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Criando...
-                </>
-              ) : (
-                "Criar Cliente"
-              )}
-            </Button>
-          </div>
-        </form>
+        <div className="px-5 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-end gap-2">
+          <Button type="button" variant="outline" onClick={close}>
+            Cancelar
+          </Button>
+          <Button
+            type="button"
+            onClick={submit}
+            disabled={createCustomer.isPending || !canSubmit}
+            className="bg-orange-500 hover:bg-orange-600 text-white"
+          >
+            {createCustomer.isPending ? (
+              <span className="inline-flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Salvando...
+              </span>
+            ) : (
+              "Criar"
+            )}
+          </Button>
+        </div>
       </div>
     </div>
   );

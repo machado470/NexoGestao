@@ -1,22 +1,58 @@
 import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
-import type { User } from "../../drizzle/schema";
-import { sdk } from "./sdk";
+import cookie from "cookie";
+
+const NEXO_API_URL = process.env.NEXO_API_URL || "http://localhost:3000";
+const NEXO_TOKEN_COOKIE = "nexo_token";
 
 export type TrpcContext = {
   req: CreateExpressContextOptions["req"];
   res: CreateExpressContextOptions["res"];
-  user: User | null;
+  user: any | null;
 };
+
+/**
+ * Compat: alguns módulos antigos importam "Context" de ./context
+ * Então a gente expõe um alias pra não quebrar.
+ */
+export type Context = TrpcContext;
+
+function getNexoTokenFromReq(req: any): string | null {
+  const raw = req?.headers?.cookie;
+  if (!raw || typeof raw !== "string") return null;
+
+  const parsed = cookie.parse(raw);
+  const token = parsed?.[NEXO_TOKEN_COOKIE];
+  if (!token) return null;
+
+  return token;
+}
+
+async function fetchNexoMe(req: any) {
+  const token = getNexoTokenFromReq(req);
+  if (!token) return null;
+
+  const response = await fetch(`${NEXO_API_URL}/me`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) return null;
+
+  return response.json();
+}
 
 export async function createContext(
   opts: CreateExpressContextOptions
 ): Promise<TrpcContext> {
-  let user: User | null = null;
+  let user: any | null = null;
 
   try {
-    user = await sdk.authenticateRequest(opts.req);
-  } catch (error) {
-    // Authentication is optional for public procedures.
+    const me = await fetchNexoMe(opts.req);
+    // /me retorna { ok, data: { user, ... } }
+    user = me?.data?.user ?? null;
+  } catch {
     user = null;
   }
 

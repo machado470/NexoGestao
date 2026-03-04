@@ -1,56 +1,32 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
-import { Button } from "@/components/ui/button";
-import { DataTable } from "@/components/DataTable";
-import { Pagination } from "@/components/Pagination";
-import { Plus, Loader, Users } from "lucide-react";
-import { CreateCustomerModal } from "@/components/CreateCustomerModal";
-import { EditCustomerModal } from "@/components/EditCustomerModal";
-import { ConfirmDeleteModal } from "@/components/ConfirmDeleteModal";
-import { ContactHistoryModal } from "@/components/ContactHistoryModal";
 import { toast } from "sonner";
+import { Users, Plus, RefreshCcw } from "lucide-react";
+import CreateCustomerModal from "@/components/CreateCustomerModal";
+import { Button } from "@/components/ui/button";
 
-interface Customer {
-  id: number;
+type Customer = {
+  id: string;
   name: string;
+  phone: string | null;
   email: string | null;
-  phone: string;
-  notes: string | null;
-  active: number;
-  createdAt: Date;
-}
-
-interface PaginatedResponse {
-  data: Customer[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    pages: number;
-  };
-}
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
 
 export default function CustomersPage() {
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(20);
-  const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, pages: 1 });
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
 
-  // Queries
-  const listCustomers = trpc.data.customers.list.useQuery({ page, limit });
+  // ✅ Agora vem do Nest via BFF proxy
+  const listCustomers = trpc.nexo.customers.list.useQuery(undefined, {
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
 
-  useEffect(() => {
-    if (listCustomers.data) {
-      const response = listCustomers.data as unknown as PaginatedResponse;
-      if (response && response.data && response.pagination) {
-        setCustomers(response.data);
-        setPagination(response.pagination);
-      }
-    }
+  const customers: Customer[] = useMemo(() => {
+    // resposta do proxy: { ok, data: Customer[] }
+    return (listCustomers.data?.data ?? []) as Customer[];
   }, [listCustomers.data]);
 
   useEffect(() => {
@@ -59,180 +35,124 @@ export default function CustomersPage() {
     }
   }, [listCustomers.error]);
 
-  const handleCreateSuccess = () => {
-    void listCustomers.refetch();
-  };
-
-  const deleteCustomer = trpc.data.customers.delete.useMutation({
-    onSuccess: () => {
-      toast.success("Cliente deletado com sucesso!");
-      void listCustomers.refetch();
-      setShowDeleteModal(false);
-    },
-    onError: (error) => {
-      toast.error("Erro ao deletar cliente: " + error.message);
-    },
-  });
-
-  const handleDeleteClick = (row: Customer) => {
-    setSelectedCustomerId(row.id);
-    setShowDeleteModal(true);
-  };
-
-  const handleConfirmDelete = async () => {
-    if (selectedCustomerId) {
-      await deleteCustomer.mutateAsync({ id: selectedCustomerId });
-    }
-  };
-
-  const handleEditClick = (row: Customer) => {
-    setSelectedCustomerId(row.id);
-    setShowEditModal(true);
-  };
-
-  const handlePageChange = (newPage: number) => {
-    setPage(newPage);
-  };
-
-  const handleLimitChange = (newLimit: number) => {
-    setLimit(newLimit);
-    setPage(1);
-  };
+  const total = customers.length;
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <Users className="w-8 h-8 text-orange-500" />
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <Users className="w-6 h-6 text-orange-500" />
             Clientes
           </h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
-            Gerencie todos os seus clientes em um único lugar
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+            Lista vinda do NexoGestão (Nest) via BFF (cookie httpOnly).
           </p>
         </div>
-        <Button
-          onClick={() => setShowCreateModal(true)}
-          className="bg-orange-500 hover:bg-orange-600 text-white gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          Novo Cliente
-        </Button>
+
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => void listCustomers.refetch()}
+            className="flex items-center gap-2"
+          >
+            <RefreshCcw className="w-4 h-4" />
+            Atualizar
+          </Button>
+
+          <Button
+            type="button"
+            onClick={() => setIsCreateOpen(true)}
+            className="bg-orange-500 hover:bg-orange-600 text-white flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            Novo Cliente
+          </Button>
+        </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+      {/* Stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
           <p className="text-sm text-gray-600 dark:text-gray-400">Total de Clientes</p>
-          <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
-            {pagination.total}
-          </p>
+          <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{total}</p>
         </div>
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
           <p className="text-sm text-gray-600 dark:text-gray-400">Ativos</p>
-          <p className="text-2xl font-bold text-green-600 dark:text-green-400 mt-1">
-            {customers.filter((c) => c.active === 1).length}
+          <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
+            {customers.filter(c => c.active).length}
           </p>
         </div>
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
           <p className="text-sm text-gray-600 dark:text-gray-400">Inativos</p>
-          <p className="text-2xl font-bold text-red-600 dark:text-red-400 mt-1">
-            {customers.filter((c) => c.active === 0).length}
+          <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
+            {customers.filter(c => !c.active).length}
           </p>
         </div>
       </div>
 
       {/* Table */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+          <p className="text-sm font-medium text-gray-900 dark:text-white">
+            Lista
+          </p>
+        </div>
+
         {listCustomers.isLoading ? (
-          <div className="flex items-center justify-center h-64">
-            <Loader className="w-8 h-8 animate-spin text-orange-500" />
+          <div className="p-6 text-sm text-gray-600 dark:text-gray-400">
+            Carregando...
           </div>
-        ) : customers.length > 0 ? (
-          <>
-            <DataTable
-              columns={[
-                { key: "name", label: "Nome", sortable: true },
-                { key: "email", label: "Email", sortable: true },
-                { key: "phone", label: "Telefone", sortable: true },
-                {
-                  key: "active",
-                  label: "Status",
-                  render: (value) => (
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        value === 1
-                          ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-                          : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
-                      }`}
-                    >
-                      {value === 1 ? "Ativo" : "Inativo"}
-                    </span>
-                  ),
-                },
-                {
-                  key: "id" as any,
-                  label: "Contatos",
-                  render: (_, row: any) => (
-                    <ContactHistoryModal
-                      customerId={row.id}
-                      customerName={row.name}
-                      trigger={
-                        <Button variant="outline" size="sm" className="text-xs">
-                          Ver Historico
-                        </Button>
-                      }
-                    />
-                  ),
-                },
-              ]}
-              data={customers}
-              onEdit={(row) => handleEditClick(row as Customer)}
-              onDelete={(row) => handleDeleteClick(row as Customer)}
-            />
-            <Pagination
-              page={pagination.page}
-              pages={pagination.pages}
-              total={pagination.total}
-              limit={pagination.limit}
-              onPageChange={handlePageChange}
-              onLimitChange={handleLimitChange}
-            />
-          </>
+        ) : customers.length === 0 ? (
+          <div className="p-6 text-sm text-gray-600 dark:text-gray-400">
+            Nenhum cliente ainda. Crie o primeiro.
+          </div>
         ) : (
-          <div className="flex items-center justify-center h-64 text-gray-500 dark:text-gray-400">
-            <p>Nenhum cliente encontrado</p>
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-gray-50 dark:bg-gray-900/40">
+                <tr className="text-left">
+                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Nome</th>
+                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Telefone</th>
+                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Email</th>
+                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                {customers.map(c => (
+                  <tr key={c.id} className="hover:bg-gray-50 dark:hover:bg-gray-900/30">
+                    <td className="px-4 py-3 text-gray-900 dark:text-white">{c.name}</td>
+                    <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{c.phone ?? "—"}</td>
+                    <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{c.email ?? "—"}</td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={
+                          c.active
+                            ? "inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
+                            : "inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300"
+                        }
+                      >
+                        {c.active ? "Ativo" : "Inativo"}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
 
-      {/* Modals */}
+      {/* Modal */}
       <CreateCustomerModal
-        isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        onSuccess={handleCreateSuccess}
+        open={isCreateOpen}
+        onOpenChange={setIsCreateOpen}
+        onCreated={async () => {
+          await listCustomers.refetch();
+        }}
       />
-
-      {selectedCustomerId && (
-        <>
-          <EditCustomerModal
-            isOpen={showEditModal}
-            onClose={() => setShowEditModal(false)}
-            customerId={selectedCustomerId}
-            onSuccess={handleCreateSuccess}
-          />
-
-          <ConfirmDeleteModal
-            isOpen={showDeleteModal}
-            onCancel={() => setShowDeleteModal(false)}
-            onConfirm={handleConfirmDelete}
-            title="Deletar Cliente"
-            message="Tem certeza que deseja deletar este cliente?"
-            isLoading={deleteCustomer.isPending}
-          />
-        </>
-      )}
     </div>
   );
 }

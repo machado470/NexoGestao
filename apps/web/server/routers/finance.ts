@@ -1,126 +1,178 @@
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
-import {
-  createCharge,
-  getChargesByOrg,
-  getChargeById,
-  updateCharge,
-  deleteCharge,
-} from "../db";
+import { nexoFetch } from "../_core/nexoClient";
+
+// Helpers
+const paginationInput = z.object({
+  page: z.number().int().positive().default(1),
+  limit: z.number().int().positive().default(20),
+});
 
 export const financeRouter = router({
-  // ===== Charges =====
   charges: router({
+    /**
+     * create charge
+     * Nest (esperado): POST /finance/charges
+     */
     create: protectedProcedure
       .input(
         z.object({
           customerId: z.number().min(1, "Cliente é obrigatório"),
           description: z.string().min(1, "Descrição é obrigatória"),
-          amount: z.number().min(1, "Valor deve ser maior que 0"),
-          dueDate: z.date(),
+          amount: z.number().min(0.01, "Valor deve ser maior que 0"),
+          dueDate: z.coerce.date(),
           notes: z.string().optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
-        const orgId = ctx.user?.id || 1;
-        return await createCharge({
-          organizationId: orgId,
-          customerId: input.customerId,
-          description: input.description,
-          amount: Math.round(input.amount * 100), // Converter para centavos
-          dueDate: input.dueDate,
-          status: "PENDING",
-          notes: input.notes,
+        // envia como o front manda (Nest decide se converte pra centavos)
+        const res = await nexoFetch<any>(ctx.req, `/finance/charges`, {
+          method: "POST",
+          body: JSON.stringify({
+            ...input,
+            dueDate: input.dueDate.toISOString(),
+          }),
         });
+
+        // se sem token, nexoFetch retorna null
+        return res;
       }),
 
-    list: protectedProcedure.query(async ({ ctx }) => {
-      const orgId = ctx.user?.id || 1;
-      return await getChargesByOrg(orgId);
-    }),
+    /**
+     * list charges (front usa page/limit em vários pontos)
+     * Nest (esperado): GET /finance/charges?page=&limit=&status=
+     * Retorno esperado do Nest pode ser:
+     * - { ok, data: Charge[], pagination? }
+     * - ou { data, pagination }
+     *
+     * A gente normaliza pro shape do front:
+     * { data, pagination }
+     */
+    list: protectedProcedure
+      .input(
+        paginationInput
+          .extend({
+            status: z.enum(["PENDING", "PAID", "OVERDUE", "CANCELED"]).optional(),
+            customerId: z.number().optional(),
+            q: z.string().optional(),
+          })
+          .optional()
+      )
+      .query(async ({ input, ctx }) => {
+        const page = input?.page ?? 1;
+        const limit = input?.limit ?? 20;
 
+        const params = new URLSearchParams();
+        params.set("page", String(page));
+        params.set("limit", String(limit));
+        if (input?.status) params.set("status", input.status);
+        if (input?.customerId) params.set("customerId", String(input.customerId));
+        if (input?.q) params.set("q", input.q);
+
+        const raw = await nexoFetch<any>(ctx.req, `/finance/charges?${params.toString()}`, {
+          method: "GET",
+        });
+
+        // Se o Nest já devolve { ok, data, pagination }:
+        const payload = raw?.data ?? raw;
+        const data = payload?.data ?? payload ?? [];
+        const pagination =
+          payload?.pagination ?? {
+            page,
+            limit,
+            total: Array.isArray(data) ? data.length : 0,
+            pages: 1,
+          };
+
+        return { data, pagination };
+      }),
+
+    /**
+     * getById
+     * Nest (esperado): GET /finance/charges/:id
+     */
     getById: protectedProcedure
-      .input(z.object({ id: z.number() }))
-      .query(async ({ input }) => {
-        return await getChargeById(input.id);
+      .input(z.object({ id: z.number().int().positive() }))
+      .query(async ({ input, ctx }) => {
+        const raw = await nexoFetch<any>(ctx.req, `/finance/charges/${input.id}`, {
+          method: "GET",
+        });
+
+        return raw?.data ?? raw;
       }),
 
+    /**
+     * update
+     * Nest (esperado): PATCH /finance/charges/:id
+     */
     update: protectedProcedure
       .input(
         z.object({
-          id: z.number(),
+          id: z.number().int().positive(),
           description: z.string().min(1).optional(),
-          amount: z.number().min(1).optional(),
-          dueDate: z.date().optional(),
-          paidDate: z.date().optional(),
+          amount: z.number().min(0.01).optional(),
+          dueDate: z.coerce.date().optional(),
+          paidDate: z.coerce.date().optional(),
           status: z.enum(["PENDING", "PAID", "OVERDUE", "CANCELED"]).optional(),
           notes: z.string().optional(),
         })
       )
-      .mutation(async ({ input }) => {
-        const { id, amount, ...data } = input;
-        const updateData: any = { ...data };
-        if (amount !== undefined) {
-          updateData.amount = Math.round(amount * 100);
-        }
-        return await updateCharge(id, updateData);
-      }),
+      .mutation(async ({ input, ctx }) => {
+        const { id, ...rest } = input;
 
-    delete: protectedProcedure
-      .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
-        return await deleteCharge(input.id);
-      }),
-
-    // ===== Statistics =====
-    stats: protectedProcedure.query(async ({ ctx }) => {
-      const orgId = ctx.user?.id || 1;
-      const allCharges = await getChargesByOrg(orgId);
-
-      const now = new Date();
-      const pending = allCharges.filter((c) => c.status === "PENDING");
-      const paid = allCharges.filter((c) => c.status === "PAID");
-      const overdue = allCharges.filter(
-        (c) => c.status === "PENDING" && new Date(c.dueDate) < now
-      );
-
-      const totalPending = pending.reduce((sum, c) => sum + (c.amount || 0), 0);
-      const totalPaid = paid.reduce((sum, c) => sum + (c.amount || 0), 0);
-      const totalOverdue = overdue.reduce((sum, c) => sum + (c.amount || 0), 0);
-
-      return {
-        totalCharges: allCharges.length,
-        totalPending: pending.length,
-        totalPaid: paid.length,
-        totalOverdue: overdue.length,
-        totalPendingAmount: totalPending,
-        totalPaidAmount: totalPaid,
-        totalOverdueAmount: totalOverdue,
-        totalAmount: totalPending + totalPaid,
-      };
-    }),
-
-    // ===== Revenue by Month =====
-    revenueByMonth: protectedProcedure.query(async ({ ctx }) => {
-      const orgId = ctx.user?.id || 1;
-      const allCharges = await getChargesByOrg(orgId);
-      const paidCharges = allCharges.filter((c) => c.status === "PAID");
-
-      // Group by month
-      const monthlyRevenue: Record<string, number> = {};
-      paidCharges.forEach((charge) => {
-        const date = new Date(charge.paidDate || charge.createdAt);
-        const monthKey = date.toLocaleString("pt-BR", {
-          month: "short",
-          year: "numeric",
+        const raw = await nexoFetch<any>(ctx.req, `/finance/charges/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            ...rest,
+            dueDate: rest.dueDate ? rest.dueDate.toISOString() : undefined,
+            paidDate: rest.paidDate ? rest.paidDate.toISOString() : undefined,
+          }),
         });
-        monthlyRevenue[monthKey] = (monthlyRevenue[monthKey] || 0) + (charge.amount || 0);
+
+        return raw?.data ?? raw;
+      }),
+
+    /**
+     * delete
+     * Nest (esperado): DELETE /finance/charges/:id
+     */
+    delete: protectedProcedure
+      .input(z.object({ id: z.number().int().positive() }))
+      .mutation(async ({ input, ctx }) => {
+        const raw = await nexoFetch<any>(ctx.req, `/finance/charges/${input.id}`, {
+          method: "DELETE",
+        });
+
+        return raw?.data ?? raw;
+      }),
+
+    /**
+     * stats
+     * Front antigo chamava stats.useQuery({})
+     * então a gente aceita input opcional (ou {}).
+     *
+     * Nest (esperado): GET /finance/charges/stats
+     */
+    stats: protectedProcedure
+      .input(z.object({}).optional())
+      .query(async ({ ctx }) => {
+        const raw = await nexoFetch<any>(ctx.req, `/finance/charges/stats`, {
+          method: "GET",
+        });
+
+        return raw?.data ?? raw;
+      }),
+
+    /**
+     * revenueByMonth
+     * Nest (esperado): GET /finance/charges/revenue-by-month
+     */
+    revenueByMonth: protectedProcedure.query(async ({ ctx }) => {
+      const raw = await nexoFetch<any>(ctx.req, `/finance/charges/revenue-by-month`, {
+        method: "GET",
       });
 
-      return Object.entries(monthlyRevenue).map(([month, amount]) => ({
-        month,
-        amount: amount / 100, // Converter de centavos para reais
-      }));
+      return raw?.data ?? raw ?? [];
     }),
   }),
 });
