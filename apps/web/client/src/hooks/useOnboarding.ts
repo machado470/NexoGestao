@@ -62,7 +62,7 @@ export function useOnboarding(steps: OnboardingStep[]) {
   };
 
   const skipOnboarding = () => {
-    setState((prev) => ({ ...prev, isActive: false, completedSteps: steps.map((s) => s.id) });
+    setState((prev) => ({ ...prev, isActive: false, completedSteps: steps.map((s) => s.id) }));
   };
 
   const resetOnboarding = () => {

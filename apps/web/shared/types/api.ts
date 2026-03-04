@@ -130,7 +130,7 @@ export enum PaymentMethod {
 }
 
 // Status labels em pt-BR
-export const statusLabels = {
+export const statusLabels: Record<string, string> = {
   [CustomerStatus.ACTIVE]: 'Ativo',
   [CustomerStatus.INACTIVE]: 'Inativo',
   [CustomerStatus.SUSPENDED]: 'Suspenso',
@@ -158,7 +158,7 @@ export const statusLabels = {
 };
 
 // Status colors
-export const statusColors = {
+export const statusColors: Record<string, string> = {
   [CustomerStatus.ACTIVE]: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
   [CustomerStatus.INACTIVE]: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400',
   [CustomerStatus.SUSPENDED]: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',

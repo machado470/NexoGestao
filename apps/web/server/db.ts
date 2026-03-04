@@ -514,3 +514,108 @@ export async function updateGovernance(id: number, data: Partial<Governance>): P
 export async function deleteGovernance(id: number) {
   return okDelete(_governance.delete(id), id);
 }
+
+// =============================================================================
+// CONTACT HISTORY (DEV MODE) — In-memory fallback
+// =============================================================================
+
+export type ContactHistory = {
+  id: number;
+  organizationId: number;
+  customerId: number;
+  contactType: "phone" | "email" | "whatsapp" | "in_person" | "other";
+  subject: string;
+  description?: string | null;
+  notes?: string | null;
+  contactedBy?: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+type CreateContactHistoryInput = Omit<ContactHistory, "id" | "createdAt" | "updatedAt">;
+
+let _contactHistorySeq = 1;
+const _contactHistory = new Map<number, ContactHistory>();
+
+export async function createContactHistory(input: CreateContactHistoryInput): Promise<ContactHistory> {
+  const t = now();
+  const id = _contactHistorySeq++;
+  const c: ContactHistory = {
+    id,
+    createdAt: t,
+    updatedAt: t,
+    description: input.description ?? null,
+    notes: input.notes ?? null,
+    contactedBy: input.contactedBy ?? null,
+    ...input,
+  };
+  _contactHistory.set(id, c);
+  return c;
+}
+
+export async function getContactHistoryByCustomer(customerId: number): Promise<ContactHistory[]> {
+  const list = Array.from(_contactHistory.values()).filter((c) => c.customerId === customerId);
+  list.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
+  return list;
+}
+
+export async function deleteContactHistory(id: number) {
+  return okDelete(_contactHistory.delete(id), id);
+}
+
+// =============================================================================
+// WHATSAPP MESSAGES (DEV MODE) — In-memory fallback
+// =============================================================================
+
+export type WhatsAppMessage = {
+  id: number;
+  organizationId: number;
+  customerId: number;
+  direction: "inbound" | "outbound";
+  content: string;
+  status: "pending" | "sent" | "delivered" | "read" | "failed";
+  senderNumber?: string | null;
+  receiverNumber?: string | null;
+  mediaUrl?: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+type CreateWhatsAppMessageInput = Omit<WhatsAppMessage, "id" | "createdAt" | "updatedAt">;
+
+let _whatsappSeq = 1;
+const _whatsappMessages = new Map<number, WhatsAppMessage>();
+
+export async function createWhatsappMessage(input: CreateWhatsAppMessageInput): Promise<WhatsAppMessage> {
+  const t = now();
+  const id = _whatsappSeq++;
+  const w: WhatsAppMessage = {
+    id,
+    createdAt: t,
+    updatedAt: t,
+    senderNumber: input.senderNumber ?? null,
+    receiverNumber: input.receiverNumber ?? null,
+    mediaUrl: input.mediaUrl ?? null,
+    ...input,
+  };
+  _whatsappMessages.set(id, w);
+  return w;
+}
+
+export async function getWhatsappMessagesByCustomer(customerId: number): Promise<WhatsAppMessage[]> {
+  const list = Array.from(_whatsappMessages.values()).filter((w) => w.customerId === customerId);
+  list.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
+  return list;
+}
+
+export async function updateWhatsappMessageStatus(id: number, status: string): Promise<WhatsAppMessage | null> {
+  const current = _whatsappMessages.get(id);
+  if (!current) return null;
+  const updated: WhatsAppMessage = { ...current, status: status as any, updatedAt: now() };
+  _whatsappMessages.set(id, updated);
+  return updated;
+}
+
+export async function deleteWhatsappMessage(id: number) {
+  return okDelete(_whatsappMessages.delete(id), id);
+}
