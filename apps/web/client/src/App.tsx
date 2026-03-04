@@ -20,6 +20,7 @@ import PeoplePage from "./pages/PeoplePage";
 import GovernancePage from "./pages/GovernancePage";
 import FinancesPage from "./pages/FinancesPage";
 import ExecutiveDashboard from "./pages/ExecutiveDashboard";
+import ExecutiveDashboardNew from "./pages/ExecutiveDashboardNew";
 import WhatsAppPage from "./pages/WhatsAppPage";
 import LaunchesPage from "./pages/LaunchesPage";
 import About from "./pages/About";
@@ -113,6 +114,9 @@ function Router() {
       )} />
       <Route path="/executive-dashboard" component={() => (
         <ProtectedRoute component={() => <MainLayout><ExecutiveDashboard /></MainLayout>} />
+      )} />
+      <Route path="/executive-dashboard-new" component={() => (
+        <ProtectedRoute component={() => <MainLayout><ExecutiveDashboardNew /></MainLayout>} />
       )} />
       <Route path="/whatsapp" component={() => (
         <ProtectedRoute component={() => <MainLayout><WhatsAppPage /></MainLayout>} />

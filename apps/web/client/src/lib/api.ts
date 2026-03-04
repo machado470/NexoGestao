@@ -230,6 +230,48 @@ export interface ExecutiveMetrics {
   riskScore: number;
 }
 
+// ===== Dashboard =====
+export interface DashboardMetrics {
+  totalCustomers: number;
+  totalServiceOrders: number;
+  inProgressOrders: number;
+  completedOrders: number;
+  delayedOrders: number;
+  riskTickets: number;
+  totalRevenueInCents: number;
+  paidRevenueInCents: number;
+  pendingRevenueInCents: number;
+}
+
+export interface RevenueData {
+  month: string;
+  revenue: number;
+}
+
+export interface CustomerGrowthData {
+  month: string;
+  newCustomers: number;
+  totalCustomers: number;
+}
+
+export interface ServiceOrdersStatus {
+  open: number;
+  assigned: number;
+  inProgress: number;
+  completed: number;
+  cancelled: number;
+  onHold: number;
+}
+
+export interface ChargesStatus {
+  pending: number;
+  paid: number;
+  overdue: number;
+  cancelled: number;
+  refunded: number;
+  partial: number;
+}
+
 class NexoGestaoAPI {
   private client: AxiosInstance;
   private token: string | null = null;
@@ -807,3 +849,54 @@ class NexoGestaoAPI {
 }
 
 export const api = new NexoGestaoAPI();
+
+  // ===== Dashboard =====
+  async getDashboardMetrics(): Promise<DashboardMetrics> {
+    try {
+      const response = await this.client.get<DashboardMetrics>("/dashboard/metrics");
+      return response.data;
+    } catch (error) {
+      console.error("Erro ao buscar métricas do dashboard:", error);
+      throw error;
+    }
+  }
+
+  async getDashboardRevenue(): Promise<RevenueData[]> {
+    try {
+      const response = await this.client.get<RevenueData[]>("/dashboard/revenue");
+      return response.data;
+    } catch (error) {
+      console.error("Erro ao buscar dados de faturamento:", error);
+      throw error;
+    }
+  }
+
+  async getDashboardGrowth(): Promise<CustomerGrowthData[]> {
+    try {
+      const response = await this.client.get<CustomerGrowthData[]>("/dashboard/growth");
+      return response.data;
+    } catch (error) {
+      console.error("Erro ao buscar dados de crescimento:", error);
+      throw error;
+    }
+  }
+
+  async getDashboardServiceOrdersStatus(): Promise<ServiceOrdersStatus> {
+    try {
+      const response = await this.client.get<ServiceOrdersStatus>("/dashboard/service-orders-status");
+      return response.data;
+    } catch (error) {
+      console.error("Erro ao buscar status das ordens de serviço:", error);
+      throw error;
+    }
+  }
+
+  async getDashboardChargesStatus(): Promise<ChargesStatus> {
+    try {
+      const response = await this.client.get<ChargesStatus>("/dashboard/charges-status");
+      return response.data;
+    } catch (error) {
+      console.error("Erro ao buscar status das cobranças:", error);
+      throw error;
+    }
+  }

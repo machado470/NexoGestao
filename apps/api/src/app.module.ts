@@ -60,6 +60,9 @@ import { WhatsAppModule } from './whatsapp/whatsapp.module'
 // 📧 E-mail
 import { EmailModule } from './email/email.module'
 
+// 📊 DASHBOARD EXECUTIVO
+import { DashboardModule } from './dashboard/dashboard.module'
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -117,6 +120,9 @@ import { EmailModule } from './email/email.module'
 
     // 🔥 Governança
     GovernanceModule,
+
+    // 📊 Dashboard Executivo
+    DashboardModule,
   ],
 })
 export class AppModule {}
