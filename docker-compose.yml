@@ -41,6 +41,8 @@ services:
 
     # PROD: usa o entrypoint dentro da imagem (ele já faz migrate/seed/check dist)
     entrypoint: ["/app/apps/api/docker-entrypoint.sh"]
+    volumes:
+      - ./apps/api:/app/apps/api
 
 volumes:
   pgdata:
