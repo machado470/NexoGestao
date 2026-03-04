@@ -21,8 +21,9 @@ function isStatus(v: any): v is ServiceOrderStatus {
     v === 'OPEN' ||
     v === 'ASSIGNED' ||
     v === 'IN_PROGRESS' ||
-    v === 'DONE' ||
-    v === 'CANCELED'
+    v === 'COMPLETED' ||
+    v === 'CANCELLED' ||
+    v === 'ON_HOLD'
   )
 }
 
@@ -32,10 +33,12 @@ function statusToAction(status: ServiceOrderStatus): string {
       return 'SERVICE_ORDER_ASSIGNED'
     case 'IN_PROGRESS':
       return 'SERVICE_ORDER_STARTED'
-    case 'DONE':
+    case 'COMPLETED':
       return 'SERVICE_ORDER_DONE'
-    case 'CANCELED':
+    case 'CANCELLED':
       return 'SERVICE_ORDER_CANCELED'
+    case 'ON_HOLD':
+      return 'SERVICE_ORDER_ON_HOLD'
     case 'OPEN':
     default:
       return 'SERVICE_ORDER_UPDATED'
@@ -374,8 +377,9 @@ export class ServiceOrdersService {
 
     if (patch.status && patch.status !== existing.status) {
       if (patch.status === 'IN_PROGRESS') patch.startedAt = new Date()
-      if (patch.status === 'DONE') patch.finishedAt = new Date()
-      if (patch.status === 'CANCELED') patch.finishedAt = new Date()
+      if (patch.status === 'COMPLETED') patch.finishedAt = new Date()
+      if (patch.status === 'CANCELLED') patch.finishedAt = new Date()
+      if (patch.status === 'ON_HOLD') patch.finishedAt = null
     }
 
     const result = await this.prisma.serviceOrder.updateMany({
@@ -451,8 +455,8 @@ export class ServiceOrdersService {
       },
     })
 
-    // ✅ Se virou DONE, tenta garantir cobrança (idempotente).
-    if (statusChanged && updated.status === 'DONE') {
+    // ✅ Se virou COMPLETED, tenta garantir cobrança (idempotente).
+    if (statusChanged && updated.status === 'COMPLETED') {
       try {
         await this.finance.ensureChargeForServiceOrderDone({
           orgId: params.orgId,

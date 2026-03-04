@@ -53,8 +53,9 @@ enum TrackItemType {
 enum AppointmentStatus {
   SCHEDULED
   CONFIRMED
-  CANCELED
-  DONE
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
   NO_SHOW
 }
 
@@ -62,23 +63,35 @@ enum ServiceOrderStatus {
   OPEN
   ASSIGNED
   IN_PROGRESS
-  DONE
-  CANCELED
+  COMPLETED
+  CANCELLED
+  ON_HOLD
 }
 
 enum ChargeStatus {
   PENDING
   PAID
   OVERDUE
-  CANCELED
+  CANCELLED
+  REFUNDED
+  PARTIAL
 }
 
 enum PaymentMethod {
+  CREDIT_CARD
+  DEBIT_CARD
+  BANK_TRANSFER
   PIX
+  BOLETO
   CASH
-  CARD
-  TRANSFER
-  OTHER
+  CHECK
+}
+
+enum CustomerStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  ARCHIVED
 }
 
 //
@@ -434,7 +447,7 @@ model Customer {
   phone  String
   email  String?
   notes  String?
-  active Boolean @default(true)
+  status CustomerStatus @default(ACTIVE)
 
   appointments  Appointment[]
   serviceOrders ServiceOrder[]

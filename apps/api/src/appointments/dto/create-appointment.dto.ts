@@ -3,8 +3,9 @@ import { IsIn, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validat
 const APPOINTMENT_STATUSES = [
   'SCHEDULED',
   'CONFIRMED',
-  'CANCELED',
-  'DONE',
+  'IN_PROGRESS',
+  'COMPLETED',
+  'CANCELLED',
   'NO_SHOW',
 ] as const
 

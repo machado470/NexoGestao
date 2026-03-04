@@ -13,8 +13,9 @@ const SERVICE_ORDER_STATUSES = [
   'OPEN',
   'ASSIGNED',
   'IN_PROGRESS',
-  'DONE',
-  'CANCELED',
+  'COMPLETED',
+  'CANCELLED',
+  'ON_HOLD',
 ] as const
 
 export class UpdateServiceOrderDto {

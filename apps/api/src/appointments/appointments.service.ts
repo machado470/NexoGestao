@@ -31,8 +31,9 @@ function isStatus(v: any): v is AppointmentStatus {
   return (
     v === 'SCHEDULED' ||
     v === 'CONFIRMED' ||
-    v === 'CANCELED' ||
-    v === 'DONE' ||
+    v === 'IN_PROGRESS' ||
+    v === 'COMPLETED' ||
+    v === 'CANCELLED' ||
     v === 'NO_SHOW'
   )
 }
@@ -41,13 +42,14 @@ function statusToAction(status: AppointmentStatus): string {
   switch (status) {
     case 'CONFIRMED':
       return 'APPOINTMENT_CONFIRMED'
-    case 'CANCELED':
+    case 'CANCELLED':
       return 'APPOINTMENT_CANCELED'
-    case 'DONE':
+    case 'COMPLETED':
       return 'APPOINTMENT_DONE'
     case 'NO_SHOW':
       return 'APPOINTMENT_NO_SHOW'
     case 'SCHEDULED':
+    case 'IN_PROGRESS':
     default:
       return 'APPOINTMENT_UPDATED'
   }

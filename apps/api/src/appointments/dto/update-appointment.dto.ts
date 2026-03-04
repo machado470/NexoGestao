@@ -3,8 +3,9 @@ import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator'
 const APPOINTMENT_STATUSES = [
   'SCHEDULED',
   'CONFIRMED',
-  'CANCELED',
-  'DONE',
+  'IN_PROGRESS',
+  'COMPLETED',
+  'CANCELLED',
   'NO_SHOW',
 ] as const
 
