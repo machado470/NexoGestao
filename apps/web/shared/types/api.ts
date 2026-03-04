@@ -2,47 +2,64 @@
 // Shared usado por client/server. Mantém enums + helpers + contrato de resposta.
 
 export enum ServiceOrderStatus {
-  DRAFT = "DRAFT",
+  OPEN = "OPEN",
+  ASSIGNED = "ASSIGNED",
   IN_PROGRESS = "IN_PROGRESS",
-  COMPLETED = "COMPLETED",
-  CANCELLED = "CANCELLED"
+  DONE = "DONE",
+  CANCELED = "CANCELED"
 }
 
 export enum ChargeStatus {
-  DRAFT = "DRAFT",
-  ISSUED = "ISSUED",
+  PENDING = "PENDING",
   PAID = "PAID",
-  CANCELLED = "CANCELLED"
+  OVERDUE = "OVERDUE",
+  CANCELED = "CANCELED"
+}
+
+export enum AppointmentStatus {
+  SCHEDULED = "SCHEDULED",
+  CONFIRMED = "CONFIRMED",
+  CANCELED = "CANCELED",
+  DONE = "DONE",
+  NO_SHOW = "NO_SHOW"
 }
 
 export const SERVICE_ORDER_STATUS_LABEL: Record<ServiceOrderStatus, string> = {
-  [ServiceOrderStatus.DRAFT]: "Rascunho",
+  [ServiceOrderStatus.OPEN]: "Aberta",
+  [ServiceOrderStatus.ASSIGNED]: "Atribuída",
   [ServiceOrderStatus.IN_PROGRESS]: "Em Andamento",
-  [ServiceOrderStatus.COMPLETED]: "Concluído",
-  [ServiceOrderStatus.CANCELLED]: "Cancelado"
+  [ServiceOrderStatus.DONE]: "Concluída",
+  [ServiceOrderStatus.CANCELED]: "Cancelada"
 };
 
 export const CHARGE_STATUS_LABEL: Record<ChargeStatus, string> = {
-  [ChargeStatus.DRAFT]: "Rascunho",
-  [ChargeStatus.ISSUED]: "Emitida",
+  [ChargeStatus.PENDING]: "Pendente",
   [ChargeStatus.PAID]: "Paga",
-  [ChargeStatus.CANCELLED]: "Cancelada"
+  [ChargeStatus.OVERDUE]: "Vencida",
+  [ChargeStatus.CANCELED]: "Cancelada"
+};
+
+export const APPOINTMENT_STATUS_LABEL: Record<AppointmentStatus, string> = {
+  [AppointmentStatus.SCHEDULED]: "Agendado",
+  [AppointmentStatus.CONFIRMED]: "Confirmado",
+  [AppointmentStatus.CANCELED]: "Cancelado",
+  [AppointmentStatus.DONE]: "Realizado",
+  [AppointmentStatus.NO_SHOW]: "Não Compareceu"
 };
 
 export const SERVICE_ORDER_STATUS_BADGE: Record<ServiceOrderStatus, string> = {
-  [ServiceOrderStatus.DRAFT]: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400",
-  [ServiceOrderStatus.IN_PROGRESS]:
-    "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
-  [ServiceOrderStatus.COMPLETED]:
-    "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-  [ServiceOrderStatus.CANCELLED]: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+  [ServiceOrderStatus.OPEN]: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400",
+  [ServiceOrderStatus.ASSIGNED]: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
+  [ServiceOrderStatus.IN_PROGRESS]: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
+  [ServiceOrderStatus.DONE]: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
+  [ServiceOrderStatus.CANCELED]: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
 };
 
 export const CHARGE_STATUS_BADGE: Record<ChargeStatus, string> = {
-  [ChargeStatus.DRAFT]: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400",
-  [ChargeStatus.ISSUED]: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
+  [ChargeStatus.PENDING]: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400",
   [ChargeStatus.PAID]: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-  [ChargeStatus.CANCELLED]: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
+  [ChargeStatus.OVERDUE]: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
+  [ChargeStatus.CANCELED]: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
 };
 
 // --------------------

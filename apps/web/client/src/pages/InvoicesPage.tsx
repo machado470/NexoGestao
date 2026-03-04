@@ -1,15 +1,15 @@
 import React, { useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
 
-type UiStatus = "draft" | "issued" | "paid" | "canceled" | "";
-type ApiStatus = "DRAFT" | "ISSUED" | "PAID" | "CANCELLED";
+type UiStatus = "pending" | "paid" | "overdue" | "canceled" | "";
+type ApiStatus = "PENDING" | "PAID" | "OVERDUE" | "CANCELED";
 
 function mapInvoiceStatus(s: UiStatus): ApiStatus | undefined {
   if (!s) return undefined;
-  if (s === "draft") return "DRAFT";
-  if (s === "issued") return "ISSUED";
+  if (s === "pending") return "PENDING";
   if (s === "paid") return "PAID";
-  if (s === "canceled") return "CANCELLED";
+  if (s === "overdue") return "OVERDUE";
+  if (s === "canceled") return "CANCELED";
   return undefined;
 }
 
@@ -40,9 +40,9 @@ export default function InvoicesPage() {
             }}
           >
             <option value="">Todas</option>
-            <option value="draft">Rascunho</option>
-            <option value="issued">Emitida</option>
+            <option value="pending">Pendente</option>
             <option value="paid">Paga</option>
+            <option value="overdue">Vencida</option>
             <option value="canceled">Cancelada</option>
           </select>
         </div>
