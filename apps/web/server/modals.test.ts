@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { getDb } from "./db";
-import { customers, appointments, serviceOrders } from "../drizzle/schema";
+import { customers, appointments, serviceOrders } from "../../../drizzle/schema";
 import { eq } from "drizzle-orm";
 
 describe("CRUD Operations", async () => {
