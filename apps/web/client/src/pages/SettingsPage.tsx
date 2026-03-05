@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { trpc } from "@/lib/trpc";
+import { trpc } from "../lib/trpc";
 import { toast } from "sonner";
 import { 
   Settings, 
@@ -135,7 +135,7 @@ export default function SettingsPage() {
                   <Globe className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                   <input
                     disabled
-                    value={settingsData.slug || ""}
+                    value={settingsData?.slug || ""}
                     className="w-full rounded-md border bg-zinc-50 dark:bg-zinc-900/50 pl-10 pr-3 py-2 text-sm text-muted-foreground cursor-not-allowed dark:border-zinc-800"
                   />
                 </div>
@@ -183,12 +183,12 @@ export default function SettingsPage() {
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium">Plano Atual:</span>
                 <span className="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-800 dark:bg-orange-900/30 dark:text-orange-400">
-                  {settingsData.currentPlan || "Básico"}
+                  {settingsData?.currentPlan || "Básico"}
                 </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium">Membros:</span>
-                <span className="text-sm">{settingsData.membersCount || 0}</span>
+                <span className="text-sm">{settingsData?.membersCount || 0}</span>
               </div>
               <button className="w-full rounded-md bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 px-4 py-2 text-sm font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors">
                 Gerenciar Assinatura
