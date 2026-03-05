@@ -14,6 +14,7 @@ import {
   Sun,
   Users,
   Calendar,
+  CalendarDays,
   Briefcase,
   DollarSign,
   BarChart3,
@@ -22,7 +23,8 @@ import {
   MessageCircle,
   FileText,
   TrendingDown,
-  ChevronLeft
+  ChevronLeft,
+  Settings
 } from "lucide-react";
 
 interface MainLayoutProps {
@@ -88,7 +90,11 @@ export function MainLayout({ children }: MainLayoutProps) {
 
     { id: "people", label: "Pessoas", icon: Users, route: "/people" },
 
-    { id: "governance", label: "Governança", icon: Shield, route: "/governance" }
+    { id: "governance", label: "Governança", icon: Shield, route: "/governance" },
+
+    { id: "calendar", label: "Calendário", icon: CalendarDays, route: "/calendar" },
+
+    { id: "settings", label: "Configurações", icon: Settings, route: "/settings" }
 
   ] as const
 

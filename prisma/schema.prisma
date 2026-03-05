@@ -183,6 +183,7 @@ model Organization {
   customers     Customer[]
   appointments  Appointment[]
   serviceOrders ServiceOrder[]
+  serviceOrderAttachments ServiceOrderAttachment[]
   charges       Charge[]
   payments      Payment[]
 
@@ -939,4 +940,23 @@ model UsageMetric {
   @@index([orgId, createdAt])
   @@index([userId, event, createdAt])
   @@index([event, createdAt])
+}
+
+// ============================================================
+// ✅ Anexos de Ordens de Serviço
+// ============================================================
+model ServiceOrderAttachment {
+  id             String       @id @default(uuid())
+  orgId          String
+  org            Organization @relation(fields: [orgId], references: [id])
+  serviceOrderId String
+  fileName       String
+  fileUrl        String
+  mimeType       String
+  sizeBytes      Int          @default(0)
+  uploadedBy     String?      // userId
+  createdAt      DateTime     @default(now())
+
+  @@index([serviceOrderId, createdAt])
+  @@index([orgId, createdAt])
 }

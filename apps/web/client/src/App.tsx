@@ -29,6 +29,8 @@ import ExpensesPage from "./pages/ExpensesPage";
 import ReferralsPage from "./pages/ReferralsPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
+import CalendarPage from "./pages/CalendarPage";
+import SettingsPage from "./pages/SettingsPage";
 import { Loader } from "lucide-react";
 import { NotificationCenter } from "./components/NotificationCenter";
 
@@ -132,6 +134,12 @@ function Router() {
       )} />
       <Route path="/referrals" component={() => (
         <ProtectedRoute component={() => <MainLayout><ReferralsPage /></MainLayout>} />
+      )} />
+      <Route path="/calendar" component={() => (
+        <ProtectedRoute component={() => <MainLayout><CalendarPage /></MainLayout>} />
+      )} />
+      <Route path="/settings" component={() => (
+        <ProtectedRoute component={() => <MainLayout><SettingsPage /></MainLayout>} />
       )} />
       <Route path="/forgot-password" component={() => <PublicRoute component={ForgotPasswordPage} />} />
       <Route path="/reset-password" component={() => <PublicRoute component={ResetPasswordPage} />} />

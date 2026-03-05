@@ -42,6 +42,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
         'Invoice',
         'Launch',
         'Referral',
+        'ServiceOrderAttachment',
       ]
 
       if (params.model && modelsWithOrgId.includes(params.model)) {
