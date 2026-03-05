@@ -1,6 +1,22 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common'
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  BadRequestException,
+} from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { CreateInvoiceDto, InvoiceStatus } from './dto/create-invoice.dto'
+
+// ✅ Mapa de transições de status válidas para Faturas
+// DRAFT → ISSUED → PAID
+// DRAFT → CANCELLED
+// ISSUED → CANCELLED
+const VALID_TRANSITIONS: Record<InvoiceStatus, InvoiceStatus[]> = {
+  [InvoiceStatus.DRAFT]: [InvoiceStatus.ISSUED, InvoiceStatus.CANCELLED],
+  [InvoiceStatus.ISSUED]: [InvoiceStatus.PAID, InvoiceStatus.CANCELLED],
+  [InvoiceStatus.PAID]: [],
+  [InvoiceStatus.CANCELLED]: [],
+}
 
 @Injectable()
 export class InvoicesService {
@@ -87,6 +103,11 @@ export class InvoicesService {
     })
     if (existing) throw new ConflictException(`Fatura com número ${dto.number} já existe`)
 
+    // ✅ Validação: valor deve ser positivo
+    if (dto.amountCents <= 0) {
+      throw new BadRequestException('O valor da fatura deve ser maior que zero')
+    }
+
     return this.prisma.invoice.create({
       data: {
         orgId,
@@ -107,25 +128,56 @@ export class InvoicesService {
     const invoice = await this.prisma.invoice.findFirst({ where: { id, orgId } })
     if (!invoice) throw new NotFoundException('Fatura não encontrada')
 
+    // ✅ Validação de transição de status
+    if (dto.status && dto.status !== invoice.status) {
+      const currentStatus = invoice.status as InvoiceStatus
+      const allowedTransitions = VALID_TRANSITIONS[currentStatus] ?? []
+      if (!allowedTransitions.includes(dto.status as InvoiceStatus)) {
+        throw new BadRequestException(
+          `Transição de status inválida: ${invoice.status} → ${dto.status}. ` +
+          `Transições permitidas: ${allowedTransitions.join(', ') || 'nenhuma'}`,
+        )
+      }
+    }
+
+    // ✅ Validação: valor deve ser positivo se fornecido
+    if (dto.amountCents !== undefined && dto.amountCents <= 0) {
+      throw new BadRequestException('O valor da fatura deve ser maior que zero')
+    }
+
+    // ✅ Atualizar timestamps de acordo com o status
+    const updateData: any = {
+      customerId: dto.customerId,
+      number: dto.number,
+      description: dto.description,
+      amountCents: dto.amountCents,
+      status: dto.status,
+      dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
+      notes: dto.notes,
+    }
+
+    if (dto.status === InvoiceStatus.ISSUED && !invoice.issuedAt) {
+      updateData.issuedAt = dto.issuedAt ? new Date(dto.issuedAt) : new Date()
+    }
+    if (dto.status === InvoiceStatus.PAID && !invoice.paidAt) {
+      updateData.paidAt = dto.paidAt ? new Date(dto.paidAt) : new Date()
+    }
+
     return this.prisma.invoice.update({
       where: { id },
-      data: {
-        customerId: dto.customerId,
-        number: dto.number,
-        description: dto.description,
-        amountCents: dto.amountCents,
-        status: dto.status,
-        dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
-        issuedAt: dto.issuedAt ? new Date(dto.issuedAt) : undefined,
-        paidAt: dto.paidAt ? new Date(dto.paidAt) : undefined,
-        notes: dto.notes,
-      },
+      data: updateData,
     })
   }
 
   async delete(orgId: string, id: string) {
     const invoice = await this.prisma.invoice.findFirst({ where: { id, orgId } })
     if (!invoice) throw new NotFoundException('Fatura não encontrada')
+
+    // ✅ Impede exclusão de faturas pagas
+    if (invoice.status === InvoiceStatus.PAID) {
+      throw new BadRequestException('Não é possível excluir uma fatura já paga')
+    }
+
     await this.prisma.invoice.delete({ where: { id } })
     return { ok: true }
   }

@@ -91,9 +91,15 @@ export class ServiceOrdersService {
       status?: ServiceOrderStatus
       customerId?: string
       assignedToPersonId?: string
+      page?: number
+      limit?: number
     },
   ) {
     if (!orgId) throw new BadRequestException('orgId é obrigatório')
+
+    const page = filters.page ?? 1
+    const limit = Math.min(filters.limit ?? 20, 100)
+    const skip = (page - 1) * limit
 
     const where: any = { orgId }
 
@@ -107,18 +113,27 @@ export class ServiceOrdersService {
       where.status = filters.status
     }
 
-    return this.prisma.serviceOrder.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      take: 300,
-      include: {
-        customer: { select: { id: true, name: true, phone: true } },
-        assignedToPerson: { select: { id: true, name: true } },
-        appointment: {
-          select: { id: true, startsAt: true, endsAt: true, status: true },
+    const [data, total] = await Promise.all([
+      this.prisma.serviceOrder.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+        include: {
+          customer: { select: { id: true, name: true, phone: true } },
+          assignedTo: { select: { id: true, name: true } },
+          appointment: {
+            select: { id: true, startsAt: true, endsAt: true, status: true },
+          },
         },
-      },
-    })
+      }),
+      this.prisma.serviceOrder.count({ where }),
+    ])
+
+    return {
+      data,
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+    }
   }
 
   async get(orgId: string, id: string) {
@@ -129,7 +144,7 @@ export class ServiceOrdersService {
       where: { id, orgId },
       include: {
         customer: { select: { id: true, name: true, phone: true } },
-        assignedToPerson: { select: { id: true, name: true } },
+        assignedTo: { select: { id: true, name: true } },
         appointment: {
           select: { id: true, startsAt: true, endsAt: true, status: true },
         },
@@ -215,13 +230,13 @@ export class ServiceOrdersService {
         assignedToPersonId: params.assignedToPersonId ?? null,
         title,
         description,
-        priority,
-        scheduledFor,
+        // priority e scheduledFor não existem no schema atual - usar dueDate
+        dueDate: scheduledFor,
         status: params.assignedToPersonId ? 'ASSIGNED' : 'OPEN',
       },
       include: {
         customer: { select: { id: true, name: true, phone: true } },
-        assignedToPerson: { select: { id: true, name: true } },
+        assignedTo: { select: { id: true, name: true } },
         appointment: {
           select: { id: true, startsAt: true, endsAt: true, status: true },
         },
@@ -241,8 +256,7 @@ export class ServiceOrdersService {
         appointmentId: created.appointmentId,
         assignedToPersonId: created.assignedToPersonId,
         status: created.status,
-        priority: created.priority,
-        scheduledFor: created.scheduledFor,
+        dueDate: created.dueDate,
         actorUserId: params.createdBy,
         actorPersonId: params.personId,
         createdBy: params.createdBy,
@@ -264,8 +278,7 @@ export class ServiceOrdersService {
         appointmentId: created.appointmentId,
         assignedToPersonId: created.assignedToPersonId,
         status: created.status,
-        priority: created.priority,
-        scheduledFor: created.scheduledFor,
+        dueDate: created.dueDate,
       },
     })
 
@@ -280,18 +293,10 @@ export class ServiceOrdersService {
     const now = new Date();
     const overdueServiceOrders = await this.prisma.serviceOrder.findMany({
       where: {
-        scheduledFor: { lt: now },
+        dueDate: { lt: now },
         status: { notIn: [ServiceOrderStatus.DONE, ServiceOrderStatus.CANCELED] },
-        NOT: {
-          notifications: {
-            some: {
-              type: 'SERVICE_OVERDUE',
-              createdAt: { gte: new Date(now.getTime() - 24 * 60 * 60 * 1000) }, // Notificar apenas uma vez por dia
-            },
-          },
-        },
       },
-      include: { customer: true, assignedToPerson: true },
+      include: { customer: true, assignedTo: true },
     });
 
     for (const so of overdueServiceOrders) {
@@ -300,7 +305,7 @@ export class ServiceOrdersService {
         so.orgId,
         'SERVICE_OVERDUE',
         message,
-        so.assignedToPersonId ? so.assignedToPerson.userId : null,
+        so.assignedToPersonId ? (so.assignedTo as any)?.userId : null,
         { serviceOrderId: so.id, customerId: so.customerId },
       );
     }
@@ -354,23 +359,18 @@ export class ServiceOrdersService {
       patch.description = normalizeText(params.data.description)
     }
 
-    if (
-      typeof params.data.priority === 'number' &&
-      Number.isFinite(params.data.priority)
-    ) {
-      patch.priority = Math.min(5, Math.max(1, Math.floor(params.data.priority)))
-    }
-
+    // priority e scheduledFor não existem no schema atual
+    // scheduledFor é mapeado para dueDate
     if (typeof params.data.scheduledFor === 'string') {
       const s = params.data.scheduledFor.trim()
       if (!s) {
-        patch.scheduledFor = null
+        patch.dueDate = null
       } else {
         const d = new Date(s)
         if (Number.isNaN(d.getTime())) {
           throw new BadRequestException('scheduledFor inválido (use ISO)')
         }
-        patch.scheduledFor = d
+        patch.dueDate = d
       }
     }
 
@@ -407,11 +407,8 @@ export class ServiceOrdersService {
       patch.status = 'ASSIGNED'
     }
 
-    if (patch.status && patch.status !== existing.status) {
-      if (patch.status === 'IN_PROGRESS') patch.startedAt = new Date()
-      if (patch.status === 'DONE') patch.finishedAt = new Date()
-      if (patch.status === 'CANCELED') patch.finishedAt = new Date()
-    }
+    // Nota: startedAt e finishedAt não existem no ServiceOrder atual
+    // O status é atualizado diretamente sem timestamps adicionais
 
     const result = await this.prisma.serviceOrder.updateMany({
       where: { id: params.id, orgId: params.orgId },
@@ -424,7 +421,7 @@ export class ServiceOrdersService {
       where: { id: params.id, orgId: params.orgId },
       include: {
         customer: { select: { id: true, name: true, phone: true } },
-        assignedToPerson: { select: { id: true, name: true } },
+        assignedTo: { select: { id: true, name: true } },
         appointment: {
           select: { id: true, startsAt: true, endsAt: true, status: true },
         },

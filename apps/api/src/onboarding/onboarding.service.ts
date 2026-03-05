@@ -1,6 +1,21 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
+/**
+ * Mapeamento de passos de onboarding para valores de onboardingStep
+ * O schema usa onboardingStep (Int) e requiresOnboarding (Boolean)
+ * Mapeamento:
+ *   0 = nenhum passo concluído
+ *   1 = createCustomer concluído
+ *   2 = createService concluído
+ *   3 = createCharge concluído (onboarding completo)
+ */
+const STEP_MAP: Record<string, number> = {
+  createCustomer: 1,
+  createService: 2,
+  createCharge: 3,
+}
+
 @Injectable()
 export class OnboardingService {
   constructor(private prisma: PrismaService) {}
@@ -8,51 +23,50 @@ export class OnboardingService {
   async getOnboardingStatus(orgId: string) {
     const organization = await this.prisma.organization.findUnique({
       where: { id: orgId },
-      select: { requiresOnboarding: true, hasCreatedCustomer: true, hasCreatedService: true, hasCreatedCharge: true },
+      select: { requiresOnboarding: true, onboardingStep: true },
     });
 
     if (!organization) {
-      return null; // Ou lançar uma exceção, dependendo do fluxo desejado
+      return null;
     }
+
+    const step = organization.onboardingStep ?? 0;
 
     return {
       requiresOnboarding: organization.requiresOnboarding,
       steps: {
-        createCustomer: organization.hasCreatedCustomer,
-        createService: organization.hasCreatedService,
-        createCharge: organization.hasCreatedCharge,
+        createCustomer: step >= 1,
+        createService: step >= 2,
+        createCharge: step >= 3,
       },
     };
   }
 
   async completeOnboardingStep(orgId: string, step: 'createCustomer' | 'createService' | 'createCharge') {
-    const dataToUpdate: any = {};
-    if (step === 'createCustomer') {
-      dataToUpdate.hasCreatedCustomer = true;
-    } else if (step === 'createService') {
-      dataToUpdate.hasCreatedService = true;
-    } else if (step === 'createCharge') {
-      dataToUpdate.hasCreatedCharge = true;
-    }
+    const stepValue = STEP_MAP[step] ?? 0;
 
-    await this.prisma.organization.update({
+    const org = await this.prisma.organization.findUnique({
       where: { id: orgId },
-      data: dataToUpdate,
+      select: { onboardingStep: true, requiresOnboarding: true },
     });
 
-    // Verificar se todos os passos foram concluídos para desativar o onboarding
-    const updatedOrg = await this.prisma.organization.findUnique({
-      where: { id: orgId },
-      select: { hasCreatedCustomer: true, hasCreatedService: true, hasCreatedCharge: true },
-    });
+    if (!org) return null;
 
-    if (updatedOrg.hasCreatedCustomer && updatedOrg.hasCreatedService && updatedOrg.hasCreatedCharge) {
+    // Só avança se o passo atual for menor que o novo passo
+    if ((org.onboardingStep ?? 0) < stepValue) {
+      const isComplete = stepValue >= 3;
+
       await this.prisma.organization.update({
         where: { id: orgId },
-        data: { requiresOnboarding: false },
+        data: {
+          onboardingStep: stepValue,
+          ...(isComplete ? { requiresOnboarding: false } : {}),
+        },
       });
     }
 
     return this.getOnboardingStatus(orgId);
+  }
+}d);
   }
 }

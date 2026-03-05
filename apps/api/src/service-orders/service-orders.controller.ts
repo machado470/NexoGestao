@@ -30,11 +30,15 @@ export class ServiceOrdersController {
     @Query('status') status?: string,
     @Query('customerId') customerId?: string,
     @Query('assignedToPersonId') assignedToPersonId?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
     return this.serviceOrders.list(orgId, {
       status: status as any,
       customerId,
       assignedToPersonId,
+      page: page ? Number(page) : 1,
+      limit: limit ? Number(limit) : 20,
     })
   }
 

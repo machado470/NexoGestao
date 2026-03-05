@@ -1,6 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { CreateLaunchDto, LaunchType } from './dto/create-launch.dto'
+
+// ✅ Tipos válidos de lançamento
+const VALID_LAUNCH_TYPES = Object.values(LaunchType)
 
 @Injectable()
 export class LaunchesService {
@@ -64,6 +67,23 @@ export class LaunchesService {
   }
 
   async create(orgId: string, userId: string | null, dto: CreateLaunchDto) {
+    // ✅ Validação: valor deve ser positivo
+    if (dto.amountCents <= 0) {
+      throw new BadRequestException('O valor do lançamento deve ser maior que zero')
+    }
+
+    // ✅ Validação: tipo válido (INCOME, EXPENSE, TRANSFER)
+    if (!VALID_LAUNCH_TYPES.includes(dto.type)) {
+      throw new BadRequestException(
+        `Tipo de lançamento inválido: ${dto.type}. Tipos permitidos: ${VALID_LAUNCH_TYPES.join(', ')}`,
+      )
+    }
+
+    // ✅ Validação: categoria obrigatória e não vazia
+    if (!dto.category || dto.category.trim().length === 0) {
+      throw new BadRequestException('A categoria do lançamento é obrigatória')
+    }
+
     return this.prisma.launch.create({
       data: {
         orgId,
@@ -82,6 +102,18 @@ export class LaunchesService {
   async update(orgId: string, id: string, dto: Partial<CreateLaunchDto>) {
     const launch = await this.prisma.launch.findFirst({ where: { id, orgId } })
     if (!launch) throw new NotFoundException('Lançamento não encontrado')
+
+    // ✅ Validação: valor deve ser positivo se fornecido
+    if (dto.amountCents !== undefined && dto.amountCents <= 0) {
+      throw new BadRequestException('O valor do lançamento deve ser maior que zero')
+    }
+
+    // ✅ Validação: tipo válido se fornecido
+    if (dto.type && !VALID_LAUNCH_TYPES.includes(dto.type)) {
+      throw new BadRequestException(
+        `Tipo de lançamento inválido: ${dto.type}. Tipos permitidos: ${VALID_LAUNCH_TYPES.join(', ')}`,
+      )
+    }
 
     return this.prisma.launch.update({
       where: { id },

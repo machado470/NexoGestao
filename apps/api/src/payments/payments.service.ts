@@ -111,7 +111,6 @@ export class PaymentsService {
           },
           data: {
             status: 'PAID',
-            paidAt: new Date(),
           },
         })
 
@@ -141,7 +140,7 @@ export class PaymentsService {
           orgId,
           customerId,
           amountCents: amount,
-          notes: description,
+          description,
           status: 'PENDING',
           dueDate,
           createdAt: new Date(),
@@ -194,7 +193,6 @@ export class PaymentsService {
         where: { id: chargeId },
         data: {
           status: 'PAID',
-          paidAt: new Date(),
         },
       })
 

@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common'
+import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import { TimelineService } from '../timeline/timeline.service'
@@ -20,9 +20,9 @@ export class PeopleService {
     })
   }
 
-  async findWithContext(id: string) {
-    return this.prisma.person.findUnique({
-      where: { id },
+  async findWithContext(id: string, orgId: string) {
+    return this.prisma.person.findFirst({
+      where: { id, orgId },
       include: {
         assignments: true,
         correctiveActions: true,
@@ -39,7 +39,9 @@ export class PeopleService {
     })
   }
 
-  async updatePerson(id: string, data: any) {
+  async updatePerson(id: string, orgId: string, data: any) {
+    const person = await this.prisma.person.findFirst({ where: { id, orgId } });
+    if (!person) throw new NotFoundException('Pessoa não encontrada');
     return this.prisma.person.update({
       where: { id },
       data: {

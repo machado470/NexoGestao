@@ -41,17 +41,18 @@ export class PeopleController {
    */
   @Get(':id')
   @Roles('ADMIN')
-  async get(@Param('id') id: string) {
-    return this.people.findWithContext(id)
+  async get(@Param('id') id: string, @Org() orgId: string) {
+    return this.people.findWithContext(id, orgId)
   }
 
   @Patch(':id')
   @Roles('ADMIN')
   async update(
     @Param('id') id: string,
+    @Org() orgId: string,
     @Body() body: any,
   ) {
-    return this.people.updatePerson(id, body)
+    return this.people.updatePerson(id, orgId, body)
   }
 
   /**

@@ -29,7 +29,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
         message = exceptionResponse
       } else if (typeof exceptionResponse === 'object' && exceptionResponse !== null) {
         const resp = exceptionResponse as any
-        message = resp.message || resp.error || message
+        // Suporte a mensagens de array (class-validator)
+        message = Array.isArray(resp.message)
+          ? resp.message.join(', ')
+          : resp.message || resp.error || message
         code = resp.code || code
       }
     } else if (exception instanceof Prisma.PrismaClientKnownRequestError) {
@@ -60,21 +63,33 @@ export class AllExceptionsFilter implements ExceptionFilter {
       code = 'VALIDATION_ERROR'
     }
 
+    // ✅ Extrai requestId, orgId e userId para logs estruturados
+    const requestId = (request as any).requestId ?? request.headers['x-request-id'] ?? 'unknown'
+    const user = (request as any).user
+    const orgId = user?.orgId ?? (request.headers['x-org-id'] as string) ?? undefined
+    const userId = user?.userId ?? user?.sub ?? undefined
+
     const logMeta = {
+      requestId,
       method: request.method,
       url: request.url,
       statusCode: status,
       ip: request.ip,
+      orgId,
+      userId,
     }
 
     if (status >= 500) {
       this.logger.error(
-        `${request.method} ${request.url} - ${status}: ${message}`,
+        `${request.method} ${request.url} - ${status}: ${message} [${requestId}]`,
         exception instanceof Error ? exception.stack : String(exception),
         JSON.stringify(logMeta),
       )
     } else if (status >= 400) {
-      this.logger.warn(`${request.method} ${request.url} - ${status}: ${message}`)
+      this.logger.warn(
+        `${request.method} ${request.url} - ${status}: ${message} [${requestId}]`,
+        JSON.stringify(logMeta),
+      )
     }
 
     response.status(status).json({
@@ -82,6 +97,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       statusCode: status,
       code,
       message,
+      requestId,
       timestamp: new Date().toISOString(),
       path: request.url,
     })

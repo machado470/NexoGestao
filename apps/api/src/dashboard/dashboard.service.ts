@@ -48,14 +48,14 @@ export class DashboardService {
       this.prisma.serviceOrder.count({ where: { orgId } }),
       this.prisma.serviceOrder.count({ where: { orgId, status: { in: ['OPEN', 'ASSIGNED'] } } }),
       this.prisma.serviceOrder.count({
-        where: { orgId, status: { in: ['OPEN', 'ASSIGNED', 'IN_PROGRESS'] }, scheduledFor: { lt: now } },
+        where: { orgId, status: { in: ['OPEN', 'ASSIGNED', 'IN_PROGRESS'] }, dueDate: { lt: now } },
       }),
-      this.prisma.payment.aggregate({ where: { orgId, paidAt: { gte: startOfWeek } }, _sum: { amountCents: true } }),
+      this.prisma.payment.aggregate({ where: { orgId, createdAt: { gte: startOfWeek } }, _sum: { amountCents: true } }),
       this.prisma.charge.aggregate({ where: { orgId, status: { in: ['PENDING', 'OVERDUE'] } }, _sum: { amountCents: true } }),
       this.prisma.serviceOrder.count({ where: { orgId, status: 'IN_PROGRESS' } }),
       this.prisma.serviceOrder.count({ where: { orgId, status: 'DONE' } }),
       this.prisma.serviceOrder.count({
-        where: { orgId, status: { in: ['OPEN', 'ASSIGNED', 'IN_PROGRESS'] }, scheduledFor: { lt: now } },
+        where: { orgId, status: { in: ['OPEN', 'ASSIGNED', 'IN_PROGRESS'] }, dueDate: { lt: now } },
       }),
       this.prisma.correctiveAction.count({ where: { person: { orgId }, status: 'OPEN' } }),
       this.prisma.charge.aggregate({ where: { orgId }, _sum: { amountCents: true } }),
@@ -109,16 +109,16 @@ export class DashboardService {
         where: {
           orgId,
           status: { in: ['OPEN', 'ASSIGNED', 'IN_PROGRESS'] },
-          scheduledFor: { lt: now },
+          dueDate: { lt: now },
         },
         select: {
           id: true,
           title: true,
-          scheduledFor: true,
+          dueDate: true,
           status: true,
           customer: { select: { id: true, name: true } },
         },
-        orderBy: { scheduledFor: 'asc' },
+        orderBy: { dueDate: 'asc' },
         take: 10,
       }),
 
@@ -233,13 +233,13 @@ export class DashboardService {
     const payments = await this.prisma.payment.findMany({
       where: {
         orgId,
-        paidAt: { gte: new Date(now.getFullYear(), now.getMonth() - 11, 1) },
+        createdAt: { gte: new Date(now.getFullYear(), now.getMonth() - 11, 1) },
       },
-      select: { amountCents: true, paidAt: true },
+      select: { amountCents: true, createdAt: true },
     })
 
     payments.forEach((payment) => {
-      const paymentMonth = new Date(payment.paidAt.getFullYear(), payment.paidAt.getMonth(), 1)
+      const paymentMonth = new Date(payment.createdAt.getFullYear(), payment.createdAt.getMonth(), 1)
       const monthIndex = months.findIndex(
         (m) => m.date.getFullYear() === paymentMonth.getFullYear() && m.date.getMonth() === paymentMonth.getMonth(),
       )

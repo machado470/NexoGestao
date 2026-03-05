@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { CreateReferralDto, ReferralStatus } from './dto/create-referral.dto'
 
@@ -94,7 +94,30 @@ export class ReferralsService {
   }
 
   async create(orgId: string, dto: CreateReferralDto) {
-    const code = generateCode()
+    // ✅ Verifica duplicidade: mesmo referrer e referred na mesma org
+    const existing = await this.prisma.referral.findFirst({
+      where: {
+        orgId,
+        referrerEmail: dto.referrerEmail,
+        referredEmail: dto.referredEmail,
+      },
+    })
+    if (existing) {
+      throw new ConflictException(
+        `Já existe uma indicação de ${dto.referrerEmail} para ${dto.referredEmail}`,
+      )
+    }
+
+    // ✅ Gera código único com retry (até 5 tentativas)
+    let code = generateCode()
+    let attempts = 0
+    while (attempts < 5) {
+      const codeExists = await this.prisma.referral.findFirst({ where: { code } })
+      if (!codeExists) break
+      code = generateCode()
+      attempts++
+    }
+
     return this.prisma.referral.create({
       data: {
         orgId,

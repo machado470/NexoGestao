@@ -1,7 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
-import { CreateExpenseDto } from './dto/create-expense.dto'
+import { CreateExpenseDto, ExpenseCategory } from './dto/create-expense.dto'
 import { ExpensesQueryDto } from './dto/expenses-query.dto'
+
+// ✅ Categorias válidas de despesa
+const VALID_CATEGORIES = Object.values(ExpenseCategory)
 
 @Injectable()
 export class ExpensesService {
@@ -69,12 +72,25 @@ export class ExpensesService {
   }
 
   async create(orgId: string, userId: string | null, dto: CreateExpenseDto) {
+    // ✅ Validação: valor deve ser positivo
+    if (dto.amountCents <= 0) {
+      throw new BadRequestException('O valor da despesa deve ser maior que zero')
+    }
+
+    // ✅ Validação: categoria válida
+    const category = dto.category ?? ExpenseCategory.OTHER
+    if (!VALID_CATEGORIES.includes(category)) {
+      throw new BadRequestException(
+        `Categoria inválida: ${category}. Categorias permitidas: ${VALID_CATEGORIES.join(', ')}`,
+      )
+    }
+
     return this.prisma.expense.create({
       data: {
         orgId,
         description: dto.description,
         amountCents: dto.amountCents,
-        category: dto.category ?? 'OTHER',
+        category: category,
         date: new Date(dto.date),
         notes: dto.notes,
         createdByUserId: userId,
@@ -85,6 +101,18 @@ export class ExpensesService {
   async update(orgId: string, id: string, dto: Partial<CreateExpenseDto>) {
     const expense = await this.prisma.expense.findFirst({ where: { id, orgId } })
     if (!expense) throw new NotFoundException('Despesa não encontrada')
+
+    // ✅ Validação: valor deve ser positivo se fornecido
+    if (dto.amountCents !== undefined && dto.amountCents <= 0) {
+      throw new BadRequestException('O valor da despesa deve ser maior que zero')
+    }
+
+    // ✅ Validação: categoria válida se fornecida
+    if (dto.category && !VALID_CATEGORIES.includes(dto.category)) {
+      throw new BadRequestException(
+        `Categoria inválida: ${dto.category}. Categorias permitidas: ${VALID_CATEGORIES.join(', ')}`,
+      )
+    }
 
     return this.prisma.expense.update({
       where: { id },
