@@ -6,6 +6,8 @@ import {
 import { PrismaService } from '../prisma/prisma.service'
 import { TimelineService } from '../timeline/timeline.service'
 import { AuditService } from '../audit/audit.service'
+import { NotificationsService } from '../notifications/notifications.service'
+import { OnboardingService } from '../onboarding/onboarding.service'
 import { AUDIT_ACTIONS } from '../audit/audit.actions'
 import { normalizeEmail, normalizePhone } from '@nexogestao/common'
 
@@ -15,6 +17,8 @@ export class CustomersService {
     private readonly prisma: PrismaService,
     private readonly timeline: TimelineService,
     private readonly audit: AuditService,
+    private readonly notificationsService: NotificationsService,
+    private readonly onboardingService: OnboardingService,
   ) {}
 
   async list(orgId: string) {
@@ -112,6 +116,15 @@ export class CustomersService {
       },
     })
 
+    await this.notificationsService.createNotification(
+      created.orgId,
+      'CUSTOMER_CREATED',
+      `Novo cliente ${created.name} criado.`,
+      params.createdBy,
+      { customerId: created.id },
+    );
+
+    await this.onboardingService.completeOnboardingStep(params.orgId, 'createCustomer');
     return created
   }
 

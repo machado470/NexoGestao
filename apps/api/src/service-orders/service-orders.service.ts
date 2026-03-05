@@ -10,6 +10,8 @@ import { AUDIT_ACTIONS } from '../audit/audit.actions'
 import { ServiceOrderStatus } from '@prisma/client'
 import { OperationalStateService } from '../people/operational-state.service'
 import { FinanceService } from '../finance/finance.service'
+import { NotificationsService } from '../notifications/notifications.service'
+import { OnboardingService } from '../onboarding/onboarding.service'
 
 function normalizeText(v?: string): string | null {
   const s = (v ?? '').trim()
@@ -50,6 +52,8 @@ export class ServiceOrdersService {
     private readonly audit: AuditService,
     private readonly operationalState: OperationalStateService,
     private readonly finance: FinanceService,
+    private readonly notificationsService: NotificationsService,
+    private readonly onboardingService: OnboardingService,
   ) {}
 
   private async syncOperationalForPeople(
@@ -268,7 +272,38 @@ export class ServiceOrdersService {
     // ✅ sincroniza estado operacional do responsável (se existir)
     await this.syncOperationalForPeople(params.orgId, [created.assignedToPersonId])
 
+    await this.onboardingService.completeOnboardingStep(params.orgId, 'createService');
     return created
+  }
+
+  async checkAndNotifyOverdueServiceOrders() {
+    const now = new Date();
+    const overdueServiceOrders = await this.prisma.serviceOrder.findMany({
+      where: {
+        scheduledFor: { lt: now },
+        status: { notIn: [ServiceOrderStatus.DONE, ServiceOrderStatus.CANCELED] },
+        NOT: {
+          notifications: {
+            some: {
+              type: 'SERVICE_OVERDUE',
+              createdAt: { gte: new Date(now.getTime() - 24 * 60 * 60 * 1000) }, // Notificar apenas uma vez por dia
+            },
+          },
+        },
+      },
+      include: { customer: true, assignedToPerson: true },
+    });
+
+    for (const so of overdueServiceOrders) {
+      const message = `Serviço #${so.id} (${so.title}) para ${so.customer.name} está atrasado.`;
+      await this.notificationsService.createNotification(
+        so.orgId,
+        'SERVICE_OVERDUE',
+        message,
+        so.assignedToPersonId ? so.assignedToPerson.userId : null,
+        { serviceOrderId: so.id, customerId: so.customerId },
+      );
+    }
   }
 
   async update(params: {

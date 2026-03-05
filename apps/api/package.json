@@ -7,12 +7,12 @@
     "dev": "nest start --watch",
     "build": "rm -rf dist && pnpm exec nest build",
     "start": "node dist/main.js",
-    "prisma:generate": "prisma generate --schema prisma/schema.prisma",
-    "prisma:push": "prisma db push --schema prisma/schema.prisma",
-    "prisma:migrate": "prisma migrate dev --schema prisma/schema.prisma",
-    "prisma:migrate:deploy": "prisma migrate deploy --schema prisma/schema.prisma",
-    "prisma:migrate:status": "prisma migrate status --schema prisma/schema.prisma",
-    "prisma:seed": "prisma db seed"
+    "prisma:generate": "prisma generate --schema ../../prisma/schema.prisma",
+    "prisma:push": "prisma db push --schema ../../prisma/schema.prisma",
+    "prisma:migrate": "prisma migrate dev --schema ../../prisma/schema.prisma",
+    "prisma:migrate:deploy": "prisma migrate deploy --schema ../../prisma/schema.prisma",
+    "prisma:migrate:status": "prisma migrate status --schema ../../prisma/schema.prisma",
+    "prisma:seed": "prisma db seed --schema ../../prisma/schema.prisma"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -40,7 +40,8 @@
     "passport-jwt": "^4.0.1",
     "passport-local": "^1.0.0",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "uuid": "^9.0.0"
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.10",
@@ -59,6 +60,7 @@
     "ts-jest": "^29.4.6",
     "ts-node": "^10.9.2",
     "tsx": "^4.20.6",
-    "typescript": "^5.6.4"
+    "typescript": "^5.6.4",
+    "@types/uuid": "^9.0.0"
   }
 }

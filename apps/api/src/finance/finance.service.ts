@@ -6,6 +6,8 @@ import {
 import { PrismaService } from '../prisma/prisma.service'
 import { TimelineService } from '../timeline/timeline.service'
 import { AuditService } from '../audit/audit.service'
+import { NotificationsService } from '../notifications/notifications.service'
+import { OnboardingService } from '../onboarding/onboarding.service'
 import { AUDIT_ACTIONS } from '../audit/audit.actions'
 import { $Enums } from '@prisma/client'
 import { ChargesQueryDto } from './dto/charges-query.dto'
@@ -23,6 +25,8 @@ export class FinanceService {
     private readonly prisma: PrismaService,
     private readonly timeline: TimelineService,
     private readonly audit: AuditService,
+    private readonly notificationsService: NotificationsService,
+    private readonly onboardingService: OnboardingService,
   ) {}
 
   async overview(orgId: string) {
@@ -188,7 +192,15 @@ export class FinanceService {
       context: 'Cobrança gerada a partir de ServiceOrder DONE',
     })
 
-    return { created: true, chargeId: created.id }
+      await this.notificationsService.createNotification(
+        input.orgId,
+        'CHARGE_CREATED',
+        `Cobrança de ${input.amountCents / 100} para O.S. ${input.serviceOrderId} criada. Vencimento: ${finalDueDate.toLocaleDateString()}.`,
+        input.actorUserId,
+        { chargeId: created.id, serviceOrderId: input.serviceOrderId },
+      );
+      await this.onboardingService.completeOnboardingStep(input.orgId, 'createCharge');
+      return { created: true, chargeId: created.id }
   }
 
   async payCharge(input: {
@@ -289,6 +301,13 @@ export class FinanceService {
         },
       })
 
+      await this.notificationsService.createNotification(
+        input.orgId,
+        'PAYMENT_RECEIVED',
+        `Pagamento de ${input.amountCents / 100} recebido para cobrança ${charge.id}.`,
+        input.actorUserId,
+        { chargeId: charge.id, paymentId: payment.id },
+      );
       return { paymentId: payment.id }
     })
   }

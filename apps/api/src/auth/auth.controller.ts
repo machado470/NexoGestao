@@ -1,5 +1,7 @@
-import { Body, Controller, Post } from '@nestjs/common'
+import { Body, Controller, Post, UseGuards, Request } from '@nestjs/common'
 import { AuthService } from './auth.service'
+import { JwtAuthGuard } from './guards/jwt-auth.guard'
+import { AdminGuard } from './guards/admin.guard'
 
 @Controller('auth')
 export class AuthController {
@@ -12,29 +14,7 @@ export class AuthController {
     return this.auth.login(body.email, body.password)
   }
 
-  @Post('invite')
-  async invite(
-    @Body()
-    body: {
-      email: string
-    },
-  ) {
-    return this.auth.inviteCollaborator(body.email)
-  }
 
-  @Post('activate')
-  async activate(
-    @Body()
-    body: {
-      token: string
-      password: string
-    },
-  ) {
-    return this.auth.activateAccount(
-      body.token,
-      body.password,
-    )
-  }
 
   @Post('forgot-password')
   async forgotPassword(@Body() body: { email: string }) {

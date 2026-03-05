@@ -4,19 +4,19 @@ import {
   BadRequestException,
 } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
-import * as bcrypt from 'bcryptjs'
-import { randomUUID } from 'crypto'
+import * as bcrypt from 'bcrypt'
+
 import { PrismaService } from '../prisma/prisma.service'
-import { EmailService } from '../email/email.service'
-import { ConfigService } from '@nestjs/config'
+
+
 
 @Injectable()
 export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwt: JwtService,
-    private email: EmailService,
-    private config: ConfigService,
+
+
   ) {}
 
   async login(email: string, password: string) {
@@ -62,57 +62,5 @@ export class AuthService {
     }
   }
 
-  async inviteCollaborator(email: string, senderName: string = 'NexoGestao') {
-    const token = randomUUID()
 
-    const user = await this.prisma.user.update({
-      where: { email },
-      data: {
-        inviteToken: token,
-        inviteExpiresAt: new Date(
-          Date.now() + 1000 * 60 * 60 * 24,
-        ),
-        active: false,
-      },
-    })
-
-    const baseUrl = this.config.get<string>('FRONTEND_URL') || 'http://localhost:5173'
-    const inviteLink = `${baseUrl}/activate?token=${token}`
-
-    // Enviar e-mail de convite
-    await this.email.sendInvite(email, inviteLink, senderName)
-
-    return {
-      inviteLink,
-      userId: user.id,
-    }
-  }
-
-  async activateAccount(token: string, password: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { inviteToken: token },
-    })
-
-    if (
-      !user ||
-      !user.inviteExpiresAt ||
-      user.inviteExpiresAt < new Date()
-    ) {
-      throw new BadRequestException('Convite inválido')
-    }
-
-    const passwordHash = await bcrypt.hash(password, 10)
-
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: {
-        password: passwordHash,
-        active: true,
-        inviteToken: null,
-        inviteExpiresAt: null,
-      },
-    })
-
-    return { success: true }
-  }
 }

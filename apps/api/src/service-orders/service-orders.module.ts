@@ -4,6 +4,7 @@ import { TimelineModule } from '../timeline/timeline.module'
 import { AuditModule } from '../audit/audit.module'
 import { OperationalStateModule } from '../people/operational-state.module'
 import { FinanceModule } from '../finance/finance.module'
+import { NotificationsModule } from '../notifications/notifications.module'
 
 import { ServiceOrdersController } from './service-orders.controller'
 import { ServiceOrdersService } from './service-orders.service'
@@ -15,6 +16,7 @@ import { ServiceOrdersService } from './service-orders.service'
     AuditModule,
     OperationalStateModule,
     FinanceModule,
+    NotificationsModule,
   ],
   controllers: [ServiceOrdersController],
   providers: [ServiceOrdersService],

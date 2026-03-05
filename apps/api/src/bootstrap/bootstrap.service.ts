@@ -3,12 +3,16 @@ import {
   ConflictException,
   Injectable,
 } from '@nestjs/common'
-import * as bcrypt from 'bcryptjs'
+import * as bcrypt from 'bcrypt'
 import { PrismaService } from '../prisma/prisma.service'
+import { SubscriptionsService } from '../subscriptions/subscriptions.service'
 
 @Injectable()
 export class BootstrapService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly subscriptionsService: SubscriptionsService,
+  ){}
 
   private slugify(input: string) {
     const s = (input ?? '').trim().toLowerCase()
@@ -106,6 +110,7 @@ export class BootstrapService {
             requiresOnboarding: false,
           },
         })
+        await this.subscriptionsService.createTrialSubscription(org.id)
       }
 
       const user = await tx.user.create({

@@ -3,7 +3,7 @@ import { ConfigModule } from '@nestjs/config'
 import { ScheduleModule } from '@nestjs/schedule'
 import { ClsModule } from 'nestjs-cls'
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core'
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler'
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throottler'
 import { OrgContextInterceptor } from './auth/org-context.interceptor'
 import { RequestLoggerMiddleware } from './common/middleware/request-logger.middleware'
 
@@ -73,6 +73,11 @@ import { ExpensesModule } from './expenses/expenses.module'
 import { InvoicesModule } from './invoices/invoices.module'
 import { LaunchesModule } from './launches/launches.module'
 import { ReferralsModule } from './referrals/referrals.module'
+import { InvitesModule } from './invites/invites.module'
+import { PlansModule } from './plans/plans.module'
+import { SubscriptionsModule } from './subscriptions/subscriptions.module'
+import { NotificationsModule } from './notifications/notifications.module'
+import { OrganizationSettingsModule } from './organization-settings/organization-settings.module'
 
 @Module({
   imports: [
@@ -164,6 +169,11 @@ import { ReferralsModule } from './referrals/referrals.module'
     InvoicesModule,
     LaunchesModule,
     ReferralsModule,
+    InvitesModule,
+    PlansModule,
+    SubscriptionsModule,
+    NotificationsModule,
+    OrganizationSettingsModule,
   ],
   providers: [
     {

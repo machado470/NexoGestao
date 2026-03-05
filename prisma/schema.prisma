@@ -44,12 +44,6 @@ enum TrackStatus {
   ARCHIVED
 }
 
-enum TrackItemType {
-  READING
-  ACTION
-  CHECKPOINT
-}
-
 enum AppointmentStatus {
   SCHEDULED
   CONFIRMED
@@ -121,11 +115,59 @@ enum WhatsAppMessageType {
   EXECUTION_CONFIRMATION
 }
 
+// ============================================================
+// ✅ Novos Enums para SaaS
+// ============================================================
+
+enum PlanName {
+  STARTER
+  PRO
+  BUSINESS
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  INACTIVE
+}
+
+enum BillingEventType {
+  CHARGE
+  PAYMENT
+  REFUND
+}
+
+enum BillingEventStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+enum NotificationType {
+  CHARGE_OVERDUE
+  SERVICE_OVERDUE
+  PAYMENT_RECEIVED
+  CUSTOMER_CREATED
+  INVITE_RECEIVED
+  TRIAL_ENDING
+  TRIAL_ENDED
+}
+
+// ============================================================
+// ✅ Modelos Existentes
+// ============================================================
+
 model Organization {
   id                 String   @id @default(uuid())
   name               String
   slug               String   @unique
   requiresOnboarding Boolean  @default(true)
+  onboardingStep     Int      @default(0) // Novo: para controlar o progresso do onboarding
+  timezone           String   @default("America/Sao_Paulo") // Novo: fuso horário da organização
+  currency           String   @default("BRL") // Novo: moeda padrão da organização
+  hasTrialed         Boolean  @default(false) // Novo: para controlar se a organização já usou o trial
   createdAt          DateTime @default(now())
 
   users          User[]
@@ -150,6 +192,11 @@ model Organization {
   invoices  Invoice[]
   launches  Launch[]
   referrals Referral[]
+
+  // ✅ Novos para SaaS
+  invites       InviteToken[]
+  subscriptions Subscription[]
+  notifications Notification[]
 }
 
 model User {
@@ -158,9 +205,9 @@ model User {
   password String?
   role     UserRole
 
-  active          Boolean   @default(false)
-  inviteToken     String?   @unique
-  inviteExpiresAt DateTime?
+  active Boolean @default(false)
+  // inviteToken     String?   @unique // Removido, agora no modelo InviteToken
+  // inviteExpiresAt DateTime? // Removido, agora no modelo InviteToken
 
   orgId String
   org   Organization @relation(fields: [orgId], references: [id])
@@ -169,6 +216,9 @@ model User {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // ✅ Novos para SaaS
+  notifications Notification[]
 }
 
 model Person {
@@ -498,17 +548,14 @@ model ServiceOrder {
   appointmentId String?      @unique
   appointment   Appointment? @relation(fields: [appointmentId], references: [id])
 
-  assignedToPersonId String?
-  assignedToPerson   Person? @relation("ServiceOrderAssignedTo", fields: [assignedToPersonId], references: [id])
-
   title       String
   description String?
   status      ServiceOrderStatus @default(OPEN)
-  priority    Int                @default(2)
+  amountCents Int                @default(0)
+  dueDate     DateTime?
 
-  scheduledFor DateTime?
-  startedAt    DateTime?
-  finishedAt   DateTime?
+  assignedToPersonId String?
+  assignedTo         Person? @relation("ServiceOrderAssignedTo", fields: [assignedToPersonId], references: [id])
 
   charges Charge[]
 
@@ -517,8 +564,7 @@ model ServiceOrder {
 
   @@index([orgId, createdAt])
   @@index([orgId, status, createdAt])
-  @@index([orgId, customerId, createdAt])
-  @@index([orgId, scheduledFor])
+  @@index([customerId, createdAt])
   @@index([assignedToPersonId, createdAt])
 }
 
@@ -528,20 +574,17 @@ model Charge {
   orgId String
   org   Organization @relation(fields: [orgId], references: [id])
 
-  customerId String
-  customer   Customer @relation(fields: [customerId], references: [id])
-
   serviceOrderId String?
   serviceOrder   ServiceOrder? @relation(fields: [serviceOrderId], references: [id])
 
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+
+  title       String?
+  description String?
   amountCents Int
-  currency    String @default("BRL")
-
-  status  ChargeStatus @default(PENDING)
-  dueDate DateTime
-
-  paidAt DateTime?
-  notes  String?
+  dueDate     DateTime
+  status      ChargeStatus @default(PENDING)
 
   payments Payment[]
 
@@ -549,7 +592,7 @@ model Charge {
   updatedAt DateTime @updatedAt
 
   @@index([orgId, createdAt])
-  @@index([orgId, status, dueDate])
+  @@index([orgId, status, createdAt])
   @@index([customerId, createdAt])
   @@index([serviceOrderId, createdAt])
 }
@@ -565,20 +608,13 @@ model Payment {
 
   amountCents Int
   method      PaymentMethod
-  paidAt      DateTime      @default(now())
   notes       String?
-  externalRef String?
 
   createdAt DateTime @default(now())
 
   @@index([orgId, createdAt])
   @@index([chargeId, createdAt])
-  @@index([orgId, paidAt])
 }
-
-//
-// WhatsApp (Meu Acessor) — Templates e Log de Mensagens
-//
 
 model WhatsAppTemplate {
   id String @id @default(uuid())
@@ -586,21 +622,11 @@ model WhatsAppTemplate {
   orgId String
   org   Organization @relation(fields: [orgId], references: [id])
 
-  channel MessageChannel @default(WHATSAPP)
-
-  // key controlada (ex: APPOINTMENT_CONFIRMATION)
-  key  String
-  name String
-  body String
-
-  isActive Boolean @default(true)
+  name     String @unique
+  template String
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  @@unique([orgId, key])
-  @@index([orgId, channel, isActive])
-  @@index([orgId, createdAt])
 }
 
 model WhatsAppMessage {
@@ -609,80 +635,23 @@ model WhatsAppMessage {
   orgId String
   org   Organization @relation(fields: [orgId], references: [id])
 
-  // histórico por cliente (sempre que possível)
-  customerId String
-  customer   Customer @relation(fields: [customerId], references: [id])
-
-  channel MessageChannel @default(WHATSAPP)
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id])
 
   entityType WhatsAppEntityType
   entityId   String
-
   messageType WhatsAppMessageType
-
-  // idempotência REAL: única por (org + tipo + entidade + bucket de tempo)
-  messageKey String @unique
-
-  status WhatsAppMessageStatus @default(QUEUED)
-
-  toPhone      String
-  templateKey  String?
-  renderedText String
-
-  provider          String  @default("mock")
-  providerMessageId String?
-
-  // claim/lock para processamento concorrente seguro
-  lockedAt DateTime?
-  lockedBy String?
-
-  errorCode    String?
-  errorMessage String?
+  status     WhatsAppMessageStatus @default(QUEUED)
+  to         String
+  body       String
+  sentAt     DateTime?
 
   createdAt DateTime @default(now())
-  sentAt    DateTime?
+  updatedAt DateTime @updatedAt
 
-  metadata Json?
-
-  @@index([orgId, status, createdAt])
+  @@index([orgId, createdAt])
   @@index([customerId, createdAt])
-  @@index([orgId, messageType, createdAt])
-  @@index([orgId, entityType, entityId])
-  @@index([orgId, status, lockedAt, createdAt])
-}
-
-// ============================================================
-// 💸 MÓDULOS FINANCEIROS COMPLETOS — Expense, Invoice, Launch, Referral
-// ============================================================
-
-enum ExpenseCategory {
-  OPERATIONAL
-  MARKETING
-  INFRASTRUCTURE
-  PAYROLL
-  TAXES
-  SUPPLIES
-  TRAVEL
-  OTHER
-}
-
-enum InvoiceStatus {
-  DRAFT
-  ISSUED
-  PAID
-  CANCELLED
-}
-
-enum LaunchType {
-  INCOME
-  EXPENSE
-  TRANSFER
-}
-
-enum ReferralStatus {
-  PENDING
-  CONFIRMED
-  PAID
+  @@index([entityType, entityId, createdAt])
 }
 
 model Expense {
@@ -704,6 +673,17 @@ model Expense {
   @@index([orgId, date])
   @@index([orgId, category, date])
   @@index([orgId, createdAt])
+}
+
+enum ExpenseCategory {
+  OPERATIONAL
+  MARKETING
+  INFRASTRUCTURE
+  PAYROLL
+  TAXES
+  SUPPLIES
+  TRAVEL
+  OTHER
 }
 
 model Invoice {
@@ -732,6 +712,13 @@ model Invoice {
   @@index([customerId, createdAt])
 }
 
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  PAID
+  CANCELLED
+}
+
 model Launch {
   id    String @id @default(uuid())
   orgId String
@@ -753,6 +740,12 @@ model Launch {
   @@index([orgId, date])
   @@index([orgId, type, date])
   @@index([orgId, createdAt])
+}
+
+enum LaunchType {
+  INCOME
+  EXPENSE
+  TRANSFER
 }
 
 model Referral {
@@ -781,4 +774,98 @@ model Referral {
   @@index([orgId, status, createdAt])
   @@index([orgId, createdAt])
   @@index([referrerEmail, orgId])
+}
+
+enum ReferralStatus {
+  PENDING
+  CONFIRMED
+  PAID
+}
+
+// ============================================================
+// ✅ Novos Modelos para SaaS
+// ============================================================
+
+model InviteToken {
+  id          String   @id @default(uuid())
+  email       String
+  token       String   @unique
+  orgId       String
+  org         Organization @relation(fields: [orgId], references: [id])
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+
+  @@unique([email, orgId])
+  @@index([orgId, expiresAt])
+}
+
+model Plan {
+  id          String   @id @default(uuid())
+  name        PlanName @unique
+  description String?
+  priceCents  Int
+  features    Json // Ex: { "maxUsers": 5, "storageGb": 10 }
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  subscriptions Subscription[]
+}
+
+model Subscription {
+  id                 String             @id @default(uuid())
+  orgId              String             @unique // Uma organização tem apenas uma assinatura ativa
+  org                Organization       @relation(fields: [orgId], references: [id])
+  planId             String
+  plan               Plan               @relation(fields: [planId], references: [id])
+  status             SubscriptionStatus @default(TRIALING)
+  trialEndsAt        DateTime?
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+  canceledAt         DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  billingEvents BillingEvent[]
+
+  @@index([orgId, status])
+  @@index([planId, status])
+  @@index([trialEndsAt])
+}
+
+model BillingEvent {
+  id            String           @id @default(uuid())
+  subscriptionId String
+  subscription  Subscription     @relation(fields: [subscriptionId], references: [id])
+  type          BillingEventType
+  amountCents   Int
+  status        BillingEventStatus @default(PENDING)
+  externalId    String? // ID do evento na plataforma de pagamento (ex: Stripe)
+  description   String?
+  createdAt     DateTime         @default(now())
+
+  @@index([subscriptionId, createdAt])
+  @@index([type, status, createdAt])
+}
+
+model Notification {
+  id        String         @id @default(uuid())
+  orgId     String
+  org       Organization   @relation(fields: [orgId], references: [id])
+  userId    String? // Opcional, se a notificação for para um usuário específico
+  user      User?          @relation(fields: [userId], references: [id])
+  type      NotificationType
+  message   String
+  metadata  Json? // Dados adicionais para a notificação (ex: ID da cobrança)
+  readAt    DateTime?
+  createdAt DateTime       @default(now())
+
+  @@index([orgId, createdAt])
+  @@index([userId, createdAt])
+  @@index([orgId, type, createdAt])
+  @@index([orgId, readAt, createdAt])
+}
+enum TrackItemType {
+  READING
+  ACTION
+  CHECKPOINT
 }

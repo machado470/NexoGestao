@@ -1,28 +1,21 @@
-import {
-  Controller,
-  Post,
-  Req,
-  UseGuards,
-} from '@nestjs/common'
-import { JwtAuthGuard } from '../auth/jwt-auth.guard'
-import { PrismaService } from '../prisma/prisma.service'
+import { Controller, Post, Get, Req, UseGuards, Body } from '@nestjs/common';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { OnboardingService } from './onboarding.service';
 
 @Controller('onboarding')
 @UseGuards(JwtAuthGuard)
 export class OnboardingController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly onboardingService: OnboardingService) {}
 
-  @Post('complete')
-  async complete(@Req() req: any) {
-    const orgId = req.user.orgId
+  @Get('status')
+  async getOnboardingStatus(@Req() req: any) {
+    const orgId = req.user.orgId;
+    return this.onboardingService.getOnboardingStatus(orgId);
+  }
 
-    await this.prisma.organization.update({
-      where: { id: orgId },
-      data: {
-        requiresOnboarding: false,
-      },
-    })
-
-    return { success: true }
+  @Post('complete-step')
+  async completeOnboardingStep(@Req() req: any, @Body('step') step: 'createCustomer' | 'createService' | 'createCharge') {
+    const orgId = req.user.orgId;
+    return this.onboardingService.completeOnboardingStep(orgId, step);
   }
 }

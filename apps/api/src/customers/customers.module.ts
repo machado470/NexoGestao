@@ -3,6 +3,7 @@ import { PrismaModule } from '../prisma/prisma.module'
 import { TimelineModule } from '../timeline/timeline.module'
 import { AuditModule } from '../audit/audit.module'
 import { QuotasModule } from '../quotas/quotas.module'
+import { NotificationsModule } from '../notifications/notifications.module'
 
 import { CustomersController } from './customers.controller'
 import { CustomersService } from './customers.service'
@@ -13,6 +14,7 @@ import { CustomersService } from './customers.service'
     TimelineModule,
     AuditModule,
     QuotasModule,
+    NotificationsModule,
   ],
   controllers: [
     CustomersController,
