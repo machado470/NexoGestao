@@ -4,22 +4,29 @@
     "module": "CommonJS",
     "moduleResolution": "node",
     "target": "ES2021",
-
     "outDir": "./dist",
     "rootDir": "./src",
-
     "declaration": false,
     "emitDeclarationOnly": false,
     "sourceMap": true,
-
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
-
     "strict": false,
     "noImplicitAny": false,
     "strictPropertyInitialization": false,
-    "incremental": false
+    "incremental": false,
+    "baseUrl": ".",
+    "paths": {
+      "@prisma/client": [
+        "src/types/prisma-client-fallback.ts"
+      ]
+    }
   },
-  "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "dist"]
+  "include": [
+    "src/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
 }

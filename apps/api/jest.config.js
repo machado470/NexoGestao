@@ -10,6 +10,7 @@ module.exports = {
   testEnvironment: 'node',
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
+    '^@prisma/client$': '<rootDir>/src/types/prisma-client-fallback.ts',
   },
   globals: {
     'ts-jest': {
