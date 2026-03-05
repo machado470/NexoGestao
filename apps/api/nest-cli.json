@@ -1,8 +1,1 @@
-{
-  "collection": "@nestjs/schematics",
-  "sourceRoot": "src",
-  "compilerOptions": {
-    "tsConfigPath": "tsconfig.build.json",
-    "watchAssets": true
-  }
-}
+../nest-cli.json
