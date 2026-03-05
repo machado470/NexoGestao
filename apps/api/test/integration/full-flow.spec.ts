@@ -23,6 +23,10 @@ import { TimelineService } from '../../src/timeline/timeline.service'
 import { OperationalStateService } from '../../src/people/operational-state.service'
 import { NotificationsService } from '../../src/notifications/notifications.service'
 import { OnboardingService } from '../../src/onboarding/onboarding.service'
+import { ExpenseCategory } from '../../src/expenses/dto/create-expense.dto'
+import { CreateInvoiceDto, InvoiceStatus } from '../../src/invoices/dto/create-invoice.dto'
+import { LaunchType } from '../../src/launches/dto/create-launch.dto'
+import { CreateReferralDto } from '../../src/referrals/dto/create-referral.dto'
 
 const ORG_ID = 'test-org-id'
 const USER_ID = 'test-user-id'
@@ -162,7 +166,7 @@ describe('ExpensesService - Regras de Domínio', () => {
         description: 'Despesa inválida',
         amountCents: 0,
         date: '2024-01-15',
-        category: 'SUPPLIES' as any,
+        category: ExpenseCategory.SUPPLIES,
       }),
     ).rejects.toThrow(BadRequestException)
   })
@@ -173,7 +177,7 @@ describe('ExpensesService - Regras de Domínio', () => {
         description: 'Despesa inválida',
         amountCents: -100,
         date: '2024-01-15',
-        category: 'SUPPLIES' as any,
+        category: ExpenseCategory.SUPPLIES,
       }),
     ).rejects.toThrow(BadRequestException)
   })
@@ -193,7 +197,7 @@ describe('ExpensesService - Regras de Domínio', () => {
       description: 'Aluguel',
       amountCents: 150000,
       date: '2024-01-15',
-      category: 'OPERATIONAL' as any,
+      category: ExpenseCategory.OPERATIONAL,
     })
 
     expect(result).toEqual(mockCreated)
@@ -248,7 +252,7 @@ describe('InvoicesService - Transições de Status', () => {
     mockPrisma.invoice.findFirst.mockResolvedValue(draftInvoice)
     mockPrisma.invoice.update.mockResolvedValue({ ...draftInvoice, status: 'ISSUED' })
 
-    const result = await service.update(ORG_ID, 'inv-1', { status: 'ISSUED' as any })
+    const result = await service.update(ORG_ID, 'inv-1', { status: InvoiceStatus.ISSUED })
     expect(result.status).toBe('ISSUED')
   })
 
@@ -263,7 +267,7 @@ describe('InvoicesService - Transições de Status', () => {
     mockPrisma.invoice.findFirst.mockResolvedValue(paidInvoice)
 
     await expect(
-      service.update(ORG_ID, 'inv-2', { status: 'DRAFT' as any }),
+      service.update(ORG_ID, 'inv-2', { status: InvoiceStatus.DRAFT }),
     ).rejects.toThrow(BadRequestException)
   })
 
@@ -278,7 +282,7 @@ describe('InvoicesService - Transições de Status', () => {
     mockPrisma.invoice.findFirst.mockResolvedValue(cancelledInvoice)
 
     await expect(
-      service.update(ORG_ID, 'inv-3', { status: 'ISSUED' as any }),
+      service.update(ORG_ID, 'inv-3', { status: InvoiceStatus.ISSUED }),
     ).rejects.toThrow(BadRequestException)
   })
 
@@ -302,7 +306,7 @@ describe('InvoicesService - Transições de Status', () => {
         number: 'NF-005',
         amountCents: 0,
         description: 'Fatura inválida',
-      } as any),
+      } satisfies CreateInvoiceDto),
     ).rejects.toThrow(BadRequestException)
   })
 })
@@ -330,7 +334,7 @@ describe('LaunchesService - Validações de Domínio', () => {
       service.create(ORG_ID, USER_ID, {
         description: 'Lançamento inválido',
         amountCents: 10000,
-        type: 'INVALID_TYPE' as any,
+        type: 'INVALID_TYPE' as LaunchType,
         category: 'Receita',
         date: '2024-01-15',
       }),
@@ -342,7 +346,7 @@ describe('LaunchesService - Validações de Domínio', () => {
       service.create(ORG_ID, USER_ID, {
         description: 'Lançamento inválido',
         amountCents: -500,
-        type: 'INCOME' as any,
+        type: LaunchType.INCOME,
         category: 'Receita',
         date: '2024-01-15',
       }),
@@ -361,7 +365,7 @@ describe('LaunchesService - Validações de Domínio', () => {
     const result = await service.create(ORG_ID, USER_ID, {
       description: 'Venda de produto',
       amountCents: 50000,
-      type: 'INCOME' as any,
+      type: LaunchType.INCOME,
       category: 'Vendas',
       date: '2024-01-15',
     })
@@ -403,7 +407,7 @@ describe('ReferralsService - Código Único e Duplicidade', () => {
         referrerEmail: 'referrer@example.com',
         referredName: 'Maria',
         referredEmail: 'referred@example.com',
-      } as any),
+      } satisfies CreateReferralDto),
     ).rejects.toThrow(ConflictException)
   })
 
@@ -425,7 +429,7 @@ describe('ReferralsService - Código Único e Duplicidade', () => {
       referrerEmail: 'joao@example.com',
       referredName: 'Maria',
       referredEmail: 'maria@example.com',
-    } as any)
+    } satisfies CreateReferralDto)
 
     expect(result.code).toBeTruthy()
     expect(mockPrisma.referral.create).toHaveBeenCalledWith(

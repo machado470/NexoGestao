@@ -54,11 +54,11 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
         // Operações de escrita: garantir orgId nos dados
         if (['create', 'createMany'].includes(params.action)) {
           if (Array.isArray(params.args.data)) {
-            params.args.data = params.args.data.map((item: any) => ({ ...item, orgId }))
+            params.args.data = params.args.data.map((item: Record<string, unknown>) => ({ ...item, orgId }))
           } else {
             // Usamos cast para any para evitar erros de tipagem do Prisma que espera org: { connect: { id } }
             // mas o middleware intercepta e aceita a string direta orgId.
-            params.args.data = { ...params.args.data, orgId } as any
+            params.args.data = { ...params.args.data, orgId }
           }
         }
 
@@ -80,8 +80,8 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
         await this.$connect()
         this.logger.log(`Prisma conectado (tentativa ${attempt}/${maxAttempts})`)
         return
-      } catch (err: any) {
-        const msg = err?.message ?? String(err)
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
         this.logger.error(
           `Falha ao conectar no banco (tentativa ${attempt}/${maxAttempts}): ${msg}`,
         )
