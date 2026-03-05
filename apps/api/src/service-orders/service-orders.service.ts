@@ -56,6 +56,17 @@ export class ServiceOrdersService {
     private readonly onboardingService: OnboardingService,
   ) {}
 
+  private canTransition(from: ServiceOrderStatus, to: ServiceOrderStatus): boolean {
+    const allowed: Record<ServiceOrderStatus, ServiceOrderStatus[]> = {
+      OPEN: ['ASSIGNED', 'IN_PROGRESS', 'CANCELED'],
+      ASSIGNED: ['IN_PROGRESS', 'CANCELED'],
+      IN_PROGRESS: ['DONE', 'CANCELED'],
+      DONE: [],
+      CANCELED: [],
+    }
+    return from === to || allowed[from].includes(to)
+  }
+
   private async syncOperationalForPeople(
     orgId: string,
     personIds: Array<string | null | undefined>,
@@ -377,7 +388,19 @@ export class ServiceOrdersService {
     if (typeof params.data.status === 'string') {
       if (!isStatus(params.data.status))
         throw new BadRequestException('status inválido')
+      if (!this.canTransition(existing.status, params.data.status)) {
+        throw new BadRequestException(
+          `Transição inválida de ${existing.status} para ${params.data.status}`,
+        )
+      }
       patch.status = params.data.status
+    }
+
+    if (typeof (params.data as any).cancellationReason === 'string') {
+      patch.cancellationReason = normalizeText((params.data as any).cancellationReason)
+    }
+    if (typeof (params.data as any).outcomeSummary === 'string') {
+      patch.outcomeSummary = normalizeText((params.data as any).outcomeSummary)
     }
 
     if (params.data.assignedToPersonId !== undefined) {
@@ -405,6 +428,17 @@ export class ServiceOrdersService {
 
     if (patch.assignedToPersonId && !patch.status && existing.status === 'OPEN') {
       patch.status = 'ASSIGNED'
+    }
+
+    if (patch.status === 'IN_PROGRESS' && existing.status !== 'IN_PROGRESS') {
+      patch.executionStartedAt = new Date()
+    }
+    if (patch.status === 'DONE') {
+      patch.executionEndedAt = new Date()
+      patch.executionStartedAt = patch.executionStartedAt ?? new Date()
+    }
+    if (patch.status === 'CANCELED' && !patch.cancellationReason) {
+      throw new BadRequestException('cancellationReason é obrigatório ao cancelar')
     }
 
     // Nota: startedAt e finishedAt não existem no ServiceOrder atual

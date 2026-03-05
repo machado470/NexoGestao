@@ -62,4 +62,14 @@ export class UpdateServiceOrderDto {
   @IsOptional()
   @IsString()
   dueDate?: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(400)
+  cancellationReason?: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(4000)
+  outcomeSummary?: string
 }

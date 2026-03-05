@@ -94,6 +94,8 @@ export function MainLayout({ children }: MainLayoutProps) {
 
     { id: "calendar", label: "Calendário", icon: CalendarDays, route: "/calendar" },
 
+    { id: "timeline", label: "Timeline", icon: BarChart3, route: "/timeline" },
+
     { id: "settings", label: "Configurações", icon: Settings, route: "/settings" }
 
   ] as const
@@ -297,4 +299,3 @@ export function MainLayout({ children }: MainLayoutProps) {
 
   )
 }
-

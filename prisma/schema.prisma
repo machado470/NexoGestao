@@ -183,6 +183,7 @@ model Organization {
   customers     Customer[]
   appointments  Appointment[]
   serviceOrders ServiceOrder[]
+  executions    Execution[]
   serviceOrderAttachments ServiceOrderAttachment[]
   charges       Charge[]
   payments      Payment[]
@@ -263,6 +264,7 @@ model Person {
   itemCompletions   TrackItemCompletion[]
 
   serviceOrdersAssigned ServiceOrder[] @relation("ServiceOrderAssignedTo")
+  executions           Execution[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -504,6 +506,7 @@ model Customer {
 
   appointments  Appointment[]
   serviceOrders ServiceOrder[]
+  executions    Execution[]
   charges       Charge[]
 
   // WhatsApp (histórico por cliente)
@@ -563,11 +566,16 @@ model ServiceOrder {
   status      ServiceOrderStatus @default(OPEN)
   amountCents Int                @default(0)
   dueDate     DateTime?
+  executionStartedAt DateTime?
+  executionEndedAt   DateTime?
+  cancellationReason String?
+  outcomeSummary     String?
 
   assignedToPersonId String?
   assignedTo         Person? @relation("ServiceOrderAssignedTo", fields: [assignedToPersonId], references: [id])
 
   charges Charge[]
+  executions Execution[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -576,6 +584,33 @@ model ServiceOrder {
   @@index([orgId, status, createdAt])
   @@index([customerId, createdAt])
   @@index([assignedToPersonId, createdAt])
+}
+
+model Execution {
+  id String @id @default(uuid())
+
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id])
+
+  serviceOrderId String
+  serviceOrder   ServiceOrder @relation(fields: [serviceOrderId], references: [id])
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+
+  executorPersonId String?
+  executorPerson   Person? @relation(fields: [executorPersonId], references: [id])
+
+  startedAt DateTime
+  endedAt   DateTime?
+  notes String?
+  checklist Json @default("[]")
+  attachments Json @default("[]")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orgId, createdAt])
+  @@index([serviceOrderId, createdAt])
 }
 
 model Charge {

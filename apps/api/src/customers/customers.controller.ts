@@ -48,6 +48,12 @@ export class CustomersController {
     return this.customers.get(orgId, id)
   }
 
+  @Get(':id/workspace')
+  @Roles('ADMIN', 'MANAGER', 'STAFF', 'VIEWER')
+  workspace(@Org() orgId: string, @Param('id') id: string) {
+    return this.customers.workspace(orgId, id)
+  }
+
   @Post()
   @Roles('ADMIN', 'MANAGER', 'STAFF')
   async create(
