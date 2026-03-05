@@ -323,7 +323,7 @@ export default function ExecutiveDashboardNew() {
             <h3 className="text-white font-semibold mb-4">
               Status das Ordens de Serviço
             </h3>
-            {orderStatusData.length > 0 && orderStatusData.some(d => d.value > 0) ? (
+            {orderStatusData.length > 0 && orderStatusData.some(d => (d.value ?? 0) > 0) ? (
               <ResponsiveContainer width="100%" height={300}>
                 <PieChart>
                   <Pie
@@ -365,7 +365,7 @@ export default function ExecutiveDashboardNew() {
             <h3 className="text-white font-semibold mb-4">
               Status das Cobranças
             </h3>
-            {chargeStatusData.length > 0 && chargeStatusData.some(d => d.value > 0) ? (
+            {chargeStatusData.length > 0 && chargeStatusData.some(d => (d.value ?? 0) > 0) ? (
               <ResponsiveContainer width="100%" height={300}>
                 <PieChart>
                   <Pie

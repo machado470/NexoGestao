@@ -2,14 +2,14 @@ import React, { useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
 
 type UiStatus = "pending" | "paid" | "overdue" | "canceled" | "";
-type ApiStatus = "PENDING" | "PAID" | "OVERDUE" | "CANCELED";
+type ApiStatus = "PAID" | "DRAFT" | "ISSUED" | "CANCELLED";
 
 function mapInvoiceStatus(s: UiStatus): ApiStatus | undefined {
   if (!s) return undefined;
-  if (s === "pending") return "PENDING";
+  if (s === "pending") return "DRAFT";
   if (s === "paid") return "PAID";
-  if (s === "overdue") return "OVERDUE";
-  if (s === "canceled") return "CANCELED";
+  if (s === "overdue") return "ISSUED";
+  if (s === "canceled") return "CANCELLED";
   return undefined;
 }
 

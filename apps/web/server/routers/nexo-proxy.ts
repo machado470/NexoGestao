@@ -2,11 +2,7 @@ import { publicProcedure, router } from "../_core/trpc";
 import { z } from "zod";
 import cookie from "cookie";
 
-// URL da API do NexoGestao - usar variável de ambiente ou localhost
-// IMPORTANTE: API (Nest) é 3000. O BFF (apps/web) pode ser 3001+.
 const NEXO_API_URL = process.env.NEXO_API_URL || "http://localhost:3000";
-
-// Cookie onde vamos guardar o JWT do backend (Nest)
 const NEXO_TOKEN_COOKIE = "nexo_token";
 
 type CtxLike = {
@@ -17,32 +13,23 @@ type CtxLike = {
 function getTokenFromCookie(ctx: CtxLike): string | null {
   const raw = ctx?.req?.headers?.cookie;
   if (!raw || typeof raw !== "string") return null;
-
   const parsed = cookie.parse(raw);
-  const token = parsed?.[NEXO_TOKEN_COOKIE];
-  if (!token) return null;
-
-  return token;
+  return parsed?.[NEXO_TOKEN_COOKIE] || null;
 }
 
 function getAuthHeader(ctx: CtxLike): string | null {
   const h = ctx?.req?.headers?.authorization;
   if (typeof h === "string" && h.trim().length > 0) return h;
-
   const token = getTokenFromCookie(ctx);
-  if (!token) return null;
-
-  return `Bearer ${token}`;
+  return token ? `Bearer ${token}` : null;
 }
 
 function setTokenCookie(ctx: CtxLike, token: string) {
-  // Express res.cookie existe (não precisa cookie-parser)
   ctx.res.cookie(NEXO_TOKEN_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
-    // 7 dias
     maxAge: 7 * 24 * 60 * 60 * 1000,
   });
 }
@@ -75,211 +62,300 @@ async function nexoFetch(path: string, options: RequestInit = {}) {
   return response.json();
 }
 
+const protectedProxy = publicProcedure.input(z.any().optional());
+
 export const nexoProxyRouter = router({
-  // Endpoints de Bootstrap
   bootstrap: router({
     firstAdmin: publicProcedure
-      .input(
-        z.object({
-          orgName: z.string(),
-          adminName: z.string(),
-          email: z.string().email(),
-          password: z.string().min(8),
-        })
-      )
+      .input(z.object({
+        orgName: z.string(),
+        adminName: z.string(),
+        email: z.string().email(),
+        password: z.string().min(8),
+      }))
       .mutation(async ({ input }) => {
-        try {
-          return await nexoFetch("/bootstrap/first-admin", {
-            method: "POST",
-            body: JSON.stringify({
-              orgName: input.orgName,
-              adminName: input.adminName,
-              email: input.email,
-              password: input.password,
-            }),
-          });
-        } catch (error: any) {
-          console.error("[Nexo Proxy] Bootstrap failed:", error.message);
-          throw new Error(`Falha ao criar conta: ${error.message}`);
-        }
+        return await nexoFetch("/bootstrap/first-admin", {
+          method: "POST",
+          body: JSON.stringify(input),
+        });
       }),
   }),
 
-  // Endpoints de Autenticação
   auth: router({
     login: publicProcedure
-      .input(
-        z.object({
-          email: z.string().email(),
-          password: z.string(),
-        })
-      )
+      .input(z.object({ email: z.string().email(), password: z.string() }))
       .mutation(async ({ input, ctx }) => {
-        try {
-          const result = await nexoFetch("/auth/login", {
-            method: "POST",
-            body: JSON.stringify({
-              email: input.email,
-              password: input.password,
-            }),
-          });
-
-          // Salva token em cookie httpOnly pro browser mandar automaticamente depois
-          const token = result?.data?.token;
-          if (typeof token === "string" && token.length > 0) {
-            setTokenCookie(ctx as any, token);
-          }
-
-          return result;
-        } catch (error: any) {
-          console.error("[Nexo Proxy] Login failed:", error.message);
-          throw new Error(`Falha ao fazer login: ${error.message}`);
-        }
+        const result = await nexoFetch("/auth/login", {
+          method: "POST",
+          body: JSON.stringify(input),
+        });
+        const token = result?.data?.token;
+        if (token) setTokenCookie(ctx as any, token);
+        return result;
       }),
-
     logout: publicProcedure.mutation(async ({ ctx }) => {
       clearTokenCookie(ctx as any);
-      return { ok: true } as const;
+      return { ok: true };
     }),
-
-    // ⚠️ IMPORTANTE:
-    // O backend NÃO tem /auth/me (deu 404). O "me" está no controller apps/api/src/me/me.controller.ts.
-    // Então o endpoint correto é /me.
-    me: publicProcedure.query(async ({ ctx }) => {
-      try {
-        const authHeader = getAuthHeader(ctx as any);
-        if (!authHeader) throw new Error("Token não fornecido");
-
-        return await nexoFetch("/me", {
-          method: "GET",
-          headers: {
-            Authorization: authHeader,
-          },
+    forgotPassword: publicProcedure
+      .input(z.object({ email: z.string().email() }))
+      .mutation(async ({ input }) => {
+        return await nexoFetch("/auth/forgot-password", {
+          method: "POST",
+          body: JSON.stringify(input),
         });
-      } catch (error: any) {
-        console.error("[Nexo Proxy] Me failed:", error.message);
-        throw new Error(`Falha ao obter dados do usuário: ${error.message}`);
-      }
+      }),
+    resetPassword: publicProcedure
+      .input(z.object({ token: z.string(), password: z.string() }))
+      .mutation(async ({ input }) => {
+        return await nexoFetch("/auth/reset-password", {
+          method: "POST",
+          body: JSON.stringify(input),
+        });
+      }),
+    me: publicProcedure.query(async ({ ctx }) => {
+      const authHeader = getAuthHeader(ctx as any);
+      if (!authHeader) throw new Error("Não autenticado");
+      return await nexoFetch("/me", { headers: { Authorization: authHeader } });
     }),
   }),
 
-  // Endpoints de Clientes
   customers: router({
     list: publicProcedure.query(async ({ ctx }) => {
-      try {
-        const authHeader = getAuthHeader(ctx as any);
-        const headers: Record<string, string> = {};
-        if (authHeader) headers.Authorization = authHeader;
-
-        return await nexoFetch("/customers", {
-          method: "GET",
-          headers,
-        });
-      } catch (error: any) {
-        console.error("[Nexo Proxy] List customers failed:", error.message);
-        throw new Error(`Falha ao listar clientes: ${error.message}`);
-      }
+      const authHeader = getAuthHeader(ctx as any);
+      return await nexoFetch("/customers", { headers: authHeader ? { Authorization: authHeader } : {} });
     }),
-
-    create: publicProcedure
-      .input(
-        z.object({
-          name: z.string(),
-          phone: z.string(),
-          email: z.string().email().optional(),
-        })
-      )
-      .mutation(async ({ input, ctx }) => {
-        try {
-          const authHeader = getAuthHeader(ctx as any);
-          const headers: Record<string, string> = {};
-          if (authHeader) headers.Authorization = authHeader;
-
-          return await nexoFetch("/customers", {
-            method: "POST",
-            body: JSON.stringify(input),
-            headers,
-          });
-        } catch (error: any) {
-          console.error("[Nexo Proxy] Create customer failed:", error.message);
-          throw new Error(`Falha ao criar cliente: ${error.message}`);
-        }
-      }),
+    getById: publicProcedure.input(z.object({ id: z.string() })).query(async ({ input, ctx }) => {
+      const authHeader = getAuthHeader(ctx as any);
+      return await nexoFetch(`/customers/${input.id}`, { headers: authHeader ? { Authorization: authHeader } : {} });
+    }),
+    create: publicProcedure.input(z.any()).mutation(async ({ input, ctx }) => {
+      const authHeader = getAuthHeader(ctx as any);
+      return await nexoFetch("/customers", {
+        method: "POST",
+        body: JSON.stringify(input),
+        headers: authHeader ? { Authorization: authHeader } : {},
+      });
+    }),
+    update: publicProcedure.input(z.object({ id: z.string(), data: z.any() })).mutation(async ({ input, ctx }) => {
+      const authHeader = getAuthHeader(ctx as any);
+      return await nexoFetch(`/customers/${input.id}`, {
+        method: "PATCH",
+        body: JSON.stringify(input.data),
+        headers: authHeader ? { Authorization: authHeader } : {},
+      });
+    }),
   }),
 
-  // Endpoints de Agendamentos
   appointments: router({
-    list: publicProcedure.query(async ({ ctx }) => {
-      try {
-        const authHeader = getAuthHeader(ctx as any);
-        const headers: Record<string, string> = {};
-        if (authHeader) headers.Authorization = authHeader;
-
-        return await nexoFetch("/appointments", {
-          method: "GET",
-          headers,
-        });
-      } catch (error: any) {
-        console.error("[Nexo Proxy] List appointments failed:", error.message);
-        throw new Error(`Falha ao listar agendamentos: ${error.message}`);
-      }
+    list: publicProcedure.input(z.any().optional()).query(async ({ input, ctx }) => {
+      const authHeader = getAuthHeader(ctx as any);
+      const query = input ? "?" + new URLSearchParams(input).toString() : "";
+      return await nexoFetch(`/appointments${query}`, { headers: authHeader ? { Authorization: authHeader } : {} });
+    }),
+    getById: publicProcedure.input(z.object({ id: z.string() })).query(async ({ input, ctx }) => {
+      const authHeader = getAuthHeader(ctx as any);
+      return await nexoFetch(`/appointments/${input.id}`, { headers: authHeader ? { Authorization: authHeader } : {} });
+    }),
+    create: publicProcedure.input(z.any()).mutation(async ({ input, ctx }) => {
+      const authHeader = getAuthHeader(ctx as any);
+      return await nexoFetch("/appointments", {
+        method: "POST",
+        body: JSON.stringify(input),
+        headers: authHeader ? { Authorization: authHeader } : {},
+      });
+    }),
+    update: publicProcedure.input(z.object({ id: z.string(), data: z.any() })).mutation(async ({ input, ctx }) => {
+      const authHeader = getAuthHeader(ctx as any);
+      return await nexoFetch(`/appointments/${input.id}`, {
+        method: "PATCH",
+        body: JSON.stringify(input.data),
+        headers: authHeader ? { Authorization: authHeader } : {},
+      });
     }),
   }),
 
-  // Endpoints de Ordens de Serviço
   serviceOrders: router({
-    list: publicProcedure.query(async ({ ctx }) => {
-      try {
-        const authHeader = getAuthHeader(ctx as any);
-        const headers: Record<string, string> = {};
-        if (authHeader) headers.Authorization = authHeader;
-
-        return await nexoFetch("/service-orders", {
-          method: "GET",
-          headers,
-        });
-      } catch (error: any) {
-        console.error("[Nexo Proxy] List service orders failed:", error.message);
-        throw new Error(`Falha ao listar ordens de serviço: ${error.message}`);
-      }
+    list: publicProcedure.input(z.any().optional()).query(async ({ input, ctx }) => {
+      const authHeader = getAuthHeader(ctx as any);
+      const query = input ? "?" + new URLSearchParams(input).toString() : "";
+      return await nexoFetch(`/service-orders${query}`, { headers: authHeader ? { Authorization: authHeader } : {} });
+    }),
+    getById: publicProcedure.input(z.object({ id: z.string() })).query(async ({ input, ctx }) => {
+      const authHeader = getAuthHeader(ctx as any);
+      return await nexoFetch(`/service-orders/${input.id}`, { headers: authHeader ? { Authorization: authHeader } : {} });
+    }),
+    create: publicProcedure.input(z.any()).mutation(async ({ input, ctx }) => {
+      const authHeader = getAuthHeader(ctx as any);
+      return await nexoFetch("/service-orders", {
+        method: "POST",
+        body: JSON.stringify(input),
+        headers: authHeader ? { Authorization: authHeader } : {},
+      });
+    }),
+    update: publicProcedure.input(z.object({ id: z.string(), data: z.any() })).mutation(async ({ input, ctx }) => {
+      const authHeader = getAuthHeader(ctx as any);
+      return await nexoFetch(`/service-orders/${input.id}`, {
+        method: "PATCH",
+        body: JSON.stringify(input.data),
+        headers: authHeader ? { Authorization: authHeader } : {},
+      });
     }),
   }),
 
-  // Endpoints de Finanças
+  people: router({
+    list: publicProcedure.query(async ({ ctx }) => {
+      const authHeader = getAuthHeader(ctx as any);
+      return await nexoFetch("/people", { headers: authHeader ? { Authorization: authHeader } : {} });
+    }),
+    getById: publicProcedure.input(z.object({ id: z.string() })).query(async ({ input, ctx }) => {
+      const authHeader = getAuthHeader(ctx as any);
+      return await nexoFetch(`/people/${input.id}`, { headers: authHeader ? { Authorization: authHeader } : {} });
+    }),
+    create: publicProcedure.input(z.any()).mutation(async ({ input, ctx }) => {
+      const authHeader = getAuthHeader(ctx as any);
+      return await nexoFetch("/people", {
+        method: "POST",
+        body: JSON.stringify(input),
+        headers: authHeader ? { Authorization: authHeader } : {},
+      });
+    }),
+    update: publicProcedure.input(z.object({ id: z.string(), data: z.any() })).mutation(async ({ input, ctx }) => {
+      const authHeader = getAuthHeader(ctx as any);
+      return await nexoFetch(`/people/${input.id}`, {
+        method: "PATCH",
+        body: JSON.stringify(input.data),
+        headers: authHeader ? { Authorization: authHeader } : {},
+      });
+    }),
+  }),
+
   finance: router({
     overview: publicProcedure.query(async ({ ctx }) => {
-      try {
+      const authHeader = getAuthHeader(ctx as any);
+      return await nexoFetch("/finance/overview", { headers: authHeader ? { Authorization: authHeader } : {} });
+    }),
+    charges: router({
+      list: publicProcedure.input(z.any().optional()).query(async ({ input, ctx }) => {
         const authHeader = getAuthHeader(ctx as any);
-        const headers: Record<string, string> = {};
-        if (authHeader) headers.Authorization = authHeader;
-
-        return await nexoFetch("/finance/overview", {
-          method: "GET",
-          headers,
+        const query = input ? "?" + new URLSearchParams(input).toString() : "";
+        return await nexoFetch(`/finance/charges${query}`, { headers: authHeader ? { Authorization: authHeader } : {} });
+      }),
+      stats: publicProcedure.query(async ({ ctx }) => {
+        const authHeader = getAuthHeader(ctx as any);
+        return await nexoFetch("/finance/charges/stats", { headers: authHeader ? { Authorization: authHeader } : {} });
+      }),
+      revenueByMonth: publicProcedure.query(async ({ ctx }) => {
+        const authHeader = getAuthHeader(ctx as any);
+        return await nexoFetch("/finance/charges/revenue-by-month", { headers: authHeader ? { Authorization: authHeader } : {} });
+      }),
+      create: publicProcedure.input(z.any()).mutation(async ({ input, ctx }) => {
+        const authHeader = getAuthHeader(ctx as any);
+        return await nexoFetch("/finance/charges", {
+          method: "POST",
+          body: JSON.stringify(input),
+          headers: authHeader ? { Authorization: authHeader } : {},
         });
-      } catch (error: any) {
-        console.error("[Nexo Proxy] Finance overview failed:", error.message);
-        throw new Error(`Falha ao obter overview financeiro: ${error.message}`);
-      }
+      }),
+      update: publicProcedure.input(z.object({ id: z.string(), data: z.any() })).mutation(async ({ input, ctx }) => {
+        const authHeader = getAuthHeader(ctx as any);
+        return await nexoFetch(`/finance/charges/${input.id}`, {
+          method: "PATCH",
+          body: JSON.stringify(input.data),
+          headers: authHeader ? { Authorization: authHeader } : {},
+        });
+      }),
+      delete: publicProcedure.input(z.object({ id: z.string() })).mutation(async ({ input, ctx }) => {
+        const authHeader = getAuthHeader(ctx as any);
+        return await nexoFetch(`/finance/charges/${input.id}`, {
+          method: "DELETE",
+          headers: authHeader ? { Authorization: authHeader } : {},
+        });
+      }),
     }),
   }),
 
-  // Endpoints de Admin
-  admin: router({
-    overview: publicProcedure.query(async ({ ctx }) => {
-      try {
-        const authHeader = getAuthHeader(ctx as any);
-        const headers: Record<string, string> = {};
-        if (authHeader) headers.Authorization = authHeader;
+  governance: router({
+    summary: publicProcedure.query(async ({ ctx }) => {
+      const authHeader = getAuthHeader(ctx as any);
+      return await nexoFetch("/governance/summary", { headers: authHeader ? { Authorization: authHeader } : {} });
+    }),
+    runs: publicProcedure.input(z.any().optional()).query(async ({ input, ctx }) => {
+      const authHeader = getAuthHeader(ctx as any);
+      const query = input ? "?" + new URLSearchParams(input).toString() : "";
+      return await nexoFetch(`/governance/runs${query}`, { headers: authHeader ? { Authorization: authHeader } : {} });
+    }),
+    autoScore: publicProcedure.query(async ({ ctx }) => {
+      const authHeader = getAuthHeader(ctx as any);
+      return await nexoFetch("/governance/auto-score", { headers: authHeader ? { Authorization: authHeader } : {} });
+    }),
+  }),
 
-        return await nexoFetch("/admin/overview", {
-          method: "GET",
-          headers,
-        });
-      } catch (error: any) {
-        console.error("[Nexo Proxy] Admin overview failed:", error.message);
-        throw new Error(`Falha ao obter overview admin: ${error.message}`);
-      }
+  dashboard: router({
+    metrics: publicProcedure.query(async ({ ctx }) => {
+      const authHeader = getAuthHeader(ctx as any);
+      return await nexoFetch("/dashboard/metrics", { headers: authHeader ? { Authorization: authHeader } : {} });
+    }),
+    revenue: publicProcedure.query(async ({ ctx }) => {
+      const authHeader = getAuthHeader(ctx as any);
+      return await nexoFetch("/dashboard/revenue", { headers: authHeader ? { Authorization: authHeader } : {} });
+    }),
+    growth: publicProcedure.query(async ({ ctx }) => {
+      const authHeader = getAuthHeader(ctx as any);
+      return await nexoFetch("/dashboard/growth", { headers: authHeader ? { Authorization: authHeader } : {} });
+    }),
+    serviceOrdersStatus: publicProcedure.query(async ({ ctx }) => {
+      const authHeader = getAuthHeader(ctx as any);
+      return await nexoFetch("/dashboard/service-orders-status", { headers: authHeader ? { Authorization: authHeader } : {} });
+    }),
+    chargesStatus: publicProcedure.query(async ({ ctx }) => {
+      const authHeader = getAuthHeader(ctx as any);
+      return await nexoFetch("/dashboard/charges-status", { headers: authHeader ? { Authorization: authHeader } : {} });
+    }),
+  }),
+
+  reports: router({
+    executive: publicProcedure.query(async ({ ctx }) => {
+      const authHeader = getAuthHeader(ctx as any);
+      return await nexoFetch("/reports/executive-report", { headers: authHeader ? { Authorization: authHeader } : {} });
+    }),
+    metrics: publicProcedure.input(z.any().optional()).query(async ({ input, ctx }) => {
+      const authHeader = getAuthHeader(ctx as any);
+      const query = input ? "?" + new URLSearchParams(input).toString() : "";
+      return await nexoFetch(`/reports/metrics${query}`, { headers: authHeader ? { Authorization: authHeader } : {} });
+    }),
+  }),
+
+  whatsapp: router({
+    messages: publicProcedure.input(z.object({ customerId: z.string() })).query(async ({ input, ctx }) => {
+      const authHeader = getAuthHeader(ctx as any);
+      return await nexoFetch(`/whatsapp/messages/${input.customerId}`, { headers: authHeader ? { Authorization: authHeader } : {} });
+    }),
+    send: publicProcedure.input(z.any()).mutation(async ({ input, ctx }) => {
+      const authHeader = getAuthHeader(ctx as any);
+      return await nexoFetch("/whatsapp/messages", {
+        method: "POST",
+        body: JSON.stringify(input),
+        headers: authHeader ? { Authorization: authHeader } : {},
+      });
+    }),
+    updateStatus: publicProcedure.input(z.object({ id: z.string(), status: z.string() })).mutation(async ({ input, ctx }) => {
+      const authHeader = getAuthHeader(ctx as any);
+      return await nexoFetch(`/whatsapp/messages/${input.id}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: input.status }),
+        headers: authHeader ? { Authorization: authHeader } : {},
+      });
+    }),
+  }),
+
+  onboarding: router({
+    complete: publicProcedure.mutation(async ({ ctx }) => {
+      const authHeader = getAuthHeader(ctx as any);
+      return await nexoFetch("/onboarding/complete", {
+        method: "POST",
+        headers: authHeader ? { Authorization: authHeader } : {},
+      });
     }),
   }),
 });

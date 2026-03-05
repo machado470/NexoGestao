@@ -439,4 +439,131 @@ export class FinanceService {
     if (!charge) throw new NotFoundException('Cobrança não encontrada')
     return charge
   }
+
+  async getChargeStats(orgId: string) {
+    const [total, paid, pending, overdue] = await Promise.all([
+      this.prisma.charge.aggregate({
+        where: { orgId },
+        _count: { _all: true },
+      }),
+      this.prisma.charge.aggregate({
+        where: { orgId, status: 'PAID' },
+        _count: { _all: true },
+        _sum: { amountCents: true },
+      }),
+      this.prisma.charge.aggregate({
+        where: { orgId, status: 'PENDING' },
+        _count: { _all: true },
+        _sum: { amountCents: true },
+      }),
+      this.prisma.charge.aggregate({
+        where: { orgId, status: 'OVERDUE' },
+        _count: { _all: true },
+        _sum: { amountCents: true },
+      }),
+    ])
+
+    return {
+      totalCharges: total._count._all ?? 0,
+      totalPaid: paid._count._all ?? 0,
+      totalPaidAmount: (paid._sum.amountCents ?? 0) / 100,
+      totalPending: pending._count._all ?? 0,
+      totalPendingAmount: (pending._sum.amountCents ?? 0) / 100,
+      totalOverdue: overdue._count._all ?? 0,
+      totalOverdueAmount: (overdue._sum.amountCents ?? 0) / 100,
+    }
+  }
+
+  async getRevenueByMonth(orgId: string) {
+    const payments = await this.prisma.payment.findMany({
+      where: { orgId },
+      select: { amountCents: true, paidAt: true },
+      orderBy: { paidAt: 'asc' },
+    })
+
+    const monthlyRevenue: Record<string, number> = {}
+
+    payments.forEach((p) => {
+      const month = p.paidAt.toISOString().substring(0, 7) // YYYY-MM
+      monthlyRevenue[month] = (monthlyRevenue[month] || 0) + p.amountCents / 100
+    })
+
+    return Object.entries(monthlyRevenue).map(([month, revenue]) => ({
+      month,
+      revenue,
+    }))
+  }
+
+  async createCharge(input: any) {
+    const { orgId, actorUserId, actorPersonId, ...data } = input
+
+    const charge = await this.prisma.charge.create({
+      data: {
+        orgId,
+        customerId: data.customerId,
+        amountCents: data.amountCents,
+        dueDate: new Date(data.dueDate),
+        notes: data.notes,
+        serviceOrderId: data.serviceOrderId,
+        status: 'PENDING',
+      },
+    })
+
+    await this.audit.log({
+      orgId,
+      action: AUDIT_ACTIONS.CHARGE_CREATED,
+      actorUserId,
+      actorPersonId,
+      entityType: 'CHARGE',
+      entityId: charge.id,
+      context: 'Cobrança criada manualmente',
+    })
+
+    return charge
+  }
+
+  async updateCharge(input: any) {
+    const { id, orgId, actorUserId, actorPersonId, ...data } = input
+
+    const charge = await this.prisma.charge.findFirst({
+      where: { id, orgId },
+    })
+
+    if (!charge) throw new NotFoundException('Cobrança não encontrada')
+
+    const updated = await this.prisma.charge.update({
+      where: { id },
+      data: {
+        amountCents: data.amountCents,
+        dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
+        paidAt: data.paidAt ? new Date(data.paidAt) : undefined,
+        status: data.status,
+        notes: data.notes,
+      },
+    })
+
+    await this.audit.log({
+      orgId,
+      action: AUDIT_ACTIONS.CHARGE_UPDATED,
+      actorUserId,
+      actorPersonId,
+      entityType: 'CHARGE',
+      entityId: id,
+      context: 'Cobrança atualizada manualmente',
+    })
+
+    return updated
+  }
+
+  async deleteCharge(orgId: string, id: string) {
+    const charge = await this.prisma.charge.findFirst({
+      where: { id, orgId },
+    })
+
+    if (!charge) throw new NotFoundException('Cobrança não encontrada')
+
+    await this.prisma.charge.delete({
+      where: { id },
+    })
+  }
 }

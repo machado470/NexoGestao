@@ -39,6 +39,18 @@ export class PeopleService {
     })
   }
 
+  async updatePerson(id: string, data: any) {
+    return this.prisma.person.update({
+      where: { id },
+      data: {
+        name: data.name,
+        role: data.role,
+        email: data.email,
+        active: data.active,
+      },
+    })
+  }
+
   async createPerson(params: {
     name: string
     role: string

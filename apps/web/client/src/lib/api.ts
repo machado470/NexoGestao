@@ -1,6 +1,62 @@
-import axios, { AxiosInstance } from "axios";
+import { trpc } from "./trpc";
 
-// Tipos básicos para a API
+// Interfaces de Dados para o Frontend
+export interface AdminOverview {
+  totalOrganizations: number;
+  totalUsers: number;
+  activeOrganizations: number;
+}
+
+export interface Customer {
+  id: string;
+  name: string;
+  phone: string;
+  email?: string | null;
+  notes?: string | null;
+  active: boolean;
+  createdAt: string;
+}
+
+export interface Appointment {
+  id: string;
+  customerId: string;
+  startsAt: string;
+  endsAt: string;
+  status: string;
+  notes?: string | null;
+  customer?: Customer;
+}
+
+export interface ServiceOrder {
+  id: string;
+  customerId: string;
+  title: string;
+  description?: string | null;
+  status: string;
+  priority: number;
+  scheduledFor?: string | null;
+  assignedToPersonId?: string | null;
+  customer?: Customer;
+}
+
+export interface Charge {
+  id: string;
+  customerId: string;
+  description: string;
+  amountCents: number;
+  status: string;
+  dueDate: string;
+  paidAt?: string | null;
+  customer?: Customer;
+}
+
+export interface FinanceOverview {
+  totalRevenueInCents: number;
+  paidRevenueInCents: number;
+  pendingRevenueInCents: number;
+  overdueRevenueInCents: number;
+}
+
 export interface DashboardMetrics {
   totalCustomers: number;
   totalServiceOrders: number;
@@ -30,6 +86,7 @@ export interface ServiceOrdersStatus {
   inProgress: number;
   completed: number;
   cancelled: number;
+  onHold?: number;
 }
 
 export interface ChargesStatus {
@@ -37,6 +94,8 @@ export interface ChargesStatus {
   paid: number;
   overdue: number;
   cancelled: number;
+  refunded?: number;
+  partial?: number;
 }
 
 export interface ExecutiveReport {
@@ -53,101 +112,95 @@ export interface ExecutiveMetrics {
   trend: "up" | "down" | "neutral";
 }
 
-class NexoGestaoAPI {
-  private client: AxiosInstance;
+/**
+ * Cliente de API que abstrai as chamadas tRPC para o proxy do backend NestJS.
+ * IMPORTANTE: Para chamadas imperativas fora de componentes (como no AuthContext),
+ * usamos a instância direta do client tRPC se disponível, ou fallback.
+ * No entanto, o padrão do projeto parece ser usar hooks. 
+ * Para manter a compatibilidade com o código legado que usa 'await api.login()',
+ * vamos usar o vanilla client do tRPC.
+ */
+import { createTRPCProxyClient, httpBatchLink } from '@trpc/client';
+// @ts-ignore
+import type { AppRouter } from '../../server/routers';
 
-  constructor() {
-    this.client = axios.create({
-      baseURL: "/api",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
+const client = createTRPCProxyClient<AppRouter | any>({
+  links: [
+    httpBatchLink({
+      url: '/api/trpc',
+    }),
+  ],
+});
 
-    // Interceptor para adicionar token se necessário
-    this.client.interceptors.request.use((config) => {
-      const token = localStorage.getItem("token");
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-      return config;
-    });
-  }
+export const api = {
+  // Auth
+  login: (data: any) => client.nexo.auth.login.mutate(data),
+  logout: () => client.nexo.auth.logout.mutate(),
+  me: () => client.nexo.auth.me.query(),
+  forgotPassword: (email: string) => client.nexo.auth.forgotPassword.mutate({ email }),
+  resetPassword: (data: any) => client.nexo.auth.resetPassword.mutate(data),
+  
+  // Bootstrap
+  register: (data: any) => client.nexo.bootstrap.firstAdmin.mutate(data),
+  
+  // Admin
+  getAdminOverview: () => client.nexo.admin.overview.query(),
 
-  // ===== Reports =====
-  async getExecutiveReport(): Promise<ExecutiveReport> {
-    try {
-      const response = await this.client.get<{ success: boolean; data: ExecutiveReport }>("/reports/executive");
-      return response.data.data;
-    } catch (error) {
-      console.error("Erro ao buscar relatório executivo:", error);
-      throw error;
-    }
-  }
-
-  async getExecutiveMetrics(days?: number): Promise<ExecutiveMetrics[]> {
-    try {
-      const response = await this.client.get<{ success: boolean; data: ExecutiveMetrics[] }>(
-        "/reports/metrics",
-        { params: days ? { days } : {} }
-      );
-      return response.data.data;
-    } catch (error) {
-      console.error("Erro ao buscar métricas executivas:", error);
-      throw error;
-    }
-  }
-
-  // ===== Dashboard =====
-  async getDashboardMetrics(): Promise<DashboardMetrics> {
-    try {
-      const response = await this.client.get<DashboardMetrics>("/dashboard/metrics");
-      return response.data;
-    } catch (error) {
-      console.error("Erro ao buscar métricas do dashboard:", error);
-      throw error;
-    }
-  }
-
-  async getDashboardRevenue(): Promise<RevenueData[]> {
-    try {
-      const response = await this.client.get<RevenueData[]>("/dashboard/revenue");
-      return response.data;
-    } catch (error) {
-      console.error("Erro ao buscar dados de faturamento:", error);
-      throw error;
-    }
-  }
-
-  async getDashboardGrowth(): Promise<CustomerGrowthData[]> {
-    try {
-      const response = await this.client.get<CustomerGrowthData[]>("/dashboard/growth");
-      return response.data;
-    } catch (error) {
-      console.error("Erro ao buscar dados de crescimento:", error);
-      throw error;
-    }
-  }
-
-  async getDashboardServiceOrdersStatus(): Promise<ServiceOrdersStatus> {
-    try {
-      const response = await this.client.get<ServiceOrdersStatus>("/dashboard/service-orders-status");
-      return response.data;
-    } catch (error) {
-      console.error("Erro ao buscar status das ordens de serviço:", error);
-      throw error;
-    }
-  }
-
-  async getDashboardChargesStatus(): Promise<ChargesStatus> {
-    try {
-      const response = await this.client.get<ChargesStatus>("/dashboard/charges-status");
-      return response.data;
-    } catch (error) {
-      console.error("Erro ao buscar status das cobranças:", error);
-      throw error;
-    }
-  }
-}
-
-export const api = new NexoGestaoAPI();
+  // Customers
+  listCustomers: () => client.nexo.customers.list.query(),
+  getCustomer: (id: string) => client.nexo.customers.getById.query({ id }),
+  createCustomer: (data: any) => client.nexo.customers.create.mutate(data),
+  updateCustomer: (id: string, data: any) => client.nexo.customers.update.mutate({ id, data }),
+  
+  // Appointments
+  listAppointments: (filters?: any) => client.nexo.appointments.list.query(filters),
+  getAppointment: (id: string) => client.nexo.appointments.getById.query({ id }),
+  createAppointment: (data: any) => client.nexo.appointments.create.mutate(data),
+  updateAppointment: (id: string, data: any) => client.nexo.appointments.update.mutate({ id, data }),
+  
+  // Service Orders
+  listServiceOrders: (filters?: any) => client.nexo.serviceOrders.list.query(filters),
+  getServiceOrder: (id: string) => client.nexo.serviceOrders.getById.query({ id }),
+  createServiceOrder: (data: any) => client.nexo.serviceOrders.create.mutate(data),
+  updateServiceOrder: (id: string, data: any) => client.nexo.serviceOrders.update.mutate({ id, data }),
+  
+  // People
+  listPeople: () => client.nexo.people.list.query(),
+  getPerson: (id: string) => client.nexo.people.getById.query({ id }),
+  createPerson: (data: any) => client.nexo.people.create.mutate(data),
+  updatePerson: (id: string, data: any) => client.nexo.people.update.mutate({ id, data }),
+  
+  // Finance
+  getFinanceOverview: () => client.nexo.finance.overview.query(),
+  listCharges: (filters?: any) => client.nexo.finance.charges.list.query(filters),
+  getChargeStats: () => client.nexo.finance.charges.stats.query(),
+  getRevenueByMonth: () => client.nexo.finance.charges.revenueByMonth.query(),
+  createCharge: (data: any) => client.nexo.finance.charges.create.mutate(data),
+  updateCharge: (id: string, data: any) => client.nexo.finance.charges.update.mutate({ id, data }),
+  deleteCharge: (id: string) => client.nexo.finance.charges.delete.mutate({ id }),
+  payCharge: (chargeId: string, data: any) => client.nexo.finance.charges.update.mutate({ id: chargeId, data: { ...data, status: 'PAID', paidAt: new Date().toISOString() } }),
+  
+  // Governance
+  getGovernanceSummary: () => client.nexo.governance.summary.query(),
+  listGovernanceRuns: (filters?: any) => client.nexo.governance.runs.query(filters),
+  getGovernanceAutoScore: () => client.nexo.governance.autoScore.query(),
+  
+  // Dashboard
+  getDashboardMetrics: () => client.nexo.dashboard.metrics.query(),
+  getDashboardRevenue: () => client.nexo.dashboard.revenue.query(),
+  getDashboardGrowth: () => client.nexo.dashboard.growth.query(),
+  getDashboardServiceOrdersStatus: () => client.nexo.dashboard.serviceOrdersStatus.query(),
+  getDashboardChargesStatus: () => client.nexo.dashboard.chargesStatus.query(),
+  
+  // Reports
+  getExecutiveReport: () => client.nexo.reports.executive.query(),
+  getExecutiveMetrics: (filters?: any) => client.nexo.reports.metrics.query(filters),
+  
+  // WhatsApp
+  getWhatsAppMessages: (customerId: string) => client.nexo.whatsapp.messages.query({ customerId }),
+  sendWhatsAppMessage: (data: any) => client.nexo.whatsapp.send.mutate(data),
+  updateWhatsAppStatus: (id: string, status: string) => client.nexo.whatsapp.updateStatus.mutate({ id, status }),
+  
+  // Onboarding
+  completeOnboarding: () => client.nexo.onboarding.complete.mutate(),
+};

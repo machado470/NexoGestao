@@ -18,6 +18,9 @@ import { OperationalStateGuard } from '../people/operational-state.guard'
 import { FinanceService } from './finance.service'
 import { CreatePaymentDto } from './dto/create-payment.dto'
 import { ChargesQueryDto } from './dto/charges-query.dto'
+import { CreateChargeDto } from './dto/create-charge.dto'
+import { UpdateChargeDto } from './dto/update-charge.dto'
+import { Patch, Delete } from '@nestjs/common'
 
 @UseGuards(JwtAuthGuard, RolesGuard, OperationalStateGuard)
 @Controller('finance')
@@ -41,11 +44,72 @@ export class FinanceController {
     return { ok: true, data } // data = { items, meta }
   }
 
+  @Get('charges/stats')
+  @Roles('ADMIN')
+  async getChargeStats(@Org() orgId: string) {
+    const data = await this.finance.getChargeStats(orgId)
+    return { ok: true, data }
+  }
+
+  @Get('charges/revenue-by-month')
+  @Roles('ADMIN')
+  async getRevenueByMonth(@Org() orgId: string) {
+    const data = await this.finance.getRevenueByMonth(orgId)
+    return { ok: true, data }
+  }
+
   @Get('charges/:id')
   @Roles('ADMIN')
   async getCharge(@Org() orgId: string, @Param('id') id: string) {
     const data = await this.finance.getCharge(orgId, id)
     return { ok: true, data }
+  }
+
+  @Post('charges')
+  @Roles('ADMIN')
+  async createCharge(
+    @Org() orgId: string,
+    @User() user: any,
+    @Body() body: CreateChargeDto,
+  ) {
+    const actorUserId = user?.userId ?? user?.sub ?? null
+    const actorPersonId = user?.personId ?? null
+
+    const data = await this.finance.createCharge({
+      ...body,
+      orgId,
+      actorUserId,
+      actorPersonId,
+    })
+    return { ok: true, data }
+  }
+
+  @Patch('charges/:id')
+  @Roles('ADMIN')
+  async updateCharge(
+    @Org() orgId: string,
+    @User() user: any,
+    @Param('id') id: string,
+    @Body() body: UpdateChargeDto,
+  ) {
+    const actorUserId = user?.userId ?? user?.sub ?? null
+    const actorPersonId = user?.personId ?? null
+
+    const data = await this.finance.updateCharge({
+      ...body,
+      id,
+      orgId,
+      actorUserId,
+      actorPersonId,
+    })
+    return { ok: true, data }
+  }
+
+  @Delete('charges/:id')
+  @Roles('ADMIN')
+  async deleteCharge(@Org() orgId: string, @Param('id') id: string) {
+    await this.finance.deleteCharge(orgId, id)
+    return { ok: true }
   }
 
   @Post('charges/:chargeId/pay')

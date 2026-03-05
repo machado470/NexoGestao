@@ -35,4 +35,21 @@ export class AuthController {
       body.password,
     )
   }
+
+  @Post('forgot-password')
+  async forgotPassword(@Body() body: { email: string }) {
+    // Implementação mockada para integração
+    return { success: true, message: 'Se o e-mail existir, um link de recuperação será enviado.' }
+  }
+
+  @Post('reset-password')
+  async resetPassword(@Body() body: { token: string; password: string }) {
+    // Implementação mockada para integração
+    return { success: true, message: 'Senha redefinida com sucesso.' }
+  }
+
+  @Post('logout')
+  async logout() {
+    return { success: true }
+  }
 }

@@ -1,9 +1,10 @@
 import {
+  Body,
   Controller,
   Get,
   Param,
+  Patch,
   Post,
-  Body,
   UseGuards,
 } from '@nestjs/common'
 import { PeopleService } from './people.service'
@@ -42,6 +43,15 @@ export class PeopleController {
   @Roles('ADMIN')
   async get(@Param('id') id: string) {
     return this.people.findWithContext(id)
+  }
+
+  @Patch(':id')
+  @Roles('ADMIN')
+  async update(
+    @Param('id') id: string,
+    @Body() body: any,
+  ) {
+    return this.people.updatePerson(id, body)
   }
 
   /**
