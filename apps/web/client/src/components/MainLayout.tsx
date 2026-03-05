@@ -24,7 +24,8 @@ import {
   FileText,
   TrendingDown,
   ChevronLeft,
-  Settings
+  Settings,
+  Workflow
 } from "lucide-react";
 
 interface MainLayoutProps {
@@ -95,6 +96,8 @@ export function MainLayout({ children }: MainLayoutProps) {
     { id: "calendar", label: "Calendário", icon: CalendarDays, route: "/calendar" },
 
     { id: "timeline", label: "Timeline", icon: BarChart3, route: "/timeline" },
+
+    { id: "operations", label: "Workflow Operacional", icon: Workflow, route: "/operations" },
 
     { id: "settings", label: "Configurações", icon: Settings, route: "/settings" }
 
