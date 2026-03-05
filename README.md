@@ -140,6 +140,9 @@ Negócios que vivem no WhatsApp e planilha.
 
 ---
 
+## 🚀 CI/CD
+Os workflows de CI/CD para Staging e Produção foram configurados no GitHub Actions. O deploy para Staging é acionado automaticamente em pushes para a branch `development`, enquanto o deploy para Produção é acionado em pushes para a branch `main`.
+
 ## 🏗 Arquitetura Técnica
 
 ### Stack Atual
@@ -356,6 +359,6 @@ Desenvolvido com ❤️ para pequenas e médias empresas que querem organizar su
 
 ---
 
-**Última atualização:** 2026-03-02  
+**Última atualização:** 2026-03-05  
 **Versão:** 1.0.0  
 **Status:** Em desenvolvimento ativo

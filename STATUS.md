@@ -129,51 +129,21 @@ Comandos padrão:
 - Reset total DEV: docker compose down -v && docker compose up --build :contentReference[oaicite:30]{index=30}
 
 ------------------------------------------------------------
-10) STATUS REAL ATUAL (O QUE ESTÁ TRAVANDO AGORA)
+10) STATUS ATUAL E PRÓXIMOS PASSOS
 ------------------------------------------------------------
-Você está no módulo Governance/Enforcement.
-Objetivo: EnforcementEngine respeitar PersonException ativa e NÃO aplicar enforcement indevido.
 
-Problemas confirmados:
-A) hasActiveException() estava “stubado” e retornava false sempre → enforcement indevido.
-B) “Dois universos” de código:
-   - host: apps/api/src/...
-   - container: /app/apps/api/src/...
-   Container NÃO monta volume do host.
-   Você editou no host, mas o build roda no container e a pasta /app/apps/api/src/governance está vazia.
-   Resultado: arquivo enforcement-engine.service.ts não existe no runtime do container, build falha. :contentReference[oaicite:31]{index=31}
+**CI/CD:**
+- Workflows de CI/CD para Staging e Produção configurados com sucesso no GitHub Actions.
+- Deploy para Staging acionado automaticamente em pushes para `development`.
+- Deploy para Produção acionado em pushes para `main`.
 
-Decisão obrigatória:
-- Caminho profissional (recomendado): adicionar bind mount no docker-compose.yml:
-  services:
-    api:
-      volumes:
-        - ./apps/api:/app/apps/api
-Depois:
-  docker compose down -v
-  docker compose up -d --build
-A partir daí: editar no host reflete no container. :contentReference[oaicite:32]{index=32}
+**Próximos Passos (Prioridade):**
+1. **Corrigir o Docker (bind mount)** para o módulo Governance/Enforcement, conforme detalhado anteriormente.
+2. **Restaurar/recriar o módulo Governance** dentro do caminho correto (host montado).
+3. **Criar smoke test mínimo** para o módulo Governance.
+4. **Voltar para features novas** após a correção do Governance.
 
-------------------------------------------------------------
-11) O QUE VOCÊ (AGENT) DEVE FAZER AGORA (ORDEM EXATA)
-------------------------------------------------------------
-1) Corrigir o Docker (bind mount) para acabar com universo paralelo.
-   - Mostrar patch do docker-compose.yml (somente as linhas necessárias).
-   - Rodar: docker compose down -v && docker compose up -d --build
-   - Validar: docker compose ps; logs; health.
-
-2) Restaurar / recriar o módulo governance dentro do caminho certo (host montado).
-   - Recriar enforcement-engine.service.ts e qualquer arquivo que falte.
-   - Garantir hasActiveException() consultando PersonException no banco e respeitando active/validAt etc (conforme schema).
-   - Garantir TimelineEvent/AuditEvent para enforcement.
-
-3) Criar smoke test mínimo:
-   - Seed cria PersonException ativa
-   - Rodar governance/enforcement
-   - Confirmar que não aplicou enforcement indevido (ver timeline/audit).
-   - Comandos + SQL de verificação.
-
-4) Só depois disso voltar para features novas.
+**Última atualização:** 2026-03-05
 
 ------------------------------------------------------------
 12) FORMATO DE RESPOSTA DO AGENT (SEM ENROLAÇÃO)
@@ -185,4 +155,3 @@ A partir daí: editar no host reflete no container. :contentReference[oaicite:32
   D) Queries SQL de validação
 - Se editar arquivo: seguir rm -f → nano → cat e mostrar conteúdo completo no final.
 
-FIM DO COMMANDO.
