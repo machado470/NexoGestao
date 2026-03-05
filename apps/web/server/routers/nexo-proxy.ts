@@ -362,4 +362,20 @@ export const nexoProxyRouter = router({
       });
     }),
   }),
+  settings: router({
+    get: publicProcedure.query(async ({ ctx }) => {
+      const authHeader = getAuthHeader(ctx as any);
+      return await nexoFetch("/organization-settings", {
+        headers: authHeader ? { Authorization: authHeader } : {},
+      });
+    }),
+    update: publicProcedure.input(z.any()).mutation(async ({ input, ctx }) => {
+      const authHeader = getAuthHeader(ctx as any);
+      return await nexoFetch("/organization-settings", {
+        method: "PATCH",
+        body: JSON.stringify(input),
+        headers: authHeader ? { Authorization: authHeader } : {},
+      });
+    }),
+  }),
 });
