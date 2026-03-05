@@ -11,4 +11,3 @@ jobs:
       - name: Deploy to Staging
         run: |
           echo "Deploying to staging environment..."
-          # Adicione aqui os comandos de deploy

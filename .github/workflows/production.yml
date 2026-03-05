@@ -1,7 +1,7 @@
 name: Deploy Production
- water:
+on:
   push:
-    branches:
+     branches:
       - main
 jobs:
   deploy:
@@ -11,4 +11,3 @@ jobs:
       - name: Deploy to Production
         run: |
           echo "Deploying to production environment..."
-          # Adicione aqui os comandos de deploy
