@@ -10,10 +10,17 @@ export class DashboardService {
    */
   async getMetrics(orgId: string) {
     const now = new Date()
+    const startOfWeek = new Date(now)
+    startOfWeek.setDate(now.getDate() - now.getDay())
+    startOfWeek.setHours(0, 0, 0, 0)
 
     const [
       totalCustomers,
       totalServiceOrders,
+      openServiceOrders,
+      overdueServiceOrders,
+      weeklyRevenueAgg,
+      pendingPaymentsAgg,
       inProgressOrders,
       completedOrders,
       delayedOrders,
@@ -22,66 +29,73 @@ export class DashboardService {
       paidRevenue,
       pendingRevenue,
     ] = await Promise.all([
-      // Total de clientes ativos
+      // 1. Total de clientes ativos
       this.prisma.customer.count({
         where: { orgId, active: true },
       }),
 
-      // Total de ordens de serviço
+      // 2. Total de ordens de serviço
       this.prisma.serviceOrder.count({
         where: { orgId },
       }),
 
-      // Ordens em andamento
+      // 3. Ordens de serviço abertas (OPEN ou ASSIGNED)
+      this.prisma.serviceOrder.count({
+        where: { orgId, status: { in: ['OPEN', 'ASSIGNED'] } },
+      }),
+
+      // 4. Ordens de serviço atrasadas (não concluídas e data agendada passou)
       this.prisma.serviceOrder.count({
         where: {
           orgId,
           status: { in: ['OPEN', 'ASSIGNED', 'IN_PROGRESS'] },
+          scheduledFor: { lt: now },
         },
       }),
 
-      // Ordens concluídas
-      this.prisma.serviceOrder.count({
+      // 5. Faturamento semanal (pagamentos realizados nesta semana)
+      this.prisma.payment.aggregate({
         where: {
           orgId,
-          status: 'DONE',
+          paidAt: { gte: startOfWeek },
         },
+        _sum: { amountCents: true },
       }),
 
-      // Ordens atrasadas (finishedAt passou da data agendada)
+      // 6. Pagamentos pendentes (cobranças PENDING ou OVERDUE)
+      this.prisma.charge.aggregate({
+        where: {
+          orgId,
+          status: { in: ['PENDING', 'OVERDUE'] },
+        },
+        _sum: { amountCents: true },
+      }),
+
+      // Métricas adicionais para compatibilidade
+      this.prisma.serviceOrder.count({
+        where: { orgId, status: 'IN_PROGRESS' },
+      }),
+      this.prisma.serviceOrder.count({
+        where: { orgId, status: 'DONE' },
+      }),
       this.prisma.serviceOrder.count({
         where: {
           orgId,
           status: { in: ['OPEN', 'ASSIGNED', 'IN_PROGRESS'] },
-          scheduledFor: {
-            lt: now,
-          },
+          scheduledFor: { lt: now },
         },
       }),
-
-      // Tickets de risco (CorrectiveActions abertas)
       this.prisma.correctiveAction.count({
-        where: {
-          person: {
-            orgId,
-          },
-          status: 'OPEN',
-        },
+        where: { person: { orgId }, status: 'OPEN' },
       }),
-
-      // Faturamento total (todas as cobranças)
       this.prisma.charge.aggregate({
         where: { orgId },
         _sum: { amountCents: true },
       }),
-
-      // Faturamento pago
       this.prisma.charge.aggregate({
         where: { orgId, status: 'PAID' },
         _sum: { amountCents: true },
       }),
-
-      // Faturamento pendente
       this.prisma.charge.aggregate({
         where: { orgId, status: { in: ['PENDING', 'OVERDUE'] } },
         _sum: { amountCents: true },
@@ -89,7 +103,14 @@ export class DashboardService {
     ])
 
     return {
+      // Novas métricas solicitadas
       totalCustomers,
+      openServiceOrders,
+      overdueServiceOrders,
+      weeklyRevenueInCents: weeklyRevenueAgg._sum.amountCents ?? 0,
+      pendingPaymentsInCents: pendingPaymentsAgg._sum.amountCents ?? 0,
+
+      // Métricas existentes (compatibilidade)
       totalServiceOrders,
       inProgressOrders,
       completedOrders,
@@ -112,7 +133,6 @@ export class DashboardService {
       revenue: number
     }> = []
 
-    // Gera os últimos 12 meses
     for (let i = 11; i >= 0; i--) {
       const date = new Date(now.getFullYear(), now.getMonth() - i, 1)
       const monthName = date.toLocaleDateString('pt-BR', {
@@ -127,7 +147,6 @@ export class DashboardService {
       })
     }
 
-    // Busca pagamentos por mês
     const payments = await this.prisma.payment.findMany({
       where: {
         orgId,
@@ -141,7 +160,6 @@ export class DashboardService {
       },
     })
 
-    // Agrupa pagamentos por mês
     payments.forEach((payment) => {
       const paymentMonth = new Date(
         payment.paidAt.getFullYear(),
@@ -162,7 +180,7 @@ export class DashboardService {
 
     return months.map((m) => ({
       month: m.month,
-      revenue: m.revenue / 100, // Converte cents para reais
+      revenue: m.revenue / 100,
     }))
   }
 
@@ -178,7 +196,6 @@ export class DashboardService {
       totalCustomers: number
     }> = []
 
-    // Gera os últimos 12 meses
     for (let i = 11; i >= 0; i--) {
       const date = new Date(now.getFullYear(), now.getMonth() - i, 1)
       const monthName = date.toLocaleDateString('pt-BR', {
@@ -194,7 +211,6 @@ export class DashboardService {
       })
     }
 
-    // Busca todos os clientes criados nos últimos 12 meses
     const customers = await this.prisma.customer.findMany({
       where: {
         orgId,
@@ -208,7 +224,6 @@ export class DashboardService {
       orderBy: { createdAt: 'asc' },
     })
 
-    // Conta clientes por mês
     customers.forEach((customer) => {
       const customerMonth = new Date(
         customer.createdAt.getFullYear(),
@@ -227,7 +242,6 @@ export class DashboardService {
       }
     })
 
-    // Calcula total acumulado
     let cumulative = 0
     months.forEach((m) => {
       cumulative += m.newCustomers

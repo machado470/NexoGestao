@@ -59,6 +59,10 @@ export interface FinanceOverview {
 
 export interface DashboardMetrics {
   totalCustomers: number;
+  openServiceOrders: number;
+  overdueServiceOrders: number;
+  weeklyRevenueInCents: number;
+  pendingPaymentsInCents: number;
   totalServiceOrders: number;
   inProgressOrders: number;
   completedOrders: number;
