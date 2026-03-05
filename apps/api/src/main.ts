@@ -18,6 +18,8 @@ function parseCorsOrigins(raw?: string): string[] {
 }
 
 async function bootstrap() {
+    // TODO: Adicionar Sentry.io ou similar para monitoramento de erros em produção
+  // Ex: Sentry.init({ dsn: process.env.SENTRY_DSN_API, ... });
   const structuredLogger = new StructuredLoggerService()
 
   try {

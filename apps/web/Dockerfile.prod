@@ -1,0 +1,44 @@
+# Stage 1: Build
+FROM node:20-slim AS builder
+
+WORKDIR /app
+
+# Instalar pnpm
+RUN npm install -g pnpm
+
+# Copiar manifestos e patches
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/web/package.json apps/web/package.json
+COPY patches ./patches
+
+# Instalar dependências
+RUN pnpm install --frozen-lockfile
+
+# Copiar o resto do código
+COPY . .
+
+# Build do web (client + server)
+RUN pnpm --filter web build
+
+# Stage 2: Production
+FROM node:20-slim
+
+WORKDIR /app
+
+# Instalar pnpm para rodar o script de start
+RUN npm install -g pnpm
+
+# Copiar package.json do web para o pnpm encontrar o script
+COPY apps/web/package.json apps/web/package.json
+
+# Copiar artefatos de build e dependências de produção
+COPY --from=builder /app/apps/web/dist ./apps/web/dist
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/apps/web/node_modules ./apps/web/node_modules
+
+WORKDIR /app/apps/web
+
+EXPOSE 3000
+
+# O comando `start` já define NODE_ENV=production
+CMD ["pnpm", "run", "start"]

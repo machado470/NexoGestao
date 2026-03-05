@@ -1,0 +1,65 @@
+# Stage 1: Build
+FROM node:20-slim AS builder
+
+WORKDIR /app
+
+# Instalar dependências globais
+RUN npm install -g pnpm
+
+# Copiar arquivos de manifesto do workspace
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/api/package.json apps/api/package.json
+COPY patches ./patches
+
+# Instalar dependências
+RUN pnpm install --frozen-lockfile
+
+# Copiar o restante do código-fonte
+COPY . .
+
+# Gerar Prisma Client
+RUN pnpm --filter api prisma:generate
+
+# Construir a aplicação
+RUN pnpm --filter api build
+
+# Stage 2: Production
+FROM node:20-slim
+
+WORKDIR /app
+
+# Instalar dependências de produção e utilitários
+RUN apt-get update && apt-get install -y \
+  openssl \
+  ca-certificates \
+  postgresql-client \
+  curl \
+  && rm -rf /var/lib/apt/lists/*
+
+RUN npm install -g pnpm
+
+# Copiar arquivos de manifesto para instalar apenas as dependências de produção
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/api/package.json apps/api/package.json
+COPY patches ./patches
+
+# Instalar somente dependências de produção
+RUN pnpm install --prod --frozen-lockfile
+
+# Copiar o entrypoint e torná-lo executável
+COPY --from=builder /app/apps/api/docker-entrypoint.sh /app/apps/api/docker-entrypoint.sh
+RUN chmod +x /app/apps/api/docker-entrypoint.sh \
+  && sed -i 's/\r$//' /app/apps/api/docker-entrypoint.sh
+
+# Copiar os artefatos de build
+COPY --from=builder /app/apps/api/dist ./apps/api/dist
+COPY --from=builder /app/apps/api/prisma ./apps/api/prisma
+
+WORKDIR /app/apps/api
+
+EXPOSE 3000
+
+# O entrypoint cuidará de migrations, seed e de iniciar a aplicação
+ENTRYPOINT ["/app/apps/api/docker-entrypoint.sh"]
+
+CMD ["node", "dist/main.js"]

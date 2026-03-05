@@ -8,6 +8,9 @@ import App from "./App";
 import { getLoginUrl } from "./const";
 import "./index.css";
 
+// TODO: Adicionar Sentry.io ou similar para monitoramento de erros em produção (frontend)
+// Ex: Sentry.init({ dsn: process.env.SENTRY_DSN_WEB, integrations: [Sentry.browserTracingIntegration(), Sentry.replayIntegration()] });
+
 const queryClient = new QueryClient();
 
 const redirectToLoginIfUnauthorized = (error: unknown) => {
