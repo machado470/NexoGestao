@@ -187,8 +187,8 @@ export class WhatsAppService {
 
   async markSent(params: {
     id: string
-    provider: string
-    providerMessageId: string
+    provider?: string
+    providerMessageId?: string
   }) {
     const { id, provider, providerMessageId } = params
 
@@ -196,8 +196,8 @@ export class WhatsAppService {
       where: { id },
       data: {
         status: WhatsAppMessageStatus.SENT,
-        provider,
-        providerMessageId,
+        ...(provider ? { provider } : {}),
+        ...(providerMessageId ? { providerMessageId } : {}),
         sentAt: new Date(),
         errorCode: null,
         errorMessage: null,
@@ -209,9 +209,9 @@ export class WhatsAppService {
 
   async markFailed(params: {
     id: string
-    provider: string
-    errorCode: string
-    errorMessage: string
+    provider?: string
+    errorCode?: string
+    errorMessage?: string
   }) {
     const { id, provider, errorCode, errorMessage } = params
 
@@ -219,9 +219,9 @@ export class WhatsAppService {
       where: { id },
       data: {
         status: WhatsAppMessageStatus.FAILED,
-        provider,
-        errorCode,
-        errorMessage,
+        ...(provider ? { provider } : {}),
+        ...(errorCode ? { errorCode } : {}),
+        ...(errorMessage ? { errorMessage } : {}),
         lockedAt: null,
         lockedBy: null,
       },

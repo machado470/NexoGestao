@@ -1,7 +1,7 @@
 import { publicProcedure, router } from "../_core/trpc";
 import { z } from "zod";
 import { getDb } from "../db";
-import { organizations, accounts, users } from "../../drizzle/schema";
+import { organizations, accounts, users } from "../../../../drizzle/schema";
 import { eq } from "drizzle-orm";
 import * as bcrypt from "bcrypt";
 import { sdk } from "../_core/sdk";
