@@ -1,0 +1,14 @@
+name: Deploy Staging
+on:
+  push:
+    branches:
+      - development
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Deploy to Staging
+        run: |
+          echo "Deploying to staging environment..."
+          # Adicione aqui os comandos de deploy
