@@ -92,4 +92,26 @@ export class BillingController {
       limits,
     }))
   }
+
+  /**
+   * GET /billing/status
+   * Retorna o status detalhado da assinatura da organização.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Get('status')
+  async getBillingStatus(@Req() req: any) {
+    const orgId = req.user.orgId
+    return this.billingService.getBillingStatus(orgId)
+  }
+
+  /**
+   * GET /billing/limits
+   * Retorna os limites e o uso atual de quotas da organização.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Get('limits')
+  async getBillingLimits(@Req() req: any) {
+    const orgId = req.user.orgId
+    return this.billingService.getBillingLimits(orgId)
+  }
 }

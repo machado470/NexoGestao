@@ -1,119 +1,108 @@
 # Guia de Deploy de Produção
 
-Este guia fornece as instruções passo a passo para realizar o deploy do NexoGestão em um ambiente de produção.
+Este guia detalha o processo de deploy do NexoGestão em um ambiente de produção, utilizando os scripts e configurações atualizados para garantir um processo robusto e idempotente.
 
 ## 1. Pré-requisitos
 
-- Um servidor Linux (Ubuntu 22.04 recomendado) com acesso root/sudo.
-- **Docker** e **Docker Compose** instalados.
-- **Git** instalado.
-- Um **domínio** configurado para apontar para o IP do seu servidor.
-- Portas `80` e `443` abertas no firewall do servidor.
+-   Um servidor Linux (Ubuntu 22.04 LTS recomendado) com acesso `root`/`sudo`.
+-   **Docker** e **Docker Compose** instalados.
+-   **Git** instalado.
+-   Um **domínio** configurado para apontar para o IP do seu servidor (ex: `seudominio.com.br`).
+-   Portas `80` e `443` abertas no firewall do servidor.
 
-## 2. Configuração Inicial do Servidor
+## 2. Configuração Inicial
 
 1.  **Clonar o Repositório**:
 
     ```bash
-    git clone https://github.com/seu-usuario/nexogestao.git
-    cd nexogestao
+    git clone https://github.com/machado470/NexoGestao.git
+    cd NexoGestao
     ```
 
-2.  **Criar o Arquivo de Variáveis de Ambiente**:
+2.  **Configurar Variáveis de Ambiente**:
 
-    Copie o arquivo de exemplo e preencha **TODAS** as variáveis. Preste atenção especial às senhas e chaves secretas.
+    Copie o arquivo de exemplo `.env.prod.example` para `.env.prod` e preencha **TODAS** as variáveis. Este arquivo contém configurações críticas para o ambiente de produção, incluindo credenciais de banco de dados, chaves de API e domínios.
 
     ```bash
-    cp examples/env/.env.prod.example .env.prod
+    cp .env.prod.example .env.prod
     nano .env.prod
     ```
 
-    **Variáveis Críticas**:
-    - `DOMAIN`: Seu domínio de produção (ex: `app.nexogestao.com.br`).
-    - `POSTGRES_PASSWORD`: Senha forte para o banco de dados.
-    - `REDIS_PASSWORD`: Senha forte para o Redis.
-    - `JWT_SECRET`: Uma string aleatória e muito longa (64+ caracteres).
-    - `STRIPE_*`: Suas chaves de API do Stripe (modo *live*).
-    - `SENTRY_DSN`: DSN do seu projeto Sentry.
+    **Variáveis Críticas a Preencher**:
+    -   `DOMAIN`: Seu domínio principal (ex: `seudominio.com.br`).
+    -   `EMAIL`: E-mail para registro do certificado Let's Encrypt.
+    -   `POSTGRES_PASSWORD`: Senha forte para o banco de dados PostgreSQL.
+    -   `REDIS_PASSWORD`: Senha forte para o Redis.
+    -   `JWT_SECRET`: Uma string aleatória e longa (64+ caracteres) para segurança JWT.
+    -   `STRIPE_SECRET_KEY`: Sua chave secreta do Stripe (modo *live*).
+    -   `STRIPE_WEBHOOK_SECRET`: O segredo do webhook do Stripe.
+    -   `STRIPE_PRICE_STARTER`, `STRIPE_PRICE_PRO`, `STRIPE_PRICE_BUSINESS`: IDs dos planos no Stripe.
+    -   `SENTRY_DSN_API`, `VITE_SENTRY_DSN`: DSNs dos projetos Sentry para backend e frontend.
+    -   `RESEND_API_KEY`: Chave de API do Resend para envio de e-mails.
 
-## 3. Geração do Certificado SSL (Let's Encrypt)
+## 3. Executando o Deploy de Produção
 
-Vamos usar o Certbot com o Nginx para obter um certificado SSL gratuito.
+O deploy é gerenciado por um script idempotente que automatiza a construção das imagens Docker, a configuração SSL e a inicialização dos serviços.
 
-1.  **Primeiro Deploy (Apenas Nginx e Certbot)**:
-
-    Inicie apenas os serviços necessários para o desafio do Certbot.
-
-    ```bash
-    docker compose -f docker-compose.prod.yml up -d nginx certbot
-    ```
-
-2.  **Executar o Certbot**:
-
-    Substitua `app.nexogestao.com.br` pelo seu domínio.
+1.  **Executar o Script de Deploy**:
 
     ```bash
-    docker compose -f docker-compose.prod.yml run --rm certbot certonly \
-      --webroot -w /var/www/certbot \
-      -d app.nexogestao.com.br \
-      --email seu-email@dominio.com \
-      --agree-tos \
-      --no-eff-email
+    ./dev/deploy-prod.sh
     ```
 
-3.  **Verificar Renovação**:
+    Este script irá:
+    -   Validar as dependências (Docker, Docker Compose, curl).
+    -   Carregar as variáveis do `.env.prod`.
+    -   Gerar ou renovar certificados SSL via Let's Encrypt para `seudominio.com.br`, `app.seudominio.com.br` e `api.seudominio.com.br` (se `DOMAIN` e `EMAIL` estiverem configurados). Caso contrário, gerará um certificado *self-signed* para desenvolvimento.
+    -   Construir as imagens Docker e iniciar os contêineres (`api`, `web`, `postgres`, `redis`, `nginx`).
+    -   Aguardar o banco de dados e a API ficarem saudáveis.
+    -   Aplicar as migrações do Prisma.
+    -   Executar um *smoke test* básico para verificar a funcionalidade.
 
-    O contêiner `certbot` já está configurado para renovar o certificado automaticamente. Após a primeira execução, você pode parar o Nginx temporariamente.
+2.  **Verificar os Logs**:
 
-    ```bash
-    docker compose -f docker-compose.prod.yml stop nginx
-    ```
-
-## 4. Deploy Completo da Aplicação
-
-1.  **Build e Start dos Serviços**:
-
-    Agora, suba todos os serviços em modo de produção. O Docker Compose irá construir as imagens da `api` and `web` e iniciar todos os contêineres na ordem correta.
-
-    ```bash
-    docker compose -f docker-compose.prod.yml --env-file .env.prod up --build -d
-    ```
-
-2.  **Executar a Migração do Banco de Dados**:
-
-    Com a API em execução, execute o comando `prisma migrate deploy` para aplicar todas as migrações e preparar o schema do banco de dados.
-
-    ```bash
-    docker compose -f docker-compose.prod.yml exec api pnpm prisma:migrate:deploy
-    ```
-
-3.  **Verificar os Logs**:
-
-    Monitore os logs para garantir que todos os serviços iniciaram sem erros.
+    Monitore os logs para garantir que todos os serviços iniciaram sem erros:
 
     ```bash
     docker compose -f docker-compose.prod.yml logs -f
     ```
 
-    Você deve ver mensagens indicando que a API, o Web, o Postgres e o Redis estão saudáveis.
+## 4. Configuração de Backup
 
-4.  **Acessar a Aplicação**:
+Um script de backup diário com rotação de 7 dias está disponível e pode ser configurado via cron.
 
-    Acesse `https://seu-dominio.com` no navegador. A aplicação deve estar online e funcionando.
+1.  **Instalar o Cron Job de Backup**:
+
+    Como usuário `root`, copie o arquivo de cron para o diretório `/etc/cron.d/`:
+
+    ```bash
+    sudo cp /home/ubuntu/NexoGestao/infra/cron/nexogestao-backup.cron /etc/cron.d/nexogestao-backup
+    sudo chmod 644 /etc/cron.d/nexogestao-backup
+    ```
+
+    O script `run-backup.sh` fará o dump do banco de dados PostgreSQL, compactará e armazenará em `/var/backups/nexogestao/`. Backups com mais de 7 dias serão automaticamente removidos. Se as variáveis `BACKUP_S3_BUCKET` e `BACKUP_S3_REGION` estiverem configuradas no `.env.prod`, o backup também será enviado para o S3.
 
 ## 5. Manutenção e Atualizações
 
--   **Atualizar a Aplicação**: Para aplicar novas atualizações do código, puxe as mudanças do Git e rode o comando de deploy novamente:
+-   **Atualizar a Aplicação**: Para aplicar novas atualizações de código, puxe as mudanças do Git e execute o script de deploy novamente. Ele é idempotente e garantirá que a aplicação seja atualizada sem interrupções.
 
     ```bash
     git pull origin main
-    docker compose -f docker-compose.prod.yml --env-file .env.prod up --build -d
+    ./dev/deploy-prod.sh
     ```
 
--   **Backup e Restore**: Os scripts `scripts/backup-db.sh` e `scripts/restore-db.sh` estão disponíveis para backup e restauração do banco de dados. Um cron job para backup automático é configurado em `infra/cron/nexogestao-backup.cron`.
-
--   **Smoke Test**: Após um deploy, execute o smoke test para garantir que as funcionalidades críticas estão operacionais:
+-   **Smoke Test Manual**: Para verificar a saúde da aplicação a qualquer momento, execute o script de smoke test:
 
     ```bash
-    ./scripts/smoke-e2e.sh https://seu-dominio.com/api admin@nexo.com SuaSenha
+    ./dev/smoke-prod.sh
     ```
+
+    Você pode passar as URLs base da API e do Web, e credenciais de admin, se necessário:
+
+    ```bash
+    API_BASE=https://api.seudominio.com.br WEB_BASE=https://app.seudominio.com.br ADMIN_EMAIL=seu-admin@email.com ADMIN_PASSWORD=SuaSenhaForte ./dev/smoke-prod.sh
+    ```
+
+## 6. Acesso à Aplicação
+
+Após o deploy bem-sucedido, acesse `https://app.seudominio.com.br` e `https://api.seudominio.com.br` no seu navegador ou via ferramentas de API. A aplicação deve estar online e funcionando.

@@ -4,6 +4,7 @@ import {
   BadRequestException,
   NotFoundException,
   ForbiddenException,
+  ServiceUnavailableException,
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { PrismaService } from '../prisma/prisma.service'
@@ -61,24 +62,72 @@ export class BillingService {
   private readonly logger = new Logger(BillingService.name)
   private stripe: Stripe | null = null
 
+  /** Flag: true se Stripe está configurado e disponível */
+  get isStripeConfigured(): boolean {
+    return this.stripe !== null
+  }
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
   ) {
     const secretKey = this.config.get<string>('STRIPE_SECRET_KEY')
+    const isProduction = this.config.get<string>('NODE_ENV') === 'production'
     if (secretKey) {
       this.stripe = new Stripe(secretKey, {
         apiVersion: '2024-06-20',
       })
       this.logger.log('Stripe inicializado com sucesso')
     } else {
-      this.logger.warn('STRIPE_SECRET_KEY não configurado — billing em modo simulado')
+      if (isProduction) {
+        this.logger.warn(
+          'STRIPE_SECRET_KEY não configurado em produção — módulo billing responderá 503 para operações Stripe',
+        )
+      } else {
+        this.logger.warn('STRIPE_SECRET_KEY não configurado — billing em modo simulado')
+      }
     }
+  }
+
+  /**
+   * Valida se o Stripe está disponível para operações que o exigem em produção.
+   * Em desenvolvimento, permite modo simulado.
+   * Em produção, retorna 503 com mensagem clara.
+   */
+  private assertStripeAvailable(operation: string): void {
+    if (this.stripe) return
+    const isProduction = this.config.get<string>('NODE_ENV') === 'production'
+    if (isProduction) {
+      throw new ServiceUnavailableException(
+        `Módulo de billing indisponível: STRIPE_SECRET_KEY não configurado. ` +
+          `Configure a variável de ambiente e reinicie o servidor. ` +
+          `Operação solicitada: ${operation}`,
+      )
+    }
+  }
+
+  /**
+   * Valida se o webhook secret está configurado (obrigatório em produção).
+   */
+  private assertWebhookSecretAvailable(): string {
+    const webhookSecret = this.config.get<string>('STRIPE_WEBHOOK_SECRET')
+    if (!webhookSecret) {
+      const isProduction = this.config.get<string>('NODE_ENV') === 'production'
+      if (isProduction) {
+        throw new ServiceUnavailableException(
+          'Módulo de billing indisponível: STRIPE_WEBHOOK_SECRET não configurado. ' +
+            'Configure a variável de ambiente e reinicie o servidor.',
+        )
+      }
+    }
+    return webhookSecret ?? ''
   }
 
   // ─── Criar Checkout Session ────────────────────────────────────────────────
 
   async createCheckoutSession(orgId: string, planName: PlanName, successUrl: string, cancelUrl: string) {
+    // Em produção, lança 503 se Stripe não estiver configurado
+    this.assertStripeAvailable('create-checkout-session')
     if (!this.stripe) {
       return this.simulateCheckoutSession(orgId, planName)
     }
@@ -139,10 +188,11 @@ export class BillingService {
   // ─── Processar Webhook do Stripe ──────────────────────────────────────────
 
   async handleWebhook(rawBody: Buffer, signature: string) {
-    const webhookSecret = this.config.get<string>('STRIPE_WEBHOOK_SECRET')
+    // Valida se webhook secret está configurado (503 em produção se não estiver)
+    const webhookSecret = this.assertWebhookSecretAvailable()
 
     if (!this.stripe || !webhookSecret) {
-      this.logger.warn('Webhook recebido mas Stripe não configurado')
+      this.logger.warn('Webhook recebido mas Stripe não configurado — ignorando')
       return { received: true, simulated: true }
     }
 
@@ -513,5 +563,44 @@ export class BillingService {
 
     const planName = subscription.plan.name
     return { planName, limits: PLAN_LIMITS[planName] ?? PLAN_LIMITS['FREE'] }
+  }
+
+  // ─── Status e Limites (Novas Rotas) ───────────────────────────────────────
+
+  /**
+   * Retorna o status detalhado da assinatura para a org.
+   */
+  async getBillingStatus(orgId: string) {
+    const subscription = await this.prisma.subscription.findUnique({
+      where: { orgId },
+      include: { plan: true },
+    })
+
+    if (!subscription) {
+      return {
+        status: 'NO_SUBSCRIPTION',
+        plan: 'FREE',
+        isActive: false,
+        message: 'Nenhuma assinatura encontrada. Usando plano gratuito.',
+      }
+    }
+
+    return {
+      status: subscription.status,
+      plan: subscription.plan.name,
+      isActive: subscription.status === SubscriptionStatus.ACTIVE || subscription.status === SubscriptionStatus.TRIALING,
+      currentPeriodEnd: subscription.currentPeriodEnd,
+      cancelAtPeriodEnd: !!subscription.stripeSubscriptionId && subscription.status === SubscriptionStatus.ACTIVE && !!subscription.canceledAt,
+    }
+  }
+
+  /**
+   * Retorna os limites e o uso atual de quotas da organização.
+   */
+  async getBillingLimits(orgId: string) {
+    // Usar o QuotasService que já tem essa lógica pronta
+    const { QuotasService } = await import('../quotas/quotas.service')
+    const quotasService = new QuotasService(this.prisma)
+    return quotasService.getQuotaUsage(orgId)
   }
 }
