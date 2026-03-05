@@ -13,47 +13,59 @@ export const financeRouter = router({
     /**
      * create charge
      * Nest (esperado): POST /finance/charges
+     * O backend espera: customerId (UUID string), amountCents (inteiro em centavos), dueDate (ISO)
      */
     create: protectedProcedure
       .input(
         z.object({
-          customerId: z.number().min(1, "Cliente é obrigatório"),
-          description: z.string().min(1, "Descrição é obrigatória"),
-          amount: z.number().min(0.01, "Valor deve ser maior que 0"),
+          // customerId pode vir como string (UUID) ou number (legado) — normalizamos para string
+          customerId: z.union([z.string(), z.number()]).transform(v => String(v)),
+          description: z.string().optional(),
+          // amount em reais (float) → convertemos para centavos no BFF
+          amount: z.number().min(0.01, "Valor deve ser maior que 0").optional(),
+          // amountCents direto (prioridade sobre amount)
+          amountCents: z.number().int().min(1).optional(),
           dueDate: z.coerce.date(),
           notes: z.string().optional(),
+          serviceOrderId: z.string().optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
-        // envia como o front manda (Nest decide se converte pra centavos)
+        // Converte amount (reais) para amountCents se necessário
+        const amountCents =
+          input.amountCents ??
+          (input.amount ? Math.round(input.amount * 100) : undefined);
+
+        if (!amountCents || amountCents < 1) {
+          throw new Error("Valor da cobrança é obrigatório e deve ser maior que 0");
+        }
+
         const res = await nexoFetch<any>(ctx.req, `/finance/charges`, {
           method: "POST",
           body: JSON.stringify({
-            ...input,
+            customerId: input.customerId,
+            amountCents,
             dueDate: input.dueDate.toISOString(),
+            notes: input.notes,
+            serviceOrderId: input.serviceOrderId,
           }),
         });
 
-        // se sem token, nexoFetch retorna null
         return res;
       }),
 
     /**
      * list charges (front usa page/limit em vários pontos)
      * Nest (esperado): GET /finance/charges?page=&limit=&status=
-     * Retorno esperado do Nest pode ser:
-     * - { ok, data: Charge[], pagination? }
-     * - ou { data, pagination }
-     *
-     * A gente normaliza pro shape do front:
-     * { data, pagination }
      */
     list: protectedProcedure
       .input(
         paginationInput
           .extend({
             status: z.enum(["PENDING", "PAID", "OVERDUE", "CANCELED"]).optional(),
-            customerId: z.number().optional(),
+            customerId: z.union([z.string(), z.number()]).optional().transform(v =>
+              v !== undefined ? String(v) : undefined
+            ),
             q: z.string().optional(),
           })
           .optional()
@@ -73,18 +85,18 @@ export const financeRouter = router({
           method: "GET",
         });
 
-        // Se o Nest já devolve { ok, data, pagination }:
+        // Normaliza resposta do Nest: { ok, data: { items, meta } } ou { ok, data: Charge[] }
         const payload = raw?.data ?? raw;
-        const data = payload?.data ?? payload ?? [];
-        const pagination =
-          payload?.pagination ?? {
-            page,
-            limit,
-            total: Array.isArray(data) ? data.length : 0,
-            pages: 1,
-          };
+        const items = payload?.items ?? payload?.data ?? (Array.isArray(payload) ? payload : []);
+        const meta = payload?.meta ?? payload?.pagination;
+        const pagination = meta ?? {
+          page,
+          limit,
+          total: Array.isArray(items) ? items.length : 0,
+          pages: 1,
+        };
 
-        return { data, pagination };
+        return { data: items, pagination };
       }),
 
     /**
@@ -92,7 +104,7 @@ export const financeRouter = router({
      * Nest (esperado): GET /finance/charges/:id
      */
     getById: protectedProcedure
-      .input(z.object({ id: z.number().int().positive() }))
+      .input(z.object({ id: z.union([z.string(), z.number()]).transform(v => String(v)) }))
       .query(async ({ input, ctx }) => {
         const raw = await nexoFetch<any>(ctx.req, `/finance/charges/${input.id}`, {
           method: "GET",
@@ -108,24 +120,35 @@ export const financeRouter = router({
     update: protectedProcedure
       .input(
         z.object({
-          id: z.number().int().positive(),
+          id: z.union([z.string(), z.number()]).transform(v => String(v)),
           description: z.string().min(1).optional(),
           amount: z.number().min(0.01).optional(),
+          amountCents: z.number().int().min(1).optional(),
           dueDate: z.coerce.date().optional(),
+          paidAt: z.coerce.date().optional(),
           paidDate: z.coerce.date().optional(),
           status: z.enum(["PENDING", "PAID", "OVERDUE", "CANCELED"]).optional(),
           notes: z.string().optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
-        const { id, ...rest } = input;
+        const { id, amount, amountCents: amountCentsInput, paidDate, ...rest } = input;
+
+        // Converte amount (reais) para amountCents se necessário
+        const amountCents =
+          amountCentsInput ??
+          (amount ? Math.round(amount * 100) : undefined);
+
+        // paidDate é alias para paidAt
+        const paidAt = rest.paidAt ?? paidDate;
 
         const raw = await nexoFetch<any>(ctx.req, `/finance/charges/${id}`, {
           method: "PATCH",
           body: JSON.stringify({
             ...rest,
+            amountCents,
             dueDate: rest.dueDate ? rest.dueDate.toISOString() : undefined,
-            paidDate: rest.paidDate ? rest.paidDate.toISOString() : undefined,
+            paidAt: paidAt ? paidAt.toISOString() : undefined,
           }),
         });
 
@@ -137,7 +160,7 @@ export const financeRouter = router({
      * Nest (esperado): DELETE /finance/charges/:id
      */
     delete: protectedProcedure
-      .input(z.object({ id: z.number().int().positive() }))
+      .input(z.object({ id: z.union([z.string(), z.number()]).transform(v => String(v)) }))
       .mutation(async ({ input, ctx }) => {
         const raw = await nexoFetch<any>(ctx.req, `/finance/charges/${input.id}`, {
           method: "DELETE",
@@ -148,9 +171,6 @@ export const financeRouter = router({
 
     /**
      * stats
-     * Front antigo chamava stats.useQuery({})
-     * então a gente aceita input opcional (ou {}).
-     *
      * Nest (esperado): GET /finance/charges/stats
      */
     stats: protectedProcedure
@@ -174,5 +194,29 @@ export const financeRouter = router({
 
       return raw?.data ?? raw ?? [];
     }),
+
+    /**
+     * pay — registra pagamento de uma cobrança
+     * Nest (esperado): POST /finance/charges/:chargeId/pay
+     */
+    pay: protectedProcedure
+      .input(
+        z.object({
+          chargeId: z.union([z.string(), z.number()]).transform(v => String(v)),
+          method: z.enum(["PIX", "CASH", "CARD", "TRANSFER", "OTHER"]).default("PIX"),
+          amountCents: z.number().int().min(1).optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const raw = await nexoFetch<any>(ctx.req, `/finance/charges/${input.chargeId}/pay`, {
+          method: "POST",
+          body: JSON.stringify({
+            method: input.method,
+            amountCents: input.amountCents,
+          }),
+        });
+
+        return raw?.data ?? raw;
+      }),
   }),
 });

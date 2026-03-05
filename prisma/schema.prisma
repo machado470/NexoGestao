@@ -459,6 +459,8 @@ model Appointment {
   customerId String
   customer   Customer @relation(fields: [customerId], references: [id])
 
+  title       String?
+  description String?
   startsAt DateTime
   endsAt   DateTime
   status   AppointmentStatus @default(SCHEDULED)

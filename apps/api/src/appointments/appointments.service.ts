@@ -83,7 +83,7 @@ export class AppointmentsService {
   ) {}
 
   async list(
-    _orgId: string,
+    orgId: string,
     filters: {
       from?: string
       to?: string
@@ -91,10 +91,11 @@ export class AppointmentsService {
       customerId?: string
     },
   ) {
+    if (!orgId) throw new BadRequestException('orgId é obrigatório')
     const from = parseISODate('from', filters.from)
     const to = parseISODate('to', filters.to)
 
-    const where: any = {}
+    const where: any = { orgId }
 
     if (filters.customerId) where.customerId = filters.customerId
 
@@ -119,11 +120,12 @@ export class AppointmentsService {
     })
   }
 
-  async get(_orgId: string, id: string) {
+  async get(orgId: string, id: string) {
+    if (!orgId) throw new BadRequestException('orgId é obrigatório')
     if (!id) throw new BadRequestException('id é obrigatório')
 
     const appt = await this.prisma.appointment.findFirst({
-      where: { id },
+      where: { id, orgId },
       include: {
         customer: { select: { id: true, name: true, phone: true } },
       },
@@ -137,6 +139,8 @@ export class AppointmentsService {
     createdBy: string | null
     personId: string | null
     customerId: string
+    title?: string
+    description?: string
     startsAt: string
     endsAt?: string
     status?: AppointmentStatus
@@ -172,12 +176,15 @@ export class AppointmentsService {
     try {
       const created = await this.prisma.appointment.create({
         data: {
+          orgId: params.orgId,
           customerId: params.customerId,
+          title: params.title?.trim() || null,
+          description: params.description?.trim() || null,
           startsAt,
           endsAt,
           status,
           notes,
-        } as any,
+        },
         include: {
           customer: { select: { id: true, name: true, phone: true } },
         },

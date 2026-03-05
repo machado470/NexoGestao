@@ -75,7 +75,7 @@ export function CreateChargeModal({
     }
 
     createCharge.mutate({
-      customerId: parseInt(formData.customerId),
+      customerId: formData.customerId, // UUID string
       description: formData.description,
       amount,
       dueDate: new Date(formData.dueDate),

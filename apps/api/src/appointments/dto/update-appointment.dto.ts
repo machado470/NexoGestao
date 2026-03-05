@@ -1,11 +1,11 @@
 import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator'
 
+// Enums alinhados com o schema Prisma: AppointmentStatus
 const APPOINTMENT_STATUSES = [
   'SCHEDULED',
   'CONFIRMED',
-  'IN_PROGRESS',
-  'COMPLETED',
-  'CANCELLED',
+  'CANCELED',
+  'DONE',
   'NO_SHOW',
 ] as const
 

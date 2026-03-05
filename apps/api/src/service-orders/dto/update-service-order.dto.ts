@@ -9,13 +9,13 @@ import {
   ValidateIf,
 } from 'class-validator'
 
+// Enums alinhados com o schema Prisma: ServiceOrderStatus
 const SERVICE_ORDER_STATUSES = [
   'OPEN',
   'ASSIGNED',
   'IN_PROGRESS',
-  'COMPLETED',
-  'CANCELLED',
-  'ON_HOLD',
+  'DONE',
+  'CANCELED',
 ] as const
 
 export class UpdateServiceOrderDto {

@@ -17,16 +17,19 @@ export class CustomersService {
     private readonly audit: AuditService,
   ) {}
 
-  async list(_orgId: string) {
+  async list(orgId: string) {
+    if (!orgId) throw new BadRequestException('orgId é obrigatório')
     return this.prisma.customer.findMany({
+      where: { orgId },
       orderBy: { createdAt: 'desc' },
       take: 200,
     })
   }
 
-  async get(_orgId: string, id: string) {
+  async get(orgId: string, id: string) {
+    if (!orgId) throw new BadRequestException('orgId é obrigatório')
     const customer = await this.prisma.customer.findFirst({
-      where: { id },
+      where: { id, orgId },
     })
     if (!customer) throw new NotFoundException('Cliente não encontrado')
     return customer
@@ -53,7 +56,7 @@ export class CustomersService {
     // se veio email, não deixa duplicar por org
     if (email) {
       const exists = await this.prisma.customer.findFirst({
-        where: { email },
+        where: { email, orgId: params.orgId },
         select: { id: true },
       })
       if (exists) {
@@ -63,12 +66,13 @@ export class CustomersService {
 
     const created = await this.prisma.customer.create({
       data: {
+        orgId: params.orgId,
         name,
         phone,
         email,
         notes,
         active: true,
-      } as any,
+      },
     })
 
     const context = `Cliente criado: ${created.name}`
@@ -128,7 +132,7 @@ export class CustomersService {
     if (!params.id) throw new BadRequestException('id é obrigatório')
 
     const before = await this.prisma.customer.findFirst({
-      where: { id: params.id },
+      where: { id: params.id, orgId: params.orgId },
       select: {
         id: true,
         name: true,
@@ -159,7 +163,7 @@ export class CustomersService {
 
       if (v && v !== before.email) {
         const dup = await this.prisma.customer.findFirst({
-          where: { email: v, NOT: { id: params.id } },
+          where: { email: v, orgId: params.orgId, NOT: { id: params.id } },
           select: { id: true },
         })
         if (dup) throw new BadRequestException('Já existe um cliente com este e-mail')
@@ -181,9 +185,9 @@ export class CustomersService {
       throw new BadRequestException('Nenhum campo para atualizar')
     }
 
-    // 🔒 multi-tenant blindado: o middleware injeta o orgId no where
+    // 🔒 multi-tenant: garante isolamento por org
     const result = await this.prisma.customer.updateMany({
-      where: { id: params.id },
+      where: { id: params.id, orgId: params.orgId },
       data,
     })
 
@@ -192,7 +196,7 @@ export class CustomersService {
     }
 
     const updated = await this.prisma.customer.findFirst({
-      where: { id: params.id },
+      where: { id: params.id, orgId: params.orgId },
     })
     if (!updated) throw new NotFoundException('Cliente não encontrado')
 

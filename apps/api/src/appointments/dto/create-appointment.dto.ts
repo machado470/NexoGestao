@@ -1,11 +1,11 @@
 import { IsIn, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator'
 
+// Enums alinhados com o schema Prisma: AppointmentStatus
 const APPOINTMENT_STATUSES = [
   'SCHEDULED',
   'CONFIRMED',
-  'IN_PROGRESS',
-  'COMPLETED',
-  'CANCELLED',
+  'CANCELED',
+  'DONE',
   'NO_SHOW',
 ] as const
 
@@ -13,6 +13,16 @@ export class CreateAppointmentDto {
   @IsString()
   @IsNotEmpty()
   customerId!: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  title?: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  description?: string
 
   // ISO string (validação final no service com Date)
   @IsString()
