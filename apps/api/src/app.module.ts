@@ -3,7 +3,7 @@ import { ConfigModule } from '@nestjs/config'
 import { ScheduleModule } from '@nestjs/schedule'
 import { ClsModule } from 'nestjs-cls'
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core'
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throottler'
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler'
 import { OrgContextInterceptor } from './auth/org-context.interceptor'
 import { RequestLoggerMiddleware } from './common/middleware/request-logger.middleware'
 

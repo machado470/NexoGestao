@@ -9,7 +9,9 @@ datasource db {
 
 enum UserRole {
   ADMIN
-  COLLABORATOR
+  MANAGER
+  STAFF
+  VIEWER
 }
 
 enum RiskLevel {
@@ -208,6 +210,9 @@ model User {
   email    String   @unique
   password String?
   role     UserRole
+
+  resetToken          String?   @unique
+  resetTokenExpiresAt DateTime?
 
   active Boolean @default(false)
   // inviteToken     String?   @unique // Removido, agora no modelo InviteToken
@@ -586,8 +591,10 @@ model Charge {
 
   title       String?
   description String?
+  notes       String?
   amountCents Int
   dueDate     DateTime
+  paidAt      DateTime?
   status      ChargeStatus @default(PENDING)
 
   payments Payment[]
@@ -613,6 +620,7 @@ model Payment {
   amountCents Int
   method      PaymentMethod
   notes       String?
+  paidAt      DateTime @default(now())
 
   createdAt DateTime @default(now())
 
@@ -646,9 +654,22 @@ model WhatsAppMessage {
   entityId   String
   messageType WhatsAppMessageType
   status     WhatsAppMessageStatus @default(QUEUED)
-  to         String
-  body       String
-  sentAt     DateTime?
+  
+  toPhone      String
+  renderedText String
+  messageKey   String   @unique
+  templateKey  String?
+  
+  provider          String?
+  providerMessageId String?
+  errorCode         String?
+  errorMessage      String?
+  
+  lockedAt DateTime?
+  lockedBy String?
+  
+  metadata Json?
+  sentAt   DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -656,6 +677,7 @@ model WhatsAppMessage {
   @@index([orgId, createdAt])
   @@index([customerId, createdAt])
   @@index([entityType, entityId, createdAt])
+  @@index([messageKey])
 }
 
 model Expense {
@@ -796,6 +818,7 @@ model InviteToken {
   token       String   @unique
   orgId       String
   org         Organization @relation(fields: [orgId], references: [id])
+  role        UserRole @default(STAFF)
   expiresAt   DateTime
   createdAt   DateTime @default(now())
 

@@ -42,11 +42,12 @@ export class WhatsAppDispatcherJob {
               providerMessageId: res.providerMessageId,
             })
           } else {
+            const errorRes = res as any
             await this.whatsApp.markFailed({
               id: m.id,
-              provider: res.provider,
-              errorCode: res.errorCode,
-              errorMessage: res.errorMessage,
+              provider: errorRes.provider,
+              errorCode: errorRes.errorCode,
+              errorMessage: errorRes.errorMessage,
             })
           }
         } catch (err: any) {

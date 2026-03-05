@@ -28,7 +28,7 @@ export class ServiceOrdersController {
   ) {}
 
   @Get()
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'MANAGER', 'STAFF', 'VIEWER')
   list(
     @Org() orgId: string,
     @Query('status') status?: string,
@@ -47,13 +47,13 @@ export class ServiceOrdersController {
   }
 
   @Get(':id')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'MANAGER', 'STAFF', 'VIEWER')
   get(@Org() orgId: string, @Param('id') id: string) {
     return this.serviceOrders.get(orgId, id)
   }
 
   @Post()
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'MANAGER', 'STAFF')
   async create(
     @Org() orgId: string,
     @User() user: any,
@@ -80,7 +80,7 @@ export class ServiceOrdersController {
   }
 
   @Patch(':id')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'MANAGER', 'STAFF')
   update(
     @Org() orgId: string,
     @User() user: any,

@@ -9,7 +9,15 @@ import { AuditService } from '../audit/audit.service'
 import { NotificationsService } from '../notifications/notifications.service'
 import { OnboardingService } from '../onboarding/onboarding.service'
 import { AUDIT_ACTIONS } from '../audit/audit.actions'
-import { normalizeEmail, normalizePhone } from '@nexogestao/common'
+function normalizeEmail(v?: string): string | null {
+  const s = (v ?? '').trim().toLowerCase();
+  return s ? s : null;
+}
+
+function normalizePhone(v?: string): string {
+  const digits = (v ?? '').replace(/\D/g, '').trim();
+  return digits;
+}
 import { AnalyticsService, UsageMetricEvent } from '../analytics/analytics.service'
 
 @Injectable()
@@ -30,6 +38,20 @@ export class CustomersService {
       orderBy: { createdAt: 'desc' },
       take: 200,
     })
+  }
+
+  async exportCsv(orgId: string) {
+    const customers = await this.prisma.customer.findMany({
+      where: { orgId },
+      orderBy: { name: 'asc' },
+    })
+
+    const header = 'ID,Nome,Email,Telefone,Ativo,Criado Em\n'
+    const rows = customers.map(c => {
+      return `"${c.id}","${c.name}","${c.email || ''}","${c.phone}","${c.active ? 'Sim' : 'Não'}","${c.createdAt.toISOString()}"`
+    }).join('\n')
+
+    return header + rows
   }
 
   async get(orgId: string, id: string) {

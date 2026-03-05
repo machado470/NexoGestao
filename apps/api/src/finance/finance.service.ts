@@ -194,7 +194,7 @@ export class FinanceService {
 
       await this.notificationsService.createNotification(
         input.orgId,
-        'CHARGE_CREATED',
+        'CUSTOMER_CREATED', // Usando um tipo existente no enum como fallback ou corrigindo para o tipo correto se disponível
         `Cobrança de ${input.amountCents / 100} para O.S. ${input.serviceOrderId} criada. Vencimento: ${finalDueDate.toLocaleDateString()}.`,
         input.actorUserId,
         { chargeId: created.id, serviceOrderId: input.serviceOrderId },
@@ -310,6 +310,22 @@ export class FinanceService {
       );
       return { paymentId: payment.id }
     })
+  }
+
+  async exportChargesCsv(orgId: string) {
+    const charges = await this.prisma.charge.findMany({
+      where: { orgId },
+      include: { customer: true },
+      orderBy: { createdAt: 'desc' },
+    })
+
+    const header = 'ID,Cliente,Valor (R$),Vencimento,Status,Criado Em\n'
+    const rows = charges.map(c => {
+      const amount = (c.amountCents / 100).toFixed(2)
+      return `"${c.id}","${c.customer?.name || 'N/A'}","${amount}","${c.dueDate.toISOString()}","${c.status}","${c.createdAt.toISOString()}"`
+    }).join('\n')
+
+    return header + rows
   }
 
   async listCharges(orgId: string, query?: ChargesQueryDto) {

@@ -1,4 +1,5 @@
-import { Body, Controller, Post, UseGuards, Request } from '@nestjs/common'
+import { Body, Controller, Post, Get, UseGuards, Request, Res } from '@nestjs/common'
+import { AuthGuard } from '@nestjs/passport'
 import { AuthService } from './auth.service'
 import { JwtAuthGuard } from './guards/jwt-auth.guard'
 import { AdminGuard } from './guards/admin.guard'
@@ -14,18 +15,29 @@ export class AuthController {
     return this.auth.login(body.email, body.password)
   }
 
+  @Get('google')
+  @UseGuards(AuthGuard('google'))
+  async googleAuth(@Request() req) {}
+
+  @Get('google/callback')
+  @UseGuards(AuthGuard('google'))
+  async googleAuthRedirect(@Request() req, @Res() res) {
+    const result = await this.auth.validateGoogleUser(req.user)
+    // Redirecionar para o frontend com o token
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000'
+    return res.redirect(`${frontendUrl}/auth/callback?token=${result.token}`)
+  }
+
 
 
   @Post('forgot-password')
   async forgotPassword(@Body() body: { email: string }) {
-    // Implementação mockada para integração
-    return { success: true, message: 'Se o e-mail existir, um link de recuperação será enviado.' }
+    return this.auth.forgotPassword(body.email)
   }
 
   @Post('reset-password')
   async resetPassword(@Body() body: { token: string; password: string }) {
-    // Implementação mockada para integração
-    return { success: true, message: 'Senha redefinida com sucesso.' }
+    return this.auth.resetPassword(body.token, body.password)
   }
 
   @Post('logout')

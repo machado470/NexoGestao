@@ -123,6 +123,7 @@ export class MeController {
       assignments,
       requiresOnboarding:
         org?.requiresOnboarding ?? false,
+      redirect: org?.requiresOnboarding ? '/onboarding' : '/dashboard',
     }
   }
 

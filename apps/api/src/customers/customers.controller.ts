@@ -6,6 +6,7 @@ import {
   Patch,
   Post,
   UseGuards,
+  Res,
 } from '@nestjs/common'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
@@ -27,19 +28,28 @@ export class CustomersController {
   ) {}
 
   @Get()
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'MANAGER', 'STAFF', 'VIEWER')
   list(@Org() orgId: string) {
     return this.customers.list(orgId)
   }
 
+  @Get('export')
+  @Roles('ADMIN', 'MANAGER')
+  async export(@Org() orgId: string, @Res() res) {
+    const csv = await this.customers.exportCsv(orgId)
+    res.set('Content-Type', 'text/csv')
+    res.attachment(`customers-${orgId}-${Date.now()}.csv`)
+    return res.send(csv)
+  }
+
   @Get(':id')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'MANAGER', 'STAFF', 'VIEWER')
   get(@Org() orgId: string, @Param('id') id: string) {
     return this.customers.get(orgId, id)
   }
 
   @Post()
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'MANAGER', 'STAFF')
   async create(
     @Org() orgId: string,
     @User() user: any,
@@ -63,7 +73,7 @@ export class CustomersController {
   }
 
   @Patch(':id')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'MANAGER', 'STAFF')
   update(
     @Org() orgId: string,
     @User() user: any,

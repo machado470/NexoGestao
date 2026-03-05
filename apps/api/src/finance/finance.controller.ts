@@ -6,6 +6,7 @@ import {
   Body,
   UseGuards,
   Query,
+  Res,
 } from '@nestjs/common'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
@@ -28,14 +29,14 @@ export class FinanceController {
   constructor(private readonly finance: FinanceService) {}
 
   @Get('overview')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'MANAGER')
   async overview(@Org() orgId: string) {
     const data = await this.finance.overview(orgId)
     return { ok: true, data }
   }
 
   @Get('charges')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'MANAGER')
   async listCharges(
     @Org() orgId: string,
     @Query() query: ChargesQueryDto,
@@ -44,29 +45,38 @@ export class FinanceController {
     return { ok: true, data } // data = { items, meta }
   }
 
+  @Get('charges/export')
+  @Roles('ADMIN', 'MANAGER')
+  async exportCharges(@Org() orgId: string, @Res() res) {
+    const csv = await this.finance.exportChargesCsv(orgId)
+    res.set('Content-Type', 'text/csv')
+    res.attachment(`charges-${orgId}-${Date.now()}.csv`)
+    return res.send(csv)
+  }
+
   @Get('charges/stats')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'MANAGER')
   async getChargeStats(@Org() orgId: string) {
     const data = await this.finance.getChargeStats(orgId)
     return { ok: true, data }
   }
 
   @Get('charges/revenue-by-month')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'MANAGER')
   async getRevenueByMonth(@Org() orgId: string) {
     const data = await this.finance.getRevenueByMonth(orgId)
     return { ok: true, data }
   }
 
   @Get('charges/:id')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'MANAGER')
   async getCharge(@Org() orgId: string, @Param('id') id: string) {
     const data = await this.finance.getCharge(orgId, id)
     return { ok: true, data }
   }
 
   @Post('charges')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'MANAGER')
   async createCharge(
     @Org() orgId: string,
     @User() user: any,
@@ -85,7 +95,7 @@ export class FinanceController {
   }
 
   @Patch('charges/:id')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'MANAGER')
   async updateCharge(
     @Org() orgId: string,
     @User() user: any,
@@ -106,14 +116,14 @@ export class FinanceController {
   }
 
   @Delete('charges/:id')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'MANAGER')
   async deleteCharge(@Org() orgId: string, @Param('id') id: string) {
     await this.finance.deleteCharge(orgId, id)
     return { ok: true }
   }
 
   @Post('charges/:chargeId/pay')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'MANAGER')
   async payCharge(
     @Org() orgId: string,
     @User() user: any,
