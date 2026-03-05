@@ -49,11 +49,11 @@ export const invoicesRouter = router({
   create: protectedProcedure
     .input(
       z.object({
-        customerId: z.number().min(1),
+        customerId: z.union([z.number().min(1), z.string().min(1)]).optional(),
         number: z.string().min(1, "Número da NF é obrigatório"),
         amount: z.number().min(0.01, "Valor deve ser maior que 0"),
-        issueDate: z.coerce.date(),
-        dueDate: z.coerce.date(),
+        issueDate: z.coerce.date().optional(),
+        dueDate: z.coerce.date().optional(),
         status: z.enum(["DRAFT", "ISSUED", "PAID", "CANCELLED"]).default("DRAFT"),
         notes: z.string().optional(),
       })
@@ -62,9 +62,13 @@ export const invoicesRouter = router({
       const raw = await nexoFetch<any>(ctx.req, `/invoices`, {
         method: "POST",
         body: JSON.stringify({
-          ...input,
-          issueDate: input.issueDate.toISOString(),
-          dueDate: input.dueDate.toISOString(),
+          customerId: input.customerId ? String(input.customerId) : undefined,
+          number: input.number,
+          amountCents: Math.round(input.amount * 100),
+          issuedAt: input.issueDate ? input.issueDate.toISOString() : undefined,
+          dueDate: input.dueDate ? input.dueDate.toISOString() : undefined,
+          status: input.status,
+          notes: input.notes,
         }),
       });
 
@@ -74,7 +78,7 @@ export const invoicesRouter = router({
   update: protectedProcedure
     .input(
       z.object({
-        id: z.number().int().positive(),
+        id: z.union([z.number().int().positive(), z.string().min(1)]),
         status: z.enum(["DRAFT", "ISSUED", "PAID", "CANCELLED"]).optional(),
         amount: z.number().optional(),
         dueDate: z.coerce.date().optional(),
@@ -82,13 +86,14 @@ export const invoicesRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const { id, ...rest } = input;
+      const { id, amount, dueDate, ...rest } = input;
 
       const raw = await nexoFetch<any>(ctx.req, `/invoices/${id}`, {
         method: "PATCH",
         body: JSON.stringify({
           ...rest,
-          dueDate: rest.dueDate ? rest.dueDate.toISOString() : undefined,
+          ...(amount !== undefined ? { amountCents: Math.round(amount * 100) } : {}),
+          dueDate: dueDate ? dueDate.toISOString() : undefined,
         }),
       });
 
@@ -96,7 +101,7 @@ export const invoicesRouter = router({
     }),
 
   delete: protectedProcedure
-    .input(z.object({ id: z.number().int().positive() }))
+    .input(z.object({ id: z.union([z.number().int().positive(), z.string().min(1)]) }))
     .mutation(async ({ input, ctx }) => {
       const raw = await nexoFetch<any>(ctx.req, `/invoices/${input.id}`, {
         method: "DELETE",

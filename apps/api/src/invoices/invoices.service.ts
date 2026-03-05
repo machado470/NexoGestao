@@ -65,6 +65,10 @@ export class InvoicesService {
       total: totalAgg._sum.amountCents ?? 0,
       count: totalAgg._count.id,
       byStatus: statusMap,
+      // Aliases convenientes para o frontend
+      totalIssued: statusMap['ISSUED']?.total ?? 0,
+      totalPaid: statusMap['PAID']?.total ?? 0,
+      pending: statusMap['DRAFT']?.count ?? 0,
     }
   }
 

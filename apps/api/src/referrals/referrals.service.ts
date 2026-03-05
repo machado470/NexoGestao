@@ -141,6 +141,8 @@ export class ReferralsService {
 
   async generateCode(orgId: string) {
     const code = generateCode()
-    return { code }
+    const baseUrl = process.env.APP_URL ?? process.env.FRONTEND_URL ?? 'https://app.nexogestao.com.br'
+    const referralUrl = `${baseUrl}/register?ref=${code}`
+    return { code, referralUrl }
   }
 }
