@@ -17,11 +17,15 @@ import { User } from '../auth/decorators/user.decorator'
 import { ServiceOrdersService } from './service-orders.service'
 import { CreateServiceOrderDto } from './dto/create-service-order.dto'
 import { UpdateServiceOrderDto } from './dto/update-service-order.dto'
+import { QuotasService } from '../quotas/quotas.service'
 
 @Controller('service-orders')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class ServiceOrdersController {
-  constructor(private readonly serviceOrders: ServiceOrdersService) {}
+  constructor(
+    private readonly serviceOrders: ServiceOrdersService,
+    private readonly quotas: QuotasService,
+  ) {}
 
   @Get()
   @Roles('ADMIN')
@@ -50,11 +54,14 @@ export class ServiceOrdersController {
 
   @Post()
   @Roles('ADMIN')
-  create(
+  async create(
     @Org() orgId: string,
     @User() user: any,
     @Body() body: CreateServiceOrderDto,
   ) {
+    // Validar quota antes de criar
+    await this.quotas.validateQuota(orgId, 'CREATE_SERVICE_ORDER')
+
     const actorUserId = user?.userId ?? null
     const actorPersonId = user?.personId ?? null
 

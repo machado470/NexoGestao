@@ -41,7 +41,10 @@
     "passport-local": "^1.0.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
-    "uuid": "^9.0.0"
+    "uuid": "^9.0.0",
+    "stripe": "^16.0.0",
+    "@sentry/node": "^8.0.0",
+    "@sentry/profiling-node": "^8.0.0"
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.10",

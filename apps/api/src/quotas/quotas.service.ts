@@ -1,34 +1,42 @@
 import { Injectable, Logger, ForbiddenException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { SubscriptionStatus } from '@prisma/client'
 
-interface QuotaLimits {
+export interface QuotaLimits {
   customers: number
   appointments: number
   serviceOrders: number
-  collaborators: number
+  users: number
   storage: number // em MB
 }
 
-const PLAN_LIMITS: Record<string, QuotaLimits> = {
+export const PLAN_LIMITS: Record<string, QuotaLimits> = {
   FREE: {
     customers: 5,
-    appointments: 10,
-    serviceOrders: 5,
-    collaborators: 1,
+    appointments: 20,
+    serviceOrders: 10,
+    users: 2,
     storage: 100,
   },
-  PRO: {
-    customers: 50,
-    appointments: 100,
-    serviceOrders: 50,
-    collaborators: 5,
-    storage: 1000,
+  STARTER: {
+    customers: 30,
+    appointments: 200,
+    serviceOrders: 100,
+    users: 5,
+    storage: 500,
   },
-  ENTERPRISE: {
+  PRO: {
+    customers: 100,
+    appointments: 2000,
+    serviceOrders: 1000,
+    users: 10,
+    storage: 5000,
+  },
+  BUSINESS: {
     customers: 999999,
     appointments: 999999,
     serviceOrders: 999999,
-    collaborators: 999999,
+    users: 999999,
     storage: 999999,
   },
 }
@@ -40,12 +48,38 @@ export class QuotasService {
   constructor(private prisma: PrismaService) {}
 
   /**
-   * Obtém o plano de uma organização
-   * Nota: Como o campo 'plan' não existe no schema atual, retornamos 'FREE' por padrão.
-   * Em uma implementação real, este campo deveria ser adicionado ao modelo Organization.
+   * Obtém o nome do plano atual da organização via subscription.
+   * Fallback para FREE se sem assinatura ativa.
    */
-  async getOrgPlan(_orgId: string): Promise<string> {
-    return 'FREE'
+  async getOrgPlan(orgId: string): Promise<string> {
+    try {
+      const subscription = await this.prisma.subscription.findUnique({
+        where: { orgId },
+        include: { plan: true },
+      })
+
+      if (!subscription) return 'FREE'
+
+      if (
+        subscription.status === SubscriptionStatus.CANCELED ||
+        subscription.status === SubscriptionStatus.INACTIVE
+      ) {
+        return 'FREE'
+      }
+
+      if (
+        subscription.status === SubscriptionStatus.TRIALING &&
+        subscription.trialEndsAt &&
+        subscription.trialEndsAt < new Date()
+      ) {
+        return 'FREE'
+      }
+
+      return subscription.plan.name
+    } catch (err) {
+      this.logger.warn(`Erro ao obter plano da org ${orgId}: ${err.message} — usando FREE`)
+      return 'FREE'
+    }
   }
 
   /**
@@ -61,10 +95,9 @@ export class QuotasService {
   async canCreateCustomer(orgId: string): Promise<boolean> {
     const plan = await this.getOrgPlan(orgId)
     const limits = this.getQuotaLimits(plan)
-
-    const customerCount = await this.prisma.customer.count()
-
-    return customerCount < limits.customers
+    if (limits.customers >= 999999) return true
+    const count = await this.prisma.customer.count({ where: { orgId } })
+    return count < limits.customers
   }
 
   /**
@@ -73,10 +106,9 @@ export class QuotasService {
   async canCreateAppointment(orgId: string): Promise<boolean> {
     const plan = await this.getOrgPlan(orgId)
     const limits = this.getQuotaLimits(plan)
-
-    const appointmentCount = await this.prisma.appointment.count()
-
-    return appointmentCount < limits.appointments
+    if (limits.appointments >= 999999) return true
+    const count = await this.prisma.appointment.count({ where: { orgId } })
+    return count < limits.appointments
   }
 
   /**
@@ -85,10 +117,9 @@ export class QuotasService {
   async canCreateServiceOrder(orgId: string): Promise<boolean> {
     const plan = await this.getOrgPlan(orgId)
     const limits = this.getQuotaLimits(plan)
-
-    const serviceOrderCount = await this.prisma.serviceOrder.count()
-
-    return serviceOrderCount < limits.serviceOrders
+    if (limits.serviceOrders >= 999999) return true
+    const count = await this.prisma.serviceOrder.count({ where: { orgId } })
+    return count < limits.serviceOrders
   }
 
   /**
@@ -97,10 +128,9 @@ export class QuotasService {
   async canAddCollaborator(orgId: string): Promise<boolean> {
     const plan = await this.getOrgPlan(orgId)
     const limits = this.getQuotaLimits(plan)
-
-    const collaboratorCount = await this.prisma.user.count()
-
-    return collaboratorCount < limits.collaborators
+    if (limits.users >= 999999) return true
+    const count = await this.prisma.user.count({ where: { orgId } })
+    return count < limits.users
   }
 
   /**
@@ -110,12 +140,15 @@ export class QuotasService {
     const plan = await this.getOrgPlan(orgId)
     const limits = this.getQuotaLimits(plan)
 
-    const [customerCount, appointmentCount, serviceOrderCount, collaboratorCount] = await Promise.all([
-      this.prisma.customer.count(),
-      this.prisma.appointment.count(),
-      this.prisma.serviceOrder.count(),
-      this.prisma.user.count(),
+    const [customerCount, appointmentCount, serviceOrderCount, userCount] = await Promise.all([
+      this.prisma.customer.count({ where: { orgId } }),
+      this.prisma.appointment.count({ where: { orgId } }),
+      this.prisma.serviceOrder.count({ where: { orgId } }),
+      this.prisma.user.count({ where: { orgId } }),
     ])
+
+    const pct = (used: number, limit: number) =>
+      limit >= 999999 ? 0 : Math.min(100, Math.round((used / limit) * 100))
 
     return {
       plan,
@@ -124,22 +157,26 @@ export class QuotasService {
         customers: {
           used: customerCount,
           limit: limits.customers,
-          percentage: Math.round((customerCount / limits.customers) * 100),
+          percentage: pct(customerCount, limits.customers),
+          unlimited: limits.customers >= 999999,
         },
         appointments: {
           used: appointmentCount,
           limit: limits.appointments,
-          percentage: Math.round((appointmentCount / limits.appointments) * 100),
+          percentage: pct(appointmentCount, limits.appointments),
+          unlimited: limits.appointments >= 999999,
         },
         serviceOrders: {
           used: serviceOrderCount,
           limit: limits.serviceOrders,
-          percentage: Math.round((serviceOrderCount / limits.serviceOrders) * 100),
+          percentage: pct(serviceOrderCount, limits.serviceOrders),
+          unlimited: limits.serviceOrders >= 999999,
         },
-        collaborators: {
-          used: collaboratorCount,
-          limit: limits.collaborators,
-          percentage: Math.round((collaboratorCount / limits.collaborators) * 100),
+        users: {
+          used: userCount,
+          limit: limits.users,
+          percentage: pct(userCount, limits.users),
+          unlimited: limits.users >= 999999,
         },
       },
     }
@@ -177,11 +214,10 @@ export class QuotasService {
     }
 
     if (!canProceed) {
-      const limits = this.getQuotaLimits(plan)
-      this.logger.warn(`Quota excedida para ${action} no plano ${plan}`)
-
+      this.logger.warn(`Quota excedida: ${action} | org=${orgId} | plano=${plan}`)
       throw new ForbiddenException(
-        `Limite de ${resourceName}s atingido para o plano ${plan}. Faça upgrade para continuar.`,
+        `Limite de ${resourceName}s atingido para o plano ${plan}. ` +
+          `Faça upgrade para continuar. Acesse /billing/create-checkout-session`,
       )
     }
   }

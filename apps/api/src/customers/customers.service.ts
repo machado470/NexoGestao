@@ -10,6 +10,7 @@ import { NotificationsService } from '../notifications/notifications.service'
 import { OnboardingService } from '../onboarding/onboarding.service'
 import { AUDIT_ACTIONS } from '../audit/audit.actions'
 import { normalizeEmail, normalizePhone } from '@nexogestao/common'
+import { AnalyticsService, UsageMetricEvent } from '../analytics/analytics.service'
 
 @Injectable()
 export class CustomersService {
@@ -19,6 +20,7 @@ export class CustomersService {
     private readonly audit: AuditService,
     private readonly notificationsService: NotificationsService,
     private readonly onboardingService: OnboardingService,
+    private readonly analytics: AnalyticsService,
   ) {}
 
   async list(orgId: string) {
@@ -125,6 +127,15 @@ export class CustomersService {
     );
 
     await this.onboardingService.completeOnboardingStep(params.orgId, 'createCustomer');
+
+    // 📊 Registrar evento de analytics
+    void this.analytics.track({
+      orgId: params.orgId,
+      userId: params.createdBy ?? undefined,
+      event: UsageMetricEvent.CREATE_CUSTOMER,
+      metadata: { customerId: created.id },
+    })
+
     return created
   }
 

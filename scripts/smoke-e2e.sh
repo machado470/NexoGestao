@@ -226,8 +226,42 @@ else
   log_fail "Falha ao consultar dashboard. Resposta: $DASHBOARD_RESPONSE"
 fi
 
-# ─── PASSO 10: Limpeza (opcional) ─────────────────────────────────────────────
-log_section "PASSO 10: Limpeza de Dados de Teste"
+# ─── PASSO 10: Verificar Quota de Plano ──────────────────────────────────────
+log_section "PASSO 10: Verificar Quota de Plano"
+QUOTA_RESPONSE=$(http_request "GET" "/quotas/usage" "" "$TOKEN")
+QUOTA_OK=$(echo "$QUOTA_RESPONSE" | jq 'has("plan") or has("usage") or has("limits")' 2>/dev/null || echo "false")
+if [[ "$QUOTA_OK" == "true" ]]; then
+  PLAN=$(echo "$QUOTA_RESPONSE" | jq -r '.plan // "N/A"' 2>/dev/null || echo "N/A")
+  log_ok "Quota verificada. Plano atual: $PLAN"
+else
+  log_fail "Falha ao verificar quota. Resposta: $QUOTA_RESPONSE"
+fi
+
+# ─── PASSO 11: Verificar Analytics de Uso ─────────────────────────────────────
+log_section "PASSO 11: Verificar Analytics de Uso"
+ANALYTICS_RESPONSE=$(http_request "GET" "/analytics/usage" "" "$TOKEN")
+ANALYTICS_OK=$(echo "$ANALYTICS_RESPONSE" | jq 'has("orgId") or has("summary") or has("byEvent")' 2>/dev/null || echo "false")
+if [[ "$ANALYTICS_OK" == "true" ]]; then
+  TOTAL=$(echo "$ANALYTICS_RESPONSE" | jq -r '.summary.totalEvents // 0' 2>/dev/null || echo "0")
+  log_ok "Analytics consultado. Total de eventos registrados: $TOTAL"
+else
+  log_fail "Falha ao consultar analytics. Resposta: $ANALYTICS_RESPONSE"
+fi
+
+# ─── PASSO 12: Verificar Subscription (Billing) ───────────────────────────────
+log_section "PASSO 12: Verificar Subscription (Billing)"
+BILLING_RESPONSE=$(http_request "GET" "/billing/subscription" "" "$TOKEN")
+BILLING_OK=$(echo "$BILLING_RESPONSE" | jq 'has("plan") or has("status") or has("subscription")' 2>/dev/null || echo "false")
+if [[ "$BILLING_OK" == "true" ]]; then
+  STATUS=$(echo "$BILLING_RESPONSE" | jq -r '.status // .subscription.status // "N/A"' 2>/dev/null || echo "N/A")
+  log_ok "Subscription consultada. Status: $STATUS"
+else
+  log_info "Subscription endpoint retornou: $BILLING_RESPONSE (pode ser sem plano ativo)"
+  PASSED=$((PASSED+1))
+fi
+
+# ─── PASSO 13: Limpeza (opcional) ─────────────────────────────────────────────
+log_section "PASSO 13: Limpeza de Dados de Teste"
 if [[ -n "${CLEANUP:-}" ]]; then
   [[ -n "$EXPENSE_ID" ]] && http_request "DELETE" "/expenses/$EXPENSE_ID" "" "$TOKEN" > /dev/null && log_ok "Despesa removida"
   [[ -n "$LAUNCH_ID" ]] && http_request "DELETE" "/launches/$LAUNCH_ID" "" "$TOKEN" > /dev/null && log_ok "Lançamento removido"

@@ -17,11 +17,15 @@ import { User } from '../auth/decorators/user.decorator'
 import { AppointmentsService } from './appointments.service'
 import { CreateAppointmentDto } from './dto/create-appointment.dto'
 import { UpdateAppointmentDto } from './dto/update-appointment.dto'
+import { QuotasService } from '../quotas/quotas.service'
 
 @Controller('appointments')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class AppointmentsController {
-  constructor(private readonly appointments: AppointmentsService) {}
+  constructor(
+    private readonly appointments: AppointmentsService,
+    private readonly quotas: QuotasService,
+  ) {}
 
   @Get()
   @Roles('ADMIN')
@@ -48,11 +52,14 @@ export class AppointmentsController {
 
   @Post()
   @Roles('ADMIN')
-  create(
+  async create(
     @Org() orgId: string,
     @User() user: any,
     @Body() body: CreateAppointmentDto,
   ) {
+    // Validar quota antes de criar
+    await this.quotas.validateQuota(orgId, 'CREATE_APPOINTMENT')
+
     const actorUserId = user?.userId ?? null
     const actorPersonId = user?.personId ?? null
 

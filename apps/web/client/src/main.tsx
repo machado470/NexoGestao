@@ -7,9 +7,10 @@ import superjson from "superjson";
 import App from "./App";
 import { getLoginUrl } from "./const";
 import "./index.css";
+import { initSentry } from "./lib/sentry";
 
-// TODO: Adicionar Sentry.io ou similar para monitoramento de erros em produção (frontend)
-// Ex: Sentry.init({ dsn: process.env.SENTRY_DSN_WEB, integrations: [Sentry.browserTracingIntegration(), Sentry.replayIntegration()] });
+// 🚨 Inicializar Sentry para monitoramento de erros (ativado se VITE_SENTRY_DSN estiver configurado)
+initSentry()
 
 const queryClient = new QueryClient();
 

@@ -5,6 +5,7 @@ import { AuditModule } from '../audit/audit.module'
 import { OperationalStateModule } from '../people/operational-state.module'
 import { FinanceModule } from '../finance/finance.module'
 import { NotificationsModule } from '../notifications/notifications.module'
+import { QuotasModule } from '../quotas/quotas.module'
 
 import { ServiceOrdersController } from './service-orders.controller'
 import { ServiceOrdersService } from './service-orders.service'
@@ -17,6 +18,7 @@ import { ServiceOrdersService } from './service-orders.service'
     OperationalStateModule,
     FinanceModule,
     NotificationsModule,
+    QuotasModule,
   ],
   controllers: [ServiceOrdersController],
   providers: [ServiceOrdersService],

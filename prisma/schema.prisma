@@ -120,6 +120,7 @@ enum WhatsAppMessageType {
 // ============================================================
 
 enum PlanName {
+  FREE
   STARTER
   PRO
   BUSINESS
@@ -197,6 +198,9 @@ model Organization {
   invites       InviteToken[]
   subscriptions Subscription[]
   notifications Notification[]
+  usageMetrics  UsageMetric[]
+
+  updatedAt DateTime @updatedAt
 }
 
 model User {
@@ -812,39 +816,49 @@ model Plan {
 }
 
 model Subscription {
-  id                 String             @id @default(uuid())
-  orgId              String             @unique // Uma organização tem apenas uma assinatura ativa
-  org                Organization       @relation(fields: [orgId], references: [id])
-  planId             String
-  plan               Plan               @relation(fields: [planId], references: [id])
-  status             SubscriptionStatus @default(TRIALING)
-  trialEndsAt        DateTime?
-  currentPeriodStart DateTime?
-  currentPeriodEnd   DateTime?
-  canceledAt         DateTime?
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
+  id                      String             @id @default(uuid())
+  orgId                   String             @unique // Uma organização tem apenas uma assinatura ativa
+  org                     Organization       @relation(fields: [orgId], references: [id])
+  planId                  String
+  plan                    Plan               @relation(fields: [planId], references: [id])
+  status                  SubscriptionStatus @default(TRIALING)
+  trialEndsAt             DateTime?
+  currentPeriodStart      DateTime?
+  currentPeriodEnd        DateTime?
+  canceledAt              DateTime?
+  // Stripe integration
+  stripeCustomerId        String?            @unique
+  stripeSubscriptionId    String?            @unique
+  stripeCheckoutSessionId String?
+  stripePriceId           String?
+  createdAt               DateTime           @default(now())
+  updatedAt               DateTime           @updatedAt
 
   billingEvents BillingEvent[]
 
   @@index([orgId, status])
   @@index([planId, status])
   @@index([trialEndsAt])
+  @@index([stripeCustomerId])
+  @@index([stripeSubscriptionId])
 }
 
 model BillingEvent {
-  id            String           @id @default(uuid())
+  id             String             @id @default(uuid())
   subscriptionId String
-  subscription  Subscription     @relation(fields: [subscriptionId], references: [id])
-  type          BillingEventType
-  amountCents   Int
-  status        BillingEventStatus @default(PENDING)
-  externalId    String? // ID do evento na plataforma de pagamento (ex: Stripe)
-  description   String?
-  createdAt     DateTime         @default(now())
+  subscription   Subscription       @relation(fields: [subscriptionId], references: [id])
+  type           BillingEventType
+  amountCents    Int
+  status         BillingEventStatus @default(PENDING)
+  externalId     String?            // ID do evento na plataforma de pagamento (ex: Stripe)
+  stripeEventId  String?            @unique // Idempotency key para webhooks Stripe
+  description    String?
+  metadata       Json?
+  createdAt      DateTime           @default(now())
 
   @@index([subscriptionId, createdAt])
   @@index([type, status, createdAt])
+  @@index([stripeEventId])
 }
 
 model Notification {
@@ -868,4 +882,38 @@ enum TrackItemType {
   READING
   ACTION
   CHECKPOINT
+}
+
+// ============================================================
+// ✅ Analytics de Produto
+// ============================================================
+
+enum UsageMetricEvent {
+  LOGIN
+  CREATE_CUSTOMER
+  CREATE_SERVICE_ORDER
+  CREATE_CHARGE
+  REGISTER_PAYMENT
+  CREATE_EXPENSE
+  ISSUE_INVOICE
+  VIEW_DASHBOARD
+  CREATE_APPOINTMENT
+  CREATE_PERSON
+  UPGRADE_PLAN
+  CANCEL_SUBSCRIPTION
+}
+
+model UsageMetric {
+  id        String           @id @default(uuid())
+  orgId     String
+  org       Organization     @relation(fields: [orgId], references: [id])
+  userId    String?
+  event     UsageMetricEvent
+  metadata  Json?
+  createdAt DateTime         @default(now())
+
+  @@index([orgId, event, createdAt])
+  @@index([orgId, createdAt])
+  @@index([userId, event, createdAt])
+  @@index([event, createdAt])
 }

@@ -67,6 +67,4 @@ export class OnboardingService {
 
     return this.getOnboardingStatus(orgId);
   }
-}d);
-  }
 }

@@ -1,22 +1,19 @@
 import {
   Injectable,
   UnauthorizedException,
-  BadRequestException,
 } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import * as bcrypt from 'bcrypt'
 
 import { PrismaService } from '../prisma/prisma.service'
-
-
+import { AnalyticsService, UsageMetricEvent } from '../analytics/analytics.service'
 
 @Injectable()
 export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwt: JwtService,
-
-
+    private analytics: AnalyticsService,
   ) {}
 
   async login(email: string, password: string) {
@@ -51,6 +48,14 @@ export class AuthService {
       personId: user.person.id,
     })
 
+    // 📊 Registrar evento de login
+    void this.analytics.track({
+      orgId: user.orgId,
+      userId: user.id,
+      event: UsageMetricEvent.LOGIN,
+      metadata: { role: user.role },
+    })
+
     return {
       token,
       user: {
@@ -61,6 +66,4 @@ export class AuthService {
       },
     }
   }
-
-
 }

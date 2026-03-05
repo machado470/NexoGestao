@@ -79,6 +79,15 @@ import { SubscriptionsModule } from './subscriptions/subscriptions.module'
 import { NotificationsModule } from './notifications/notifications.module'
 import { OrganizationSettingsModule } from './organization-settings/organization-settings.module'
 
+// 💳 BILLING (Stripe)
+import { BillingModule } from './billing/billing.module'
+
+// 📊 ANALYTICS DE PRODUTO
+import { AnalyticsModule } from './analytics/analytics.module'
+
+// 🚨 SENTRY (Monitoramento)
+import { SentryModule } from './common/sentry/sentry.module'
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -174,6 +183,15 @@ import { OrganizationSettingsModule } from './organization-settings/organization
     SubscriptionsModule,
     NotificationsModule,
     OrganizationSettingsModule,
+
+    // 💳 Billing Stripe
+    BillingModule,
+
+    // 📊 Analytics de produto
+    AnalyticsModule,
+
+    // 🚨 Sentry
+    SentryModule,
   ],
   providers: [
     {

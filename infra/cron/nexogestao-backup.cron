@@ -1,0 +1,16 @@
+# ============================================================
+# NexoGestao — Cron Jobs de Backup
+# ============================================================
+# Instalação:
+#   sudo cp infra/cron/nexogestao-backup.cron /etc/cron.d/nexogestao-backup
+#   sudo chmod 644 /etc/cron.d/nexogestao-backup
+# ============================================================
+
+# Backup diário às 2h da manhã (com upload S3)
+0 2 * * * root /app/scripts/backup-db.sh --upload >> /var/log/nexo-backup.log 2>&1
+
+# Backup semanal completo (domingo às 3h)
+0 3 * * 0 root /app/scripts/backup-db.sh --upload >> /var/log/nexo-backup-weekly.log 2>&1
+
+# Limpeza de logs antigos (mensal)
+0 4 1 * * root find /var/log -name "nexo-backup*.log" -mtime +90 -delete

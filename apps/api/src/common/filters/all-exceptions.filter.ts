@@ -9,6 +9,10 @@ import {
 import { Request, Response } from 'express'
 import { Prisma } from '@prisma/client'
 
+// Sentry (opcional — inicializado via SentryService no bootstrap)
+let Sentry: any = null
+try { Sentry = require('@sentry/node') } catch { /* sem sentry */ }
+
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger('ExceptionFilter')
@@ -85,6 +89,18 @@ export class AllExceptionsFilter implements ExceptionFilter {
         exception instanceof Error ? exception.stack : String(exception),
         JSON.stringify(logMeta),
       )
+      // Capturar no Sentry apenas erros 5xx (não erros de validação)
+      if (Sentry && exception instanceof Error) {
+        Sentry.withScope((scope: any) => {
+          scope.setTag('requestId', requestId)
+          if (orgId) scope.setTag('orgId', orgId)
+          if (userId) scope.setUser({ id: userId })
+          scope.setExtra('method', request.method)
+          scope.setExtra('url', request.url)
+          scope.setExtra('statusCode', status)
+          Sentry.captureException(exception)
+        })
+      }
     } else if (status >= 400) {
       this.logger.warn(
         `${request.method} ${request.url} - ${status}: ${message} [${requestId}]`,
