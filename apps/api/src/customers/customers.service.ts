@@ -63,6 +63,44 @@ export class CustomersService {
     return customer
   }
 
+  async workspace(orgId: string, id: string) {
+    const customer = await this.prisma.customer.findFirst({
+      where: { id, orgId },
+    })
+    if (!customer) throw new NotFoundException('Cliente não encontrado')
+
+    const [appointments, serviceOrders, charges, timeline] = await Promise.all([
+      this.prisma.appointment.findMany({
+        where: { orgId, customerId: id },
+        orderBy: { startsAt: 'desc' },
+        take: 50,
+      }),
+      this.prisma.serviceOrder.findMany({
+        where: { orgId, customerId: id },
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+      }),
+      this.prisma.charge.findMany({
+        where: { orgId, customerId: id },
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+      }),
+      this.prisma.timelineEvent.findMany({
+        where: {
+          orgId,
+          OR: [
+            { metadata: { path: ['customerId'], equals: id } },
+            { metadata: { path: ['entityId'], equals: id } },
+          ],
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 200,
+      }),
+    ])
+
+    return { customer, timeline, appointments, serviceOrders, charges }
+  }
+
   async create(params: {
     orgId: string
     createdBy: string | null

@@ -125,4 +125,18 @@ export class TimelineService {
       take: 100,
     })
   }
+
+  async listByCustomerInOrg(orgId: string, customerId: string, limit = 100) {
+    return this.prisma.timelineEvent.findMany({
+      where: {
+        orgId,
+        OR: [
+          { metadata: { path: ['customerId'], equals: customerId } },
+          { metadata: { path: ['entityId'], equals: customerId } },
+        ],
+      },
+      orderBy: { createdAt: 'desc' },
+      take: Math.min(Math.max(limit, 1), 300),
+    })
+  }
 }

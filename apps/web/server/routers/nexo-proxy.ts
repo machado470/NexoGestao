@@ -129,6 +129,10 @@ export const nexoProxyRouter = router({
       const authHeader = getAuthHeader(ctx as any);
       return await nexoFetch(`/customers/${input.id}`, { headers: authHeader ? { Authorization: authHeader } : {} });
     }),
+    workspace: publicProcedure.input(z.object({ id: z.string() })).query(async ({ input, ctx }) => {
+      const authHeader = getAuthHeader(ctx as any);
+      return await nexoFetch(`/customers/${input.id}/workspace`, { headers: authHeader ? { Authorization: authHeader } : {} });
+    }),
     create: publicProcedure.input(z.any()).mutation(async ({ input, ctx }) => {
       const authHeader = getAuthHeader(ctx as any);
       return await nexoFetch("/customers", {
@@ -144,6 +148,14 @@ export const nexoProxyRouter = router({
         body: JSON.stringify(input.data),
         headers: authHeader ? { Authorization: authHeader } : {},
       });
+    }),
+  }),
+
+  timeline: router({
+    listByCustomer: publicProcedure.input(z.object({ customerId: z.string(), limit: z.number().optional() })).query(async ({ input, ctx }) => {
+      const authHeader = getAuthHeader(ctx as any);
+      const query = input.limit ? `?limit=${input.limit}` : '';
+      return await nexoFetch(`/timeline/customers/${input.customerId}${query}`, { headers: authHeader ? { Authorization: authHeader } : {} });
     }),
   }),
 

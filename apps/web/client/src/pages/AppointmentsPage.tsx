@@ -8,8 +8,8 @@ import { CreateAppointmentModal } from "@/components/CreateAppointmentModal";
 import { toast } from "sonner";
 
 interface Appointment {
-  id: number;
-  customerId: number;
+  id: string;
+  customerId: string;
   title: string;
   description: string | null;
   startsAt: Date;
@@ -32,7 +32,7 @@ interface PaginatedResponse {
 export default function AppointmentsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [customers, setCustomers] = useState<Array<{ id: number; name: string }>>([]);
+  const [customers, setCustomers] = useState<Array<{ id: string; name: string }>>([]);
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, pages: 1 });
@@ -83,7 +83,7 @@ export default function AppointmentsPage() {
     const colors: Record<string, string> = {
       SCHEDULED: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
       CONFIRMED: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-      IN_PROGRESS: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
+      NO_SHOW: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
       DONE: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
       CANCELED: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
     };
@@ -129,7 +129,7 @@ export default function AppointmentsPage() {
         <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
           <p className="text-sm text-gray-600 dark:text-gray-400">Em Progresso</p>
           <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400 mt-1">
-            {appointments.filter((a) => a.status === "IN_PROGRESS").length}
+            {appointments.filter((a) => a.status === "NO_SHOW").length}
           </p>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">

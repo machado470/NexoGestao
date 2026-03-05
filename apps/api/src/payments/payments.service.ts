@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config'
 import { PrismaService } from '../prisma/prisma.service'
 import { EmailService } from '../email/email.service'
 import { ChargeStatus } from '@prisma/client'
+import { FinanceService } from '../finance/finance.service'
 
 interface CreateCheckoutSessionDto {
   customerId: string
@@ -35,6 +36,7 @@ export class PaymentsService {
     private configService: ConfigService,
     private prisma: PrismaService,
     private email: EmailService,
+    private finance: FinanceService,
   ) {
     this.stripeApiKey = this.configService.get<string>('STRIPE_API_KEY') || ''
   }
@@ -134,29 +136,16 @@ export class PaymentsService {
     description: string,
     dueDate: Date,
   ): Promise<{ id: string; status: string }> {
-    try {
-      const charge = await this.prisma.charge.create({
-        data: {
-          orgId,
-          customerId,
-          amountCents: amount,
-          description,
-          status: 'PENDING',
-          dueDate,
-          createdAt: new Date(),
-        },
-      })
-
-      this.logger.log(`Cobrança criada: ${charge.id}`)
-
-      return {
-        id: charge.id,
-        status: charge.status,
-      }
-    } catch (error) {
-      this.logger.error(`Erro ao criar cobrança: ${error}`)
-      throw error
-    }
+    const created = await this.finance.createCharge({
+      orgId,
+      customerId,
+      amountCents: amount,
+      dueDate,
+      description,
+      actorUserId: null,
+      actorPersonId: null,
+    })
+    return { id: created.id, status: created.status }
   }
 
   /**
@@ -164,20 +153,11 @@ export class PaymentsService {
    */
   async listCharges(orgId: string, status?: string) {
     try {
-      const charges = await this.prisma.charge.findMany({
-        where: {
-          orgId,
-          ...(status && { status: status as ChargeStatus }),
-        },
-        include: {
-          customer: true,
-        },
-        orderBy: {
-          createdAt: 'desc',
-        },
-      })
+      const result = await this.finance.listCharges(orgId, {
+        status: status as ChargeStatus,
+      } as any)
 
-      return charges
+      return result.items
     } catch (error) {
       this.logger.error(`Erro ao listar cobranças: ${error}`)
       throw error
@@ -189,11 +169,15 @@ export class PaymentsService {
    */
   async markChargeAsPaid(chargeId: string, _paymentMethod: string = 'manual'): Promise<void> {
     try {
-      await this.prisma.charge.update({
-        where: { id: chargeId },
-        data: {
-          status: 'PAID',
-        },
+      const charge = await this.prisma.charge.findFirst({ where: { id: chargeId } })
+      if (!charge) return
+      await this.finance.payCharge({
+        orgId: charge.orgId,
+        chargeId,
+        actorUserId: null,
+        actorPersonId: null,
+        method: 'OTHER',
+        amountCents: charge.amountCents,
       })
 
       this.logger.log(`Cobrança marcada como paga: ${chargeId}`)
@@ -208,38 +192,11 @@ export class PaymentsService {
    */
   async checkOverdueCharges(): Promise<void> {
     try {
-      const now = new Date()
-      const overdueCharges = await this.prisma.charge.findMany({
-        where: {
-          status: 'PENDING',
-          dueDate: {
-            lt: now,
-          },
-        },
-        include: {
-          customer: true,
-        },
-      })
-
-      for (const charge of overdueCharges) {
-        // Atualizar status para OVERDUE
-        await this.prisma.charge.update({
-          where: { id: charge.id },
-          data: { status: 'OVERDUE' },
-        })
-
-        // Enviar notificação por e-mail
-        if (charge.customer.email) {
-          await this.email.sendOverdueChargeNotification(
-            charge.customer.email,
-            charge.customer.name,
-            charge.amountCents,
-            charge.dueDate,
-          )
-        }
+      const orgs = await this.prisma.organization.findMany({ select: { id: true } })
+      for (const org of orgs) {
+        const res = await this.finance.automateOverdueLifecycle(org.id)
+        this.logger.log(`Org ${org.id}: ${res.updated} cobranças vencidas processadas`)
       }
-
-      this.logger.log(`${overdueCharges.length} cobranças marcadas como vencidas`)
     } catch (error) {
       this.logger.error(`Erro ao verificar cobranças vencidas: ${error}`)
     }

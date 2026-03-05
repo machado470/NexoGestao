@@ -11,6 +11,8 @@ import { OnboardingService } from '../onboarding/onboarding.service'
 import { AUDIT_ACTIONS } from '../audit/audit.actions'
 import { $Enums } from '@prisma/client'
 import { ChargesQueryDto } from './dto/charges-query.dto'
+import { WhatsAppService } from '../whatsapp/whatsapp.service'
+import { RiskService } from '../risk/risk.service'
 
 function isUuidLike(s: string): boolean {
   // UUID v4/v1 “parecido” (bom o suficiente pra decidir equals vs contains)
@@ -27,7 +29,53 @@ export class FinanceService {
     private readonly audit: AuditService,
     private readonly notificationsService: NotificationsService,
     private readonly onboardingService: OnboardingService,
+    private readonly whatsapp: WhatsAppService,
+    private readonly risk: RiskService,
   ) {}
+
+  async automateOverdueLifecycle(orgId: string) {
+    const now = new Date()
+    const overdue = await this.prisma.charge.findMany({
+      where: { orgId, status: 'PENDING', dueDate: { lt: now } },
+      include: { customer: { select: { id: true, phone: true } } },
+      take: 200,
+    })
+
+    for (const charge of overdue) {
+      await this.prisma.charge.update({
+        where: { id: charge.id },
+        data: { status: 'OVERDUE' },
+      })
+
+      await this.timeline.log({
+        orgId,
+        action: 'CHARGE_OVERDUE',
+        description: 'Cobrança movida para vencida (automação)',
+        metadata: { chargeId: charge.id, customerId: charge.customerId },
+      })
+
+      if (charge.customer?.phone) {
+        await this.whatsapp.queueMessage({
+          orgId,
+          customerId: charge.customerId,
+          toPhone: charge.customer.phone,
+          entityType: 'CHARGE',
+          entityId: charge.id,
+          messageType: 'PAYMENT_REMINDER',
+          messageKey: `charge:${charge.id}:overdue`,
+          renderedText: 'Sua cobrança está em atraso. Regularize para evitar bloqueios.',
+        })
+      }
+
+      await this.risk.recalculateCustomerOperationalRisk(
+        orgId,
+        charge.customerId,
+        'CHARGE_OVERDUE',
+      )
+    }
+
+    return { updated: overdue.length }
+  }
 
   async overview(orgId: string) {
     const now = new Date()
@@ -199,6 +247,23 @@ export class FinanceService {
         input.actorUserId,
         { chargeId: created.id, serviceOrderId: input.serviceOrderId },
       );
+
+      const chargeWithCustomer = await this.prisma.charge.findFirst({
+        where: { id: created.id, orgId: input.orgId },
+        include: { customer: { select: { phone: true } } },
+      })
+      if (chargeWithCustomer?.customer?.phone) {
+        await this.whatsapp.queueMessage({
+          orgId: input.orgId,
+          customerId,
+          toPhone: chargeWithCustomer.customer.phone,
+          entityType: 'CHARGE',
+          entityId: created.id,
+          messageType: 'PAYMENT_LINK',
+          messageKey: `charge:${created.id}:payment-link`,
+          renderedText: 'Cobrança gerada. Entre em contato para pagamento.',
+        })
+      }
       await this.onboardingService.completeOnboardingStep(input.orgId, 'createCharge');
       return { created: true, chargeId: created.id }
   }
@@ -308,6 +373,23 @@ export class FinanceService {
         input.actorUserId,
         { chargeId: charge.id, paymentId: payment.id },
       );
+
+      const paidCharge = await this.prisma.charge.findFirst({
+        where: { id: charge.id, orgId: input.orgId },
+        include: { customer: { select: { id: true, phone: true } } },
+      })
+      if (paidCharge?.customer?.phone) {
+        await this.whatsapp.queueMessage({
+          orgId: input.orgId,
+          customerId: paidCharge.customer.id,
+          toPhone: paidCharge.customer.phone,
+          entityType: 'CHARGE',
+          entityId: charge.id,
+          messageType: 'RECEIPT',
+          messageKey: `charge:${charge.id}:receipt:${payment.id}`,
+          renderedText: 'Pagamento recebido com sucesso. Obrigado! ✅',
+        })
+      }
       return { paymentId: payment.id }
     })
   }

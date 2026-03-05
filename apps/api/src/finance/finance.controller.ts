@@ -35,6 +35,13 @@ export class FinanceController {
     return { ok: true, data }
   }
 
+  @Post('charges/automation/overdue')
+  @Roles('ADMIN', 'MANAGER')
+  async processOverdue(@Org() orgId: string) {
+    const data = await this.finance.automateOverdueLifecycle(orgId)
+    return { ok: true, data }
+  }
+
   @Get('charges')
   @Roles('ADMIN', 'MANAGER')
   async listCharges(

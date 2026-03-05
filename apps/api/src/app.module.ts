@@ -54,6 +54,7 @@ import { AppointmentsModule } from './appointments/appointments.module'
 
 // 🧩 NEXOGESTÃO OFICIAL — Ordens de Serviço (O.S.)
 import { ServiceOrdersModule } from './service-orders/service-orders.module'
+import { ExecutionModule } from './execution/execution.module'
 
 // 💰 NEXOGESTÃO OFICIAL — Financeiro
 import { FinanceModule } from './finance/finance.module'
@@ -158,6 +159,7 @@ import { SentryModule } from './common/sentry/sentry.module'
     CustomersModule,
     AppointmentsModule,
     ServiceOrdersModule,
+    ExecutionModule,
     FinanceModule,
     PaymentsModule,
 

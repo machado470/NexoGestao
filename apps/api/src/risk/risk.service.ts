@@ -63,4 +63,38 @@ export class RiskService {
       metadata: { score, reason: finalReason },
     })
   }
+
+  async recalculateCustomerOperationalRisk(
+    orgId: string,
+    customerId: string,
+    reason?: string,
+  ) {
+    const [noShowCount, overdueCount, canceledCount] = await Promise.all([
+      this.prisma.appointment.count({
+        where: { orgId, customerId, status: 'NO_SHOW' },
+      }),
+      this.prisma.charge.count({
+        where: { orgId, customerId, status: 'OVERDUE' },
+      }),
+      this.prisma.appointment.count({
+        where: { orgId, customerId, status: 'CANCELED' },
+      }),
+    ])
+
+    const score = Math.min(100, noShowCount * 25 + overdueCount * 20 + Math.max(0, canceledCount - 1) * 10)
+
+    await this.timeline.log({
+      orgId,
+      action: 'CUSTOMER_OPERATIONAL_RISK_UPDATED',
+      description: `Risco operacional do cliente recalculado (${score})`,
+      metadata: {
+        customerId,
+        reason: reason ?? 'OPERATIONAL_EVENT',
+        score,
+        factors: { noShowCount, overdueCount, canceledCount },
+      },
+    })
+
+    return { score, factors: { noShowCount, overdueCount, canceledCount } }
+  }
 }

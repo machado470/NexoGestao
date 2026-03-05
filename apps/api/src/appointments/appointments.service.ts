@@ -9,6 +9,8 @@ import { TimelineService } from '../timeline/timeline.service'
 import { AuditService } from '../audit/audit.service'
 import { AUDIT_ACTIONS } from '../audit/audit.actions'
 import { AppointmentStatus } from '@prisma/client'
+import { WhatsAppService } from '../whatsapp/whatsapp.service'
+import { RiskService } from '../risk/risk.service'
 
 const DEFAULT_DURATION_MIN = 30
 
@@ -80,7 +82,54 @@ export class AppointmentsService {
     private readonly prisma: PrismaService,
     private readonly timeline: TimelineService,
     private readonly audit: AuditService,
+    private readonly whatsapp: WhatsAppService,
+    private readonly risk: RiskService,
   ) {}
+
+  private canTransition(from: AppointmentStatus, to: AppointmentStatus): boolean {
+    const allowed: Record<AppointmentStatus, AppointmentStatus[]> = {
+      SCHEDULED: ['CONFIRMED', 'CANCELED', 'NO_SHOW', 'DONE'],
+      CONFIRMED: ['CANCELED', 'NO_SHOW', 'DONE'],
+      CANCELED: [],
+      NO_SHOW: [],
+      DONE: [],
+    }
+    return from === to || allowed[from].includes(to)
+  }
+
+  private async enqueueAppointmentWorkflow(params: {
+    orgId: string
+    customerId: string
+    appointmentId: string
+    status: AppointmentStatus
+  }) {
+    const customer = await this.prisma.customer.findFirst({
+      where: { id: params.customerId, orgId: params.orgId },
+      select: { id: true, phone: true },
+    })
+    if (!customer?.phone) return
+
+    const messageTypeByStatus: Partial<Record<AppointmentStatus, any>> = {
+      CONFIRMED: 'APPOINTMENT_CONFIRMATION',
+      NO_SHOW: 'REMIND_24H',
+    }
+    const messageType = messageTypeByStatus[params.status]
+    if (!messageType) return
+
+    await this.whatsapp.queueMessage({
+      orgId: params.orgId,
+      customerId: customer.id,
+      toPhone: customer.phone,
+      entityType: 'APPOINTMENT',
+      entityId: params.appointmentId,
+      messageType,
+      messageKey: `appointment:${params.appointmentId}:${params.status}`,
+      renderedText:
+        params.status === 'CONFIRMED'
+          ? 'Seu agendamento foi confirmado ✅'
+          : 'Identificamos ausência no agendamento. Deseja reagendar?',
+    })
+  }
 
   async list(
     orgId: string,
@@ -168,7 +217,7 @@ export class AppointmentsService {
     const notes = normalizeNotes(params.notes)
 
     const customer = await this.prisma.customer.findFirst({
-      where: { id: params.customerId },
+      where: { id: params.customerId, orgId: params.orgId },
       select: { id: true, name: true },
     })
     if (!customer) throw new BadRequestException('Cliente inválido para este org')
@@ -294,7 +343,7 @@ export class AppointmentsService {
     if (!params.id) throw new BadRequestException('id é obrigatório')
 
     const existing = await this.prisma.appointment.findFirst({
-      where: { id: params.id },
+      where: { id: params.id, orgId: params.orgId },
       select: {
         id: true,
         status: true,
@@ -327,6 +376,11 @@ export class AppointmentsService {
 
     if (typeof params.data.status === 'string') {
       if (!isStatus(params.data.status)) throw new BadRequestException('status inválido')
+      if (!this.canTransition(existing.status, params.data.status)) {
+        throw new BadRequestException(
+          `Transição inválida de ${existing.status} para ${params.data.status}`,
+        )
+      }
       patch.status = params.data.status
     }
 
@@ -361,7 +415,7 @@ export class AppointmentsService {
       if (result.count === 0) throw new NotFoundException('Agendamento não encontrado')
 
       const updated = await this.prisma.appointment.findFirst({
-        where: { id: params.id },
+        where: { id: params.id, orgId: params.orgId },
         include: {
           customer: { select: { id: true, name: true, phone: true } },
         },
@@ -418,6 +472,22 @@ export class AppointmentsService {
           patch,
         },
       })
+
+      if (statusChanged) {
+        await this.enqueueAppointmentWorkflow({
+          orgId: params.orgId,
+          customerId: updated.customerId,
+          appointmentId: updated.id,
+          status: updated.status,
+        })
+        if (updated.status === 'NO_SHOW') {
+          await this.risk.recalculateCustomerOperationalRisk(
+            params.orgId,
+            updated.customerId,
+            'APPOINTMENT_NO_SHOW',
+          )
+        }
+      }
 
       return updated
     } catch (e: any) {

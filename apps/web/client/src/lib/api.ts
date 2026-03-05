@@ -153,6 +153,7 @@ export const api = {
   // Customers
   listCustomers: () => client.nexo.customers.list.query(),
   getCustomer: (id: string) => client.nexo.customers.getById.query({ id }),
+  getCustomerWorkspace: (id: string) => client.nexo.customers.workspace.query({ id }),
   createCustomer: (data: any) => client.nexo.customers.create.mutate(data),
   updateCustomer: (id: string, data: any) => client.nexo.customers.update.mutate({ id, data }),
   
@@ -204,6 +205,9 @@ export const api = {
   getWhatsAppMessages: (customerId: string) => client.nexo.whatsapp.messages.query({ customerId }),
   sendWhatsAppMessage: (data: any) => client.nexo.whatsapp.send.mutate(data),
   updateWhatsAppStatus: (id: string, status: string) => client.nexo.whatsapp.updateStatus.mutate({ id, status }),
+
+  // Timeline
+  getCustomerTimeline: (customerId: string, limit?: number) => client.nexo.timeline.listByCustomer.query({ customerId, limit }),
   
   // Onboarding
   completeOnboarding: () => client.nexo.onboarding.complete.mutate(),
