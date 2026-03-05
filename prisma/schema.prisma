@@ -144,6 +144,12 @@ model Organization {
   // WhatsApp (Meu Acessor)
   whatsAppTemplates WhatsAppTemplate[]
   whatsAppMessages  WhatsAppMessage[]
+
+  // Módulos financeiros completos
+  expenses  Expense[]
+  invoices  Invoice[]
+  launches  Launch[]
+  referrals Referral[]
 }
 
 model User {
@@ -443,6 +449,9 @@ model Customer {
   // WhatsApp (histórico por cliente)
   whatsAppMessages WhatsAppMessage[]
 
+  // Módulos financeiros
+  invoices Invoice[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -640,4 +649,136 @@ model WhatsAppMessage {
   @@index([orgId, messageType, createdAt])
   @@index([orgId, entityType, entityId])
   @@index([orgId, status, lockedAt, createdAt])
+}
+
+// ============================================================
+// 💸 MÓDULOS FINANCEIROS COMPLETOS — Expense, Invoice, Launch, Referral
+// ============================================================
+
+enum ExpenseCategory {
+  OPERATIONAL
+  MARKETING
+  INFRASTRUCTURE
+  PAYROLL
+  TAXES
+  SUPPLIES
+  TRAVEL
+  OTHER
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  PAID
+  CANCELLED
+}
+
+enum LaunchType {
+  INCOME
+  EXPENSE
+  TRANSFER
+}
+
+enum ReferralStatus {
+  PENDING
+  CONFIRMED
+  PAID
+}
+
+model Expense {
+  id    String @id @default(uuid())
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id])
+
+  description String
+  amountCents Int
+  category    ExpenseCategory @default(OTHER)
+  date        DateTime
+  notes       String?
+
+  createdByUserId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orgId, date])
+  @@index([orgId, category, date])
+  @@index([orgId, createdAt])
+}
+
+model Invoice {
+  id    String @id @default(uuid())
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id])
+
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id])
+
+  number      String
+  description String?
+  amountCents Int
+  status      InvoiceStatus @default(DRAFT)
+  dueDate     DateTime?
+  issuedAt    DateTime?
+  paidAt      DateTime?
+  notes       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([orgId, number])
+  @@index([orgId, status, createdAt])
+  @@index([orgId, dueDate])
+  @@index([customerId, createdAt])
+}
+
+model Launch {
+  id    String @id @default(uuid())
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id])
+
+  description String
+  amountCents Int
+  type        LaunchType
+  category    String
+  account     String?
+  date        DateTime
+  notes       String?
+
+  createdByUserId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orgId, date])
+  @@index([orgId, type, date])
+  @@index([orgId, createdAt])
+}
+
+model Referral {
+  id    String @id @default(uuid())
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id])
+
+  referrerName  String
+  referrerEmail String
+  referrerPhone String?
+
+  referredName  String
+  referredEmail String
+  referredPhone String?
+
+  creditAmountCents Int     @default(0)
+  status            ReferralStatus @default(PENDING)
+  code              String?
+
+  confirmedAt DateTime?
+  paidAt      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orgId, status, createdAt])
+  @@index([orgId, createdAt])
+  @@index([referrerEmail, orgId])
 }

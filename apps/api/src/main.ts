@@ -1,8 +1,11 @@
 import { NestFactory } from '@nestjs/core'
 import { AppModule } from './app.module'
 import { ApiResponseInterceptor } from './common/http/api-response.interceptor'
-import { ApiExceptionFilter } from './common/http/api-exception.filter'
-import { ValidationPipe } from '@nestjs/common'
+import { AllExceptionsFilter } from './common/filters/all-exceptions.filter'
+import { ValidationPipe, Logger } from '@nestjs/common'
+import { StructuredLoggerService } from './common/logger/structured-logger.service'
+import helmet from 'helmet'
+import { RequestLoggerMiddleware } from './common/middleware/request-logger.middleware'
 
 function parseCorsOrigins(raw?: string): string[] {
   const v = (raw ?? '').trim()
@@ -15,18 +18,37 @@ function parseCorsOrigins(raw?: string): string[] {
 }
 
 async function bootstrap() {
+  const structuredLogger = new StructuredLoggerService()
+
   try {
-    const app = await NestFactory.create(AppModule)
+    const app = await NestFactory.create(AppModule, {
+      logger: structuredLogger,
+    })
 
+    // ✅ Helmet — headers de segurança HTTP
+    app.use(
+      helmet({
+        contentSecurityPolicy: process.env.NODE_ENV === 'production',
+        crossOriginEmbedderPolicy: false,
+      }),
+    )
+
+    // ✅ Middleware de log de requisições
+    const requestLogger = new RequestLoggerMiddleware()
+    app.use((req: any, res: any, next: any) => requestLogger.use(req, res, next))
+
+    // ✅ Interceptor de resposta padronizada
     app.useGlobalInterceptors(new ApiResponseInterceptor())
-    app.useGlobalFilters(new ApiExceptionFilter())
 
-    // ✅ validação real (DTOs com class-validator)
+    // ✅ Filtro global de exceções (captura Prisma, HTTP, genérico)
+    app.useGlobalFilters(new AllExceptionsFilter())
+
+    // ✅ Validação real (DTOs com class-validator)
     app.useGlobalPipes(
       new ValidationPipe({
-        whitelist: true, // remove campos desconhecidos
-        forbidNonWhitelisted: true, // erro se mandar campo extra
-        transform: true, // transforma types básicos (string->number quando fizer sentido)
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
         transformOptions: {
           enableImplicitConversion: true,
         },
@@ -38,6 +60,9 @@ async function bootstrap() {
     app.enableCors({
       origin: origins,
       credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Org-Id'],
+      exposedHeaders: ['X-RateLimit-Limit', 'X-RateLimit-Remaining'],
     })
 
     const portRaw = process.env.API_PORT || process.env.PORT || '3000'
@@ -45,21 +70,24 @@ async function bootstrap() {
 
     await app.listen(port, '0.0.0.0')
 
-    console.log('🚀 API ONLINE NA PORTA', port)
-    console.log('🌐 CORS_ORIGINS', origins.join(', '))
+    structuredLogger.log(`API online na porta ${port}`, 'Bootstrap')
+    structuredLogger.log(`CORS_ORIGINS: ${origins.join(', ')}`, 'Bootstrap')
+    structuredLogger.log(`NODE_ENV: ${process.env.NODE_ENV || 'development'}`, 'Bootstrap')
   } catch (err) {
-    console.error('🔥 ERRO NO BOOTSTRAP', err)
+    structuredLogger.error('Erro fatal no bootstrap', err instanceof Error ? err.stack : String(err), 'Bootstrap')
     process.exit(1)
   }
 }
 
 process.on('unhandledRejection', reason => {
-  console.error('🔥 UNHANDLED REJECTION', reason)
+  const logger = new Logger('UnhandledRejection')
+  logger.error('Unhandled Promise Rejection', reason instanceof Error ? reason.stack : String(reason))
   process.exit(1)
 })
 
 process.on('uncaughtException', err => {
-  console.error('🔥 UNCAUGHT EXCEPTION', err)
+  const logger = new Logger('UncaughtException')
+  logger.error('Uncaught Exception', err.stack)
   process.exit(1)
 })
 

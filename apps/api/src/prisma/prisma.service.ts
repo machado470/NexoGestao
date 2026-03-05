@@ -38,6 +38,10 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
         'Payment',
         'WhatsAppTemplate',
         'WhatsAppMessage',
+        'Expense',
+        'Invoice',
+        'Launch',
+        'Referral',
       ]
 
       if (params.model && modelsWithOrgId.includes(params.model)) {

@@ -19,7 +19,7 @@ export default function CreatePersonModal({ open, onClose, onCreated }: Props) {
     if (!name.trim()) return;
 
     try {
-      await createPerson.mutateAsync({ name: name.trim(), role: role ? role : undefined });
+      await createPerson.mutateAsync({ name: name.trim(), role: role.trim() || 'Colaborador' });
       onCreated?.();
       onClose();
     } catch (error: unknown) {

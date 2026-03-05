@@ -21,6 +21,16 @@ export class DashboardController {
   }
 
   /**
+   * GET /dashboard/alerts
+   * Retorna alertas operacionais: ordens atrasadas, cobranças vencidas, serviços do dia
+   */
+  @Get('alerts')
+  @Roles('ADMIN')
+  async getAlerts(@Org() orgId: string) {
+    return this.dashboard.getAlerts(orgId)
+  }
+
+  /**
    * GET /dashboard/revenue
    * Retorna dados de faturamento por período (últimos 12 meses)
    */

@@ -312,6 +312,10 @@ export const nexoProxyRouter = router({
       const authHeader = getAuthHeader(ctx as any);
       return await nexoFetch("/dashboard/charges-status", { headers: authHeader ? { Authorization: authHeader } : {} });
     }),
+    alerts: publicProcedure.query(async ({ ctx }) => {
+      const authHeader = getAuthHeader(ctx as any);
+      return await nexoFetch("/dashboard/alerts", { headers: authHeader ? { Authorization: authHeader } : {} });
+    }),
   }),
 
   reports: router({

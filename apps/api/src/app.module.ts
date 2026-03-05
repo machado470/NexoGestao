@@ -1,9 +1,11 @@
-import { Module } from '@nestjs/common'
+import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
 import { ScheduleModule } from '@nestjs/schedule'
-import { ClsModule, ClsService } from 'nestjs-cls'
-import { APP_INTERCEPTOR } from '@nestjs/core'
+import { ClsModule } from 'nestjs-cls'
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core'
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler'
 import { OrgContextInterceptor } from './auth/org-context.interceptor'
+import { RequestLoggerMiddleware } from './common/middleware/request-logger.middleware'
 
 import { PrismaModule } from './prisma/prisma.module'
 import { HealthModule } from './health/health.module'
@@ -66,6 +68,12 @@ import { EmailModule } from './email/email.module'
 // 📊 DASHBOARD EXECUTIVO
 import { DashboardModule } from './dashboard/dashboard.module'
 
+// 💸 MÓDULOS FINANCEIROS COMPLETOS
+import { ExpensesModule } from './expenses/expenses.module'
+import { InvoicesModule } from './invoices/invoices.module'
+import { LaunchesModule } from './launches/launches.module'
+import { ReferralsModule } from './referrals/referrals.module'
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -77,6 +85,25 @@ import { DashboardModule } from './dashboard/dashboard.module'
         '.env.docker',
       ],
     }),
+
+    // ✅ Rate Limiting global
+    ThrottlerModule.forRoot([
+      {
+        name: 'short',
+        ttl: 1000,
+        limit: 20,
+      },
+      {
+        name: 'medium',
+        ttl: 60000,
+        limit: 200,
+      },
+      {
+        name: 'long',
+        ttl: 3600000,
+        limit: 1000,
+      },
+    ]),
 
     ScheduleModule.forRoot(),
 
@@ -131,12 +158,27 @@ import { DashboardModule } from './dashboard/dashboard.module'
 
     // 📊 Dashboard Executivo
     DashboardModule,
+
+    // 💸 Módulos financeiros completos
+    ExpensesModule,
+    InvoicesModule,
+    LaunchesModule,
+    ReferralsModule,
   ],
   providers: [
     {
       provide: APP_INTERCEPTOR,
       useClass: OrgContextInterceptor,
     },
+    // ✅ Rate limiting global aplicado a todos os endpoints
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(RequestLoggerMiddleware).forRoutes('*')
+  }
+}
