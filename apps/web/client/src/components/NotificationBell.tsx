@@ -45,25 +45,43 @@ export default function NotificationBell() {
   const utils = trpc.useUtils();
 
   useEffect(() => {
-    const eventSource = new EventSource("/api/notification-center/stream", {
-      withCredentials: true,
-    });
+    let eventSource: EventSource | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let isUnmounted = false;
 
-    const handleLiveEvent = () => {
+    const invalidateNotificationQueries = () => {
       void Promise.all([
         utils.dashboard.notificationCenter.unreadCount.invalidate(),
         utils.dashboard.notificationCenter.list.invalidate(),
       ]);
     };
 
-    eventSource.addEventListener("message", handleLiveEvent);
-    eventSource.onerror = () => {
-      eventSource.close();
+    const connect = () => {
+      if (isUnmounted) return;
+
+      eventSource = new EventSource("/api/notification-center/stream", {
+        withCredentials: true,
+      });
+
+      eventSource.addEventListener("message", invalidateNotificationQueries);
+      eventSource.onerror = () => {
+        eventSource?.removeEventListener("message", invalidateNotificationQueries);
+        eventSource?.close();
+
+        if (isUnmounted) return;
+        reconnectTimer = setTimeout(() => {
+          connect();
+        }, 2000);
+      };
     };
 
+    connect();
+
     return () => {
-      eventSource.removeEventListener("message", handleLiveEvent);
-      eventSource.close();
+      isUnmounted = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      eventSource?.removeEventListener("message", invalidateNotificationQueries);
+      eventSource?.close();
     };
   }, [utils]);
 

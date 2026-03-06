@@ -7,5 +7,6 @@ import { OnboardingService } from './onboarding.service';
   imports: [PrismaModule],
   controllers: [OnboardingController],
   providers: [OnboardingService],
+  exports: [OnboardingService],
 })
 export class OnboardingModule {}

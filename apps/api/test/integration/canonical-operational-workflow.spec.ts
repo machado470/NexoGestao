@@ -52,6 +52,8 @@ describe('Canonical Operational Workflow (e2e)', () => {
   })
 
   afterAll(async () => {
+    if (!prisma || !app) return
+
     await prisma.payment.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
     await prisma.whatsAppMessage.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
     await prisma.charge.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
