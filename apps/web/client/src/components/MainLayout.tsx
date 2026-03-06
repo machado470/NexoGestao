@@ -97,6 +97,8 @@ export function MainLayout({ children }: MainLayoutProps) {
 
     { id: "timeline", label: "Timeline", icon: BarChart3, route: "/timeline" },
 
+    { id: "operations-dashboard", label: "Dashboard Operacional", icon: Workflow, route: "/dashboard/operations" },
+
     { id: "operations", label: "Workflow Operacional", icon: Workflow, route: "/operations" },
 
     { id: "settings", label: "Configurações", icon: Settings, route: "/settings" }
