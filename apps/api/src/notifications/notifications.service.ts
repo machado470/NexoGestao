@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { NotificationType } from '@prisma/client';
+import { Injectable, NotFoundException } from '@nestjs/common'
+import { PrismaService } from '../prisma/prisma.service'
+import { NotificationType } from '@prisma/client'
 
 @Injectable()
 export class NotificationsService {
@@ -21,24 +21,57 @@ export class NotificationsService {
         message,
         metadata,
       },
-    });
+    })
   }
 
   async getNotifications(orgId: string, userId?: string) {
-    const where: any = { orgId };
+    const where: any = { orgId }
     if (userId) {
-      where.userId = userId;
+      where.OR = [{ userId }, { userId: null }]
     }
     return this.prisma.notification.findMany({
       where,
       orderBy: { createdAt: 'desc' },
-    });
+    })
   }
 
-  async markAsRead(notificationId: string) {
-    return this.prisma.notification.update({
-      where: { id: notificationId },
+  async getUnreadCount(orgId: string, userId: string) {
+    return this.prisma.notification.count({
+      where: {
+        orgId,
+        readAt: null,
+        OR: [{ userId }, { userId: null }],
+      },
+    })
+  }
+
+  async markAsRead(orgId: string, userId: string, notificationId: string) {
+    const result = await this.prisma.notification.updateMany({
+      where: {
+        id: notificationId,
+        orgId,
+        OR: [{ userId }, { userId: null }],
+      },
       data: { readAt: new Date() },
-    });
+    })
+
+    if (result.count === 0) {
+      throw new NotFoundException('Notificação não encontrada')
+    }
+
+    return { ok: true }
+  }
+
+  async markAllAsRead(orgId: string, userId: string) {
+    const result = await this.prisma.notification.updateMany({
+      where: {
+        orgId,
+        readAt: null,
+        OR: [{ userId }, { userId: null }],
+      },
+      data: { readAt: new Date() },
+    })
+
+    return { ok: true, updated: result.count }
   }
 }

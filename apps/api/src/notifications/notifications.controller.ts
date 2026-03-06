@@ -1,6 +1,14 @@
-import { Controller, Get, Param, Patch, UseGuards, Request } from '@nestjs/common';
-import { NotificationsService } from './notifications.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import {
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Request,
+  UseGuards,
+} from '@nestjs/common'
+import { NotificationsService } from './notifications.service'
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 
 @Controller('notifications')
 export class NotificationsController {
@@ -9,14 +17,34 @@ export class NotificationsController {
   @UseGuards(JwtAuthGuard)
   @Get()
   async getMyNotifications(@Request() req) {
-    const orgId = req.user.orgId;
-    const userId = req.user.sub; // ID do usuário logado
-    return this.notificationsService.getNotifications(orgId, userId);
+    const orgId = req.user.orgId
+    const userId = req.user.sub
+    return this.notificationsService.getNotifications(orgId, userId)
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('unread-count')
+  async getUnreadCount(@Request() req) {
+    const orgId = req.user.orgId
+    const userId = req.user.sub
+
+    const unread = await this.notificationsService.getUnreadCount(orgId, userId)
+    return { unread }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('read-all')
+  async markAllAsRead(@Request() req) {
+    const orgId = req.user.orgId
+    const userId = req.user.sub
+    return this.notificationsService.markAllAsRead(orgId, userId)
   }
 
   @UseGuards(JwtAuthGuard)
   @Patch(':id/read')
-  async markAsRead(@Param('id') id: string) {
-    return this.notificationsService.markAsRead(id);
+  async markAsRead(@Request() req, @Param('id') id: string) {
+    const orgId = req.user.orgId
+    const userId = req.user.sub
+    return this.notificationsService.markAsRead(orgId, userId, id)
   }
 }
