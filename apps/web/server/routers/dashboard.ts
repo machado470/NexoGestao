@@ -24,7 +24,7 @@ export const dashboardRouter = router({
     )
     .query(async ({ ctx, input }) => {
       if (!ctx.user?.organizationId) return [];
-      return listOperationalNotifications(ctx.user.organizationId, input?.limit ?? 20);
+      return await listOperationalNotifications(ctx.user.organizationId, input?.limit ?? 20);
     }),
 
   dashboard: router({

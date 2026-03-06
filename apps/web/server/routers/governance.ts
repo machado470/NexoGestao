@@ -29,7 +29,7 @@ export const governanceRouter = router({
       )
       .mutation(async ({ ctx, input }) => {
         if (ctx.user?.organizationId && input.previousLevel !== input.newLevel) {
-          emitOperationalNotification({
+          await emitOperationalNotification({
             orgId: ctx.user.organizationId,
             type: "RISK_LEVEL_CHANGED",
             metadata: {

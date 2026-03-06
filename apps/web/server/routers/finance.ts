@@ -154,7 +154,7 @@ export const financeRouter = router({
         });
 
         if (ctx.user?.organizationId && input.status === "OVERDUE") {
-          emitOperationalNotification({
+          await emitOperationalNotification({
             orgId: ctx.user.organizationId,
             type: "PAYMENT_OVERDUE",
             metadata: { chargeId: id },

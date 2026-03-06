@@ -156,6 +156,11 @@ enum NotificationType {
   INVITE_RECEIVED
   TRIAL_ENDING
   TRIAL_ENDED
+  APPOINTMENT_CONFIRMED
+  APPOINTMENT_NO_SHOW
+  SERVICE_ORDER_COMPLETED
+  PAYMENT_OVERDUE
+  RISK_LEVEL_CHANGED
 }
 
 // ============================================================
@@ -927,7 +932,9 @@ model Notification {
   userId    String? // Opcional, se a notificação for para um usuário específico
   user      User?          @relation(fields: [userId], references: [id])
   type      NotificationType
+  title     String         @default("")
   message   String
+  read      Boolean        @default(false)
   metadata  Json? // Dados adicionais para a notificação (ex: ID da cobrança)
   readAt    DateTime?
   createdAt DateTime       @default(now())
