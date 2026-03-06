@@ -327,6 +327,25 @@ export const nexoProxyRouter = router({
           headers: authHeader ? { Authorization: authHeader } : {},
         });
       }),
+      pay: publicProcedure
+        .input(
+          z.object({
+            id: z.string(),
+            method: z.string().optional(),
+            amountCents: z.number().optional(),
+          }),
+        )
+        .mutation(async ({ input, ctx }) => {
+          const authHeader = getAuthHeader(ctx as any);
+          return await nexoFetch(`/finance/charges/${input.id}/pay`, {
+            method: "POST",
+            body: JSON.stringify({
+              method: input.method,
+              amountCents: input.amountCents,
+            }),
+            headers: authHeader ? { Authorization: authHeader } : {},
+          });
+        }),
     }),
   }),
 

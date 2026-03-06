@@ -14,6 +14,7 @@ const routeBreadcrumbs: Record<string, Breadcrumb[]> = {
   "/finances": [{ label: "Financeiro", href: "/finances" }],
   "/people": [{ label: "Pessoas", href: "/people" }],
   "/governance": [{ label: "Governança", href: "/governance" }],
+  "/dashboard/operations": [{ label: "Dashboard Operacional", href: "/dashboard/operations" }],
 };
 
 export function Breadcrumbs() {

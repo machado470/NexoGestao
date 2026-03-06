@@ -33,6 +33,7 @@ import CalendarPage from "./pages/CalendarPage";
 import SettingsPage from "./pages/SettingsPage";
 import TimelinePage from "./pages/TimelinePage";
 import OperationalWorkflowPage from "./pages/OperationalWorkflowPage";
+import OperationsDashboardPage from "./pages/OperationsDashboardPage";
 import { Loader } from "lucide-react";
 import { NotificationCenter } from "./components/NotificationCenter";
 
@@ -148,6 +149,9 @@ function Router() {
       )} />
       <Route path="/operations" component={() => (
         <ProtectedRoute component={() => <MainLayout><OperationalWorkflowPage /></MainLayout>} />
+      )} />
+      <Route path="/dashboard/operations" component={() => (
+        <ProtectedRoute component={() => <MainLayout><OperationsDashboardPage /></MainLayout>} />
       )} />
       <Route path="/forgot-password" component={() => <PublicRoute component={ForgotPasswordPage} />} />
       <Route path="/reset-password" component={() => <PublicRoute component={ResetPasswordPage} />} />
