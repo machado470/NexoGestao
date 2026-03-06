@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { Loader, TrendingUp, Users, Calendar, Briefcase, DollarSign, AlertTriangle } from "lucide-react";
-import { toast } from "sonner";
 import {
   LineChart,
   Line,
