@@ -1,8 +1,18 @@
-import React, { useMemo, useState } from "react";
-import { Bell, CheckCheck, CalendarClock, DollarSign, ShieldAlert } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  Bell,
+  CheckCheck,
+  CalendarClock,
+  DollarSign,
+  ShieldAlert,
+} from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Pagination } from "@/components/Pagination";
 
 type FilterType = "all" | "appointments" | "finance" | "risk";
@@ -34,35 +44,63 @@ export default function NotificationBell() {
 
   const utils = trpc.useUtils();
 
-  const unreadCountQuery = trpc.dashboard.notificationCenter.unreadCount.useQuery(undefined, {
-    refetchInterval: 30_000,
-  });
+  useEffect(() => {
+    const eventSource = new EventSource("/api/notification-center/stream", {
+      withCredentials: true,
+    });
+
+    const handleLiveEvent = () => {
+      void Promise.all([
+        utils.dashboard.notificationCenter.unreadCount.invalidate(),
+        utils.dashboard.notificationCenter.list.invalidate(),
+      ]);
+    };
+
+    eventSource.addEventListener("message", handleLiveEvent);
+    eventSource.onerror = () => {
+      eventSource.close();
+    };
+
+    return () => {
+      eventSource.removeEventListener("message", handleLiveEvent);
+      eventSource.close();
+    };
+  }, [utils]);
+
+  const unreadCountQuery =
+    trpc.dashboard.notificationCenter.unreadCount.useQuery(undefined, {
+      refetchInterval: 30_000,
+    });
 
   const notificationQuery = trpc.dashboard.notificationCenter.list.useQuery(
     { page, limit, category },
     {
-      enabled: open
+      enabled: open,
     }
   );
 
-  const markAsReadMutation = trpc.dashboard.notificationCenter.markAsRead.useMutation({
-    onSuccess: async () => {
-      await Promise.all([
-        utils.dashboard.notificationCenter.list.invalidate(),
-        utils.dashboard.notificationCenter.unreadCount.invalidate(),
-      ]);
-    },
-  });
+  const markAsReadMutation =
+    trpc.dashboard.notificationCenter.markAsRead.useMutation({
+      onSuccess: async () => {
+        await Promise.all([
+          utils.dashboard.notificationCenter.list.invalidate(),
+          utils.dashboard.notificationCenter.unreadCount.invalidate(),
+        ]);
+      },
+    });
 
   const unreadCount = unreadCountQuery.data?.unreadCount ?? 0;
   const payload = notificationQuery.data;
 
-  const hasNotifications = useMemo(() => (payload?.items?.length ?? 0) > 0, [payload]);
+  const hasNotifications = useMemo(
+    () => (payload?.items?.length ?? 0) > 0,
+    [payload]
+  );
 
   return (
     <Popover
       open={open}
-      onOpenChange={(nextOpen) => {
+      onOpenChange={nextOpen => {
         setOpen(nextOpen);
       }}
     >
@@ -86,7 +124,9 @@ export default function NotificationBell() {
           <div className="flex items-center justify-between gap-2">
             <div>
               <h3 className="text-sm font-semibold">Central de Notificações</h3>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">Organização: alertas operacionais</p>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                Organização: alertas operacionais
+              </p>
             </div>
             <span className="rounded-full bg-zinc-100 px-2 py-1 text-xs font-semibold dark:bg-zinc-800">
               Não lidas: {payload?.unreadCount ?? unreadCount}
@@ -94,7 +134,7 @@ export default function NotificationBell() {
           </div>
 
           <div className="mt-3 flex gap-2">
-            {FILTERS.map((filter) => (
+            {FILTERS.map(filter => (
               <button
                 key={filter.value}
                 onClick={() => {
@@ -115,26 +155,37 @@ export default function NotificationBell() {
 
         <div className="max-h-[360px] overflow-y-auto p-3">
           {notificationQuery.isLoading ? (
-            <div className="rounded-lg border p-3 text-sm text-zinc-500 dark:border-zinc-800">Carregando notificações...</div>
+            <div className="rounded-lg border p-3 text-sm text-zinc-500 dark:border-zinc-800">
+              Carregando notificações...
+            </div>
           ) : !hasNotifications ? (
             <div className="rounded-lg border p-3 text-sm text-zinc-500 dark:border-zinc-800">
               Nenhuma notificação encontrada para este filtro.
             </div>
           ) : (
             <div className="space-y-2">
-              {payload?.items.map((notification) => {
+              {payload?.items.map(notification => {
                 const Icon = notificationIcon(notification.type);
 
                 return (
-                  <div key={notification.id} className="rounded-lg border p-3 dark:border-zinc-800">
+                  <div
+                    key={notification.id}
+                    className="rounded-lg border p-3 dark:border-zinc-800"
+                  >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex min-w-0 items-start gap-2">
                         <Icon className="mt-0.5 h-4 w-4 text-zinc-500" />
                         <div>
-                          <div className="text-sm font-semibold">{notification.title}</div>
-                          <div className="text-sm text-zinc-600 dark:text-zinc-300">{notification.message}</div>
+                          <div className="text-sm font-semibold">
+                            {notification.title}
+                          </div>
+                          <div className="text-sm text-zinc-600 dark:text-zinc-300">
+                            {notification.message}
+                          </div>
                           <div className="mt-1 text-xs text-zinc-500">
-                            {new Date(notification.createdAt).toLocaleString("pt-BR")}
+                            {new Date(notification.createdAt).toLocaleString(
+                              "pt-BR"
+                            )}
                           </div>
                         </div>
                       </div>
@@ -145,7 +196,9 @@ export default function NotificationBell() {
                           size="sm"
                           className="h-auto p-1"
                           title="Marcar como lida"
-                          onClick={() => markAsReadMutation.mutate({ id: notification.id })}
+                          onClick={() =>
+                            markAsReadMutation.mutate({ id: notification.id })
+                          }
                         >
                           <CheckCheck className="h-4 w-4" />
                         </Button>
@@ -168,7 +221,7 @@ export default function NotificationBell() {
           total={payload?.total ?? 0}
           limit={limit}
           onPageChange={setPage}
-          onLimitChange={(nextLimit) => {
+          onLimitChange={nextLimit => {
             setLimit(nextLimit);
             setPage(1);
           }}
