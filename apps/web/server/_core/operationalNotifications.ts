@@ -1,6 +1,9 @@
 import prismaClientPkg from "@prisma/client";
+import { emitNotificationCenterEvent } from "./notificationCenterEvents";
 
-const { PrismaClient } = prismaClientPkg as unknown as { PrismaClient: new () => any };
+const { PrismaClient } = prismaClientPkg as unknown as {
+  PrismaClient: new () => any;
+};
 
 export type OperationalEventType =
   | "APPOINTMENT_CONFIRMED"
@@ -23,7 +26,11 @@ export type OperationalNotification = {
 export type NotificationCategory = "appointments" | "finance" | "risk";
 
 const CATEGORY_TYPES: Record<NotificationCategory, OperationalEventType[]> = {
-  appointments: ["APPOINTMENT_CONFIRMED", "APPOINTMENT_NO_SHOW", "SERVICE_ORDER_COMPLETED"],
+  appointments: [
+    "APPOINTMENT_CONFIRMED",
+    "APPOINTMENT_NO_SHOW",
+    "SERVICE_ORDER_COMPLETED",
+  ],
   finance: ["PAYMENT_OVERDUE"],
   risk: ["RISK_LEVEL_CHANGED"],
 };
@@ -44,7 +51,7 @@ export type NotificationListResult = {
 };
 
 const globalForOperationalNotifications = globalThis as unknown as {
-  operationalNotificationsPrisma?: PrismaClient;
+  operationalNotificationsPrisma?: any;
 };
 
 const prisma =
@@ -104,7 +111,7 @@ export async function emitOperationalNotification(input: {
 
   if (!payload) return;
 
-  await prisma.notification.create({
+  const created = await prisma.notification.create({
     data: {
       orgId,
       type: input.type,
@@ -114,9 +121,18 @@ export async function emitOperationalNotification(input: {
       read: false,
     },
   });
+
+  emitNotificationCenterEvent({
+    orgId,
+    type: "created",
+    notificationId: created.id,
+  });
 }
 
-export async function listOperationalNotifications(orgId: string | number, limit = 20) {
+export async function listOperationalNotifications(
+  orgId: string | number,
+  limit = 20
+) {
   const rows = await prisma.notification.findMany({
     where: { orgId: String(orgId) },
     orderBy: { createdAt: "desc" },
@@ -196,10 +212,20 @@ export async function markNotificationAsRead(input: {
     },
   });
 
+  if (updated.count > 0) {
+    emitNotificationCenterEvent({
+      orgId,
+      type: "updated",
+      notificationId: input.id,
+    });
+  }
+
   return { success: updated.count > 0 };
 }
 
-export async function countUnreadOperationalNotifications(orgId: string | number) {
+export async function countUnreadOperationalNotifications(
+  orgId: string | number
+) {
   return prisma.notification.count({
     where: {
       orgId: String(orgId),

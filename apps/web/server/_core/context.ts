@@ -16,7 +16,7 @@ export type TrpcContext = {
  */
 export type Context = TrpcContext;
 
-function getNexoTokenFromReq(req: any): string | null {
+export function getNexoTokenFromReq(req: any): string | null {
   const raw = req?.headers?.cookie;
   if (!raw || typeof raw !== "string") return null;
 
@@ -27,7 +27,7 @@ function getNexoTokenFromReq(req: any): string | null {
   return token;
 }
 
-async function fetchNexoMe(req: any) {
+export async function fetchNexoMe(req: any) {
   const token = getNexoTokenFromReq(req);
   if (!token) return null;
 
