@@ -28,7 +28,7 @@
     "@nestjs/platform-express": "11.1.6",
     "@nestjs/schedule": "^6.1.1",
     "@nestjs/throttler": "^6.5.0",
-    "@nexogestao/common": "workspace:^",
+    "@nexogestao/common": "file:../../packages/common",
     "@prisma/client": "5.22.0",
     "@sentry/node": "^8.0.0",
     "@sentry/profiling-node": "^8.0.0",
