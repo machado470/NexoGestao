@@ -9,7 +9,7 @@ import { AuditService } from '../audit/audit.service'
 import { NotificationsService } from '../notifications/notifications.service'
 import { OnboardingService } from '../onboarding/onboarding.service'
 import { AUDIT_ACTIONS } from '../audit/audit.actions'
-import { $Enums } from '@prisma/client'
+import { $Enums, Prisma } from '@prisma/client'
 import { ChargesQueryDto } from './dto/charges-query.dto'
 import { WhatsAppService } from '../whatsapp/whatsapp.service'
 import { RiskService } from '../risk/risk.service'
@@ -18,6 +18,15 @@ function isUuidLike(s: string): boolean {
   // UUID v4/v1 “parecido” (bom o suficiente pra decidir equals vs contains)
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
     s,
+  )
+}
+
+
+type DbClient = PrismaService | any
+
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002'
   )
 }
 
@@ -143,6 +152,7 @@ export class FinanceService {
     dueDate?: Date | string | null
     actorUserId?: string | null
     actorPersonId?: string | null
+    tx?: any
   }) {
     const amountCents = input.amountCents ?? 0
     if (amountCents <= 0) return { created: false }
@@ -155,9 +165,11 @@ export class FinanceService {
       dueDate = Number.isNaN(parsed.getTime()) ? null : parsed
     }
 
+    const db: DbClient = input.tx ?? this.prisma
+
     let customerId = input.customerId
     if (!customerId) {
-      const so = await this.prisma.serviceOrder.findFirst({
+      const so = await db.serviceOrder.findFirst({
         where: { id: input.serviceOrderId, orgId: input.orgId },
         select: { customerId: true },
       })
@@ -170,102 +182,142 @@ export class FinanceService {
       customerId = so.customerId
     }
 
-    const existing = await this.prisma.charge.findFirst({
-      where: {
-        orgId: input.orgId,
-        serviceOrderId: input.serviceOrderId,
-        status: { in: ['PENDING', 'OVERDUE'] },
-      },
-      orderBy: { createdAt: 'desc' },
-      select: { id: true, amountCents: true, dueDate: true },
-    })
-
-    if (existing) {
-      const shouldUpdate =
-        existing.amountCents !== amountCents ||
-        (dueDate && existing.dueDate.getTime() !== dueDate.getTime())
-
-      if (shouldUpdate) {
-        await this.prisma.charge.update({
-          where: { id: existing.id },
-          data: {
-            amountCents,
-            dueDate: dueDate ?? existing.dueDate,
-          },
-        })
-      }
-
-      return { created: false, chargeId: existing.id }
-    }
-
     const finalDueDate =
       dueDate ?? new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)
 
-    const created = await this.prisma.charge.create({
-      data: {
-        orgId: input.orgId,
-        serviceOrderId: input.serviceOrderId,
-        customerId,
-        amountCents,
-        status: 'PENDING',
-        dueDate: finalDueDate,
-      },
-      select: { id: true },
-    })
-
-    await this.timeline.log({
-      orgId: input.orgId,
-      personId: input.actorPersonId ?? null,
-      action: 'CHARGE_CREATED',
-      description: 'Cobrança criada automaticamente (O.S. concluída)',
-      metadata: {
-        chargeId: created.id,
-        serviceOrderId: input.serviceOrderId,
-        customerId,
-        amountCents,
-        dueDate: finalDueDate.toISOString(),
-        actorUserId: input.actorUserId ?? null,
-        actorPersonId: input.actorPersonId ?? null,
-      },
-    })
-
-    await this.audit.log({
-      orgId: input.orgId,
-      action: AUDIT_ACTIONS.CHARGE_CREATED,
-      actorUserId: input.actorUserId ?? null,
-      actorPersonId: input.actorPersonId ?? null,
-      personId: input.actorPersonId ?? null,
-      entityType: 'CHARGE',
-      entityId: created.id,
-      context: 'Cobrança gerada a partir de ServiceOrder DONE',
-    })
-
-      await this.notificationsService.createNotification(
-        input.orgId,
-        'CUSTOMER_CREATED', // Usando um tipo existente no enum como fallback ou corrigindo para o tipo correto se disponível
-        `Cobrança de ${input.amountCents / 100} para O.S. ${input.serviceOrderId} criada. Vencimento: ${finalDueDate.toLocaleDateString()}.`,
-        input.actorUserId,
-        { chargeId: created.id, serviceOrderId: input.serviceOrderId },
-      );
-
-      const chargeWithCustomer = await this.prisma.charge.findFirst({
-        where: { id: created.id, orgId: input.orgId },
-        include: { customer: { select: { phone: true } } },
+    const run = async (tx: any) => {
+      const existing = await tx.charge.findUnique({
+        where: {
+          orgId_serviceOrderId: {
+            orgId: input.orgId,
+            serviceOrderId: input.serviceOrderId,
+          },
+        },
+        select: { id: true, amountCents: true, dueDate: true, status: true },
       })
-      if (chargeWithCustomer?.customer?.phone) {
-        await this.whatsapp.queueMessage({
+
+      if (existing) {
+        if (existing.status === 'PENDING' || existing.status === 'OVERDUE') {
+          const shouldUpdate =
+            existing.amountCents !== amountCents ||
+            existing.dueDate.getTime() !== finalDueDate.getTime()
+
+          if (shouldUpdate) {
+            await tx.charge.updateMany({
+              where: {
+                id: existing.id,
+                orgId: input.orgId,
+                status: { in: ['PENDING', 'OVERDUE'] },
+              },
+              data: {
+                amountCents,
+                dueDate: finalDueDate,
+              },
+            })
+          }
+        }
+
+        return { created: false, chargeId: existing.id }
+      }
+
+      let created: { id: string }
+      try {
+        created = await tx.charge.create({
+          data: {
+            orgId: input.orgId,
+            serviceOrderId: input.serviceOrderId,
+            customerId,
+            amountCents,
+            status: 'PENDING',
+            dueDate: finalDueDate,
+          },
+          select: { id: true },
+        })
+      } catch (error) {
+        if (!isUniqueViolation(error)) throw error
+
+        const concurrent = await tx.charge.findUnique({
+          where: {
+            orgId_serviceOrderId: {
+              orgId: input.orgId,
+              serviceOrderId: input.serviceOrderId,
+            },
+          },
+          select: { id: true },
+        })
+
+        if (!concurrent) throw error
+        return { created: false, chargeId: concurrent.id }
+      }
+
+      await tx.timelineEvent.create({
+        data: {
           orgId: input.orgId,
-          customerId,
-          toPhone: chargeWithCustomer.customer.phone,
+          action: 'CHARGE_CREATED',
+          personId: input.actorPersonId ?? null,
+          description: 'Cobrança criada automaticamente (O.S. concluída)',
+          metadata: {
+            chargeId: created.id,
+            serviceOrderId: input.serviceOrderId,
+            customerId,
+            amountCents,
+            dueDate: finalDueDate.toISOString(),
+            actorUserId: input.actorUserId ?? null,
+            actorPersonId: input.actorPersonId ?? null,
+          },
+        },
+      })
+
+      await tx.auditEvent.create({
+        data: {
+          orgId: input.orgId,
+          action: AUDIT_ACTIONS.CHARGE_CREATED,
+          actorUserId: input.actorUserId ?? null,
+          actorPersonId: input.actorPersonId ?? null,
+          personId: input.actorPersonId ?? null,
           entityType: 'CHARGE',
           entityId: created.id,
-          messageType: 'PAYMENT_LINK',
-          messageKey: `charge:${created.id}:payment-link`,
-          renderedText: 'Cobrança gerada. Entre em contato para pagamento.',
-        })
-      }
-      await this.onboardingService.completeOnboardingStep(input.orgId, 'createCharge');
+          context: 'Cobrança gerada a partir de ServiceOrder DONE',
+        },
+      })
+
       return { created: true, chargeId: created.id }
+    }
+
+    const result = input.tx
+      ? await run(input.tx)
+      : await this.prisma.$transaction((tx) => run(tx))
+
+    if (!result.created) return result
+
+    await this.notificationsService.createNotification(
+      input.orgId,
+      'CUSTOMER_CREATED',
+      `Cobrança de ${amountCents / 100} para O.S. ${input.serviceOrderId} criada. Vencimento: ${finalDueDate.toLocaleDateString()}.`,
+      input.actorUserId ?? null,
+      { chargeId: result.chargeId, serviceOrderId: input.serviceOrderId },
+    )
+
+    const chargeWithCustomer = await this.prisma.charge.findFirst({
+      where: { id: result.chargeId, orgId: input.orgId },
+      include: { customer: { select: { phone: true } } },
+    })
+
+    if (chargeWithCustomer?.customer?.phone) {
+      await this.whatsapp.queueMessage({
+        orgId: input.orgId,
+        customerId,
+        toPhone: chargeWithCustomer.customer.phone,
+        entityType: 'CHARGE',
+        entityId: result.chargeId,
+        messageType: 'PAYMENT_LINK',
+        messageKey: `charge:${result.chargeId}:payment-link`,
+        renderedText: 'Cobrança gerada. Entre em contato para pagamento.',
+      })
+    }
+
+    await this.onboardingService.completeOnboardingStep(input.orgId, 'createCharge')
+    return result
   }
 
   async payCharge(input: {
@@ -286,31 +338,43 @@ export class FinanceService {
 
       if (!charge) throw new NotFoundException('Cobrança não encontrada')
       if (charge.status === 'PAID') return { alreadyPaid: true }
+      if (charge.status !== 'PENDING') {
+        throw new BadRequestException('Transição inválida: somente PENDING → PAID')
+      }
 
       if (input.amountCents !== charge.amountCents) {
         throw new BadRequestException('Valor do pagamento diferente da cobrança')
       }
 
-      const payment = await tx.payment.create({
-        data: {
-          orgId: input.orgId,
-          chargeId: charge.id,
-          amountCents: input.amountCents,
-          method: input.method,
-          paidAt: now,
-        },
-        select: { id: true },
-      })
+      let payment: { id: string }
+      try {
+        payment = await tx.payment.create({
+          data: {
+            orgId: input.orgId,
+            chargeId: charge.id,
+            amountCents: input.amountCents,
+            method: input.method,
+            paidAt: now,
+          },
+          select: { id: true },
+        })
+      } catch (error) {
+        if (!isUniqueViolation(error)) throw error
+        return { alreadyPaid: true }
+      }
 
-      await tx.charge.update({
-        where: { id: charge.id },
+      const transition = await tx.charge.updateMany({
+        where: { id: charge.id, orgId: input.orgId, status: 'PENDING' },
         data: {
           status: 'PAID',
           paidAt: now,
         },
       })
 
-      // Timeline (ATÔMICO)
+      if (transition.count === 0) {
+        return { alreadyPaid: true }
+      }
+
       await tx.timelineEvent.create({
         data: {
           orgId: input.orgId,
@@ -328,14 +392,13 @@ export class FinanceService {
         },
       })
 
-      // Audit: CHARGE_PAID (ATÔMICO)
       await tx.auditEvent.create({
         data: {
           orgId: input.orgId,
           action: AUDIT_ACTIONS.CHARGE_PAID,
           actorUserId: input.actorUserId ?? null,
           actorPersonId: input.actorPersonId ?? null,
-          personId: input.actorPersonId ?? null, // legado
+          personId: input.actorPersonId ?? null,
           entityType: 'CHARGE',
           entityId: charge.id,
           context: 'Cobrança marcada como paga',
@@ -347,14 +410,13 @@ export class FinanceService {
         },
       })
 
-      // Audit: PAYMENT_CREATED (ATÔMICO)
       await tx.auditEvent.create({
         data: {
           orgId: input.orgId,
           action: AUDIT_ACTIONS.PAYMENT_CREATED,
           actorUserId: input.actorUserId ?? null,
           actorPersonId: input.actorPersonId ?? null,
-          personId: input.actorPersonId ?? null, // legado
+          personId: input.actorPersonId ?? null,
           entityType: 'PAYMENT',
           entityId: payment.id,
           context: 'Pagamento criado',
@@ -372,7 +434,7 @@ export class FinanceService {
         `Pagamento de ${input.amountCents / 100} recebido para cobrança ${charge.id}.`,
         input.actorUserId,
         { chargeId: charge.id, paymentId: payment.id },
-      );
+      )
 
       const paidCharge = await this.prisma.charge.findFirst({
         where: { id: charge.id, orgId: input.orgId },
@@ -642,21 +704,28 @@ export class FinanceService {
   async updateCharge(input: any) {
     const { id, orgId, actorUserId, actorPersonId, ...data } = input
 
-    const charge = await this.prisma.charge.findFirst({
-      where: { id, orgId },
-    })
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const ownership = await tx.charge.findFirst({
+        where: { id, orgId },
+        select: { id: true },
+      })
 
-    if (!charge) throw new NotFoundException('Cobrança não encontrada')
+      if (!ownership) throw new NotFoundException('Cobrança não encontrada')
 
-    const updated = await this.prisma.charge.update({
-      where: { id },
-      data: {
-        amountCents: data.amountCents,
-        dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
-        paidAt: data.paidAt ? new Date(data.paidAt) : undefined,
-        status: data.status,
-        notes: data.notes,
-      },
+      const result = await tx.charge.updateMany({
+        where: { id, orgId },
+        data: {
+          amountCents: data.amountCents,
+          dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
+          paidAt: data.paidAt ? new Date(data.paidAt) : undefined,
+          status: data.status,
+          notes: data.notes,
+        },
+      })
+
+      if (result.count === 0) throw new NotFoundException('Cobrança não encontrada')
+
+      return tx.charge.findFirst({ where: { id, orgId } })
     })
 
     await this.audit.log({
@@ -673,14 +742,19 @@ export class FinanceService {
   }
 
   async deleteCharge(orgId: string, id: string) {
-    const charge = await this.prisma.charge.findFirst({
-      where: { id, orgId },
-    })
+    await this.prisma.$transaction(async (tx) => {
+      const ownership = await tx.charge.findFirst({
+        where: { id, orgId },
+        select: { id: true },
+      })
 
-    if (!charge) throw new NotFoundException('Cobrança não encontrada')
+      if (!ownership) throw new NotFoundException('Cobrança não encontrada')
 
-    await this.prisma.charge.delete({
-      where: { id },
+      const deleted = await tx.charge.deleteMany({
+        where: { id, orgId },
+      })
+
+      if (deleted.count === 0) throw new NotFoundException('Cobrança não encontrada')
     })
   }
 }

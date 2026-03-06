@@ -647,6 +647,7 @@ model Charge {
   @@index([orgId, status, createdAt])
   @@index([customerId, createdAt])
   @@index([serviceOrderId, createdAt])
+  @@unique([orgId, serviceOrderId], map: "Charge_orgId_serviceOrderId_key")
 }
 
 model Payment {
@@ -667,6 +668,7 @@ model Payment {
 
   @@index([orgId, createdAt])
   @@index([chargeId, createdAt])
+  @@unique([orgId, chargeId], map: "Payment_orgId_chargeId_key")
 }
 
 model WhatsAppTemplate {
