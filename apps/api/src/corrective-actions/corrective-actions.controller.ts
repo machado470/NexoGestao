@@ -6,6 +6,7 @@ import {
   UseGuards,
 } from '@nestjs/common'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
+import { Org } from '../auth/decorators/org.decorator'
 import { OperationalStateGuard } from '../people/operational-state.guard'
 import { CorrectiveActionsService } from './corrective-actions.service'
 
@@ -18,15 +19,19 @@ export class CorrectiveActionsController {
 
   @Get('person/:personId')
   async listByPerson(
+    @Org() orgId: string,
     @Param('personId') personId: string,
   ) {
-    return this.service.listByPerson(personId)
+    return this.service.listByPerson(orgId, personId)
   }
 
   @Post(':id/resolve')
   @UseGuards(OperationalStateGuard)
-  async resolve(@Param('id') id: string) {
-    return this.service.resolve(id)
+  async resolve(
+    @Org() orgId: string,
+    @Param('id') id: string,
+  ) {
+    return this.service.resolve(orgId, id)
   }
 
   /**
@@ -35,9 +40,11 @@ export class CorrectiveActionsController {
   @Post('person/:personId/reassess')
   @UseGuards(OperationalStateGuard)
   async processReassessment(
+    @Org() orgId: string,
     @Param('personId') personId: string,
   ) {
     return this.service.processReassessment(
+      orgId,
       personId,
     )
   }
