@@ -1,11 +1,13 @@
 import { Controller, Get, Patch, Body, UseGuards, Request } from '@nestjs/common';
 import { OrganizationSettingsService } from './organization-settings.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { AdminGuard } from '../auth/guards/admin.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import { UpdateOrganizationSettingsDto } from './dto/update-organization-settings.dto';
 
 @Controller('organization-settings')
-@UseGuards(JwtAuthGuard, AdminGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('ADMIN')
 export class OrganizationSettingsController {
   constructor(private readonly organizationSettingsService: OrganizationSettingsService) {}
 

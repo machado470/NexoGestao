@@ -10,41 +10,38 @@ export class ExceptionsService {
   ) {}
 
   async create(params: {
+    orgId: string
     personId: string
     type: 'VACATION' | 'LEAVE' | 'PAUSE'
     reason: string
     startsAt: Date
     endsAt: Date
   }) {
-    // 1️⃣ Regra básica de período
-    if (params.endsAt <= params.startsAt) {
-      throw new BadRequestException(
-        'Período de exceção inválido',
-      )
+    if (!params.orgId) {
+      throw new BadRequestException('orgId é obrigatório')
     }
 
-    // 2️⃣ Pessoa precisa existir
-    const person = await this.prisma.person.findUnique({
-      where: { id: params.personId },
+    if (params.endsAt <= params.startsAt) {
+      throw new BadRequestException('Período de exceção inválido')
+    }
+
+    const person = await this.prisma.person.findFirst({
+      where: { id: params.personId, orgId: params.orgId },
       select: { id: true, active: true },
     })
 
     if (!person) {
-      throw new BadRequestException(
-        'Pessoa não encontrada',
-      )
+      throw new BadRequestException('Pessoa não encontrada para esta organização')
     }
 
     if (!person.active) {
-      throw new BadRequestException(
-        'Pessoa está inativa',
-      )
+      throw new BadRequestException('Pessoa está inativa')
     }
 
-    // 3️⃣ Não permitir exceções sobrepostas
     const overlap = await this.prisma.personException.findFirst({
       where: {
         personId: params.personId,
+        person: { orgId: params.orgId },
         OR: [
           {
             startsAt: { lte: params.endsAt },
@@ -55,19 +52,21 @@ export class ExceptionsService {
     })
 
     if (overlap) {
-      throw new BadRequestException(
-        'Já existe uma exceção ativa nesse período',
-      )
+      throw new BadRequestException('Já existe uma exceção ativa nesse período')
     }
 
-    // 4️⃣ Criar exceção
-    const created =
-      await this.prisma.personException.create({
-        data: params,
-      })
+    const created = await this.prisma.personException.create({
+      data: {
+        personId: params.personId,
+        type: params.type,
+        reason: params.reason,
+        startsAt: params.startsAt,
+        endsAt: params.endsAt,
+      },
+    })
 
-    // 5️⃣ Auditoria
     await this.audit.log({
+      orgId: params.orgId,
       personId: params.personId,
       action: 'PERSON_EXCEPTION_CREATED',
       context: `${params.type}: ${params.reason}`,
@@ -76,22 +75,22 @@ export class ExceptionsService {
     return created
   }
 
-  async listForPerson(personId: string) {
-    // Pessoa inválida → lista vazia explícita
-    const personExists =
-      await this.prisma.person.findUnique({
-        where: { id: personId },
-        select: { id: true },
-      })
+  async listForPerson(orgId: string, personId: string) {
+    if (!orgId) {
+      throw new BadRequestException('orgId é obrigatório')
+    }
+
+    const personExists = await this.prisma.person.findFirst({
+      where: { id: personId, orgId },
+      select: { id: true },
+    })
 
     if (!personExists) {
-      throw new BadRequestException(
-        'Pessoa não encontrada',
-      )
+      throw new BadRequestException('Pessoa não encontrada para esta organização')
     }
 
     return this.prisma.personException.findMany({
-      where: { personId },
+      where: { personId, person: { orgId } },
       orderBy: { startsAt: 'desc' },
     })
   }

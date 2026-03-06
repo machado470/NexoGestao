@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
 } from '@nestjs/common'
 import * as bcrypt from 'bcrypt'
@@ -12,7 +13,7 @@ export class BootstrapService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly subscriptionsService: SubscriptionsService,
-  ){}
+  ) {}
 
   private slugify(input: string) {
     const s = (input ?? '').trim().toLowerCase()
@@ -43,31 +44,61 @@ export class BootstrapService {
     }
   }
 
-  async createFirstAdmin(params: {
-    orgName: string
-    adminName: string
-    email: string
-    password: string
-  }) {
+  private async validateBootstrapAuthorization(secretFromHeader?: string) {
+    const usersCount = await this.prisma.user.count()
+    if (usersCount === 0) {
+      return
+    }
+
+    const configuredSecret = process.env.BOOTSTRAP_SECRET?.trim()
+    if (!configuredSecret) {
+      throw new ForbiddenException(
+        'Bootstrap bloqueado após inicialização. Configure BOOTSTRAP_SECRET para uso administrativo.',
+      )
+    }
+
+    if (!secretFromHeader || secretFromHeader.trim() !== configuredSecret) {
+      throw new ForbiddenException('x-bootstrap-secret inválido.')
+    }
+  }
+
+  async createFirstAdmin(
+    params: {
+      orgName: string
+      adminName: string
+      email: string
+      password: string
+      organizationId?: string
+    },
+    bootstrapSecret?: string,
+  ) {
+    await this.validateBootstrapAuthorization(bootstrapSecret)
+
     const orgName = (params.orgName ?? '').trim()
     const adminName = (params.adminName ?? '').trim()
     const email = (params.email ?? '').trim().toLowerCase()
     const password = params.password ?? ''
+    const organizationId = (params.organizationId ?? '').trim() || null
 
-    if (!orgName) throw new BadRequestException('orgName obrigatório')
+    if (!orgName && !organizationId) {
+      throw new BadRequestException('orgName obrigatório quando organizationId não é informado')
+    }
+
     if (!adminName) throw new BadRequestException('adminName obrigatório')
     if (!email) throw new BadRequestException('email obrigatório')
     if (!password || password.length < 4) {
       throw new BadRequestException('password inválida')
     }
 
-    const existingAdmin = await this.prisma.user.findFirst({
-      where: { role: 'ADMIN' },
-      select: { id: true },
-    })
+    if (organizationId) {
+      const orgAdmin = await this.prisma.user.findFirst({
+        where: { role: 'ADMIN', orgId: organizationId },
+        select: { id: true },
+      })
 
-    if (existingAdmin) {
-      throw new ConflictException('Bootstrap já realizado (ADMIN existente)')
+      if (orgAdmin) {
+        throw new ConflictException('Organização já possui ADMIN')
+      }
     }
 
     const emailInUse = await this.prisma.user.findUnique({
@@ -82,35 +113,46 @@ export class BootstrapService {
     const passwordHash = await bcrypt.hash(password, 10)
 
     const created = await this.prisma.$transaction(async (tx) => {
-      // ✅ Regra: se já existe org institucional "default" (seed), usa ela.
-      // Evita criar "NexoGestão" duplicado.
-      let org = await tx.organization.findUnique({
-        where: { slug: 'default' },
+      let org = null as Awaited<ReturnType<typeof tx.organization.findUnique>>
+
+      if (organizationId) {
+        org = await tx.organization.findUnique({ where: { id: organizationId } })
+        if (!org) {
+          throw new BadRequestException('organizationId inválido')
+        }
+      } else {
+        org = await tx.organization.findUnique({ where: { slug: 'default' } })
+
+        if (org) {
+          org = await tx.organization.update({
+            where: { id: org.id },
+            data: {
+              name: orgName || org.name,
+              requiresOnboarding: false,
+            },
+          })
+        } else {
+          const baseSlug = this.slugify(orgName)
+          const slug = await this.uniqueOrgSlug(baseSlug)
+
+          org = await tx.organization.create({
+            data: {
+              name: orgName,
+              slug,
+              requiresOnboarding: false,
+            },
+          })
+          await this.subscriptionsService.createTrialSubscription(org.id)
+        }
+      }
+
+      const existingAdmin = await tx.user.findFirst({
+        where: { role: 'ADMIN', orgId: org.id },
+        select: { id: true },
       })
 
-      if (org) {
-        // opcional: quando bootstrap roda, onboarding deixa de ser obrigatório
-        org = await tx.organization.update({
-          where: { id: org.id },
-          data: {
-            // mantém o nome do seed se quiser; ou alinha com o orgName recebido
-            name: orgName || org.name,
-            requiresOnboarding: false,
-          },
-        })
-      } else {
-        // fallback: sem seed, cria org nova
-        const baseSlug = this.slugify(orgName)
-        const slug = await this.uniqueOrgSlug(baseSlug)
-
-        org = await tx.organization.create({
-          data: {
-            name: orgName,
-            slug,
-            requiresOnboarding: false,
-          },
-        })
-        await this.subscriptionsService.createTrialSubscription(org.id)
+      if (existingAdmin) {
+        throw new ConflictException('Organização já possui ADMIN')
       }
 
       const user = await tx.user.create({
