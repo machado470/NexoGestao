@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
@@ -13,6 +14,8 @@ import { $Enums, Prisma } from '@prisma/client'
 import { ChargesQueryDto } from './dto/charges-query.dto'
 import { WhatsAppService } from '../whatsapp/whatsapp.service'
 import { RiskService } from '../risk/risk.service'
+import { RequestContextService } from '../common/context/request-context.service'
+import { MetricsService } from '../common/metrics/metrics.service'
 
 function isUuidLike(s: string): boolean {
   // UUID v4/v1 “parecido” (bom o suficiente pra decidir equals vs contains)
@@ -32,6 +35,8 @@ function isUniqueViolation(error: unknown): boolean {
 
 @Injectable()
 export class FinanceService {
+  private readonly logger = new Logger(FinanceService.name)
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly timeline: TimelineService,
@@ -40,6 +45,8 @@ export class FinanceService {
     private readonly onboardingService: OnboardingService,
     private readonly whatsapp: WhatsAppService,
     private readonly risk: RiskService,
+    private readonly requestContext: RequestContextService,
+    private readonly metrics: MetricsService,
   ) {}
 
   async automateOverdueLifecycle(orgId: string) {
@@ -264,6 +271,7 @@ export class FinanceService {
             dueDate: finalDueDate.toISOString(),
             actorUserId: input.actorUserId ?? null,
             actorPersonId: input.actorPersonId ?? null,
+            requestId: this.requestContext.requestId,
           },
         },
       })
@@ -278,6 +286,7 @@ export class FinanceService {
           entityType: 'CHARGE',
           entityId: created.id,
           context: 'Cobrança gerada a partir de ServiceOrder DONE',
+          metadata: { requestId: this.requestContext.requestId },
         },
       })
 
@@ -317,6 +326,17 @@ export class FinanceService {
     }
 
     await this.onboardingService.completeOnboardingStep(input.orgId, 'createCharge')
+    this.metrics.increment('chargesCreated')
+    this.logger.log(
+      JSON.stringify({
+        event: 'charge_creation',
+        requestId: this.requestContext.requestId,
+        userId: input.actorUserId ?? this.requestContext.userId,
+        orgId: input.orgId,
+        chargeId: result.chargeId,
+        source: 'service_order_done',
+      }),
+    )
     return result
   }
 
@@ -388,6 +408,7 @@ export class FinanceService {
             method: input.method,
             actorUserId: input.actorUserId ?? null,
             actorPersonId: input.actorPersonId ?? null,
+            requestId: this.requestContext.requestId,
           },
         },
       })
@@ -406,6 +427,7 @@ export class FinanceService {
             paymentId: payment.id,
             method: input.method,
             amountCents: input.amountCents,
+            requestId: this.requestContext.requestId,
           },
         },
       })
@@ -424,6 +446,7 @@ export class FinanceService {
             chargeId: charge.id,
             method: input.method,
             amountCents: input.amountCents,
+            requestId: this.requestContext.requestId,
           },
         },
       })
@@ -452,6 +475,18 @@ export class FinanceService {
           renderedText: 'Pagamento recebido com sucesso. Obrigado! ✅',
         })
       }
+      this.metrics.increment('paymentsProcessed')
+      this.logger.log(
+        JSON.stringify({
+          event: 'payment_processed',
+          requestId: this.requestContext.requestId,
+          userId: input.actorUserId ?? this.requestContext.userId,
+          orgId: input.orgId,
+          chargeId: charge.id,
+          paymentId: payment.id,
+          amountCents: input.amountCents,
+        }),
+      )
       return { paymentId: payment.id }
     })
   }
@@ -696,7 +731,11 @@ export class FinanceService {
       entityType: 'CHARGE',
       entityId: charge.id,
       context: 'Cobrança criada manualmente',
+      metadata: { requestId: this.requestContext.requestId },
     })
+
+    this.metrics.increment('chargesCreated')
+    this.logger.log(JSON.stringify({ event: 'charge_creation', requestId: this.requestContext.requestId, userId: actorUserId, orgId, chargeId: charge.id, source: 'manual' }))
 
     return charge
   }

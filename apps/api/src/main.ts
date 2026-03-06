@@ -3,9 +3,9 @@ import { AppModule } from './app.module'
 import { ApiResponseInterceptor } from './common/http/api-response.interceptor'
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter'
 import { ValidationPipe, Logger } from '@nestjs/common'
+import { MetricsService } from './common/metrics/metrics.service'
 import { StructuredLoggerService } from './common/logger/structured-logger.service'
 import helmet from 'helmet'
-import { RequestLoggerMiddleware } from './common/middleware/request-logger.middleware'
 
 function parseCorsOrigins(raw?: string): string[] {
   const v = (raw ?? '').trim()
@@ -35,15 +35,11 @@ async function bootstrap() {
       }),
     )
 
-    // ✅ Middleware de log de requisições
-    const requestLogger = new RequestLoggerMiddleware()
-    app.use((req: any, res: any, next: any) => requestLogger.use(req, res, next))
-
     // ✅ Interceptor de resposta padronizada
     app.useGlobalInterceptors(new ApiResponseInterceptor())
 
     // ✅ Filtro global de exceções (captura Prisma, HTTP, genérico)
-    app.useGlobalFilters(new AllExceptionsFilter())
+    app.useGlobalFilters(new AllExceptionsFilter(app.get(MetricsService)))
 
     // ✅ Validação real (DTOs com class-validator)
     app.useGlobalPipes(

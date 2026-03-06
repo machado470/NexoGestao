@@ -1,14 +1,23 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { TimelineService } from '../timeline/timeline.service'
 import { FinanceService } from '../finance/finance.service'
+import { AuditService } from '../audit/audit.service'
+import { AUDIT_ACTIONS } from '../audit/audit.actions'
+import { RequestContextService } from '../common/context/request-context.service'
+import { MetricsService } from '../common/metrics/metrics.service'
 
 @Injectable()
 export class ExecutionService {
+  private readonly logger = new Logger(ExecutionService.name)
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly timeline: TimelineService,
     private readonly finance: FinanceService,
+    private readonly audit: AuditService,
+    private readonly requestContext: RequestContextService,
+    private readonly metrics: MetricsService,
   ) {}
 
   async listByServiceOrder(orgId: string, serviceOrderId: string) {
@@ -72,6 +81,9 @@ export class ExecutionService {
         })
       }
 
+      const requestId = this.requestContext.requestId
+      const userId = this.requestContext.userId
+
       await tx.timelineEvent.create({
         data: {
           orgId: input.orgId,
@@ -80,9 +92,37 @@ export class ExecutionService {
             executionId: updated.id,
             serviceOrderId: updated.serviceOrderId,
             customerId: updated.customerId,
+            requestId,
           },
         },
       })
+
+      await this.audit.log({
+        orgId: input.orgId,
+        action: AUDIT_ACTIONS.EXECUTION_COMPLETED,
+        actorUserId: userId,
+        entityType: 'EXECUTION',
+        entityId: updated.id,
+        context: 'Execution completed',
+        metadata: {
+          requestId,
+          serviceOrderId: updated.serviceOrderId,
+          customerId: updated.customerId,
+        },
+      })
+
+      this.metrics.increment('executionsCompleted')
+      this.logger.log(
+        JSON.stringify({
+          event: 'execution_completion',
+          requestId,
+          userId,
+          orgId: input.orgId,
+          executionId: updated.id,
+          serviceOrderId: updated.serviceOrderId,
+          chargeTriggered: Boolean(serviceOrder && serviceOrder.amountCents > 0),
+        }),
+      )
 
       return updated
     })

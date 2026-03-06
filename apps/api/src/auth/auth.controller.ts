@@ -3,6 +3,7 @@ import { AuthGuard } from '@nestjs/passport'
 import { AuthService } from './auth.service'
 import { JwtAuthGuard } from './guards/jwt-auth.guard'
 import { Public } from './decorators/public.decorator'
+import { Throttle } from '@nestjs/throttler'
 
 @Controller('auth')
 export class AuthController {
@@ -10,6 +11,7 @@ export class AuthController {
 
   @Public()
   @Post('login')
+  @Throttle({ short: { limit: 5, ttl: 60000 } })
   async login(
     @Body() body: { email: string; password: string },
   ) {
@@ -35,12 +37,14 @@ export class AuthController {
 
   @Public()
   @Post('forgot-password')
+  @Throttle({ short: { limit: 5, ttl: 60000 } })
   async forgotPassword(@Body() body: { email: string }) {
     return this.auth.forgotPassword(body.email)
   }
 
   @Public()
   @Post('reset-password')
+  @Throttle({ short: { limit: 5, ttl: 60000 } })
   async resetPassword(@Body() body: { token: string; password: string }) {
     return this.auth.resetPassword(body.token, body.password)
   }

@@ -40,6 +40,8 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
         return next(params)
       }
 
+      const requestId = this.cls.get('requestId') ?? null
+
       const args = params.args ?? {}
       params.args = args
 
@@ -62,6 +64,10 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
         }
       }
 
+      if (requestId && ['create', 'createMany', 'update', 'updateMany', 'upsert', 'delete', 'deleteMany'].includes(params.action)) {
+        this.logger.debug(`Prisma ${params.action} model=${model ?? 'raw'} requestId=${requestId}`)
+      }
+
       if (['update', 'updateMany', 'upsert', 'delete', 'deleteMany'].includes(params.action)) {
         args.where = { ...(args.where ?? {}), orgId }
 
@@ -73,6 +79,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
 
       return next(params)
     })
+
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {

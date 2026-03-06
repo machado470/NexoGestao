@@ -22,6 +22,7 @@ import { ChargesQueryDto } from './dto/charges-query.dto'
 import { CreateChargeDto } from './dto/create-charge.dto'
 import { UpdateChargeDto } from './dto/update-charge.dto'
 import { Patch, Delete } from '@nestjs/common'
+import { Throttle } from '@nestjs/throttler'
 
 @UseGuards(JwtAuthGuard, RolesGuard, OperationalStateGuard)
 @Controller('finance')
@@ -130,6 +131,7 @@ export class FinanceController {
   }
 
   @Post('charges/:chargeId/pay')
+  @Throttle({ short: { limit: 8, ttl: 60000 } })
   @Roles('ADMIN', 'MANAGER')
   async payCharge(
     @Org() orgId: string,

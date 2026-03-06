@@ -6,6 +6,8 @@ import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core'
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler'
 import { OrgContextInterceptor } from './auth/org-context.interceptor'
 import { RequestLoggerMiddleware } from './common/middleware/request-logger.middleware'
+import { RequestContextService } from './common/context/request-context.service'
+import { MetricsService } from './common/metrics/metrics.service'
 
 import { PrismaModule } from './prisma/prisma.module'
 import { HealthModule } from './health/health.module'
@@ -198,6 +200,8 @@ import { SentryModule } from './common/sentry/sentry.module'
     SentryModule,
   ],
   providers: [
+    RequestContextService,
+    MetricsService,
     {
       provide: APP_INTERCEPTOR,
       useClass: OrgContextInterceptor,

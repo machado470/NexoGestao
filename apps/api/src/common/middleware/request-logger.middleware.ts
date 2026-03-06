@@ -1,10 +1,9 @@
-import { Injectable, NestMiddleware, Logger } from '@nestjs/common'
+import { Injectable, NestMiddleware } from '@nestjs/common'
 import { Request, Response, NextFunction } from 'express'
 import { randomUUID } from 'crypto'
 
 @Injectable()
 export class RequestLoggerMiddleware implements NestMiddleware {
-  private readonly logger = new Logger('HTTP')
 
   use(req: Request, res: Response, next: NextFunction): void {
     const { method, originalUrl, ip } = req
@@ -21,38 +20,30 @@ export class RequestLoggerMiddleware implements NestMiddleware {
       const contentLength = res.get('content-length') || '0'
       const duration = Date.now() - startTime
 
-      // ✅ Extrai orgId e userId do token JWT (se já decodificado pelo guard)
       const user = (req as any).user
-      const orgId = user?.orgId ?? (req.headers['x-org-id'] as string) ?? undefined
-      const userId = user?.userId ?? user?.sub ?? undefined
+      const orgId = user?.orgId ?? (req.headers['x-org-id'] as string) ?? null
+      const userId = user?.userId ?? user?.sub ?? null
 
       const logData = {
+        event: 'http_request',
         requestId,
-        method,
-        url: originalUrl,
-        statusCode,
+        userId,
+        orgId,
+        route: `${method} ${originalUrl}`,
+        status: statusCode,
+        latencyMs: duration,
         contentLength,
-        duration: `${duration}ms`,
         ip,
         userAgent,
-        orgId,
-        userId,
       }
 
+      const line = JSON.stringify(logData)
       if (statusCode >= 500) {
-        this.logger.error(
-          `${method} ${originalUrl} ${statusCode} ${duration}ms [${requestId}]`,
-          JSON.stringify(logData),
-        )
+        console.error(line)
       } else if (statusCode >= 400) {
-        this.logger.warn(
-          `${method} ${originalUrl} ${statusCode} ${duration}ms [${requestId}]`,
-          JSON.stringify(logData),
-        )
+        console.warn(line)
       } else {
-        this.logger.log(
-          `${method} ${originalUrl} ${statusCode} ${duration}ms [${requestId}]`,
-        )
+        console.log(line)
       }
     })
 

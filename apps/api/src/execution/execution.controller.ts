@@ -5,6 +5,7 @@ import { Roles } from '../auth/decorators/roles.decorator'
 import { Org } from '../auth/decorators/org.decorator'
 import { User } from '../auth/decorators/user.decorator'
 import { ExecutionService } from './execution.service'
+import { Throttle } from '@nestjs/throttler'
 
 @Controller('executions')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -24,6 +25,7 @@ export class ExecutionController {
   }
 
   @Post(':id/complete')
+  @Throttle({ short: { limit: 10, ttl: 60000 } })
   @Roles('ADMIN', 'MANAGER', 'STAFF')
   complete(@Org() orgId: string, @Param('id') id: string, @Body() body: any) {
     return this.execution.complete({ orgId, executionId: id, notes: body.notes, checklist: body.checklist, attachments: body.attachments })
