@@ -9,6 +9,13 @@ function formatDate(dateStr: string | Date): string {
   return new Date(dateStr).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
+type DashboardNotification = {
+  id: string;
+  title: string;
+  message: string;
+  createdAt: string | Date;
+};
+
 function AlertCard({ title, count, colorClass, children }: {
   title: string;
   count: number;
@@ -92,7 +99,7 @@ export default function Dashboard() {
           <div className="rounded-2xl border p-4 text-sm text-zinc-500 dark:border-zinc-800">Carregando notificações...</div>
         ) : notificationsQuery.data && notificationsQuery.data.length > 0 ? (
           <div className="space-y-2">
-            {notificationsQuery.data.map((notification) => (
+            {notificationsQuery.data.map((notification: DashboardNotification) => (
               <div key={notification.id} className="rounded-2xl border p-3 dark:border-zinc-800">
                 <div className="text-sm font-semibold">{notification.title}</div>
                 <div className="text-sm text-zinc-600 dark:text-zinc-300">{notification.message}</div>
