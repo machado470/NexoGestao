@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
+import { Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { TimelineService } from '../timeline/timeline.service'
 import { FinanceService } from '../finance/finance.service'
@@ -30,29 +30,61 @@ export class ExecutionService {
   }
 
   async complete(input: { orgId: string; executionId: string; notes?: string; checklist?: any; attachments?: any }) {
-    const existing = (await this.prisma.$queryRawUnsafe(`SELECT * FROM "Execution" WHERE "id"=$1 AND "orgId"=$2 LIMIT 1`, input.executionId, input.orgId)) as any[]
-    if (!existing[0]) throw new NotFoundException('Execution não encontrada')
-    if (existing[0].endedAt) throw new BadRequestException('Execution já concluída')
-    const rows = (await this.prisma.$queryRawUnsafe(`UPDATE "Execution" SET "endedAt"=NOW(), "notes"=COALESCE($1,"notes"), "checklist"=COALESCE($2::jsonb,"checklist"), "attachments"=COALESCE($3::jsonb,"attachments"), "updatedAt"=NOW() WHERE "id"=$4 AND "orgId"=$5 RETURNING *`, input.notes ?? null, input.checklist ? JSON.stringify(input.checklist) : null, input.attachments ? JSON.stringify(input.attachments) : null, input.executionId, input.orgId)) as any[]
-    const updated = rows[0]
-    await this.prisma.serviceOrder.updateMany({ where: { id: updated.serviceOrderId, orgId: input.orgId }, data: { status: 'DONE', executionEndedAt: new Date() } })
-
-    const serviceOrder = await this.prisma.serviceOrder.findFirst({
-      where: { id: updated.serviceOrderId, orgId: input.orgId },
-      select: { amountCents: true, dueDate: true },
-    })
-
-    if (serviceOrder && serviceOrder.amountCents > 0) {
-      await this.finance.ensureChargeForServiceOrderDone({
-        orgId: input.orgId,
-        serviceOrderId: updated.serviceOrderId,
-        customerId: updated.customerId,
-        amountCents: serviceOrder.amountCents,
-        dueDate: serviceOrder.dueDate,
+    return this.prisma.$transaction(async (tx) => {
+      const transition = await tx.execution.updateMany({
+        where: { id: input.executionId, orgId: input.orgId, endedAt: null },
+        data: {
+          endedAt: new Date(),
+          notes: input.notes ?? undefined,
+          checklist: input.checklist ?? undefined,
+          attachments: input.attachments ?? undefined,
+        },
       })
-    }
 
-    await this.timeline.log({ orgId: input.orgId, action: 'EXECUTION_DONE', metadata: { executionId: updated.id, serviceOrderId: updated.serviceOrderId, customerId: updated.customerId } })
-    return updated
+      const updated = await tx.execution.findFirst({
+        where: { id: input.executionId, orgId: input.orgId },
+      })
+
+      if (!updated) throw new NotFoundException('Execution não encontrada')
+
+      if (transition.count === 0) {
+        return { ...updated, idempotent: true }
+      }
+
+      await tx.serviceOrder.updateMany({
+        where: { id: updated.serviceOrderId, orgId: input.orgId },
+        data: { status: 'DONE', executionEndedAt: new Date() },
+      })
+
+      const serviceOrder = await tx.serviceOrder.findFirst({
+        where: { id: updated.serviceOrderId, orgId: input.orgId },
+        select: { amountCents: true, dueDate: true },
+      })
+
+      if (serviceOrder && serviceOrder.amountCents > 0) {
+        await this.finance.ensureChargeForServiceOrderDone({
+          orgId: input.orgId,
+          serviceOrderId: updated.serviceOrderId,
+          customerId: updated.customerId,
+          amountCents: serviceOrder.amountCents,
+          dueDate: serviceOrder.dueDate,
+          tx,
+        })
+      }
+
+      await tx.timelineEvent.create({
+        data: {
+          orgId: input.orgId,
+          action: 'EXECUTION_DONE',
+          metadata: {
+            executionId: updated.id,
+            serviceOrderId: updated.serviceOrderId,
+            customerId: updated.customerId,
+          },
+        },
+      })
+
+      return updated
+    })
   }
 }
