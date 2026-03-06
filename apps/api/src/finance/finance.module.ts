@@ -7,12 +7,13 @@ import { NotificationsModule } from '../notifications/notifications.module'
 import { WhatsAppModule } from '../whatsapp/whatsapp.module'
 import { RiskModule } from '../risk/risk.module'
 import { OnboardingModule } from '../onboarding/onboarding.module'
+import { AutomationModule } from '../automation/automation.module'
 
 import { FinanceController } from './finance.controller'
 import { FinanceService } from './finance.service'
 
 @Module({
-  imports: [PrismaModule, TimelineModule, AuditModule, OperationalStateModule, NotificationsModule, WhatsAppModule, RiskModule, OnboardingModule],
+  imports: [PrismaModule, TimelineModule, AuditModule, OperationalStateModule, NotificationsModule, WhatsAppModule, RiskModule, OnboardingModule, AutomationModule],
   controllers: [FinanceController],
   providers: [FinanceService],
   exports: [FinanceService],

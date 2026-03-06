@@ -208,6 +208,8 @@ model Organization {
   subscriptions Subscription[]
   notifications Notification[]
   usageMetrics  UsageMetric[]
+  automationRules      AutomationRule[]
+  automationExecutions AutomationExecution[]
 
   updatedAt DateTime @updatedAt
 }
@@ -946,10 +948,80 @@ model Notification {
   @@index([orgId, type, createdAt])
   @@index([orgId, readAt, createdAt])
 }
+
+model AutomationRule {
+  id    String @id @default(uuid())
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id])
+
+  name        String
+  description String?
+  active      Boolean @default(true)
+
+  trigger      AutomationTrigger
+  conditionSet Json?
+  actionSet    Json
+
+  createdByUserId String?
+  lastRunAt       DateTime?
+
+  executions AutomationExecution[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orgId, active, trigger, createdAt])
+  @@index([orgId, trigger, createdAt])
+}
+
+model AutomationExecution {
+  id    String @id @default(uuid())
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id])
+
+  ruleId String
+  rule   AutomationRule @relation(fields: [ruleId], references: [id])
+
+  trigger AutomationTrigger
+  status  AutomationExecutionStatus @default(PENDING)
+
+  eventPayload Json
+  resultPayload Json?
+  errorMessage String?
+
+  startedAt   DateTime @default(now())
+  finishedAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([orgId, createdAt])
+  @@index([orgId, trigger, status, createdAt])
+  @@index([ruleId, createdAt])
+}
 enum TrackItemType {
   READING
   ACTION
   CHECKPOINT
+}
+
+enum AutomationTrigger {
+  SERVICE_ORDER_COMPLETED
+  PAYMENT_OVERDUE
+  APPOINTMENT_CREATED
+}
+
+enum AutomationExecutionStatus {
+  PENDING
+  SKIPPED
+  SUCCESS
+  FAILED
+}
+
+enum AutomationActionType {
+  SEND_WHATSAPP_MESSAGE
+  CREATE_CHARGE
+  CREATE_NOTIFICATION
+  UPDATE_RISK
 }
 
 // ============================================================

@@ -11,6 +11,7 @@ import { AUDIT_ACTIONS } from '../audit/audit.actions'
 import { AppointmentStatus } from '@prisma/client'
 import { WhatsAppService } from '../whatsapp/whatsapp.service'
 import { RiskService } from '../risk/risk.service'
+import { AutomationService } from '../automation/automation.service'
 
 const DEFAULT_DURATION_MIN = 30
 
@@ -84,6 +85,7 @@ export class AppointmentsService {
     private readonly audit: AuditService,
     private readonly whatsapp: WhatsAppService,
     private readonly risk: RiskService,
+    private readonly automation: AutomationService,
   ) {}
 
   private canTransition(from: AppointmentStatus, to: AppointmentStatus): boolean {
@@ -260,6 +262,19 @@ export class AppointmentsService {
           startsAt: created.startsAt,
           endsAt: created.endsAt,
           status: created.status,
+        },
+      })
+
+      await this.automation.executeTrigger({
+        orgId: params.orgId,
+        trigger: 'APPOINTMENT_CREATED',
+        payload: {
+          appointmentId: created.id,
+          customerId: created.customerId,
+          customerPhone: created.customer?.phone ?? null,
+          startsAt: created.startsAt,
+          status: created.status,
+          entityId: created.id,
         },
       })
 
