@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
 import cookie from "cookie";
+import { emitOperationalNotification } from "../_core/operationalNotifications";
 
 const NEXO_API_URL = process.env.NEXO_API_URL || "http://localhost:3000";
 const NEXO_TOKEN_COOKIE = "nexo_token";
@@ -84,7 +85,6 @@ export const dataRouter = router({
         })
       )
       .query(async ({ ctx, input }) => {
-        // Se o backend suportar paginação: ótimo. Se não, ele devolve array e a gente pagina aqui.
         const out = await nexoFetch(ctx, `/customers?page=${input.page}&limit=${input.limit}`, {
           method: "GET",
         });
@@ -104,7 +104,7 @@ export const dataRouter = router({
           };
         }
 
-        return out; // esperado: { data, pagination }
+        return out;
       }),
 
     getById: protectedProcedure
@@ -154,7 +154,7 @@ export const dataRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
-        return await nexoFetch(ctx, `/appointments`, {
+        const result = await nexoFetch(ctx, `/appointments`, {
           method: "POST",
           body: JSON.stringify({
             customerId: input.customerId,
@@ -166,6 +166,24 @@ export const dataRouter = router({
             notes: input.notes,
           }),
         });
+
+        if (ctx.user?.organizationId && input.status === "CONFIRMED") {
+          emitOperationalNotification({
+            orgId: ctx.user.organizationId,
+            type: "APPOINTMENT_CONFIRMED",
+            metadata: { appointmentId: result?.id ?? null },
+          });
+        }
+
+        if (ctx.user?.organizationId && input.status === "NO_SHOW") {
+          emitOperationalNotification({
+            orgId: ctx.user.organizationId,
+            type: "APPOINTMENT_NO_SHOW",
+            metadata: { appointmentId: result?.id ?? null },
+          });
+        }
+
+        return result;
       }),
 
     list: protectedProcedure
@@ -218,7 +236,7 @@ export const dataRouter = router({
       )
       .mutation(async ({ input, ctx }) => {
         const { id, ...data } = input;
-        return await nexoFetch(ctx, `/appointments/${id}`, {
+        const result = await nexoFetch(ctx, `/appointments/${id}`, {
           method: "PATCH",
           body: JSON.stringify({
             ...data,
@@ -226,6 +244,24 @@ export const dataRouter = router({
             endsAt: data.endsAt ? toISO(data.endsAt) : undefined,
           }),
         });
+
+        if (ctx.user?.organizationId && input.status === "CONFIRMED") {
+          emitOperationalNotification({
+            orgId: ctx.user.organizationId,
+            type: "APPOINTMENT_CONFIRMED",
+            metadata: { appointmentId: id },
+          });
+        }
+
+        if (ctx.user?.organizationId && input.status === "NO_SHOW") {
+          emitOperationalNotification({
+            orgId: ctx.user.organizationId,
+            type: "APPOINTMENT_NO_SHOW",
+            metadata: { appointmentId: id },
+          });
+        }
+
+        return result;
       }),
 
     delete: protectedProcedure
@@ -250,7 +286,7 @@ export const dataRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
-        return await nexoFetch(ctx, `/service-orders`, {
+        const result = await nexoFetch(ctx, `/service-orders`, {
           method: "POST",
           body: JSON.stringify({
             customerId: input.customerId,
@@ -262,6 +298,16 @@ export const dataRouter = router({
             notes: input.notes,
           }),
         });
+
+        if (ctx.user?.organizationId && input.status === "DONE") {
+          emitOperationalNotification({
+            orgId: ctx.user.organizationId,
+            type: "SERVICE_ORDER_COMPLETED",
+            metadata: { serviceOrderId: result?.id ?? null },
+          });
+        }
+
+        return result;
       }),
 
     list: protectedProcedure
@@ -314,10 +360,20 @@ export const dataRouter = router({
       )
       .mutation(async ({ input, ctx }) => {
         const { id, ...data } = input;
-        return await nexoFetch(ctx, `/service-orders/${id}`, {
+        const result = await nexoFetch(ctx, `/service-orders/${id}`, {
           method: "PATCH",
           body: JSON.stringify(data),
         });
+
+        if (ctx.user?.organizationId && input.status === "DONE") {
+          emitOperationalNotification({
+            orgId: ctx.user.organizationId,
+            type: "SERVICE_ORDER_COMPLETED",
+            metadata: { serviceOrderId: id },
+          });
+        }
+
+        return result;
       }),
 
     delete: protectedProcedure

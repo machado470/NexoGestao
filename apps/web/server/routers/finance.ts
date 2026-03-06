@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
 import { nexoFetch } from "../_core/nexoClient";
+import { emitOperationalNotification } from "../_core/operationalNotifications";
 
 // Helpers
 const paginationInput = z.object({
@@ -151,6 +152,14 @@ export const financeRouter = router({
             paidAt: paidAt ? paidAt.toISOString() : undefined,
           }),
         });
+
+        if (ctx.user?.organizationId && input.status === "OVERDUE") {
+          emitOperationalNotification({
+            orgId: ctx.user.organizationId,
+            type: "PAYMENT_OVERDUE",
+            metadata: { chargeId: id },
+          });
+        }
 
         return raw?.data ?? raw;
       }),
