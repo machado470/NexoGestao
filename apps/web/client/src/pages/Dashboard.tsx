@@ -43,6 +43,9 @@ export default function Dashboard() {
   const metricsQuery = trpc.nexo.dashboard.metrics.useQuery(undefined, {
     refetchInterval: 60_000,
   });
+  const notificationsQuery = trpc.dashboard.notifications.useQuery({ limit: 8 }, {
+    refetchInterval: 30_000,
+  });
 
   const alerts = (alertsQuery.data as any)?.data ?? alertsQuery.data;
   const metrics = (metricsQuery.data as any)?.data ?? metricsQuery.data;
@@ -81,6 +84,30 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+
+      <div>
+        <h2 className="mb-3 text-lg font-semibold">Notificações Operacionais</h2>
+        {notificationsQuery.isLoading ? (
+          <div className="rounded-2xl border p-4 text-sm text-zinc-500 dark:border-zinc-800">Carregando notificações...</div>
+        ) : notificationsQuery.data && notificationsQuery.data.length > 0 ? (
+          <div className="space-y-2">
+            {notificationsQuery.data.map((notification) => (
+              <div key={notification.id} className="rounded-2xl border p-3 dark:border-zinc-800">
+                <div className="text-sm font-semibold">{notification.title}</div>
+                <div className="text-sm text-zinc-600 dark:text-zinc-300">{notification.message}</div>
+                <div className="mt-1 text-xs text-zinc-500">
+                  {new Date(notification.createdAt).toLocaleString("pt-BR")}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-2xl border p-4 text-sm text-zinc-500 dark:border-zinc-800">
+            Sem notificações operacionais no momento.
+          </div>
+        )}
+      </div>
 
       {/* Alertas operacionais */}
       <div>
