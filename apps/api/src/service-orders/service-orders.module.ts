@@ -6,6 +6,7 @@ import { OperationalStateModule } from '../people/operational-state.module'
 import { FinanceModule } from '../finance/finance.module'
 import { NotificationsModule } from '../notifications/notifications.module'
 import { QuotasModule } from '../quotas/quotas.module'
+import { OnboardingModule } from '../onboarding/onboarding.module'
 
 import { ServiceOrdersController } from './service-orders.controller'
 import { ServiceOrdersService } from './service-orders.service'
@@ -19,6 +20,7 @@ import { ServiceOrdersService } from './service-orders.service'
     FinanceModule,
     NotificationsModule,
     QuotasModule,
+    OnboardingModule,
   ],
   controllers: [ServiceOrdersController],
   providers: [ServiceOrdersService],

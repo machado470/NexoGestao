@@ -8,9 +8,9 @@ module.exports = {
   collectCoverageFrom: ['src/**/*.(t|j)s'],
   coverageDirectory: './coverage',
   testEnvironment: 'node',
+  setupFiles: ['<rootDir>/test/setup-env.ts'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
-    '^@prisma/client$': '<rootDir>/src/types/prisma-client-fallback.ts',
   },
   globals: {
     'ts-jest': {

@@ -1,13 +1,13 @@
 import { Module } from '@nestjs/common';
 import { OrganizationSettingsService } from './organization-settings.service';
 import { OrganizationSettingsController } from './organization-settings.controller';
-import { PrismaService } from '../prisma/prisma.service';
+import { PrismaModule } from '../prisma/prisma.module';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  imports: [PrismaService, SubscriptionsModule, AuthModule],
-  providers: [OrganizationSettingsService, PrismaService],
+  imports: [PrismaModule, SubscriptionsModule, AuthModule],
+  providers: [OrganizationSettingsService],
   controllers: [OrganizationSettingsController],
   exports: [OrganizationSettingsService],
 })

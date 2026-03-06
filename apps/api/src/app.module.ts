@@ -94,6 +94,8 @@ import { SentryModule } from './common/sentry/sentry.module'
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: [
+        '../../.env.test',
+        '.env.test',
         '../../.env',
         '../../.env.docker',
         '.env',
