@@ -691,6 +691,70 @@ async function ensureDemoFinance(
   return { chargesCreated, paymentsCreated }
 }
 
+
+async function ensureDemoAutomationRules(orgId: string) {
+  const count = await prisma.automationRule.count({ where: { orgId } })
+  if (count > 0) return 0
+
+  await prisma.automationRule.createMany({
+    data: [
+      {
+        orgId,
+        name: 'Quando O.S. concluir, notificar cliente',
+        description: 'Envia notificação interna e mensagem WhatsApp de conclusão.',
+        trigger: 'SERVICE_ORDER_COMPLETED',
+        actionSet: [
+          {
+            type: 'CREATE_NOTIFICATION',
+            notificationType: 'SERVICE_ORDER_COMPLETED',
+            message: 'Uma ordem de serviço foi concluída via automação.',
+          },
+          {
+            type: 'SEND_WHATSAPP_MESSAGE',
+            entityType: 'SERVICE_ORDER',
+            messageType: 'EXECUTION_CONFIRMATION',
+            renderedText: 'Seu serviço foi concluído com sucesso. Obrigado!',
+          },
+        ],
+      },
+      {
+        orgId,
+        name: 'Quando pagamento atrasar, aumentar risco',
+        description: 'Atualiza risco operacional e cria notificação de atraso.',
+        trigger: 'PAYMENT_OVERDUE',
+        conditionSet: {
+          all: [{ field: 'amountCents', operator: 'gt', value: 0 }],
+        },
+        actionSet: [
+          {
+            type: 'UPDATE_RISK',
+            reason: 'PAYMENT_OVERDUE_AUTOMATION',
+          },
+          {
+            type: 'CREATE_NOTIFICATION',
+            notificationType: 'PAYMENT_OVERDUE',
+            message: 'Cobrança em atraso identificada e tratada pela automação.',
+          },
+        ],
+      },
+      {
+        orgId,
+        name: 'Quando agendamento criar, avisar equipe',
+        trigger: 'APPOINTMENT_CREATED',
+        actionSet: [
+          {
+            type: 'CREATE_NOTIFICATION',
+            notificationType: 'APPOINTMENT_CONFIRMED',
+            message: 'Novo agendamento criado automaticamente.',
+          },
+        ],
+      },
+    ],
+  })
+
+  return 3
+}
+
 async function main() {
   const seedMode = (process.env.SEED_MODE || 'none').toLowerCase()
 
@@ -723,6 +787,7 @@ async function main() {
   const serviceOrdersCreated = await ensureDemoServiceOrders(org.id, actor)
 
   const finance = await ensureDemoFinance(org.id, actor)
+  const automationRulesCreated = await ensureDemoAutomationRules(org.id)
 
   console.log('✅ Seed DEMO aplicado')
   console.log(`👤 Admin DEMO: ${admin.created ? 'CRIADO' : 'JÁ EXISTIA'}`)
@@ -735,6 +800,7 @@ async function main() {
   console.log(`🧾 ServiceOrders DEMO criadas agora: ${serviceOrdersCreated}`)
   console.log(`💸 Charges DEMO criadas agora: ${finance.chargesCreated}`)
   console.log(`💰 Payments DEMO criados agora: ${finance.paymentsCreated}`)
+  console.log(`⚙️ AutomationRules DEMO criadas agora: ${automationRulesCreated}`)
   console.log('🎯 Seed actor:', actor)
   console.log('🕒 Seed day base:', seedDayBase().toISOString())
 }

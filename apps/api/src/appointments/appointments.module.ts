@@ -5,6 +5,7 @@ import { AuditModule } from '../audit/audit.module'
 import { QuotasModule } from '../quotas/quotas.module'
 import { WhatsAppModule } from '../whatsapp/whatsapp.module'
 import { RiskModule } from '../risk/risk.module'
+import { AutomationModule } from '../automation/automation.module'
 
 import { AppointmentsController } from './appointments.controller'
 import { AppointmentsService } from './appointments.service'
@@ -17,6 +18,7 @@ import { AppointmentsService } from './appointments.service'
     QuotasModule,
     WhatsAppModule,
     RiskModule,
+    AutomationModule,
   ],
   controllers: [
     AppointmentsController,

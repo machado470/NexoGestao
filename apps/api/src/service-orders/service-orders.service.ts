@@ -10,6 +10,7 @@ import { AUDIT_ACTIONS } from '../audit/audit.actions'
 import { ServiceOrderStatus } from '@prisma/client'
 import { OperationalStateService } from '../people/operational-state.service'
 import { FinanceService } from '../finance/finance.service'
+import { AutomationService } from '../automation/automation.service'
 import { NotificationsService } from '../notifications/notifications.service'
 import { OnboardingService } from '../onboarding/onboarding.service'
 
@@ -52,6 +53,7 @@ export class ServiceOrdersService {
     private readonly audit: AuditService,
     private readonly operationalState: OperationalStateService,
     private readonly finance: FinanceService,
+    private readonly automation: AutomationService,
     private readonly notificationsService: NotificationsService,
     private readonly onboardingService: OnboardingService,
   ) {}
@@ -519,6 +521,18 @@ export class ServiceOrdersService {
 
     // ✅ Se virou DONE, tenta garantir cobrança (idempotente).
     if (statusChanged && updated.status === 'DONE') {
+      await this.automation.executeTrigger({
+        orgId: params.orgId,
+        trigger: 'SERVICE_ORDER_COMPLETED',
+        payload: {
+          serviceOrderId: updated.id,
+          customerId: updated.customerId,
+          customerPhone: updated.customer?.phone ?? null,
+          amountCents,
+          entityId: updated.id,
+        },
+      })
+
       try {
         await this.finance.ensureChargeForServiceOrderDone({
           orgId: params.orgId,

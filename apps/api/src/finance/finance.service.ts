@@ -16,6 +16,7 @@ import { WhatsAppService } from '../whatsapp/whatsapp.service'
 import { RiskService } from '../risk/risk.service'
 import { RequestContextService } from '../common/context/request-context.service'
 import { MetricsService } from '../common/metrics/metrics.service'
+import { AutomationService } from '../automation/automation.service'
 
 function isUuidLike(s: string): boolean {
   // UUID v4/v1 “parecido” (bom o suficiente pra decidir equals vs contains)
@@ -47,6 +48,7 @@ export class FinanceService {
     private readonly risk: RiskService,
     private readonly requestContext: RequestContextService,
     private readonly metrics: MetricsService,
+    private readonly automation: AutomationService,
   ) {}
 
   async automateOverdueLifecycle(orgId: string) {
@@ -88,6 +90,19 @@ export class FinanceService {
         charge.customerId,
         'CHARGE_OVERDUE',
       )
+
+      await this.automation.executeTrigger({
+        orgId,
+        trigger: 'PAYMENT_OVERDUE',
+        payload: {
+          chargeId: charge.id,
+          customerId: charge.customerId,
+          customerPhone: charge.customer?.phone ?? null,
+          amountCents: charge.amountCents,
+          dueDate: charge.dueDate,
+          entityId: charge.id,
+        },
+      })
     }
 
     return { updated: overdue.length }
