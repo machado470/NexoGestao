@@ -1,111 +1,137 @@
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
-import { nexoFetch } from "../_core/nexoClient";
+import cookie from "cookie";
 
-const paginationInput = z.object({
-  page: z.number().int().positive().default(1),
-  limit: z.number().int().positive().default(20),
-});
+const NEXO_API_URL = process.env.NEXO_API_URL || "http://localhost:3000";
+const NEXO_TOKEN_COOKIE = "nexo_token";
+
+const zId = z.preprocess((v) => (v === undefined || v === null ? v : String(v)), z.string().min(1));
+
+function getNexoTokenFromReq(req: any): string | null {
+  const raw = req?.headers?.cookie;
+  if (!raw || typeof raw !== "string") return null;
+  const parsed = cookie.parse(raw);
+  return parsed?.[NEXO_TOKEN_COOKIE] || null;
+}
+
+async function nexoFetch(ctx: any, path: string, init?: RequestInit) {
+  const token = getNexoTokenFromReq(ctx?.req);
+  if (!token) throw new Error("Sem sessão Nexo (cookie nexo_token não encontrado). Faça login novamente.");
+
+  const res = await fetch(`${NEXO_API_URL}${path}`, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+      ...(init?.headers || {}),
+    },
+  });
+
+  const text = await res.text();
+  let json: any = null;
+  try {
+    json = text ? JSON.parse(text) : null;
+  } catch {
+    json = { raw: text };
+  }
+
+  if (!res.ok) {
+    const msg = json?.message || json?.error || json?.raw || `HTTP ${res.status}`;
+    throw new Error(String(msg));
+  }
+
+  return json;
+}
 
 export const expensesRouter = router({
-  list: protectedProcedure
-    .input(
-      paginationInput
-        .extend({
-          category: z.string().optional(),
-          from: z.string().optional(),
-          to: z.string().optional(),
-        })
-        .optional()
-    )
-    .query(async ({ input, ctx }) => {
-      const page = input?.page ?? 1;
-      const limit = input?.limit ?? 20;
-      const params = new URLSearchParams();
-      params.set("page", String(page));
-      params.set("limit", String(limit));
-      if (input?.category) params.set("category", input.category);
-      if (input?.from) params.set("from", input.from);
-      if (input?.to) params.set("to", input.to);
-
-      const raw = await nexoFetch<any>(ctx.req, `/expenses?${params.toString()}`, {
-        method: "GET",
-      });
-      const payload = raw?.data ?? raw;
-      const data = payload?.data ?? payload ?? [];
-      const pagination =
-        payload?.pagination ?? {
-          page,
-          limit,
-          total: Array.isArray(data) ? data.length : 0,
-          pages: 1,
-        };
-      return { data, pagination };
-    }),
-
   create: protectedProcedure
     .input(
       z.object({
-        description: z.string().min(1),
-        amount: z.number().positive(),
-        category: z.string().min(1),
-        date: z.coerce.date(),
+        description: z.string().min(1, "Descrição é obrigatória"),
+        amount: z.number().positive("Valor deve ser > 0"),
+        category: z.string().optional(),
+        dueDate: z.date().optional(),
+        paidAt: z.date().optional(),
         notes: z.string().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const raw = await nexoFetch<any>(ctx.req, `/expenses`, {
+      return await nexoFetch(ctx, `/expenses`, {
         method: "POST",
         body: JSON.stringify({
           description: input.description,
-          amountCents: Math.round(input.amount * 100),
+          amount: input.amount,
           category: input.category,
-          date: input.date.toISOString(),
+          dueDate: input.dueDate ? input.dueDate.toISOString() : undefined,
+          paidAt: input.paidAt ? input.paidAt.toISOString() : undefined,
           notes: input.notes,
         }),
       });
-      return raw?.data ?? raw;
+    }),
+
+  list: protectedProcedure
+    .input(
+      z.object({
+        page: z.number().int().positive().default(1),
+        limit: z.number().int().positive().default(10),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const out = await nexoFetch(ctx, `/expenses?page=${input.page}&limit=${input.limit}`, {
+        method: "GET",
+      });
+
+      if (Array.isArray(out)) {
+        const total = out.length;
+        const offset = (input.page - 1) * input.limit;
+        const data = out.slice(offset, offset + input.limit);
+        return {
+          data,
+          pagination: {
+            page: input.page,
+            limit: input.limit,
+            total,
+            pages: Math.ceil(total / input.limit),
+          },
+        };
+      }
+
+      return out;
+    }),
+
+  getById: protectedProcedure
+    .input(z.object({ id: zId }))
+    .query(async ({ input, ctx }) => {
+      return await nexoFetch(ctx, `/expenses/${input.id}`, { method: "GET" });
     }),
 
   update: protectedProcedure
     .input(
       z.object({
-        id: z.string().min(1),
-        description: z.string().optional(),
+        id: zId,
+        description: z.string().min(1).optional(),
         amount: z.number().positive().optional(),
         category: z.string().optional(),
-        date: z.coerce.date().optional(),
+        dueDate: z.date().optional(),
+        paidAt: z.date().optional(),
         notes: z.string().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const { id, amount, date, ...rest } = input;
-      const raw = await nexoFetch<any>(ctx.req, `/expenses/${id}`, {
+      const { id, ...data } = input;
+      return await nexoFetch(ctx, `/expenses/${id}`, {
         method: "PATCH",
         body: JSON.stringify({
-          ...rest,
-          ...(amount !== undefined ? { amountCents: Math.round(amount * 100) } : {}),
-          ...(date !== undefined ? { date: date.toISOString() } : {}),
+          ...data,
+          dueDate: data.dueDate ? data.dueDate.toISOString() : undefined,
+          paidAt: data.paidAt ? data.paidAt.toISOString() : undefined,
         }),
       });
-      return raw?.data ?? raw;
     }),
 
   delete: protectedProcedure
-    .input(z.object({ id: z.string().min(1) }))
+    .input(z.object({ id: zId }))
     .mutation(async ({ input, ctx }) => {
-      const raw = await nexoFetch<any>(ctx.req, `/expenses/${input.id}`, {
-        method: "DELETE",
-      });
-      return raw?.data ?? raw;
+      return await nexoFetch(ctx, `/expenses/${input.id}`, { method: "DELETE" });
     }),
-
-  summary: protectedProcedure
-    .input(z.object({}).optional())
-    .query(async ({ ctx }) => {
-      const raw = await nexoFetch<any>(ctx.req, `/expenses/summary`, {
-        method: "GET",
-      });
-      return raw?.data ?? raw;
-    }),
-});});
+});

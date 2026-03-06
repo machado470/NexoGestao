@@ -1,22 +1,55 @@
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
-import {
-  createCustomer,
-  getCustomersByOrg,
-  getCustomerById,
-  updateCustomer,
-  deleteCustomer,
-  createAppointment,
-  getAppointmentsByOrg,
-  getAppointmentById,
-  updateAppointment,
-  deleteAppointment,
-  createServiceOrder,
-  getServiceOrdersByOrg,
-  getServiceOrderById,
-  updateServiceOrder,
-  deleteServiceOrder,
-} from "../db";
+import cookie from "cookie";
+
+const NEXO_API_URL = process.env.NEXO_API_URL || "http://localhost:3000";
+const NEXO_TOKEN_COOKIE = "nexo_token";
+
+/**
+ * Aceita number/string e normaliza em string (pra não morrer quando o backend for UUID).
+ */
+const zId = z.preprocess((v) => (v === undefined || v === null ? v : String(v)), z.string().min(1));
+
+function getNexoTokenFromReq(req: any): string | null {
+  const raw = req?.headers?.cookie;
+  if (!raw || typeof raw !== "string") return null;
+  const parsed = cookie.parse(raw);
+  const token = parsed?.[NEXO_TOKEN_COOKIE];
+  return token || null;
+}
+
+async function nexoFetch(ctx: any, path: string, init?: RequestInit) {
+  const token = getNexoTokenFromReq(ctx?.req);
+  if (!token) throw new Error("Sem sessão Nexo (cookie nexo_token não encontrado). Faça login novamente.");
+
+  const res = await fetch(`${NEXO_API_URL}${path}`, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+      ...(init?.headers || {}),
+    },
+  });
+
+  const text = await res.text();
+  let json: any = null;
+  try {
+    json = text ? JSON.parse(text) : null;
+  } catch {
+    json = { raw: text };
+  }
+
+  if (!res.ok) {
+    const msg = json?.message || json?.error || json?.raw || `HTTP ${res.status}`;
+    throw new Error(String(msg));
+  }
+
+  return json;
+}
+
+function toISO(d: Date | undefined) {
+  return d ? d.toISOString() : undefined;
+}
 
 export const dataRouter = router({
   // ===== Customers =====
@@ -31,14 +64,15 @@ export const dataRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
-        const orgId = ctx.user?.id || 1;
-        return await createCustomer({
-          organizationId: orgId,
-          name: input.name,
-          email: input.email,
-          phone: input.phone,
-          notes: input.notes,
-          active: 1,
+        return await nexoFetch(ctx, `/customers`, {
+          method: "POST",
+          body: JSON.stringify({
+            name: input.name,
+            email: input.email,
+            phone: input.phone,
+            notes: input.notes,
+            active: true,
+          }),
         });
       }),
 
@@ -50,48 +84,58 @@ export const dataRouter = router({
         })
       )
       .query(async ({ ctx, input }) => {
-        const orgId = ctx.user?.id || 1;
-        const allCustomers = await getCustomersByOrg(orgId);
-        const total = allCustomers.length;
-        const offset = (input.page - 1) * input.limit;
-        const data = allCustomers.slice(offset, offset + input.limit);
-        return {
-          data,
-          pagination: {
-            page: input.page,
-            limit: input.limit,
-            total,
-            pages: Math.ceil(total / input.limit),
-          },
-        };
+        // Se o backend suportar paginação: ótimo. Se não, ele devolve array e a gente pagina aqui.
+        const out = await nexoFetch(ctx, `/customers?page=${input.page}&limit=${input.limit}`, {
+          method: "GET",
+        });
+
+        if (Array.isArray(out)) {
+          const total = out.length;
+          const offset = (input.page - 1) * input.limit;
+          const data = out.slice(offset, offset + input.limit);
+          return {
+            data,
+            pagination: {
+              page: input.page,
+              limit: input.limit,
+              total,
+              pages: Math.ceil(total / input.limit),
+            },
+          };
+        }
+
+        return out; // esperado: { data, pagination }
       }),
 
     getById: protectedProcedure
-      .input(z.object({ id: z.number() }))
-      .query(async ({ input }) => {
-        return await getCustomerById(input.id);
+      .input(z.object({ id: zId }))
+      .query(async ({ input, ctx }) => {
+        return await nexoFetch(ctx, `/customers/${input.id}`, { method: "GET" });
       }),
 
     update: protectedProcedure
       .input(
         z.object({
-          id: z.number(),
+          id: zId,
           name: z.string().min(1).optional(),
           email: z.string().email().optional(),
           phone: z.string().optional(),
           notes: z.string().optional(),
-          active: z.number().optional(),
+          active: z.boolean().optional(),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const { id, ...data } = input;
-        return await updateCustomer(id, data);
+        return await nexoFetch(ctx, `/customers/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify(data),
+        });
       }),
 
     delete: protectedProcedure
-      .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
-        return await deleteCustomer(input.id);
+      .input(z.object({ id: zId }))
+      .mutation(async ({ input, ctx }) => {
+        return await nexoFetch(ctx, `/customers/${input.id}`, { method: "DELETE" });
       }),
   }),
 
@@ -100,7 +144,7 @@ export const dataRouter = router({
     create: protectedProcedure
       .input(
         z.object({
-          customerId: z.number().min(1, "Cliente é obrigatório"),
+          customerId: zId,
           title: z.string().min(1, "Título é obrigatório"),
           description: z.string().optional(),
           startsAt: z.date(),
@@ -110,16 +154,17 @@ export const dataRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
-        const orgId = ctx.user?.id || 1;
-        return await createAppointment({
-          organizationId: orgId,
-          customerId: input.customerId,
-          title: input.title,
-          description: input.description,
-          startsAt: input.startsAt,
-          endsAt: input.endsAt,
-          status: input.status,
-          notes: input.notes,
+        return await nexoFetch(ctx, `/appointments`, {
+          method: "POST",
+          body: JSON.stringify({
+            customerId: input.customerId,
+            title: input.title,
+            description: input.description,
+            startsAt: toISO(input.startsAt),
+            endsAt: toISO(input.endsAt),
+            status: input.status,
+            notes: input.notes,
+          }),
         });
       }),
 
@@ -131,32 +176,38 @@ export const dataRouter = router({
         })
       )
       .query(async ({ ctx, input }) => {
-        const orgId = ctx.user?.id || 1;
-        const allAppointments = await getAppointmentsByOrg(orgId);
-        const total = allAppointments.length;
-        const offset = (input.page - 1) * input.limit;
-        const data = allAppointments.slice(offset, offset + input.limit);
-        return {
-          data,
-          pagination: {
-            page: input.page,
-            limit: input.limit,
-            total,
-            pages: Math.ceil(total / input.limit),
-          },
-        };
+        const out = await nexoFetch(ctx, `/appointments?page=${input.page}&limit=${input.limit}`, {
+          method: "GET",
+        });
+
+        if (Array.isArray(out)) {
+          const total = out.length;
+          const offset = (input.page - 1) * input.limit;
+          const data = out.slice(offset, offset + input.limit);
+          return {
+            data,
+            pagination: {
+              page: input.page,
+              limit: input.limit,
+              total,
+              pages: Math.ceil(total / input.limit),
+            },
+          };
+        }
+
+        return out;
       }),
 
     getById: protectedProcedure
-      .input(z.object({ id: z.number() }))
-      .query(async ({ input }) => {
-        return await getAppointmentById(input.id);
+      .input(z.object({ id: zId }))
+      .query(async ({ input, ctx }) => {
+        return await nexoFetch(ctx, `/appointments/${input.id}`, { method: "GET" });
       }),
 
     update: protectedProcedure
       .input(
         z.object({
-          id: z.number(),
+          id: zId,
           title: z.string().min(1).optional(),
           description: z.string().optional(),
           startsAt: z.date().optional(),
@@ -165,15 +216,22 @@ export const dataRouter = router({
           notes: z.string().optional(),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const { id, ...data } = input;
-        return await updateAppointment(id, data);
+        return await nexoFetch(ctx, `/appointments/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            ...data,
+            startsAt: data.startsAt ? toISO(data.startsAt) : undefined,
+            endsAt: data.endsAt ? toISO(data.endsAt) : undefined,
+          }),
+        });
       }),
 
     delete: protectedProcedure
-      .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
-        return await deleteAppointment(input.id);
+      .input(z.object({ id: zId }))
+      .mutation(async ({ input, ctx }) => {
+        return await nexoFetch(ctx, `/appointments/${input.id}`, { method: "DELETE" });
       }),
   }),
 
@@ -182,7 +240,7 @@ export const dataRouter = router({
     create: protectedProcedure
       .input(
         z.object({
-          customerId: z.number().min(1, "Cliente é obrigatório"),
+          customerId: zId,
           title: z.string().min(1, "Título é obrigatório"),
           description: z.string().optional(),
           priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).default("MEDIUM"),
@@ -192,16 +250,17 @@ export const dataRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
-        const orgId = ctx.user?.id || 1;
-        return await createServiceOrder({
-          organizationId: orgId,
-          customerId: input.customerId,
-          title: input.title,
-          description: input.description,
-          priority: input.priority,
-          status: input.status,
-          assignedTo: input.assignedTo,
-          notes: input.notes,
+        return await nexoFetch(ctx, `/service-orders`, {
+          method: "POST",
+          body: JSON.stringify({
+            customerId: input.customerId,
+            title: input.title,
+            description: input.description,
+            priority: input.priority,
+            status: input.status,
+            assignedTo: input.assignedTo,
+            notes: input.notes,
+          }),
         });
       }),
 
@@ -213,32 +272,38 @@ export const dataRouter = router({
         })
       )
       .query(async ({ ctx, input }) => {
-        const orgId = ctx.user?.id || 1;
-        const allServiceOrders = await getServiceOrdersByOrg(orgId);
-        const total = allServiceOrders.length;
-        const offset = (input.page - 1) * input.limit;
-        const data = allServiceOrders.slice(offset, offset + input.limit);
-        return {
-          data,
-          pagination: {
-            page: input.page,
-            limit: input.limit,
-            total,
-            pages: Math.ceil(total / input.limit),
-          },
-        };
+        const out = await nexoFetch(ctx, `/service-orders?page=${input.page}&limit=${input.limit}`, {
+          method: "GET",
+        });
+
+        if (Array.isArray(out)) {
+          const total = out.length;
+          const offset = (input.page - 1) * input.limit;
+          const data = out.slice(offset, offset + input.limit);
+          return {
+            data,
+            pagination: {
+              page: input.page,
+              limit: input.limit,
+              total,
+              pages: Math.ceil(total / input.limit),
+            },
+          };
+        }
+
+        return out;
       }),
 
     getById: protectedProcedure
-      .input(z.object({ id: z.number() }))
-      .query(async ({ input }) => {
-        return await getServiceOrderById(input.id);
+      .input(z.object({ id: zId }))
+      .query(async ({ input, ctx }) => {
+        return await nexoFetch(ctx, `/service-orders/${input.id}`, { method: "GET" });
       }),
 
     update: protectedProcedure
       .input(
         z.object({
-          id: z.number(),
+          id: zId,
           title: z.string().min(1).optional(),
           description: z.string().optional(),
           priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).optional(),
@@ -247,15 +312,18 @@ export const dataRouter = router({
           notes: z.string().optional(),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const { id, ...data } = input;
-        return await updateServiceOrder(id, data);
+        return await nexoFetch(ctx, `/service-orders/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify(data),
+        });
       }),
 
     delete: protectedProcedure
-      .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
-        return await deleteServiceOrder(input.id);
+      .input(z.object({ id: zId }))
+      .mutation(async ({ input, ctx }) => {
+        return await nexoFetch(ctx, `/service-orders/${input.id}`, { method: "DELETE" });
       }),
   }),
 });

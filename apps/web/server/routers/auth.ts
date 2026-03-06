@@ -1,87 +1,35 @@
 import { publicProcedure, router } from "../_core/trpc";
 import { z } from "zod";
-import { getDb } from "../db";
-import { organizations, accounts, users } from "../../drizzle/schema";
-import { eq } from "drizzle-orm";
-import * as bcrypt from "bcrypt";
-import { sdk } from "../_core/sdk";
-import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "../_core/cookies";
 
+const NEXO_API_URL = process.env.NEXO_API_URL || "http://localhost:3000";
+const NEXO_TOKEN_COOKIE = "nexo_token";
+
+async function postJson(path: string, body: any) {
+  const res = await fetch(`${NEXO_API_URL}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  const text = await res.text();
+  let json: any = null;
+  try {
+    json = text ? JSON.parse(text) : null;
+  } catch {
+    json = { raw: text };
+  }
+
+  if (!res.ok) {
+    const msg = json?.message || json?.error || json?.raw || `HTTP ${res.status}`;
+    throw new Error(String(msg));
+  }
+
+  return json;
+}
+
 export const authRouter = router({
-  // Registro de nova organização
-  register: publicProcedure
-    .input(
-      z.object({
-        orgName: z.string().min(2, "Nome da organização deve ter pelo menos 2 caracteres"),
-        adminName: z.string().min(2, "Nome do admin deve ter pelo menos 2 caracteres"),
-        email: z.string().email("Email inválido"),
-        password: z.string().min(8, "Senha deve ter pelo menos 8 caracteres"),
-      })
-    )
-    .mutation(async ({ input, ctx }) => {
-      try {
-        const db = await getDb();
-        if (!db) {
-          throw new Error("Banco de dados não disponível");
-        }
-
-        // Verificar se email já existe
-        const existingOrg = await db
-          .select()
-          .from(organizations)
-          .where(eq(organizations.email, input.email))
-          .limit(1);
-
-        if (existingOrg.length > 0) {
-          throw new Error("Este email já está registrado");
-        }
-
-        // Hash da senha
-        const hashedPassword = await bcrypt.hash(input.password, 10);
-
-        // Criar organização
-        const result = await db.insert(organizations).values({
-          name: input.orgName,
-          email: input.email,
-          adminName: input.adminName,
-          password: hashedPassword,
-        });
-
-        // Obter o ID da organização criada
-        const orgId = (result as any).insertId || 1;
-
-        // Criar conta associada
-        await db.insert(accounts).values({
-          organizationId: Number(orgId),
-          status: "active",
-        });
-
-        // Criar sessão JWT e definir cookie
-        const sessionToken = await sdk.createSessionToken(
-          `org_${orgId}`,
-          { name: input.adminName }
-        );
-        
-        const cookieOptions = getSessionCookieOptions(ctx.req);
-        ctx.res.cookie(COOKIE_NAME, sessionToken, {
-          ...cookieOptions,
-          maxAge: 1000 * 60 * 60 * 24 * 365, // 1 ano
-        });
-
-        return {
-          success: true,
-          message: "Organização criada com sucesso!",
-          organizationId: orgId,
-          email: input.email,
-        };
-      } catch (error: any) {
-        console.error("[Auth] Register failed:", error.message);
-        throw new Error(`Falha ao registrar: ${error.message}`);
-      }
-    }),
-
-  // Login
+  // Login REAL (Nest)
   login: publicProcedure
     .input(
       z.object({
@@ -90,101 +38,59 @@ export const authRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      try {
-        const db = await getDb();
-        if (!db) {
-          throw new Error("Banco de dados não disponível");
-        }
+      const out = await postJson(`/auth/login`, input);
 
-        // Buscar organização
-        const org = await db
-          .select()
-          .from(organizations)
-          .where(eq(organizations.email, input.email))
-          .limit(1);
+      // esperado: { ok: true, data: { token, user, org... } } ou { token: ... }
+      const token =
+        out?.data?.token || out?.token || out?.accessToken || out?.data?.accessToken;
 
-        if (org.length === 0) {
-          throw new Error("Email ou senha incorretos");
-        }
-
-        const organization = org[0];
-
-        // Verificar senha com bcrypt
-        const isPasswordValid = await bcrypt.compare(input.password, organization.password);
-        if (!isPasswordValid) {
-          throw new Error("Email ou senha incorretos");
-        }
-
-        // Criar ou atualizar usuário na tabela users
-        const openId = `org_${organization.id}`;
-        await db.insert(users)
-          .values({
-            openId,
-            name: organization.adminName,
-            email: organization.email,
-            loginMethod: "email",
-            role: "admin",
-          })
-          .onDuplicateKeyUpdate({
-            set: {
-              name: organization.adminName,
-              email: organization.email,
-              lastSignedIn: new Date(),
-            },
-          });
-
-        // Criar sessão JWT e definir cookie
-        const sessionToken = await sdk.createSessionToken(
-          openId,
-          { name: organization.adminName }
-        );
-        
-        const cookieOptions = getSessionCookieOptions(ctx.req);
-        ctx.res.cookie(COOKIE_NAME, sessionToken, {
-          ...cookieOptions,
-          maxAge: 1000 * 60 * 60 * 24 * 365, // 1 ano
-        });
-
-        return {
-          success: true,
-          message: "Login realizado com sucesso!",
-          organization: {
-            id: organization.id,
-            name: organization.name,
-            email: organization.email,
-            adminName: organization.adminName,
-          },
-        };
-      } catch (error: any) {
-        console.error("[Auth] Login failed:", error.message);
-        throw new Error(`Falha ao fazer login: ${error.message}`);
+      if (!token) {
+        throw new Error("Login não retornou token. Confira o formato da resposta em /auth/login.");
       }
+
+      const cookieOptions = getSessionCookieOptions(ctx.req);
+
+      ctx.res.cookie(NEXO_TOKEN_COOKIE, token, {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        path: "/",
+        // 7 dias (ajusta depois se quiser)
+        maxAge: 60 * 60 * 24 * 7,
+        ...cookieOptions,
+      });
+
+      return out;
     }),
 
-  // Obter dados da organização
-  getOrganization: publicProcedure
-    .input(z.object({ id: z.number() }))
-    .query(async ({ input }) => {
-      try {
-        const db = await getDb();
-        if (!db) {
-          throw new Error("Banco de dados não disponível");
-        }
+  // (Opcional) Register REAL (Nest) — só mantém se existir no backend
+  register: publicProcedure
+    .input(
+      z.object({
+        orgName: z.string().min(2),
+        adminName: z.string().min(2),
+        email: z.string().email(),
+        password: z.string().min(8),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const out = await postJson(`/auth/register`, input);
 
-        const org = await db
-          .select()
-          .from(organizations)
-          .where(eq(organizations.id, input.id))
-          .limit(1);
+      const token =
+        out?.data?.token || out?.token || out?.accessToken || out?.data?.accessToken;
 
-        if (org.length === 0) {
-          throw new Error("Organização não encontrada");
-        }
-
-        return org[0];
-      } catch (error: any) {
-        console.error("[Auth] Get organization failed:", error.message);
-        throw new Error(`Falha ao obter organização: ${error.message}`);
+      if (token) {
+        const cookieOptions = getSessionCookieOptions(ctx.req);
+        ctx.res.cookie(NEXO_TOKEN_COOKIE, token, {
+          httpOnly: true,
+          sameSite: "lax",
+          secure: process.env.NODE_ENV === "production",
+          path: "/",
+          maxAge: 60 * 60 * 24 * 7,
+          ...cookieOptions,
+        });
       }
+
+      return out;
     }),
 });
