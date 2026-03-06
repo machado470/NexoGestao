@@ -7,7 +7,7 @@ import { Loader2, Send, Phone, MessageCircle, Search, Plus } from "lucide-react"
 import { useAuth } from "@/_core/hooks/useAuth";
 
 interface ConversationThread {
-  customerId: number;
+  customerId: string;
   customerName: string;
   whatsappNumber?: string;
   lastMessage?: string;
@@ -18,7 +18,7 @@ interface ConversationThread {
 
 export default function WhatsAppPage() {
   const { user } = useAuth();
-  const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [messageInput, setMessageInput] = useState("");
   const [conversations, setConversations] = useState<ConversationThread[]>([]);
@@ -26,9 +26,9 @@ export default function WhatsAppPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Queries
-  const customersQuery = trpc.data.customers.list.useQuery({ page: 1, limit: 200 });
+  const customersQuery = trpc.nexo.customers.list.useQuery();
   const whatsappMessagesQuery = trpc.contact.getWhatsappMessages.useQuery(
-    { customerId: selectedCustomerId || 0 },
+    { customerId: selectedCustomerId || "" },
     { enabled: !!selectedCustomerId }
   );
 
@@ -43,8 +43,9 @@ export default function WhatsAppPage() {
 
   // Carregar conversas quando clientes mudam
   useEffect(() => {
-    if (customersQuery.data && Array.isArray(customersQuery.data)) {
-      const convos = customersQuery.data.map((customer: any) => ({
+    const customerList = (customersQuery.data as any)?.data ?? customersQuery.data ?? [];
+    if (Array.isArray(customerList)) {
+      const convos = customerList.map((customer: any) => ({
         customerId: customer.id,
         customerName: customer.name,
         whatsappNumber: customer.phone,

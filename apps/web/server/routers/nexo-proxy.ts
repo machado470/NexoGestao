@@ -185,6 +185,13 @@ export const nexoProxyRouter = router({
         headers: authHeader ? { Authorization: authHeader } : {},
       });
     }),
+    delete: publicProcedure.input(z.object({ id: z.string() })).mutation(async ({ input, ctx }) => {
+      const authHeader = getAuthHeader(ctx as any);
+      return await nexoFetch(`/appointments/${input.id}`, {
+        method: "DELETE",
+        headers: authHeader ? { Authorization: authHeader } : {},
+      });
+    }),
   }),
 
   serviceOrders: router({
@@ -210,6 +217,13 @@ export const nexoProxyRouter = router({
       return await nexoFetch(`/service-orders/${input.id}`, {
         method: "PATCH",
         body: JSON.stringify(input.data),
+        headers: authHeader ? { Authorization: authHeader } : {},
+      });
+    }),
+    delete: publicProcedure.input(z.object({ id: z.string() })).mutation(async ({ input, ctx }) => {
+      const authHeader = getAuthHeader(ctx as any);
+      return await nexoFetch(`/service-orders/${input.id}`, {
+        method: "DELETE",
         headers: authHeader ? { Authorization: authHeader } : {},
       });
     }),

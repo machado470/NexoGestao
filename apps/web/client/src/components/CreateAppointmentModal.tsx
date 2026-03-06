@@ -8,7 +8,7 @@ interface CreateAppointmentModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  customers: Array<{ id: number; name: string }>;
+  customers: Array<{ id: string | number; name: string }>;
 }
 
 export function CreateAppointmentModal({
@@ -27,7 +27,7 @@ export function CreateAppointmentModal({
     notes: "",
   });
 
-  const createAppointment = trpc.data.appointments.create.useMutation({
+  const createAppointment = trpc.nexo.appointments.create.useMutation({
     onSuccess: () => {
       toast.success("Agendamento criado com sucesso!");
       setFormData({
@@ -54,7 +54,7 @@ export function CreateAppointmentModal({
       return;
     }
     createAppointment.mutate({
-      customerId: parseInt(formData.customerId),
+      customerId: formData.customerId,
       title: formData.title,
       description: formData.description,
       startsAt: new Date(formData.startsAt),
