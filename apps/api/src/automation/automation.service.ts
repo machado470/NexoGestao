@@ -11,6 +11,8 @@ import { RiskService } from '../risk/risk.service'
 import { WhatsAppService } from '../whatsapp/whatsapp.service'
 import { CreateAutomationRuleDto } from './dto/create-automation-rule.dto'
 import { UpdateAutomationRuleDto } from './dto/update-automation-rule.dto'
+import { QueueService } from '../queue/queue.service'
+import { QUEUE_NAMES } from '../queue/queue.constants'
 
 type AutomationContext = {
   orgId: string
@@ -27,7 +29,16 @@ export class AutomationService {
     private readonly notifications: NotificationsService,
     private readonly risk: RiskService,
     private readonly whatsapp: WhatsAppService,
+    private readonly queueService: QueueService,
   ) {}
+
+  async executeActionJob(input: {
+    orgId: string
+    action: Record<string, any>
+    payload: Record<string, any>
+  }) {
+    await this.executeAction(input)
+  }
 
   async listRules(orgId: string) {
     return this.prisma.automationRule.findMany({
@@ -115,7 +126,7 @@ export class AutomationService {
         let executedActions = 0
 
         for (const action of actionSet) {
-          const handled = await this.executeAction({
+          const handled = await this.enqueueAutomationAction({
             orgId: context.orgId,
             action,
             payload: context.payload,
@@ -217,7 +228,7 @@ export class AutomationService {
     if (actionType === AutomationActionType.CREATE_NOTIFICATION) {
       const message = input.action.message ?? 'Automação executada com sucesso'
       const type = (input.action.notificationType ?? 'PAYMENT_OVERDUE') as NotificationType
-      await this.notifications.createNotification(input.orgId, type, message, undefined, {
+      await this.notifications.enqueueNotification(input.orgId, type, message, undefined, {
         automationAction: input.action,
         payload: input.payload,
       })
@@ -229,7 +240,7 @@ export class AutomationService {
       const toPhone = input.payload.customerPhone
       if (!customerId || !toPhone) return false
 
-      await this.whatsapp.queueMessage({
+      await this.whatsapp.enqueueMessage({
         orgId: input.orgId,
         customerId,
         toPhone,
@@ -253,18 +264,26 @@ export class AutomationService {
       const dueInDays = Number(input.action.dueInDays ?? 3)
       const dueDate = new Date(Date.now() + dueInDays * 24 * 60 * 60 * 1000)
 
-      await this.prisma.charge.create({
-        data: {
+      await this.queueService.addJob(QUEUE_NAMES.FINANCE, 'create-charge', {
+        orgId: input.orgId,
+        customerId,
+        serviceOrderId: input.payload.serviceOrderId ?? null,
+        amountCents,
+        dueDate,
+        title: input.action.title ?? 'Cobrança gerada por automação',
+        description: input.action.description ?? null,
+      })
+
+      await this.queueService.addJob(
+        QUEUE_NAMES.FINANCE,
+        'payment-reminder',
+        {
           orgId: input.orgId,
           customerId,
-          serviceOrderId: input.payload.serviceOrderId ?? null,
-          amountCents,
-          dueDate,
-          title: input.action.title ?? 'Cobrança gerada por automação',
-          description: input.action.description ?? null,
-          status: 'PENDING',
+          chargeTitle: input.action.title ?? 'Cobrança gerada por automação',
         },
-      })
+        { delay: 3 * 24 * 60 * 60 * 1000 },
+      )
       return true
     }
 
@@ -281,5 +300,17 @@ export class AutomationService {
     }
 
     return false
+  }
+
+  private async enqueueAutomationAction(input: {
+    orgId: string
+    action: Record<string, any>
+    payload: Record<string, any>
+  }) {
+    const actionType = String(input.action?.type ?? '').trim() as AutomationActionType
+    if (!Object.values(AutomationActionType).includes(actionType)) return false
+
+    await this.queueService.addJob(QUEUE_NAMES.AUTOMATION, 'execute-action', input)
+    return true
   }
 }

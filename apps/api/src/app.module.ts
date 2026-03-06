@@ -88,6 +88,7 @@ import { BillingModule } from './billing/billing.module'
 // 📊 ANALYTICS DE PRODUTO
 import { AnalyticsModule } from './analytics/analytics.module'
 import { AutomationModule } from './automation/automation.module'
+import { QueueModule } from './queue/queue.module'
 
 // 🚨 SENTRY (Monitoramento)
 import { SentryModule } from './common/sentry/sentry.module'
@@ -197,6 +198,7 @@ import { SentryModule } from './common/sentry/sentry.module'
     // 📊 Analytics de produto
     AnalyticsModule,
     AutomationModule,
+    QueueModule,
 
     // 🚨 Sentry
     SentryModule,

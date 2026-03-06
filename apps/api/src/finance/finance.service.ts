@@ -17,6 +17,8 @@ import { RiskService } from '../risk/risk.service'
 import { RequestContextService } from '../common/context/request-context.service'
 import { MetricsService } from '../common/metrics/metrics.service'
 import { AutomationService } from '../automation/automation.service'
+import { QueueService } from '../queue/queue.service'
+import { QUEUE_NAMES } from '../queue/queue.constants'
 
 function isUuidLike(s: string): boolean {
   // UUID v4/v1 “parecido” (bom o suficiente pra decidir equals vs contains)
@@ -49,6 +51,7 @@ export class FinanceService {
     private readonly requestContext: RequestContextService,
     private readonly metrics: MetricsService,
     private readonly automation: AutomationService,
+    private readonly queueService: QueueService,
   ) {}
 
   async automateOverdueLifecycle(orgId: string) {
@@ -73,7 +76,7 @@ export class FinanceService {
       })
 
       if (charge.customer?.phone) {
-        await this.whatsapp.queueMessage({
+        await this.whatsapp.enqueueMessage({
           orgId,
           customerId: charge.customerId,
           toPhone: charge.customer.phone,
@@ -106,6 +109,61 @@ export class FinanceService {
     }
 
     return { updated: overdue.length }
+  }
+
+  async enqueueCreateCharge(input: {
+    orgId: string
+    customerId: string
+    serviceOrderId?: string | null
+    amountCents: number
+    dueDate: Date
+    title?: string
+    description?: string | null
+  }) {
+    return this.queueService.addJob(QUEUE_NAMES.FINANCE, 'create-charge', input)
+  }
+
+  async createAutomationCharge(input: {
+    orgId: string
+    customerId: string
+    serviceOrderId?: string | null
+    amountCents: number
+    dueDate: Date | string
+    title?: string
+    description?: string | null
+  }) {
+    return this.prisma.charge.create({
+      data: {
+        orgId: input.orgId,
+        customerId: input.customerId,
+        serviceOrderId: input.serviceOrderId ?? null,
+        amountCents: input.amountCents,
+        dueDate: new Date(input.dueDate),
+        title: input.title ?? 'Cobrança gerada por automação',
+        description: input.description ?? null,
+        status: 'PENDING',
+      },
+    })
+  }
+
+  async sendPaymentReminder(input: { orgId: string; customerId: string; chargeTitle?: string }) {
+    const customer = await this.prisma.customer.findFirst({
+      where: { id: input.customerId, orgId: input.orgId },
+      select: { phone: true },
+    })
+
+    if (!customer?.phone) return
+
+    await this.whatsapp.enqueueMessage({
+      orgId: input.orgId,
+      customerId: input.customerId,
+      toPhone: customer.phone,
+      entityType: 'CHARGE',
+      entityId: input.customerId,
+      messageType: 'PAYMENT_REMINDER',
+      messageKey: `charge:reminder:${input.customerId}:${Date.now()}`,
+      renderedText: `Lembrete de pagamento: ${input.chargeTitle ?? 'cobrança pendente'}.`,
+    })
   }
 
   async overview(orgId: string) {
