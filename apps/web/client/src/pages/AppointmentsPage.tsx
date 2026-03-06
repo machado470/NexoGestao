@@ -38,8 +38,8 @@ export default function AppointmentsPage() {
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, pages: 1 });
 
   // Queries
-  const listAppointments = trpc.data.appointments.list.useQuery({ page, limit });
-  const listCustomers = trpc.data.customers.list.useQuery({ page: 1, limit: 1000 });
+  const listAppointments = trpc.nexo.appointments.list.useQuery({ page, limit });
+  const listCustomers = trpc.nexo.customers.list.useQuery();
 
   useEffect(() => {
     if (listAppointments.data) {
@@ -54,8 +54,9 @@ export default function AppointmentsPage() {
   useEffect(() => {
     if (listCustomers.data) {
       const response = listCustomers.data as any;
-      if (response && response.data && Array.isArray(response.data)) {
-        setCustomers(response.data);
+      const customerList = response?.data ?? response ?? [];
+      if (Array.isArray(customerList)) {
+        setCustomers(customerList);
       }
     }
   }, [listCustomers.data]);

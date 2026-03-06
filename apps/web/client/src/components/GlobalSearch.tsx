@@ -4,7 +4,7 @@ import { Search, X, Users, Calendar, Briefcase, DollarSign, Loader } from "lucid
 import { trpc } from "@/lib/trpc";
 
 interface SearchResult {
-  id: number;
+  id: string | number;
   type: "customer" | "appointment" | "serviceOrder" | "charge";
   title: string;
   subtitle?: string;
@@ -20,9 +20,9 @@ export function GlobalSearch() {
   const [isSearching, setIsSearching] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
 
-  const customersQuery = trpc.data.customers.list.useQuery({ page: 1, limit: 1000 }, { enabled: false });
-  const appointmentsQuery = trpc.data.appointments.list.useQuery({ page: 1, limit: 1000 }, { enabled: false });
-  const serviceOrdersQuery = trpc.data.serviceOrders.list.useQuery({ page: 1, limit: 1000 }, { enabled: false });
+  const customersQuery = trpc.nexo.customers.list.useQuery(undefined, { enabled: false });
+  const appointmentsQuery = trpc.nexo.appointments.list.useQuery({ page: 1, limit: 1000 }, { enabled: false });
+  const serviceOrdersQuery = trpc.nexo.serviceOrders.list.useQuery({ page: 1, limit: 1000 }, { enabled: false });
   const chargesQuery = trpc.finance.charges.list.useQuery({ page: 1, limit: 1000 }, { enabled: false });
 
   useEffect(() => {

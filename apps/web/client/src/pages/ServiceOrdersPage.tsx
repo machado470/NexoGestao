@@ -41,15 +41,15 @@ export default function ServiceOrdersPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("");
 
-  const listQuery = trpc.data.serviceOrders.list.useQuery({ page, limit });
-  const updateMutation = trpc.data.serviceOrders.update.useMutation({
+  const listQuery = trpc.nexo.serviceOrders.list.useQuery({ page, limit });
+  const updateMutation = trpc.nexo.serviceOrders.update.useMutation({
     onSuccess: () => {
       toast.success("OS atualizada com sucesso!");
       listQuery.refetch();
     },
     onError: (err: any) => toast.error(err.message || "Erro ao atualizar OS"),
   });
-  const deleteMutation = trpc.data.serviceOrders.delete.useMutation({
+  const deleteMutation = trpc.nexo.serviceOrders.delete.useMutation({
     onSuccess: () => {
       toast.success("OS removida!");
       listQuery.refetch();
@@ -65,7 +65,7 @@ export default function ServiceOrdersPage() {
     : serviceOrders;
 
   const handleStatusChange = (id: number | string, newStatus: string) => {
-    updateMutation.mutate({ id: Number(id), status: newStatus as any });
+    updateMutation.mutate({ id: String(id), data: { status: newStatus as any } });
   };
 
   return (
@@ -212,7 +212,7 @@ export default function ServiceOrdersPage() {
                     size="sm"
                     onClick={() => {
                       if (confirm("Remover esta OS?")) {
-                        deleteMutation.mutate({ id: Number(os.id) });
+                        deleteMutation.mutate({ id: String(os.id) });
                       }
                     }}
                     disabled={deleteMutation.isPending}

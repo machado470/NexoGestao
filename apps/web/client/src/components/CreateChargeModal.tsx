@@ -42,8 +42,8 @@ export function CreateChargeModal({
   });
 
   // Fetch customers
-  const { data: customersResponse } = trpc.data.customers.list.useQuery({ page: 1, limit: 1000 });
-  const customers = (customersResponse as any)?.data || [];
+  const { data: customersResponse } = trpc.nexo.customers.list.useQuery();
+  const customers = (customersResponse as any)?.data ?? customersResponse ?? [];
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
