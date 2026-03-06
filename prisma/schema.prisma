@@ -998,6 +998,21 @@ model AutomationExecution {
   @@index([orgId, trigger, status, createdAt])
   @@index([ruleId, createdAt])
 }
+
+model QueueJob {
+  id          String   @id @default(uuid())
+  queue       String
+  jobId       String
+  status      String
+  payload     Json
+  error       String?
+  createdAt   DateTime @default(now())
+  completedAt DateTime?
+
+  @@index([queue, status, createdAt])
+  @@unique([queue, jobId])
+}
+
 enum TrackItemType {
   READING
   ACTION

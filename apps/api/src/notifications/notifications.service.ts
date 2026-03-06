@@ -1,12 +1,31 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { NotificationType } from '@prisma/client'
+import { QueueService } from '../queue/queue.service'
+import { QUEUE_NAMES } from '../queue/queue.constants'
 
 @Injectable()
 export class NotificationsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly queueService: QueueService,
+  ) {}
 
-  async createNotification(
+  async enqueueNotification(
+    orgId: string,
+    type: NotificationType,
+    message: string,
+    userId?: string,
+    metadata?: any,
+  ) {
+    return this.queueService.addJob(
+      QUEUE_NAMES.NOTIFICATIONS,
+      'create-notification',
+      { orgId, type, message, userId, metadata },
+    )
+  }
+
+  async createNotificationNow(
     orgId: string,
     type: NotificationType,
     message: string,
@@ -22,6 +41,16 @@ export class NotificationsService {
         metadata,
       },
     })
+  }
+
+  async createNotification(
+    orgId: string,
+    type: NotificationType,
+    message: string,
+    userId?: string,
+    metadata?: any,
+  ) {
+    return this.createNotificationNow(orgId, type, message, userId, metadata)
   }
 
   async getNotifications(orgId: string, userId?: string) {

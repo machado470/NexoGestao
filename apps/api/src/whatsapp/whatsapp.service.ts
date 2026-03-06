@@ -7,6 +7,8 @@ import {
   WhatsAppMessageType,
 } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
+import { QueueService } from '../queue/queue.service'
+import { QUEUE_NAMES } from '../queue/queue.constants'
 
 type QueueMessageInput = {
   orgId: string
@@ -33,7 +35,28 @@ function isPrismaP1017(err: any): boolean {
 export class WhatsAppService {
   private readonly logger = new Logger(WhatsAppService.name)
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly queueService: QueueService,
+  ) {}
+
+  async enqueueMessage(input: QueueMessageInput) {
+    const result = await this.queueMessage(input)
+    const message = result.message
+    if (!message) return result
+
+    await this.queueService.addJob(
+      QUEUE_NAMES.WHATSAPP,
+      'dispatch-message',
+      { messageId: message.id },
+    )
+
+    return result
+  }
+
+  async findById(id: string) {
+    return this.prisma.whatsAppMessage.findUnique({ where: { id } })
+  }
 
   private async reconnectIfNeeded(err: any) {
     if (!isPrismaP1017(err)) return false

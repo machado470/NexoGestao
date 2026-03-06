@@ -8,14 +8,16 @@ import { WhatsAppModule } from '../whatsapp/whatsapp.module'
 import { RiskModule } from '../risk/risk.module'
 import { OnboardingModule } from '../onboarding/onboarding.module'
 import { AutomationModule } from '../automation/automation.module'
+import { QueueModule } from '../queue/queue.module'
+import { FinanceProcessor } from '../queue/processors/finance.processor'
 
 import { FinanceController } from './finance.controller'
 import { FinanceService } from './finance.service'
 
 @Module({
-  imports: [PrismaModule, TimelineModule, AuditModule, OperationalStateModule, NotificationsModule, WhatsAppModule, RiskModule, OnboardingModule, AutomationModule],
+  imports: [PrismaModule, TimelineModule, AuditModule, OperationalStateModule, NotificationsModule, WhatsAppModule, RiskModule, OnboardingModule, AutomationModule, QueueModule],
   controllers: [FinanceController],
-  providers: [FinanceService],
+  providers: [FinanceService, FinanceProcessor],
   exports: [FinanceService],
 })
 export class FinanceModule {}
