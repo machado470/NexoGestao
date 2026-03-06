@@ -13,6 +13,7 @@ interface AuthContextType {
   loading: boolean;
   error: unknown | null;
   login: (email: string, password: string) => Promise<void>;
+  register: (payload: { orgName: string; adminName: string; email: string; password: string }) => Promise<void>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
   refresh: () => Promise<void>;
@@ -33,6 +34,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Login via proxy (define cookie httpOnly)
   const loginMutation = trpc.nexo.auth.login.useMutation();
+
+  // Register via canonical proxy route (cria tenant + admin)
+  const registerMutation = trpc.nexo.bootstrap.firstAdmin.useMutation();
 
   // Logout limpa cookie
   const logoutMutation = trpc.session.logout.useMutation();
@@ -57,6 +61,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     },
     [loginMutation, meQuery]
+  );
+
+
+  const register = useCallback(
+    async (payload: { orgName: string; adminName: string; email: string; password: string }) => {
+      setLocalLoading(true);
+      setLocalError(null);
+
+      try {
+        await registerMutation.mutateAsync(payload);
+        await loginMutation.mutateAsync({ email: payload.email, password: payload.password });
+        await meQuery.refetch();
+      } catch (err) {
+        setLocalError(err);
+        throw err;
+      } finally {
+        setLocalLoading(false);
+      }
+    },
+    [registerMutation, loginMutation, meQuery]
   );
 
   const logout = useCallback(async () => {
@@ -89,14 +113,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localLoading ||
         meQuery.isLoading ||
         loginMutation.isPending ||
+        registerMutation.isPending ||
         logoutMutation.isPending,
       error:
         localError ||
         meQuery.error ||
         loginMutation.error ||
+        registerMutation.error ||
         logoutMutation.error ||
         null,
       login,
+      register,
       logout,
       isAuthenticated: Boolean(user),
       refresh,
@@ -110,9 +137,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     meQuery.error,
     loginMutation.isPending,
     loginMutation.error,
+    registerMutation.isPending,
+    registerMutation.error,
     logoutMutation.isPending,
     logoutMutation.error,
     login,
+    register,
     logout,
     refresh,
   ]);

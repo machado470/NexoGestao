@@ -1,264 +1,188 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
-import { api } from "@/lib/api";
+import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
-import { Loader, CheckCircle, AlertCircle } from "lucide-react";
+
+type StepKey = "company" | "customer" | "appointment" | "serviceOrder" | "charge";
+
+type Progress = Record<StepKey, boolean>;
+
+const BASE_PROGRESS: Progress = {
+  company: false,
+  customer: false,
+  appointment: false,
+  serviceOrder: false,
+  charge: false,
+};
 
 export default function Onboarding() {
   const [, navigate] = useLocation();
   const { user } = useAuth();
-  const [step, setStep] = useState(1);
-  const [loading, setLoading] = useState(false);
+  const utils = trpc.useUtils();
+
+  const [progress, setProgress] = useState<Progress>(BASE_PROGRESS);
   const [error, setError] = useState<string | null>(null);
-  const [formData, setFormData] = useState({
-    personName: "",
-    personRole: "",
-    personEmail: "",
-  });
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
+  const [companyName, setCompanyName] = useState("");
+  const [customerName, setCustomerName] = useState("");
+  const [appointmentTitle, setAppointmentTitle] = useState("Primeiro atendimento");
+  const [serviceOrderTitle, setServiceOrderTitle] = useState("Primeira ordem de serviço");
+  const [chargeAmount, setChargeAmount] = useState("150");
+
+  const storageKey = useMemo(() => `pilot-onboarding:${user?.id ?? "anon"}`, [user?.id]);
+
+  const customersQuery = trpc.nexo.customers.list.useQuery();
+  const appointmentsQuery = trpc.nexo.appointments.list.useQuery({ page: 1, limit: 20 });
+  const serviceOrdersQuery = trpc.nexo.serviceOrders.list.useQuery({ page: 1, limit: 20 });
+  const chargesQuery = trpc.nexo.finance.charges.list.useQuery({ page: 1, limit: 20 });
+
+  const companyMutation = trpc.nexo.settings.update.useMutation();
+  const customerMutation = trpc.nexo.customers.create.useMutation();
+  const appointmentMutation = trpc.nexo.appointments.create.useMutation();
+  const serviceOrderMutation = trpc.nexo.serviceOrders.create.useMutation();
+  const chargeMutation = trpc.nexo.finance.charges.create.useMutation();
+  const completeOnboardingMutation = trpc.nexo.onboarding.complete.useMutation();
+
+  useEffect(() => {
+    const raw = localStorage.getItem(storageKey);
+    if (raw) {
+      try {
+        setProgress({ ...BASE_PROGRESS, ...JSON.parse(raw) });
+      } catch {
+        setProgress(BASE_PROGRESS);
+      }
+    }
+  }, [storageKey]);
+
+  useEffect(() => {
+    localStorage.setItem(storageKey, JSON.stringify(progress));
+  }, [progress, storageKey]);
+
+  useEffect(() => {
+    const hasCustomer = ((customersQuery.data as any)?.data ?? customersQuery.data ?? []).length > 0;
+    const hasAppointment = ((appointmentsQuery.data as any)?.data ?? []).length > 0;
+    const hasServiceOrder = ((serviceOrdersQuery.data as any)?.data ?? []).length > 0;
+    const hasCharge = ((chargesQuery.data as any)?.data ?? []).length > 0;
+
+    setProgress((prev) => ({
       ...prev,
-      [name]: value,
+      customer: prev.customer || hasCustomer,
+      appointment: prev.appointment || hasAppointment,
+      serviceOrder: prev.serviceOrder || hasServiceOrder,
+      charge: prev.charge || hasCharge,
     }));
-  };
+  }, [customersQuery.data, appointmentsQuery.data, serviceOrdersQuery.data, chargesQuery.data]);
 
-  const handleCreatePerson = async () => {
-    setError(null);
-    if (!formData.personName || !formData.personRole) {
-      setError("Por favor, preencha todos os campos obrigatórios");
-      return;
-    }
+  const firstCustomer = ((customersQuery.data as any)?.data ?? customersQuery.data ?? [])[0];
 
-    try {
-      setLoading(true);
-      await api.createPerson({
-        name: formData.personName,
-        role: formData.personRole,
-        email: formData.personEmail || undefined,
-      });
-      setStep(2);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao criar colaborador");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const canRun = {
+    company: true,
+    customer: progress.company,
+    appointment: progress.customer,
+    serviceOrder: progress.appointment,
+    charge: progress.serviceOrder,
+  } as const;
 
-  const handleCompleteOnboarding = async () => {
-    setError(null);
-    try {
-      setLoading(true);
-      await api.completeOnboarding();
-      navigate("/dashboard");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao completar onboarding");
-    } finally {
-      setLoading(false);
-    }
+  const completeStep = (key: StepKey) => setProgress((p) => ({ ...p, [key]: true }));
+
+  const finish = async () => {
+    await completeOnboardingMutation.mutateAsync();
+    navigate("/dashboard");
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-orange-100 dark:from-gray-900 dark:to-gray-800">
-      {/* Header */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 py-6">
-        <div className="max-w-4xl mx-auto px-4">
-          <div className="flex items-center space-x-2 mb-4">
-            <div className="h-10 w-10 rounded-lg bg-orange-500 flex items-center justify-center text-white font-bold text-xl">
-              N
-            </div>
-            <span className="text-xl font-bold text-gray-900 dark:text-white">NexoGestão</span>
-          </div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-            Bem-vindo, {user?.userId}!
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-2">
-            Vamos configurar sua organização em poucos passos
-          </p>
-        </div>
-      </div>
+    <div className="min-h-screen p-6 bg-gray-50 dark:bg-gray-900">
+      <div className="mx-auto max-w-3xl space-y-4">
+        <h1 className="text-2xl font-bold">Onboarding guiado (piloto)</h1>
+        <p className="text-sm opacity-75">Fluxo persistente: empresa → cliente → agendamento → OS → cobrança.</p>
 
-      {/* Content */}
-      <div className="max-w-4xl mx-auto px-4 py-12">
-        {/* Progress Indicator */}
-        <div className="flex items-center justify-between mb-12">
-          <div className="flex-1">
-            <div
-              className={`h-2 rounded-full transition-all ${
-                step >= 1 ? "bg-orange-500" : "bg-gray-300 dark:bg-gray-600"
-              }`}
-            />
-            <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mt-2">
-              Passo 1: Primeiro Colaborador
-            </p>
-          </div>
-          <div className="w-8 h-8 rounded-full flex items-center justify-center mx-2 bg-orange-500 text-white font-bold">
-            1
-          </div>
-          <div className="flex-1">
-            <div
-              className={`h-2 rounded-full transition-all ${
-                step >= 2 ? "bg-orange-500" : "bg-gray-300 dark:bg-gray-600"
-              }`}
-            />
-            <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mt-2">
-              Passo 2: Confirmação
-            </p>
-          </div>
-        </div>
+        {error && <div className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
 
-        {/* Step 1: Create Person */}
-        {step === 1 && (
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
-              Adicione seu primeiro colaborador
-            </h2>
+        <section className="rounded-xl border p-4 bg-white dark:bg-zinc-900">
+          <h2 className="font-semibold">1) Perfil da empresa</h2>
+          <input className="mt-2 w-full rounded border p-2 dark:bg-zinc-950" placeholder="Nome fantasia" value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
+          <Button className="mt-2" disabled={!canRun.company || progress.company || companyMutation.isPending} onClick={async () => {
+            setError(null);
+            try {
+              if (!companyName.trim()) throw new Error("Informe o nome da empresa.");
+              await companyMutation.mutateAsync({ companyName: companyName.trim() });
+              completeStep("company");
+            } catch (e) {
+              setError((e as Error).message);
+            }
+          }}>{progress.company ? "Concluído" : "Salvar perfil"}</Button>
+        </section>
 
-            {error && (
-              <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
-                <p className="text-sm text-red-800 dark:text-red-300">{error}</p>
-              </div>
-            )}
+        <section className="rounded-xl border p-4 bg-white dark:bg-zinc-900">
+          <h2 className="font-semibold">2) Primeiro cliente</h2>
+          <input className="mt-2 w-full rounded border p-2 dark:bg-zinc-950" placeholder="Nome do cliente" value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
+          <Button className="mt-2" disabled={!canRun.customer || progress.customer || customerMutation.isPending} onClick={async () => {
+            setError(null);
+            try {
+              if (!customerName.trim()) throw new Error("Informe o nome do cliente.");
+              await customerMutation.mutateAsync({ name: customerName.trim() });
+              await utils.nexo.customers.list.invalidate();
+              completeStep("customer");
+            } catch (e) {
+              setError((e as Error).message);
+            }
+          }}>{progress.customer ? "Concluído" : "Criar cliente"}</Button>
+        </section>
 
-            <div className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Nome Completo *
-                </label>
-                <input
-                  type="text"
-                  name="personName"
-                  value={formData.personName}
-                  onChange={handleChange}
-                  placeholder="João Silva"
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                />
-              </div>
+        <section className="rounded-xl border p-4 bg-white dark:bg-zinc-900">
+          <h2 className="font-semibold">3) Primeiro agendamento</h2>
+          <input className="mt-2 w-full rounded border p-2 dark:bg-zinc-950" value={appointmentTitle} onChange={(e) => setAppointmentTitle(e.target.value)} />
+          <Button className="mt-2" disabled={!canRun.appointment || progress.appointment || appointmentMutation.isPending} onClick={async () => {
+            setError(null);
+            try {
+              if (!firstCustomer?.id) throw new Error("Crie um cliente primeiro.");
+              await appointmentMutation.mutateAsync({ customerId: String(firstCustomer.id), title: appointmentTitle, startsAt: new Date().toISOString() });
+              await utils.nexo.appointments.list.invalidate();
+              completeStep("appointment");
+            } catch (e) {
+              setError((e as Error).message);
+            }
+          }}>{progress.appointment ? "Concluído" : "Criar agendamento"}</Button>
+        </section>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Cargo/Função *
-                </label>
-                <select
-                  name="personRole"
-                  value={formData.personRole}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                >
-                  <option value="">Selecione um cargo</option>
-                  <option value="Gerente">Gerente</option>
-                  <option value="Supervisor">Supervisor</option>
-                  <option value="Operacional">Operacional</option>
-                  <option value="Administrativo">Administrativo</option>
-                  <option value="Financeiro">Financeiro</option>
-                  <option value="Outro">Outro</option>
-                </select>
-              </div>
+        <section className="rounded-xl border p-4 bg-white dark:bg-zinc-900">
+          <h2 className="font-semibold">4) Primeira ordem de serviço</h2>
+          <input className="mt-2 w-full rounded border p-2 dark:bg-zinc-950" value={serviceOrderTitle} onChange={(e) => setServiceOrderTitle(e.target.value)} />
+          <Button className="mt-2" disabled={!canRun.serviceOrder || progress.serviceOrder || serviceOrderMutation.isPending} onClick={async () => {
+            setError(null);
+            try {
+              if (!firstCustomer?.id) throw new Error("Crie um cliente primeiro.");
+              await serviceOrderMutation.mutateAsync({ customerId: String(firstCustomer.id), title: serviceOrderTitle, priority: "MEDIUM" });
+              await utils.nexo.serviceOrders.list.invalidate();
+              completeStep("serviceOrder");
+            } catch (e) {
+              setError((e as Error).message);
+            }
+          }}>{progress.serviceOrder ? "Concluído" : "Criar OS"}</Button>
+        </section>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Email (opcional)
-                </label>
-                <input
-                  type="email"
-                  name="personEmail"
-                  value={formData.personEmail}
-                  onChange={handleChange}
-                  placeholder="joao@empresa.com"
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                />
-              </div>
+        <section className="rounded-xl border p-4 bg-white dark:bg-zinc-900">
+          <h2 className="font-semibold">5) Primeira cobrança</h2>
+          <input className="mt-2 w-full rounded border p-2 dark:bg-zinc-950" type="number" min="1" value={chargeAmount} onChange={(e) => setChargeAmount(e.target.value)} />
+          <Button className="mt-2" disabled={!canRun.charge || progress.charge || chargeMutation.isPending} onClick={async () => {
+            setError(null);
+            try {
+              if (!firstCustomer?.id) throw new Error("Crie um cliente primeiro.");
+              const amount = Math.round(Number(chargeAmount) * 100);
+              if (!amount) throw new Error("Informe um valor de cobrança válido.");
+              await chargeMutation.mutateAsync({ customerId: String(firstCustomer.id), description: "Primeira cobrança", amountCents: amount, dueDate: new Date().toISOString() });
+              await utils.nexo.finance.charges.list.invalidate();
+              completeStep("charge");
+            } catch (e) {
+              setError((e as Error).message);
+            }
+          }}>{progress.charge ? "Concluído" : "Criar cobrança"}</Button>
+        </section>
 
-              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                <p className="text-sm text-blue-800 dark:text-blue-300">
-                  💡 <strong>Dica:</strong> Você poderá adicionar mais colaboradores depois no dashboard.
-                </p>
-              </div>
-
-              <Button
-                onClick={handleCreatePerson}
-                disabled={loading}
-                className="w-full bg-orange-500 hover:bg-orange-600 text-white py-2 rounded-lg font-medium flex items-center justify-center"
-              >
-                {loading ? (
-                  <>
-                    <Loader className="w-4 h-4 animate-spin mr-2" />
-                    Criando...
-                  </>
-                ) : (
-                  "Continuar"
-                )}
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* Step 2: Confirmation */}
-        {step === 2 && (
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 text-center">
-            <div className="inline-flex items-center justify-center h-16 w-16 rounded-full bg-green-100 dark:bg-green-900/20 mb-6">
-              <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
-            </div>
-
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-              Tudo pronto!
-            </h2>
-
-            <p className="text-gray-600 dark:text-gray-400 mb-8 max-w-md mx-auto">
-              Seu colaborador foi criado com sucesso. Agora você pode acessar o dashboard completo e começar a gerenciar sua operação.
-            </p>
-
-            <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-6 mb-8">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                Próximos passos:
-              </h3>
-              <ul className="space-y-3 text-left">
-                <li className="flex items-start">
-                  <CheckCircle className="w-5 h-5 text-green-500 mr-3 flex-shrink-0 mt-0.5" />
-                  <span className="text-gray-700 dark:text-gray-300">
-                    Adicione clientes e agendamentos
-                  </span>
-                </li>
-                <li className="flex items-start">
-                  <CheckCircle className="w-5 h-5 text-green-500 mr-3 flex-shrink-0 mt-0.5" />
-                  <span className="text-gray-700 dark:text-gray-300">
-                    Crie ordens de serviço e acompanhe o progresso
-                  </span>
-                </li>
-                <li className="flex items-start">
-                  <CheckCircle className="w-5 h-5 text-green-500 mr-3 flex-shrink-0 mt-0.5" />
-                  <span className="text-gray-700 dark:text-gray-300">
-                    Configure trilhas de aprendizado e governança
-                  </span>
-                </li>
-                <li className="flex items-start">
-                  <CheckCircle className="w-5 h-5 text-green-500 mr-3 flex-shrink-0 mt-0.5" />
-                  <span className="text-gray-700 dark:text-gray-300">
-                    Acompanhe métricas e relatórios em tempo real
-                  </span>
-                </li>
-              </ul>
-            </div>
-
-            <Button
-              onClick={handleCompleteOnboarding}
-              disabled={loading}
-              className="w-full bg-orange-500 hover:bg-orange-600 text-white py-2 rounded-lg font-medium flex items-center justify-center"
-            >
-              {loading ? (
-                <>
-                  <Loader className="w-4 h-4 animate-spin mr-2" />
-                  Finalizando...
-                </>
-              ) : (
-                "Ir para Dashboard"
-              )}
-            </Button>
-          </div>
-        )}
+        <Button disabled={!progress.charge || completeOnboardingMutation.isPending} onClick={finish}>
+          Finalizar onboarding
+        </Button>
       </div>
     </div>
   );
