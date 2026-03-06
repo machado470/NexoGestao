@@ -1,10 +1,21 @@
-import { Injectable, OnModuleInit, Logger } from '@nestjs/common'
-import { PrismaClient } from '@prisma/client'
+import {
+  Injectable,
+  OnModuleInit,
+  Logger,
+  ForbiddenException,
+} from '@nestjs/common'
+import { Prisma, PrismaClient } from '@prisma/client'
 import { ClsService } from 'nestjs-cls'
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit {
   private readonly logger = new Logger(PrismaService.name)
+
+  private readonly orgScopedModels = new Set<string>(
+    (((Prisma as any).dmmf?.datamodel?.models as any[]) ?? [])
+      .filter((model) => model.fields.some((field: any) => field.name === 'orgId'))
+      .map((model) => model.name),
+  )
 
   constructor(private readonly cls: ClsService) {
     super()
@@ -14,61 +25,49 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
     const maxAttempts = 12
     const baseDelayMs = 500
 
-    // Middleware para Multi-tenancy
     this.$use(async (params, next) => {
       const orgId = this.cls.get('orgId')
+      const isHttpRequest = this.cls.get('isHttpRequest')
+      const allowWithoutOrg = this.cls.get('allowWithoutOrg')
+      const model = params.model
+      const isOrgScopedModel = Boolean(model && this.orgScopedModels.has(model))
 
-      // Se não houver orgId no contexto, seguimos normalmente (ex: jobs, seeds, auth)
-      if (!orgId) {
+      if (isOrgScopedModel && isHttpRequest && !orgId && !allowWithoutOrg) {
+        throw new ForbiddenException('Contexto de organização ausente na requisição.')
+      }
+
+      if (!isOrgScopedModel || !orgId) {
         return next(params)
       }
 
-      // Modelos que possuem orgId para isolamento
-      const modelsWithOrgId = [
-        'User',
-        'Person',
-        'TimelineEvent',
-        'Track',
-        'AuditEvent',
-        'GovernanceRun',
-        'Customer',
-        'Appointment',
-        'ServiceOrder',
-        'Charge',
-        'Payment',
-        'WhatsAppTemplate',
-        'WhatsAppMessage',
-        'Expense',
-        'Invoice',
-        'Launch',
-        'Referral',
-        'ServiceOrderAttachment',
-      ]
+      const args = params.args ?? {}
+      params.args = args
 
-      if (params.model && modelsWithOrgId.includes(params.model)) {
-        // Operações de leitura: injetar orgId no filtro where
-        if (['findUnique', 'findFirst', 'findMany', 'count', 'aggregate', 'groupBy'].includes(params.action)) {
-          params.args.where = { ...params.args.where, orgId }
+      if (
+        ['findUnique', 'findFirst', 'findMany', 'count', 'aggregate', 'groupBy'].includes(
+          params.action,
+        )
+      ) {
+        args.where = { ...(args.where ?? {}), orgId }
+      }
+
+      if (['create', 'createMany'].includes(params.action)) {
+        if (Array.isArray(args.data)) {
+          args.data = args.data.map((item: Record<string, unknown>) => ({
+            ...item,
+            orgId,
+          }))
+        } else {
+          args.data = { ...(args.data ?? {}), orgId }
         }
+      }
 
-        // Operações de escrita: garantir orgId nos dados
-        if (['create', 'createMany'].includes(params.action)) {
-          if (Array.isArray(params.args.data)) {
-            params.args.data = params.args.data.map((item: Record<string, unknown>) => ({ ...item, orgId }))
-          } else {
-            // Usamos cast para any para evitar erros de tipagem do Prisma que espera org: { connect: { id } }
-            // mas o middleware intercepta e aceita a string direta orgId.
-            params.args.data = { ...params.args.data, orgId }
-          }
-        }
+      if (['update', 'updateMany', 'upsert', 'delete', 'deleteMany'].includes(params.action)) {
+        args.where = { ...(args.where ?? {}), orgId }
 
-        // Operações de atualização/deleção: injetar orgId no filtro where para segurança extra
-        if (['update', 'updateMany', 'upsert', 'delete', 'deleteMany'].includes(params.action)) {
-          params.args.where = { ...params.args.where, orgId }
-          
-          if (params.action === 'upsert') {
-            params.args.create = { ...params.args.create, orgId }
-          }
+        if (params.action === 'upsert') {
+          args.create = { ...(args.create ?? {}), orgId }
+          args.update = { ...(args.update ?? {}) }
         }
       }
 
