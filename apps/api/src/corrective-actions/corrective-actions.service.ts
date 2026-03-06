@@ -3,6 +3,9 @@ import { PrismaService } from '../prisma/prisma.service'
 import { TimelineService } from '../timeline/timeline.service'
 import { OperationalStateService } from '../people/operational-state.service'
 import { RiskService } from '../risk/risk.service'
+import { AuditService } from '../audit/audit.service'
+import { AUDIT_ACTIONS } from '../audit/audit.actions'
+import { RequestContextService } from '../common/context/request-context.service'
 
 @Injectable()
 export class CorrectiveActionsService {
@@ -11,6 +14,8 @@ export class CorrectiveActionsService {
     private readonly timeline: TimelineService,
     private readonly operationalState: OperationalStateService,
     private readonly risk: RiskService,
+    private readonly audit: AuditService,
+    private readonly requestContext: RequestContextService,
   ) {}
 
   async listByPerson(orgId: string, personId: string) {
@@ -80,7 +85,19 @@ export class CorrectiveActionsService {
         resultingState: newStatus.state,
         riskScore: newStatus.riskScore,
         recalculatedScore,
+        requestId: this.requestContext.requestId,
       },
+    })
+
+    await this.audit.log({
+      orgId,
+      action: AUDIT_ACTIONS.CORRECTIVE_ACTION_RESOLVED,
+      actorUserId: this.requestContext.userId,
+      actorPersonId: this.requestContext.personId,
+      entityType: 'CORRECTIVE_ACTION',
+      entityId: resolved.id,
+      context: 'Ação corretiva resolvida',
+      metadata: { requestId: this.requestContext.requestId, personId: resolved.personId },
     })
 
     return resolved

@@ -27,6 +27,9 @@ export class OrgContextInterceptor implements NestInterceptor {
     this.cls.set('isHttpRequest', true)
     this.cls.set('allowWithoutOrg', Boolean(isPublic))
 
+    const requestId = (request as any).requestId ?? request.headers['x-request-id'] ?? null
+    this.cls.set('requestId', requestId)
+
     if (user && user.orgId) {
       this.cls.set('orgId', user.orgId)
       this.cls.set('userId', user.sub || user.userId)

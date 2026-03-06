@@ -1,6 +1,7 @@
 import { Controller, Post, Get, Req, UseGuards, Body } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { OnboardingService } from './onboarding.service';
+import { Throttle } from '@nestjs/throttler';
 
 @Controller('onboarding')
 @UseGuards(JwtAuthGuard)
@@ -15,12 +16,14 @@ export class OnboardingController {
 
 
   @Post('complete')
+  @Throttle({ short: { limit: 10, ttl: 60000 } })
   async completeOnboarding(@Req() req: any) {
     const orgId = req.user.orgId;
     return this.onboardingService.completeOnboardingStep(orgId, 'createCharge');
   }
 
   @Post('complete-step')
+  @Throttle({ short: { limit: 10, ttl: 60000 } })
   async completeOnboardingStep(@Req() req: any, @Body('step') step: 'createCustomer' | 'createService' | 'createCharge') {
     const orgId = req.user.orgId;
     return this.onboardingService.completeOnboardingStep(orgId, step);

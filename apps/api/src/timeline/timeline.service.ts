@@ -1,4 +1,5 @@
 import { Injectable, Inject } from '@nestjs/common'
+import { RequestContextService } from '../common/context/request-context.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { TimelineQueryDto } from './dto/timeline-query.dto'
 
@@ -37,6 +38,7 @@ export class TimelineService {
   constructor(
     @Inject(PrismaService)
     private readonly prisma: PrismaService,
+    private readonly requestContext: RequestContextService,
   ) {}
 
   async log(input: TimelineLogInput) {
@@ -84,13 +86,18 @@ export class TimelineService {
       )
     }
 
+    const requestId = this.requestContext.requestId
+
     await this.prisma.timelineEvent.create({
       data: {
         orgId: input.orgId,
         action: input.action,
         personId,
         description: input.description ?? null,
-        metadata: input.metadata ?? {},
+        metadata: {
+          ...(input.metadata ?? {}),
+          ...(requestId ? { requestId } : {}),
+        },
       },
     })
   }
