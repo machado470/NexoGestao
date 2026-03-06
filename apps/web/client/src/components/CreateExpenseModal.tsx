@@ -14,7 +14,7 @@ export default function CreateExpenseModal({ open, onClose, onCreated }: Props) 
     description: "",
     amount: "",
     category: "",
-    dueDate: "", // UI pode continuar chamando de dueDate, mas no payload vira "date"
+    dueDate: "",
     notes: "",
   });
 
@@ -28,7 +28,7 @@ export default function CreateExpenseModal({ open, onClose, onCreated }: Props) 
       description: formData.description,
       amount,
       category: formData.category,
-      date: new Date(formData.dueDate), // ✅ backend espera "date"
+      dueDate: new Date(formData.dueDate),
       notes: formData.notes ? formData.notes : undefined,
     });
 

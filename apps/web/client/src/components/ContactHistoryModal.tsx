@@ -13,7 +13,7 @@ import {
 import { Loader2, Phone, Mail, MessageCircle, User, Plus, Trash2 } from "lucide-react";
 
 interface ContactHistoryModalProps {
-  customerId: number;
+  customerId: string;
   customerName: string;
   trigger?: React.ReactNode;
 }
@@ -68,7 +68,7 @@ export function ContactHistoryModal({
   };
 
   // Deletar contato
-  const handleDeleteContact = async (id: number) => {
+  const handleDeleteContact = async (id: string) => {
     if (!confirm("Tem certeza que deseja deletar este contato?")) return;
 
     try {

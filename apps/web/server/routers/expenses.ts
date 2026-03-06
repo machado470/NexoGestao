@@ -99,6 +99,21 @@ export const expensesRouter = router({
       return out;
     }),
 
+
+
+  summary: protectedProcedure.query(async ({ ctx }) => {
+    const out = await nexoFetch(ctx, `/expenses?page=1&limit=1000`, {
+      method: "GET",
+    });
+
+    const rows = Array.isArray(out) ? out : Array.isArray(out?.data) ? out.data : [];
+    const totalExpenses = rows.reduce((acc: number, item: any) => acc + Number(item?.amount ?? 0), 0);
+
+    return {
+      totalExpenses,
+      count: rows.length,
+    };
+  }),
   getById: protectedProcedure
     .input(z.object({ id: zId }))
     .query(async ({ input, ctx }) => {
