@@ -89,6 +89,7 @@ import { BillingModule } from './billing/billing.module'
 import { AnalyticsModule } from './analytics/analytics.module'
 import { AutomationModule } from './automation/automation.module'
 import { QueueModule } from './queue/queue.module'
+import { WebhookModule } from './webhooks/webhook.module'
 
 // 🚨 SENTRY (Monitoramento)
 import { SentryModule } from './common/sentry/sentry.module'
@@ -199,6 +200,7 @@ import { SentryModule } from './common/sentry/sentry.module'
     AnalyticsModule,
     AutomationModule,
     QueueModule,
+    WebhookModule,
 
     // 🚨 Sentry
     SentryModule,

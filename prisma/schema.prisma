@@ -163,6 +163,12 @@ enum NotificationType {
   RISK_LEVEL_CHANGED
 }
 
+enum WebhookDeliveryStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
 // ============================================================
 // ✅ Modelos Existentes
 // ============================================================
@@ -210,6 +216,7 @@ model Organization {
   usageMetrics  UsageMetric[]
   automationRules      AutomationRule[]
   automationExecutions AutomationExecution[]
+  webhookEndpoints     WebhookEndpoint[]
 
   updatedAt DateTime @updatedAt
 }
@@ -1011,6 +1018,41 @@ model QueueJob {
 
   @@index([queue, status, createdAt])
   @@unique([queue, jobId])
+}
+
+model WebhookEndpoint {
+  id     String       @id @default(uuid())
+  orgId  String
+  org    Organization @relation(fields: [orgId], references: [id])
+
+  url    String
+  secret String
+  active Boolean @default(true)
+  events Json
+
+  deliveries WebhookDelivery[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orgId, active, createdAt])
+}
+
+model WebhookDelivery {
+  id         String                @id @default(uuid())
+  endpointId String
+  endpoint   WebhookEndpoint       @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  eventType     String
+  payload       Json
+  status        WebhookDeliveryStatus @default(PENDING)
+  attempts      Int                 @default(0)
+  lastAttemptAt DateTime?
+  createdAt     DateTime            @default(now())
+
+  @@index([endpointId])
+  @@index([eventType])
+  @@index([status])
 }
 
 enum TrackItemType {

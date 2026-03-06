@@ -2,6 +2,7 @@ import { Injectable, Inject } from '@nestjs/common'
 import { RequestContextService } from '../common/context/request-context.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { TimelineQueryDto } from './dto/timeline-query.dto'
+import { WebhookDispatcher } from '../webhooks/webhook.dispatcher'
 
 type TimelineLogInput = {
   orgId: string
@@ -39,6 +40,7 @@ export class TimelineService {
     @Inject(PrismaService)
     private readonly prisma: PrismaService,
     private readonly requestContext: RequestContextService,
+    private readonly webhookDispatcher: WebhookDispatcher,
   ) {}
 
   async log(input: TimelineLogInput) {
@@ -88,7 +90,7 @@ export class TimelineService {
 
     const requestId = this.requestContext.requestId
 
-    await this.prisma.timelineEvent.create({
+    const event = await this.prisma.timelineEvent.create({
       data: {
         orgId: input.orgId,
         action: input.action,
@@ -98,6 +100,17 @@ export class TimelineService {
           ...(input.metadata ?? {}),
           ...(requestId ? { requestId } : {}),
         },
+      },
+    })
+
+    await this.webhookDispatcher.dispatchTimelineEvent({
+      orgId: input.orgId,
+      action: input.action,
+      timelineEventId: event.id,
+      data: {
+        personId,
+        description: input.description ?? null,
+        metadata: input.metadata ?? null,
       },
     })
   }

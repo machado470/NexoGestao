@@ -3,6 +3,7 @@ export const QUEUE_NAMES = {
   NOTIFICATIONS: 'notifications',
   WHATSAPP: 'whatsapp',
   FINANCE: 'finance',
+  WEBHOOKS: 'webhooks',
 } as const
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES]
