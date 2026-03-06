@@ -93,6 +93,14 @@ export const nexoProxyRouter = router({
         if (token) setTokenCookie(ctx as any, token);
         return result;
       }),
+    register: publicProcedure
+      .input(z.object({ orgName: z.string(), adminName: z.string(), email: z.string().email(), password: z.string().min(8) }))
+      .mutation(async ({ input }) => {
+        return await nexoFetch("/auth/register", {
+          method: "POST",
+          body: JSON.stringify(input),
+        });
+      }),
     logout: publicProcedure.mutation(async ({ ctx }) => {
       clearTokenCookie(ctx as any);
       return { ok: true };
@@ -220,6 +228,27 @@ export const nexoProxyRouter = router({
         headers: authHeader ? { Authorization: authHeader } : {},
       });
     }),
+    startExecution: publicProcedure.input(z.object({ id: z.string() })).mutation(async ({ input, ctx }) => {
+      const authHeader = getAuthHeader(ctx as any);
+      return await nexoFetch(`/service-orders/${input.id}/execution/start`, {
+        method: "POST",
+        headers: authHeader ? { Authorization: authHeader } : {},
+      });
+    }),
+    completeExecutionStep: publicProcedure.input(z.object({ id: z.string(), stepId: z.string() })).mutation(async ({ input, ctx }) => {
+      const authHeader = getAuthHeader(ctx as any);
+      return await nexoFetch(`/service-orders/${input.id}/execution/steps/${input.stepId}/complete`, {
+        method: "POST",
+        headers: authHeader ? { Authorization: authHeader } : {},
+      });
+    }),
+    finishExecution: publicProcedure.input(z.object({ id: z.string() })).mutation(async ({ input, ctx }) => {
+      const authHeader = getAuthHeader(ctx as any);
+      return await nexoFetch(`/service-orders/${input.id}/execution/finish`, {
+        method: "POST",
+        headers: authHeader ? { Authorization: authHeader } : {},
+      });
+    }),
     delete: publicProcedure.input(z.object({ id: z.string() })).mutation(async ({ input, ctx }) => {
       const authHeader = getAuthHeader(ctx as any);
       return await nexoFetch(`/service-orders/${input.id}`, {
@@ -298,6 +327,52 @@ export const nexoProxyRouter = router({
           headers: authHeader ? { Authorization: authHeader } : {},
         });
       }),
+    }),
+  }),
+
+
+
+  expenses: router({
+    list: publicProcedure.input(z.any().optional()).query(async ({ input, ctx }) => {
+      const authHeader = getAuthHeader(ctx as any);
+      const query = input ? "?" + new URLSearchParams(input).toString() : "";
+      return await nexoFetch(`/expenses${query}`, { headers: authHeader ? { Authorization: authHeader } : {} });
+    }),
+    create: publicProcedure.input(z.any()).mutation(async ({ input, ctx }) => {
+      const authHeader = getAuthHeader(ctx as any);
+      return await nexoFetch(`/expenses`, { method: "POST", body: JSON.stringify(input), headers: authHeader ? { Authorization: authHeader } : {} });
+    }),
+    update: publicProcedure.input(z.object({ id: z.string(), data: z.any() })).mutation(async ({ input, ctx }) => {
+      const authHeader = getAuthHeader(ctx as any);
+      return await nexoFetch(`/expenses/${input.id}`, { method: "PATCH", body: JSON.stringify(input.data), headers: authHeader ? { Authorization: authHeader } : {} });
+    }),
+    delete: publicProcedure.input(z.object({ id: z.string() })).mutation(async ({ input, ctx }) => {
+      const authHeader = getAuthHeader(ctx as any);
+      return await nexoFetch(`/expenses/${input.id}`, { method: "DELETE", headers: authHeader ? { Authorization: authHeader } : {} });
+    }),
+  }),
+
+  invoices: router({
+    list: publicProcedure.input(z.any().optional()).query(async ({ input, ctx }) => {
+      const authHeader = getAuthHeader(ctx as any);
+      const query = input ? "?" + new URLSearchParams(input).toString() : "";
+      return await nexoFetch(`/invoices${query}`, { headers: authHeader ? { Authorization: authHeader } : {} });
+    }),
+    create: publicProcedure.input(z.any()).mutation(async ({ input, ctx }) => {
+      const authHeader = getAuthHeader(ctx as any);
+      return await nexoFetch(`/invoices`, { method: "POST", body: JSON.stringify(input), headers: authHeader ? { Authorization: authHeader } : {} });
+    }),
+    update: publicProcedure.input(z.object({ id: z.string(), data: z.any() })).mutation(async ({ input, ctx }) => {
+      const authHeader = getAuthHeader(ctx as any);
+      return await nexoFetch(`/invoices/${input.id}`, { method: "PATCH", body: JSON.stringify(input.data), headers: authHeader ? { Authorization: authHeader } : {} });
+    }),
+    delete: publicProcedure.input(z.object({ id: z.string() })).mutation(async ({ input, ctx }) => {
+      const authHeader = getAuthHeader(ctx as any);
+      return await nexoFetch(`/invoices/${input.id}`, { method: "DELETE", headers: authHeader ? { Authorization: authHeader } : {} });
+    }),
+    summary: publicProcedure.query(async ({ ctx }) => {
+      const authHeader = getAuthHeader(ctx as any);
+      return await nexoFetch(`/invoices/summary`, { headers: authHeader ? { Authorization: authHeader } : {} });
     }),
   }),
 

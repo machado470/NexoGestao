@@ -40,6 +40,7 @@ export default function ServiceOrdersPage() {
   const limit = 20;
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("");
+  const [stepIds, setStepIds] = useState<Record<string, string>>({});
 
   const listQuery = trpc.nexo.serviceOrders.list.useQuery({ page, limit });
   const updateMutation = trpc.nexo.serviceOrders.update.useMutation({
@@ -55,6 +56,28 @@ export default function ServiceOrdersPage() {
       listQuery.refetch();
     },
     onError: (err: any) => toast.error(err.message || "Erro ao remover OS"),
+  });
+
+  const startExecutionMutation = trpc.nexo.serviceOrders.startExecution.useMutation({
+    onSuccess: () => {
+      toast.success("Execução iniciada.");
+      listQuery.refetch();
+    },
+    onError: (err: any) => toast.error(err.message || "Erro ao iniciar execução"),
+  });
+  const completeStepMutation = trpc.nexo.serviceOrders.completeExecutionStep.useMutation({
+    onSuccess: () => {
+      toast.success("Etapa marcada como concluída.");
+      listQuery.refetch();
+    },
+    onError: (err: any) => toast.error(err.message || "Erro ao concluir etapa"),
+  });
+  const finishExecutionMutation = trpc.nexo.serviceOrders.finishExecution.useMutation({
+    onSuccess: () => {
+      toast.success("Execução finalizada.");
+      listQuery.refetch();
+    },
+    onError: (err: any) => toast.error(err.message || "Erro ao finalizar execução"),
   });
 
   const serviceOrders = (listQuery.data?.data ?? []) as any[];
@@ -207,6 +230,25 @@ export default function ServiceOrdersPage() {
                       <option key={val} value={val}>{label}</option>
                     ))}
                   </select>
+                  <Button size="sm" variant="outline" onClick={() => startExecutionMutation.mutate({ id: String(os.id) })}>
+                    Iniciar execução
+                  </Button>
+                  <input
+                    className="w-20 text-xs border border-gray-200 dark:border-gray-600 rounded px-2 py-1 dark:bg-gray-700"
+                    placeholder="stepId"
+                    value={stepIds[String(os.id)] ?? ""}
+                    onChange={(e) => setStepIds((prev) => ({ ...prev, [String(os.id)]: e.target.value }))}
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => completeStepMutation.mutate({ id: String(os.id), stepId: stepIds[String(os.id)] || "1" })}
+                  >
+                    Concluir etapa
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => finishExecutionMutation.mutate({ id: String(os.id) })}>
+                    Finalizar execução
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"
