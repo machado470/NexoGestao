@@ -168,7 +168,7 @@ export const dataRouter = router({
         });
 
         if (ctx.user?.organizationId && input.status === "CONFIRMED") {
-          emitOperationalNotification({
+          await emitOperationalNotification({
             orgId: ctx.user.organizationId,
             type: "APPOINTMENT_CONFIRMED",
             metadata: { appointmentId: result?.id ?? null },
@@ -176,7 +176,7 @@ export const dataRouter = router({
         }
 
         if (ctx.user?.organizationId && input.status === "NO_SHOW") {
-          emitOperationalNotification({
+          await emitOperationalNotification({
             orgId: ctx.user.organizationId,
             type: "APPOINTMENT_NO_SHOW",
             metadata: { appointmentId: result?.id ?? null },
@@ -246,7 +246,7 @@ export const dataRouter = router({
         });
 
         if (ctx.user?.organizationId && input.status === "CONFIRMED") {
-          emitOperationalNotification({
+          await emitOperationalNotification({
             orgId: ctx.user.organizationId,
             type: "APPOINTMENT_CONFIRMED",
             metadata: { appointmentId: id },
@@ -254,7 +254,7 @@ export const dataRouter = router({
         }
 
         if (ctx.user?.organizationId && input.status === "NO_SHOW") {
-          emitOperationalNotification({
+          await emitOperationalNotification({
             orgId: ctx.user.organizationId,
             type: "APPOINTMENT_NO_SHOW",
             metadata: { appointmentId: id },
@@ -300,7 +300,7 @@ export const dataRouter = router({
         });
 
         if (ctx.user?.organizationId && input.status === "DONE") {
-          emitOperationalNotification({
+          await emitOperationalNotification({
             orgId: ctx.user.organizationId,
             type: "SERVICE_ORDER_COMPLETED",
             metadata: { serviceOrderId: result?.id ?? null },
@@ -366,7 +366,7 @@ export const dataRouter = router({
         });
 
         if (ctx.user?.organizationId && input.status === "DONE") {
-          emitOperationalNotification({
+          await emitOperationalNotification({
             orgId: ctx.user.organizationId,
             type: "SERVICE_ORDER_COMPLETED",
             metadata: { serviceOrderId: id },

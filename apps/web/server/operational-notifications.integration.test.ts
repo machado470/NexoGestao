@@ -1,8 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { PrismaClient } from "@prisma/client";
 import { appRouter } from "./routers";
 import { __resetOperationalNotificationsForTests } from "./_core/operationalNotifications";
 
-function createCtx(orgId: number) {
+const prisma = new PrismaClient();
+const ORG_10_ID = "00000000-0000-0000-0000-000000000010";
+const ORG_20_ID = "00000000-0000-0000-0000-000000000020";
+
+function createCtx(orgId: string) {
   return {
     req: { headers: { cookie: "nexo_token=test-token" } },
     res: {},
@@ -15,8 +20,32 @@ function createCtx(orgId: number) {
 }
 
 describe("Operational notifications integration", () => {
-  beforeEach(() => {
-    __resetOperationalNotificationsForTests();
+  beforeEach(async () => {
+    await prisma.notification.deleteMany({
+      where: { orgId: { in: [ORG_10_ID, ORG_20_ID] } },
+    });
+
+    await prisma.organization.upsert({
+      where: { id: ORG_10_ID },
+      update: {},
+      create: {
+        id: ORG_10_ID,
+        name: "Test Org 10",
+        slug: "test-org-10",
+      },
+    });
+
+    await prisma.organization.upsert({
+      where: { id: ORG_20_ID },
+      update: {},
+      create: {
+        id: ORG_20_ID,
+        name: "Test Org 20",
+        slug: "test-org-20",
+      },
+    });
+
+    await __resetOperationalNotificationsForTests();
 
     vi.stubGlobal(
       "fetch",
@@ -28,7 +57,7 @@ describe("Operational notifications integration", () => {
   });
 
   it("generates notifications for required operational events", async () => {
-    const caller = appRouter.createCaller(createCtx(10));
+    const caller = appRouter.createCaller(createCtx(ORG_10_ID));
 
     await caller.data.appointments.update({ id: "apt-1", status: "CONFIRMED" });
     await caller.data.appointments.update({ id: "apt-2", status: "NO_SHOW" });
@@ -48,11 +77,12 @@ describe("Operational notifications integration", () => {
     expect(types).toContain("SERVICE_ORDER_COMPLETED");
     expect(types).toContain("PAYMENT_OVERDUE");
     expect(types).toContain("RISK_LEVEL_CHANGED");
+    expect(notifications.every((n) => n.orgId === ORG_10_ID)).toBe(true);
   });
 
   it("scopes notifications by orgId and keeps them visible in dashboard query", async () => {
-    const callerOrg10 = appRouter.createCaller(createCtx(10));
-    const callerOrg20 = appRouter.createCaller(createCtx(20));
+    const callerOrg10 = appRouter.createCaller(createCtx(ORG_10_ID));
+    const callerOrg20 = appRouter.createCaller(createCtx(ORG_20_ID));
 
     await callerOrg10.data.appointments.update({ id: "apt-10", status: "CONFIRMED" });
     await callerOrg20.data.appointments.update({ id: "apt-20", status: "CONFIRMED" });
@@ -65,5 +95,7 @@ describe("Operational notifications integration", () => {
 
     expect(org10Notifications[0]?.metadata).toMatchObject({ appointmentId: "apt-10" });
     expect(org20Notifications[0]?.metadata).toMatchObject({ appointmentId: "apt-20" });
+    expect(org10Notifications[0]?.orgId).toBe(ORG_10_ID);
+    expect(org20Notifications[0]?.orgId).toBe(ORG_20_ID);
   });
 });
