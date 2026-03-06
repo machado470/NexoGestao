@@ -7,10 +7,16 @@ import { router, protectedProcedure } from "../_core/trpc";
  */
 
 export const dashboardRouter = router({
-  status: protectedProcedure.query(async () => {
-    return {
-      ok: true,
-      message: "Dashboard router placeholder",
-    };
+  status: protectedProcedure.query(async () => ({
+    ok: true,
+    message: "Dashboard router placeholder",
+  })),
+
+  dashboard: router({
+    kpis: protectedProcedure.query(async () => ({} as Record<string, unknown>)),
+    revenueTrend: protectedProcedure.query(async () => [] as Array<Record<string, unknown>>),
+    appointmentDistribution: protectedProcedure.query(async () => [] as Array<Record<string, unknown>>),
+    chargeDistribution: protectedProcedure.query(async () => [] as Array<Record<string, unknown>>),
+    performanceMetrics: protectedProcedure.query(async () => [] as Array<Record<string, unknown>>),
   }),
 });

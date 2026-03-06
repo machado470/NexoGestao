@@ -84,23 +84,23 @@ export default function ExecutiveDashboard() {
   const performanceQuery = trpc.dashboard.dashboard.performanceMetrics.useQuery(undefined);
 
   useEffect(() => {
-    if (kpisQuery.data) setKpis(kpisQuery.data as KPIs);
+    if (kpisQuery.data) setKpis(kpisQuery.data as unknown as KPIs);
   }, [kpisQuery.data]);
 
   useEffect(() => {
-    if (revenueTrendQuery.data) setRevenueTrend(revenueTrendQuery.data as RevenueTrend[]);
+    if (revenueTrendQuery.data) setRevenueTrend(revenueTrendQuery.data as unknown as RevenueTrend[]);
   }, [revenueTrendQuery.data]);
 
   useEffect(() => {
-    if (appointmentDistQuery.data) setAppointmentDist(appointmentDistQuery.data as Distribution[]);
+    if (appointmentDistQuery.data) setAppointmentDist(appointmentDistQuery.data as unknown as Distribution[]);
   }, [appointmentDistQuery.data]);
 
   useEffect(() => {
-    if (chargeDistQuery.data) setChargeDist(chargeDistQuery.data as Distribution[]);
+    if (chargeDistQuery.data) setChargeDist(chargeDistQuery.data as unknown as Distribution[]);
   }, [chargeDistQuery.data]);
 
   useEffect(() => {
-    if (performanceQuery.data) setPerformanceMetrics(performanceQuery.data as PerformanceMetric[]);
+    if (performanceQuery.data) setPerformanceMetrics(performanceQuery.data as unknown as PerformanceMetric[]);
   }, [performanceQuery.data]);
 
   const isLoading = kpisQuery.isLoading;
