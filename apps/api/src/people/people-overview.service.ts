@@ -16,9 +16,9 @@ export class PeopleOverviewService {
     private readonly correctives: CorrectiveActionsService,
   ) {}
 
-  async getOverview(personId: string) {
-    const person = await this.prisma.person.findUnique({
-      where: { id: personId },
+  async getOverview(orgId: string, personId: string) {
+    const person = await this.prisma.person.findFirst({
+      where: { id: personId, orgId },
       select: {
         id: true,
         name: true,
@@ -66,6 +66,7 @@ export class PeopleOverviewService {
 
     const correctiveActions =
       await this.correctives.listByPerson(
+        orgId,
         personId,
       )
 

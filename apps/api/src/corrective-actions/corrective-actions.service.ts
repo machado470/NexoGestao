@@ -13,22 +13,28 @@ export class CorrectiveActionsService {
     private readonly risk: RiskService,
   ) {}
 
-  async listByPerson(personId: string) {
+  async listByPerson(orgId: string, personId: string) {
     return this.prisma.correctiveAction.findMany({
-      where: { personId },
+      where: {
+        personId,
+        person: { orgId },
+      },
       orderBy: { createdAt: 'desc' },
     })
   }
 
-  async resolve(id: string) {
-    const action = await this.prisma.correctiveAction.findUnique({
-      where: { id },
+  async resolve(orgId: string, id: string) {
+    const action = await this.prisma.correctiveAction.findFirst({
+      where: {
+        id,
+        person: { orgId },
+      },
     })
 
     if (!action) return null
 
-    const person = await this.prisma.person.findUnique({
-      where: { id: action.personId },
+    const person = await this.prisma.person.findFirst({
+      where: { id: action.personId, orgId },
       select: { orgId: true },
     })
 
@@ -38,13 +44,24 @@ export class CorrectiveActionsService {
 
     const resolvedAt = new Date()
 
-    const resolved = await this.prisma.correctiveAction.update({
-      where: { id },
+    const result = await this.prisma.correctiveAction.updateMany({
+      where: {
+        id,
+        person: { orgId },
+      },
       data: {
         status: 'DONE',
         resolvedAt,
       },
     })
+
+    if (result.count === 0) return null
+
+    const resolved = await this.prisma.correctiveAction.findFirst({
+      where: { id, person: { orgId } },
+    })
+
+    if (!resolved) return null
 
     const recalculatedScore = await this.risk.recalculatePersonRisk(
       action.personId,
@@ -69,10 +86,11 @@ export class CorrectiveActionsService {
     return resolved
   }
 
-  async processReassessment(personId: string) {
+  async processReassessment(orgId: string, personId: string) {
     const lastOpen = await this.prisma.correctiveAction.findFirst({
       where: {
         personId,
+        person: { orgId },
         status: 'OPEN',
       },
       orderBy: { createdAt: 'desc' },
@@ -81,7 +99,7 @@ export class CorrectiveActionsService {
 
     if (!lastOpen) return { reassessed: true, resolved: false }
 
-    const resolved = await this.resolve(lastOpen.id)
+    const resolved = await this.resolve(orgId, lastOpen.id)
     return {
       reassessed: true,
       resolved: !!resolved,

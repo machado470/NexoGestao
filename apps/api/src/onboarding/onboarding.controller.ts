@@ -13,6 +13,13 @@ export class OnboardingController {
     return this.onboardingService.getOnboardingStatus(orgId);
   }
 
+
+  @Post('complete')
+  async completeOnboarding(@Req() req: any) {
+    const orgId = req.user.orgId;
+    return this.onboardingService.completeOnboardingStep(orgId, 'createCharge');
+  }
+
   @Post('complete-step')
   async completeOnboardingStep(@Req() req: any, @Body('step') step: 'createCustomer' | 'createService' | 'createCharge') {
     const orgId = req.user.orgId;
