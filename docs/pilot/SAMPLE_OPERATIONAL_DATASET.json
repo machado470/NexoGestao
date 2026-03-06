@@ -1,0 +1,92 @@
+{
+  "organization": {
+    "name": "Serviços Viva - Ambiente Piloto",
+    "slug": "pilot-servicos-viva",
+    "timezone": "America/Sao_Paulo",
+    "currency": "BRL"
+  },
+  "customers": [
+    {
+      "name": "Condomínio Parque das Flores",
+      "segment": "Condomínio residencial",
+      "email": "sindico@parquedasflores.com.br",
+      "phone": "5511987112233"
+    },
+    {
+      "name": "Clínica Vida Leve",
+      "segment": "Saúde",
+      "email": "compras@clinicaleve.com.br",
+      "phone": "5511933557799"
+    },
+    {
+      "name": "Restaurante Sabor da Serra",
+      "segment": "Alimentação",
+      "email": "proprietario@sabordaserra.com.br",
+      "phone": "5511974431188"
+    },
+    {
+      "name": "Escola Crescer Mais",
+      "segment": "Educação",
+      "email": "diretoria@crescermais.edu.br",
+      "phone": "5511911223344"
+    },
+    {
+      "name": "Loja Center Tech",
+      "segment": "Varejo",
+      "email": "financeiro@centertech.com.br",
+      "phone": "5511945670033"
+    }
+  ],
+  "appointments": {
+    "total": 5,
+    "byStatus": {
+      "CONFIRMED": 2,
+      "SCHEDULED": 1,
+      "DONE": 1,
+      "NO_SHOW": 1
+    }
+  },
+  "serviceOrders": {
+    "total": 5,
+    "byStatus": {
+      "OPEN": 2,
+      "ASSIGNED": 1,
+      "IN_PROGRESS": 1,
+      "DONE": 1
+    }
+  },
+  "invoices": {
+    "total": 4,
+    "amountCents": 483000,
+    "byStatus": {
+      "DRAFT": 1,
+      "ISSUED": 2,
+      "PAID": 1
+    }
+  },
+  "charges": {
+    "withServiceOrder": 2,
+    "standalone": 2,
+    "byStatus": {
+      "PENDING": 2,
+      "PAID": 1,
+      "OVERDUE": 1
+    }
+  },
+  "expenses": {
+    "total": 5,
+    "amountCents": 91730,
+    "categories": [
+      "OPERATIONAL",
+      "SUPPLIES",
+      "INFRASTRUCTURE",
+      "MARKETING",
+      "PAYROLL"
+    ]
+  },
+  "launches": {
+    "total": 4,
+    "incomeCents": 283000,
+    "expenseCents": 44240
+  }
+}
