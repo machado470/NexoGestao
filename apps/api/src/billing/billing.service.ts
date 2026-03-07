@@ -1,17 +1,20 @@
 import {
   Injectable,
   Logger,
-  BadRequestException,
   NotFoundException,
-  ForbiddenException,
   ServiceUnavailableException,
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { PrismaService } from '../prisma/prisma.service'
-import { PlanName, SubscriptionStatus, BillingEventType, BillingEventStatus } from '@prisma/client'
+import {
+  PlanName,
+  SubscriptionStatus,
+  BillingEventType,
+  BillingEventStatus,
+} from '@prisma/client'
 import Stripe from 'stripe'
+import { QuotasService } from '../quotas/quotas.service'
 
-// Mapeamento de planos para Price IDs do Stripe (configurar via env)
 const PLAN_PRICE_MAP: Record<string, string> = {
   FREE: '',
   STARTER: process.env.STRIPE_PRICE_STARTER ?? 'price_starter',
@@ -19,14 +22,16 @@ const PLAN_PRICE_MAP: Record<string, string> = {
   BUSINESS: process.env.STRIPE_PRICE_BUSINESS ?? 'price_business',
 }
 
-// Limites por plano
-export const PLAN_LIMITS: Record<string, {
-  customers: number
-  users: number
-  serviceOrders: number
-  appointments: number
-  label: string
-}> = {
+export const PLAN_LIMITS: Record<
+  string,
+  {
+    customers: number
+    users: number
+    serviceOrders: number
+    appointments: number
+    label: string
+  }
+> = {
   FREE: {
     customers: 5,
     users: 2,
@@ -59,518 +64,147 @@ export const PLAN_LIMITS: Record<string, {
 
 @Injectable()
 export class BillingService {
+
   private readonly logger = new Logger(BillingService.name)
   private stripe: Stripe | null = null
-
-  /** Flag: true se Stripe está configurado e disponível */
-  get isStripeConfigured(): boolean {
-    return this.stripe !== null
-  }
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    private readonly quotasService: QuotasService,
   ) {
+
     const secretKey = this.config.get<string>('STRIPE_SECRET_KEY')
-    const isProduction = this.config.get<string>('NODE_ENV') === 'production'
+
     if (secretKey) {
-      this.stripe = new Stripe(secretKey, {
-        apiVersion: '2024-06-20',
-      })
-      this.logger.log('Stripe inicializado com sucesso')
+      this.stripe = new Stripe(secretKey, { apiVersion: '2024-06-20' })
+      this.logger.log('Stripe inicializado')
     } else {
-      if (isProduction) {
-        this.logger.warn(
-          'STRIPE_SECRET_KEY não configurado em produção — módulo billing responderá 503 para operações Stripe',
-        )
-      } else {
-        this.logger.warn('STRIPE_SECRET_KEY não configurado — billing em modo simulado')
-      }
+      this.logger.warn('Stripe não configurado — modo simulado')
     }
+
   }
 
-  /**
-   * Valida se o Stripe está disponível para operações que o exigem em produção.
-   * Em desenvolvimento, permite modo simulado.
-   * Em produção, retorna 503 com mensagem clara.
-   */
-  private assertStripeAvailable(operation: string): void {
+  get isStripeConfigured(): boolean {
+    return this.stripe !== null
+  }
+
+  private assertStripeAvailable(operation: string) {
+
     if (this.stripe) return
-    const isProduction = this.config.get<string>('NODE_ENV') === 'production'
-    if (isProduction) {
+
+    if (this.config.get<string>('NODE_ENV') === 'production') {
       throw new ServiceUnavailableException(
-        `Módulo de billing indisponível: STRIPE_SECRET_KEY não configurado. ` +
-          `Configure a variável de ambiente e reinicie o servidor. ` +
-          `Operação solicitada: ${operation}`,
+        `Stripe não configurado (${operation})`,
       )
     }
+
   }
 
-  /**
-   * Valida se o webhook secret está configurado (obrigatório em produção).
-   */
-  private assertWebhookSecretAvailable(): string {
-    const webhookSecret = this.config.get<string>('STRIPE_WEBHOOK_SECRET')
-    if (!webhookSecret) {
-      const isProduction = this.config.get<string>('NODE_ENV') === 'production'
-      if (isProduction) {
-        throw new ServiceUnavailableException(
-          'Módulo de billing indisponível: STRIPE_WEBHOOK_SECRET não configurado. ' +
-            'Configure a variável de ambiente e reinicie o servidor.',
-        )
-      }
-    }
-    return webhookSecret ?? ''
-  }
+  /*
+  ========================================
+  CHECKOUT
+  ========================================
+  */
 
-  // ─── Criar Checkout Session ────────────────────────────────────────────────
+  async createCheckoutSession(
+    orgId: string,
+    planName: PlanName,
+    successUrl?: string,
+    cancelUrl?: string,
+  ) {
 
-  async createCheckoutSession(orgId: string, planName: PlanName, successUrl: string, cancelUrl: string) {
-    // Em produção, lança 503 se Stripe não estiver configurado
-    this.assertStripeAvailable('create-checkout-session')
     if (!this.stripe) {
       return this.simulateCheckoutSession(orgId, planName)
     }
 
-    const plan = await this.prisma.plan.findUnique({ where: { name: planName } })
-    if (!plan) throw new NotFoundException(`Plano ${planName} não encontrado`)
-
     const priceId = PLAN_PRICE_MAP[planName]
-    if (!priceId) throw new BadRequestException(`Plano ${planName} não possui Price ID configurado no Stripe`)
 
-    const subscription = await this.prisma.subscription.findUnique({ where: { orgId } })
-    const org = await this.prisma.organization.findUnique({ where: { id: orgId } })
-    if (!org) throw new NotFoundException('Organização não encontrada')
-
-    let customerId = subscription?.stripeCustomerId
-
-    // Criar ou reutilizar customer no Stripe
-    if (!customerId) {
-      const customer = await this.stripe.customers.create({
-        name: org.name,
-        metadata: { orgId, slug: org.slug },
-      })
-      customerId = customer.id
-
-      if (subscription) {
-        await this.prisma.subscription.update({
-          where: { orgId },
-          data: { stripeCustomerId: customerId },
-        })
-      }
+    if (!priceId) {
+      throw new Error(`Plano ${planName} não possui priceId`)
     }
 
     const session = await this.stripe.checkout.sessions.create({
-      customer: customerId,
       payment_method_types: ['card'],
       line_items: [{ price: priceId, quantity: 1 }],
       mode: 'subscription',
-      success_url: successUrl ?? `${this.config.get('FRONTEND_URL')}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: cancelUrl ?? `${this.config.get('FRONTEND_URL')}/billing/cancel`,
+      success_url: successUrl ?? 'http://localhost:5173/billing/success',
+      cancel_url: cancelUrl ?? 'http://localhost:5173/billing/cancel',
       metadata: { orgId, planName },
-      subscription_data: {
-        metadata: { orgId, planName },
-      },
     })
 
-    // Salvar session ID
-    if (subscription) {
-      await this.prisma.subscription.update({
-        where: { orgId },
-        data: { stripeCheckoutSessionId: session.id },
-      })
+    return {
+      url: session.url,
+      sessionId: session.id,
     }
 
-    this.logger.log(`Checkout session criada para org ${orgId}: ${session.id}`)
-    return { url: session.url, sessionId: session.id }
   }
 
-  // ─── Processar Webhook do Stripe ──────────────────────────────────────────
+  /*
+  ========================================
+  WEBHOOK
+  ========================================
+  */
 
   async handleWebhook(rawBody: Buffer, signature: string) {
-    // Valida se webhook secret está configurado (503 em produção se não estiver)
-    const webhookSecret = this.assertWebhookSecretAvailable()
 
-    if (!this.stripe || !webhookSecret) {
-      this.logger.warn('Webhook recebido mas Stripe não configurado — ignorando')
+    if (!this.stripe) {
+      this.logger.warn('Webhook recebido mas Stripe não configurado')
       return { received: true, simulated: true }
     }
 
-    let event: Stripe.Event
-    try {
-      event = this.stripe.webhooks.constructEvent(rawBody, signature, webhookSecret)
-    } catch (err) {
-      this.logger.error(`Webhook signature inválida: ${err.message}`)
-      throw new BadRequestException(`Webhook Error: ${err.message}`)
+    const secret = this.config.get<string>('STRIPE_WEBHOOK_SECRET')
+
+    if (!secret) {
+      throw new ServiceUnavailableException(
+        'STRIPE_WEBHOOK_SECRET não configurado',
+      )
     }
 
-    this.logger.log(`Webhook recebido: ${event.type} (${event.id})`)
+    const event = this.stripe.webhooks.constructEvent(
+      rawBody,
+      signature,
+      secret,
+    )
 
-    // Idempotência: verificar se já processamos este evento
-    const existing = await this.prisma.billingEvent.findUnique({
-      where: { stripeEventId: event.id },
-    })
-    if (existing) {
-      this.logger.log(`Evento ${event.id} já processado — ignorando`)
-      return { received: true, duplicate: true }
-    }
-
-    switch (event.type) {
-      case 'checkout.session.completed':
-        await this.handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session, event.id)
-        break
-
-      case 'customer.subscription.updated':
-        await this.handleSubscriptionUpdated(event.data.object as Stripe.Subscription, event.id)
-        break
-
-      case 'customer.subscription.deleted':
-        await this.handleSubscriptionDeleted(event.data.object as Stripe.Subscription, event.id)
-        break
-
-      case 'invoice.payment_succeeded':
-        await this.handlePaymentSucceeded(event.data.object as Stripe.Invoice, event.id)
-        break
-
-      case 'invoice.payment_failed':
-        await this.handlePaymentFailed(event.data.object as Stripe.Invoice, event.id)
-        break
-
-      default:
-        this.logger.log(`Evento não tratado: ${event.type}`)
-    }
+    this.logger.log(`Webhook recebido: ${event.type}`)
 
     return { received: true }
+
   }
 
-  // ─── Handlers de Webhook ──────────────────────────────────────────────────
-
-  private async handleCheckoutCompleted(session: Stripe.Checkout.Session, eventId: string) {
-    const orgId = session.metadata?.orgId
-    const planName = session.metadata?.planName as PlanName
-
-    if (!orgId || !planName) {
-      this.logger.error('Checkout sem orgId ou planName no metadata')
-      return
-    }
-
-    const plan = await this.prisma.plan.findUnique({ where: { name: planName } })
-    if (!plan) {
-      this.logger.error(`Plano ${planName} não encontrado`)
-      return
-    }
-
-    const stripeSubscriptionId = session.subscription as string
-    let stripeSubscription: Stripe.Subscription | null = null
-
-    if (this.stripe && stripeSubscriptionId) {
-      stripeSubscription = await this.stripe.subscriptions.retrieve(stripeSubscriptionId)
-    }
-
-    const periodStart = stripeSubscription?.current_period_start
-      ? new Date(stripeSubscription.current_period_start * 1000)
-      : new Date()
-    const periodEnd = stripeSubscription?.current_period_end
-      ? new Date(stripeSubscription.current_period_end * 1000)
-      : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-
-    const subscription = await this.prisma.subscription.upsert({
-      where: { orgId },
-      create: {
-        orgId,
-        planId: plan.id,
-        status: SubscriptionStatus.ACTIVE,
-        stripeCustomerId: session.customer as string,
-        stripeSubscriptionId,
-        stripeCheckoutSessionId: session.id,
-        stripePriceId: stripeSubscription?.items?.data?.[0]?.price?.id,
-        currentPeriodStart: periodStart,
-        currentPeriodEnd: periodEnd,
-        trialEndsAt: null,
-      },
-      update: {
-        planId: plan.id,
-        status: SubscriptionStatus.ACTIVE,
-        stripeCustomerId: session.customer as string,
-        stripeSubscriptionId,
-        stripeCheckoutSessionId: session.id,
-        stripePriceId: stripeSubscription?.items?.data?.[0]?.price?.id,
-        currentPeriodStart: periodStart,
-        currentPeriodEnd: periodEnd,
-        canceledAt: null,
-        trialEndsAt: null,
-      },
-    })
-
-    await this.prisma.billingEvent.create({
-      data: {
-        subscriptionId: subscription.id,
-        type: BillingEventType.PAYMENT,
-        amountCents: (session.amount_total ?? 0),
-        status: BillingEventStatus.COMPLETED,
-        externalId: session.id,
-        stripeEventId: eventId,
-        description: `Checkout completado — Plano ${planName}`,
-        metadata: { sessionId: session.id, planName },
-      },
-    })
-
-    this.logger.log(`Subscription ATIVADA para org ${orgId} — Plano ${planName}`)
-  }
-
-  private async handleSubscriptionUpdated(stripeSubscription: Stripe.Subscription, eventId: string) {
-    const orgId = stripeSubscription.metadata?.orgId
-    if (!orgId) return
-
-    const planName = stripeSubscription.metadata?.planName as PlanName
-    const plan = planName ? await this.prisma.plan.findUnique({ where: { name: planName } }) : null
-
-    const status = this.mapStripeStatus(stripeSubscription.status)
-
-    const subscription = await this.prisma.subscription.findUnique({ where: { orgId } })
-    if (!subscription) return
-
-    await this.prisma.subscription.update({
-      where: { orgId },
-      data: {
-        status,
-        ...(plan ? { planId: plan.id } : {}),
-        currentPeriodStart: new Date(stripeSubscription.current_period_start * 1000),
-        currentPeriodEnd: new Date(stripeSubscription.current_period_end * 1000),
-        canceledAt: stripeSubscription.canceled_at
-          ? new Date(stripeSubscription.canceled_at * 1000)
-          : null,
-      },
-    })
-
-    await this.prisma.billingEvent.create({
-      data: {
-        subscriptionId: subscription.id,
-        type: BillingEventType.CHARGE,
-        amountCents: 0,
-        status: BillingEventStatus.COMPLETED,
-        stripeEventId: eventId,
-        description: `Subscription atualizada — status: ${status}`,
-        metadata: { stripeStatus: stripeSubscription.status },
-      },
-    })
-
-    this.logger.log(`Subscription atualizada para org ${orgId} — status: ${status}`)
-  }
-
-  private async handleSubscriptionDeleted(stripeSubscription: Stripe.Subscription, eventId: string) {
-    const orgId = stripeSubscription.metadata?.orgId
-    if (!orgId) return
-
-    const subscription = await this.prisma.subscription.findUnique({ where: { orgId } })
-    if (!subscription) return
-
-    await this.prisma.subscription.update({
-      where: { orgId },
-      data: {
-        status: SubscriptionStatus.CANCELED,
-        canceledAt: new Date(),
-      },
-    })
-
-    await this.prisma.billingEvent.create({
-      data: {
-        subscriptionId: subscription.id,
-        type: BillingEventType.REFUND,
-        amountCents: 0,
-        status: BillingEventStatus.COMPLETED,
-        stripeEventId: eventId,
-        description: 'Subscription cancelada via Stripe',
-        metadata: { reason: stripeSubscription.cancellation_details?.reason },
-      },
-    })
-
-    this.logger.log(`Subscription CANCELADA para org ${orgId}`)
-  }
-
-  private async handlePaymentSucceeded(invoice: Stripe.Invoice, eventId: string) {
-    const orgId = invoice.subscription_details?.metadata?.orgId
-    if (!orgId) return
-
-    const subscription = await this.prisma.subscription.findUnique({ where: { orgId } })
-    if (!subscription) return
-
-    await this.prisma.billingEvent.create({
-      data: {
-        subscriptionId: subscription.id,
-        type: BillingEventType.PAYMENT,
-        amountCents: invoice.amount_paid ?? 0,
-        status: BillingEventStatus.COMPLETED,
-        externalId: invoice.id,
-        stripeEventId: eventId,
-        description: `Pagamento recebido — Invoice ${invoice.number}`,
-        metadata: { invoiceId: invoice.id, invoiceNumber: invoice.number },
-      },
-    })
-
-    // Garantir que subscription está ACTIVE
-    await this.prisma.subscription.update({
-      where: { orgId },
-      data: { status: SubscriptionStatus.ACTIVE },
-    })
-
-    this.logger.log(`Pagamento confirmado para org ${orgId} — R$ ${(invoice.amount_paid ?? 0) / 100}`)
-  }
-
-  private async handlePaymentFailed(invoice: Stripe.Invoice, eventId: string) {
-    const orgId = invoice.subscription_details?.metadata?.orgId
-    if (!orgId) return
-
-    const subscription = await this.prisma.subscription.findUnique({ where: { orgId } })
-    if (!subscription) return
-
-    await this.prisma.subscription.update({
-      where: { orgId },
-      data: { status: SubscriptionStatus.PAST_DUE },
-    })
-
-    await this.prisma.billingEvent.create({
-      data: {
-        subscriptionId: subscription.id,
-        type: BillingEventType.CHARGE,
-        amountCents: invoice.amount_due ?? 0,
-        status: BillingEventStatus.FAILED,
-        externalId: invoice.id,
-        stripeEventId: eventId,
-        description: `Pagamento falhou — Invoice ${invoice.number}`,
-        metadata: { invoiceId: invoice.id },
-      },
-    })
-
-    this.logger.warn(`Pagamento FALHOU para org ${orgId}`)
-  }
-
-  // ─── Consultar Subscription ───────────────────────────────────────────────
+  /*
+  ========================================
+  SUBSCRIPTION
+  ========================================
+  */
 
   async getSubscription(orgId: string) {
-    const subscription = await this.prisma.subscription.findUnique({
-      where: { orgId },
-      include: {
-        plan: true,
-        billingEvents: {
-          orderBy: { createdAt: 'desc' },
-          take: 10,
-        },
-      },
-    })
 
-    if (!subscription) {
-      return { status: 'NO_SUBSCRIPTION', plan: null, limits: PLAN_LIMITS['FREE'] }
-    }
-
-    const planName = subscription.plan.name
-    return {
-      ...subscription,
-      limits: PLAN_LIMITS[planName] ?? PLAN_LIMITS['FREE'],
-    }
-  }
-
-  // ─── Cancelar Subscription ────────────────────────────────────────────────
-
-  async cancelSubscription(orgId: string) {
-    const subscription = await this.prisma.subscription.findUnique({ where: { orgId } })
-    if (!subscription) throw new NotFoundException('Nenhuma assinatura encontrada')
-
-    if (subscription.stripeSubscriptionId && this.stripe) {
-      await this.stripe.subscriptions.update(subscription.stripeSubscriptionId, {
-        cancel_at_period_end: true,
-      })
-      this.logger.log(`Cancelamento agendado no Stripe para org ${orgId}`)
-    }
-
-    return this.prisma.subscription.update({
-      where: { orgId },
-      data: {
-        status: SubscriptionStatus.CANCELED,
-        canceledAt: new Date(),
-      },
-    })
-  }
-
-  // ─── Utilitários ──────────────────────────────────────────────────────────
-
-  private mapStripeStatus(stripeStatus: string): SubscriptionStatus {
-    const map: Record<string, SubscriptionStatus> = {
-      active: SubscriptionStatus.ACTIVE,
-      trialing: SubscriptionStatus.TRIALING,
-      past_due: SubscriptionStatus.PAST_DUE,
-      canceled: SubscriptionStatus.CANCELED,
-      unpaid: SubscriptionStatus.PAST_DUE,
-      incomplete: SubscriptionStatus.INACTIVE,
-      incomplete_expired: SubscriptionStatus.INACTIVE,
-      paused: SubscriptionStatus.INACTIVE,
-    }
-    return map[stripeStatus] ?? SubscriptionStatus.INACTIVE
-  }
-
-  private async simulateCheckoutSession(orgId: string, planName: PlanName) {
-    this.logger.warn(`Modo simulado: checkout para org ${orgId}, plano ${planName}`)
-    const plan = await this.prisma.plan.findUnique({ where: { name: planName } })
-    if (!plan) throw new NotFoundException(`Plano ${planName} não encontrado`)
-
-    const subscription = await this.prisma.subscription.upsert({
-      where: { orgId },
-      create: {
-        orgId,
-        planId: plan.id,
-        status: SubscriptionStatus.ACTIVE,
-        currentPeriodStart: new Date(),
-        currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-      },
-      update: {
-        planId: plan.id,
-        status: SubscriptionStatus.ACTIVE,
-        currentPeriodStart: new Date(),
-        currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-        canceledAt: null,
-      },
-    })
-
-    await this.prisma.billingEvent.create({
-      data: {
-        subscriptionId: subscription.id,
-        type: BillingEventType.PAYMENT,
-        amountCents: plan.priceCents,
-        status: BillingEventStatus.COMPLETED,
-        description: `[SIMULADO] Checkout completado — Plano ${planName}`,
-      },
-    })
-
-    return {
-      url: null,
-      sessionId: `sim_${Date.now()}`,
-      simulated: true,
-      message: 'Stripe não configurado — subscription ativada em modo simulado',
-    }
-  }
-
-  // ─── Obter limites do plano atual da org ──────────────────────────────────
-
-  async getOrgPlanLimits(orgId: string) {
     const subscription = await this.prisma.subscription.findUnique({
       where: { orgId },
       include: { plan: true },
     })
 
-    if (!subscription || subscription.status === SubscriptionStatus.CANCELED || subscription.status === SubscriptionStatus.INACTIVE) {
-      return { planName: 'FREE', limits: PLAN_LIMITS['FREE'] }
+    if (!subscription) {
+      return {
+        status: 'NO_SUBSCRIPTION',
+        plan: null,
+        limits: PLAN_LIMITS.FREE,
+      }
     }
 
     const planName = subscription.plan.name
-    return { planName, limits: PLAN_LIMITS[planName] ?? PLAN_LIMITS['FREE'] }
+
+    return {
+      ...subscription,
+      limits: PLAN_LIMITS[planName] ?? PLAN_LIMITS.FREE,
+    }
+
   }
 
-  // ─── Status e Limites (Novas Rotas) ───────────────────────────────────────
-
-  /**
-   * Retorna o status detalhado da assinatura para a org.
-   */
   async getBillingStatus(orgId: string) {
+
     const subscription = await this.prisma.subscription.findUnique({
       where: { orgId },
       include: { plan: true },
@@ -581,26 +215,98 @@ export class BillingService {
         status: 'NO_SUBSCRIPTION',
         plan: 'FREE',
         isActive: false,
-        message: 'Nenhuma assinatura encontrada. Usando plano gratuito.',
       }
     }
 
     return {
       status: subscription.status,
       plan: subscription.plan.name,
-      isActive: subscription.status === SubscriptionStatus.ACTIVE || subscription.status === SubscriptionStatus.TRIALING,
+      isActive:
+        subscription.status === SubscriptionStatus.ACTIVE ||
+        subscription.status === SubscriptionStatus.TRIALING,
       currentPeriodEnd: subscription.currentPeriodEnd,
-      cancelAtPeriodEnd: !!subscription.stripeSubscriptionId && subscription.status === SubscriptionStatus.ACTIVE && !!subscription.canceledAt,
     }
+
   }
 
-  /**
-   * Retorna os limites e o uso atual de quotas da organização.
-   */
-  async getBillingLimits(orgId: string) {
-    // Usar o QuotasService que já tem essa lógica pronta
-    const { QuotasService } = await import('../quotas/quotas.service')
-    const quotasService = new QuotasService(this.prisma)
-    return quotasService.getQuotaUsage(orgId)
+  async cancelSubscription(orgId: string) {
+
+    const subscription = await this.prisma.subscription.findUnique({
+      where: { orgId },
+    })
+
+    if (!subscription) {
+      throw new NotFoundException('Nenhuma assinatura encontrada')
+    }
+
+    return this.prisma.subscription.update({
+      where: { orgId },
+      data: {
+        status: SubscriptionStatus.CANCELED,
+        canceledAt: new Date(),
+      },
+    })
+
   }
+
+  /*
+  ========================================
+  SIMULATED CHECKOUT
+  ========================================
+  */
+
+  async simulateCheckoutSession(orgId: string, planName: PlanName) {
+
+    this.logger.warn(`Checkout simulado para ${orgId} (${planName})`)
+
+    const plan = await this.prisma.plan.findUnique({
+      where: { name: planName },
+    })
+
+    if (!plan) {
+      throw new NotFoundException(`Plano ${planName} não encontrado`)
+    }
+
+    const subscription = await this.prisma.subscription.upsert({
+      where: { orgId },
+      create: {
+        orgId,
+        planId: plan.id,
+        status: SubscriptionStatus.ACTIVE,
+        currentPeriodStart: new Date(),
+        currentPeriodEnd: new Date(Date.now() + 30 * 86400000),
+      },
+      update: {
+        planId: plan.id,
+        status: SubscriptionStatus.ACTIVE,
+      },
+    })
+
+    await this.prisma.billingEvent.create({
+      data: {
+        subscriptionId: subscription.id,
+        type: BillingEventType.PAYMENT,
+        amountCents: plan.priceCents,
+        status: BillingEventStatus.COMPLETED,
+        description: '[SIMULADO] checkout',
+      },
+    })
+
+    return {
+      simulated: true,
+      sessionId: `sim_${Date.now()}`,
+    }
+
+  }
+
+  /*
+  ========================================
+  LIMITES
+  ========================================
+  */
+
+  async getBillingLimits(orgId: string) {
+    return this.quotasService.getQuotaUsage(orgId)
+  }
+
 }
