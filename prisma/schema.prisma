@@ -7,11 +7,541 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Organization {
+  id                 String             @id @default(uuid())
+  name               String
+  slug               String             @unique
+  requiresOnboarding Boolean            @default(true)
+  createdAt          DateTime           @default(now())
+  appointments       Appointment[]
+  auditEvents        AuditEvent[]
+  charges            Charge[]
+  customers          Customer[]
+  expenses           Expense[]
+  runs               GovernanceRun[]
+  invoices           Invoice[]
+  launches           Launch[]
+  payments           Payment[]
+  persons            Person[]
+  referrals          Referral[]
+  serviceOrders      ServiceOrder[]
+  timelineEvents     TimelineEvent[]
+  tracks             Track[]
+  users              User[]
+  whatsAppMessages   WhatsAppMessage[]
+  whatsAppTemplates  WhatsAppTemplate[]
+
+  subscription       Subscription?
+}
+
+model User {
+  id              String       @id @default(uuid())
+  email           String       @unique
+  password        String?
+  role            UserRole
+  active          Boolean      @default(false)
+  inviteToken     String?      @unique
+  inviteExpiresAt DateTime?
+  orgId           String
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  Expense         Expense[]
+  Launch          Launch[]
+  person          Person?
+  org             Organization @relation(fields: [orgId], references: [id])
+}
+
+model Person {
+  id                        String                @id @default(uuid())
+  name                      String
+  email                     String?
+  role                      String
+  active                    Boolean               @default(true)
+  offboardedAt              DateTime?
+  offboardReason            String?
+  orgId                     String
+  userId                    String?               @unique
+  riskScore                 Int                   @default(0)
+  createdAt                 DateTime              @default(now())
+  updatedAt                 DateTime              @updatedAt
+  operationalRiskScore      Int                   @default(0)
+  operationalState          OperationalStateValue @default(NORMAL)
+  operationalStateUpdatedAt DateTime?
+  assessments               Assessment[]
+  assignments               Assignment[]
+  auditEvents               AuditEvent[]
+  correctiveActions         CorrectiveAction[]
+  org                       Organization          @relation(fields: [orgId], references: [id])
+  user                      User?                 @relation(fields: [userId], references: [id])
+  exceptions                PersonException[]
+  riskSnapshots             RiskSnapshot[]
+  serviceOrdersAssigned     ServiceOrder[]        @relation("ServiceOrderAssignedTo")
+  timelineEvents            TimelineEvent[]
+  itemCompletions           TrackItemCompletion[]
+
+  @@index([orgId, createdAt])
+  @@index([orgId, active, createdAt])
+  @@index([orgId, operationalState, operationalRiskScore, operationalStateUpdatedAt])
+}
+
+model TimelineEvent {
+  id          String       @id @default(uuid())
+  action      String
+  personId    String?
+  description String?
+  metadata    Json?
+  createdAt   DateTime     @default(now())
+  orgId       String
+  org         Organization @relation(fields: [orgId], references: [id])
+  person      Person?      @relation(fields: [personId], references: [id])
+
+  @@index([orgId, createdAt])
+  @@index([orgId, action, createdAt])
+  @@index([personId, createdAt])
+  @@index([action, createdAt])
+}
+
+model Track {
+  id          String       @id @default(uuid())
+  slug        String
+  title       String
+  description String?
+  createdAt   DateTime     @default(now())
+  status      TrackStatus  @default(DRAFT)
+  version     Int          @default(1)
+  orgId       String
+  assessments Assessment[]
+  assignments Assignment[]
+  org         Organization @relation(fields: [orgId], references: [id])
+  items       TrackItem[]
+
+  @@unique([slug, version, orgId])
+  @@index([orgId])
+  @@index([orgId, status, createdAt])
+}
+
+model TrackItem {
+  id          String                @id @default(uuid())
+  trackId     String
+  title       String
+  content     String?
+  type        TrackItemType
+  order       Int
+  createdAt   DateTime              @default(now())
+  track       Track                 @relation(fields: [trackId], references: [id])
+  completions TrackItemCompletion[]
+
+  @@unique([trackId, order])
+  @@index([trackId, order])
+}
+
+model TrackItemCompletion {
+  id           String     @id @default(uuid())
+  itemId       String
+  personId     String
+  assignmentId String
+  completedAt  DateTime   @default(now())
+  assignment   Assignment @relation(fields: [assignmentId], references: [id])
+  item         TrackItem  @relation(fields: [itemId], references: [id])
+  person       Person     @relation(fields: [personId], references: [id])
+
+  @@unique([itemId, personId])
+  @@index([personId, completedAt])
+  @@index([assignmentId, completedAt])
+}
+
+model Assignment {
+  id          String                @id @default(uuid())
+  personId    String
+  trackId     String
+  progress    Int                   @default(0)
+  risk        RiskLevel             @default(LOW)
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  assessments Assessment[]
+  person      Person                @relation(fields: [personId], references: [id])
+  track       Track                 @relation(fields: [trackId], references: [id])
+  completions TrackItemCompletion[]
+
+  @@unique([personId, trackId])
+  @@index([personId, createdAt])
+  @@index([trackId, createdAt])
+}
+
+model Assessment {
+  id           String     @id @default(uuid())
+  assignmentId String
+  personId     String
+  trackId      String
+  score        Int
+  risk         RiskLevel
+  notes        String?
+  createdAt    DateTime   @default(now())
+  assignment   Assignment @relation(fields: [assignmentId], references: [id])
+  person       Person     @relation(fields: [personId], references: [id])
+  track        Track      @relation(fields: [trackId], references: [id])
+
+  @@index([personId, createdAt])
+  @@index([trackId, createdAt])
+  @@index([assignmentId, createdAt])
+}
+
+model CorrectiveAction {
+  id         String           @id @default(uuid())
+  reason     String
+  personId   String
+  createdAt  DateTime         @default(now())
+  resolvedAt DateTime?
+  status     CorrectiveStatus @default(OPEN)
+  person     Person           @relation(fields: [personId], references: [id])
+
+  @@index([personId, status, createdAt])
+  @@index([status, createdAt])
+}
+
+model PersonException {
+  id          String        @id @default(uuid())
+  reason      String
+  startsAt    DateTime
+  endsAt      DateTime
+  personId    String
+  createdAt   DateTime      @default(now())
+  processedAt DateTime?
+  type        ExceptionType
+  person      Person        @relation(fields: [personId], references: [id])
+
+  @@index([personId, startsAt, endsAt])
+  @@index([endsAt, processedAt])
+}
+
+model AuditEvent {
+  id            String       @id @default(uuid())
+  personId      String?
+  action        String
+  context       String?
+  createdAt     DateTime     @default(now())
+  metadata      Json?
+  actorPersonId String?
+  actorUserId   String?
+  entityId      String?
+  entityType    String?
+  orgId         String
+  org           Organization @relation(fields: [orgId], references: [id])
+  person        Person?      @relation(fields: [personId], references: [id])
+
+  @@index([orgId, createdAt])
+  @@index([orgId, action, createdAt])
+  @@index([personId, createdAt])
+  @@index([action, createdAt])
+}
+
+model RiskSnapshot {
+  id        String   @id @default(uuid())
+  personId  String
+  score     Int
+  reason    String
+  createdAt DateTime @default(now())
+  person    Person   @relation(fields: [personId], references: [id])
+
+  @@index([personId, createdAt])
+}
+
+model GovernanceRun {
+  id                     String       @id @default(uuid())
+  orgId                  String
+  evaluated              Int          @default(0)
+  warnings               Int          @default(0)
+  correctives            Int          @default(0)
+  institutionalRiskScore Int          @default(0)
+  restrictedCount        Int          @default(0)
+  suspendedCount         Int          @default(0)
+  openCorrectivesCount   Int          @default(0)
+  durationMs             Int          @default(0)
+  startedAt              DateTime
+  finishedAt             DateTime
+  createdAt              DateTime     @default(now())
+  bucket                 String
+  org                    Organization @relation(fields: [orgId], references: [id])
+
+  @@unique([orgId, bucket])
+  @@index([orgId, createdAt])
+}
+
+model Customer {
+  id               String            @id @default(uuid())
+  orgId            String
+  name             String
+  phone            String
+  email            String?
+  notes            String?
+  active           Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  appointments     Appointment[]
+  charges          Charge[]
+  org              Organization      @relation(fields: [orgId], references: [id])
+  invoices         Invoice[]
+  serviceOrders    ServiceOrder[]
+  whatsAppMessages WhatsAppMessage[]
+
+  @@index([orgId, createdAt])
+  @@index([orgId, active, createdAt])
+  @@index([orgId, email])
+}
+
+model Appointment {
+  id           String            @id @default(uuid())
+  orgId        String
+  customerId   String
+  startsAt     DateTime
+  endsAt       DateTime
+  status       AppointmentStatus @default(SCHEDULED)
+  notes        String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  customer     Customer          @relation(fields: [customerId], references: [id])
+  org          Organization      @relation(fields: [orgId], references: [id])
+  serviceOrder ServiceOrder?
+
+  @@index([orgId, startsAt])
+  @@index([orgId, startsAt, endsAt])
+  @@index([orgId, status, startsAt])
+  @@index([customerId, startsAt])
+}
+
+model ServiceOrder {
+  id                 String             @id @default(uuid())
+  orgId              String
+  customerId         String
+  appointmentId      String?            @unique
+  assignedToPersonId String?
+  title              String
+  description        String?
+  status             ServiceOrderStatus @default(OPEN)
+  priority           Int                @default(2)
+  scheduledFor       DateTime?
+  startedAt          DateTime?
+  finishedAt         DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  charges            Charge[]
+  appointment        Appointment?       @relation(fields: [appointmentId], references: [id])
+  assignedTo         Person?            @relation("ServiceOrderAssignedTo", fields: [assignedToPersonId], references: [id])
+  customer           Customer           @relation(fields: [customerId], references: [id])
+  org                Organization       @relation(fields: [orgId], references: [id])
+
+  @@index([orgId, createdAt])
+  @@index([orgId, status, createdAt])
+  @@index([assignedToPersonId, createdAt])
+  @@index([orgId, customerId, createdAt])
+  @@index([orgId, scheduledFor])
+}
+
+model Charge {
+  id             String        @id @default(uuid())
+  orgId          String
+  customerId     String
+  serviceOrderId String?
+  amountCents    Int
+  currency       String        @default("BRL")
+  status         ChargeStatus  @default(PENDING)
+  dueDate        DateTime
+  paidAt         DateTime?
+  notes          String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  customer       Customer      @relation(fields: [customerId], references: [id])
+  org            Organization  @relation(fields: [orgId], references: [id])
+  serviceOrder   ServiceOrder? @relation(fields: [serviceOrderId], references: [id])
+  payments       Payment[]
+
+  @@index([orgId, createdAt])
+  @@index([customerId, createdAt])
+  @@index([serviceOrderId, createdAt])
+  @@index([orgId, status, dueDate])
+}
+
+model Payment {
+  id          String        @id @default(uuid())
+  orgId       String
+  chargeId    String
+  amountCents Int
+  method      PaymentMethod
+  paidAt      DateTime      @default(now())
+  notes       String?
+  externalRef String?
+  createdAt   DateTime      @default(now())
+  charge      Charge        @relation(fields: [chargeId], references: [id])
+  org         Organization  @relation(fields: [orgId], references: [id])
+
+  @@index([orgId, createdAt])
+  @@index([chargeId, createdAt])
+  @@index([orgId, paidAt])
+}
+
+model Expense {
+  id              String       @id @default(dbgenerated("gen_random_uuid()"))
+  orgId           String
+  description     String
+  amountCents     Int
+  category        String
+  date            DateTime
+  notes           String?
+  receiptUrl      String?
+  createdByUserId String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @default(now()) @updatedAt
+
+  User            User?        @relation(fields: [createdByUserId], references: [id])
+  org             Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+}
+
+model Invoice {
+  id          String       @id @default(dbgenerated("gen_random_uuid()"))
+  orgId       String
+  customerId  String?
+  number      String
+  description String
+  amountCents Int
+  currency    String       @default("BRL")
+  status      String       @default("DRAFT")
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @default(now()) @updatedAt
+
+  customer    Customer?    @relation(fields: [customerId], references: [id])
+  org         Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+}
+
+model Launch {
+  id              String       @id @default(dbgenerated("gen_random_uuid()"))
+  orgId           String
+  description     String
+  amountCents     Int
+  type            String
+  category        String
+  account         String?
+  date            DateTime
+  notes           String?
+  createdByUserId String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @default(now()) @updatedAt
+
+  User            User?        @relation(fields: [createdByUserId], references: [id])
+  org             Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+}
+
+model Referral {
+  id                String       @id @default(dbgenerated("gen_random_uuid()"))
+  orgId             String
+  referrerName      String
+  referrerEmail     String
+  referredName      String
+  referredEmail     String
+  creditAmountCents Int          @default(0)
+  status            String       @default("PENDING")
+  code              String       @unique
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @default(now()) @updatedAt
+
+  org               Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+}
+
+model WhatsAppTemplate {
+  id        String         @id @default(uuid())
+  orgId     String
+  channel   MessageChannel @default(WHATSAPP)
+  key       String
+  name      String
+  body      String
+  isActive  Boolean        @default(true)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  org       Organization   @relation(fields: [orgId], references: [id])
+}
+
+model WhatsAppMessage {
+  id           String                @id @default(uuid())
+  orgId        String
+  customerId   String
+  channel      MessageChannel        @default(WHATSAPP)
+  entityType   WhatsAppEntityType
+  entityId     String
+  messageType  WhatsAppMessageType
+  messageKey   String                @unique
+  status       WhatsAppMessageStatus @default(QUEUED)
+  toPhone      String
+  renderedText String
+  createdAt    DateTime              @default(now())
+
+  customer     Customer              @relation(fields: [customerId], references: [id])
+  org          Organization          @relation(fields: [orgId], references: [id])
+}
+
+model Plan {
+  id         String         @id @default(uuid())
+  name       PlanName       @unique
+  priceCents Int
+  createdAt  DateTime       @default(now())
+  subscriptions Subscription[]
+}
+
+model Subscription {
+  id                 String              @id @default(uuid())
+  orgId              String              @unique
+  planId             String
+  status             SubscriptionStatus  @default(ACTIVE)
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+  canceledAt         DateTime?
+  createdAt          DateTime            @default(now())
+
+  org                Organization        @relation(fields: [orgId], references: [id])
+  plan               Plan                @relation(fields: [planId], references: [id])
+  events             BillingEvent[]
+}
+
+model BillingEvent {
+  id             String             @id @default(uuid())
+  subscriptionId String
+  type           BillingEventType
+  amountCents    Int
+  status         BillingEventStatus
+  description    String?
+  createdAt      DateTime           @default(now())
+
+  subscription   Subscription       @relation(fields: [subscriptionId], references: [id])
+}
+
+enum PlanName {
+  FREE
+  STARTER
+  PRO
+  BUSINESS
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  TRIALING
+  CANCELED
+  PAST_DUE
+}
+
+enum BillingEventType {
+  PAYMENT
+  REFUND
+  ADJUSTMENT
+}
+
+enum BillingEventStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
 enum UserRole {
   ADMIN
-  MANAGER
-  STAFF
-  VIEWER
+  COLLABORATOR
 }
 
 enum RiskLevel {
@@ -77,9 +607,6 @@ enum PaymentMethod {
   OTHER
 }
 
-//
-// ✅ Operational State snapshot (rápido pra dashboard/filtros)
-//
 enum OperationalStateValue {
   NORMAL
   WARNING
@@ -87,19 +614,16 @@ enum OperationalStateValue {
   SUSPENDED
 }
 
-//
-// WhatsApp (Meu Acessor) — Operacional, Logado, Idempotente
-//
 enum MessageChannel {
   WHATSAPP
 }
 
 enum WhatsAppMessageStatus {
   QUEUED
-  SENDING
   SENT
   FAILED
   CANCELED
+  SENDING
 }
 
 enum WhatsAppEntityType {
@@ -117,1019 +641,8 @@ enum WhatsAppMessageType {
   EXECUTION_CONFIRMATION
 }
 
-// ============================================================
-// ✅ Novos Enums para SaaS
-// ============================================================
-
-enum PlanName {
-  FREE
-  STARTER
-  PRO
-  BUSINESS
-}
-
-enum SubscriptionStatus {
-  TRIALING
-  ACTIVE
-  PAST_DUE
-  CANCELED
-  INACTIVE
-}
-
-enum BillingEventType {
-  CHARGE
-  PAYMENT
-  REFUND
-}
-
-enum BillingEventStatus {
-  PENDING
-  COMPLETED
-  FAILED
-}
-
-enum NotificationType {
-  CHARGE_OVERDUE
-  SERVICE_OVERDUE
-  PAYMENT_RECEIVED
-  CUSTOMER_CREATED
-  INVITE_RECEIVED
-  TRIAL_ENDING
-  TRIAL_ENDED
-  APPOINTMENT_CONFIRMED
-  APPOINTMENT_NO_SHOW
-  SERVICE_ORDER_COMPLETED
-  PAYMENT_OVERDUE
-  RISK_LEVEL_CHANGED
-}
-
-enum WebhookDeliveryStatus {
-  PENDING
-  SUCCESS
-  FAILED
-}
-
-// ============================================================
-// ✅ Modelos Existentes
-// ============================================================
-
-model Organization {
-  id                 String   @id @default(uuid())
-  name               String
-  slug               String   @unique
-  requiresOnboarding Boolean  @default(true)
-  onboardingStep     Int      @default(0) // Novo: para controlar o progresso do onboarding
-  timezone           String   @default("America/Sao_Paulo") // Novo: fuso horário da organização
-  currency           String   @default("BRL") // Novo: moeda padrão da organização
-  hasTrialed         Boolean  @default(false) // Novo: para controlar se a organização já usou o trial
-  createdAt          DateTime @default(now())
-
-  users          User[]
-  persons        Person[]
-  tracks         Track[]
-  runs           GovernanceRun[]
-  timelineEvents TimelineEvent[]
-  auditEvents    AuditEvent[]
-
-  customers     Customer[]
-  appointments  Appointment[]
-  serviceOrders ServiceOrder[]
-  executions    Execution[]
-  serviceOrderAttachments ServiceOrderAttachment[]
-  charges       Charge[]
-  payments      Payment[]
-
-  // WhatsApp (Meu Acessor)
-  whatsAppTemplates WhatsAppTemplate[]
-  whatsAppMessages  WhatsAppMessage[]
-
-  // Módulos financeiros completos
-  expenses  Expense[]
-  invoices  Invoice[]
-  launches  Launch[]
-  referrals Referral[]
-
-  // ✅ Novos para SaaS
-  invites       InviteToken[]
-  subscriptions Subscription[]
-  notifications Notification[]
-  usageMetrics  UsageMetric[]
-  automationRules      AutomationRule[]
-  automationExecutions AutomationExecution[]
-  webhookEndpoints     WebhookEndpoint[]
-
-  updatedAt DateTime @updatedAt
-}
-
-model User {
-  id       String   @id @default(uuid())
-  email    String   @unique
-  password String?
-  role     UserRole
-
-  resetToken          String?   @unique
-  resetTokenExpiresAt DateTime?
-
-  active Boolean @default(false)
-  // inviteToken     String?   @unique // Removido, agora no modelo InviteToken
-  // inviteExpiresAt DateTime? // Removido, agora no modelo InviteToken
-
-  orgId String
-  org   Organization @relation(fields: [orgId], references: [id])
-
-  person Person?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // ✅ Novos para SaaS
-  notifications Notification[]
-}
-
-model Person {
-  id     String  @id @default(uuid())
-  name   String
-  email  String?
-  role   String
-  active Boolean @default(true)
-
-  riskScore      Int       @default(0)
-  offboardedAt   DateTime?
-  offboardReason String?
-
-  // ✅ snapshot do estado operacional (pra UI/relatórios)
-  operationalState          OperationalStateValue @default(NORMAL)
-  operationalRiskScore      Int                   @default(0)
-  operationalStateUpdatedAt DateTime?
-
-  orgId String
-  org   Organization @relation(fields: [orgId], references: [id])
-
-  userId String? @unique
-  user   User?   @relation(fields: [userId], references: [id])
-
-  assignments       Assignment[]
-  assessments       Assessment[]
-  correctiveActions CorrectiveAction[]
-  auditEvents       AuditEvent[]
-  timelineEvents    TimelineEvent[]
-  riskSnapshots     RiskSnapshot[]
-  exceptions        PersonException[]
-  itemCompletions   TrackItemCompletion[]
-
-  serviceOrdersAssigned ServiceOrder[] @relation("ServiceOrderAssignedTo")
-  executions           Execution[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([orgId, createdAt])
-  @@index([orgId, active, createdAt])
-
-  // ✅ index útil pra listar “quem está RESTRICTED/SUSPENDED”
-  @@index([orgId, operationalState, operationalRiskScore, operationalStateUpdatedAt])
-}
-
-model TimelineEvent {
-  id          String  @id @default(uuid())
-  action      String
-  personId    String?
-  description String?
-  metadata    Json?
-
-  orgId String
-  org   Organization @relation(fields: [orgId], references: [id])
-
-  createdAt DateTime @default(now())
-
-  person Person? @relation(fields: [personId], references: [id])
-
-  @@index([orgId, createdAt])
-  @@index([orgId, action, createdAt])
-  @@index([personId, createdAt])
-  @@index([action, createdAt])
-}
-
-model Track {
-  id          String      @id @default(uuid())
-  title       String
-  description String?
-  slug        String
-  version     Int         @default(1)
-  status      TrackStatus @default(DRAFT)
-
-  orgId String
-  org   Organization @relation(fields: [orgId], references: [id])
-
-  createdAt DateTime @default(now())
-
-  assignments Assignment[]
-  assessments Assessment[]
-  items       TrackItem[]
-
-  @@unique([slug, version, orgId])
-  @@index([orgId])
-  @@index([orgId, status, createdAt])
-}
-
-model TrackItem {
-  id      String        @id @default(uuid())
-  trackId String
-  title   String
-  content String?
-  type    TrackItemType
-  order   Int
-
-  createdAt DateTime @default(now())
-
-  track       Track                 @relation(fields: [trackId], references: [id])
-  completions TrackItemCompletion[]
-
-  @@unique([trackId, order])
-  @@index([trackId, order])
-}
-
-model TrackItemCompletion {
-  id           String @id @default(uuid())
-  itemId       String
-  personId     String
-  assignmentId String
-
-  completedAt DateTime @default(now())
-
-  item       TrackItem  @relation(fields: [itemId], references: [id])
-  person     Person     @relation(fields: [personId], references: [id])
-  assignment Assignment @relation(fields: [assignmentId], references: [id])
-
-  @@unique([itemId, personId])
-  @@index([personId, completedAt])
-  @@index([assignmentId, completedAt])
-}
-
-model Assignment {
-  id       String @id @default(uuid())
-  personId String
-  trackId  String
-
-  progress Int       @default(0)
-  risk     RiskLevel @default(LOW)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  person Person @relation(fields: [personId], references: [id])
-  track  Track  @relation(fields: [trackId], references: [id])
-
-  assessments Assessment[]
-  completions TrackItemCompletion[]
-
-  @@unique([personId, trackId])
-  @@index([personId, createdAt])
-  @@index([trackId, createdAt])
-}
-
-model Assessment {
-  id           String @id @default(uuid())
-  assignmentId String
-  personId     String
-  trackId      String
-
-  score Int
-  risk  RiskLevel
-  notes String?
-
-  createdAt DateTime @default(now())
-
-  assignment Assignment @relation(fields: [assignmentId], references: [id])
-  person     Person     @relation(fields: [personId], references: [id])
-  track      Track      @relation(fields: [trackId], references: [id])
-
-  @@index([personId, createdAt])
-  @@index([trackId, createdAt])
-  @@index([assignmentId, createdAt])
-}
-
-model CorrectiveAction {
-  id         String           @id @default(uuid())
-  personId   String
-  reason     String
-  status     CorrectiveStatus @default(OPEN)
-  resolvedAt DateTime?
-
-  createdAt DateTime @default(now())
-
-  person Person @relation(fields: [personId], references: [id])
-
-  @@index([personId, status, createdAt])
-  @@index([status, createdAt])
-}
-
-model PersonException {
-  id       String        @id @default(uuid())
-  personId String
-  type     ExceptionType
-  reason   String
-  startsAt DateTime
-  endsAt   DateTime
-
-  processedAt DateTime?
-
-  createdAt DateTime @default(now())
-
-  person Person @relation(fields: [personId], references: [id])
-
-  @@index([personId, startsAt, endsAt])
-  @@index([endsAt, processedAt])
-}
-
-model AuditEvent {
-  id String @id @default(uuid())
-
-  // ⚠️ legado (compat). Continua existindo.
-  personId String?
-
-  // ✅ institucional (multi-tenant + autoria + entidade)
-  orgId         String
-  actorUserId   String?
-  actorPersonId String?
-  entityType    String?
-  entityId      String?
-
-  action   String
-  context  String?
-  metadata Json?
-
-  createdAt DateTime @default(now())
-
-  person Person?      @relation(fields: [personId], references: [id])
-  org    Organization @relation(fields: [orgId], references: [id])
-
-  @@index([orgId, createdAt])
-  @@index([orgId, action, createdAt])
-  @@index([personId, createdAt])
-  @@index([action, createdAt])
-}
-
-model RiskSnapshot {
-  id       String @id @default(uuid())
-  personId String
-  score    Int
-  reason   String
-
-  createdAt DateTime @default(now())
-
-  person Person @relation(fields: [personId], references: [id])
-
-  @@index([personId, createdAt])
-}
-
-model GovernanceRun {
-  id String @id @default(uuid())
-
-  orgId String
-  org   Organization @relation(fields: [orgId], references: [id])
-
-  evaluated   Int @default(0)
-  warnings    Int @default(0)
-  correctives Int @default(0)
-
-  institutionalRiskScore Int @default(0)
-  restrictedCount        Int @default(0)
-  suspendedCount         Int @default(0)
-  openCorrectivesCount   Int @default(0)
-
-  durationMs Int @default(0)
-
-  startedAt  DateTime
-  finishedAt DateTime
-  createdAt  DateTime @default(now())
-
-  @@index([orgId, createdAt])
-}
-
-model Customer {
-  id    String       @id @default(uuid())
-  orgId String
-  org   Organization @relation(fields: [orgId], references: [id])
-
-  name   String
-  phone  String
-  email  String?
-  notes  String?
-  active Boolean @default(true)
-
-  appointments  Appointment[]
-  serviceOrders ServiceOrder[]
-  executions    Execution[]
-  charges       Charge[]
-
-  // WhatsApp (histórico por cliente)
-  whatsAppMessages WhatsAppMessage[]
-
-  // Módulos financeiros
-  invoices Invoice[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([orgId, createdAt])
-  @@index([orgId, active, createdAt])
-  @@index([orgId, email])
-}
-
-model Appointment {
-  id    String       @id @default(uuid())
-  orgId String
-  org   Organization @relation(fields: [orgId], references: [id])
-
-  customerId String
-  customer   Customer @relation(fields: [customerId], references: [id])
-
-  title       String?
-  description String?
-  startsAt DateTime
-  endsAt   DateTime
-  status   AppointmentStatus @default(SCHEDULED)
-  notes    String?
-
-  serviceOrder ServiceOrder?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([orgId, startsAt])
-  @@index([orgId, startsAt, endsAt])
-  @@index([orgId, status, startsAt])
-  @@index([customerId, startsAt])
-}
-
-model ServiceOrder {
-  id String @id @default(uuid())
-
-  orgId String
-  org   Organization @relation(fields: [orgId], references: [id])
-
-  customerId String
-  customer   Customer @relation(fields: [customerId], references: [id])
-
-  appointmentId String?      @unique
-  appointment   Appointment? @relation(fields: [appointmentId], references: [id])
-
-  title       String
-  description String?
-  status      ServiceOrderStatus @default(OPEN)
-  amountCents Int                @default(0)
-  dueDate     DateTime?
-  executionStartedAt DateTime?
-  executionEndedAt   DateTime?
-  cancellationReason String?
-  outcomeSummary     String?
-
-  assignedToPersonId String?
-  assignedTo         Person? @relation("ServiceOrderAssignedTo", fields: [assignedToPersonId], references: [id])
-
-  charges Charge[]
-  executions Execution[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([orgId, createdAt])
-  @@index([orgId, status, createdAt])
-  @@index([customerId, createdAt])
-  @@index([assignedToPersonId, createdAt])
-}
-
-model Execution {
-  id String @id @default(uuid())
-
-  orgId String
-  org   Organization @relation(fields: [orgId], references: [id])
-
-  serviceOrderId String
-  serviceOrder   ServiceOrder @relation(fields: [serviceOrderId], references: [id])
-
-  customerId String
-  customer   Customer @relation(fields: [customerId], references: [id])
-
-  executorPersonId String?
-  executorPerson   Person? @relation(fields: [executorPersonId], references: [id])
-
-  startedAt DateTime
-  endedAt   DateTime?
-  notes String?
-  checklist Json @default("[]")
-  attachments Json @default("[]")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([orgId, createdAt])
-  @@index([serviceOrderId, createdAt])
-}
-
-model Charge {
-  id String @id @default(uuid())
-
-  orgId String
-  org   Organization @relation(fields: [orgId], references: [id])
-
-  serviceOrderId String?
-  serviceOrder   ServiceOrder? @relation(fields: [serviceOrderId], references: [id])
-
-  customerId String
-  customer   Customer @relation(fields: [customerId], references: [id])
-
-  title       String?
-  description String?
-  notes       String?
-  amountCents Int
-  dueDate     DateTime
-  paidAt      DateTime?
-  status      ChargeStatus @default(PENDING)
-
-  payments Payment[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([orgId, createdAt])
-  @@index([orgId, status, createdAt])
-  @@index([customerId, createdAt])
-  @@index([serviceOrderId, createdAt])
-  @@unique([orgId, serviceOrderId], map: "Charge_orgId_serviceOrderId_key")
-}
-
-model Payment {
-  id String @id @default(uuid())
-
-  orgId String
-  org   Organization @relation(fields: [orgId], references: [id])
-
-  chargeId String
-  charge   Charge @relation(fields: [chargeId], references: [id])
-
-  amountCents Int
-  method      PaymentMethod
-  notes       String?
-  paidAt      DateTime @default(now())
-
-  createdAt DateTime @default(now())
-
-  @@index([orgId, createdAt])
-  @@index([chargeId, createdAt])
-  @@unique([orgId, chargeId], map: "Payment_orgId_chargeId_key")
-}
-
-model WhatsAppTemplate {
-  id String @id @default(uuid())
-
-  orgId String
-  org   Organization @relation(fields: [orgId], references: [id])
-
-  name     String @unique
-  template String
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model WhatsAppMessage {
-  id String @id @default(uuid())
-
-  orgId String
-  org   Organization @relation(fields: [orgId], references: [id])
-
-  customerId String?
-  customer   Customer? @relation(fields: [customerId], references: [id])
-
-  entityType WhatsAppEntityType
-  entityId   String
-  messageType WhatsAppMessageType
-  status     WhatsAppMessageStatus @default(QUEUED)
-  
-  toPhone      String
-  renderedText String
-  messageKey   String   @unique
-  templateKey  String?
-  
-  provider          String?
-  providerMessageId String?
-  errorCode         String?
-  errorMessage      String?
-  
-  lockedAt DateTime?
-  lockedBy String?
-  
-  metadata Json?
-  sentAt   DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([orgId, createdAt])
-  @@index([customerId, createdAt])
-  @@index([entityType, entityId, createdAt])
-  @@index([messageKey])
-}
-
-model Expense {
-  id    String @id @default(uuid())
-  orgId String
-  org   Organization @relation(fields: [orgId], references: [id])
-
-  description String
-  amountCents Int
-  category    ExpenseCategory @default(OTHER)
-  date        DateTime
-  notes       String?
-
-  createdByUserId String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([orgId, date])
-  @@index([orgId, category, date])
-  @@index([orgId, createdAt])
-}
-
-enum ExpenseCategory {
-  OPERATIONAL
-  MARKETING
-  INFRASTRUCTURE
-  PAYROLL
-  TAXES
-  SUPPLIES
-  TRAVEL
-  OTHER
-}
-
-model Invoice {
-  id    String @id @default(uuid())
-  orgId String
-  org   Organization @relation(fields: [orgId], references: [id])
-
-  customerId String?
-  customer   Customer? @relation(fields: [customerId], references: [id])
-
-  number      String
-  description String?
-  amountCents Int
-  status      InvoiceStatus @default(DRAFT)
-  dueDate     DateTime?
-  issuedAt    DateTime?
-  paidAt      DateTime?
-  notes       String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([orgId, number])
-  @@index([orgId, status, createdAt])
-  @@index([orgId, dueDate])
-  @@index([customerId, createdAt])
-}
-
-enum InvoiceStatus {
-  DRAFT
-  ISSUED
-  PAID
-  CANCELLED
-}
-
-model Launch {
-  id    String @id @default(uuid())
-  orgId String
-  org   Organization @relation(fields: [orgId], references: [id])
-
-  description String
-  amountCents Int
-  type        LaunchType
-  category    String
-  account     String?
-  date        DateTime
-  notes       String?
-
-  createdByUserId String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([orgId, date])
-  @@index([orgId, type, date])
-  @@index([orgId, createdAt])
-}
-
-enum LaunchType {
-  INCOME
-  EXPENSE
-  TRANSFER
-}
-
-model Referral {
-  id    String @id @default(uuid())
-  orgId String
-  org   Organization @relation(fields: [orgId], references: [id])
-
-  referrerName  String
-  referrerEmail String
-  referrerPhone String?
-
-  referredName  String
-  referredEmail String
-  referredPhone String?
-
-  creditAmountCents Int     @default(0)
-  status            ReferralStatus @default(PENDING)
-  code              String?
-
-  confirmedAt DateTime?
-  paidAt      DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([orgId, status, createdAt])
-  @@index([orgId, createdAt])
-  @@index([referrerEmail, orgId])
-}
-
-enum ReferralStatus {
-  PENDING
-  CONFIRMED
-  PAID
-}
-
-// ============================================================
-// ✅ Novos Modelos para SaaS
-// ============================================================
-
-model InviteToken {
-  id          String   @id @default(uuid())
-  email       String
-  token       String   @unique
-  orgId       String
-  org         Organization @relation(fields: [orgId], references: [id])
-  role        UserRole @default(STAFF)
-  expiresAt   DateTime
-  createdAt   DateTime @default(now())
-
-  @@unique([email, orgId])
-  @@index([orgId, expiresAt])
-}
-
-model Plan {
-  id          String   @id @default(uuid())
-  name        PlanName @unique
-  description String?
-  priceCents  Int
-  features    Json // Ex: { "maxUsers": 5, "storageGb": 10 }
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  subscriptions Subscription[]
-}
-
-model Subscription {
-  id                      String             @id @default(uuid())
-  orgId                   String             @unique // Uma organização tem apenas uma assinatura ativa
-  org                     Organization       @relation(fields: [orgId], references: [id])
-  planId                  String
-  plan                    Plan               @relation(fields: [planId], references: [id])
-  status                  SubscriptionStatus @default(TRIALING)
-  trialEndsAt             DateTime?
-  currentPeriodStart      DateTime?
-  currentPeriodEnd        DateTime?
-  canceledAt              DateTime?
-  // Stripe integration
-  stripeCustomerId        String?            @unique
-  stripeSubscriptionId    String?            @unique
-  stripeCheckoutSessionId String?
-  stripePriceId           String?
-  createdAt               DateTime           @default(now())
-  updatedAt               DateTime           @updatedAt
-
-  billingEvents BillingEvent[]
-
-  @@index([orgId, status])
-  @@index([planId, status])
-  @@index([trialEndsAt])
-  @@index([stripeCustomerId])
-  @@index([stripeSubscriptionId])
-}
-
-model BillingEvent {
-  id             String             @id @default(uuid())
-  subscriptionId String
-  subscription   Subscription       @relation(fields: [subscriptionId], references: [id])
-  type           BillingEventType
-  amountCents    Int
-  status         BillingEventStatus @default(PENDING)
-  externalId     String?            // ID do evento na plataforma de pagamento (ex: Stripe)
-  stripeEventId  String?            @unique // Idempotency key para webhooks Stripe
-  description    String?
-  metadata       Json?
-  createdAt      DateTime           @default(now())
-
-  @@index([subscriptionId, createdAt])
-  @@index([type, status, createdAt])
-  @@index([stripeEventId])
-}
-
-model Notification {
-  id        String         @id @default(uuid())
-  orgId     String
-  org       Organization   @relation(fields: [orgId], references: [id])
-  userId    String? // Opcional, se a notificação for para um usuário específico
-  user      User?          @relation(fields: [userId], references: [id])
-  type      NotificationType
-  title     String         @default("")
-  message   String
-  read      Boolean        @default(false)
-  metadata  Json? // Dados adicionais para a notificação (ex: ID da cobrança)
-  readAt    DateTime?
-  createdAt DateTime       @default(now())
-
-  @@index([orgId, createdAt])
-  @@index([userId, createdAt])
-  @@index([orgId, type, createdAt])
-  @@index([orgId, readAt, createdAt])
-}
-
-model AutomationRule {
-  id    String @id @default(uuid())
-  orgId String
-  org   Organization @relation(fields: [orgId], references: [id])
-
-  name        String
-  description String?
-  active      Boolean @default(true)
-
-  trigger      AutomationTrigger
-  conditionSet Json?
-  actionSet    Json
-
-  createdByUserId String?
-  lastRunAt       DateTime?
-
-  executions AutomationExecution[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([orgId, active, trigger, createdAt])
-  @@index([orgId, trigger, createdAt])
-}
-
-model AutomationExecution {
-  id    String @id @default(uuid())
-  orgId String
-  org   Organization @relation(fields: [orgId], references: [id])
-
-  ruleId String
-  rule   AutomationRule @relation(fields: [ruleId], references: [id])
-
-  trigger AutomationTrigger
-  status  AutomationExecutionStatus @default(PENDING)
-
-  eventPayload Json
-  resultPayload Json?
-  errorMessage String?
-
-  startedAt   DateTime @default(now())
-  finishedAt  DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@index([orgId, createdAt])
-  @@index([orgId, trigger, status, createdAt])
-  @@index([ruleId, createdAt])
-}
-
-model QueueJob {
-  id          String   @id @default(uuid())
-  queue       String
-  jobId       String
-  status      String
-  payload     Json
-  error       String?
-  createdAt   DateTime @default(now())
-  completedAt DateTime?
-
-  @@index([queue, status, createdAt])
-  @@unique([queue, jobId])
-}
-
-model WebhookEndpoint {
-  id     String       @id @default(uuid())
-  orgId  String
-  org    Organization @relation(fields: [orgId], references: [id])
-
-  url    String
-  secret String
-  active Boolean @default(true)
-  events Json
-
-  deliveries WebhookDelivery[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([orgId, active, createdAt])
-}
-
-model WebhookDelivery {
-  id         String                @id @default(uuid())
-  endpointId String
-  endpoint   WebhookEndpoint       @relation(fields: [endpointId], references: [id], onDelete: Cascade)
-
-  eventType     String
-  payload       Json
-  status        WebhookDeliveryStatus @default(PENDING)
-  attempts      Int                 @default(0)
-  lastAttemptAt DateTime?
-  createdAt     DateTime            @default(now())
-
-  @@index([endpointId])
-  @@index([eventType])
-  @@index([status])
-}
-
 enum TrackItemType {
   READING
   ACTION
   CHECKPOINT
-}
-
-enum AutomationTrigger {
-  SERVICE_ORDER_COMPLETED
-  PAYMENT_OVERDUE
-  APPOINTMENT_CREATED
-}
-
-enum AutomationExecutionStatus {
-  PENDING
-  SKIPPED
-  SUCCESS
-  FAILED
-}
-
-enum AutomationActionType {
-  SEND_WHATSAPP_MESSAGE
-  CREATE_CHARGE
-  CREATE_NOTIFICATION
-  UPDATE_RISK
-}
-
-// ============================================================
-// ✅ Analytics de Produto
-// ============================================================
-
-enum UsageMetricEvent {
-  LOGIN
-  CREATE_CUSTOMER
-  CREATE_SERVICE_ORDER
-  CREATE_CHARGE
-  REGISTER_PAYMENT
-  CREATE_EXPENSE
-  ISSUE_INVOICE
-  VIEW_DASHBOARD
-  CREATE_APPOINTMENT
-  CREATE_PERSON
-  UPGRADE_PLAN
-  CANCEL_SUBSCRIPTION
-}
-
-model UsageMetric {
-  id        String           @id @default(uuid())
-  orgId     String
-  org       Organization     @relation(fields: [orgId], references: [id])
-  userId    String?
-  event     UsageMetricEvent
-  metadata  Json?
-  createdAt DateTime         @default(now())
-
-  @@index([orgId, event, createdAt])
-  @@index([orgId, createdAt])
-  @@index([userId, event, createdAt])
-  @@index([event, createdAt])
-}
-
-// ============================================================
-// ✅ Anexos de Ordens de Serviço
-// ============================================================
-model ServiceOrderAttachment {
-  id             String       @id @default(uuid())
-  orgId          String
-  org            Organization @relation(fields: [orgId], references: [id])
-  serviceOrderId String
-  fileName       String
-  fileUrl        String
-  mimeType       String
-  sizeBytes      Int          @default(0)
-  uploadedBy     String?      // userId
-  createdAt      DateTime     @default(now())
-
-  @@index([serviceOrderId, createdAt])
-  @@index([orgId, createdAt])
 }

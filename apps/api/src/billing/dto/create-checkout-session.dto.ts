@@ -1,9 +1,8 @@
-import { IsEnum, IsOptional, IsString, IsUrl } from 'class-validator'
-import { PlanName } from '@prisma/client'
+import { IsString, IsOptional } from 'class-validator'
 
 export class CreateCheckoutSessionDto {
-  @IsEnum(PlanName)
-  planName: PlanName
+  @IsString()
+  priceId!: string
 
   @IsOptional()
   @IsString()

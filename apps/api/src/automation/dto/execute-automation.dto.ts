@@ -1,10 +1,13 @@
-import { AutomationTrigger } from '@prisma/client'
-import { IsEnum, IsObject } from 'class-validator'
+import { IsObject, IsOptional, IsString } from 'class-validator'
 
 export class ExecuteAutomationDto {
-  @IsEnum(AutomationTrigger)
-  trigger!: AutomationTrigger
+  @IsString()
+  ruleId!: string
 
+  @IsString()
+  trigger!: string
+
+  @IsOptional()
   @IsObject()
-  payload!: Record<string, any>
+  payload?: Record<string, any>
 }

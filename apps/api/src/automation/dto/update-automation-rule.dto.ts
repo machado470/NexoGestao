@@ -1,5 +1,4 @@
-import { AutomationTrigger } from '@prisma/client'
-import { IsArray, IsBoolean, IsEnum, IsObject, IsOptional, IsString } from 'class-validator'
+import { IsArray, IsBoolean, IsObject, IsOptional, IsString } from 'class-validator'
 
 export class UpdateAutomationRuleDto {
   @IsOptional()
@@ -11,8 +10,8 @@ export class UpdateAutomationRuleDto {
   description?: string
 
   @IsOptional()
-  @IsEnum(AutomationTrigger)
-  trigger?: AutomationTrigger
+  @IsString()
+  trigger?: string
 
   @IsOptional()
   @IsObject()

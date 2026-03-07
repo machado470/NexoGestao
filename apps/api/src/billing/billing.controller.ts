@@ -17,14 +17,22 @@ import { Public } from '../auth/decorators/public.decorator'
 import { CreateCheckoutSessionDto } from './dto/create-checkout-session.dto'
 import { PlanName } from '@prisma/client'
 
+const PRICE_PLAN_MAP: Record<string, PlanName> = {
+  price_starter: 'STARTER',
+  price_pro: 'PRO',
+  price_business: 'BUSINESS',
+}
+
 @Controller('billing')
 export class BillingController {
   constructor(private readonly billingService: BillingService) {}
 
-  /**
-   * POST /billing/create-checkout-session
-   * Cria uma sessão de checkout no Stripe para o plano escolhido.
-   */
+  /*
+  ========================================
+  CREATE CHECKOUT SESSION
+  ========================================
+  */
+
   @UseGuards(JwtAuthGuard)
   @Post('create-checkout-session')
   async createCheckoutSession(
@@ -32,18 +40,27 @@ export class BillingController {
     @Body() dto: CreateCheckoutSessionDto,
   ) {
     const orgId = req.user.orgId
+
+    const planName = PRICE_PLAN_MAP[dto.priceId]
+
+    if (!planName) {
+      throw new Error(`priceId desconhecido: ${dto.priceId}`)
+    }
+
     return this.billingService.createCheckoutSession(
       orgId,
-      dto.planName as PlanName,
+      planName,
       dto.successUrl,
       dto.cancelUrl,
     )
   }
 
-  /**
-   * POST /billing/webhook
-   * Recebe eventos do Stripe via webhook (raw body necessário).
-   */
+  /*
+  ========================================
+  STRIPE WEBHOOK
+  ========================================
+  */
+
   @Public()
   @Post('webhook')
   @HttpCode(HttpStatus.OK)
@@ -55,10 +72,12 @@ export class BillingController {
     return this.billingService.handleWebhook(rawBody, signature)
   }
 
-  /**
-   * GET /billing/subscription
-   * Retorna a assinatura atual da organização com limites do plano.
-   */
+  /*
+  ========================================
+  SUBSCRIPTION
+  ========================================
+  */
+
   @UseGuards(JwtAuthGuard)
   @Get('subscription')
   async getSubscription(@Req() req: any) {
@@ -66,10 +85,12 @@ export class BillingController {
     return this.billingService.getSubscription(orgId)
   }
 
-  /**
-   * POST /billing/cancel
-   * Cancela a assinatura da organização.
-   */
+  /*
+  ========================================
+  CANCEL SUBSCRIPTION
+  ========================================
+  */
+
   @UseGuards(JwtAuthGuard)
   @Post('cancel')
   async cancelSubscription(@Req() req: any) {
@@ -77,15 +98,17 @@ export class BillingController {
     return this.billingService.cancelSubscription(orgId)
   }
 
-  /**
-   * GET /billing/plans
-   * Lista todos os planos disponíveis.
-   */
+  /*
+  ========================================
+  PLANS
+  ========================================
+  */
+
   @UseGuards(JwtAuthGuard)
   @Get('plans')
-  async getPlans(@Req() req: any) {
-    // Retorna os planos com limites embutidos
+  async getPlans() {
     const { PLAN_LIMITS } = await import('./billing.service')
+
     return Object.entries(PLAN_LIMITS).map(([name, limits]) => ({
       name,
       label: limits.label,
@@ -93,10 +116,12 @@ export class BillingController {
     }))
   }
 
-  /**
-   * GET /billing/status
-   * Retorna o status detalhado da assinatura da organização.
-   */
+  /*
+  ========================================
+  BILLING STATUS
+  ========================================
+  */
+
   @UseGuards(JwtAuthGuard)
   @Get('status')
   async getBillingStatus(@Req() req: any) {
@@ -104,10 +129,12 @@ export class BillingController {
     return this.billingService.getBillingStatus(orgId)
   }
 
-  /**
-   * GET /billing/limits
-   * Retorna os limites e o uso atual de quotas da organização.
-   */
+  /*
+  ========================================
+  BILLING LIMITS
+  ========================================
+  */
+
   @UseGuards(JwtAuthGuard)
   @Get('limits')
   async getBillingLimits(@Req() req: any) {

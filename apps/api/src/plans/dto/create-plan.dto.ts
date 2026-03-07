@@ -1,10 +1,9 @@
-import { IsNotEmpty, IsEnum, IsNumber, IsJSON, IsOptional } from 'class-validator';
-import { PlanName } from '@prisma/client';
+import { IsNotEmpty, IsString, IsNumber, IsJSON, IsOptional } from 'class-validator';
 
 export class CreatePlanDto {
   @IsNotEmpty()
-  @IsEnum(PlanName)
-  name: PlanName;
+  @IsString()
+  name: string;
 
   @IsOptional()
   description?: string;
@@ -15,5 +14,5 @@ export class CreatePlanDto {
 
   @IsOptional()
   @IsJSON()
-  features?: string; // JSON string for features
+  features?: string;
 }
