@@ -1,14 +1,21 @@
-import { Module } from '@nestjs/common';
-import { NotificationsService } from './notifications.service';
-import { NotificationsController } from './notifications.controller';
-import { PrismaService } from '../prisma/prisma.service';
-import { AuthModule } from '../auth/auth.module';
-import { QueueModule } from '../queue/queue.module';
-import { NotificationProcessor } from '../queue/processors/notification.processor';
+import { Module } from '@nestjs/common'
+import { NotificationsService } from './notifications.service'
+import { NotificationsController } from './notifications.controller'
+import { AuthModule } from '../auth/auth.module'
+import { QueueModule } from '../queue/queue.module'
+import { PrismaModule } from '../prisma/prisma.module'
+import { NotificationProcessor } from '../queue/processors/notification.processor'
 
 @Module({
-  imports: [AuthModule, QueueModule],
-  providers: [NotificationsService, PrismaService, NotificationProcessor],
+  imports: [
+    AuthModule,
+    QueueModule,
+    PrismaModule
+  ],
+  providers: [
+    NotificationsService,
+    NotificationProcessor
+  ],
   controllers: [NotificationsController],
   exports: [NotificationsService],
 })

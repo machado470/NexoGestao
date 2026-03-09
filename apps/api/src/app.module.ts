@@ -72,6 +72,7 @@ import { QueueModule } from './queue/queue.module'
 import { WebhookModule } from './webhooks/webhook.module'
 
 import { SentryModule } from './common/sentry/sentry.module'
+import { MetricsService } from './common/metrics/metrics.service'
 
 @Module({
   imports: [
@@ -167,6 +168,7 @@ import { SentryModule } from './common/sentry/sentry.module'
     SentryModule,
   ],
   providers: [
+    MetricsService,
     {
       provide: APP_INTERCEPTOR,
       useClass: OrgContextInterceptor,

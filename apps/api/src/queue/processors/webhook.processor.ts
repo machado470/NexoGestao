@@ -18,67 +18,62 @@ export class WebhookProcessor implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit() {
-    this.worker = new Worker(
-      QUEUE_NAMES.WEBHOOKS,
-      async (job: Job<any>) => {
-        await this.queueService.updateJobStatus({
-          queue: QUEUE_NAMES.WEBHOOKS,
-          jobId: job.id?.toString() ?? '',
-          status: 'ACTIVE',
-        })
+    try {
+      this.worker = new Worker(
+        QUEUE_NAMES.WEBHOOKS,
+        async (job: Job<any>) => {
+          await this.queueService.updateJobStatus({
+            queue: QUEUE_NAMES.WEBHOOKS,
+            jobId: job.id?.toString() ?? '',
+            status: 'ACTIVE',
+          })
 
-        if (job.name !== 'dispatch-webhook') return
+          if (job.name !== 'dispatch-webhook') return
 
-        const delivery = await this.webhookService.getDeliveryContext(job.data.deliveryId)
-        if (!delivery || !delivery.endpoint?.active) return
+          const delivery = await this.webhookService.getDeliveryContext(job.data.deliveryId)
+          if (!delivery || !delivery.endpoint?.active) return
 
-        const payloadText = JSON.stringify(delivery.payload)
-        const signature = createHmac('sha256', delivery.endpoint.secret).update(payloadText).digest('hex')
+          const payloadText = JSON.stringify(delivery.payload)
+          const signature = createHmac('sha256', delivery.endpoint.secret)
+            .update(payloadText)
+            .digest('hex')
 
-        const response = await fetch(delivery.endpoint.url, {
-          method: 'POST',
-          headers: {
-            'content-type': 'application/json',
-            'x-nexo-signature': signature,
-          },
-          body: payloadText,
-        })
+          const response = await fetch(delivery.endpoint.url, {
+            method: 'POST',
+            headers: {
+              'content-type': 'application/json',
+              'x-nexo-signature': signature,
+            },
+            body: payloadText,
+          })
 
-        const isSuccess = response.ok
-        await this.webhookService.markDeliveryAttempt({
-          deliveryId: delivery.id,
-          attempts: Number(job.attemptsMade ?? 0) + 1,
-          status: isSuccess ? 'SUCCESS' : 'FAILED',
-        })
+          if (!response.ok) {
+            throw new Error(`Webhook HTTP error status=${response.status}`)
+          }
 
-        if (!isSuccess) {
-          throw new Error(`Webhook HTTP error status=${response.status}`)
-        }
+          await this.queueService.updateJobStatus({
+            queue: QUEUE_NAMES.WEBHOOKS,
+            jobId: job.id?.toString() ?? '',
+            status: 'COMPLETED',
+            completed: true,
+          })
+        },
+        { connection: this.connection },
+      )
 
-        await this.queueService.updateJobStatus({
-          queue: QUEUE_NAMES.WEBHOOKS,
-          jobId: job.id?.toString() ?? '',
-          status: 'COMPLETED',
-          completed: true,
-        })
-      },
-      { connection: this.connection },
-    )
-
-    this.worker.on('failed', async (job, err) => {
-      if (!job) return
-      this.logger.error(`webhook job failed id=${job.id} error=${err.message}`)
-
-      await this.queueService.updateJobStatus({
-        queue: QUEUE_NAMES.WEBHOOKS,
-        jobId: job.id?.toString() ?? '',
-        status: 'FAILED',
-        error: err.message,
-      })
-    })
+      this.logger.log('Webhook worker iniciado')
+    } catch (err) {
+      const error = err as Error
+      this.logger.error(`Falha ao iniciar webhook worker: ${error.message}`)
+    }
   }
 
   async onModuleDestroy() {
-    await this.worker?.close()
+    try {
+      await this.worker?.close()
+    } catch (err) {
+      const error = err as Error
+      this.logger.error(`Erro ao fechar webhook worker: ${error.message}`)
+    }
   }
 }

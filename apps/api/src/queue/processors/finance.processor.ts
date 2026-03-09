@@ -17,46 +17,47 @@ export class FinanceProcessor implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit() {
-    this.worker = new Worker(
-      QUEUE_NAMES.FINANCE,
-      async (job: Job<any>) => {
-        await this.queueService.updateJobStatus({
-          queue: QUEUE_NAMES.FINANCE,
-          jobId: job.id?.toString() ?? '',
-          status: 'ACTIVE',
-        })
+    try {
+      this.worker = new Worker(
+        QUEUE_NAMES.FINANCE,
+        async (job: Job<any>) => {
+          await this.queueService.updateJobStatus({
+            queue: QUEUE_NAMES.FINANCE,
+            jobId: job.id?.toString() ?? '',
+            status: 'ACTIVE',
+          })
 
-        if (job.name === 'create-charge') {
-          await this.financeService.createAutomationCharge(job.data)
-        }
+          if (job.name === 'create-charge') {
+            await this.financeService.createAutomationCharge(job.data)
+          }
 
-        if (job.name === 'payment-reminder') {
-          await this.financeService.sendPaymentReminder(job.data)
-        }
+          if (job.name === 'payment-reminder') {
+            await this.financeService.sendPaymentReminder(job.data)
+          }
 
-        await this.queueService.updateJobStatus({
-          queue: QUEUE_NAMES.FINANCE,
-          jobId: job.id?.toString() ?? '',
-          status: 'COMPLETED',
-          completed: true,
-        })
-      },
-      { connection: this.connection },
-    )
+          await this.queueService.updateJobStatus({
+            queue: QUEUE_NAMES.FINANCE,
+            jobId: job.id?.toString() ?? '',
+            status: 'COMPLETED',
+            completed: true,
+          })
+        },
+        { connection: this.connection },
+      )
 
-    this.worker.on('failed', async (job, err) => {
-      if (!job) return
-      this.logger.error(`finance job failed id=${job.id} error=${err.message}`)
-      await this.queueService.updateJobStatus({
-        queue: QUEUE_NAMES.FINANCE,
-        jobId: job.id?.toString() ?? '',
-        status: 'FAILED',
-        error: err.message,
-      })
-    })
+      this.logger.log('Finance worker iniciado')
+    } catch (err) {
+      const error = err as Error
+      this.logger.error(`Falha ao iniciar finance worker: ${error.message}`)
+    }
   }
 
   async onModuleDestroy() {
-    await this.worker?.close()
+    try {
+      await this.worker?.close()
+    } catch (err) {
+      const error = err as Error
+      this.logger.error(`Erro ao fechar finance worker: ${error.message}`)
+    }
   }
 }

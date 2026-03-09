@@ -17,46 +17,47 @@ export class NotificationProcessor implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit() {
-    this.worker = new Worker(
-      QUEUE_NAMES.NOTIFICATIONS,
-      async (job: Job<any>) => {
-        await this.queueService.updateJobStatus({
-          queue: QUEUE_NAMES.NOTIFICATIONS,
-          jobId: job.id?.toString() ?? '',
-          status: 'ACTIVE',
-        })
+    try {
+      this.worker = new Worker(
+        QUEUE_NAMES.NOTIFICATIONS,
+        async (job: Job<any>) => {
+          await this.queueService.updateJobStatus({
+            queue: QUEUE_NAMES.NOTIFICATIONS,
+            jobId: job.id?.toString() ?? '',
+            status: 'ACTIVE',
+          })
 
-        await this.notificationsService.createNotificationNow(
-          job.data.orgId,
-          job.data.type,
-          job.data.message,
-          job.data.userId,
-          job.data.metadata,
-        )
+          await this.notificationsService.createNotificationNow(
+            job.data.orgId,
+            job.data.type,
+            job.data.message,
+            job.data.userId,
+            job.data.metadata,
+          )
 
-        await this.queueService.updateJobStatus({
-          queue: QUEUE_NAMES.NOTIFICATIONS,
-          jobId: job.id?.toString() ?? '',
-          status: 'COMPLETED',
-          completed: true,
-        })
-      },
-      { connection: this.connection },
-    )
+          await this.queueService.updateJobStatus({
+            queue: QUEUE_NAMES.NOTIFICATIONS,
+            jobId: job.id?.toString() ?? '',
+            status: 'COMPLETED',
+            completed: true,
+          })
+        },
+        { connection: this.connection },
+      )
 
-    this.worker.on('failed', async (job, err) => {
-      if (!job) return
-      this.logger.error(`notification job failed id=${job.id} error=${err.message}`)
-      await this.queueService.updateJobStatus({
-        queue: QUEUE_NAMES.NOTIFICATIONS,
-        jobId: job.id?.toString() ?? '',
-        status: 'FAILED',
-        error: err.message,
-      })
-    })
+      this.logger.log('Notification worker iniciado')
+    } catch (err) {
+      const error = err as Error
+      this.logger.error(`Falha ao iniciar notification worker: ${error.message}`)
+    }
   }
 
   async onModuleDestroy() {
-    await this.worker?.close()
+    try {
+      await this.worker?.close()
+    } catch (err) {
+      const error = err as Error
+      this.logger.error(`Erro ao fechar notification worker: ${error.message}`)
+    }
   }
 }

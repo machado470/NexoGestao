@@ -1,25 +1,32 @@
 import { Module } from '@nestjs/common'
 import { PrismaModule } from '../prisma/prisma.module'
-import { AuditModule } from '../audit/audit.module'
 import { TimelineModule } from '../timeline/timeline.module'
+import { AuditModule } from '../audit/audit.module'
 import { RiskModule } from '../risk/risk.module'
 
 import { PeopleService } from './people.service'
 import { PeopleController } from './people.controller'
-
-// ✅ importa o módulo correto (traz service/repo/guard/job/scheduler)
-import { OperationalStateModule } from './operational-state.module'
+import { OperationalStateService } from './operational-state.service'
+import { OperationalStateRepository } from './operational-state.repository'
 
 @Module({
   imports: [
     PrismaModule,
-    AuditModule,
     TimelineModule,
-    RiskModule,
-    OperationalStateModule,
+    AuditModule,
+    RiskModule
   ],
-  providers: [PeopleService],
-  controllers: [PeopleController],
-  exports: [PeopleService],
+  providers: [
+    PeopleService,
+    OperationalStateService,
+    OperationalStateRepository
+  ],
+  controllers: [
+    PeopleController
+  ],
+  exports: [
+    PeopleService,
+    OperationalStateService
+  ]
 })
 export class PeopleModule {}

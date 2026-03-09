@@ -17,42 +17,43 @@ export class AutomationProcessor implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit() {
-    this.worker = new Worker(
-      QUEUE_NAMES.AUTOMATION,
-      async (job: Job<any>) => {
-        await this.queueService.updateJobStatus({
-          queue: QUEUE_NAMES.AUTOMATION,
-          jobId: job.id?.toString() ?? '',
-          status: 'ACTIVE',
-        })
+    try {
+      this.worker = new Worker(
+        QUEUE_NAMES.AUTOMATION,
+        async (job: Job<any>) => {
+          await this.queueService.updateJobStatus({
+            queue: QUEUE_NAMES.AUTOMATION,
+            jobId: job.id?.toString() ?? '',
+            status: 'ACTIVE',
+          })
 
-        if (job.name === 'execute-action') {
-          await this.automationService.executeActionJob(job.data)
-        }
+          if (job.name === 'execute-action') {
+            await this.automationService.executeActionJob(job.data)
+          }
 
-        await this.queueService.updateJobStatus({
-          queue: QUEUE_NAMES.AUTOMATION,
-          jobId: job.id?.toString() ?? '',
-          status: 'COMPLETED',
-          completed: true,
-        })
-      },
-      { connection: this.connection },
-    )
+          await this.queueService.updateJobStatus({
+            queue: QUEUE_NAMES.AUTOMATION,
+            jobId: job.id?.toString() ?? '',
+            status: 'COMPLETED',
+            completed: true,
+          })
+        },
+        { connection: this.connection },
+      )
 
-    this.worker.on('failed', async (job, err) => {
-      if (!job) return
-      this.logger.error(`automation job failed id=${job.id} error=${err.message}`)
-      await this.queueService.updateJobStatus({
-        queue: QUEUE_NAMES.AUTOMATION,
-        jobId: job.id?.toString() ?? '',
-        status: 'FAILED',
-        error: err.message,
-      })
-    })
+      this.logger.log('Automation worker iniciado')
+    } catch (err) {
+      const error = err as Error
+      this.logger.error(`Falha ao iniciar automation worker: ${error.message}`)
+    }
   }
 
   async onModuleDestroy() {
-    await this.worker?.close()
+    try {
+      await this.worker?.close()
+    } catch (err) {
+      const error = err as Error
+      this.logger.error(`Erro ao fechar automation worker: ${error.message}`)
+    }
   }
 }
