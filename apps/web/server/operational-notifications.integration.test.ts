@@ -1,9 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { PrismaClient } from "@prisma/client";
 import { appRouter } from "./routers";
 import { __resetOperationalNotificationsForTests } from "./_core/operationalNotifications";
 
-const prisma = new PrismaClient();
 const ORG_10_ID = "00000000-0000-0000-0000-000000000010";
 const ORG_20_ID = "00000000-0000-0000-0000-000000000020";
 
@@ -21,30 +19,6 @@ function createCtx(orgId: string) {
 
 describe("Operational notifications integration", () => {
   beforeEach(async () => {
-    await prisma.notification.deleteMany({
-      where: { orgId: { in: [ORG_10_ID, ORG_20_ID] } },
-    });
-
-    await prisma.organization.upsert({
-      where: { id: ORG_10_ID },
-      update: {},
-      create: {
-        id: ORG_10_ID,
-        name: "Test Org 10",
-        slug: "test-org-10",
-      },
-    });
-
-    await prisma.organization.upsert({
-      where: { id: ORG_20_ID },
-      update: {},
-      create: {
-        id: ORG_20_ID,
-        name: "Test Org 20",
-        slug: "test-org-20",
-      },
-    });
-
     await __resetOperationalNotificationsForTests();
 
     vi.stubGlobal(

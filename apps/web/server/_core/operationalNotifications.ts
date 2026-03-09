@@ -20,6 +20,7 @@ export type OperationalNotification = {
   message: string;
   createdAt: Date;
   read: boolean;
+  readAt?: Date;
   metadata?: Record<string, unknown>;
 };
 
@@ -52,6 +53,7 @@ export type NotificationListResult = {
 
 const globalForOperationalNotifications = globalThis as unknown as {
   operationalNotificationsPrisma?: any;
+  operationalNotificationsMemoryStore?: OperationalNotification[];
 };
 
 const prisma =
@@ -60,6 +62,13 @@ const prisma =
 
 if (process.env.NODE_ENV !== "production") {
   globalForOperationalNotifications.operationalNotificationsPrisma = prisma;
+}
+
+const memoryStore =
+  globalForOperationalNotifications.operationalNotificationsMemoryStore ?? [];
+
+if (process.env.NODE_ENV !== "production") {
+  globalForOperationalNotifications.operationalNotificationsMemoryStore = memoryStore;
 }
 
 function asOperationalEventType(type: string): OperationalEventType {
@@ -101,6 +110,167 @@ function toNotificationPayload(input: {
   }
 }
 
+function generateNotificationId() {
+  return `notif_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function supportsPrismaNotificationDelegate() {
+  return Boolean(prisma && prisma.notification);
+}
+
+function sortByCreatedAtDesc<T extends { createdAt: Date }>(items: T[]) {
+  return [...items].sort(
+    (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
+  );
+}
+
+function filterByCategory(
+  items: OperationalNotification[],
+  category?: NotificationCategory | "all"
+) {
+  if (!category || category === "all") return items;
+  return items.filter((item) => CATEGORY_TYPES[category].includes(item.type));
+}
+
+async function createNotificationRecord(data: {
+  orgId: string;
+  type: OperationalEventType;
+  title: string;
+  message: string;
+  metadata?: Record<string, unknown>;
+  read: boolean;
+}) {
+  if (supportsPrismaNotificationDelegate()) {
+    return prisma.notification.create({
+      data: {
+        orgId: data.orgId,
+        type: data.type,
+        title: data.title,
+        message: data.message,
+        metadata: (data.metadata as unknown) ?? undefined,
+        read: data.read,
+      },
+    });
+  }
+
+  const created: OperationalNotification = {
+    id: generateNotificationId(),
+    orgId: data.orgId,
+    type: data.type,
+    title: data.title,
+    message: data.message,
+    metadata: data.metadata,
+    read: data.read,
+    createdAt: new Date(),
+  };
+
+  memoryStore.push(created);
+  return created;
+}
+
+async function findNotifications(params: {
+  orgId: string;
+  limit?: number;
+  skip?: number;
+  category?: NotificationCategory | "all";
+}) {
+  if (supportsPrismaNotificationDelegate()) {
+    const where = {
+      orgId: params.orgId,
+      ...(params.category && params.category !== "all"
+        ? { type: { in: CATEGORY_TYPES[params.category] } }
+        : {}),
+    };
+
+    return prisma.notification.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      take: params.limit,
+      skip: params.skip,
+    });
+  }
+
+  const filtered = filterByCategory(
+    memoryStore.filter((item) => item.orgId === params.orgId),
+    params.category
+  );
+
+  const sorted = sortByCreatedAtDesc(filtered);
+  const start = params.skip ?? 0;
+  const end = params.limit ? start + params.limit : undefined;
+
+  return sorted.slice(start, end);
+}
+
+async function countNotifications(params: {
+  orgId: string;
+  unreadOnly?: boolean;
+  category?: NotificationCategory | "all";
+}) {
+  if (supportsPrismaNotificationDelegate()) {
+    const where = {
+      orgId: params.orgId,
+      ...(params.unreadOnly ? { read: false } : {}),
+      ...(params.category && params.category !== "all"
+        ? { type: { in: CATEGORY_TYPES[params.category] } }
+        : {}),
+    };
+
+    return prisma.notification.count({ where });
+  }
+
+  return filterByCategory(
+    memoryStore.filter(
+      (item) =>
+        item.orgId === params.orgId &&
+        (!params.unreadOnly || item.read === false)
+    ),
+    params.category
+  ).length;
+}
+
+async function markAsRead(params: { id: string; orgId: string }) {
+  if (supportsPrismaNotificationDelegate()) {
+    return prisma.notification.updateMany({
+      where: {
+        id: params.id,
+        orgId: params.orgId,
+        read: false,
+      },
+      data: {
+        read: true,
+        readAt: new Date(),
+      },
+    });
+  }
+
+  let updatedCount = 0;
+
+  for (const item of memoryStore) {
+    if (item.id === params.id && item.orgId === params.orgId && item.read === false) {
+      item.read = true;
+      item.readAt = new Date();
+      updatedCount += 1;
+    }
+  }
+
+  return { count: updatedCount };
+}
+
+function normalizeRow(row: any): OperationalNotification {
+  return {
+    id: row.id,
+    orgId: row.orgId,
+    type: asOperationalEventType(row.type),
+    title: row.title,
+    message: row.message,
+    createdAt: row.createdAt instanceof Date ? row.createdAt : new Date(row.createdAt),
+    read: Boolean(row.read),
+    readAt: row.readAt ? new Date(row.readAt) : undefined,
+    metadata: (row.metadata as Record<string, unknown> | null) ?? undefined,
+  };
+}
+
 export async function emitOperationalNotification(input: {
   orgId: string | number;
   type: OperationalEventType;
@@ -111,15 +281,13 @@ export async function emitOperationalNotification(input: {
 
   if (!payload) return;
 
-  const created = await prisma.notification.create({
-    data: {
-      orgId,
-      type: input.type,
-      title: payload.title,
-      message: payload.message,
-      metadata: (input.metadata as unknown) ?? undefined,
-      read: false,
-    },
+  const created = await createNotificationRecord({
+    orgId,
+    type: input.type,
+    title: payload.title,
+    message: payload.message,
+    metadata: input.metadata,
+    read: false,
   });
 
   emitNotificationCenterEvent({
@@ -133,22 +301,12 @@ export async function listOperationalNotifications(
   orgId: string | number,
   limit = 20
 ) {
-  const rows = await prisma.notification.findMany({
-    where: { orgId: String(orgId) },
-    orderBy: { createdAt: "desc" },
-    take: limit,
+  const rows = await findNotifications({
+    orgId: String(orgId),
+    limit,
   });
 
-  return rows.map((row: any) => ({
-    id: row.id,
-    orgId: row.orgId,
-    type: asOperationalEventType(row.type),
-    title: row.title,
-    message: row.message,
-    createdAt: row.createdAt,
-    read: row.read,
-    metadata: (row.metadata as Record<string, unknown> | null) ?? undefined,
-  }));
+  return rows.map(normalizeRow);
 }
 
 export async function listOperationalNotificationsPaginated(
@@ -158,35 +316,25 @@ export async function listOperationalNotificationsPaginated(
   const limit = Math.max(1, Math.min(params.limit ?? 10, 50));
   const page = Math.max(1, params.page ?? 1);
 
-  const where = {
-    orgId,
-    ...(params.category && params.category !== "all"
-      ? { type: { in: CATEGORY_TYPES[params.category] } }
-      : {}),
-  };
-
   const [rows, total, unreadCount] = await Promise.all([
-    prisma.notification.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      take: limit,
+    findNotifications({
+      orgId,
+      category: params.category,
+      limit,
       skip: (page - 1) * limit,
     }),
-    prisma.notification.count({ where }),
-    prisma.notification.count({ where: { orgId, read: false } }),
+    countNotifications({
+      orgId,
+      category: params.category,
+    }),
+    countNotifications({
+      orgId,
+      unreadOnly: true,
+    }),
   ]);
 
   return {
-    items: rows.map((row: any) => ({
-      id: row.id,
-      orgId: row.orgId,
-      type: asOperationalEventType(row.type),
-      title: row.title,
-      message: row.message,
-      createdAt: row.createdAt,
-      read: row.read,
-      metadata: (row.metadata as Record<string, unknown> | null) ?? undefined,
-    })),
+    items: rows.map(normalizeRow),
     total,
     page,
     pages: Math.max(1, Math.ceil(total / limit)),
@@ -199,17 +347,9 @@ export async function markNotificationAsRead(input: {
   orgId: string | number;
 }) {
   const orgId = String(input.orgId);
-
-  const updated = await prisma.notification.updateMany({
-    where: {
-      id: input.id,
-      orgId,
-      read: false,
-    },
-    data: {
-      read: true,
-      readAt: new Date(),
-    },
+  const updated = await markAsRead({
+    id: input.id,
+    orgId,
   });
 
   if (updated.count > 0) {
@@ -226,26 +366,29 @@ export async function markNotificationAsRead(input: {
 export async function countUnreadOperationalNotifications(
   orgId: string | number
 ) {
-  return prisma.notification.count({
-    where: {
-      orgId: String(orgId),
-      read: false,
-    },
+  return countNotifications({
+    orgId: String(orgId),
+    unreadOnly: true,
   });
 }
 
 export async function __resetOperationalNotificationsForTests() {
-  await prisma.notification.deleteMany({
-    where: {
-      type: {
-        in: [
-          "APPOINTMENT_CONFIRMED",
-          "APPOINTMENT_NO_SHOW",
-          "SERVICE_ORDER_COMPLETED",
-          "PAYMENT_OVERDUE",
-          "RISK_LEVEL_CHANGED",
-        ],
+  if (supportsPrismaNotificationDelegate()) {
+    await prisma.notification.deleteMany({
+      where: {
+        type: {
+          in: [
+            "APPOINTMENT_CONFIRMED",
+            "APPOINTMENT_NO_SHOW",
+            "SERVICE_ORDER_COMPLETED",
+            "PAYMENT_OVERDUE",
+            "RISK_LEVEL_CHANGED",
+          ],
+        },
       },
-    },
-  });
+    });
+    return;
+  }
+
+  memoryStore.length = 0;
 }
