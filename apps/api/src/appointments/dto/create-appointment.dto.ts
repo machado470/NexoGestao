@@ -14,16 +14,6 @@ export class CreateAppointmentDto {
   @IsNotEmpty()
   customerId!: string
 
-  @IsOptional()
-  @IsString()
-  @MaxLength(200)
-  title?: string
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(2000)
-  description?: string
-
   // ISO string (validação final no service com Date)
   @IsString()
   @IsNotEmpty()

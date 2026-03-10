@@ -87,7 +87,6 @@ export class ServiceOrdersService {
       try {
         await this.operationalState.syncAndLogStateChange(orgId, pid)
       } catch (err) {
-        // não derruba fluxo de O.S. por causa de risco/estado
         console.warn(
           '[ServiceOrders] Falha ao sync operacional. orgId=%s personId=%s err=%s',
           orgId,
@@ -117,12 +116,14 @@ export class ServiceOrdersService {
     const where: any = { orgId }
 
     if (filters.customerId) where.customerId = filters.customerId
-    if (filters.assignedToPersonId)
+    if (filters.assignedToPersonId) {
       where.assignedToPersonId = filters.assignedToPersonId
+    }
 
     if (filters.status != null) {
-      if (!isStatus(filters.status))
+      if (!isStatus(filters.status)) {
         throw new BadRequestException('status inválido')
+      }
       where.status = filters.status
     }
 
@@ -163,6 +164,7 @@ export class ServiceOrdersService {
         },
       },
     })
+
     if (!os) throw new NotFoundException('Ordem de serviço não encontrada')
     return os
   }
@@ -180,8 +182,9 @@ export class ServiceOrdersService {
     assignedToPersonId?: string
   }) {
     if (!params.orgId) throw new BadRequestException('orgId é obrigatório')
-    if (!params.customerId)
+    if (!params.customerId) {
       throw new BadRequestException('customerId é obrigatório')
+    }
 
     const title = normalizeText(params.title)
     if (!title) throw new BadRequestException('title é obrigatório')
@@ -213,8 +216,9 @@ export class ServiceOrdersService {
         where: { id: params.appointmentId, orgId: params.orgId },
         select: { id: true, customerId: true },
       })
-      if (!appt)
+      if (!appt) {
         throw new BadRequestException('appointmentId inválido para este org')
+      }
       if (appt.customerId !== params.customerId) {
         throw new BadRequestException(
           'appointmentId não pertence ao mesmo customerId',
@@ -231,8 +235,9 @@ export class ServiceOrdersService {
         },
         select: { id: true },
       })
-      if (!p)
+      if (!p) {
         throw new BadRequestException('assignedToPersonId inválido para este org')
+      }
     }
 
     const created = await this.prisma.serviceOrder.create({
@@ -243,8 +248,8 @@ export class ServiceOrdersService {
         assignedToPersonId: params.assignedToPersonId ?? null,
         title,
         description,
-        // priority e scheduledFor não existem no schema atual - usar dueDate
-        dueDate: scheduledFor,
+        priority,
+        scheduledFor,
         status: params.assignedToPersonId ? 'ASSIGNED' : 'OPEN',
       },
       include: {
@@ -269,7 +274,8 @@ export class ServiceOrdersService {
         appointmentId: created.appointmentId,
         assignedToPersonId: created.assignedToPersonId,
         status: created.status,
-        dueDate: created.dueDate,
+        priority: created.priority,
+        scheduledFor: created.scheduledFor,
         actorUserId: params.createdBy,
         actorPersonId: params.personId,
         createdBy: params.createdBy,
@@ -291,36 +297,37 @@ export class ServiceOrdersService {
         appointmentId: created.appointmentId,
         assignedToPersonId: created.assignedToPersonId,
         status: created.status,
-        dueDate: created.dueDate,
+        priority: created.priority,
+        scheduledFor: created.scheduledFor,
       },
     })
 
-    // ✅ sincroniza estado operacional do responsável (se existir)
     await this.syncOperationalForPeople(params.orgId, [created.assignedToPersonId])
+    await this.onboardingService.completeOnboardingStep(params.orgId, 'createService')
 
-    await this.onboardingService.completeOnboardingStep(params.orgId, 'createService');
     return created
   }
 
   async checkAndNotifyOverdueServiceOrders() {
-    const now = new Date();
+    const now = new Date()
+
     const overdueServiceOrders = await this.prisma.serviceOrder.findMany({
       where: {
-        dueDate: { lt: now },
+        scheduledFor: { lt: now },
         status: { notIn: [ServiceOrderStatus.DONE, ServiceOrderStatus.CANCELED] },
       },
       include: { customer: true, assignedTo: true },
-    });
+    })
 
     for (const so of overdueServiceOrders) {
-      const message = `Serviço #${so.id} (${so.title}) para ${so.customer.name} está atrasado.`;
+      const message = `Serviço #${so.id} (${so.title}) para ${so.customer.name} está atrasado.`
       await this.notificationsService.createNotification(
         so.orgId,
         'SERVICE_OVERDUE',
         message,
         so.assignedToPersonId ? (so.assignedTo as any)?.userId : null,
         { serviceOrderId: so.id, customerId: so.customerId },
-      );
+      )
     }
   }
 
@@ -336,8 +343,6 @@ export class ServiceOrdersService {
       scheduledFor?: string
       status?: ServiceOrderStatus
       assignedToPersonId?: string | null
-
-      // 💰 Finance (MVP): usados ao concluir O.S.
       amountCents?: number
       dueDate?: string
     }
@@ -356,7 +361,6 @@ export class ServiceOrdersService {
     })
     if (!existing) throw new NotFoundException('Ordem de serviço não encontrada')
 
-    // Captura inputs de financeiro (não entram no patch do ServiceOrder)
     const amountCents = params.data.amountCents
     const dueDate = params.data.dueDate
 
@@ -372,37 +376,36 @@ export class ServiceOrdersService {
       patch.description = normalizeText(params.data.description)
     }
 
-    // priority e scheduledFor não existem no schema atual
-    // scheduledFor é mapeado para dueDate
+    if (typeof params.data.priority === 'number') {
+      if (!Number.isFinite(params.data.priority)) {
+        throw new BadRequestException('priority inválida')
+      }
+      patch.priority = Math.min(5, Math.max(1, Math.floor(params.data.priority)))
+    }
+
     if (typeof params.data.scheduledFor === 'string') {
       const s = params.data.scheduledFor.trim()
       if (!s) {
-        patch.dueDate = null
+        patch.scheduledFor = null
       } else {
         const d = new Date(s)
         if (Number.isNaN(d.getTime())) {
           throw new BadRequestException('scheduledFor inválido (use ISO)')
         }
-        patch.dueDate = d
+        patch.scheduledFor = d
       }
     }
 
     if (typeof params.data.status === 'string') {
-      if (!isStatus(params.data.status))
+      if (!isStatus(params.data.status)) {
         throw new BadRequestException('status inválido')
+      }
       if (!this.canTransition(existing.status, params.data.status)) {
         throw new BadRequestException(
           `Transição inválida de ${existing.status} para ${params.data.status}`,
         )
       }
       patch.status = params.data.status
-    }
-
-    if (typeof (params.data as any).cancellationReason === 'string') {
-      patch.cancellationReason = normalizeText((params.data as any).cancellationReason)
-    }
-    if (typeof (params.data as any).outcomeSummary === 'string') {
-      patch.outcomeSummary = normalizeText((params.data as any).outcomeSummary)
     }
 
     if (params.data.assignedToPersonId !== undefined) {
@@ -414,18 +417,13 @@ export class ServiceOrdersService {
           where: { id: v.trim(), orgId: params.orgId, active: true },
           select: { id: true },
         })
-        if (!p)
+        if (!p) {
           throw new BadRequestException('assignedToPersonId inválido para este org')
+        }
         patch.assignedToPersonId = v.trim()
       } else {
         throw new BadRequestException('assignedToPersonId inválido')
       }
-    }
-
-    if (Object.keys(patch).length === 0) {
-      // permite chamar update apenas para enviar amountCents/dueDate? não.
-      // mantém disciplina: update precisa mexer em algo de O.S.
-      throw new BadRequestException('Nenhum campo para atualizar')
     }
 
     if (patch.assignedToPersonId && !patch.status && existing.status === 'OPEN') {
@@ -433,25 +431,25 @@ export class ServiceOrdersService {
     }
 
     if (patch.status === 'IN_PROGRESS' && existing.status !== 'IN_PROGRESS') {
-      patch.executionStartedAt = new Date()
-    }
-    if (patch.status === 'DONE') {
-      patch.executionEndedAt = new Date()
-      patch.executionStartedAt = patch.executionStartedAt ?? new Date()
-    }
-    if (patch.status === 'CANCELED' && !patch.cancellationReason) {
-      throw new BadRequestException('cancellationReason é obrigatório ao cancelar')
+      patch.startedAt = new Date()
     }
 
-    // Nota: startedAt e finishedAt não existem no ServiceOrder atual
-    // O status é atualizado diretamente sem timestamps adicionais
+    if (patch.status === 'DONE' && existing.status !== 'DONE') {
+      patch.finishedAt = new Date()
+      patch.startedAt = patch.startedAt ?? new Date()
+    }
+
+    if (Object.keys(patch).length === 0) {
+      throw new BadRequestException('Nenhum campo para atualizar')
+    }
 
     const result = await this.prisma.serviceOrder.updateMany({
       where: { id: params.id, orgId: params.orgId },
       data: patch,
     })
-    if (result.count === 0)
+    if (result.count === 0) {
       throw new NotFoundException('Ordem de serviço não encontrada')
+    }
 
     const updated = await this.prisma.serviceOrder.findFirst({
       where: { id: params.id, orgId: params.orgId },
@@ -466,6 +464,9 @@ export class ServiceOrdersService {
     if (!updated) throw new NotFoundException('Ordem de serviço não encontrada')
 
     const statusChanged = !!patch.status && patch.status !== existing.status
+    const assignedChanged =
+      patch.assignedToPersonId !== undefined &&
+      patch.assignedToPersonId !== existing.assignedToPersonId
 
     await this.timeline.log({
       orgId: params.orgId,
@@ -487,14 +488,9 @@ export class ServiceOrdersService {
       },
     })
 
-    const assignedChanged =
-      patch.assignedToPersonId !== undefined &&
-      patch.assignedToPersonId !== existing.assignedToPersonId
-
     let auditAction: string = AUDIT_ACTIONS.SERVICE_ORDER_UPDATED
     if (statusChanged) auditAction = AUDIT_ACTIONS.SERVICE_ORDER_STATUS_CHANGED
-    else if (assignedChanged)
-      auditAction = AUDIT_ACTIONS.SERVICE_ORDER_ASSIGNED_CHANGED
+    else if (assignedChanged) auditAction = AUDIT_ACTIONS.SERVICE_ORDER_ASSIGNED_CHANGED
 
     await this.audit.log({
       orgId: params.orgId,
@@ -519,7 +515,6 @@ export class ServiceOrdersService {
       },
     })
 
-    // ✅ Se virou DONE, tenta garantir cobrança (idempotente).
     if (statusChanged && updated.status === 'DONE') {
       await this.automation.executeTrigger({
         orgId: params.orgId,
@@ -543,7 +538,6 @@ export class ServiceOrdersService {
           dueDate,
         })
       } catch (err) {
-        // NÃO derruba conclusão da O.S. por causa do financeiro.
         console.warn(
           '[ServiceOrders] Falha ao criar cobrança ao concluir O.S. orgId=%s soId=%s err=%s',
           params.orgId,
@@ -553,9 +547,6 @@ export class ServiceOrdersService {
       }
     }
 
-    // ✅ REGRAS de sync operacional:
-    // - Se mudou responsável: recalcula o antigo e o novo
-    // - Se mudou status: recalcula o responsável atual (se existir)
     const impacted: Array<string | null> = []
 
     if (assignedChanged) {

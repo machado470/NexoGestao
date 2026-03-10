@@ -1,13 +1,12 @@
-import { Module } from '@nestjs/common';
-import { SubscriptionsService } from './subscriptions.service';
-import { SubscriptionsController } from './subscriptions.controller';
-import { PrismaService } from '../prisma/prisma.service';
-import { PlansModule } from '../plans/plans.module';
-import { AuthModule } from '../auth/auth.module';
+import { Module } from '@nestjs/common'
+import { SubscriptionsService } from './subscriptions.service'
+import { SubscriptionsController } from './subscriptions.controller'
+import { PrismaModule } from '../prisma/prisma.module'
+import { PlansModule } from '../plans/plans.module'
 
 @Module({
-  imports: [PlansModule, AuthModule],
-  providers: [SubscriptionsService, PrismaService],
+  imports: [PrismaModule, PlansModule],
+  providers: [SubscriptionsService],
   controllers: [SubscriptionsController],
   exports: [SubscriptionsService],
 })

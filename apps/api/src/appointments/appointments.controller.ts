@@ -57,7 +57,6 @@ export class AppointmentsController {
     @User() user: any,
     @Body() body: CreateAppointmentDto,
   ) {
-    // Validar quota antes de criar
     await this.quotas.validateQuota(orgId, 'CREATE_APPOINTMENT')
 
     const actorUserId = user?.userId ?? null
@@ -68,8 +67,6 @@ export class AppointmentsController {
       createdBy: actorUserId,
       personId: actorPersonId,
       customerId: body.customerId,
-      title: body.title,
-      description: body.description,
       startsAt: body.startsAt,
       endsAt: body.endsAt,
       status: body.status as any,

@@ -1,5 +1,11 @@
 import { IsEmail, IsNotEmpty, IsEnum } from 'class-validator';
-import { UserRole } from '@prisma/client';
+
+export const InviteUserRole = {
+  ADMIN: 'ADMIN',
+  COLLABORATOR: 'COLLABORATOR',
+} as const;
+
+export type InviteUserRole = (typeof InviteUserRole)[keyof typeof InviteUserRole];
 
 export class CreateInviteDto {
   @IsEmail()
@@ -7,6 +13,6 @@ export class CreateInviteDto {
   email: string;
 
   @IsNotEmpty()
-  @IsEnum(UserRole)
-  role: UserRole;
+  @IsEnum(InviteUserRole)
+  role: InviteUserRole;
 }

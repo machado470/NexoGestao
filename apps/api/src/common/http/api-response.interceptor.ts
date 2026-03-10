@@ -4,16 +4,25 @@ import {
   Injectable,
   NestInterceptor,
 } from '@nestjs/common'
-import { Observable } from 'rxjs'
-import { map } from 'rxjs/operators'
+import { Observable, map } from 'rxjs'
 
 @Injectable()
 export class ApiResponseInterceptor implements NestInterceptor {
-  intercept(_context: ExecutionContext, next: CallHandler): Observable<any> {
+  intercept(_context: ExecutionContext, next: CallHandler): Observable<unknown> {
     return next.handle().pipe(
-      map(data => {
-        if (data && typeof data === 'object' && 'ok' in data) return data
-        return { ok: true, data }
+      map((data: unknown) => {
+        if (
+          data !== null &&
+          typeof data === 'object' &&
+          'ok' in (data as Record<string, unknown>)
+        ) {
+          return data
+        }
+
+        return {
+          ok: true,
+          data,
+        }
       }),
     )
   }

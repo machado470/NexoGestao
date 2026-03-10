@@ -1,10 +1,9 @@
-// apps/api/prisma/seed.ts
 import {
   PrismaClient,
   AppointmentStatus,
   ServiceOrderStatus,
   PaymentMethod,
-} from '@prisma/client'
+} from '../node_modules/@prisma/client'
 import * as bcrypt from 'bcryptjs'
 
 const prisma = new PrismaClient()
@@ -26,7 +25,6 @@ function seedDayBase(): Date {
     if (!Number.isNaN(d.getTime())) return d
   }
 
-  // “Hoje” às 09:00:00.000 (timezone do container)
   const d = new Date()
   d.setHours(9, 0, 0, 0)
   return d
@@ -171,7 +169,6 @@ async function ensureDemoAppointments(orgId: string) {
 
   const base = seedDayBase()
 
-  // 6 agendamentos distribuídos entre os customers (determinísticos por dia)
   const plan: Array<{
     customerIndex: number
     startsAt: Date
@@ -193,7 +190,6 @@ async function ensureDemoAppointments(orgId: string) {
     const c = customers[Math.min(p.customerIndex, customers.length - 1)]
     const endsAt = new Date(p.startsAt.getTime() + p.durationMin * 60 * 1000)
 
-    // evita duplicar (org + customer + startsAt) — agora startsAt é determinístico no dia
     const exists = await prisma.appointment.findFirst({
       where: { orgId, customerId: c.id, startsAt: p.startsAt },
       select: { id: true },
@@ -218,7 +214,6 @@ async function ensureDemoAppointments(orgId: string) {
 }
 
 async function ensureDemoCollaborators(orgId: string) {
-  // cria só se ainda não existe nenhum colaborador
   const existing = await prisma.person.count({
     where: { orgId, role: 'COLLABORATOR', active: true },
   })
@@ -262,7 +257,6 @@ async function ensureDemoCollaborators(orgId: string) {
 }
 
 async function ensureDemoTracks(orgId: string) {
-  // cria só se ainda não existe nenhuma track
   const existing = await prisma.track.count({ where: { orgId } })
   if (existing > 0) {
     const tracks = await prisma.track.findMany({
@@ -275,7 +269,6 @@ async function ensureDemoTracks(orgId: string) {
 
   const createdTracks: { id: string; title: string }[] = []
 
-  // Track 1
   const t1 = await prisma.track.create({
     data: {
       orgId,
@@ -316,7 +309,6 @@ async function ensureDemoTracks(orgId: string) {
 
   createdTracks.push(t1)
 
-  // Track 2
   const t2 = await prisma.track.create({
     data: {
       orgId,
@@ -501,9 +493,7 @@ async function ensureDemoServiceOrders(
         title: p.title,
         status: p.status,
         priority: 2,
-
         scheduledFor: appointmentId ? null : addHours(base, 10),
-
         startedAt: startedAtFor(base, p.status),
         finishedAt: finishedAtFor(base, p.status),
       },
@@ -519,12 +509,11 @@ async function ensureDemoServiceOrders(
       },
     })
 
-    // ✅ Loga timeline igual a API faria
     await prisma.timelineEvent.create({
       data: {
         orgId,
         action: 'SERVICE_ORDER_CREATED',
-        personId: actor.actorPersonId, // pode ser null — tudo bem
+        personId: actor.actorPersonId,
         description: `O.S. criada (seed): ${so.title} (${c.name})`,
         metadata: {
           serviceOrderId: so.id,
@@ -534,14 +523,9 @@ async function ensureDemoServiceOrders(
           status: so.status,
           priority: so.priority,
           scheduledFor: so.scheduledFor,
-
-          // padrão novo
           actorUserId: actor.actorUserId,
           actorPersonId: actor.actorPersonId,
-
-          // compat legado
           createdBy: actor.actorUserId,
-
           seed: true,
           seedSource: 'prisma/seed.ts',
         },
@@ -554,12 +538,6 @@ async function ensureDemoServiceOrders(
   return created
 }
 
-/**
- * ✅ FINANCE DEMO:
- * - cria charges realistas (PENDING/OVERDUE/PAID/CANCELED)
- * - cria payments para PAID
- * - tudo determinístico por dia
- */
 async function ensureDemoFinance(
   orgId: string,
   actor: { actorUserId: string | null; actorPersonId: string | null },
@@ -575,7 +553,6 @@ async function ensureDemoFinance(
 
   if (serviceOrders.length === 0) return { chargesCreated: 0, paymentsCreated: 0 }
 
-  // plano determinístico: espalha status e valores
   const moneyPlan = [
     { amountCents: 8900, status: 'PENDING' as const, dueDaysFromBase: +3, pay: false },
     { amountCents: 15900, status: 'PENDING' as const, dueDaysFromBase: +7, pay: false },
@@ -596,7 +573,6 @@ async function ensureDemoFinance(
     const p = moneyPlan[i]
     const so = serviceOrders[i % serviceOrders.length]
 
-    // evita duplicar: 1 charge por serviceOrder (demo)
     const existing = await prisma.charge.findFirst({
       where: { orgId, serviceOrderId: so.id },
       select: { id: true, status: true },
@@ -604,8 +580,6 @@ async function ensureDemoFinance(
     if (existing) continue
 
     const dueDate = addDays(base, p.dueDaysFromBase)
-
-    // createdAt “realista” (espalha no tempo)
     const createdAt = addHours(base, -(24 + i * 3))
 
     const created = await prisma.charge.create({
@@ -644,9 +618,8 @@ async function ensureDemoFinance(
       },
     })
 
-    // se PAID: cria payment + marca paidAt
     if (p.pay) {
-      const paidAt = addHours(base, -(2 + i)) // determinístico
+      const paidAt = addHours(base, -(2 + i))
 
       const payment = await prisma.payment.create({
         data: {
@@ -691,70 +664,6 @@ async function ensureDemoFinance(
   return { chargesCreated, paymentsCreated }
 }
 
-
-async function ensureDemoAutomationRules(orgId: string) {
-  const count = await prisma.automationRule.count({ where: { orgId } })
-  if (count > 0) return 0
-
-  await prisma.automationRule.createMany({
-    data: [
-      {
-        orgId,
-        name: 'Quando O.S. concluir, notificar cliente',
-        description: 'Envia notificação interna e mensagem WhatsApp de conclusão.',
-        trigger: 'SERVICE_ORDER_COMPLETED',
-        actionSet: [
-          {
-            type: 'CREATE_NOTIFICATION',
-            notificationType: 'SERVICE_ORDER_COMPLETED',
-            message: 'Uma ordem de serviço foi concluída via automação.',
-          },
-          {
-            type: 'SEND_WHATSAPP_MESSAGE',
-            entityType: 'SERVICE_ORDER',
-            messageType: 'EXECUTION_CONFIRMATION',
-            renderedText: 'Seu serviço foi concluído com sucesso. Obrigado!',
-          },
-        ],
-      },
-      {
-        orgId,
-        name: 'Quando pagamento atrasar, aumentar risco',
-        description: 'Atualiza risco operacional e cria notificação de atraso.',
-        trigger: 'PAYMENT_OVERDUE',
-        conditionSet: {
-          all: [{ field: 'amountCents', operator: 'gt', value: 0 }],
-        },
-        actionSet: [
-          {
-            type: 'UPDATE_RISK',
-            reason: 'PAYMENT_OVERDUE_AUTOMATION',
-          },
-          {
-            type: 'CREATE_NOTIFICATION',
-            notificationType: 'PAYMENT_OVERDUE',
-            message: 'Cobrança em atraso identificada e tratada pela automação.',
-          },
-        ],
-      },
-      {
-        orgId,
-        name: 'Quando agendamento criar, avisar equipe',
-        trigger: 'APPOINTMENT_CREATED',
-        actionSet: [
-          {
-            type: 'CREATE_NOTIFICATION',
-            notificationType: 'APPOINTMENT_CONFIRMED',
-            message: 'Novo agendamento criado automaticamente.',
-          },
-        ],
-      },
-    ],
-  })
-
-  return 3
-}
-
 async function main() {
   const seedMode = (process.env.SEED_MODE || 'none').toLowerCase()
 
@@ -787,7 +696,6 @@ async function main() {
   const serviceOrdersCreated = await ensureDemoServiceOrders(org.id, actor)
 
   const finance = await ensureDemoFinance(org.id, actor)
-  const automationRulesCreated = await ensureDemoAutomationRules(org.id)
 
   console.log('✅ Seed DEMO aplicado')
   console.log(`👤 Admin DEMO: ${admin.created ? 'CRIADO' : 'JÁ EXISTIA'}`)
@@ -800,7 +708,6 @@ async function main() {
   console.log(`🧾 ServiceOrders DEMO criadas agora: ${serviceOrdersCreated}`)
   console.log(`💸 Charges DEMO criadas agora: ${finance.chargesCreated}`)
   console.log(`💰 Payments DEMO criados agora: ${finance.paymentsCreated}`)
-  console.log(`⚙️ AutomationRules DEMO criadas agora: ${automationRulesCreated}`)
   console.log('🎯 Seed actor:', actor)
   console.log('🕒 Seed day base:', seedDayBase().toISOString())
 }

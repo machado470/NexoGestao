@@ -16,7 +16,7 @@
     "prisma": "node ../../scripts/prisma-cli.mjs"
   },
   "prisma": {
-    "seed": "tsx prisma/seed.ts"
+    "seed": "tsx ../../prisma/seed.ts"
   },
   "dependencies": {
     "@nestjs/bullmq": "^11.0.4",

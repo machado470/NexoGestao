@@ -1,11 +1,9 @@
 import { NestFactory } from '@nestjs/core'
+import { ValidationPipe, Logger } from '@nestjs/common'
+import helmet from 'helmet'
+
 import { AppModule } from './app.module'
 import { ApiResponseInterceptor } from './common/http/api-response.interceptor'
-import { AllExceptionsFilter } from './common/filters/all-exceptions.filter'
-import { ValidationPipe, Logger } from '@nestjs/common'
-import { MetricsService } from './common/metrics/metrics.service'
-import { StructuredLoggerService } from './common/logger/structured-logger.service'
-import helmet from 'helmet'
 
 function parseCorsOrigins(raw?: string): string[] {
   const v = (raw ?? '').trim()
@@ -18,16 +16,11 @@ function parseCorsOrigins(raw?: string): string[] {
 }
 
 async function bootstrap() {
-    // TODO: Adicionar Sentry.io ou similar para monitoramento de erros em produção
-  // Ex: Sentry.init({ dsn: process.env.SENTRY_DSN_API, ... });
-  const structuredLogger = new StructuredLoggerService()
+  const logger = new Logger('Bootstrap')
 
   try {
-    const app = await NestFactory.create(AppModule, {
-      logger: structuredLogger,
-    })
+    const app = await NestFactory.create(AppModule)
 
-    // ✅ Helmet — headers de segurança HTTP
     app.use(
       helmet({
         contentSecurityPolicy: process.env.NODE_ENV === 'production',
@@ -35,13 +28,8 @@ async function bootstrap() {
       }),
     )
 
-    // ✅ Interceptor de resposta padronizada
     app.useGlobalInterceptors(new ApiResponseInterceptor())
 
-    // ✅ Filtro global de exceções (captura Prisma, HTTP, genérico)
-    app.useGlobalFilters(new AllExceptionsFilter(app.get(MetricsService)))
-
-    // ✅ Validação real (DTOs com class-validator)
     app.useGlobalPipes(
       new ValidationPipe({
         whitelist: true,
@@ -68,18 +56,23 @@ async function bootstrap() {
 
     await app.listen(port, '0.0.0.0')
 
-    structuredLogger.log(`API online na porta ${port}`, 'Bootstrap')
-    structuredLogger.log(`CORS_ORIGINS: ${origins.join(', ')}`, 'Bootstrap')
-    structuredLogger.log(`NODE_ENV: ${process.env.NODE_ENV || 'development'}`, 'Bootstrap')
+    logger.log(`API online na porta ${port}`)
+    logger.log(`CORS_ORIGINS: ${origins.join(', ')}`)
+    logger.log(`NODE_ENV: ${process.env.NODE_ENV || 'development'}`)
   } catch (err) {
-    structuredLogger.error('Erro fatal no bootstrap', err instanceof Error ? err.stack : String(err), 'Bootstrap')
-    process.exit(1)
+    logger.error('Erro fatal no bootstrap')
+    logger.error(err instanceof Error ? err.message : String(err))
+    logger.error(err instanceof Error ? err.stack : 'Sem stack disponível')
+    throw err
   }
 }
 
 process.on('unhandledRejection', reason => {
   const logger = new Logger('UnhandledRejection')
-  logger.error('Unhandled Promise Rejection', reason instanceof Error ? reason.stack : String(reason))
+  logger.error(
+    'Unhandled Promise Rejection',
+    reason instanceof Error ? reason.stack : String(reason),
+  )
   process.exit(1)
 })
 
@@ -89,4 +82,4 @@ process.on('uncaughtException', err => {
   process.exit(1)
 })
 
-bootstrap()
+void bootstrap()

@@ -1,7 +1,7 @@
 import {
   Injectable,
   UnauthorizedException,
-  NotFoundException,
+  Logger,
 } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import * as bcrypt from 'bcrypt'
@@ -14,15 +14,24 @@ import { ConfigService } from '@nestjs/config'
 
 @Injectable()
 export class AuthService {
-  private resend: Resend
+  private readonly logger = new Logger(AuthService.name)
+  private resend: Resend | null = null
 
   constructor(
-    private prisma: PrismaService,
-    private jwt: JwtService,
-    private analytics: AnalyticsService,
-    private config: ConfigService,
+    private readonly prisma: PrismaService,
+    private readonly jwt: JwtService,
+    private readonly analytics: AnalyticsService,
+    private readonly config: ConfigService,
   ) {
-    this.resend = new Resend(this.config.get('RESEND_API_KEY'))
+    const resendApiKey = this.config.get<string>('RESEND_API_KEY')
+
+    if (resendApiKey && resendApiKey.trim().length > 0) {
+      this.resend = new Resend(resendApiKey)
+    } else {
+      this.logger.warn(
+        'RESEND_API_KEY ausente. Recuperação por e-mail ficará desabilitada.',
+      )
+    }
   }
 
   async validateGoogleUser(googleUser: any) {
@@ -32,15 +41,8 @@ export class AuthService {
     })
 
     if (!user) {
-      // Se não existir, vamos criar um usuário básico e marcar para onboarding
-      // Nota: Em uma aplicação real, você pode querer criar a organização aqui ou em um passo posterior
-      // Por enquanto, vamos assumir que o onboarding lidará com a criação da organização se necessário
-      // Ou criar uma organização "Sandbox" temporária.
-      
-      // Para este desafio, vamos apenas buscar ou criar. 
-      // Como o usuário precisa de orgId, vamos tentar encontrar uma organização padrão ou criar uma.
       let org = await this.prisma.organization.findFirst({
-        where: { slug: 'default' }
+        where: { slug: 'default' },
       })
 
       if (!org) {
@@ -49,14 +51,14 @@ export class AuthService {
             name: 'Minha Organização',
             slug: `org-${Date.now()}`,
             requiresOnboarding: true,
-          }
+          },
         })
       }
 
       user = await this.prisma.user.create({
         data: {
           email: googleUser.email,
-          role: 'ADMIN', // Default para o primeiro usuário
+          role: 'ADMIN',
           active: true,
           orgId: org.id,
           person: {
@@ -65,10 +67,10 @@ export class AuthService {
               email: googleUser.email,
               role: 'ADMIN',
               orgId: org.id,
-            }
-          }
+            },
+          },
         },
-        include: { person: true }
+        include: { person: true },
       })
     }
 
@@ -100,44 +102,41 @@ export class AuthService {
     })
 
     if (!user) {
-      // Por segurança, não informamos se o usuário existe ou não
-      return { success: true, message: 'Se o e-mail existir, um link de recuperação será enviado.' }
+      return {
+        success: true,
+        message: 'Se o e-mail existir, um link de recuperação será enviado.',
+      }
     }
 
     const token = uuidv4()
     const expiresAt = new Date()
     expiresAt.setHours(expiresAt.getHours() + 1)
 
-    // Reutilizar o campo password para armazenar temporariamente o token de reset 
-    // ou idealmente teríamos um modelo PasswordReset. 
-    // Como não podemos alterar a infra (BD schema), vamos usar metadados ou criar um novo modelo se permitido.
-    // O schema já tem InviteToken, mas é para convites.
-    // Vamos verificar se podemos adicionar ao schema ou se há um campo genérico.
-    // No schema atual, o User não tem campo de reset token. 
-    // Vou usar o campo 'active' (Boolean) não ajuda muito.
-    // Vou assumir que posso adicionar um modelo ao schema.prisma já que faz parte da tarefa.
-    
-    // Na verdade, vou usar o InviteToken adaptado ou apenas simular o envio por enquanto 
-    // se eu não quiser rodar migration agora. Mas a tarefa pede implementação completa.
-    
-    // Vou adicionar o modelo PasswordReset ao schema.prisma no próximo passo.
-    
-    // Simulação do envio de e-mail via Resend
-    const frontendUrl = this.config.get('FRONTEND_URL') || 'http://localhost:3000'
+    const frontendUrl =
+      this.config.get<string>('FRONTEND_URL') || 'http://localhost:3000'
     const resetLink = `${frontendUrl}/auth/reset-password?token=${token}`
 
-    try {
-      await this.resend.emails.send({
-        from: this.config.get('EMAIL_FROM') || 'onboarding@resend.dev',
-        to: email,
-        subject: 'Recuperação de Senha - NexoGestao',
-        html: `<p>Você solicitou a recuperação de senha. Clique no link abaixo para redefinir:</p><a href="${resetLink}">${resetLink}</a><p>Este link expira em 1 hora.</p>`,
-      })
-    } catch (error) {
-      console.error('Erro ao enviar e-mail:', error)
+    if (this.resend) {
+      try {
+        await this.resend.emails.send({
+          from: this.config.get<string>('EMAIL_FROM') || 'onboarding@resend.dev',
+          to: email,
+          subject: 'Recuperação de Senha - NexoGestao',
+          html: `<p>Você solicitou a recuperação de senha. Clique no link abaixo para redefinir:</p><a href="${resetLink}">${resetLink}</a><p>Este link expira em 1 hora.</p>`,
+        })
+      } catch (error) {
+        this.logger.error(
+          `Erro ao enviar e-mail de recuperação: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        )
+      }
+    } else {
+      this.logger.warn(
+        `Recuperação de senha solicitada para ${email}, mas o Resend não está configurado.`,
+      )
     }
 
-    // Salvar o token no banco
     await this.prisma.user.update({
       where: { id: user.id },
       data: {
@@ -146,7 +145,10 @@ export class AuthService {
       },
     })
 
-    return { success: true, message: 'Se o e-mail existir, um link de recuperação será enviado.' }
+    return {
+      success: true,
+      message: 'Se o e-mail existir, um link de recuperação será enviado.',
+    }
   }
 
   async resetPassword(token: string, password: string) {
@@ -192,9 +194,7 @@ export class AuthService {
     }
 
     if (!user.person) {
-      throw new UnauthorizedException(
-        'Usuário sem identidade operacional',
-      )
+      throw new UnauthorizedException('Usuário sem identidade operacional')
     }
 
     const valid = await bcrypt.compare(password, user.password)
@@ -204,7 +204,6 @@ export class AuthService {
 
     const result = this.generateToken(user)
 
-    // 📊 Registrar evento de login
     void this.analytics.track({
       orgId: user.orgId,
       userId: user.id,

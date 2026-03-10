@@ -4,7 +4,8 @@ import { EmailService } from '../email/email.service';
 import { v4 as uuidv4 } from 'uuid';
 import * as bcrypt from 'bcrypt';
 import { ConfigService } from '@nestjs/config';
-import { UserRole } from '@prisma/client';
+import type { UserRole } from '@prisma/client';
+import type { InviteUserRole } from './dto/create-invite.dto';
 
 @Injectable()
 export class InvitesService {
@@ -14,7 +15,9 @@ export class InvitesService {
     private configService: ConfigService,
   ) {}
 
-  async createInvite(orgId: string, invitedEmail: string, inviterName: string, role: UserRole) {
+  async createInvite(orgId: string, invitedEmail: string, inviterName: string, role: InviteUserRole) {
+    const prismaRole = role as UserRole;
+
     const existingUser = await this.prisma.user.findFirst({
       where: { orgId, email: invitedEmail },
     });
@@ -40,7 +43,7 @@ export class InvitesService {
         token: hashedToken,
         orgId,
         expiresAt,
-        role,
+        role: prismaRole,
       },
     });
 

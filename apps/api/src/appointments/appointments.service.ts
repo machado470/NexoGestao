@@ -190,8 +190,6 @@ export class AppointmentsService {
     createdBy: string | null
     personId: string | null
     customerId: string
-    title?: string
-    description?: string
     startsAt: string
     endsAt?: string
     status?: AppointmentStatus
@@ -229,8 +227,6 @@ export class AppointmentsService {
         data: {
           orgId: params.orgId,
           customerId: params.customerId,
-          title: params.title?.trim() || null,
-          description: params.description?.trim() || null,
           startsAt,
           endsAt,
           status,
@@ -251,14 +247,9 @@ export class AppointmentsService {
         metadata: {
           appointmentId: created.id,
           customerId: created.customerId,
-
-          // ✅ padrão novo (oficial)
           actorUserId: params.createdBy,
           actorPersonId: params.personId,
-
-          // ✅ compat legado
           createdBy: params.createdBy,
-
           startsAt: created.startsAt,
           endsAt: created.endsAt,
           status: created.status,
@@ -309,14 +300,9 @@ export class AppointmentsService {
           description: context,
           metadata: {
             customerId: params.customerId,
-
-            // ✅ padrão novo (oficial)
             actorUserId: params.createdBy,
             actorPersonId: params.personId,
-
-            // ✅ compat legado
             createdBy: params.createdBy,
-
             attempted: { startsAt, endsAt, status },
           },
         })
@@ -424,7 +410,7 @@ export class AppointmentsService {
 
     try {
       const result = await this.prisma.appointment.updateMany({
-        where: { id: params.id },
+        where: { id: params.id, orgId: params.orgId },
         data: patch,
       })
       if (result.count === 0) throw new NotFoundException('Agendamento não encontrado')
@@ -449,14 +435,9 @@ export class AppointmentsService {
         metadata: {
           appointmentId: updated.id,
           customerId: updated.customerId,
-
-          // ✅ padrão novo (oficial)
           actorUserId: params.updatedBy,
           actorPersonId: params.personId,
-
-          // ✅ compat legado
           updatedBy: params.updatedBy,
-
           patch,
         },
       })
@@ -516,14 +497,9 @@ export class AppointmentsService {
           description: context,
           metadata: {
             appointmentId: params.id,
-
-            // ✅ padrão novo (oficial)
             actorUserId: params.updatedBy,
             actorPersonId: params.personId,
-
-            // ✅ compat legado
             updatedBy: params.updatedBy,
-
             attempted: {
               startsAt: finalStartsAt,
               endsAt: finalEndsAt,

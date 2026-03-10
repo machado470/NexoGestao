@@ -15,8 +15,8 @@ import { GoogleStrategy } from './google.strategy'
   imports: [
     ConfigModule,
     PrismaModule,
-    PassportModule,
     AnalyticsModule,
+    PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
