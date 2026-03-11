@@ -25,6 +25,17 @@ import { AssessmentsModule } from './assessments/assessments.module'
 import { RiskModule } from './risk/risk.module'
 import { AuditModule } from './audit/audit.module'
 
+import { CustomersModule } from './customers/customers.module'
+import { AppointmentsModule } from './appointments/appointments.module'
+import { ServiceOrdersModule } from './service-orders/service-orders.module'
+import { FinanceModule } from './finance/finance.module'
+import { WhatsAppModule } from './whatsapp/whatsapp.module'
+import { InvitesModule } from './invites/invites.module'
+import { AutomationModule } from './automation/automation.module'
+import { NotificationsModule } from './notifications/notifications.module'
+import { SubscriptionsModule } from './subscriptions/subscriptions.module'
+import { QueueModule } from './queue/queue.module'
+
 @Module({
   imports: [
     CoreModule,
@@ -56,6 +67,7 @@ import { AuditModule } from './audit/audit.module'
 
     PrismaModule,
     HealthModule,
+    QueueModule,
 
     BootstrapModule,
     AuthModule,
@@ -69,6 +81,16 @@ import { AuditModule } from './audit/audit.module'
     AssessmentsModule,
     RiskModule,
     AuditModule,
+
+    CustomersModule,
+    AppointmentsModule,
+    ServiceOrdersModule,
+    FinanceModule,
+    WhatsAppModule,
+    InvitesModule,
+    AutomationModule,
+    NotificationsModule,
+    SubscriptionsModule,
   ],
   providers: [
     MetricsService,

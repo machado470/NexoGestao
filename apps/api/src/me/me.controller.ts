@@ -1,15 +1,11 @@
-import {
-  Controller,
-  Get,
-  Req,
-} from '@nestjs/common'
+import { Controller, Get, Req, UseGuards } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 
 @Controller('me')
+@UseGuards(JwtAuthGuard)
 export class MeController {
-  constructor(
-    private readonly prisma: PrismaService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   @Get()
   async me(@Req() req: any) {

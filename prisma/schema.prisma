@@ -28,6 +28,7 @@ model Organization {
   timelineEvents     TimelineEvent[]
   tracks             Track[]
   users              User[]
+  usageMetrics       UsageMetric[]
   whatsAppMessages   WhatsAppMessage[]
   whatsAppTemplates  WhatsAppTemplate[]
 
@@ -35,20 +36,23 @@ model Organization {
 }
 
 model User {
-  id              String       @id @default(uuid())
-  email           String       @unique
-  password        String?
-  role            UserRole
-  active          Boolean      @default(false)
-  inviteToken     String?      @unique
-  inviteExpiresAt DateTime?
-  orgId           String
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-  Expense         Expense[]
-  Launch          Launch[]
-  person          Person?
-  org             Organization @relation(fields: [orgId], references: [id])
+  id                  String       @id @default(uuid())
+  email               String       @unique
+  password            String?
+  role                UserRole
+  active              Boolean      @default(false)
+  inviteToken         String?      @unique
+  inviteExpiresAt     DateTime?
+  resetToken          String?
+  resetTokenExpiresAt DateTime?
+  orgId               String
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+  Expense             Expense[]
+  Launch              Launch[]
+  person              Person?
+  org                 Organization @relation(fields: [orgId], references: [id])
+  usageMetrics        UsageMetric[]
 }
 
 model Person {
@@ -479,25 +483,25 @@ model WhatsAppMessage {
 }
 
 model Plan {
-  id         String         @id @default(uuid())
-  name       PlanName       @unique
-  priceCents Int
-  createdAt  DateTime       @default(now())
+  id            String         @id @default(uuid())
+  name          PlanName       @unique
+  priceCents    Int
+  createdAt     DateTime       @default(now())
   subscriptions Subscription[]
 }
 
 model Subscription {
-  id                 String              @id @default(uuid())
-  orgId              String              @unique
+  id                 String             @id @default(uuid())
+  orgId              String             @unique
   planId             String
-  status             SubscriptionStatus  @default(ACTIVE)
+  status             SubscriptionStatus @default(ACTIVE)
   currentPeriodStart DateTime
   currentPeriodEnd   DateTime
   canceledAt         DateTime?
-  createdAt          DateTime            @default(now())
+  createdAt          DateTime           @default(now())
 
-  org                Organization        @relation(fields: [orgId], references: [id])
-  plan               Plan                @relation(fields: [planId], references: [id])
+  org                Organization       @relation(fields: [orgId], references: [id])
+  plan               Plan               @relation(fields: [planId], references: [id])
   events             BillingEvent[]
 }
 
@@ -511,6 +515,22 @@ model BillingEvent {
   createdAt      DateTime           @default(now())
 
   subscription   Subscription       @relation(fields: [subscriptionId], references: [id])
+}
+
+model UsageMetric {
+  id        String           @id @default(uuid())
+  orgId     String
+  userId    String?
+  event     UsageMetricEvent
+  metadata  Json?
+  createdAt DateTime         @default(now())
+
+  org       Organization     @relation(fields: [orgId], references: [id])
+  user      User?            @relation(fields: [userId], references: [id])
+
+  @@index([orgId, createdAt])
+  @@index([orgId, event, createdAt])
+  @@index([userId, createdAt])
 }
 
 enum PlanName {
@@ -537,6 +557,10 @@ enum BillingEventStatus {
   PENDING
   COMPLETED
   FAILED
+}
+
+enum UsageMetricEvent {
+  LOGIN
 }
 
 enum UserRole {

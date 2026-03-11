@@ -7,13 +7,13 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common'
+import { WhatsAppEntityType, WhatsAppMessageStatus, WhatsAppMessageType } from '@prisma/client'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
 import { Roles } from '../auth/decorators/roles.decorator'
 import { Org } from '../auth/decorators/org.decorator'
 import { WhatsAppService } from './whatsapp.service'
 import { PrismaService } from '../prisma/prisma.service'
-import { WhatsAppMessageStatus } from '@prisma/client'
 
 @Controller('whatsapp')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -37,22 +37,16 @@ export class WhatsAppController {
 
   @Post('messages')
   @Roles('ADMIN')
-  async sendMessage(
-    @Org() orgId: string,
-    @Body() body: any,
-  ) {
-    // No mundo real, aqui chamaria o dispatcher. 
-    // Para integração, usamos o queueMessage que já existe.
+  async sendMessage(@Org() orgId: string, @Body() body: any) {
     return this.whatsapp.queueMessage({
       orgId,
       customerId: body.customerId,
       toPhone: body.toPhone,
-      entityType: body.entityType || 'CUSTOMER',
+      entityType: (body.entityType || 'SERVICE_ORDER') as WhatsAppEntityType,
       entityId: body.entityId || body.customerId,
-      messageType: body.messageType || 'DIRECT',
+      messageType: (body.messageType || 'EXECUTION_CONFIRMATION') as WhatsAppMessageType,
       messageKey: `manual-${Date.now()}`,
       renderedText: body.content,
-      metadata: body.metadata,
     })
   }
 

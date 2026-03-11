@@ -1,78 +1,78 @@
-import { Injectable, OnModuleInit, Logger } from '@nestjs/common'
-import { PrismaService } from '../prisma/prisma.service'
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  OnModuleInit,
+} from '@nestjs/common'
 import { PlanName } from '@prisma/client'
-import { CreatePlanDto } from './dto/create-plan.dto'
+import { PrismaService } from '../prisma/prisma.service'
 
 @Injectable()
 export class PlansService implements OnModuleInit {
   private readonly logger = new Logger(PlansService.name)
 
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async onModuleInit() {
-    try {
-      await this.createDefaultPlans()
-      this.logger.log('Planos padrão verificados')
-    } catch (err) {
-      const error = err as Error
-      this.logger.error(`Falha ao criar planos padrão: ${error.message}`)
-    }
+    await this.ensureDefaultPlans()
   }
 
-  async createDefaultPlans() {
-    const plans = [
-      {
-        name: PlanName.STARTER,
-        description: 'Plano inicial com funcionalidades básicas.',
-        priceCents: 0,
-        features: { maxUsers: 1, storageGb: 1, support: 'email' },
-      },
-      {
-        name: PlanName.PRO,
-        description: 'Plano profissional com mais recursos.',
-        priceCents: 9900,
-        features: { maxUsers: 5, storageGb: 10, support: 'chat' },
-      },
-      {
-        name: PlanName.BUSINESS,
-        description: 'Plano empresarial com todos os recursos.',
-        priceCents: 29900,
-        features: { maxUsers: 20, storageGb: 100, support: 'phone' },
-      },
+  private async ensureDefaultPlans() {
+    const plans: Array<{ name: PlanName; priceCents: number }> = [
+      { name: PlanName.FREE, priceCents: 0 },
+      { name: PlanName.STARTER, priceCents: 0 },
+      { name: PlanName.PRO, priceCents: 9900 },
+      { name: PlanName.BUSINESS, priceCents: 19900 },
     ]
 
-    for (const planData of plans) {
-      await this.prisma.plan.upsert({
-        where: { name: planData.name },
-        update: {
-          description: planData.description,
-          priceCents: planData.priceCents,
-          features: planData.features as any,
-        },
-        create: {
-          ...planData,
-          features: planData.features as any,
-        },
-      })
+    try {
+      for (const plan of plans) {
+        await this.prisma.plan.upsert({
+          where: { name: plan.name },
+          update: {
+            priceCents: plan.priceCents,
+          },
+          create: {
+            name: plan.name,
+            priceCents: plan.priceCents,
+          },
+        })
+      }
+
+      this.logger.log('Planos padrão verificados com sucesso')
+    } catch (error) {
+      this.logger.error(
+        `Falha ao criar planos padrão: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      )
     }
   }
 
-  async createPlan(createPlanDto: CreatePlanDto) {
+  async createPlan(data: { name: PlanName; priceCents: number }) {
     return this.prisma.plan.create({
       data: {
-        ...createPlanDto,
-        features: JSON.parse(createPlanDto.features as string) as any,
+        name: data.name,
+        priceCents: data.priceCents,
       },
     })
   }
 
-  async findAllPlans() {
-    return this.prisma.plan.findMany()
+  async listPlans() {
+    return this.prisma.plan.findMany({
+      orderBy: { createdAt: 'asc' },
+    })
   }
 
   async findPlanByName(name: PlanName) {
-    return this.prisma.plan.findUnique({
+    const plan = await this.prisma.plan.findUnique({
       where: { name },
     })
+
+    if (!plan) {
+      throw new NotFoundException(`Plano ${name} não encontrado.`)
+    }
+
+    return plan
   }
 }

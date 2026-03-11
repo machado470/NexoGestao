@@ -49,11 +49,10 @@ if [ ! -f .env ]; then
 fi
 
 # 5) garantir DATABASE_URL
-DB_URL="postgresql://postgres:postgres@${DB_HOST}:5432/autoescola?schema=public"
+DB_URL="postgresql://postgres:postgres@${DB_HOST}:5432/nexogestao?schema=public"
 if grep -q '^DATABASE_URL=' .env; then
-  # se tiver mas estiver diferente, atualiza
   sed -i "s|^DATABASE_URL=.*|DATABASE_URL=\"${DB_URL}\"|g" .env
-  echo -e "${check} DATABASE_URL ajustada para ${DB_HOST}"
+  echo -e "${check} DATABASE_URL ajustada para ${DB_HOST} / nexogestao"
 else
   echo "DATABASE_URL=\"${DB_URL}\"" >> .env
   echo -e "${check} DATABASE_URL adicionada ao .env"

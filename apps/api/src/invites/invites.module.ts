@@ -1,14 +1,16 @@
-import { Module } from '@nestjs/common';
-import { InvitesService } from './invites.service';
-import { InvitesController } from './invites.controller';
-import { PrismaService } from '../prisma/prisma.service';
-import { EmailModule } from '../email/email.module';
-import { ConfigModule } from '@nestjs/config';
-import { AuthModule } from '../auth/auth.module';
+import { Module } from '@nestjs/common'
+import { ConfigModule } from '@nestjs/config'
+
+import { PrismaModule } from '../prisma/prisma.module'
+import { EmailModule } from '../email/email.module'
+import { AuthModule } from '../auth/auth.module'
+
+import { InvitesService } from './invites.service'
+import { InvitesController } from './invites.controller'
 
 @Module({
-  imports: [EmailModule, ConfigModule, AuthModule],
-  providers: [InvitesService, PrismaService],
+  imports: [PrismaModule, EmailModule, ConfigModule, AuthModule],
+  providers: [InvitesService],
   controllers: [InvitesController],
   exports: [InvitesService],
 })

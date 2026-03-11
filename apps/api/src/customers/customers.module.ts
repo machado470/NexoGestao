@@ -8,6 +8,7 @@ import { AuditModule } from '../audit/audit.module'
 import { NotificationsModule } from '../notifications/notifications.module'
 import { OnboardingModule } from '../onboarding/onboarding.module'
 import { AnalyticsModule } from '../analytics/analytics.module'
+import { QuotasModule } from '../quotas/quotas.module'
 
 @Module({
   imports: [
@@ -16,10 +17,11 @@ import { AnalyticsModule } from '../analytics/analytics.module'
     AuditModule,
     NotificationsModule,
     OnboardingModule,
-    AnalyticsModule
+    AnalyticsModule,
+    QuotasModule,
   ],
   providers: [CustomersService],
   controllers: [CustomersController],
-  exports: [CustomersService]
+  exports: [CustomersService],
 })
 export class CustomersModule {}

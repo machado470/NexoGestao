@@ -204,12 +204,23 @@ export class AuthService {
 
     const result = this.generateToken(user)
 
-    void this.analytics.track({
-      orgId: user.orgId,
-      userId: user.id,
-      event: UsageMetricEvent.LOGIN,
-      metadata: { role: user.role },
-    })
+    try {
+      const loginEvent =
+        (UsageMetricEvent as any)?.LOGIN ?? 'LOGIN'
+
+      await this.analytics.track({
+        orgId: user.orgId,
+        userId: user.id,
+        event: loginEvent as any,
+        metadata: { role: user.role },
+      })
+    } catch (error) {
+      this.logger.warn(
+        `Falha ao registrar analytics de login: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      )
+    }
 
     return result
   }

@@ -11,6 +11,7 @@ import { FinanceModule } from '../finance/finance.module'
 import { AutomationModule } from '../automation/automation.module'
 import { NotificationsModule } from '../notifications/notifications.module'
 import { OnboardingModule } from '../onboarding/onboarding.module'
+import { QuotasModule } from '../quotas/quotas.module'
 
 @Module({
   imports: [
@@ -21,10 +22,11 @@ import { OnboardingModule } from '../onboarding/onboarding.module'
     FinanceModule,
     AutomationModule,
     NotificationsModule,
-    OnboardingModule
+    OnboardingModule,
+    QuotasModule,
   ],
   providers: [ServiceOrdersService],
   controllers: [ServiceOrdersController],
-  exports: [ServiceOrdersService]
+  exports: [ServiceOrdersService],
 })
 export class ServiceOrdersModule {}

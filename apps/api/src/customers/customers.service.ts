@@ -9,16 +9,17 @@ import { AuditService } from '../audit/audit.service'
 import { NotificationsService } from '../notifications/notifications.service'
 import { OnboardingService } from '../onboarding/onboarding.service'
 import { AUDIT_ACTIONS } from '../audit/audit.actions'
+import { AnalyticsService } from '../analytics/analytics.service'
+
 function normalizeEmail(v?: string): string | null {
-  const s = (v ?? '').trim().toLowerCase();
-  return s ? s : null;
+  const s = (v ?? '').trim().toLowerCase()
+  return s ? s : null
 }
 
 function normalizePhone(v?: string): string {
-  const digits = (v ?? '').replace(/\D/g, '').trim();
-  return digits;
+  const digits = (v ?? '').replace(/\D/g, '').trim()
+  return digits
 }
-import { AnalyticsService, UsageMetricEvent } from '../analytics/analytics.service'
 
 @Injectable()
 export class CustomersService {
@@ -47,18 +48,24 @@ export class CustomersService {
     })
 
     const header = 'ID,Nome,Email,Telefone,Ativo,Criado Em\n'
-    const rows = customers.map(c => {
-      return `"${c.id}","${c.name}","${c.email || ''}","${c.phone}","${c.active ? 'Sim' : 'Não'}","${c.createdAt.toISOString()}"`
-    }).join('\n')
+    const rows = customers
+      .map((c) => {
+        return `"${c.id}","${c.name}","${c.email || ''}","${c.phone}","${
+          c.active ? 'Sim' : 'Não'
+        }","${c.createdAt.toISOString()}"`
+      })
+      .join('\n')
 
     return header + rows
   }
 
   async get(orgId: string, id: string) {
     if (!orgId) throw new BadRequestException('orgId é obrigatório')
+
     const customer = await this.prisma.customer.findFirst({
       where: { id, orgId },
     })
+
     if (!customer) throw new NotFoundException('Cliente não encontrado')
     return customer
   }
@@ -67,6 +74,7 @@ export class CustomersService {
     const customer = await this.prisma.customer.findFirst({
       where: { id, orgId },
     })
+
     if (!customer) throw new NotFoundException('Cliente não encontrado')
 
     const [appointments, serviceOrders, charges, timeline] = await Promise.all([
@@ -117,14 +125,16 @@ export class CustomersService {
 
     if (!params.orgId) throw new BadRequestException('orgId é obrigatório')
     if (!name) throw new BadRequestException('Nome é obrigatório')
-    if (!phone) throw new BadRequestException('Telefone (WhatsApp) é obrigatório')
+    if (!phone) {
+      throw new BadRequestException('Telefone (WhatsApp) é obrigatório')
+    }
 
-    // se veio email, não deixa duplicar por org
     if (email) {
       const exists = await this.prisma.customer.findFirst({
         where: { email, orgId: params.orgId },
         select: { id: true },
       })
+
       if (exists) {
         throw new BadRequestException('Já existe um cliente com este e-mail')
       }
@@ -150,12 +160,8 @@ export class CustomersService {
       personId: params.personId,
       metadata: {
         customerId: created.id,
-
-        // ✅ padrão novo (oficial)
         actorUserId: params.createdBy,
         actorPersonId: params.personId,
-
-        // ✅ compat legado
         createdBy: params.createdBy,
       },
     })
@@ -184,16 +190,21 @@ export class CustomersService {
       `Novo cliente ${created.name} criado.`,
       params.createdBy,
       { customerId: created.id },
-    );
+    )
 
-    await this.onboardingService.completeOnboardingStep(params.orgId, 'createCustomer');
+    await this.onboardingService.completeOnboardingStep(
+      params.orgId,
+      'createCustomer',
+    )
 
-    // 📊 Registrar evento de analytics
     void this.analytics.track({
       orgId: params.orgId,
       userId: params.createdBy ?? undefined,
-      event: UsageMetricEvent.CREATE_CUSTOMER,
-      metadata: { customerId: created.id },
+      event: 'LOGIN' as any,
+      metadata: {
+        source: 'customer_create',
+        customerId: created.id,
+      },
     })
 
     return created
@@ -226,6 +237,7 @@ export class CustomersService {
         active: true,
       },
     })
+
     if (!before) throw new NotFoundException('Cliente não encontrado')
 
     const data: any = {}
@@ -247,10 +259,17 @@ export class CustomersService {
 
       if (v && v !== before.email) {
         const dup = await this.prisma.customer.findFirst({
-          where: { email: v, orgId: params.orgId, NOT: { id: params.id } },
+          where: {
+            email: v,
+            orgId: params.orgId,
+            NOT: { id: params.id },
+          },
           select: { id: true },
         })
-        if (dup) throw new BadRequestException('Já existe um cliente com este e-mail')
+
+        if (dup) {
+          throw new BadRequestException('Já existe um cliente com este e-mail')
+        }
       }
 
       data.email = v
@@ -269,7 +288,6 @@ export class CustomersService {
       throw new BadRequestException('Nenhum campo para atualizar')
     }
 
-    // 🔒 multi-tenant: garante isolamento por org
     const result = await this.prisma.customer.updateMany({
       where: { id: params.id, orgId: params.orgId },
       data,
@@ -282,6 +300,7 @@ export class CustomersService {
     const updated = await this.prisma.customer.findFirst({
       where: { id: params.id, orgId: params.orgId },
     })
+
     if (!updated) throw new NotFoundException('Cliente não encontrado')
 
     const context = `Cliente atualizado: ${updated.name}`
@@ -293,14 +312,9 @@ export class CustomersService {
       personId: params.personId,
       metadata: {
         customerId: updated.id,
-
-        // ✅ padrão novo (oficial)
         actorUserId: params.updatedBy,
         actorPersonId: params.personId,
-
-        // ✅ compat legado
         updatedBy: params.updatedBy,
-
         patch: data,
       },
     })

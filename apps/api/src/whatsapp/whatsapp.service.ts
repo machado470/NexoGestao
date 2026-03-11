@@ -1,5 +1,3 @@
-// apps/api/src/whatsapp/whatsapp.service.ts
-
 import { Injectable, Logger } from '@nestjs/common'
 import {
   WhatsAppEntityType,
@@ -14,21 +12,18 @@ type QueueMessageInput = {
   orgId: string
   customerId: string
   toPhone: string
-
   entityType: WhatsAppEntityType
   entityId: string
   messageType: WhatsAppMessageType
-
   messageKey: string
-
-  templateKey?: string | null
   renderedText: string
-
-  metadata?: any
 }
 
 function isPrismaP1017(err: any): boolean {
-  return err?.code === 'P1017' || String(err?.message ?? '').includes('closed the connection')
+  return (
+    err?.code === 'P1017' ||
+    String(err?.message ?? '').includes('closed the connection')
+  )
 }
 
 @Injectable()
@@ -45,11 +40,9 @@ export class WhatsAppService {
     const message = result.message
     if (!message) return result
 
-    await this.queueService.addJob(
-      QUEUE_NAMES.WHATSAPP,
-      'dispatch-message',
-      { messageId: message.id },
-    )
+    await this.queueService.addJob(QUEUE_NAMES.WHATSAPP, 'dispatch-message', {
+      messageId: message.id,
+    })
 
     return result
   }
@@ -61,9 +54,7 @@ export class WhatsAppService {
   private async reconnectIfNeeded(err: any) {
     if (!isPrismaP1017(err)) return false
 
-    this.logger.warn(
-      `[P1017] DB connection closed. Reconnecting Prisma...`,
-    )
+    this.logger.warn('[P1017] DB connection closed. Reconnecting Prisma...')
 
     try {
       await this.prisma.$disconnect()
@@ -71,7 +62,7 @@ export class WhatsAppService {
 
     try {
       await this.prisma.$connect()
-      this.logger.warn(`[P1017] Prisma reconnected.`)
+      this.logger.warn('[P1017] Prisma reconnected.')
       return true
     } catch (e: any) {
       this.logger.error(
@@ -81,9 +72,6 @@ export class WhatsAppService {
     }
   }
 
-  /**
-   * Enfileira mensagem (QUEUED) com idempotência real.
-   */
   async queueMessage(input: QueueMessageInput) {
     const {
       orgId,
@@ -93,9 +81,7 @@ export class WhatsAppService {
       entityId,
       messageType,
       messageKey,
-      templateKey,
       renderedText,
-      metadata,
     } = input
 
     try {
@@ -108,10 +94,8 @@ export class WhatsAppService {
           entityId,
           messageType,
           messageKey,
-          templateKey: templateKey ?? null,
           renderedText,
           status: WhatsAppMessageStatus.QUEUED,
-          metadata: metadata ?? undefined,
         },
       })
 
@@ -127,16 +111,13 @@ export class WhatsAppService {
         })
         return { created: false, message: existing }
       }
+
       throw err
     }
   }
 
   /**
-   * Claim concorrente seguro.
-   * NÃO usa RETURNING m.* para evitar erro:
-   * "cached plan must not change result type"
-   *
-   * 🔒 Robustez: se der P1017, faz reconnect e tenta 1x novamente.
+   * Claim concorrente seguro usando apenas campos existentes no schema atual.
    */
   async claimQueued(params: { limit?: number; workerId: string }) {
     const limit = params.limit ?? 50
@@ -156,16 +137,12 @@ export class WhatsAppService {
               LIMIT $1
             )
             UPDATE "WhatsAppMessage" m
-            SET
-              status = 'SENDING',
-              "lockedAt" = NOW(),
-              "lockedBy" = $2
+            SET status = 'SENDING'
             FROM picked
             WHERE m.id = picked.id
             RETURNING m.id;
             `,
             limit,
-            workerId,
           )
 
           return rows.map((r) => r.id)
@@ -213,19 +190,12 @@ export class WhatsAppService {
     provider: string
     providerMessageId: string
   }) {
-    const { id, provider, providerMessageId } = params
+    const { id } = params
 
     return this.prisma.whatsAppMessage.update({
       where: { id },
       data: {
         status: WhatsAppMessageStatus.SENT,
-        provider,
-        providerMessageId,
-        sentAt: new Date(),
-        errorCode: null,
-        errorMessage: null,
-        lockedAt: null,
-        lockedBy: null,
       },
     })
   }
@@ -236,17 +206,12 @@ export class WhatsAppService {
     errorCode: string
     errorMessage: string
   }) {
-    const { id, provider, errorCode, errorMessage } = params
+    const { id } = params
 
     return this.prisma.whatsAppMessage.update({
       where: { id },
       data: {
         status: WhatsAppMessageStatus.FAILED,
-        provider,
-        errorCode,
-        errorMessage,
-        lockedAt: null,
-        lockedBy: null,
       },
     })
   }

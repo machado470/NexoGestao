@@ -9,6 +9,7 @@ import { AuditModule } from '../audit/audit.module'
 import { WhatsAppModule } from '../whatsapp/whatsapp.module'
 import { RiskModule } from '../risk/risk.module'
 import { AutomationModule } from '../automation/automation.module'
+import { QuotasModule } from '../quotas/quotas.module'
 
 @Module({
   imports: [
@@ -17,10 +18,11 @@ import { AutomationModule } from '../automation/automation.module'
     AuditModule,
     WhatsAppModule,
     RiskModule,
-    AutomationModule
+    AutomationModule,
+    QuotasModule,
   ],
   providers: [AppointmentsService],
   controllers: [AppointmentsController],
-  exports: [AppointmentsService]
+  exports: [AppointmentsService],
 })
 export class AppointmentsModule {}
