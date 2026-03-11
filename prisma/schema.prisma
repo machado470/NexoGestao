@@ -326,6 +326,8 @@ model ServiceOrder {
   scheduledFor       DateTime?
   startedAt          DateTime?
   finishedAt         DateTime?
+  amountCents        Int?
+  dueDate            DateTime?
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
   charges            Charge[]

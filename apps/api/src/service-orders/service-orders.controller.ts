@@ -59,7 +59,6 @@ export class ServiceOrdersController {
     @User() user: any,
     @Body() body: CreateServiceOrderDto,
   ) {
-    // Validar quota antes de criar
     await this.quotas.validateQuota(orgId, 'CREATE_SERVICE_ORDER')
 
     const actorUserId = user?.userId ?? null
@@ -76,6 +75,8 @@ export class ServiceOrdersController {
       scheduledFor: body.scheduledFor,
       appointmentId: body.appointmentId,
       assignedToPersonId: body.assignedToPersonId,
+      amountCents: body.amountCents,
+      dueDate: body.dueDate,
     })
   }
 

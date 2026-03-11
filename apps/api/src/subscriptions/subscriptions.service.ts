@@ -1,7 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { PlansService } from '../plans/plans.service'
-import { PlanName, SubscriptionStatus } from '@prisma/client'
+import { PlanName, Prisma, SubscriptionStatus } from '@prisma/client'
+
+type DbClient = PrismaService | Prisma.TransactionClient
 
 @Injectable()
 export class SubscriptionsService {
@@ -10,7 +12,9 @@ export class SubscriptionsService {
     private readonly plansService: PlansService,
   ) {}
 
-  async createTrialSubscription(orgId: string) {
+  async createTrialSubscription(orgId: string, tx?: DbClient) {
+    const db = tx ?? this.prisma
+
     const starterPlan = await this.plansService.findPlanByName(PlanName.STARTER)
 
     if (!starterPlan) {
@@ -23,7 +27,7 @@ export class SubscriptionsService {
     const trialEnd = new Date()
     trialEnd.setDate(trialEnd.getDate() + 14)
 
-    const existing = await this.prisma.subscription.findUnique({
+    const existing = await db.subscription.findUnique({
       where: { orgId },
       include: { plan: true },
     })
@@ -32,7 +36,7 @@ export class SubscriptionsService {
       return existing
     }
 
-    return this.prisma.subscription.create({
+    return db.subscription.create({
       data: {
         orgId,
         planId: starterPlan.id,

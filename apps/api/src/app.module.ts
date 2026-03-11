@@ -28,6 +28,7 @@ import { AuditModule } from './audit/audit.module'
 import { CustomersModule } from './customers/customers.module'
 import { AppointmentsModule } from './appointments/appointments.module'
 import { ServiceOrdersModule } from './service-orders/service-orders.module'
+import { ExecutionModule } from './execution/execution.module'
 import { FinanceModule } from './finance/finance.module'
 import { WhatsAppModule } from './whatsapp/whatsapp.module'
 import { InvitesModule } from './invites/invites.module'
@@ -85,6 +86,7 @@ import { QueueModule } from './queue/queue.module'
     CustomersModule,
     AppointmentsModule,
     ServiceOrdersModule,
+    ExecutionModule,
     FinanceModule,
     WhatsAppModule,
     InvitesModule,

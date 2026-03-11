@@ -1,9 +1,7 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common'
 import {
   AutomationActionType,
-  AutomationExecutionStatus,
   AutomationTrigger,
-  NotificationType,
 } from '@prisma/client'
 
 import { PrismaService } from '../prisma/prisma.service'
@@ -34,8 +32,21 @@ export class AutomationService {
     private readonly queueService: QueueService,
   ) {}
 
+  private get automationRuleDelegate(): any | null {
+    const prismaAny = this.prisma as any
+    return prismaAny.automationRule ?? null
+  }
+
+  private get automationExecutionDelegate(): any | null {
+    const prismaAny = this.prisma as any
+    return prismaAny.automationExecution ?? null
+  }
+
   async listRules(orgId: string) {
-    return this.prisma.automationRule.findMany({
+    const delegate = this.automationRuleDelegate
+    if (!delegate) return []
+
+    return delegate.findMany({
       where: { orgId },
       orderBy: { createdAt: 'desc' },
     })
@@ -46,7 +57,15 @@ export class AutomationService {
       throw new BadRequestException('actionSet deve conter ao menos uma ação')
     }
 
-    return this.prisma.automationRule.create({
+    const delegate = this.automationRuleDelegate
+    if (!delegate) {
+      return {
+        disabled: true,
+        reason: 'AutomationRule model não está disponível no Prisma atual.',
+      }
+    }
+
+    return delegate.create({
       data: {
         orgId,
         name: dto.name.trim(),
@@ -61,7 +80,12 @@ export class AutomationService {
   }
 
   async updateRule(orgId: string, id: string, dto: UpdateAutomationRuleDto) {
-    const existing = await this.prisma.automationRule.findFirst({
+    const delegate = this.automationRuleDelegate
+    if (!delegate) {
+      throw new NotFoundException('Regra de automação não disponível neste ambiente')
+    }
+
+    const existing = await delegate.findFirst({
       where: { id, orgId },
     })
 
@@ -69,7 +93,7 @@ export class AutomationService {
       throw new NotFoundException('Regra de automação não encontrada')
     }
 
-    return this.prisma.automationRule.update({
+    return delegate.update({
       where: { id },
       data: {
         name: dto.name?.trim(),
@@ -83,9 +107,21 @@ export class AutomationService {
   }
 
   async executeTrigger(context: AutomationContext) {
+    const ruleDelegate = this.automationRuleDelegate
+    const executionDelegate = this.automationExecutionDelegate
+
+    if (!ruleDelegate || !executionDelegate) {
+      return {
+        trigger: context.trigger,
+        matchedRules: 0,
+        results: [],
+        disabled: true,
+      }
+    }
+
     const triggerEnum = context.trigger as AutomationTrigger
 
-    const rules = await this.prisma.automationRule.findMany({
+    const rules = await ruleDelegate.findMany({
       where: {
         orgId: context.orgId,
         trigger: triggerEnum,
@@ -97,7 +133,7 @@ export class AutomationService {
     const results: any[] = []
 
     for (const rule of rules) {
-      const execution = await this.prisma.automationExecution.create({
+      const execution = await executionDelegate.create({
         data: {
           orgId: context.orgId,
           ruleId: rule.id,
@@ -121,7 +157,7 @@ export class AutomationService {
           if (handled) executedActions++
         }
 
-        await this.prisma.automationExecution.update({
+        await executionDelegate.update({
           where: { id: execution.id },
           data: {
             status: 'SUCCESS',
@@ -140,7 +176,7 @@ export class AutomationService {
 
         this.logger.error(`automation execution failed rule=${rule.id}: ${message}`)
 
-        await this.prisma.automationExecution.update({
+        await executionDelegate.update({
           where: { id: execution.id },
           data: {
             status: 'FAILED',

@@ -81,7 +81,9 @@ export class BootstrapService {
     const organizationId = (params.organizationId ?? '').trim() || null
 
     if (!orgName && !organizationId) {
-      throw new BadRequestException('orgName obrigatório quando organizationId não é informado')
+      throw new BadRequestException(
+        'orgName obrigatório quando organizationId não é informado',
+      )
     }
 
     if (!adminName) throw new BadRequestException('adminName obrigatório')
@@ -142,7 +144,8 @@ export class BootstrapService {
               requiresOnboarding: false,
             },
           })
-          await this.subscriptionsService.createTrialSubscription(org.id)
+
+          await this.subscriptionsService.createTrialSubscription(org.id, tx)
         }
       }
 

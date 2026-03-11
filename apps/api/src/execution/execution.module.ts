@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common'
 import { PrismaModule } from '../prisma/prisma.module'
 import { TimelineModule } from '../timeline/timeline.module'
-import { FinanceModule } from '../finance/finance.module'
 import { AuditModule } from '../audit/audit.module'
+import { FinanceModule } from '../finance/finance.module'
 
 import { ExecutionController } from './execution.controller'
 import { ExecutionService } from './execution.service'
@@ -11,8 +11,8 @@ import { ExecutionService } from './execution.service'
   imports: [
     PrismaModule,
     TimelineModule,
-    FinanceModule,
     AuditModule,
+    FinanceModule,
   ],
   controllers: [ExecutionController],
   providers: [ExecutionService],

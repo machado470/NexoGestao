@@ -32,4 +32,14 @@ export class CreateServiceOrderDto {
   @IsOptional()
   @IsString()
   assignedToPersonId?: string
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(1_000_000_000)
+  amountCents?: number
+
+  @IsOptional()
+  @IsString()
+  dueDate?: string
 }

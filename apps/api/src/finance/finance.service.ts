@@ -21,12 +21,10 @@ import { QueueService } from '../queue/queue.service'
 import { QUEUE_NAMES } from '../queue/queue.constants'
 
 function isUuidLike(s: string): boolean {
-  // UUID v4/v1 “parecido” (bom o suficiente pra decidir equals vs contains)
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
     s,
   )
 }
-
 
 type DbClient = PrismaService | any
 
@@ -139,14 +137,16 @@ export class FinanceService {
         serviceOrderId: input.serviceOrderId ?? null,
         amountCents: input.amountCents,
         dueDate: new Date(input.dueDate),
-        title: input.title ?? 'Cobrança gerada por automação',
-        description: input.description ?? null,
         status: 'PENDING',
       },
     })
   }
 
-  async sendPaymentReminder(input: { orgId: string; customerId: string; chargeTitle?: string }) {
+  async sendPaymentReminder(input: {
+    orgId: string
+    customerId: string
+    chargeTitle?: string
+  }) {
     const customer = await this.prisma.customer.findFirst({
       where: { id: input.customerId, orgId: input.orgId },
       select: { phone: true },
@@ -266,12 +266,10 @@ export class FinanceService {
       dueDate ?? new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)
 
     const run = async (tx: any) => {
-      const existing = await tx.charge.findUnique({
+      const existing = await tx.charge.findFirst({
         where: {
-          orgId_serviceOrderId: {
-            orgId: input.orgId,
-            serviceOrderId: input.serviceOrderId,
-          },
+          orgId: input.orgId,
+          serviceOrderId: input.serviceOrderId,
         },
         select: { id: true, amountCents: true, dueDate: true, status: true },
       })
@@ -316,12 +314,10 @@ export class FinanceService {
       } catch (error) {
         if (!isUniqueViolation(error)) throw error
 
-        const concurrent = await tx.charge.findUnique({
+        const concurrent = await tx.charge.findFirst({
           where: {
-            orgId_serviceOrderId: {
-              orgId: input.orgId,
-              serviceOrderId: input.serviceOrderId,
-            },
+            orgId: input.orgId,
+            serviceOrderId: input.serviceOrderId,
           },
           select: { id: true },
         })
@@ -548,6 +544,7 @@ export class FinanceService {
           renderedText: 'Pagamento recebido com sucesso. Obrigado! ✅',
         })
       }
+
       this.metrics.increment('paymentsProcessed')
       this.logger.log(
         JSON.stringify({
@@ -572,10 +569,12 @@ export class FinanceService {
     })
 
     const header = 'ID,Cliente,Valor (R$),Vencimento,Status,Criado Em\n'
-    const rows = charges.map(c => {
-      const amount = (c.amountCents / 100).toFixed(2)
-      return `"${c.id}","${c.customer?.name || 'N/A'}","${amount}","${c.dueDate.toISOString()}","${c.status}","${c.createdAt.toISOString()}"`
-    }).join('\n')
+    const rows = charges
+      .map((c) => {
+        const amount = (c.amountCents / 100).toFixed(2)
+        return `"${c.id}","${c.customer?.name || 'N/A'}","${amount}","${c.dueDate.toISOString()}","${c.status}","${c.createdAt.toISOString()}"`
+      })
+      .join('\n')
 
     return header + rows
   }
@@ -588,7 +587,6 @@ export class FinanceService {
     const orderBy = query?.orderBy ?? 'createdAt'
     const direction = query?.direction ?? 'desc'
 
-    // limit: default 50, range 0..100
     let limit = 50
     if (rawLimit !== undefined) {
       if (!Number.isFinite(rawLimit)) {
@@ -612,7 +610,6 @@ export class FinanceService {
       }
     }
 
-    // ✅ cursor inválido = 400 (evita UI “silenciosa”)
     if (cursor) {
       const exists = await this.prisma.charge.findFirst({
         where: { id: cursor, orgId },
@@ -621,13 +618,15 @@ export class FinanceService {
       if (!exists) throw new BadRequestException('cursor inválido')
     }
 
-    // where base
     const where: any = {
       orgId,
       ...(status ? { status } : {}),
     }
 
-    // q inteligente: UUID -> equals, humano -> contains
+    if (query?.serviceOrderId) {
+      where.serviceOrderId = query.serviceOrderId
+    }
+
     if (q) {
       const uuid = isUuidLike(q)
 
@@ -644,7 +643,6 @@ export class FinanceService {
       }
     }
 
-    // orderBy + tie-breaker por id (pra paginação não “pular/duplicar”)
     const order: any[] = []
     if (orderBy === 'amountCents') {
       order.push({ amountCents: direction })
@@ -659,8 +657,6 @@ export class FinanceService {
       order.push({ id: 'desc' })
     }
 
-    // Paginação por cursor (cursor = id da última charge)
-    // Técnica: take = limit + 1 para saber hasMore
     const take = limit + 1
 
     const rows = await this.prisma.charge.findMany({
@@ -688,7 +684,6 @@ export class FinanceService {
     const hasMore = rows.length > limit
     const items = hasMore ? rows.slice(0, limit) : rows
 
-    // ✅ CORREÇÃO: só retorna nextCursor se realmente houver próxima página
     const nextCursor =
       hasMore && items.length ? items[items.length - 1].id : null
 
@@ -771,7 +766,7 @@ export class FinanceService {
     const monthlyRevenue: Record<string, number> = {}
 
     payments.forEach((p) => {
-      const month = p.paidAt.toISOString().substring(0, 7) // YYYY-MM
+      const month = p.paidAt.toISOString().substring(0, 7)
       monthlyRevenue[month] = (monthlyRevenue[month] || 0) + p.amountCents / 100
     })
 
@@ -808,7 +803,16 @@ export class FinanceService {
     })
 
     this.metrics.increment('chargesCreated')
-    this.logger.log(JSON.stringify({ event: 'charge_creation', requestId: this.requestContext.requestId, userId: actorUserId, orgId, chargeId: charge.id, source: 'manual' }))
+    this.logger.log(
+      JSON.stringify({
+        event: 'charge_creation',
+        requestId: this.requestContext.requestId,
+        userId: actorUserId,
+        orgId,
+        chargeId: charge.id,
+        source: 'manual',
+      }),
+    )
 
     return charge
   }

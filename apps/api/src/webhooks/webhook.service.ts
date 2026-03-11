@@ -8,8 +8,26 @@ import { randomBytes } from 'crypto'
 export class WebhookService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private get webhookEndpointDelegate(): any | null {
+    const prismaAny = this.prisma as any
+    return prismaAny.webhookEndpoint ?? null
+  }
+
+  private get webhookDeliveryDelegate(): any | null {
+    const prismaAny = this.prisma as any
+    return prismaAny.webhookDelivery ?? null
+  }
+
   async createEndpoint(orgId: string, dto: CreateWebhookDto) {
-    return this.prisma.webhookEndpoint.create({
+    const delegate = this.webhookEndpointDelegate
+    if (!delegate) {
+      return {
+        disabled: true,
+        reason: 'WebhookEndpoint model não está disponível no Prisma atual.',
+      }
+    }
+
+    return delegate.create({
       data: {
         orgId,
         url: dto.url,
@@ -29,7 +47,10 @@ export class WebhookService {
   }
 
   async listEndpoints(orgId: string) {
-    return this.prisma.webhookEndpoint.findMany({
+    const delegate = this.webhookEndpointDelegate
+    if (!delegate) return []
+
+    return delegate.findMany({
       where: { orgId },
       orderBy: { createdAt: 'desc' },
       select: {
@@ -44,10 +65,19 @@ export class WebhookService {
   }
 
   async updateEndpoint(orgId: string, id: string, dto: UpdateWebhookDto) {
-    const existing = await this.prisma.webhookEndpoint.findFirst({ where: { id, orgId }, select: { id: true } })
+    const delegate = this.webhookEndpointDelegate
+    if (!delegate) {
+      throw new NotFoundException('Webhook endpoint não disponível neste ambiente')
+    }
+
+    const existing = await delegate.findFirst({
+      where: { id, orgId },
+      select: { id: true },
+    })
+
     if (!existing) throw new NotFoundException('Webhook endpoint não encontrado')
 
-    return this.prisma.webhookEndpoint.update({
+    return delegate.update({
       where: { id },
       data: {
         url: dto.url,
@@ -66,15 +96,27 @@ export class WebhookService {
   }
 
   async deleteEndpoint(orgId: string, id: string) {
-    const existing = await this.prisma.webhookEndpoint.findFirst({ where: { id, orgId }, select: { id: true } })
+    const delegate = this.webhookEndpointDelegate
+    if (!delegate) {
+      return { deleted: false, disabled: true }
+    }
+
+    const existing = await delegate.findFirst({
+      where: { id, orgId },
+      select: { id: true },
+    })
+
     if (!existing) throw new NotFoundException('Webhook endpoint não encontrado')
 
-    await this.prisma.webhookEndpoint.delete({ where: { id } })
+    await delegate.delete({ where: { id } })
     return { deleted: true }
   }
 
   async listDeliveries(orgId: string, query?: { eventType?: string; status?: string }) {
-    return this.prisma.webhookDelivery.findMany({
+    const delegate = this.webhookDeliveryDelegate
+    if (!delegate) return []
+
+    return delegate.findMany({
       where: {
         endpoint: { orgId },
         ...(query?.eventType ? { eventType: query.eventType } : {}),
@@ -100,7 +142,20 @@ export class WebhookService {
     eventType: string
     payload: Record<string, any>
   }) {
-    return this.prisma.webhookDelivery.create({
+    const delegate = this.webhookDeliveryDelegate
+    if (!delegate) {
+      return {
+        id: `disabled-${Date.now()}`,
+        endpointId: input.endpointId,
+        eventType: input.eventType,
+        payload: input.payload,
+        status: 'FAILED',
+        attempts: 0,
+        disabled: true,
+      }
+    }
+
+    return delegate.create({
       data: {
         endpointId: input.endpointId,
         eventType: input.eventType,
@@ -115,7 +170,17 @@ export class WebhookService {
     attempts: number
     status: 'PENDING' | 'SUCCESS' | 'FAILED'
   }) {
-    return this.prisma.webhookDelivery.update({
+    const delegate = this.webhookDeliveryDelegate
+    if (!delegate) {
+      return {
+        id: input.deliveryId,
+        attempts: input.attempts,
+        status: input.status,
+        disabled: true,
+      }
+    }
+
+    return delegate.update({
       where: { id: input.deliveryId },
       data: {
         attempts: input.attempts,
@@ -126,7 +191,10 @@ export class WebhookService {
   }
 
   async getDeliveryContext(deliveryId: string) {
-    return this.prisma.webhookDelivery.findUnique({
+    const delegate = this.webhookDeliveryDelegate
+    if (!delegate) return null
+
+    return delegate.findUnique({
       where: { id: deliveryId },
       include: {
         endpoint: true,
@@ -135,7 +203,10 @@ export class WebhookService {
   }
 
   async getActiveEndpointsByEvent(orgId: string, eventType: string) {
-    const endpoints = await this.prisma.webhookEndpoint.findMany({
+    const delegate = this.webhookEndpointDelegate
+    if (!delegate) return []
+
+    const endpoints = await delegate.findMany({
       where: {
         orgId,
         active: true,
@@ -146,7 +217,7 @@ export class WebhookService {
       },
     })
 
-    return endpoints.filter((endpoint) => {
+    return endpoints.filter((endpoint: any) => {
       const events = Array.isArray(endpoint.events) ? endpoint.events : []
       return events.includes(eventType)
     })

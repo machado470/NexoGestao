@@ -15,11 +15,9 @@ type TimelineLogInput = {
 function pickActorUserId(metadata?: Record<string, any> | null): string | null {
   if (!metadata) return null
 
-  // padrão novo
   const v1 = metadata.actorUserId
   if (typeof v1 === 'string' && v1.trim()) return v1.trim()
 
-  // compat legado
   const v2 = metadata.updatedBy ?? metadata.createdBy
   if (typeof v2 !== 'string') return null
   const s = v2.trim()
@@ -48,10 +46,8 @@ export class TimelineService {
       throw new Error('TimelineService.log(): orgId é obrigatório')
     }
 
-    // 1) se veio personId explícito
     let personId = input.personId ?? null
 
-    // 2) se não veio, tenta metadata.actorPersonId e valida no org
     if (!personId) {
       const actorPersonId = pickActorPersonId(input.metadata ?? null)
 
@@ -64,7 +60,6 @@ export class TimelineService {
       }
     }
 
-    // 3) fallback por userId (actorUserId / createdBy / updatedBy)
     if (!personId) {
       const actorUserId = pickActorUserId(input.metadata ?? null)
 
@@ -78,7 +73,6 @@ export class TimelineService {
       }
     }
 
-    // aviso (não quebra) para ações sem autoria
     if (!personId && String(input.action || '').startsWith('APPOINTMENT_')) {
       console.warn(
         '[Timeline] APPOINTMENT_* sem personId. action=%s orgId=%s metadataKeys=%s',
@@ -103,21 +97,29 @@ export class TimelineService {
       },
     })
 
-    await this.webhookDispatcher.dispatchTimelineEvent({
-      orgId: input.orgId,
-      action: input.action,
-      timelineEventId: event.id,
-      data: {
-        personId,
-        description: input.description ?? null,
-        metadata: input.metadata ?? null,
-      },
-    })
+    try {
+      await this.webhookDispatcher.dispatchTimelineEvent({
+        orgId: input.orgId,
+        action: input.action,
+        timelineEventId: event.id,
+        data: {
+          personId,
+          description: input.description ?? null,
+          metadata: input.metadata ?? null,
+        },
+      })
+    } catch (error) {
+      console.warn(
+        '[Timeline] Falha ao despachar webhook. action=%s orgId=%s error=%s',
+        input.action,
+        input.orgId,
+        error instanceof Error ? error.message : String(error),
+      )
+    }
+
+    return event
   }
 
-  /**
-   * ✅ query é opcional (compat com callers antigos)
-   */
   async listByOrg(orgId: string, query?: TimelineQueryDto) {
     const take =
       (query as any)?.limit && Number((query as any).limit) > 0

@@ -1,11 +1,11 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { TimelineService } from '../timeline/timeline.service'
-import { FinanceService } from '../finance/finance.service'
 import { AuditService } from '../audit/audit.service'
 import { AUDIT_ACTIONS } from '../audit/audit.actions'
 import { RequestContextService } from '../common/context/request-context.service'
 import { MetricsService } from '../common/metrics/metrics.service'
+import { FinanceService } from '../finance/finance.service'
 
 @Injectable()
 export class ExecutionService {
@@ -14,86 +14,264 @@ export class ExecutionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly timeline: TimelineService,
-    private readonly finance: FinanceService,
     private readonly audit: AuditService,
     private readonly requestContext: RequestContextService,
     private readonly metrics: MetricsService,
+    private readonly finance: FinanceService,
   ) {}
 
   async listByServiceOrder(orgId: string, serviceOrderId: string) {
-    return this.prisma.$queryRawUnsafe(
-      `SELECT * FROM "Execution" WHERE "orgId"=$1 AND "serviceOrderId"=$2 ORDER BY "createdAt" DESC`,
-      orgId,
-      serviceOrderId,
+    const serviceOrder = await this.prisma.serviceOrder.findFirst({
+      where: { id: serviceOrderId, orgId },
+      select: {
+        id: true,
+        orgId: true,
+        customerId: true,
+        status: true,
+        title: true,
+        description: true,
+        scheduledFor: true,
+        startedAt: true,
+        finishedAt: true,
+        amountCents: true,
+        dueDate: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    })
+
+    if (!serviceOrder) {
+      throw new NotFoundException('ServiceOrder não encontrada')
+    }
+
+    return [
+      {
+        id: serviceOrder.id,
+        orgId: serviceOrder.orgId,
+        serviceOrderId: serviceOrder.id,
+        customerId: serviceOrder.customerId,
+        executorPersonId: null,
+        startedAt: serviceOrder.startedAt,
+        endedAt: serviceOrder.finishedAt,
+        notes: serviceOrder.description ?? null,
+        checklist: [],
+        attachments: [],
+        status: serviceOrder.status,
+        amountCents: serviceOrder.amountCents ?? null,
+        dueDate: serviceOrder.dueDate ?? null,
+        mode: 'service-order-fallback',
+        createdAt: serviceOrder.createdAt,
+        updatedAt: serviceOrder.updatedAt,
+      },
+    ]
+  }
+
+  async start(input: {
+    orgId: string
+    serviceOrderId: string
+    executorPersonId?: string | null
+    notes?: string
+    checklist?: any
+    attachments?: any
+  }) {
+    const so = await this.prisma.serviceOrder.findFirst({
+      where: { id: input.serviceOrderId, orgId: input.orgId },
+      select: {
+        id: true,
+        orgId: true,
+        customerId: true,
+        status: true,
+        startedAt: true,
+        finishedAt: true,
+        amountCents: true,
+        dueDate: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    })
+
+    if (!so) {
+      throw new NotFoundException('ServiceOrder não encontrada')
+    }
+
+    await this.prisma.serviceOrder.updateMany({
+      where: { id: input.serviceOrderId, orgId: input.orgId },
+      data: {
+        status: 'IN_PROGRESS',
+        startedAt: so.startedAt ?? new Date(),
+      },
+    })
+
+    const updated = await this.prisma.serviceOrder.findFirst({
+      where: { id: input.serviceOrderId, orgId: input.orgId },
+      select: {
+        id: true,
+        orgId: true,
+        customerId: true,
+        status: true,
+        startedAt: true,
+        finishedAt: true,
+        description: true,
+        amountCents: true,
+        dueDate: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    })
+
+    if (!updated) {
+      throw new NotFoundException('ServiceOrder não encontrada')
+    }
+
+    await this.timeline.log({
+      orgId: input.orgId,
+      personId: input.executorPersonId ?? null,
+      action: 'EXECUTION_STARTED',
+      description: 'Execução iniciada em modo fallback por ServiceOrder',
+      metadata: {
+        executionId: updated.id,
+        serviceOrderId: updated.id,
+        customerId: updated.customerId,
+        executorPersonId: input.executorPersonId ?? null,
+        notes: input.notes ?? null,
+        checklist: input.checklist ?? [],
+        attachments: input.attachments ?? [],
+        amountCents: updated.amountCents ?? null,
+        dueDate: updated.dueDate ?? null,
+        fallbackMode: true,
+      },
+    })
+
+    await this.audit.log({
+      orgId: input.orgId,
+      action: 'EXECUTION_STARTED',
+      actorPersonId: input.executorPersonId ?? null,
+      personId: input.executorPersonId ?? null,
+      entityType: 'SERVICE_ORDER',
+      entityId: updated.id,
+      context: 'Execution started (fallback)',
+      metadata: {
+        serviceOrderId: updated.id,
+        customerId: updated.customerId,
+        notes: input.notes ?? null,
+        amountCents: updated.amountCents ?? null,
+        dueDate: updated.dueDate ?? null,
+        fallbackMode: true,
+      },
+    })
+
+    this.logger.warn(
+      JSON.stringify({
+        event: 'execution_start_fallback',
+        orgId: input.orgId,
+        serviceOrderId: updated.id,
+        customerId: updated.customerId,
+      }),
     )
+
+    return {
+      id: updated.id,
+      orgId: updated.orgId,
+      serviceOrderId: updated.id,
+      customerId: updated.customerId,
+      executorPersonId: input.executorPersonId ?? null,
+      startedAt: updated.startedAt,
+      endedAt: updated.finishedAt,
+      notes: input.notes ?? updated.description ?? null,
+      checklist: input.checklist ?? [],
+      attachments: input.attachments ?? [],
+      status: updated.status,
+      amountCents: updated.amountCents ?? null,
+      dueDate: updated.dueDate ?? null,
+      mode: 'service-order-fallback',
+      createdAt: updated.createdAt,
+      updatedAt: updated.updatedAt,
+    }
   }
 
-  async start(input: { orgId: string; serviceOrderId: string; executorPersonId?: string | null; notes?: string; checklist?: any; attachments?: any }) {
-    const so = await this.prisma.serviceOrder.findFirst({ where: { id: input.serviceOrderId, orgId: input.orgId }, select: { id: true, customerId: true } })
-    if (!so) throw new NotFoundException('ServiceOrder não encontrada')
-    const rows = (await this.prisma.$queryRawUnsafe(`INSERT INTO "Execution" ("id","orgId","serviceOrderId","customerId","executorPersonId","startedAt","notes","checklist","attachments","createdAt","updatedAt") VALUES (gen_random_uuid(),$1,$2,$3,$4,NOW(),$5,$6::jsonb,$7::jsonb,NOW(),NOW()) RETURNING *`, input.orgId, input.serviceOrderId, so.customerId, input.executorPersonId ?? null, input.notes ?? null, JSON.stringify(input.checklist ?? []), JSON.stringify(input.attachments ?? []))) as any[]
-    const created = rows[0]
-    await this.timeline.log({ orgId: input.orgId, personId: input.executorPersonId ?? null, action: 'EXECUTION_STARTED', metadata: { executionId: created.id, serviceOrderId: input.serviceOrderId, customerId: so.customerId } })
-    await this.prisma.serviceOrder.updateMany({ where: { id: input.serviceOrderId, orgId: input.orgId }, data: { status: 'IN_PROGRESS', executionStartedAt: new Date() } })
-    return created
-  }
+  async complete(input: {
+    orgId: string
+    executionId: string
+    notes?: string
+    checklist?: any
+    attachments?: any
+  }) {
+    const existing = await this.prisma.serviceOrder.findFirst({
+      where: { id: input.executionId, orgId: input.orgId },
+      select: {
+        id: true,
+        orgId: true,
+        customerId: true,
+        status: true,
+        startedAt: true,
+        finishedAt: true,
+        description: true,
+        amountCents: true,
+        dueDate: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    })
 
-  async complete(input: { orgId: string; executionId: string; notes?: string; checklist?: any; attachments?: any }) {
-    return this.prisma.$transaction(async (tx) => {
-      const transition = await tx.execution.updateMany({
-        where: { id: input.executionId, orgId: input.orgId, endedAt: null },
+    if (!existing) {
+      throw new NotFoundException('Execution não encontrada')
+    }
+
+    const alreadyDone = existing.status === 'DONE'
+
+    if (!alreadyDone) {
+      await this.prisma.serviceOrder.updateMany({
+        where: { id: input.executionId, orgId: input.orgId },
         data: {
-          endedAt: new Date(),
-          notes: input.notes ?? undefined,
-          checklist: input.checklist ?? undefined,
-          attachments: input.attachments ?? undefined,
+          status: 'DONE',
+          finishedAt: new Date(),
+          ...(typeof input.notes === 'string' && input.notes.trim()
+            ? { description: input.notes.trim() }
+            : {}),
         },
       })
+    }
 
-      const updated = await tx.execution.findFirst({
-        where: { id: input.executionId, orgId: input.orgId },
-      })
+    const updated = await this.prisma.serviceOrder.findFirst({
+      where: { id: input.executionId, orgId: input.orgId },
+      select: {
+        id: true,
+        orgId: true,
+        customerId: true,
+        status: true,
+        startedAt: true,
+        finishedAt: true,
+        description: true,
+        amountCents: true,
+        dueDate: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    })
 
-      if (!updated) throw new NotFoundException('Execution não encontrada')
+    if (!updated) {
+      throw new NotFoundException('Execution não encontrada')
+    }
 
-      if (transition.count === 0) {
-        return { ...updated, idempotent: true }
-      }
-
-      await tx.serviceOrder.updateMany({
-        where: { id: updated.serviceOrderId, orgId: input.orgId },
-        data: { status: 'DONE', executionEndedAt: new Date() },
-      })
-
-      const serviceOrder = await tx.serviceOrder.findFirst({
-        where: { id: updated.serviceOrderId, orgId: input.orgId },
-        select: { amountCents: true, dueDate: true },
-      })
-
-      if (serviceOrder && serviceOrder.amountCents > 0) {
-        await this.finance.ensureChargeForServiceOrderDone({
-          orgId: input.orgId,
-          serviceOrderId: updated.serviceOrderId,
-          customerId: updated.customerId,
-          amountCents: serviceOrder.amountCents,
-          dueDate: serviceOrder.dueDate,
-          tx,
-        })
-      }
-
+    if (!alreadyDone) {
       const requestId = this.requestContext.requestId
       const userId = this.requestContext.userId
 
-      await tx.timelineEvent.create({
-        data: {
-          orgId: input.orgId,
-          action: 'EXECUTION_DONE',
-          metadata: {
-            executionId: updated.id,
-            serviceOrderId: updated.serviceOrderId,
-            customerId: updated.customerId,
-            requestId,
-          },
+      await this.timeline.log({
+        orgId: input.orgId,
+        action: 'EXECUTION_DONE',
+        description: 'Execução concluída em modo fallback por ServiceOrder',
+        metadata: {
+          executionId: updated.id,
+          serviceOrderId: updated.id,
+          customerId: updated.customerId,
+          requestId,
+          notes: input.notes ?? null,
+          checklist: input.checklist ?? [],
+          attachments: input.attachments ?? [],
+          amountCents: updated.amountCents ?? null,
+          dueDate: updated.dueDate ?? null,
+          fallbackMode: true,
         },
       })
 
@@ -101,30 +279,74 @@ export class ExecutionService {
         orgId: input.orgId,
         action: AUDIT_ACTIONS.EXECUTION_COMPLETED,
         actorUserId: userId,
-        entityType: 'EXECUTION',
+        entityType: 'SERVICE_ORDER',
         entityId: updated.id,
-        context: 'Execution completed',
+        context: 'Execution completed (fallback)',
         metadata: {
           requestId,
-          serviceOrderId: updated.serviceOrderId,
+          serviceOrderId: updated.id,
           customerId: updated.customerId,
+          amountCents: updated.amountCents ?? null,
+          dueDate: updated.dueDate ?? null,
+          fallbackMode: true,
         },
       })
 
+      try {
+        await this.finance.ensureChargeForServiceOrderDone({
+          orgId: input.orgId,
+          serviceOrderId: updated.id,
+          customerId: updated.customerId,
+          actorUserId: userId ?? null,
+          actorPersonId: null,
+          amountCents: updated.amountCents ?? undefined,
+          dueDate: updated.dueDate ?? null,
+        })
+      } catch (err) {
+        this.logger.warn(
+          JSON.stringify({
+            event: 'execution_charge_creation_failed',
+            requestId,
+            userId,
+            orgId: input.orgId,
+            serviceOrderId: updated.id,
+            error: err instanceof Error ? err.message : String(err),
+          }),
+        )
+      }
+
       this.metrics.increment('executionsCompleted')
-      this.logger.log(
+
+      this.logger.warn(
         JSON.stringify({
-          event: 'execution_completion',
+          event: 'execution_completion_fallback',
           requestId,
           userId,
           orgId: input.orgId,
           executionId: updated.id,
-          serviceOrderId: updated.serviceOrderId,
-          chargeTriggered: Boolean(serviceOrder && serviceOrder.amountCents > 0),
+          serviceOrderId: updated.id,
         }),
       )
+    }
 
-      return updated
-    })
+    return {
+      id: updated.id,
+      orgId: updated.orgId,
+      serviceOrderId: updated.id,
+      customerId: updated.customerId,
+      executorPersonId: null,
+      startedAt: updated.startedAt,
+      endedAt: updated.finishedAt,
+      notes: input.notes ?? updated.description ?? null,
+      checklist: input.checklist ?? [],
+      attachments: input.attachments ?? [],
+      status: updated.status,
+      amountCents: updated.amountCents ?? null,
+      dueDate: updated.dueDate ?? null,
+      mode: 'service-order-fallback',
+      createdAt: updated.createdAt,
+      updatedAt: updated.updatedAt,
+      ...(alreadyDone ? { idempotent: true } : {}),
+    }
   }
 }
