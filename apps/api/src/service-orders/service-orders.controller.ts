@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
   Param,
   Patch,
   Post,
@@ -18,6 +19,7 @@ import { ServiceOrdersService } from './service-orders.service'
 import { CreateServiceOrderDto } from './dto/create-service-order.dto'
 import { UpdateServiceOrderDto } from './dto/update-service-order.dto'
 import { QuotasService } from '../quotas/quotas.service'
+import { FinanceService } from '../finance/finance.service'
 
 @Controller('service-orders')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -25,6 +27,7 @@ export class ServiceOrdersController {
   constructor(
     private readonly serviceOrders: ServiceOrdersService,
     private readonly quotas: QuotasService,
+    private readonly finance: FinanceService,
   ) {}
 
   @Get()
@@ -97,6 +100,36 @@ export class ServiceOrdersController {
       personId: actorPersonId,
       id,
       data: body as any,
+    })
+  }
+
+  /**
+   * POST /service-orders/:id/generate-charge
+   * Gera cobrança manualmente para uma OS finalizada (DONE).
+   * Útil quando a geração automática falhou ou foi pulada.
+   * Idempotente: se já existe cobrança para a OS, atualiza se necessário.
+   */
+  @Post(':id/generate-charge')
+  @HttpCode(200)
+  @Roles('ADMIN', 'MANAGER')
+  async generateCharge(
+    @Org() orgId: string,
+    @User() user: any,
+    @Param('id') id: string,
+  ) {
+    const actorUserId = user?.userId ?? null
+    const actorPersonId = user?.personId ?? null
+
+    const os = await this.serviceOrders.get(orgId, id)
+
+    return this.finance.ensureChargeForServiceOrderDone({
+      orgId,
+      serviceOrderId: id,
+      customerId: os?.customerId ?? undefined,
+      amountCents: os?.amountCents ?? 0,
+      dueDate: os?.dueDate ?? null,
+      actorUserId,
+      actorPersonId,
     })
   }
 }

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc";
+import { nexoFetch } from "../_core/nexoClient";
 import {
   countUnreadOperationalNotifications,
   listOperationalNotifications,
@@ -8,15 +9,14 @@ import {
 } from "../_core/operationalNotifications";
 
 /**
- * Dashboard router (temporariamente desativado).
- * Antigo usava DB local (drizzle/in-memory).
- * Novo vai consumir o backend Nest (reports/dashboard endpoints).
+ * Dashboard router — conectado ao backend NestJS.
+ * KPIs e métricas operacionais vêm de GET /dashboard/*.
  */
 
 export const dashboardRouter = router({
   status: protectedProcedure.query(async () => ({
     ok: true,
-    message: "Dashboard router placeholder",
+    message: "Dashboard router ativo",
   })),
 
   notifications: protectedProcedure
@@ -85,11 +85,95 @@ export const dashboardRouter = router({
       }),
   }),
 
+  /**
+   * Sub-router de dashboard — conectado ao backend NestJS.
+   * Nest: GET /dashboard/metrics, /dashboard/alerts, /dashboard/revenue, etc.
+   */
   dashboard: router({
-    kpis: protectedProcedure.query(async () => ({} as Record<string, unknown>)),
-    revenueTrend: protectedProcedure.query(async () => [] as Array<Record<string, unknown>>),
+    /**
+     * KPIs operacionais: clientes ativos, agendamentos do dia, OS abertas, cobranças pendentes
+     * Nest: GET /dashboard/metrics
+     */
+    kpis: protectedProcedure.query(async ({ ctx }) => {
+      try {
+        const raw = await nexoFetch<any>(ctx.req, `/dashboard/metrics`, { method: "GET" });
+        return raw?.data ?? raw ?? {};
+      } catch {
+        return {} as Record<string, unknown>;
+      }
+    }),
+
+    /**
+     * Alertas operacionais: OS atrasadas, cobranças vencidas, serviços do dia
+     * Nest: GET /dashboard/alerts
+     */
+    alerts: protectedProcedure.query(async ({ ctx }) => {
+      try {
+        const raw = await nexoFetch<any>(ctx.req, `/dashboard/alerts`, { method: "GET" });
+        return raw?.data ?? raw ?? [];
+      } catch {
+        return [] as Array<Record<string, unknown>>;
+      }
+    }),
+
+    /**
+     * Tendência de receita (últimos 12 meses)
+     * Nest: GET /dashboard/revenue
+     */
+    revenueTrend: protectedProcedure.query(async ({ ctx }) => {
+      try {
+        const raw = await nexoFetch<any>(ctx.req, `/dashboard/revenue`, { method: "GET" });
+        return raw?.data ?? raw ?? [];
+      } catch {
+        return [] as Array<Record<string, unknown>>;
+      }
+    }),
+
+    /**
+     * Crescimento de clientes por mês
+     * Nest: GET /dashboard/growth
+     */
+    customerGrowth: protectedProcedure.query(async ({ ctx }) => {
+      try {
+        const raw = await nexoFetch<any>(ctx.req, `/dashboard/growth`, { method: "GET" });
+        return raw?.data ?? raw ?? [];
+      } catch {
+        return [] as Array<Record<string, unknown>>;
+      }
+    }),
+
+    /**
+     * Distribuição de agendamentos por status
+     * Nest: GET /dashboard/service-orders-status (usado para OS)
+     */
     appointmentDistribution: protectedProcedure.query(async () => [] as Array<Record<string, unknown>>),
-    chargeDistribution: protectedProcedure.query(async () => [] as Array<Record<string, unknown>>),
+
+    /**
+     * Distribuição de cobranças por status
+     * Nest: GET /dashboard/charges-status
+     */
+    chargeDistribution: protectedProcedure.query(async ({ ctx }) => {
+      try {
+        const raw = await nexoFetch<any>(ctx.req, `/dashboard/charges-status`, { method: "GET" });
+        return raw?.data ?? raw ?? [];
+      } catch {
+        return [] as Array<Record<string, unknown>>;
+      }
+    }),
+
+    /**
+     * Status das ordens de serviço
+     * Nest: GET /dashboard/service-orders-status
+     */
+    serviceOrdersStatus: protectedProcedure.query(async ({ ctx }) => {
+      try {
+        const raw = await nexoFetch<any>(ctx.req, `/dashboard/service-orders-status`, { method: "GET" });
+        return raw?.data ?? raw ?? [];
+      } catch {
+        return [] as Array<Record<string, unknown>>;
+      }
+    }),
+
     performanceMetrics: protectedProcedure.query(async () => [] as Array<Record<string, unknown>>),
   }),
 });

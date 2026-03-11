@@ -15,6 +15,7 @@ import { invoicesRouter } from "./routers/invoices";
 import { launchesRouter } from "./routers/launches";
 import { referralsRouter } from "./routers/referrals";
 import { aiRouter } from "./routers/ai";
+import { financeAdvancedRouter } from "./routers/finance-advanced";
 
 import cookie from "cookie";
 
@@ -84,6 +85,7 @@ export const appRouter = router({
   launches: launchesRouter,
   referrals: referralsRouter,
   ai: aiRouter,
+  financeAdvanced: financeAdvancedRouter,
 
   /**
    * Session Router

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -29,6 +30,7 @@ export class PeopleController {
 
   /**
    * 👑 ADMIN — lista pessoas ativas da organização
+   * GET /people
    */
   @Get()
   @Roles('ADMIN')
@@ -37,7 +39,21 @@ export class PeopleController {
   }
 
   /**
+   * 👑 ADMIN — métrica institucional
+   * GET /people/stats/linked
+   * IMPORTANTE: rota estática deve vir ANTES de :id para não ser capturada como parâmetro dinâmico.
+   */
+  @Get('stats/linked')
+  @Roles('ADMIN')
+  async countLinked() {
+    return {
+      count: await this.people.countUsersWithPerson(),
+    }
+  }
+
+  /**
    * 👑 ADMIN — detalhe completo da pessoa
+   * GET /people/:id
    */
   @Get(':id')
   @Roles('ADMIN')
@@ -45,18 +61,9 @@ export class PeopleController {
     return this.people.findWithContext(id, orgId)
   }
 
-  @Patch(':id')
-  @Roles('ADMIN')
-  async update(
-    @Param('id') id: string,
-    @Org() orgId: string,
-    @Body() body: any,
-  ) {
-    return this.people.updatePerson(id, orgId, body)
-  }
-
   /**
    * 👑 ADMIN — cria pessoa (ATO FUNDADOR)
+   * POST /people
    */
   @Post()
   @Roles('ADMIN')
@@ -75,13 +82,32 @@ export class PeopleController {
   }
 
   /**
-   * 👑 ADMIN — métrica institucional
+   * 👑 ADMIN — atualiza pessoa
+   * PATCH /people/:id
    */
-  @Get('stats/linked')
+  @Patch(':id')
   @Roles('ADMIN')
-  async countLinked() {
-    return {
-      count: await this.people.countUsersWithPerson(),
-    }
+  async update(
+    @Param('id') id: string,
+    @Org() orgId: string,
+    @Body() body: any,
+  ) {
+    return this.people.updatePerson(id, orgId, body)
+  }
+
+  /**
+   * 👑 ADMIN — desativa pessoa (soft delete)
+   * DELETE /people/:id
+   * Não remove do banco; apenas marca active = false e gera audit + timeline.
+   * Regra: pessoa com OS ativa não pode ser desativada.
+   */
+  @Delete(':id')
+  @Roles('ADMIN')
+  async deactivate(
+    @Param('id') id: string,
+    @Org() orgId: string,
+    @User() user: any,
+  ) {
+    return this.people.deactivatePerson(id, orgId, user?.userId ?? null)
   }
 }

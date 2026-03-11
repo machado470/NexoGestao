@@ -36,6 +36,27 @@ import { AutomationModule } from './automation/automation.module'
 import { NotificationsModule } from './notifications/notifications.module'
 import { SubscriptionsModule } from './subscriptions/subscriptions.module'
 import { QueueModule } from './queue/queue.module'
+// Módulos adicionados — estavam implementados mas não registrados no AppModule
+import { TimelineModule } from './timeline/timeline.module'
+import { GovernanceModule } from './governance/governance.module'
+import { ExpensesModule } from './expenses/expenses.module'
+import { InvoicesModule } from './invoices/invoices.module'
+import { DashboardModule } from './dashboard/dashboard.module'
+import { ReportsModule } from './reports/reports.module'
+import { PlansModule } from './plans/plans.module'
+import { EmailModule } from './email/email.module'
+import { PaymentsModule } from './payments/payments.module'
+import { BillingModule } from './billing/billing.module'
+import { AnalyticsModule } from './analytics/analytics.module'
+import { CorrectiveActionsModule } from './corrective-actions/corrective-actions.module'
+import { AdminModule } from './admin/admin.module'
+import { PendingModule } from './pending/pending.module'
+import { ExceptionsModule } from './exceptions/exceptions.module'
+import { LaunchesModule } from './launches/launches.module'
+import { ReferralsModule } from './referrals/referrals.module'
+import { OrganizationSettingsModule } from './organization-settings/organization-settings.module'
+import { WebhookModule } from './webhooks/webhook.module'
+import { SentryModule } from './common/sentry/sentry.module'
 
 @Module({
   imports: [
@@ -69,6 +90,10 @@ import { QueueModule } from './queue/queue.module'
     PrismaModule,
     HealthModule,
     QueueModule,
+    SentryModule,
+    AnalyticsModule,
+    EmailModule,
+    WebhookModule,
 
     BootstrapModule,
     AuthModule,
@@ -82,17 +107,33 @@ import { QueueModule } from './queue/queue.module'
     AssessmentsModule,
     RiskModule,
     AuditModule,
+    TimelineModule,
+    CorrectiveActionsModule,
+    ExceptionsModule,
+    PendingModule,
 
     CustomersModule,
     AppointmentsModule,
     ServiceOrdersModule,
     ExecutionModule,
     FinanceModule,
+    PaymentsModule,
+    ExpensesModule,
+    InvoicesModule,
+    BillingModule,
     WhatsAppModule,
     InvitesModule,
     AutomationModule,
     NotificationsModule,
     SubscriptionsModule,
+    PlansModule,
+    GovernanceModule,
+    DashboardModule,
+    ReportsModule,
+    AdminModule,
+    OrganizationSettingsModule,
+    LaunchesModule,
+    ReferralsModule,
   ],
   providers: [
     MetricsService,

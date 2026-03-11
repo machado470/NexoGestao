@@ -10,6 +10,10 @@ import { EnforcementEngineService } from './enforcement-engine.service'
 import { EnforcementJob } from './enforcement.job'
 import { EnforcementController } from './enforcement.controller'
 
+// Leitura de dados de governança — controller e service existiam mas não estavam registrados
+import { GovernanceReadController } from './governance-read.controller'
+import { GovernanceReadService } from './governance-read.service'
+
 @Module({
   imports: [
     PrismaModule,
@@ -17,6 +21,7 @@ import { EnforcementController } from './enforcement.controller'
   ],
   controllers: [
     EnforcementController,
+    GovernanceReadController,
   ],
   providers: [
     GovernanceRunService,
@@ -25,6 +30,8 @@ import { EnforcementController } from './enforcement.controller'
     EnforcementPolicyService,
     EnforcementEngineService,
     EnforcementJob,
+
+    GovernanceReadService,
   ],
   exports: [
     GovernanceRunService,
@@ -33,6 +40,8 @@ import { EnforcementController } from './enforcement.controller'
     EnforcementPolicyService,
     EnforcementEngineService,
     EnforcementJob,
+
+    GovernanceReadService,
   ],
 })
 export class GovernanceModule {}

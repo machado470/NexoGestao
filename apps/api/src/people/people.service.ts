@@ -40,8 +40,8 @@ export class PeopleService {
   }
 
   async updatePerson(id: string, orgId: string, data: any) {
-    const person = await this.prisma.person.findFirst({ where: { id, orgId } });
-    if (!person) throw new NotFoundException('Pessoa não encontrada');
+    const person = await this.prisma.person.findFirst({ where: { id, orgId } })
+    if (!person) throw new NotFoundException('Pessoa não encontrada')
     return this.prisma.person.update({
       where: { id },
       data: {
@@ -51,6 +51,56 @@ export class PeopleService {
         active: data.active,
       },
     })
+  }
+
+  /**
+   * Soft delete: desativa a pessoa sem remover do banco.
+   * Bloqueia se houver OS ativa vinculada à pessoa.
+   * Gera audit + timeline conforme regras do sistema.
+   */
+  async deactivatePerson(id: string, orgId: string, actorUserId: string | null) {
+    const person = await this.prisma.person.findFirst({ where: { id, orgId } })
+    if (!person) throw new NotFoundException('Pessoa não encontrada')
+    if (!person.active) {
+      return { ok: true, message: 'Pessoa já estava inativa', person }
+    }
+
+    // Bloqueia se há OS ativa vinculada à pessoa
+    const activeOS = await this.prisma.serviceOrder.count({
+      where: {
+        orgId,
+        assignedToPersonId: id,
+        status: { in: ['OPEN', 'IN_PROGRESS'] },
+      },
+    })
+    if (activeOS > 0) {
+      throw new BadRequestException(
+        `Pessoa possui ${activeOS} ordem(ns) de serviço ativa(s). Finalize ou reatribua antes de desativar.`,
+      )
+    }
+
+    const updated = await this.prisma.person.update({
+      where: { id },
+      data: { active: false },
+    })
+
+    await this.audit.log({
+      personId: id,
+      action: 'PERSON_DEACTIVATED',
+      context: actorUserId
+        ? `Desativado por ADMIN ${actorUserId}`
+        : 'Desativado pelo sistema',
+    })
+
+    await this.timeline.log({
+      orgId,
+      action: 'PERSON_DEACTIVATED',
+      personId: id,
+      description: 'Pessoa desativada (soft delete)',
+      metadata: { deactivatedBy: actorUserId },
+    })
+
+    return { ok: true, person: updated }
   }
 
   async createPerson(params: {

@@ -1,49 +1,14 @@
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
-import cookie from "cookie";
-
-const NEXO_API_URL = process.env.NEXO_API_URL || "http://localhost:3000";
-const NEXO_TOKEN_COOKIE = "nexo_token";
+import { nexoFetch } from "../_core/nexoClient";
 
 const zId = z.preprocess((v) => (v === undefined || v === null ? v : String(v)), z.string().min(1));
 
-function getNexoTokenFromReq(req: any): string | null {
-  const raw = req?.headers?.cookie;
-  if (!raw || typeof raw !== "string") return null;
-  const parsed = cookie.parse(raw);
-  return parsed?.[NEXO_TOKEN_COOKIE] || null;
-}
-
-async function nexoFetch(ctx: any, path: string, init?: RequestInit) {
-  const token = getNexoTokenFromReq(ctx?.req);
-  if (!token) throw new Error("Sem sessão Nexo (cookie nexo_token não encontrado). Faça login novamente.");
-
-  const res = await fetch(`${NEXO_API_URL}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-      ...(init?.headers || {}),
-    },
-  });
-
-  const text = await res.text();
-  let json: any = null;
-  try {
-    json = text ? JSON.parse(text) : null;
-  } catch {
-    json = { raw: text };
-  }
-
-  if (!res.ok) {
-    const msg = json?.message || json?.error || json?.raw || `HTTP ${res.status}`;
-    throw new Error(String(msg));
-  }
-
-  return json;
-}
-
 export const expensesRouter = router({
+  /**
+   * Criar despesa
+   * Nest: POST /expenses
+   */
   create: protectedProcedure
     .input(
       z.object({
@@ -56,7 +21,7 @@ export const expensesRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      return await nexoFetch(ctx, `/expenses`, {
+      return await nexoFetch(ctx.req, `/expenses`, {
         method: "POST",
         body: JSON.stringify({
           description: input.description,
@@ -69,17 +34,26 @@ export const expensesRouter = router({
       });
     }),
 
+  /**
+   * Listar despesas com paginação
+   * Nest: GET /expenses?page=&limit=
+   */
   list: protectedProcedure
     .input(
       z.object({
         page: z.number().int().positive().default(1),
         limit: z.number().int().positive().default(10),
+        category: z.string().optional(),
       })
     )
     .query(async ({ ctx, input }) => {
-      const out = await nexoFetch(ctx, `/expenses?page=${input.page}&limit=${input.limit}`, {
-        method: "GET",
+      const params = new URLSearchParams({
+        page: String(input.page),
+        limit: String(input.limit),
       });
+      if (input.category) params.set("category", input.category);
+
+      const out = await nexoFetch(ctx.req, `/expenses?${params.toString()}`, { method: "GET" });
 
       if (Array.isArray(out)) {
         const total = out.length;
@@ -99,27 +73,37 @@ export const expensesRouter = router({
       return out;
     }),
 
-
-
+  /**
+   * Resumo de despesas
+   * Nest: GET /expenses/summary (mais eficiente que carregar tudo)
+   */
   summary: protectedProcedure.query(async ({ ctx }) => {
-    const out = await nexoFetch(ctx, `/expenses?page=1&limit=1000`, {
-      method: "GET",
-    });
-
-    const rows = Array.isArray(out) ? out : Array.isArray(out?.data) ? out.data : [];
-    const totalExpenses = rows.reduce((acc: number, item: any) => acc + Number(item?.amount ?? 0), 0);
-
-    return {
-      totalExpenses,
-      count: rows.length,
-    };
+    try {
+      const out = await nexoFetch(ctx.req, `/expenses/summary`, { method: "GET" });
+      return out?.data ?? out;
+    } catch {
+      // Fallback: calcula localmente se endpoint não existir no backend
+      const out = await nexoFetch(ctx.req, `/expenses?page=1&limit=1000`, { method: "GET" });
+      const rows = Array.isArray(out) ? out : Array.isArray(out?.data) ? out.data : [];
+      const totalExpenses = rows.reduce((acc: number, item: any) => acc + Number(item?.amount ?? 0), 0);
+      return { totalExpenses, count: rows.length };
+    }
   }),
+
+  /**
+   * Buscar despesa por ID
+   * Nest: GET /expenses/:id
+   */
   getById: protectedProcedure
     .input(z.object({ id: zId }))
     .query(async ({ input, ctx }) => {
-      return await nexoFetch(ctx, `/expenses/${input.id}`, { method: "GET" });
+      return await nexoFetch(ctx.req, `/expenses/${input.id}`, { method: "GET" });
     }),
 
+  /**
+   * Atualizar despesa
+   * Nest: PATCH /expenses/:id
+   */
   update: protectedProcedure
     .input(
       z.object({
@@ -134,7 +118,7 @@ export const expensesRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       const { id, ...data } = input;
-      return await nexoFetch(ctx, `/expenses/${id}`, {
+      return await nexoFetch(ctx.req, `/expenses/${id}`, {
         method: "PATCH",
         body: JSON.stringify({
           ...data,
@@ -144,9 +128,13 @@ export const expensesRouter = router({
       });
     }),
 
+  /**
+   * Deletar despesa
+   * Nest: DELETE /expenses/:id
+   */
   delete: protectedProcedure
     .input(z.object({ id: zId }))
     .mutation(async ({ input, ctx }) => {
-      return await nexoFetch(ctx, `/expenses/${input.id}`, { method: "DELETE" });
+      return await nexoFetch(ctx.req, `/expenses/${input.id}`, { method: "DELETE" });
     }),
 });

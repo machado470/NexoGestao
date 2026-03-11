@@ -381,5 +381,18 @@ export const dataRouter = router({
       .mutation(async ({ input, ctx }) => {
         return await nexoFetch(ctx, `/service-orders/${input.id}`, { method: "DELETE" });
       }),
+
+    /**
+     * Gera cobrança manualmente para uma OS finalizada.
+     * Nest: POST /service-orders/:id/generate-charge
+     * Idempotente: se já existe cobrança, atualiza se necessário.
+     */
+    generateCharge: protectedProcedure
+      .input(z.object({ id: zId }))
+      .mutation(async ({ input, ctx }) => {
+        return await nexoFetch(ctx, `/service-orders/${input.id}/generate-charge`, {
+          method: "POST",
+        });
+      }),
   }),
 });

@@ -75,4 +75,18 @@ export const peopleRouter = router({
     const raw = await nexoFetch<any>(ctx.req, `/people/stats/linked`, { method: "GET" });
     return raw?.data ?? raw;
   }),
+
+  /**
+   * Desativar pessoa (soft delete)
+   * Nest: DELETE /people/:id
+   * Regra de negócio: bloqueia se houver OS ativa vinculada à pessoa.
+   */
+  deactivate: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      const raw = await nexoFetch<any>(ctx.req, `/people/${input.id}`, {
+        method: "DELETE",
+      });
+      return raw?.data ?? raw;
+    }),
 });
