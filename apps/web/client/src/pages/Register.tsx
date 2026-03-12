@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function Register() {
-  const { loading, error, register } = useAuth();
+  const { isSubmitting, error, register } = useAuth();
   const [, navigate] = useLocation();
 
   const [formData, setFormData] = useState({
@@ -44,22 +44,30 @@ export default function Register() {
 
     try {
       await register({
-        orgName: formData.orgName,
-        adminName: formData.adminName,
-        email: formData.email,
+        orgName: formData.orgName.trim(),
+        adminName: formData.adminName.trim(),
+        email: formData.email.trim(),
         password: formData.password,
       });
+
       navigate("/onboarding");
-    } catch {
-      // estado de erro já tratado
+    } catch (err: any) {
+      const message =
+        typeof err?.message === "string" ? err.message : "Erro ao criar conta";
+      setLocalError(message);
     }
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6">
-      <form onSubmit={submit} className="w-full max-w-md rounded-2xl border p-6 dark:border-zinc-800">
+      <form
+        onSubmit={submit}
+        className="w-full max-w-md rounded-2xl border p-6 dark:border-zinc-800"
+      >
         <h1 className="mb-1 text-xl font-semibold">Criar conta</h1>
-        <p className="mb-4 text-sm opacity-80">Criamos sua empresa (tenant), usuário admin e sessão automaticamente.</p>
+        <p className="mb-4 text-sm opacity-80">
+          Criamos sua empresa (tenant), usuário admin e sessão automaticamente.
+        </p>
 
         <div className="space-y-3">
           <input
@@ -100,10 +108,10 @@ export default function Register() {
         </div>
 
         <button
-          disabled={loading}
+          disabled={isSubmitting}
           className="mt-4 w-full rounded-lg bg-black px-4 py-2 text-white disabled:opacity-50 dark:bg-white dark:text-black"
         >
-          {loading ? "Criando..." : "Criar conta"}
+          {isSubmitting ? "Criando..." : "Criar conta"}
         </button>
 
         {errorText ? <p className="mt-3 text-sm text-red-500">{errorText}</p> : null}

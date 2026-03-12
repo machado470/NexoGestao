@@ -4,46 +4,59 @@ import type { AppRouter } from "../../../server/routers";
 import type { inferRouterOutputs } from "@trpc/server";
 
 type RouterOutputs = inferRouterOutputs<AppRouter>;
-type SessionMeOutput = RouterOutputs["session"]["me"]; // pode ser null (se sem cookie/sem sessão)
+type SessionMeOutput = RouterOutputs["session"]["me"];
 type SessionPayload = Exclude<SessionMeOutput, null>;
 type SessionUser = SessionPayload["data"]["user"];
 
 interface AuthContextType {
   user: SessionUser | null;
   loading: boolean;
+  isInitializing: boolean;
+  isSubmitting: boolean;
   error: unknown | null;
   login: (email: string, password: string) => Promise<void>;
-  register: (payload: { orgName: string; adminName: string; email: string; password: string }) => Promise<void>;
+  register: (payload: {
+    orgName: string;
+    adminName: string;
+    email: string;
+    password: string;
+  }) => Promise<void>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
   refresh: () => Promise<void>;
-  payload: SessionMeOutput; // útil pra acessar operational/pending/assignments
+  payload: SessionMeOutput;
+  redirectTo: string;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const utils = trpc.useUtils();
+
   const [localLoading, setLocalLoading] = useState(false);
   const [localError, setLocalError] = useState<unknown | null>(null);
+  const [hasResolvedSession, setHasResolvedSession] = useState(false);
 
-  // Fonte única de verdade da sessão
   const meQuery = trpc.session.me.useQuery(undefined, {
     retry: false,
     refetchOnWindowFocus: false,
   });
 
-  // Login via proxy (define cookie httpOnly)
   const loginMutation = trpc.nexo.auth.login.useMutation();
-
-  // Register via canonical proxy route (cria tenant + admin)
   const registerMutation = trpc.nexo.bootstrap.firstAdmin.useMutation();
-
-  // Logout limpa cookie
   const logoutMutation = trpc.session.logout.useMutation();
 
+  useEffect(() => {
+    if (meQuery.isFetched || meQuery.error) {
+      setHasResolvedSession(true);
+    }
+  }, [meQuery.isFetched, meQuery.error]);
+
   const refresh = useCallback(async () => {
-    await meQuery.refetch();
-  }, [meQuery]);
+    setLocalError(null);
+    const result = await meQuery.refetch();
+    utils.session.me.setData(undefined, result.data ?? null);
+  }, [meQuery, utils]);
 
   const login = useCallback(
     async (email: string, password: string) => {
@@ -52,7 +65,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       try {
         await loginMutation.mutateAsync({ email, password });
-        await meQuery.refetch();
+
+        const result = await meQuery.refetch();
+        const nextPayload = result.data ?? null;
+        utils.session.me.setData(undefined, nextPayload);
+
+        const user = nextPayload?.data?.user ?? null;
+
+        if (!user) {
+          throw new Error("Sessão não foi carregada após o login.");
+        }
       } catch (err) {
         setLocalError(err);
         throw err;
@@ -60,19 +82,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLocalLoading(false);
       }
     },
-    [loginMutation, meQuery]
+    [loginMutation, meQuery, utils]
   );
 
-
   const register = useCallback(
-    async (payload: { orgName: string; adminName: string; email: string; password: string }) => {
+    async (payload: {
+      orgName: string;
+      adminName: string;
+      email: string;
+      password: string;
+    }) => {
       setLocalLoading(true);
       setLocalError(null);
 
       try {
         await registerMutation.mutateAsync(payload);
-        await loginMutation.mutateAsync({ email: payload.email, password: payload.password });
-        await meQuery.refetch();
+
+        await loginMutation.mutateAsync({
+          email: payload.email,
+          password: payload.password,
+        });
+
+        const result = await meQuery.refetch();
+        const nextPayload = result.data ?? null;
+        utils.session.me.setData(undefined, nextPayload);
+
+        const user = nextPayload?.data?.user ?? null;
+
+        if (!user) {
+          throw new Error("Conta criada, mas a sessão não foi carregada.");
+        }
       } catch (err) {
         setLocalError(err);
         throw err;
@@ -80,7 +119,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLocalLoading(false);
       }
     },
-    [registerMutation, loginMutation, meQuery]
+    [registerMutation, loginMutation, meQuery, utils]
   );
 
   const logout = useCallback(async () => {
@@ -89,15 +128,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       await logoutMutation.mutateAsync();
+      utils.session.me.setData(undefined, null);
       await meQuery.refetch();
+      utils.session.me.setData(undefined, null);
     } catch (err) {
       setLocalError(err);
+      throw err;
     } finally {
       setLocalLoading(false);
     }
-  }, [logoutMutation, meQuery]);
+  }, [logoutMutation, meQuery, utils]);
 
-  // session.me retorna { ok, data: {...} } | null
   const payload: SessionMeOutput = meQuery.data ?? null;
 
   const user: SessionUser | null = useMemo(() => {
@@ -105,16 +146,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return payload.data?.user ?? null;
   }, [payload]);
 
+  const redirectTo = useMemo(() => {
+    return payload?.data?.redirect ?? "/dashboard";
+  }, [payload]);
+
+  const isSubmitting =
+    localLoading ||
+    loginMutation.isPending ||
+    registerMutation.isPending ||
+    logoutMutation.isPending;
+
+  const isInitializing = !hasResolvedSession && meQuery.isLoading;
+  const loading = isInitializing || isSubmitting;
+
   const value: AuthContextType = useMemo(() => {
     return {
       user,
       payload,
-      loading:
-        localLoading ||
-        meQuery.isLoading ||
-        loginMutation.isPending ||
-        registerMutation.isPending ||
-        logoutMutation.isPending,
+      redirectTo,
+      loading,
+      isInitializing,
+      isSubmitting,
       error:
         localError ||
         meQuery.error ||
@@ -131,15 +183,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [
     user,
     payload,
-    localLoading,
+    redirectTo,
+    loading,
+    isInitializing,
+    isSubmitting,
     localError,
-    meQuery.isLoading,
     meQuery.error,
-    loginMutation.isPending,
     loginMutation.error,
-    registerMutation.isPending,
     registerMutation.error,
-    logoutMutation.isPending,
     logoutMutation.error,
     login,
     register,
@@ -147,10 +198,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     refresh,
   ]);
 
-  // Guarda payload completo da sessão (user + operational + pending + etc)
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
     try {
-      localStorage.setItem("manus-runtime-user-info", JSON.stringify(payload));
+      localStorage.setItem("nexogestao-session", JSON.stringify(payload));
     } catch {
       // ignore
     }

@@ -15,7 +15,6 @@ import NotFound from "./pages/NotFound";
 import CustomersPage from "./pages/CustomersPage";
 import AppointmentsPage from "./pages/AppointmentsPage";
 import ServiceOrdersPage from "./pages/ServiceOrdersPage";
-// import FinancesPage from "./pages/FinancesPage"; // Removido
 import PeoplePage from "./pages/PeoplePage";
 import GovernancePage from "./pages/GovernancePage";
 import FinancesPage from "./pages/FinancesPage";
@@ -37,23 +36,26 @@ import OperationsDashboardPage from "./pages/OperationsDashboardPage";
 import { Loader } from "lucide-react";
 import { NotificationCenter } from "./components/NotificationCenter";
 
-// Componente para proteger rotas autenticadas
+function FullScreenLoader() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+      <Loader className="w-8 h-8 animate-spin text-orange-500" />
+    </div>
+  );
+}
+
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, isInitializing } = useAuth();
   const [, navigate] = useLocation();
 
   useEffect(() => {
-    if (!loading && !isAuthenticated) {
+    if (!isInitializing && !isAuthenticated) {
       navigate("/login");
     }
-  }, [isAuthenticated, loading, navigate]);
+  }, [isAuthenticated, isInitializing, navigate]);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <Loader className="w-8 h-8 animate-spin text-orange-500" />
-      </div>
-    );
+  if (isInitializing) {
+    return <FullScreenLoader />;
   }
 
   if (!isAuthenticated) {
@@ -63,23 +65,18 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
   return <Component />;
 }
 
-// Componente para redirecionar se já autenticado
 function PublicRoute({ component: Component }: { component: React.ComponentType }) {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, isInitializing, redirectTo } = useAuth();
   const [, navigate] = useLocation();
 
   useEffect(() => {
-    if (!loading && isAuthenticated) {
-      navigate("/dashboard");
+    if (!isInitializing && isAuthenticated) {
+      navigate(redirectTo || "/dashboard");
     }
-  }, [isAuthenticated, loading, navigate]);
+  }, [isAuthenticated, isInitializing, redirectTo, navigate]);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <Loader className="w-8 h-8 animate-spin text-orange-500" />
-      </div>
-    );
+  if (isInitializing) {
+    return <FullScreenLoader />;
   }
 
   if (isAuthenticated) {
@@ -88,76 +85,94 @@ function PublicRoute({ component: Component }: { component: React.ComponentType 
 
   return <Component />;
 }
+
 function Router() {
-  // make sure to consider if you need authentication for certain routes
   return (
     <Switch>
       <Route path="/" component={() => <PublicRoute component={Landing} />} />
       <Route path="/login" component={() => <PublicRoute component={Login} />} />
       <Route path="/register" component={() => <PublicRoute component={Register} />} />
       <Route path="/onboarding" component={() => <ProtectedRoute component={Onboarding} />} />
-      <Route path="/dashboard" component={() => (
-        <ProtectedRoute component={() => <MainLayout><Dashboard /></MainLayout>} />
-      )} />
-      <Route path="/customers" component={() => (
-        <ProtectedRoute component={() => <MainLayout><CustomersPage /></MainLayout>} />
-      )} />
-      <Route path="/appointments" component={() => (
-        <ProtectedRoute component={() => <MainLayout><AppointmentsPage /></MainLayout>} />
-      )} />
-      <Route path="/service-orders" component={() => (
-        <ProtectedRoute component={() => <MainLayout><ServiceOrdersPage /></MainLayout>} />
-      )} />
-      <Route path="/finances" component={() => (
-        <ProtectedRoute component={() => <MainLayout><FinancesPage /></MainLayout>} />
-      )} />
-      <Route path="/people" component={() => (
-        <ProtectedRoute component={() => <MainLayout><PeoplePage /></MainLayout>} />
-      )} />
-      <Route path="/governance" component={() => (
-        <ProtectedRoute component={() => <MainLayout><GovernancePage /></MainLayout>} />
-      )} />
-      <Route path="/executive-dashboard" component={() => (
-        <ProtectedRoute component={() => <MainLayout><ExecutiveDashboard /></MainLayout>} />
-      )} />
-      <Route path="/executive-dashboard-new" component={() => (
-        <ProtectedRoute component={() => <MainLayout><ExecutiveDashboardNew /></MainLayout>} />
-      )} />
-      <Route path="/whatsapp" component={() => (
-        <ProtectedRoute component={() => <MainLayout><WhatsAppPage /></MainLayout>} />
-      )} />
-      <Route path="/launches" component={() => (
-        <ProtectedRoute component={() => <MainLayout><LaunchesPage /></MainLayout>} />
-      )} />
-      <Route path="/invoices" component={() => (
-        <ProtectedRoute component={() => <MainLayout><InvoicesPage /></MainLayout>} />
-      )} />
-      <Route path="/expenses" component={() => (
-        <ProtectedRoute component={() => <MainLayout><ExpensesPage /></MainLayout>} />
-      )} />
-      <Route path="/referrals" component={() => (
-        <ProtectedRoute component={() => <MainLayout><ReferralsPage /></MainLayout>} />
-      )} />
-      <Route path="/calendar" component={() => (
-        <ProtectedRoute component={() => <MainLayout><CalendarPage /></MainLayout>} />
-      )} />
-      <Route path="/settings" component={() => (
-        <ProtectedRoute component={() => <MainLayout><SettingsPage /></MainLayout>} />
-      )} />
-      <Route path="/timeline" component={() => (
-        <ProtectedRoute component={() => <MainLayout><TimelinePage /></MainLayout>} />
-      )} />
-      <Route path="/operations" component={() => (
-        <ProtectedRoute component={() => <MainLayout><OperationalWorkflowPage /></MainLayout>} />
-      )} />
-      <Route path="/dashboard/operations" component={() => (
-        <ProtectedRoute component={() => <MainLayout><OperationsDashboardPage /></MainLayout>} />
-      )} />
+      <Route
+        path="/dashboard"
+        component={() => <ProtectedRoute component={() => <MainLayout><Dashboard /></MainLayout>} />}
+      />
+      <Route
+        path="/customers"
+        component={() => <ProtectedRoute component={() => <MainLayout><CustomersPage /></MainLayout>} />}
+      />
+      <Route
+        path="/appointments"
+        component={() => <ProtectedRoute component={() => <MainLayout><AppointmentsPage /></MainLayout>} />}
+      />
+      <Route
+        path="/service-orders"
+        component={() => <ProtectedRoute component={() => <MainLayout><ServiceOrdersPage /></MainLayout>} />}
+      />
+      <Route
+        path="/finances"
+        component={() => <ProtectedRoute component={() => <MainLayout><FinancesPage /></MainLayout>} />}
+      />
+      <Route
+        path="/people"
+        component={() => <ProtectedRoute component={() => <MainLayout><PeoplePage /></MainLayout>} />}
+      />
+      <Route
+        path="/governance"
+        component={() => <ProtectedRoute component={() => <MainLayout><GovernancePage /></MainLayout>} />}
+      />
+      <Route
+        path="/executive-dashboard"
+        component={() => <ProtectedRoute component={() => <MainLayout><ExecutiveDashboard /></MainLayout>} />}
+      />
+      <Route
+        path="/executive-dashboard-new"
+        component={() => <ProtectedRoute component={() => <MainLayout><ExecutiveDashboardNew /></MainLayout>} />}
+      />
+      <Route
+        path="/whatsapp"
+        component={() => <ProtectedRoute component={() => <MainLayout><WhatsAppPage /></MainLayout>} />}
+      />
+      <Route
+        path="/launches"
+        component={() => <ProtectedRoute component={() => <MainLayout><LaunchesPage /></MainLayout>} />}
+      />
+      <Route
+        path="/invoices"
+        component={() => <ProtectedRoute component={() => <MainLayout><InvoicesPage /></MainLayout>} />}
+      />
+      <Route
+        path="/expenses"
+        component={() => <ProtectedRoute component={() => <MainLayout><ExpensesPage /></MainLayout>} />}
+      />
+      <Route
+        path="/referrals"
+        component={() => <ProtectedRoute component={() => <MainLayout><ReferralsPage /></MainLayout>} />}
+      />
+      <Route
+        path="/calendar"
+        component={() => <ProtectedRoute component={() => <MainLayout><CalendarPage /></MainLayout>} />}
+      />
+      <Route
+        path="/settings"
+        component={() => <ProtectedRoute component={() => <MainLayout><SettingsPage /></MainLayout>} />}
+      />
+      <Route
+        path="/timeline"
+        component={() => <ProtectedRoute component={() => <MainLayout><TimelinePage /></MainLayout>} />}
+      />
+      <Route
+        path="/operations"
+        component={() => <ProtectedRoute component={() => <MainLayout><OperationalWorkflowPage /></MainLayout>} />}
+      />
+      <Route
+        path="/dashboard/operations"
+        component={() => <ProtectedRoute component={() => <MainLayout><OperationsDashboardPage /></MainLayout>} />}
+      />
       <Route path="/forgot-password" component={() => <PublicRoute component={ForgotPasswordPage} />} />
       <Route path="/reset-password" component={() => <PublicRoute component={ResetPasswordPage} />} />
       <Route path="/about" component={() => <About />} />
       <Route path="/404" component={NotFound} />
-      {/* Final fallback route */}
       <Route component={NotFound} />
     </Switch>
   );

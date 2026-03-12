@@ -1,9 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { PlansService } from '../plans/plans.service'
-import { PlanName, Prisma, SubscriptionStatus } from '@prisma/client'
+import {
+  PlanName,
+  PrismaClient,
+  SubscriptionStatus,
+} from '@prisma/client'
 
-type DbClient = PrismaService | Prisma.TransactionClient
+type DbClient = PrismaService | PrismaClient
 
 @Injectable()
 export class SubscriptionsService {
