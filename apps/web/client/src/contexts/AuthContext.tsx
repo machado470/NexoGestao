@@ -43,7 +43,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
 
   const loginMutation = trpc.nexo.auth.login.useMutation();
-  const registerMutation = trpc.nexo.bootstrap.firstAdmin.useMutation();
+  const registerMutation = trpc.nexo.auth.register.useMutation();
   const logoutMutation = trpc.session.logout.useMutation();
 
   useEffect(() => {
@@ -64,7 +64,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLocalError(null);
 
       try {
-        await loginMutation.mutateAsync({ email, password });
+        await loginMutation.mutateAsync({
+          email: email.trim().toLowerCase(),
+          password,
+        });
 
         const result = await meQuery.refetch();
         const nextPayload = result.data ?? null;
@@ -96,10 +99,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLocalError(null);
 
       try {
-        await registerMutation.mutateAsync(payload);
-
-        await loginMutation.mutateAsync({
-          email: payload.email,
+        await registerMutation.mutateAsync({
+          orgName: payload.orgName.trim(),
+          adminName: payload.adminName.trim(),
+          email: payload.email.trim().toLowerCase(),
           password: payload.password,
         });
 
@@ -119,7 +122,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLocalLoading(false);
       }
     },
-    [registerMutation, loginMutation, meQuery, utils]
+    [registerMutation, meQuery, utils]
   );
 
   const logout = useCallback(async () => {

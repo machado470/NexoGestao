@@ -63,7 +63,7 @@ export default function OperationalWorkflowPage() {
 
   const openOrders = useMemo(() => {
     return serviceOrders.filter((item: any) =>
-      ["OPEN", "ASSIGNED", "IN_PROGRESS"].includes(String(item?.status ?? ""))
+      ["OPEN", "ASSIGNED", "IN_PROGRESS"].includes(String(item?.status ?? "")),
     );
   }, [serviceOrders]);
 
@@ -172,7 +172,7 @@ export default function OperationalWorkflowPage() {
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <div className="font-medium">
-                        {charge.description || "Cobrança"}
+                        {charge.notes || "Cobrança"}
                       </div>
                       <div className="text-sm text-muted-foreground">
                         {charge.customer?.name || "Sem cliente"} •{" "}
@@ -195,7 +195,7 @@ export default function OperationalWorkflowPage() {
                         onClick={() =>
                           void markChargePaid(
                             String(charge.id),
-                            Number(charge.amountCents ?? 0)
+                            Number(charge.amountCents ?? 0),
                           )
                         }
                         disabled={updateCharge.isPending}

@@ -2,6 +2,8 @@ import {
   Injectable,
   UnauthorizedException,
   Logger,
+  ConflictException,
+  BadRequestException,
 } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import * as bcrypt from 'bcrypt'
@@ -31,6 +33,117 @@ export class AuthService {
       this.logger.warn(
         'RESEND_API_KEY ausente. Recuperação por e-mail ficará desabilitada.',
       )
+    }
+  }
+
+  private slugify(input: string) {
+    const s = (input ?? '').trim().toLowerCase()
+
+    const normalized = s
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .replace(/-+/g, '-')
+
+    return normalized || 'org'
+  }
+
+  private async uniqueOrgSlug(base: string) {
+    let slug = base
+    let i = 0
+
+    while (true) {
+      const exists = await this.prisma.organization.findUnique({
+        where: { slug },
+        select: { id: true },
+      })
+
+      if (!exists) return slug
+
+      i++
+      slug = `${base}-${i}`
+    }
+  }
+
+  async register(params: {
+    orgName: string
+    adminName: string
+    email: string
+    password: string
+  }) {
+    const orgName = (params.orgName ?? '').trim()
+    const adminName = (params.adminName ?? '').trim()
+    const email = (params.email ?? '').trim().toLowerCase()
+    const password = params.password ?? ''
+
+    if (!orgName) {
+      throw new BadRequestException('Nome da empresa é obrigatório')
+    }
+
+    if (!adminName) {
+      throw new BadRequestException('Nome do administrador é obrigatório')
+    }
+
+    if (!email) {
+      throw new BadRequestException('Email é obrigatório')
+    }
+
+    if (password.length < 8) {
+      throw new BadRequestException('A senha precisa ter ao menos 8 caracteres')
+    }
+
+    const emailInUse = await this.prisma.user.findUnique({
+      where: { email },
+      select: { id: true },
+    })
+
+    if (emailInUse) {
+      throw new ConflictException('Email já cadastrado')
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10)
+    const baseSlug = this.slugify(orgName)
+    const slug = await this.uniqueOrgSlug(baseSlug)
+
+    const createdUser = await this.prisma.$transaction(async (tx) => {
+      const org = await tx.organization.create({
+        data: {
+          name: orgName,
+          slug,
+          requiresOnboarding: true,
+        },
+      })
+
+      const user = await tx.user.create({
+        data: {
+          email,
+          password: passwordHash,
+          role: 'ADMIN',
+          active: true,
+          orgId: org.id,
+          person: {
+            create: {
+              name: adminName,
+              email,
+              role: 'ADMIN',
+              active: true,
+              orgId: org.id,
+            },
+          },
+        },
+        include: {
+          person: true,
+        },
+      })
+
+      return user
+    })
+
+    return {
+      success: true,
+      message: 'Conta criada com sucesso.',
+      ...this.generateToken(createdUser),
     }
   }
 
@@ -66,6 +179,7 @@ export class AuthService {
               name: `${googleUser.firstName} ${googleUser.lastName}`,
               email: googleUser.email,
               role: 'ADMIN',
+              active: true,
               orgId: org.id,
             },
           },
@@ -97,8 +211,10 @@ export class AuthService {
   }
 
   async forgotPassword(email: string) {
+    const normalizedEmail = (email ?? '').trim().toLowerCase()
+
     const user = await this.prisma.user.findUnique({
-      where: { email },
+      where: { email: normalizedEmail },
     })
 
     if (!user) {
@@ -113,14 +229,14 @@ export class AuthService {
     expiresAt.setHours(expiresAt.getHours() + 1)
 
     const frontendUrl =
-      this.config.get<string>('FRONTEND_URL') || 'http://localhost:3000'
-    const resetLink = `${frontendUrl}/auth/reset-password?token=${token}`
+      this.config.get<string>('FRONTEND_URL') || 'http://localhost:3001'
+    const resetLink = `${frontendUrl}/reset-password?token=${token}`
 
     if (this.resend) {
       try {
         await this.resend.emails.send({
           from: this.config.get<string>('EMAIL_FROM') || 'onboarding@resend.dev',
-          to: email,
+          to: normalizedEmail,
           subject: 'Recuperação de Senha - NexoGestao',
           html: `<p>Você solicitou a recuperação de senha. Clique no link abaixo para redefinir:</p><a href="${resetLink}">${resetLink}</a><p>Este link expira em 1 hora.</p>`,
         })
@@ -133,7 +249,7 @@ export class AuthService {
       }
     } else {
       this.logger.warn(
-        `Recuperação de senha solicitada para ${email}, mas o Resend não está configurado.`,
+        `Recuperação de senha solicitada para ${normalizedEmail}, mas o Resend não está configurado.`,
       )
     }
 
@@ -152,6 +268,10 @@ export class AuthService {
   }
 
   async resetPassword(token: string, password: string) {
+    if (!password || password.length < 8) {
+      throw new BadRequestException('A senha precisa ter ao menos 8 caracteres')
+    }
+
     const user = await this.prisma.user.findFirst({
       where: {
         resetToken: token,
@@ -180,8 +300,10 @@ export class AuthService {
   }
 
   async login(email: string, password: string) {
+    const normalizedEmail = (email ?? '').trim().toLowerCase()
+
     const user = await this.prisma.user.findUnique({
-      where: { email },
+      where: { email: normalizedEmail },
       include: { person: true },
     })
 

@@ -13,12 +13,39 @@ function getNexoTokenFromReq(req: any): string | null {
   return token || null;
 }
 
+function extractErrorMessage(body: any, status: number): string {
+  if (!body) return `Nexo API error ${status}`;
+
+  if (typeof body === "string" && body.trim()) {
+    return body;
+  }
+
+  if (Array.isArray(body?.message)) {
+    return body.message.join(", ");
+  }
+
+  if (typeof body?.message === "string" && body.message.trim()) {
+    return body.message;
+  }
+
+  if (typeof body?.error === "string" && body.error.trim()) {
+    return body.error;
+  }
+
+  if (typeof body?.data?.message === "string" && body.data.message.trim()) {
+    return body.data.message;
+  }
+
+  return `Nexo API error ${status}`;
+}
+
 export class NexoHttpError extends Error {
   status: number;
   body: any;
 
   constructor(status: number, body: any) {
-    super(`Nexo API error ${status}`);
+    super(extractErrorMessage(body, status));
+    this.name = "NexoHttpError";
     this.status = status;
     this.body = body;
   }
@@ -27,7 +54,7 @@ export class NexoHttpError extends Error {
 /**
  * Faz fetch pro Nest com Bearer token vindo do cookie httpOnly (nexo_token).
  * - Se não tiver token, retorna null (pra rotas que aceitam anon).
- * - Se tiver token mas API falhar, lança NexoHttpError.
+ * - Se tiver token mas API falhar, lança NexoHttpError com a mensagem real.
  */
 export async function nexoFetch<T>(
   req: any,
@@ -38,7 +65,6 @@ export async function nexoFetch<T>(
 
   if (!token) {
     if (init?.allowAnonymous) return null;
-    // Sem token = sem sessão
     return null;
   }
 
@@ -52,6 +78,7 @@ export async function nexoFetch<T>(
   });
 
   const text = await res.text();
+
   let body: any = null;
   try {
     body = text ? JSON.parse(text) : null;

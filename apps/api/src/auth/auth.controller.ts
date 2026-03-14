@@ -1,13 +1,27 @@
 import { Body, Controller, Post, Get, UseGuards, Request, Res } from '@nestjs/common'
 import { AuthGuard } from '@nestjs/passport'
 import { AuthService } from './auth.service'
-import { JwtAuthGuard } from './guards/jwt-auth.guard'
 import { Public } from './decorators/public.decorator'
 import { Throttle } from '@nestjs/throttler'
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
+
+  @Public()
+  @Post('register')
+  @Throttle({ short: { limit: 5, ttl: 60000 } })
+  async register(
+    @Body()
+    body: {
+      orgName: string
+      adminName: string
+      email: string
+      password: string
+    },
+  ) {
+    return this.auth.register(body)
+  }
 
   @Public()
   @Post('login')
@@ -28,12 +42,9 @@ export class AuthController {
   @UseGuards(AuthGuard('google'))
   async googleAuthRedirect(@Request() req, @Res() res) {
     const result = await this.auth.validateGoogleUser(req.user)
-    // Redirecionar para o frontend com o token
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000'
     return res.redirect(`${frontendUrl}/auth/callback?token=${result.token}`)
   }
-
-
 
   @Public()
   @Post('forgot-password')

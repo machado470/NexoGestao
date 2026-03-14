@@ -1,7 +1,13 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, AlertCircle } from "lucide-react";
 
@@ -9,7 +15,6 @@ export default function FinancesPage() {
   const [page, setPage] = useState(1);
   const limit = 20;
 
-  // Queries
   const chargesQuery = trpc.finance.charges.list.useQuery({ page, limit });
   const statsQuery = trpc.finance.charges.stats.useQuery({});
 
@@ -53,76 +58,95 @@ export default function FinancesPage() {
 
   const stats = statsQuery.data;
   const charges = chargesQuery.data?.data || [];
-  const pagination = chargesQuery.data?.pagination || { page: 1, limit: 20, total: 0, pages: 1 };
+  const pagination = chargesQuery.data?.pagination || {
+    page: 1,
+    limit: 20,
+    total: 0,
+    pages: 1,
+  };
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Financeiro</h1>
-        <p className="text-gray-600 dark:text-gray-400">Gestao de cobrancas e receitas</p>
+        <p className="text-gray-600 dark:text-gray-400">
+          Gestão de cobranças e receitas
+        </p>
       </div>
 
-      {/* Summary Cards */}
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Total de Cobrancas</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Total de Cobranças
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-blue-600">
                 {stats.totalCharges}
               </div>
-              <p className="text-xs text-gray-500 mt-1">Todas as cobrancas</p>
+              <p className="mt-1 text-xs text-gray-500">Todas as cobranças</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Cobrancas Pagas</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Cobranças Pagas
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-600">
                 R$ {Number(stats.totalPaidAmount || 0).toFixed(2)}
               </div>
-              <p className="text-xs text-gray-500 mt-1">{stats.totalPaid} cobrancas</p>
+              <p className="mt-1 text-xs text-gray-500">
+                {stats.totalPaid} cobranças
+              </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Cobrancas Pendentes</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Cobranças Pendentes
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-yellow-600">
                 R$ {Number(stats.totalPendingAmount || 0).toFixed(2)}
               </div>
-              <p className="text-xs text-gray-500 mt-1">{stats.totalPending} cobrancas</p>
+              <p className="mt-1 text-xs text-gray-500">
+                {stats.totalPending} cobranças
+              </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Cobrancas Vencidas</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Cobranças Vencidas
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-red-600">
                 R$ {Number(stats.totalOverdueAmount || 0).toFixed(2)}
               </div>
-              <p className="text-xs text-gray-500 mt-1">{stats.totalOverdue} cobrancas</p>
+              <p className="mt-1 text-xs text-gray-500">
+                {stats.totalOverdue} cobranças
+              </p>
             </CardContent>
           </Card>
         </div>
       )}
 
-      {/* Overdue Alert */}
       {stats && stats.totalOverdue > 0 && (
-        <Card className="border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20">
+        <Card className="border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20">
           <CardHeader>
             <div className="flex items-center gap-2">
-              <AlertCircle className="w-5 h-5 text-red-600" />
+              <AlertCircle className="h-5 w-5 text-red-600" />
               <CardTitle className="text-red-900 dark:text-red-400">
-                {stats.totalOverdue} Cobrancas Vencidas
+                {stats.totalOverdue} Cobranças Vencidas
               </CardTitle>
             </div>
           </CardHeader>
@@ -134,43 +158,45 @@ export default function FinancesPage() {
         </Card>
       )}
 
-      {/* Charges List */}
       <Card>
         <CardHeader>
-          <CardTitle>Cobrancas</CardTitle>
+          <CardTitle>Cobranças</CardTitle>
           <CardDescription>
-            Pagina {pagination.page} de {pagination.pages}
+            Página {pagination.page} de {pagination.pages}
           </CardDescription>
         </CardHeader>
+
         <CardContent>
-          {charges && charges.length > 0 ? (
+          {charges.length > 0 ? (
             <div className="space-y-4">
               {charges.map((charge: any) => (
                 <div
                   key={charge.id}
-                  className="border rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition"
+                  className="rounded-lg border p-4 transition hover:bg-gray-50 dark:hover:bg-gray-800/50"
                 >
-                  <div className="flex items-start justify-between gap-4 mb-3">
+                  <div className="mb-3 flex items-start justify-between gap-4">
                     <div className="flex-1">
                       <h3 className="font-semibold text-gray-900 dark:text-white">
-                        {charge.description || `Cobranca #${charge.id}`}
+                        {charge.notes || `Cobrança #${charge.id}`}
                       </h3>
-                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                        Cliente: {charge.customerName || "N/A"}
+                      <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                        Cliente: {charge.customer?.name || "N/A"}
                       </p>
                     </div>
+
                     <Badge className={getStatusColor(charge.status)}>
                       {getStatusLabel(charge.status)}
                     </Badge>
                   </div>
 
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                  <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-3">
                     <div>
                       <p className="text-gray-600 dark:text-gray-400">Valor</p>
                       <p className="font-semibold text-gray-900 dark:text-white">
-                        R$ {Number(charge.amount || 0).toFixed(2)}
+                        R$ {(Number(charge.amountCents || 0) / 100).toFixed(2)}
                       </p>
                     </div>
+
                     <div>
                       <p className="text-gray-600 dark:text-gray-400">Vencimento</p>
                       <p className="font-semibold text-gray-900 dark:text-white">
@@ -179,32 +205,20 @@ export default function FinancesPage() {
                           : "N/A"}
                       </p>
                     </div>
-                    {charge.paidDate && (
+
+                    {charge.paidAt && (
                       <div>
                         <p className="text-gray-600 dark:text-gray-400">Pagamento</p>
                         <p className="font-semibold text-green-600">
-                          {new Date(charge.paidDate).toLocaleDateString("pt-BR")}
+                          {new Date(charge.paidAt).toLocaleDateString("pt-BR")}
                         </p>
                       </div>
                     )}
-                    <div>
-                      <p className="text-gray-600 dark:text-gray-400">Metodo</p>
-                      <p className="font-semibold text-gray-900 dark:text-white">
-                        {charge.paymentMethod || "N/A"}
-                      </p>
-                    </div>
                   </div>
-
-                  {charge.notes && (
-                    <div className="mt-3 p-2 bg-gray-100 dark:bg-gray-700/50 rounded text-sm text-gray-700 dark:text-gray-300">
-                      {charge.notes}
-                    </div>
-                  )}
                 </div>
               ))}
 
-              {/* Pagination */}
-              <div className="flex justify-between items-center mt-6 pt-4 border-t">
+              <div className="mt-6 flex items-center justify-between border-t pt-4">
                 <Button
                   onClick={() => setPage(Math.max(1, page - 1))}
                   disabled={page === 1}
@@ -212,21 +226,23 @@ export default function FinancesPage() {
                 >
                   Anterior
                 </Button>
+
                 <span className="text-sm text-gray-600">
-                  Pagina {pagination.page} de {pagination.pages}
+                  Página {pagination.page} de {pagination.pages}
                 </span>
+
                 <Button
                   onClick={() => setPage(page + 1)}
                   disabled={page >= pagination.pages}
                   variant="outline"
                 >
-                  Proxima
+                  Próxima
                 </Button>
               </div>
             </div>
           ) : (
-            <div className="text-center py-8 text-gray-500">
-              Nenhuma cobranca encontrada
+            <div className="py-8 text-center text-gray-500">
+              Nenhuma cobrança encontrada
             </div>
           )}
         </CardContent>

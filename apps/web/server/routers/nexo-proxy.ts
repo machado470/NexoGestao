@@ -101,6 +101,35 @@ export const nexoProxyRouter = router({
   }),
 
   auth: router({
+    register: publicProcedure
+      .input(
+        z.object({
+          orgName: z.string().min(1),
+          adminName: z.string().min(1),
+          email: z.string().email(),
+          password: z.string().min(8),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const result = await nexoFetch("/auth/register", {
+          method: "POST",
+          body: JSON.stringify(input),
+        });
+
+        const token =
+          result?.data?.token ||
+          result?.token ||
+          result?.accessToken ||
+          result?.data?.accessToken;
+
+        if (!token) {
+          throw new Error("Cadastro não retornou token.");
+        }
+
+        setTokenCookie(ctx as CtxLike, token);
+        return result;
+      }),
+
     login: publicProcedure
       .input(z.object({ email: z.string().email(), password: z.string() }))
       .mutation(async ({ input, ctx }) => {
@@ -138,7 +167,7 @@ export const nexoProxyRouter = router({
       }),
 
     resetPassword: publicProcedure
-      .input(z.object({ token: z.string(), password: z.string() }))
+      .input(z.object({ token: z.string(), password: z.string().min(8) }))
       .mutation(async ({ input }) => {
         return await nexoFetch("/auth/reset-password", {
           method: "POST",

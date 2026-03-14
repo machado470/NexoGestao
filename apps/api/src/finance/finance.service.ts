@@ -82,7 +82,8 @@ export class FinanceService {
           entityId: charge.id,
           messageType: 'PAYMENT_REMINDER',
           messageKey: `charge:${charge.id}:overdue`,
-          renderedText: 'Sua cobrança está em atraso. Regularize para evitar bloqueios.',
+          renderedText:
+            'Sua cobrança está em atraso. Regularize para evitar bloqueios.',
         })
       }
 
@@ -580,10 +581,10 @@ export class FinanceService {
   }
 
   async listCharges(orgId: string, query?: ChargesQueryDto) {
-    const status = query?.status
+    const page = query?.page ?? 1
     const rawLimit = query?.limit
+    const status = query?.status
     const q = (query?.q ?? '').trim()
-    const cursor = (query?.cursor ?? '').trim() || undefined
     const orderBy = query?.orderBy ?? 'createdAt'
     const direction = query?.direction ?? 'desc'
 
@@ -592,30 +593,17 @@ export class FinanceService {
       if (!Number.isFinite(rawLimit)) {
         throw new BadRequestException('limit inválido')
       }
-      if (rawLimit < 0) throw new BadRequestException('limit não pode ser negativo')
-      if (rawLimit > 100) throw new BadRequestException('limit máximo é 100')
+      if (rawLimit < 1) {
+        throw new BadRequestException('limit mínimo é 1')
+      }
+      if (rawLimit > 100) {
+        throw new BadRequestException('limit máximo é 100')
+      }
       limit = rawLimit
     }
 
-    if (limit === 0) {
-      return {
-        items: [],
-        meta: {
-          limit,
-          orderBy,
-          direction,
-          hasMore: false,
-          nextCursor: null,
-        },
-      }
-    }
-
-    if (cursor) {
-      const exists = await this.prisma.charge.findFirst({
-        where: { id: cursor, orgId },
-        select: { id: true },
-      })
-      if (!exists) throw new BadRequestException('cursor inválido')
+    if (!Number.isFinite(page) || page < 1) {
+      throw new BadRequestException('page inválida')
     }
 
     const where: any = {
@@ -657,44 +645,46 @@ export class FinanceService {
       order.push({ id: 'desc' })
     }
 
-    const take = limit + 1
+    const skip = (page - 1) * limit
 
-    const rows = await this.prisma.charge.findMany({
-      where,
-      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-      orderBy: order,
-      take,
-      select: {
-        id: true,
-        serviceOrderId: true,
-        customerId: true,
-        amountCents: true,
-        status: true,
-        dueDate: true,
-        createdAt: true,
-        customer: {
-          select: { id: true, name: true, phone: true },
+    const [total, items] = await Promise.all([
+      this.prisma.charge.count({ where }),
+      this.prisma.charge.findMany({
+        where,
+        orderBy: order,
+        skip,
+        take: limit,
+        select: {
+          id: true,
+          serviceOrderId: true,
+          customerId: true,
+          amountCents: true,
+          status: true,
+          dueDate: true,
+          paidAt: true,
+          createdAt: true,
+          notes: true,
+          customer: {
+            select: { id: true, name: true, phone: true },
+          },
+          serviceOrder: {
+            select: { id: true, title: true, status: true },
+          },
         },
-        serviceOrder: {
-          select: { id: true, title: true, status: true },
-        },
-      },
-    })
+      }),
+    ])
 
-    const hasMore = rows.length > limit
-    const items = hasMore ? rows.slice(0, limit) : rows
-
-    const nextCursor =
-      hasMore && items.length ? items[items.length - 1].id : null
+    const pages = Math.max(1, Math.ceil(total / limit))
 
     return {
       items,
       meta: {
+        page,
         limit,
+        total,
+        pages,
         orderBy,
         direction,
-        hasMore,
-        nextCursor,
       },
     }
   }

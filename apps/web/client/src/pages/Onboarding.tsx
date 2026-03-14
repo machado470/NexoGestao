@@ -31,11 +31,9 @@ export default function Onboarding() {
 
   const [companyName, setCompanyName] = useState("");
   const [customerName, setCustomerName] = useState("");
-  const [appointmentTitle, setAppointmentTitle] =
-    useState("Primeiro atendimento");
-  const [serviceOrderTitle, setServiceOrderTitle] = useState(
-    "Primeira ordem de serviço"
-  );
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [appointmentNotes, setAppointmentNotes] = useState("Primeiro atendimento");
+  const [serviceOrderTitle, setServiceOrderTitle] = useState("Primeira ordem de serviço");
   const [chargeAmount, setChargeAmount] = useState("150");
 
   const storageKey = useMemo(
@@ -47,11 +45,11 @@ export default function Onboarding() {
   const appointmentsQuery = trpc.nexo.appointments.list.useQuery({
     page: 1,
     limit: 20,
-  });
+  } as any);
   const serviceOrdersQuery = trpc.nexo.serviceOrders.list.useQuery({
     page: 1,
     limit: 20,
-  });
+  } as any);
   const chargesQuery = trpc.finance.charges.list.useQuery({
     page: 1,
     limit: 20,
@@ -81,22 +79,30 @@ export default function Onboarding() {
   }, [progress, storageKey]);
 
   useEffect(() => {
-    const hasCustomer =
-      ((customersQuery.data as any)?.data ?? customersQuery.data ?? []).length >
-      0;
+    const customersPayload =
+      (customersQuery.data as any)?.data ?? customersQuery.data ?? [];
+    const appointmentsPayload =
+      (appointmentsQuery.data as any)?.data ??
+      (appointmentsQuery.data as any)?.items ??
+      appointmentsQuery.data ??
+      [];
+    const serviceOrdersPayload =
+      (serviceOrdersQuery.data as any)?.data ??
+      (serviceOrdersQuery.data as any)?.items ??
+      serviceOrdersQuery.data ??
+      [];
+    const chargesPayload =
+      (chargesQuery.data as any)?.data ??
+      (chargesQuery.data as any)?.items ??
+      chargesQuery.data ??
+      [];
 
+    const hasCustomer = Array.isArray(customersPayload) && customersPayload.length > 0;
     const hasAppointment =
-      ((appointmentsQuery.data as any)?.data ??
-        appointmentsQuery.data ??
-        []).length > 0;
-
+      Array.isArray(appointmentsPayload) && appointmentsPayload.length > 0;
     const hasServiceOrder =
-      ((serviceOrdersQuery.data as any)?.data ??
-        serviceOrdersQuery.data ??
-        []).length > 0;
-
-    const hasCharge =
-      ((chargesQuery.data as any)?.data ?? chargesQuery.data ?? []).length > 0;
+      Array.isArray(serviceOrdersPayload) && serviceOrdersPayload.length > 0;
+    const hasCharge = Array.isArray(chargesPayload) && chargesPayload.length > 0;
 
     setProgress((prev) => ({
       ...prev,
@@ -112,11 +118,8 @@ export default function Onboarding() {
     chargesQuery.data,
   ]);
 
-  const firstCustomer = (
-    (customersQuery.data as any)?.data ??
-    customersQuery.data ??
-    []
-  )[0];
+  const firstCustomer =
+    ((customersQuery.data as any)?.data ?? customersQuery.data ?? [])[0];
 
   const canRun = {
     company: true,
@@ -135,7 +138,7 @@ export default function Onboarding() {
   };
 
   return (
-    <div className="min-h-screen p-6 bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-gray-50 p-6 dark:bg-gray-900">
       <div className="mx-auto max-w-3xl space-y-4">
         <h1 className="text-2xl font-bold">Onboarding guiado (piloto)</h1>
         <p className="text-sm opacity-75">
@@ -148,7 +151,7 @@ export default function Onboarding() {
           </div>
         )}
 
-        <section className="rounded-xl border p-4 bg-white dark:bg-zinc-900">
+        <section className="rounded-xl border bg-white p-4 dark:bg-zinc-900">
           <h2 className="font-semibold">1) Perfil da empresa</h2>
           <input
             className="mt-2 w-full rounded border p-2 dark:bg-zinc-950"
@@ -158,11 +161,7 @@ export default function Onboarding() {
           />
           <Button
             className="mt-2"
-            disabled={
-              !canRun.company ||
-              progress.company ||
-              companyMutation.isPending
-            }
+            disabled={!canRun.company || progress.company || companyMutation.isPending}
             onClick={async () => {
               setError(null);
 
@@ -185,21 +184,30 @@ export default function Onboarding() {
           </Button>
         </section>
 
-        <section className="rounded-xl border p-4 bg-white dark:bg-zinc-900">
+        <section className="rounded-xl border bg-white p-4 dark:bg-zinc-900">
           <h2 className="font-semibold">2) Primeiro cliente</h2>
+
           <input
             className="mt-2 w-full rounded border p-2 dark:bg-zinc-950"
             placeholder="Nome do cliente"
             value={customerName}
             onChange={(e) => setCustomerName(e.target.value)}
           />
+
+          <input
+            className="mt-2 w-full rounded border p-2 dark:bg-zinc-950"
+            placeholder="Telefone (WhatsApp)"
+            value={customerPhone}
+            onChange={(e) => setCustomerPhone(e.target.value)}
+          />
+
+          <p className="mt-1 text-xs opacity-70">
+            Pode informar com +55 ou só números. O backend normaliza.
+          </p>
+
           <Button
             className="mt-2"
-            disabled={
-              !canRun.customer ||
-              progress.customer ||
-              customerMutation.isPending
-            }
+            disabled={!canRun.customer || progress.customer || customerMutation.isPending}
             onClick={async () => {
               setError(null);
 
@@ -208,8 +216,13 @@ export default function Onboarding() {
                   throw new Error("Informe o nome do cliente.");
                 }
 
+                if (!customerPhone.trim()) {
+                  throw new Error("Informe o telefone do cliente.");
+                }
+
                 await customerMutation.mutateAsync({
                   name: customerName.trim(),
+                  phone: customerPhone.trim(),
                 });
 
                 await utils.nexo.customers.list.invalidate();
@@ -223,12 +236,13 @@ export default function Onboarding() {
           </Button>
         </section>
 
-        <section className="rounded-xl border p-4 bg-white dark:bg-zinc-900">
+        <section className="rounded-xl border bg-white p-4 dark:bg-zinc-900">
           <h2 className="font-semibold">3) Primeiro agendamento</h2>
           <input
             className="mt-2 w-full rounded border p-2 dark:bg-zinc-950"
-            value={appointmentTitle}
-            onChange={(e) => setAppointmentTitle(e.target.value)}
+            value={appointmentNotes}
+            onChange={(e) => setAppointmentNotes(e.target.value)}
+            placeholder="Observação do agendamento"
           />
           <Button
             className="mt-2"
@@ -245,10 +259,15 @@ export default function Onboarding() {
                   throw new Error("Crie um cliente primeiro.");
                 }
 
+                const startsAt = new Date();
+                const endsAt = new Date(startsAt.getTime() + 30 * 60 * 1000);
+
                 await appointmentMutation.mutateAsync({
                   customerId: String(firstCustomer.id),
-                  title: appointmentTitle.trim(),
-                  startsAt: new Date().toISOString(),
+                  startsAt: startsAt.toISOString(),
+                  endsAt: endsAt.toISOString(),
+                  notes: appointmentNotes.trim() || "Primeiro atendimento",
+                  status: "SCHEDULED",
                 });
 
                 await utils.nexo.appointments.list.invalidate();
@@ -262,7 +281,7 @@ export default function Onboarding() {
           </Button>
         </section>
 
-        <section className="rounded-xl border p-4 bg-white dark:bg-zinc-900">
+        <section className="rounded-xl border bg-white p-4 dark:bg-zinc-900">
           <h2 className="font-semibold">4) Primeira ordem de serviço</h2>
           <input
             className="mt-2 w-full rounded border p-2 dark:bg-zinc-950"
@@ -284,10 +303,14 @@ export default function Onboarding() {
                   throw new Error("Crie um cliente primeiro.");
                 }
 
+                if (!serviceOrderTitle.trim()) {
+                  throw new Error("Informe o título da ordem de serviço.");
+                }
+
                 await serviceOrderMutation.mutateAsync({
                   customerId: String(firstCustomer.id),
                   title: serviceOrderTitle.trim(),
-                  priority: "MEDIUM",
+                  priority: 2,
                 });
 
                 await utils.nexo.serviceOrders.list.invalidate();
@@ -301,7 +324,7 @@ export default function Onboarding() {
           </Button>
         </section>
 
-        <section className="rounded-xl border p-4 bg-white dark:bg-zinc-900">
+        <section className="rounded-xl border bg-white p-4 dark:bg-zinc-900">
           <h2 className="font-semibold">5) Primeira cobrança</h2>
           <input
             className="mt-2 w-full rounded border p-2 dark:bg-zinc-950"
@@ -312,9 +335,7 @@ export default function Onboarding() {
           />
           <Button
             className="mt-2"
-            disabled={
-              !canRun.charge || progress.charge || chargeMutation.isPending
-            }
+            disabled={!canRun.charge || progress.charge || chargeMutation.isPending}
             onClick={async () => {
               setError(null);
 
@@ -330,9 +351,9 @@ export default function Onboarding() {
 
                 await chargeMutation.mutateAsync({
                   customerId: String(firstCustomer.id),
-                  description: "Primeira cobrança",
                   amount,
                   dueDate: new Date(),
+                  notes: "Primeira cobrança",
                 });
 
                 await utils.finance.charges.list.invalidate();

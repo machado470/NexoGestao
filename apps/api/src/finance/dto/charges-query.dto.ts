@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer'
-import { IsIn, IsNumber, IsOptional, IsString, IsUUID } from 'class-validator'
+import { IsIn, IsNumber, IsOptional, IsString, IsUUID, Min } from 'class-validator'
 
 const ALLOWED_STATUSES = ['PENDING', 'OVERDUE', 'PAID', 'CANCELED'] as const
 const ALLOWED_ORDER_BY = ['createdAt', 'dueDate', 'amountCents'] as const
@@ -18,6 +18,17 @@ export class ChargesQueryDto {
     return Number.isFinite(n) ? n : value
   })
   @IsNumber()
+  @Min(1)
+  page?: number
+
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === undefined || value === null || value === '') return undefined
+    const n = Number(value)
+    return Number.isFinite(n) ? n : value
+  })
+  @IsNumber()
+  @Min(1)
   limit?: number
 
   @IsOptional()
