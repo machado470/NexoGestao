@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { useAuth } from "@/_core/hooks/useAuth";
-import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import {
   Menu,
@@ -48,9 +47,12 @@ export default function Home() {
     }
   };
 
-  const handleLogout = () => {
-    logout();
-    navigate("/");
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } finally {
+      navigate("/");
+    }
   };
 
   const menuItems = [
@@ -65,13 +67,11 @@ export default function Home() {
 
   return (
     <div className={`${darkMode ? "dark" : ""} min-h-screen bg-gray-50 dark:bg-gray-900`}>
-      {/* Sidebar */}
       <div
         className={`fixed left-0 top-0 h-full bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transition-all duration-300 z-40 ${
           sidebarOpen ? "w-64" : "w-20"
         }`}
       >
-        {/* Logo */}
         <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
           {sidebarOpen && (
             <div className="flex items-center space-x-2">
@@ -89,7 +89,6 @@ export default function Home() {
           </button>
         </div>
 
-        {/* Menu Items */}
         <nav className="p-4 space-y-2">
           {menuItems.map((item) => {
             const Icon = item.icon;
@@ -110,7 +109,6 @@ export default function Home() {
           })}
         </nav>
 
-        {/* Bottom Actions */}
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 dark:border-gray-700 space-y-2">
           <button
             onClick={toggleTheme}
@@ -120,7 +118,7 @@ export default function Home() {
             {sidebarOpen && <span className="text-sm font-medium">Tema</span>}
           </button>
           <button
-            onClick={handleLogout}
+            onClick={() => void handleLogout()}
             className="w-full flex items-center space-x-3 px-4 py-2 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
           >
             <LogOut className="w-5 h-5" />
@@ -129,9 +127,7 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Main Content */}
       <div className={`transition-all duration-300 ${sidebarOpen ? "ml-64" : "ml-20"}`}>
-        {/* Header */}
         <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
@@ -146,12 +142,9 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Content */}
         <div className="p-6">
-          {/* Overview Tab */}
           {activeTab === "overview" && (
             <div className="space-y-6">
-              {/* Stats Grid */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border-l-4 border-orange-500">
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Plataforma Ativa</p>
@@ -171,7 +164,6 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Info Card */}
               <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
                 <div className="flex items-start gap-3">
                   <AlertCircle className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
@@ -180,7 +172,7 @@ export default function Home() {
                       Plataforma em Desenvolvimento
                     </h3>
                     <p className="text-sm text-blue-800 dark:text-blue-400">
-                      O proxy de API está sendo configurado para conectar com a API do NexoGestao. 
+                      O proxy de API está sendo configurado para conectar com a API do NexoGestao.
                       Todas as funcionalidades estarão disponíveis em breve!
                     </p>
                   </div>
@@ -189,7 +181,6 @@ export default function Home() {
             </div>
           )}
 
-          {/* Other Tabs */}
           {activeTab !== "overview" && (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
               <div className="text-center py-12">

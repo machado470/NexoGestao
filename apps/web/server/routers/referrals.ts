@@ -7,6 +7,21 @@ const paginationInput = z.object({
   limit: z.number().int().positive().default(20),
 });
 
+function toMoneyFromCents(value: unknown): number {
+  return Number(value ?? 0) / 100;
+}
+
+function normalizeReferral(item: any) {
+  return {
+    ...item,
+    referredUserName: item?.referredName ?? null,
+    referredUserEmail: item?.referredEmail ?? null,
+    referrerUserName: item?.referrerName ?? null,
+    referrerUserEmail: item?.referrerEmail ?? null,
+    creditAmount: toMoneyFromCents(item?.creditAmountCents),
+  };
+}
+
 export const referralsRouter = router({
   list: protectedProcedure
     .input(
@@ -32,12 +47,14 @@ export const referralsRouter = router({
       });
 
       const payload = raw?.data ?? raw;
-      const data = payload?.data ?? payload ?? [];
+      const items = payload?.data ?? payload ?? [];
+      const data = Array.isArray(items) ? items.map(normalizeReferral) : [];
+
       const pagination =
         payload?.pagination ?? {
           page,
           limit,
-          total: Array.isArray(data) ? data.length : 0,
+          total: data.length,
           pages: 1,
         };
 
@@ -63,13 +80,14 @@ export const referralsRouter = router({
         body: JSON.stringify(input),
       });
 
-      return raw?.data ?? raw;
+      const payload = raw?.data ?? raw;
+      return normalizeReferral(payload);
     }),
 
   update: protectedProcedure
     .input(
       z.object({
-        id: z.number().int().positive(),
+        id: z.union([z.number().int().positive(), z.string().min(1)]),
         status: z.enum(["PENDING", "CONFIRMED", "PAID"]).optional(),
         creditAmount: z.number().optional(),
       })
@@ -82,11 +100,12 @@ export const referralsRouter = router({
         body: JSON.stringify(rest),
       });
 
-      return raw?.data ?? raw;
+      const payload = raw?.data ?? raw;
+      return normalizeReferral(payload);
     }),
 
   delete: protectedProcedure
-    .input(z.object({ id: z.number().int().positive() }))
+    .input(z.object({ id: z.union([z.number().int().positive(), z.string().min(1)]) }))
     .mutation(async ({ input, ctx }) => {
       const raw = await nexoFetch<any>(ctx.req, `/referrals/${input.id}`, {
         method: "DELETE",
@@ -102,15 +121,22 @@ export const referralsRouter = router({
         method: "GET",
       });
 
-      return raw?.data ?? raw;
+      const payload = raw?.data ?? raw ?? {};
+      const byStatus = payload?.byStatus ?? {};
+
+      const pendingCount = Number(byStatus?.PENDING?.count ?? 0);
+      const confirmedCount = Number(byStatus?.CONFIRMED?.count ?? 0);
+      const paidCount = Number(byStatus?.PAID?.count ?? 0);
+
+      return {
+        byStatus,
+        totalReferrals: pendingCount + confirmedCount + paidCount,
+        completedReferrals: confirmedCount + paidCount,
+        totalCredits: toMoneyFromCents(payload?.totalCreditsPaid ?? 0),
+        totalCreditsPaid: payload?.totalCreditsPaid ?? 0,
+      };
     }),
 
-  /**
-   * O front antigo pedia isso:
-   * trpc.referrals.generateCode.useMutation()
-   *
-   * Nest (esperado): POST /referrals/generate-code
-   */
   generateCode: protectedProcedure
     .input(z.object({}).optional())
     .mutation(async ({ ctx }) => {
@@ -122,12 +148,6 @@ export const referralsRouter = router({
       return raw?.data ?? raw;
     }),
 
-  /**
-   * O front antigo pedia:
-   * trpc.referrals.stats.useQuery({ page, limit })
-   *
-   * Nest (esperado): GET /referrals/stats?page=&limit=
-   */
   stats: protectedProcedure
     .input(paginationInput.optional())
     .query(async ({ input, ctx }) => {
@@ -142,20 +162,46 @@ export const referralsRouter = router({
         method: "GET",
       });
 
-      return raw?.data ?? raw;
+      const payload = raw?.data ?? raw ?? {};
+      const items = Array.isArray(payload?.data) ? payload.data : [];
+      const normalizedItems = items.map(normalizeReferral);
+
+      const totalReferrals = Number(payload?.pagination?.total ?? normalizedItems.length ?? 0);
+      const completedReferrals = normalizedItems.filter(
+        (item: any) => item.status === "CONFIRMED" || item.status === "PAID"
+      ).length;
+      const totalCredits = normalizedItems.reduce(
+        (sum: number, item: any) => sum + Number(item.creditAmount ?? 0),
+        0
+      );
+
+      return {
+        totalReferrals,
+        completedReferrals,
+        totalCredits,
+        data: normalizedItems,
+        pagination:
+          payload?.pagination ?? {
+            page,
+            limit,
+            total: normalizedItems.length,
+            pages: 1,
+          },
+      };
     }),
 
-  /**
-   * O front antigo pedia:
-   * trpc.referrals.getBalance.useQuery()
-   *
-   * Nest (esperado): GET /referrals/balance
-   */
   getBalance: protectedProcedure.query(async ({ ctx }) => {
     const raw = await nexoFetch<any>(ctx.req, `/referrals/balance`, {
       method: "GET",
     });
 
-    return raw?.data ?? raw;
+    const payload = raw?.data ?? raw ?? {};
+
+    return {
+      available: toMoneyFromCents(payload?.pendingBalance ?? 0),
+      used: toMoneyFromCents(payload?.paidBalance ?? 0),
+      pendingBalance: payload?.pendingBalance ?? 0,
+      paidBalance: payload?.paidBalance ?? 0,
+    };
   }),
 });

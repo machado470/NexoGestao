@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useAuth } from '@/_core/hooks/useAuth';
+import { useAuth } from '@/contexts/AuthContext';
 
 export interface OnboardingStep {
   id: string;
@@ -25,24 +25,23 @@ export function useOnboarding(steps: OnboardingStep[]) {
   const { user } = useAuth();
   const [state, setState] = useState<OnboardingState>(() => {
     const saved = localStorage.getItem(ONBOARDING_KEY);
-    return saved ? JSON.parse(saved) : { isActive: false, currentStep: 0, completedSteps: [] };
+    return saved
+      ? JSON.parse(saved)
+      : { isActive: false, currentStep: 0, completedSteps: [] };
   });
 
-  // Start onboarding for new users
   useEffect(() => {
     if (user && !state.isActive && state.completedSteps.length === 0) {
-      // Check if user is new (created less than 1 hour ago)
       const createdAt = new Date(user.createdAt).getTime();
       const now = Date.now();
-      const isNewUser = now - createdAt < 60 * 60 * 1000; // 1 hour
+      const isNewUser = now - createdAt < 60 * 60 * 1000;
 
       if (isNewUser) {
         startOnboarding();
       }
     }
-  }, [user]);
+  }, [user, state.isActive, state.completedSteps.length]);
 
-  // Save state to localStorage
   useEffect(() => {
     localStorage.setItem(ONBOARDING_KEY, JSON.stringify(state));
   }, [state]);
@@ -54,15 +53,25 @@ export function useOnboarding(steps: OnboardingStep[]) {
   const nextStep = () => {
     setState((prev) => {
       const newStep = prev.currentStep + 1;
+
       if (newStep >= steps.length) {
-        return { ...prev, isActive: false, completedSteps: steps.map((s) => s.id) };
+        return {
+          ...prev,
+          isActive: false,
+          completedSteps: steps.map((s) => s.id),
+        };
       }
+
       return { ...prev, currentStep: newStep };
     });
   };
 
   const skipOnboarding = () => {
-    setState((prev) => ({ ...prev, isActive: false, completedSteps: steps.map((s) => s.id) }));
+    setState((prev) => ({
+      ...prev,
+      isActive: false,
+      completedSteps: steps.map((s) => s.id),
+    }));
   };
 
   const resetOnboarding = () => {

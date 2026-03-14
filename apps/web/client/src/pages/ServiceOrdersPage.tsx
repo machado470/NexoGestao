@@ -40,44 +40,22 @@ export default function ServiceOrdersPage() {
   const limit = 20;
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("");
-  const [stepIds, setStepIds] = useState<Record<string, string>>({});
 
   const listQuery = trpc.nexo.serviceOrders.list.useQuery({ page, limit });
   const updateMutation = trpc.nexo.serviceOrders.update.useMutation({
     onSuccess: () => {
       toast.success("OS atualizada com sucesso!");
-      listQuery.refetch();
+      void listQuery.refetch();
     },
-    onError: (err: any) => toast.error(err.message || "Erro ao atualizar OS"),
+    onError: (err) => toast.error(err.message || "Erro ao atualizar OS"),
   });
+
   const deleteMutation = trpc.nexo.serviceOrders.delete.useMutation({
     onSuccess: () => {
       toast.success("OS removida!");
-      listQuery.refetch();
+      void listQuery.refetch();
     },
-    onError: (err: any) => toast.error(err.message || "Erro ao remover OS"),
-  });
-
-  const startExecutionMutation = trpc.nexo.serviceOrders.startExecution.useMutation({
-    onSuccess: () => {
-      toast.success("Execução iniciada.");
-      listQuery.refetch();
-    },
-    onError: (err: any) => toast.error(err.message || "Erro ao iniciar execução"),
-  });
-  const completeStepMutation = trpc.nexo.serviceOrders.completeExecutionStep.useMutation({
-    onSuccess: () => {
-      toast.success("Etapa marcada como concluída.");
-      listQuery.refetch();
-    },
-    onError: (err: any) => toast.error(err.message || "Erro ao concluir etapa"),
-  });
-  const finishExecutionMutation = trpc.nexo.serviceOrders.finishExecution.useMutation({
-    onSuccess: () => {
-      toast.success("Execução finalizada.");
-      listQuery.refetch();
-    },
-    onError: (err: any) => toast.error(err.message || "Erro ao finalizar execução"),
+    onError: (err) => toast.error(err.message || "Erro ao remover OS"),
   });
 
   const serviceOrders = (listQuery.data?.data ?? []) as any[];
@@ -91,9 +69,32 @@ export default function ServiceOrdersPage() {
     updateMutation.mutate({ id: String(id), data: { status: newStatus as any } });
   };
 
+  const handleStartExecution = (id: number | string) => {
+    updateMutation.mutate(
+      { id: String(id), data: { status: "IN_PROGRESS" as any } },
+      {
+        onSuccess: () => {
+          toast.success("Execução iniciada.");
+          void listQuery.refetch();
+        },
+      }
+    );
+  };
+
+  const handleFinishExecution = (id: number | string) => {
+    updateMutation.mutate(
+      { id: String(id), data: { status: "DONE" as any } },
+      {
+        onSuccess: () => {
+          toast.success("Execução finalizada.");
+          void listQuery.refetch();
+        },
+      }
+    );
+  };
+
   return (
     <div className="p-6 space-y-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
@@ -108,7 +109,7 @@ export default function ServiceOrdersPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => listQuery.refetch()}
+            onClick={() => void listQuery.refetch()}
             disabled={listQuery.isFetching}
           >
             <RefreshCw className={`w-4 h-4 mr-1 ${listQuery.isFetching ? "animate-spin" : ""}`} />
@@ -124,7 +125,6 @@ export default function ServiceOrdersPage() {
         </div>
       </div>
 
-      {/* Filtros */}
       <div className="flex gap-2 flex-wrap">
         {["", "OPEN", "ASSIGNED", "IN_PROGRESS", "DONE", "CANCELED"].map((s) => (
           <button
@@ -219,7 +219,7 @@ export default function ServiceOrdersPage() {
                     )}
                   </div>
                 </div>
-                <div className="flex gap-2 items-center flex-shrink-0">
+                <div className="flex gap-2 items-center flex-shrink-0 flex-wrap">
                   <select
                     value={os.status}
                     onChange={(e) => handleStatusChange(os.id, e.target.value)}
@@ -230,25 +230,25 @@ export default function ServiceOrdersPage() {
                       <option key={val} value={val}>{label}</option>
                     ))}
                   </select>
-                  <Button size="sm" variant="outline" onClick={() => startExecutionMutation.mutate({ id: String(os.id) })}>
-                    Iniciar execução
-                  </Button>
-                  <input
-                    className="w-20 text-xs border border-gray-200 dark:border-gray-600 rounded px-2 py-1 dark:bg-gray-700"
-                    placeholder="stepId"
-                    value={stepIds[String(os.id)] ?? ""}
-                    onChange={(e) => setStepIds((prev) => ({ ...prev, [String(os.id)]: e.target.value }))}
-                  />
+
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => completeStepMutation.mutate({ id: String(os.id), stepId: stepIds[String(os.id)] || "1" })}
+                    onClick={() => handleStartExecution(os.id)}
+                    disabled={os.status === "IN_PROGRESS" || os.status === "DONE" || updateMutation.isPending}
                   >
-                    Concluir etapa
+                    Iniciar execução
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => finishExecutionMutation.mutate({ id: String(os.id) })}>
+
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleFinishExecution(os.id)}
+                    disabled={os.status !== "IN_PROGRESS" || updateMutation.isPending}
+                  >
                     Finalizar execução
                   </Button>
+
                   <Button
                     variant="outline"
                     size="sm"
@@ -285,7 +285,7 @@ export default function ServiceOrdersPage() {
         open={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         onCreated={() => {
-          listQuery.refetch();
+          void listQuery.refetch();
           toast.success("OS criada com sucesso!");
         }}
       />

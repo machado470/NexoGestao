@@ -1,29 +1,31 @@
 import React, { useState, useEffect } from "react";
-import { trpc } from "../lib/trpc";
+import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { 
-  Settings, 
-  Building2, 
-  Globe, 
-  Save, 
+import {
+  Settings,
+  Building2,
+  Globe,
+  Save,
   Loader2,
   ShieldCheck,
   CreditCard,
   Clock,
-  Coins
+  Coins,
 } from "lucide-react";
 
 export default function SettingsPage() {
   const utils = trpc.useUtils();
+
   const settingsQuery = trpc.nexo.settings.get.useQuery();
+
   const updateSettingsMutation = trpc.nexo.settings.update.useMutation({
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success("Configurações atualizadas com sucesso!");
-      utils.nexo.settings.get.invalidate();
+      await utils.nexo.settings.get.invalidate();
     },
     onError: (error) => {
       toast.error(`Erro ao atualizar: ${error.message}`);
-    }
+    },
   });
 
   const [formData, setFormData] = useState({
@@ -35,22 +37,31 @@ export default function SettingsPage() {
   useEffect(() => {
     if (settingsQuery.data) {
       const data = (settingsQuery.data as any)?.data || settingsQuery.data;
+
       setFormData({
-        name: data.name || "",
-        timezone: data.timezone || "America/Sao_Paulo",
-        currency: data.currency || "BRL",
+        name: data?.name || "",
+        timezone: data?.timezone || "America/Sao_Paulo",
+        currency: data?.currency || "BRL",
       });
     }
   }, [settingsQuery.data]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    updateSettingsMutation.mutate(formData);
+
+    updateSettingsMutation.mutate({
+      name: formData.name,
+      timezone: formData.timezone,
+      currency: formData.currency,
+    });
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   if (settingsQuery.isLoading) {
@@ -68,7 +79,8 @@ export default function SettingsPage() {
       <div className="flex items-center justify-between">
         <div className="space-y-1">
           <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <Settings className="h-6 w-6" /> Configurações
+            <Settings className="h-6 w-6" />
+            Configurações
           </h2>
           <p className="text-muted-foreground">
             Gerencie as informações da sua organização e preferências do sistema.
@@ -78,7 +90,10 @@ export default function SettingsPage() {
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <div className="col-span-2 space-y-6">
-          <form onSubmit={handleSubmit} className="space-y-4 rounded-xl border bg-card p-6 shadow-sm dark:border-zinc-800">
+          <form
+            onSubmit={handleSubmit}
+            className="space-y-4 rounded-xl border bg-card p-6 shadow-sm dark:border-zinc-800"
+          >
             <div className="flex items-center gap-2 border-b pb-4 mb-4 dark:border-zinc-800">
               <Building2 className="h-5 w-5 text-orange-500" />
               <h3 className="text-lg font-semibold">Perfil da Organização</h3>
@@ -95,10 +110,11 @@ export default function SettingsPage() {
                   placeholder="Ex: Minha Empresa LTDA"
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <label className="text-sm font-medium flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-muted-foreground" /> Fuso Horário
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  Fuso Horário
                 </label>
                 <select
                   name="timezone"
@@ -115,7 +131,8 @@ export default function SettingsPage() {
 
               <div className="space-y-2">
                 <label className="text-sm font-medium flex items-center gap-2">
-                  <Coins className="h-4 w-4 text-muted-foreground" /> Moeda Padrão
+                  <Coins className="h-4 w-4 text-muted-foreground" />
+                  Moeda Padrão
                 </label>
                 <select
                   name="currency"
@@ -130,7 +147,10 @@ export default function SettingsPage() {
               </div>
 
               <div className="space-y-2 sm:col-span-2">
-                <label className="text-sm font-medium">Slug (Identificador Único)</label>
+                <label className="text-sm font-medium">
+                  Slug (Identificador Único)
+                </label>
+
                 <div className="relative">
                   <Globe className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                   <input
@@ -139,7 +159,10 @@ export default function SettingsPage() {
                     className="w-full rounded-md border bg-zinc-50 dark:bg-zinc-900/50 pl-10 pr-3 py-2 text-sm text-muted-foreground cursor-not-allowed dark:border-zinc-800"
                   />
                 </div>
-                <p className="text-[10px] text-muted-foreground">O slug não pode ser alterado após a criação.</p>
+
+                <p className="text-[10px] text-muted-foreground">
+                  O slug não pode ser alterado após a criação.
+                </p>
               </div>
             </div>
 
@@ -166,9 +189,11 @@ export default function SettingsPage() {
               <ShieldCheck className="h-5 w-5 text-orange-500" />
               <h3 className="text-lg font-semibold">Segurança</h3>
             </div>
+
             <p className="text-sm text-muted-foreground mb-4">
               Configurações de autenticação e permissões de acesso.
             </p>
+
             <button className="w-full rounded-md border border-zinc-200 dark:border-zinc-800 px-4 py-2 text-sm font-medium hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors">
               Alterar Senha Master
             </button>
@@ -179,6 +204,7 @@ export default function SettingsPage() {
               <CreditCard className="h-5 w-5 text-orange-500" />
               <h3 className="text-lg font-semibold">Plano e Assinatura</h3>
             </div>
+
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium">Plano Atual:</span>
@@ -186,10 +212,12 @@ export default function SettingsPage() {
                   {settingsData?.currentPlan || "Básico"}
                 </span>
               </div>
+
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium">Membros:</span>
                 <span className="text-sm">{settingsData?.membersCount || 0}</span>
               </div>
+
               <button className="w-full rounded-md bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 px-4 py-2 text-sm font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors">
                 Gerenciar Assinatura
               </button>

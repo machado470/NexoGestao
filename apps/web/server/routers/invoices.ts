@@ -7,13 +7,20 @@ const paginationInput = z.object({
   limit: z.number().int().positive().default(20),
 });
 
+function normalizeInvoice(item: any) {
+  return {
+    ...item,
+    amount: Number(item?.amountCents ?? 0) / 100,
+  };
+}
+
 export const invoicesRouter = router({
   list: protectedProcedure
     .input(
       paginationInput
         .extend({
           status: z.enum(["DRAFT", "ISSUED", "PAID", "CANCELLED"]).optional(),
-          customerId: z.number().optional(),
+          customerId: z.union([z.number().int().positive(), z.string().min(1)]).optional(),
           q: z.string().optional(),
         })
         .optional()
@@ -34,12 +41,14 @@ export const invoicesRouter = router({
       });
 
       const payload = raw?.data ?? raw;
-      const data = payload?.data ?? payload ?? [];
+      const items = payload?.data ?? payload ?? [];
+      const data = Array.isArray(items) ? items.map(normalizeInvoice) : [];
+
       const pagination =
         payload?.pagination ?? {
           page,
           limit,
-          total: Array.isArray(data) ? data.length : 0,
+          total: data.length,
           pages: 1,
         };
 
@@ -49,13 +58,14 @@ export const invoicesRouter = router({
   create: protectedProcedure
     .input(
       z.object({
-        customerId: z.union([z.number().min(1), z.string().min(1)]).optional(),
-        number: z.string().min(1, "Número da NF é obrigatório"),
+        customerId: z.union([z.number().int().positive(), z.string().min(1)]).optional(),
+        number: z.string().min(1, "Número da fatura é obrigatório"),
         amount: z.number().min(0.01, "Valor deve ser maior que 0"),
         issueDate: z.coerce.date().optional(),
         dueDate: z.coerce.date().optional(),
         status: z.enum(["DRAFT", "ISSUED", "PAID", "CANCELLED"]).default("DRAFT"),
         notes: z.string().optional(),
+        description: z.string().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -69,10 +79,12 @@ export const invoicesRouter = router({
           dueDate: input.dueDate ? input.dueDate.toISOString() : undefined,
           status: input.status,
           notes: input.notes,
+          description: input.description,
         }),
       });
 
-      return raw?.data ?? raw;
+      const payload = raw?.data ?? raw;
+      return normalizeInvoice(payload);
     }),
 
   update: protectedProcedure
@@ -82,22 +94,26 @@ export const invoicesRouter = router({
         status: z.enum(["DRAFT", "ISSUED", "PAID", "CANCELLED"]).optional(),
         amount: z.number().optional(),
         dueDate: z.coerce.date().optional(),
+        issueDate: z.coerce.date().optional(),
         notes: z.string().optional(),
+        description: z.string().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const { id, amount, dueDate, ...rest } = input;
+      const { id, amount, dueDate, issueDate, ...rest } = input;
 
       const raw = await nexoFetch<any>(ctx.req, `/invoices/${id}`, {
         method: "PATCH",
         body: JSON.stringify({
           ...rest,
           ...(amount !== undefined ? { amountCents: Math.round(amount * 100) } : {}),
-          dueDate: dueDate ? dueDate.toISOString() : undefined,
+          ...(dueDate ? { dueDate: dueDate.toISOString() } : {}),
+          ...(issueDate ? { issuedAt: issueDate.toISOString() } : {}),
         }),
       });
 
-      return raw?.data ?? raw;
+      const payload = raw?.data ?? raw;
+      return normalizeInvoice(payload);
     }),
 
   delete: protectedProcedure
@@ -117,6 +133,14 @@ export const invoicesRouter = router({
         method: "GET",
       });
 
-      return raw?.data ?? raw;
+      const payload = raw?.data ?? raw ?? {};
+
+      return {
+        ...payload,
+        total: Number(payload?.total ?? 0),
+        totalIssued: Number(payload?.totalIssued ?? 0),
+        totalPaid: Number(payload?.totalPaid ?? 0),
+        pending: Number(payload?.pending ?? 0),
+      };
     }),
 });

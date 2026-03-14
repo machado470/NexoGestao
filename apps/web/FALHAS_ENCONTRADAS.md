@@ -1,65 +1,66 @@
 # Análise de Falhas - NexoGestão SaaS
 
+## Estado Atual
+
+O front-end foi consolidado para usar `AuthContext` como fonte única de autenticação.
+O hook legado `client/src/_core/hooks/useAuth.ts` foi removido.
+As rotas principais do app estão protegidas em `client/src/App.tsx`.
+
 ## Falhas Identificadas
 
-### 1. **Teste de Logout Falhando**
-- **Arquivo**: `server/auth.logout.test.ts`
-- **Problema**: O teste tenta chamar `caller.auth.logout()` mas o procedimento está em `caller.session.logout()`
-- **Causa**: O router foi reorganizado, o logout foi movido para `session` router, não `auth` router
-- **Solução**: Atualizar o teste para chamar `caller.session.logout()`
-
-### 2. **Falta de Logout no Auth Router**
+### 1. **Router `auth.ts` vazio e desnecessário**
 - **Arquivo**: `server/routers/auth.ts`
-- **Problema**: Não há procedimento de logout no auth router
-- **Solução**: Adicionar logout procedure ao auth router ou atualizar teste
+- **Problema**: Arquivo existia sem procedimentos e sem uso real
+- **Impacto**: Poluição arquitetural e confusão sobre a fonte real da autenticação
+- **Ação recomendada**: Remover o arquivo se não houver referências restantes
 
-### 3. **Senhas em Texto Plano**
-- **Arquivo**: `server/routers/auth.ts` (linhas 41, 94)
-- **Problema**: Senhas são armazenadas sem hash (TODO comentado)
-- **Solução**: Implementar bcrypt para hash de senhas
+### 2. **Camada `lib/api.ts` ainda coexistindo com hooks tRPC**
+- **Arquivo**: `client/src/lib/api.ts`
+- **Problema**: Parte do front usa `trpc.*` diretamente e parte ainda usa `api.ts`
+- **Impacto**: Duplica padrões de acesso a dados e pode dificultar invalidação de cache, manutenção e padronização
+- **Ação recomendada**: Manter como compatibilidade temporária ou migrar gradualmente para hooks tRPC consistentes
 
-### 4. **Falta de Validação de Formulários**
-- **Arquivo**: `client/src/components/CreateCustomerModal.tsx`
-- **Problema**: Não há validação de email ou telefone
-- **Solução**: Adicionar validação com regex ou biblioteca
+### 3. **`WhatsAppPage.tsx` ainda usa estado derivado sensível**
+- **Arquivo**: `client/src/pages/WhatsAppPage.tsx`
+- **Problema**: A tela foi melhorada, mas continua dependente de estrutura manual de conversas e mensagens
+- **Impacto**: Pode exigir nova refatoração para evitar complexidade crescente
+- **Ação recomendada**: Evoluir para modelo com dados normalizados ou hooks dedicados
 
-### 5. **Contexto de Autenticação Incompleto**
-- **Arquivo**: `client/src/contexts/AuthContext.tsx`
-- **Problema**: Contexto usa tRPC mas não está totalmente integrado com o sistema de sessão
-- **Solução**: Integrar com `useAuth()` hook do template
+### 4. **Arquivo morto removido: `useNexoGestao.ts`**
+- **Arquivo**: `client/src/hooks/useNexoGestao.ts`
+- **Problema anterior**: Chamava funções inexistentes como `api.getAdminOverview()`
+- **Impacto anterior**: Código morto e quebrado aumentava ruído técnico
+- **Ação aplicada**: Arquivo removido
 
-### 6. **Modais Sem Tratamento de Erros**
-- **Arquivo**: `client/src/components/CreateCustomerModal.tsx` e similares
-- **Problema**: Modais não tratam erros de rede ou validação do servidor
-- **Solução**: Adicionar try-catch e feedback de erro
+### 5. **`Home.tsx` parece tela legado**
+- **Arquivo**: `client/src/pages/Home.tsx`
+- **Problema**: Estrutura, navegação e conteúdo parecem representar uma fase anterior do projeto
+- **Impacto**: Pode confundir o fluxo principal do produto e duplicar comportamentos já cobertos por outras telas
+- **Ação recomendada**: Avaliar se a tela ainda deve existir ou ser consolidada com o dashboard principal
 
-### 7. **Falta de Tabelas de Dados**
-- **Arquivo**: `client/src/pages/Dashboard.tsx`
-- **Problema**: Seções mostram "Nenhum registro" mas não exibem dados criados
-- **Solução**: Implementar tabelas com dados reais
+### 6. **`app_session_id` aparenta ser legado**
+- **Arquivo**: `shared/const.ts` e `server/routers.ts`
+- **Problema**: O cookie principal atual da autenticação web é `nexo_token`, enquanto `app_session_id` parece resquício antigo ainda limpo no logout
+- **Impacto**: Ambiguidade sobre o mecanismo oficial de sessão
+- **Ação recomendada**: Confirmar se ainda existe uso real; remover se for apenas compatibilidade obsoleta
 
-### 8. **Importação Incorreta do useAuth**
-- **Arquivo**: `client/src/pages/Dashboard.tsx`
-- **Problema**: Importa de `@/contexts/AuthContext` mas deveria usar `@/_core/hooks/useAuth`
-- **Solução**: Atualizar imports para usar o hook correto
+### 7. **Procedimentos privados no proxy ainda usam `publicProcedure`**
+- **Arquivo**: `server/routers/nexo-proxy.ts`
+- **Problema**: Muitas rotas autenticadas ainda são declaradas como públicas e dependem da API downstream para rejeitar acesso
+- **Impacto**: Semântica fraca no BFF e menor clareza de segurança
+- **Ação recomendada**: Migrar progressivamente rotas privadas para `protectedProcedure`
 
-### 9. **Falta de Proteção de Rotas**
-- **Arquivo**: `client/src/App.tsx`
-- **Problema**: Dashboard não está protegido, qualquer um pode acessar
-- **Solução**: Adicionar verificação de autenticação nas rotas
+### 8. **Documento de falhas precisava atualização**
+- **Arquivo**: `apps/web/FALHAS_ENCONTRADAS.md`
+- **Problema anterior**: Referências ao hook antigo, auth router e ausência de proteção de rotas estavam desatualizadas
+- **Impacto anterior**: Diagnóstico incorreto e risco de decisões erradas
+- **Ação aplicada**: Atualizar o documento para refletir o estado atual
 
-### 10. **Banco de Dados Não Sincronizado**
-- **Arquivo**: `drizzle/schema.ts`
-- **Problema**: Schema pode estar desatualizado com as migrações
-- **Solução**: Executar `pnpm db:push` para sincronizar
+## Prioridade Atual de Correção
 
-## Prioridade de Correção
-
-1. **CRÍTICA**: Falha no teste de logout (1)
-2. **CRÍTICA**: Proteção de rotas (9)
-3. **ALTA**: Senhas em texto plano (3)
-4. **ALTA**: Contexto de autenticação (5)
-5. **MÉDIA**: Validação de formulários (4)
-6. **MÉDIA**: Tratamento de erros (6)
-7. **BAIXA**: Tabelas de dados (7)
-8. **BAIXA**: Banco de dados (10)
+1. **ALTA**: Revisar `nexo-proxy.ts` e trocar rotas autenticadas para `protectedProcedure`
+2. **ALTA**: Definir o destino de `lib/api.ts` como compat layer ou migrar gradualmente para hooks tRPC
+3. **MÉDIA**: Revisar `WhatsAppPage.tsx` para futura simplificação estrutural
+4. **MÉDIA**: Decidir se `Home.tsx` permanece no produto
+5. **MÉDIA**: Confirmar se `app_session_id` ainda tem uso real
+6. **BAIXA**: Limpeza adicional de documentação e arquivos residuais

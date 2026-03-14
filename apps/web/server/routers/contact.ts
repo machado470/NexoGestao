@@ -1,18 +1,20 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc";
+import { nexoFetch } from "../_core/nexoClient";
 
 /**
- * Contact router (placeholder).
- * O portal antigo salvava contatos no DB local.
- * Futuro: enviar via backend Nest ou serviço externo.
+ * Contact router
+ * Mantém histórico de contato como placeholder local
+ * e encaminha WhatsApp para o backend real do Nest.
  */
 
 const customerIdSchema = z.string().uuid().or(z.string().min(1));
+const genericIdSchema = z.string().uuid().or(z.string().min(1));
 
 export const contactRouter = router({
   status: protectedProcedure.query(async () => ({
     ok: true,
-    message: "Contact router placeholder",
+    message: "Contact router ativo",
   })),
 
   getContactHistory: protectedProcedure
@@ -34,7 +36,13 @@ export const contactRouter = router({
     .input(
       z.object({
         customerId: customerIdSchema,
-        contactType: z.enum(["phone", "email", "whatsapp", "in_person", "other"]),
+        contactType: z.enum([
+          "phone",
+          "email",
+          "whatsapp",
+          "in_person",
+          "other",
+        ]),
         subject: z.string().min(1),
         description: z.string().optional(),
         notes: z.string().optional(),
@@ -50,21 +58,21 @@ export const contactRouter = router({
     }),
 
   deleteContactHistory: protectedProcedure
-    .input(z.object({ id: z.string().uuid().or(z.string().min(1)) }))
+    .input(z.object({ id: genericIdSchema }))
     .mutation(async () => ({ success: true })),
 
   getWhatsappMessages: protectedProcedure
     .input(z.object({ customerId: customerIdSchema }))
-    .query(async () => {
-      return [] as Array<{
-        id: string;
-        customerId: string;
-        direction: "inbound" | "outbound";
-        content: string;
-        status: "pending" | "sent" | "delivered" | "read" | "failed";
-        createdAt: string;
-        mediaUrl?: string;
-      }>;
+    .query(async ({ input, ctx }) => {
+      const raw = await nexoFetch<any>(
+        ctx.req,
+        `/whatsapp/messages/${input.customerId}`,
+        {
+          method: "GET",
+        }
+      );
+
+      return raw?.data ?? raw ?? [];
     }),
 
   createWhatsappMessage: protectedProcedure
@@ -78,19 +86,32 @@ export const contactRouter = router({
         mediaUrl: z.string().optional(),
       })
     )
-    .mutation(async ({ input }) => ({
-      id: crypto.randomUUID(),
-      ...input,
-      status: "sent" as const,
-      createdAt: new Date().toISOString(),
-    })),
+    .mutation(async ({ input, ctx }) => {
+      const raw = await nexoFetch<any>(ctx.req, `/whatsapp/messages`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      });
+
+      return raw?.data ?? raw;
+    }),
 
   updateWhatsappMessageStatus: protectedProcedure
     .input(
       z.object({
-        id: z.string().uuid().or(z.string().min(1)),
+        id: genericIdSchema,
         status: z.enum(["pending", "sent", "delivered", "read", "failed"]),
       })
     )
-    .mutation(async ({ input }) => ({ success: true, ...input })),
+    .mutation(async ({ input, ctx }) => {
+      const raw = await nexoFetch<any>(
+        ctx.req,
+        `/whatsapp/messages/${input.id}/status`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ status: input.status }),
+        }
+      );
+
+      return raw?.data ?? raw;
+    }),
 });
