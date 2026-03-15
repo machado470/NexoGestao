@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 
 function getStateLabel(value?: string | null) {
@@ -20,12 +20,38 @@ export default function PeoplePage() {
   const listPeople = trpc.people.list.useQuery();
   const statsLinked = trpc.people.statsLinked.useQuery();
 
-  const people = Array.isArray(listPeople.data) ? listPeople.data : [];
-  const linkedCount =
-    typeof statsLinked.data?.count === "number" ? statsLinked.data.count : 0;
+  const people = useMemo(() => {
+    const payload = (listPeople.data as any)?.data ?? listPeople.data ?? [];
+    return Array.isArray(payload) ? payload : [];
+  }, [listPeople.data]);
+
+  const linkedCount = useMemo(() => {
+    const payload = (statsLinked.data as any)?.data ?? statsLinked.data ?? null;
+    return typeof payload?.count === "number" ? payload.count : 0;
+  }, [statsLinked.data]);
+
+  if (listPeople.isLoading) {
+    return (
+      <div className="p-6">
+        <div className="rounded-2xl border p-4 dark:border-zinc-800">
+          Carregando pessoas...
+        </div>
+      </div>
+    );
+  }
+
+  if (listPeople.isError) {
+    return (
+      <div className="p-6">
+        <div className="rounded-2xl border border-red-200 p-4 text-red-600 dark:border-red-900">
+          Erro ao carregar pessoas.
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6 p-6">
       <div>
         <h1 className="mb-1 text-2xl font-semibold">Pessoas</h1>
         <p className="text-sm opacity-70">
@@ -55,9 +81,7 @@ export default function PeoplePage() {
       </div>
 
       <div className="rounded-2xl border p-4 dark:border-zinc-800">
-        {listPeople.isLoading ? (
-          <div>Carregando...</div>
-        ) : people.length === 0 ? (
+        {people.length === 0 ? (
           <div>Nenhuma pessoa.</div>
         ) : (
           <div className="space-y-3">

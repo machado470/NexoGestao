@@ -29,6 +29,27 @@ const creationSteps = [
   "Autentica a sessão para seguir ao onboarding",
 ];
 
+function normalizeErrorMessage(error: unknown): string {
+  const message =
+    typeof error === "string"
+      ? error
+      : typeof (error as any)?.message === "string"
+        ? (error as any).message
+        : "Erro ao criar conta";
+
+  const normalized = message.toLowerCase();
+
+  if (normalized.includes("email já cadastrado")) {
+    return "Esse email já está em uso.";
+  }
+
+  if (normalized.includes("senha precisa ter ao menos 8")) {
+    return "A senha precisa ter ao menos 8 caracteres.";
+  }
+
+  return message;
+}
+
 export default function Register() {
   const { isSubmitting, error, register } = useAuth();
   const [, navigate] = useLocation();
@@ -45,21 +66,18 @@ export default function Register() {
   const errorText = useMemo(() => {
     if (localError) return localError;
     if (!error) return null;
-    if (typeof error === "string") return error;
-    if (typeof (error as any)?.message === "string") return (error as any).message;
-    return "Erro ao criar conta";
+    return normalizeErrorMessage(error);
   }, [localError, error]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLocalError(null);
 
-    if (
-      !formData.orgName.trim() ||
-      !formData.adminName.trim() ||
-      !formData.email.trim() ||
-      !formData.password
-    ) {
+    const orgName = formData.orgName.trim();
+    const adminName = formData.adminName.trim();
+    const email = formData.email.trim().toLowerCase();
+
+    if (!orgName || !adminName || !email || !formData.password) {
       setLocalError("Preencha todos os campos obrigatórios.");
       return;
     }
@@ -76,17 +94,15 @@ export default function Register() {
 
     try {
       await register({
-        orgName: formData.orgName.trim(),
-        adminName: formData.adminName.trim(),
-        email: formData.email.trim(),
+        orgName,
+        adminName,
+        email,
         password: formData.password,
       });
 
       navigate("/onboarding");
-    } catch (err: any) {
-      const message =
-        typeof err?.message === "string" ? err.message : "Erro ao criar conta";
-      setLocalError(message);
+    } catch (err) {
+      setLocalError(normalizeErrorMessage(err));
     }
   };
 

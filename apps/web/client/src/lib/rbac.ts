@@ -1,4 +1,4 @@
-export type Role = 'admin' | 'manager' | 'staff' | 'viewer'
+export type Role = 'ADMIN' | 'MANAGER' | 'STAFF' | 'VIEWER'
 
 export type Permission =
   | 'customers:create'
@@ -24,7 +24,7 @@ export type Permission =
   | 'settings:manage'
 
 const rolePermissions: Record<Role, Permission[]> = {
-  admin: [
+  ADMIN: [
     'customers:create',
     'customers:read',
     'customers:update',
@@ -47,7 +47,7 @@ const rolePermissions: Record<Role, Permission[]> = {
     'reports:export',
     'settings:manage',
   ],
-  manager: [
+  MANAGER: [
     'customers:create',
     'customers:read',
     'customers:update',
@@ -66,7 +66,7 @@ const rolePermissions: Record<Role, Permission[]> = {
     'reports:read',
     'reports:export',
   ],
-  staff: [
+  STAFF: [
     'customers:read',
     'customers:create',
     'customers:update',
@@ -79,7 +79,7 @@ const rolePermissions: Record<Role, Permission[]> = {
     'finance:read',
     'reports:read',
   ],
-  viewer: [
+  VIEWER: [
     'customers:read',
     'appointments:read',
     'orders:read',
@@ -103,10 +103,10 @@ export function canAll(role: Role, permissions: Permission[]): boolean {
 
 export function getRoleLabel(role: Role): string {
   const labels: Record<Role, string> = {
-    admin: 'Administrador',
-    manager: 'Gerente',
-    staff: 'Equipe',
-    viewer: 'Visualizador',
+    ADMIN: 'Administrador',
+    MANAGER: 'Gerente',
+    STAFF: 'Equipe',
+    VIEWER: 'Visualizador',
   }
 
   return labels[role]
@@ -114,11 +114,26 @@ export function getRoleLabel(role: Role): string {
 
 export function getRoleColor(role: Role): string {
   const colors: Record<Role, string> = {
-    admin: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
-    manager: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-    staff: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-    viewer: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400',
+    ADMIN: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+    MANAGER: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+    STAFF: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+    VIEWER: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400',
   }
 
   return colors[role]
+}
+
+export function normalizeRole(role: unknown): Role | null {
+  const value = String(role ?? '').trim().toUpperCase()
+
+  if (
+    value === 'ADMIN' ||
+    value === 'MANAGER' ||
+    value === 'STAFF' ||
+    value === 'VIEWER'
+  ) {
+    return value
+  }
+
+  return null
 }

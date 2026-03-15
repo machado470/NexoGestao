@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import {
@@ -11,7 +11,18 @@ import {
   CreditCard,
   Clock,
   Coins,
+  AlertTriangle,
 } from "lucide-react";
+
+type SettingsFormData = {
+  name: string;
+  timezone: string;
+  currency: string;
+};
+
+function normalizeSettingsPayload(payload: any) {
+  return payload?.data ?? payload ?? null;
+}
 
 export default function SettingsPage() {
   const utils = trpc.useUtils();
@@ -20,7 +31,7 @@ export default function SettingsPage() {
 
   const updateSettingsMutation = trpc.nexo.settings.update.useMutation({
     onSuccess: async () => {
-      toast.success("Configurações atualizadas com sucesso!");
+      toast.success("Configurações atualizadas com sucesso.");
       await utils.nexo.settings.get.invalidate();
     },
     onError: (error) => {
@@ -28,29 +39,31 @@ export default function SettingsPage() {
     },
   });
 
-  const [formData, setFormData] = useState({
+  const settingsData = useMemo(() => {
+    return normalizeSettingsPayload(settingsQuery.data);
+  }, [settingsQuery.data]);
+
+  const [formData, setFormData] = useState<SettingsFormData>({
     name: "",
     timezone: "America/Sao_Paulo",
     currency: "BRL",
   });
 
   useEffect(() => {
-    if (settingsQuery.data) {
-      const data = (settingsQuery.data as any)?.data || settingsQuery.data;
+    if (!settingsData) return;
 
-      setFormData({
-        name: data?.name || "",
-        timezone: data?.timezone || "America/Sao_Paulo",
-        currency: data?.currency || "BRL",
-      });
-    }
-  }, [settingsQuery.data]);
+    setFormData({
+      name: settingsData?.name || "",
+      timezone: settingsData?.timezone || "America/Sao_Paulo",
+      currency: settingsData?.currency || "BRL",
+    });
+  }, [settingsData]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
     updateSettingsMutation.mutate({
-      name: formData.name,
+      name: formData.name.trim(),
       timezone: formData.timezone,
       currency: formData.currency,
     });
@@ -72,13 +85,27 @@ export default function SettingsPage() {
     );
   }
 
-  const settingsData = (settingsQuery.data as any)?.data || settingsQuery.data;
+  if (settingsQuery.isError) {
+    return (
+      <div className="space-y-6 p-6">
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
+          <div className="flex items-center gap-2 font-medium">
+            <AlertTriangle className="h-4 w-4" />
+            Erro ao carregar configurações
+          </div>
+          <p className="mt-2 text-sm">
+            Não foi possível carregar os dados da organização agora.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
         <div className="space-y-1">
-          <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+          <h2 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
             <Settings className="h-6 w-6" />
             Configurações
           </h2>
@@ -94,7 +121,7 @@ export default function SettingsPage() {
             onSubmit={handleSubmit}
             className="space-y-4 rounded-xl border bg-card p-6 shadow-sm dark:border-zinc-800"
           >
-            <div className="flex items-center gap-2 border-b pb-4 mb-4 dark:border-zinc-800">
+            <div className="mb-4 flex items-center gap-2 border-b pb-4 dark:border-zinc-800">
               <Building2 className="h-5 w-5 text-orange-500" />
               <h3 className="text-lg font-semibold">Perfil da Organização</h3>
             </div>
@@ -112,7 +139,7 @@ export default function SettingsPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium flex items-center gap-2">
+                <label className="flex items-center gap-2 text-sm font-medium">
                   <Clock className="h-4 w-4 text-muted-foreground" />
                   Fuso Horário
                 </label>
@@ -130,7 +157,7 @@ export default function SettingsPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium flex items-center gap-2">
+                <label className="flex items-center gap-2 text-sm font-medium">
                   <Coins className="h-4 w-4 text-muted-foreground" />
                   Moeda Padrão
                 </label>
@@ -156,7 +183,7 @@ export default function SettingsPage() {
                   <input
                     disabled
                     value={settingsData?.slug || ""}
-                    className="w-full rounded-md border bg-zinc-50 dark:bg-zinc-900/50 pl-10 pr-3 py-2 text-sm text-muted-foreground cursor-not-allowed dark:border-zinc-800"
+                    className="w-full cursor-not-allowed rounded-md border bg-zinc-50 py-2 pl-10 pr-3 text-sm text-muted-foreground dark:border-zinc-800 dark:bg-zinc-900/50"
                   />
                 </div>
 
@@ -169,8 +196,10 @@ export default function SettingsPage() {
             <div className="flex justify-end pt-4">
               <button
                 type="submit"
-                disabled={updateSettingsMutation.isPending}
-                className="flex items-center gap-2 rounded-md bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 disabled:opacity-50 transition-colors"
+                disabled={
+                  updateSettingsMutation.isPending || !formData.name.trim()
+                }
+                className="flex items-center gap-2 rounded-md bg-orange-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 disabled:opacity-50"
               >
                 {updateSettingsMutation.isPending ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -185,40 +214,46 @@ export default function SettingsPage() {
 
         <div className="space-y-6">
           <div className="rounded-xl border bg-card p-6 shadow-sm dark:border-zinc-800">
-            <div className="flex items-center gap-2 border-b pb-4 mb-4 dark:border-zinc-800">
+            <div className="mb-4 flex items-center gap-2 border-b pb-4 dark:border-zinc-800">
               <ShieldCheck className="h-5 w-5 text-orange-500" />
               <h3 className="text-lg font-semibold">Segurança</h3>
             </div>
 
-            <p className="text-sm text-muted-foreground mb-4">
+            <p className="mb-4 text-sm text-muted-foreground">
               Configurações de autenticação e permissões de acesso.
             </p>
 
-            <button className="w-full rounded-md border border-zinc-200 dark:border-zinc-800 px-4 py-2 text-sm font-medium hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors">
+            <button
+              type="button"
+              className="w-full rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-800"
+            >
               Alterar Senha Master
             </button>
           </div>
 
           <div className="rounded-xl border bg-card p-6 shadow-sm dark:border-zinc-800">
-            <div className="flex items-center gap-2 border-b pb-4 mb-4 dark:border-zinc-800">
+            <div className="mb-4 flex items-center gap-2 border-b pb-4 dark:border-zinc-800">
               <CreditCard className="h-5 w-5 text-orange-500" />
               <h3 className="text-lg font-semibold">Plano e Assinatura</h3>
             </div>
 
             <div className="space-y-4">
-              <div className="flex justify-between items-center">
+              <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">Plano Atual:</span>
                 <span className="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-800 dark:bg-orange-900/30 dark:text-orange-400">
                   {settingsData?.currentPlan || "Básico"}
                 </span>
               </div>
 
-              <div className="flex justify-between items-center">
+              <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">Membros:</span>
                 <span className="text-sm">{settingsData?.membersCount || 0}</span>
               </div>
 
-              <button className="w-full rounded-md bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 px-4 py-2 text-sm font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors">
+              <button
+                type="button"
+                className="w-full rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+              >
                 Gerenciar Assinatura
               </button>
             </div>

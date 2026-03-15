@@ -21,6 +21,44 @@ const trustItems = [
   "Fluxo direto para dashboard ou onboarding, sem circo",
 ];
 
+function normalizeErrorMessage(error: unknown): string {
+  const message =
+    typeof error === "string"
+      ? error
+      : typeof (error as any)?.message === "string"
+        ? (error as any).message
+        : "Erro ao fazer login";
+
+  const normalized = message.toLowerCase();
+
+  if (
+    normalized.includes("senha inválida") ||
+    normalized.includes("usuário inválido") ||
+    normalized.includes("credenciais inválidas") ||
+    normalized.includes("invalid credentials")
+  ) {
+    return "Email ou senha inválidos.";
+  }
+
+  if (
+    normalized.includes("não autenticado") ||
+    normalized.includes("unauthorized") ||
+    normalized.includes("unauthenticated")
+  ) {
+    return "Sua sessão não pôde ser validada. Tente entrar novamente.";
+  }
+
+  if (normalized.includes("conta não ativada")) {
+    return "Sua conta ainda não está ativada.";
+  }
+
+  if (normalized.includes("usuário sem identidade operacional")) {
+    return "Sua conta está sem vínculo operacional. Verifique o cadastro.";
+  }
+
+  return message;
+}
+
 export default function Login() {
   const { login, isSubmitting, error, redirectTo } = useAuth();
   const [, navigate] = useLocation();
@@ -32,40 +70,25 @@ export default function Login() {
   const errorText = useMemo(() => {
     if (localError) return localError;
     if (!error) return null;
-    if (typeof error === "string") return error;
-    if (typeof (error as any)?.message === "string") return (error as any).message;
-    return "Erro ao fazer login";
+    return normalizeErrorMessage(error);
   }, [localError, error]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLocalError(null);
 
-    if (!email.trim() || !password) {
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (!normalizedEmail || !password) {
       setLocalError("Preencha email e senha.");
       return;
     }
 
     try {
-      await login(email.trim(), password);
+      await login(normalizedEmail, password);
       navigate(redirectTo || "/dashboard");
-    } catch (err: any) {
-      const message =
-        typeof err?.message === "string" ? err.message : "Erro ao fazer login";
-
-      const normalized = message.toLowerCase();
-
-      if (
-        normalized.includes("senha inválida") ||
-        normalized.includes("usuário inválido") ||
-        normalized.includes("credenciais inválidas") ||
-        normalized.includes("invalid credentials")
-      ) {
-        setLocalError("Email ou senha inválidos.");
-        return;
-      }
-
-      setLocalError(message);
+    } catch (err) {
+      setLocalError(normalizeErrorMessage(err));
     }
   };
 

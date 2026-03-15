@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
+import { canAny, type Permission, type Role } from "@/lib/rbac";
 import { Breadcrumbs } from "./Breadcrumbs";
 import { GlobalSearch } from "./GlobalSearch";
 import NotificationBell from "./NotificationBell";
@@ -25,16 +26,25 @@ import {
   TrendingDown,
   ChevronLeft,
   Settings,
-  Workflow
+  Workflow,
 } from "lucide-react";
 
 interface MainLayoutProps {
   children: React.ReactNode;
 }
 
+type MenuItem = {
+  id: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  route: string;
+  permissions?: Permission[];
+  allowedRoles?: Role[];
+};
+
 export function MainLayout({ children }: MainLayoutProps) {
-  const [, navigate] = useLocation();
-  const { user, logout, isSubmitting } = useAuth();
+  const [location, navigate] = useLocation();
+  const { user, role, logout, isSubmitting } = useAuth();
   const { theme, toggleTheme } = useTheme();
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -47,7 +57,6 @@ export function MainLayout({ children }: MainLayoutProps) {
     };
 
     update();
-
     window.addEventListener("resize", update);
 
     return () => {
@@ -63,25 +72,166 @@ export function MainLayout({ children }: MainLayoutProps) {
     }
   };
 
-  const menuItems = [
-    { id: "overview", label: "Visão Geral", icon: BarChart3, route: "/executive-dashboard" },
-    { id: "customers", label: "Clientes", icon: Users, route: "/customers" },
-    { id: "appointments", label: "Agendamentos", icon: Calendar, route: "/appointments" },
-    { id: "service-orders", label: "Ordens de Serviço", icon: Briefcase, route: "/service-orders" },
-    { id: "finance", label: "Financeiro", icon: DollarSign, route: "/finances" },
-    { id: "invoices", label: "Notas Fiscais", icon: FileText, route: "/invoices" },
-    { id: "expenses", label: "Despesas", icon: TrendingDown, route: "/expenses" },
-    { id: "launches", label: "Lançamentos", icon: TrendingDown, route: "/launches" },
-    { id: "referrals", label: "Referências", icon: Users, route: "/referrals" },
-    { id: "whatsapp", label: "WhatsApp", icon: MessageCircle, route: "/whatsapp" },
-    { id: "people", label: "Pessoas", icon: Users, route: "/people" },
-    { id: "governance", label: "Governança", icon: Shield, route: "/governance" },
-    { id: "calendar", label: "Calendário", icon: CalendarDays, route: "/calendar" },
-    { id: "timeline", label: "Timeline", icon: BarChart3, route: "/timeline" },
-    { id: "operations-dashboard", label: "Dashboard Operacional", icon: Workflow, route: "/dashboard/operations" },
-    { id: "operations", label: "Workflow Operacional", icon: Workflow, route: "/operations" },
-    { id: "settings", label: "Configurações", icon: Settings, route: "/settings" }
-  ] as const;
+  const menuItems: MenuItem[] = [
+    {
+      id: "overview",
+      label: "Visão Geral",
+      icon: BarChart3,
+      route: "/executive-dashboard",
+      allowedRoles: ["ADMIN", "MANAGER", "VIEWER"],
+    },
+    {
+      id: "customers",
+      label: "Clientes",
+      icon: Users,
+      route: "/customers",
+      permissions: ["customers:read"],
+    },
+    {
+      id: "appointments",
+      label: "Agendamentos",
+      icon: Calendar,
+      route: "/appointments",
+      permissions: ["appointments:read"],
+    },
+    {
+      id: "service-orders",
+      label: "Ordens de Serviço",
+      icon: Briefcase,
+      route: "/service-orders",
+      permissions: ["orders:read"],
+    },
+    {
+      id: "finance",
+      label: "Financeiro",
+      icon: DollarSign,
+      route: "/finances",
+      permissions: ["finance:read"],
+    },
+    {
+      id: "invoices",
+      label: "Notas Fiscais",
+      icon: FileText,
+      route: "/invoices",
+      allowedRoles: ["ADMIN", "MANAGER"],
+    },
+    {
+      id: "expenses",
+      label: "Despesas",
+      icon: TrendingDown,
+      route: "/expenses",
+      allowedRoles: ["ADMIN", "MANAGER"],
+    },
+    {
+      id: "launches",
+      label: "Lançamentos",
+      icon: TrendingDown,
+      route: "/launches",
+      allowedRoles: ["ADMIN", "MANAGER"],
+    },
+    {
+      id: "referrals",
+      label: "Referências",
+      icon: Users,
+      route: "/referrals",
+      allowedRoles: ["ADMIN", "MANAGER"],
+    },
+    {
+      id: "whatsapp",
+      label: "WhatsApp",
+      icon: MessageCircle,
+      route: "/whatsapp",
+      allowedRoles: ["ADMIN", "MANAGER", "STAFF"],
+    },
+    {
+      id: "people",
+      label: "Pessoas",
+      icon: Users,
+      route: "/people",
+      allowedRoles: ["ADMIN", "MANAGER"],
+    },
+    {
+      id: "governance",
+      label: "Governança",
+      icon: Shield,
+      route: "/governance",
+      allowedRoles: ["ADMIN", "MANAGER", "VIEWER"],
+    },
+    {
+      id: "calendar",
+      label: "Calendário",
+      icon: CalendarDays,
+      route: "/calendar",
+      permissions: ["appointments:read"],
+    },
+    {
+      id: "timeline",
+      label: "Timeline",
+      icon: BarChart3,
+      route: "/timeline",
+      allowedRoles: ["ADMIN", "MANAGER", "VIEWER"],
+    },
+    {
+      id: "operations-dashboard",
+      label: "Dashboard Operacional",
+      icon: Workflow,
+      route: "/dashboard/operations",
+      allowedRoles: ["ADMIN", "MANAGER", "STAFF"],
+    },
+    {
+      id: "operations",
+      label: "Workflow Operacional",
+      icon: Workflow,
+      route: "/operations",
+      allowedRoles: ["ADMIN", "MANAGER", "STAFF"],
+    },
+    {
+      id: "settings",
+      label: "Configurações",
+      icon: Settings,
+      route: "/settings",
+      permissions: ["settings:manage"],
+    },
+  ];
+
+  const visibleMenuItems = useMemo(() => {
+    if (!role) return [];
+
+    return menuItems.filter((item) => {
+      if (item.allowedRoles?.length) {
+        return item.allowedRoles.includes(role);
+      }
+
+      if (item.permissions?.length) {
+        return canAny(role, item.permissions);
+      }
+
+      return true;
+    });
+  }, [role]);
+
+  const currentRouteAllowed = useMemo(() => {
+    return visibleMenuItems.some((item) => item.route === location);
+  }, [visibleMenuItems, location]);
+
+  useEffect(() => {
+    if (!role) return;
+    if (location === "/onboarding") return;
+    if (location === "/dashboard") return;
+    if (
+      location === "/" ||
+      location === "/login" ||
+      location === "/register" ||
+      location === "/forgot-password" ||
+      location === "/reset-password"
+    ) {
+      return;
+    }
+
+    if (!currentRouteAllowed) {
+      navigate("/dashboard");
+    }
+  }, [role, location, currentRouteAllowed, navigate]);
 
   const handleNavigate = (route: string) => {
     navigate(route);
@@ -95,24 +245,24 @@ export function MainLayout({ children }: MainLayoutProps) {
     <div className={`flex h-screen bg-gray-50 dark:bg-gray-900 ${theme === "dark" ? "dark" : ""}`}>
       {sidebarOpen && isMobile && (
         <div
-          className="fixed inset-0 bg-black/50 z-30 md:hidden"
+          className="fixed inset-0 z-30 bg-black/50 md:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       <aside
-        className={`fixed md:relative left-0 top-0 h-screen z-40 bg-white dark:bg-gray-800 shadow-lg border-r border-gray-200 dark:border-gray-700 flex flex-col transition-all duration-300 ${
+        className={`fixed left-0 top-0 z-40 flex h-screen flex-col border-r border-gray-200 bg-white shadow-lg transition-all duration-300 dark:border-gray-700 dark:bg-gray-800 md:relative ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         } ${sidebarCollapsed ? "md:w-20" : "w-64 md:w-64"}`}
       >
-        <div className="p-4 flex items-center justify-between border-b border-gray-200 dark:border-gray-700 min-h-16">
-          <div className={`flex items-center ${sidebarCollapsed ? "justify-center w-full" : ""}`}>
-            <div className="h-10 w-10 rounded-lg bg-orange-500 flex items-center justify-center text-white font-bold text-xl flex-shrink-0">
+        <div className="flex min-h-16 items-center justify-between border-b border-gray-200 p-4 dark:border-gray-700">
+          <div className={`flex items-center ${sidebarCollapsed ? "w-full justify-center" : ""}`}>
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-orange-500 text-xl font-bold text-white">
               N
             </div>
 
             {!sidebarCollapsed && (
-              <span className="ml-3 text-lg font-bold text-gray-900 dark:text-white whitespace-nowrap">
+              <span className="ml-3 whitespace-nowrap text-lg font-bold text-gray-900 dark:text-white">
                 NexoGestão
               </span>
             )}
@@ -120,31 +270,40 @@ export function MainLayout({ children }: MainLayoutProps) {
 
           <button
             onClick={() => setSidebarOpen(false)}
-            className="md:hidden p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg flex-shrink-0"
+            className="rounded-lg p-1 hover:bg-gray-100 dark:hover:bg-gray-700 md:hidden"
           >
-            <X className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+            <X className="h-5 w-5 text-gray-600 dark:text-gray-400" />
           </button>
         </div>
 
-        <nav className="flex-1 overflow-y-auto py-4 px-2 space-y-1">
-          {menuItems.map((item) => {
+        <nav className="flex-1 space-y-1 overflow-y-auto px-2 py-4">
+          {visibleMenuItems.map((item) => {
             const Icon = item.icon;
+            const isActive =
+              location === item.route ||
+              (item.route !== "/dashboard" && location.startsWith(item.route));
 
             return (
               <button
                 key={item.id}
                 onClick={() => handleNavigate(item.route)}
-                className={`w-full flex items-center rounded-lg transition-colors text-gray-600 dark:text-gray-300 hover:bg-orange-50 dark:hover:bg-orange-900/20 hover:text-orange-600 dark:hover:text-orange-400 group ${
+                className={`group flex w-full items-center rounded-lg transition-colors ${
                   sidebarCollapsed ? "justify-center p-2" : "px-3 py-2"
+                } ${
+                  isActive
+                    ? "bg-orange-50 text-orange-600 dark:bg-orange-900/20 dark:text-orange-400"
+                    : "text-gray-600 hover:bg-orange-50 hover:text-orange-600 dark:text-gray-300 dark:hover:bg-orange-900/20 dark:hover:text-orange-400"
                 }`}
                 title={item.label}
               >
-                <Icon className="w-5 h-5 flex-shrink-0" />
+                <Icon className="h-5 w-5 flex-shrink-0" />
 
                 {!sidebarCollapsed && (
                   <>
-                    <span className="ml-3 text-sm font-medium flex-1 text-left">{item.label}</span>
-                    <ChevronRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <span className="ml-3 flex-1 text-left text-sm font-medium">
+                      {item.label}
+                    </span>
+                    <ChevronRight className="h-4 w-4 opacity-0 transition-opacity group-hover:opacity-100" />
                   </>
                 )}
               </button>
@@ -152,17 +311,18 @@ export function MainLayout({ children }: MainLayoutProps) {
           })}
         </nav>
 
-        <div className="border-t border-gray-200 dark:border-gray-700 p-2 space-y-1">
+        <div className="space-y-1 border-t border-gray-200 p-2 dark:border-gray-700">
           <button
             onClick={toggleTheme}
-            className={`w-full flex items-center rounded-lg transition-colors text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 ${
+            className={`flex w-full items-center rounded-lg text-gray-600 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700 ${
               sidebarCollapsed ? "justify-center p-2" : "px-3 py-2"
             }`}
           >
-            {theme === "dark"
-              ? <Sun className="w-5 h-5 flex-shrink-0" />
-              : <Moon className="w-5 h-5 flex-shrink-0" />
-            }
+            {theme === "dark" ? (
+              <Sun className="h-5 w-5 flex-shrink-0" />
+            ) : (
+              <Moon className="h-5 w-5 flex-shrink-0" />
+            )}
 
             {!sidebarCollapsed && (
               <span className="ml-3 text-sm font-medium">
@@ -172,13 +332,13 @@ export function MainLayout({ children }: MainLayoutProps) {
           </button>
 
           <button
-            onClick={handleLogout}
+            onClick={() => void handleLogout()}
             disabled={isSubmitting}
-            className={`w-full flex items-center rounded-lg transition-colors text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50 ${
+            className={`flex w-full items-center rounded-lg text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-900/20 ${
               sidebarCollapsed ? "justify-center p-2" : "px-3 py-2"
             }`}
           >
-            <LogOut className="w-5 h-5 flex-shrink-0" />
+            <LogOut className="h-5 w-5 flex-shrink-0" />
 
             {!sidebarCollapsed && (
               <span className="ml-3 text-sm font-medium">
@@ -189,9 +349,9 @@ export function MainLayout({ children }: MainLayoutProps) {
         </div>
       </aside>
 
-      <div className="flex-1 flex flex-col w-full overflow-hidden">
-        <header className="h-16 bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-4 md:px-6 sticky top-0 z-20 flex-shrink-0">
-          <div className="flex items-center gap-2 md:gap-4 flex-1 min-w-0">
+      <div className="flex w-full flex-1 flex-col overflow-hidden">
+        <header className="sticky top-0 z-20 flex h-16 flex-shrink-0 items-center justify-between border-b border-gray-200 bg-white px-4 shadow-sm dark:border-gray-700 dark:bg-gray-800 md:px-6">
+          <div className="flex min-w-0 flex-1 items-center gap-2 md:gap-4">
             <button
               onClick={() => {
                 if (isMobile) {
@@ -200,43 +360,47 @@ export function MainLayout({ children }: MainLayoutProps) {
                   setSidebarCollapsed(!sidebarCollapsed);
                 }
               }}
-              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex-shrink-0"
+              className="flex-shrink-0 rounded-lg p-2 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700"
             >
-              {isMobile
-                ? <Menu className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-                : sidebarCollapsed
-                  ? <ChevronRight className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-                  : <ChevronLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-              }
+              {isMobile ? (
+                <Menu className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+              ) : sidebarCollapsed ? (
+                <ChevronRight className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+              ) : (
+                <ChevronLeft className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+              )}
             </button>
 
-            <div className="hidden md:block min-w-0">
+            <div className="hidden min-w-0 md:block">
               <Breadcrumbs />
             </div>
           </div>
 
-          <div className="flex items-center gap-2 md:gap-4 flex-shrink-0">
-            <div className="hidden lg:block w-48 xl:w-64">
+          <div className="flex flex-shrink-0 items-center gap-2 md:gap-4">
+            <div className="hidden w-48 lg:block xl:w-64">
               <GlobalSearch />
             </div>
 
             <NotificationBell />
 
-            <span className="text-xs md:text-sm text-gray-600 dark:text-gray-400 hidden sm:block truncate max-w-[150px]">
-              {user?.email || "Usuário"}
-            </span>
+            <div className="hidden text-right sm:block">
+              <div className="max-w-[150px] truncate text-sm text-gray-700 dark:text-gray-300">
+                {user?.person?.name || user?.email || "Usuário"}
+              </div>
+              <div className="max-w-[150px] truncate text-xs text-gray-500 dark:text-gray-400">
+                {role || "Sem papel"}
+              </div>
+            </div>
 
-            <div className="h-8 w-8 rounded-full bg-orange-500 text-white flex items-center justify-center text-sm font-bold flex-shrink-0">
-              {user?.email?.charAt(0).toUpperCase() || "U"}
+            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-orange-500 text-sm font-bold text-white">
+              {(user?.person?.name || user?.email || "U").charAt(0).toUpperCase()}
             </div>
           </div>
         </header>
 
-        <div className="flex-1 overflow-hidden flex flex-col md:flex-row gap-6 p-3 md:p-8">
-          <main className="flex-1 min-w-0 overflow-y-auto">
-            <div className="max-w-7xl mx-auto w-full px-3 md:px-4">
-              {children}
-            </div>
+        <div className="flex flex-1 flex-col gap-6 overflow-hidden p-3 md:flex-row md:p-8">
+          <main className="min-w-0 flex-1 overflow-y-auto">
+            <div className="mx-auto w-full max-w-7xl px-3 md:px-4">{children}</div>
           </main>
         </div>
       </div>

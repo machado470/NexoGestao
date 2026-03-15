@@ -26,6 +26,7 @@ const SERVICE_STATUS_LABELS: Record<string, string> = {
   ASSIGNED: "Não iniciada",
   IN_PROGRESS: "Em execução",
   DONE: "Concluída",
+  CANCELED: "Cancelada",
 };
 
 function startOfToday() {
@@ -50,7 +51,7 @@ function formatCurrency(cents?: number) {
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL",
-  }).format((cents ?? 0) / 100);
+  }).format((Number(cents ?? 0)) / 100);
 }
 
 function statusTone(status?: string) {
@@ -64,7 +65,21 @@ function statusTone(status?: string) {
   if (["OPEN", "ASSIGNED", "SCHEDULED", "PENDING"].includes(status)) {
     return "bg-blue-100 text-blue-700";
   }
+  if (["CANCELED", "NO_SHOW"].includes(status)) {
+    return "bg-red-100 text-red-700";
+  }
   return "bg-gray-100 text-gray-700";
+}
+
+function normalizeArrayPayload(payload: any): any[] {
+  if (Array.isArray(payload?.data)) return payload.data;
+  if (Array.isArray(payload?.items)) return payload.items;
+  if (Array.isArray(payload)) return payload;
+  return [];
+}
+
+function normalizeAlertsPayload(payload: any) {
+  return payload?.data ?? payload ?? {};
 }
 
 export default function OperationsDashboardPage() {
@@ -115,23 +130,25 @@ export default function OperationsDashboardPage() {
     },
   });
 
-  const appointments = (
-    appointmentsQuery.data?.data ??
-    appointmentsQuery.data ??
-    []
-  ) as any[];
+  const appointments = useMemo(() => {
+    return normalizeArrayPayload(appointmentsQuery.data);
+  }, [appointmentsQuery.data]);
 
-  const serviceOrders = (serviceOrdersQuery.data?.data ?? []) as any[];
+  const serviceOrders = useMemo(() => {
+    return normalizeArrayPayload(serviceOrdersQuery.data);
+  }, [serviceOrdersQuery.data]);
 
-  const pendingCharges = (chargesQuery.data?.data ?? []) as any[];
+  const pendingCharges = useMemo(() => {
+    return normalizeArrayPayload(chargesQuery.data);
+  }, [chargesQuery.data]);
 
   const todayServiceOrders = useMemo(() => {
-    return serviceOrders.filter((order) => {
+    return serviceOrders.filter((order: any) => {
       const dateCandidate =
-        order.scheduledFor ||
-        order.dueDate ||
-        order.appointment?.startsAt ||
-        order.createdAt;
+        order?.scheduledFor ||
+        order?.dueDate ||
+        order?.appointment?.startsAt ||
+        order?.createdAt;
 
       if (!dateCandidate) return false;
 
@@ -140,14 +157,23 @@ export default function OperationsDashboardPage() {
     });
   }, [serviceOrders, todayEnd, todayStart]);
 
-  const pendingTotalCents = pendingCharges.reduce(
-    (acc, charge) => acc + Number(charge.amountCents || 0),
-    0
-  );
+  const pendingTotalCents = useMemo(() => {
+    return pendingCharges.reduce((acc: number, charge: any) => {
+      return acc + Number(charge?.amountCents || 0);
+    }, 0);
+  }, [pendingCharges]);
 
-  const alerts: any = alertsQuery.data ?? {};
-  const overdueCharges = alerts?.overdueCharges?.items ?? [];
-  const lateServices = alerts?.overdueOrders?.items ?? [];
+  const alerts = useMemo(() => {
+    return normalizeAlertsPayload(alertsQuery.data);
+  }, [alertsQuery.data]);
+
+  const overdueCharges = Array.isArray(alerts?.overdueCharges?.items)
+    ? alerts.overdueCharges.items
+    : [];
+
+  const lateServices = Array.isArray(alerts?.overdueOrders?.items)
+    ? alerts.overdueOrders.items
+    : [];
 
   const handleStartExecution = (id: string) => {
     updateServiceOrder.mutate(
@@ -175,7 +201,7 @@ export default function OperationsDashboardPage() {
     <div className="space-y-6 p-6">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
+          <h1 className="flex items-center gap-2 text-2xl font-bold">
             <Wrench className="h-6 w-6 text-orange-500" />
             Dashboard Operacional
           </h1>
@@ -193,7 +219,7 @@ export default function OperationsDashboardPage() {
             void alertsQuery.refetch();
           }}
         >
-          <RefreshCw className="w-4 h-4 mr-2" />
+          <RefreshCw className="mr-2 h-4 w-4" />
           Atualizar
         </Button>
       </div>
@@ -224,8 +250,8 @@ export default function OperationsDashboardPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <CalendarDays className="w-4 h-4" />
+            <CardTitle className="flex items-center gap-2 text-base">
+              <CalendarDays className="h-4 w-4" />
               Agendamentos de hoje
             </CardTitle>
           </CardHeader>
@@ -237,20 +263,25 @@ export default function OperationsDashboardPage() {
               </p>
             )}
 
-            {appointments.map((appointment) => (
+            {appointments.map((appointment: any) => (
               <div
                 key={appointment.id}
-                className="rounded border p-3 flex items-center justify-between gap-3"
+                className="flex items-center justify-between gap-3 rounded border p-3"
               >
                 <div>
-                  <p className="font-medium text-sm">
+                  <p className="text-sm font-medium">
                     {appointment.title || "Agendamento"}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {new Date(appointment.startsAt).toLocaleTimeString("pt-BR", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                    {appointment.startsAt
+                      ? new Date(appointment.startsAt).toLocaleTimeString(
+                          "pt-BR",
+                          {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          }
+                        )
+                      : "--:--"}
                     {appointment.customer?.name
                       ? ` • ${appointment.customer.name}`
                       : ""}
@@ -266,8 +297,8 @@ export default function OperationsDashboardPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Clock3 className="w-4 h-4" />
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Clock3 className="h-4 w-4" />
               Ordens de serviço (hoje)
             </CardTitle>
           </CardHeader>
@@ -279,11 +310,11 @@ export default function OperationsDashboardPage() {
               </p>
             )}
 
-            {todayServiceOrders.map((order) => (
-              <div key={order.id} className="rounded border p-3 space-y-2">
+            {todayServiceOrders.map((order: any) => (
+              <div key={order.id} className="space-y-2 rounded border p-3">
                 <div className="flex items-center justify-between gap-2">
                   <div>
-                    <p className="font-medium text-sm">{order.title}</p>
+                    <p className="text-sm font-medium">{order.title}</p>
                     <p className="text-xs text-muted-foreground">
                       {order.customer?.name || "Sem cliente"}
                     </p>
@@ -304,7 +335,7 @@ export default function OperationsDashboardPage() {
                       updateServiceOrder.isPending
                     }
                   >
-                    <PlayCircle className="w-4 h-4 mr-1" />
+                    <PlayCircle className="mr-1 h-4 w-4" />
                     Iniciar execução
                   </Button>
 
@@ -316,7 +347,7 @@ export default function OperationsDashboardPage() {
                       updateServiceOrder.isPending
                     }
                   >
-                    <CheckCircle2 className="w-4 h-4 mr-1" />
+                    <CheckCircle2 className="mr-1 h-4 w-4" />
                     Concluir execução
                   </Button>
                 </div>
@@ -329,8 +360,8 @@ export default function OperationsDashboardPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <CreditCard className="w-4 h-4" />
+            <CardTitle className="flex items-center gap-2 text-base">
+              <CreditCard className="h-4 w-4" />
               Cobranças pendentes e pagamentos
             </CardTitle>
           </CardHeader>
@@ -342,13 +373,13 @@ export default function OperationsDashboardPage() {
               </p>
             )}
 
-            {pendingCharges.map((charge) => (
+            {pendingCharges.map((charge: any) => (
               <div
                 key={charge.id}
-                className="rounded border p-3 flex items-center justify-between gap-3"
+                className="flex items-center justify-between gap-3 rounded border p-3"
               >
                 <div>
-                  <p className="font-medium text-sm">
+                  <p className="text-sm font-medium">
                     {charge.customer?.name || "Cliente"}
                   </p>
                   <p className="text-xs text-muted-foreground">
@@ -379,8 +410,8 @@ export default function OperationsDashboardPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-amber-500" />
+            <CardTitle className="flex items-center gap-2 text-base">
+              <AlertTriangle className="h-4 w-4 text-amber-500" />
               Alertas operacionais
             </CardTitle>
             <CardDescription>
@@ -390,7 +421,7 @@ export default function OperationsDashboardPage() {
 
           <CardContent className="space-y-4">
             <div>
-              <p className="text-sm font-medium mb-2">
+              <p className="mb-2 text-sm font-medium">
                 Cobranças vencidas ({overdueCharges.length})
               </p>
               <div className="space-y-2">
@@ -409,7 +440,7 @@ export default function OperationsDashboardPage() {
             </div>
 
             <div>
-              <p className="text-sm font-medium mb-2">
+              <p className="mb-2 text-sm font-medium">
                 Serviços atrasados ({lateServices.length})
               </p>
               <div className="space-y-2">
@@ -422,9 +453,7 @@ export default function OperationsDashboardPage() {
                 {lateServices.slice(0, 5).map((service: any) => (
                   <div key={service.id} className="rounded border p-2 text-sm">
                     {service.title}
-                    {service.customer?.name
-                      ? ` • ${service.customer.name}`
-                      : ""}
+                    {service.customer?.name ? ` • ${service.customer.name}` : ""}
                   </div>
                 ))}
               </div>

@@ -15,6 +15,31 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+function normalizeErrorMessage(error: unknown): string {
+  const message =
+    typeof error === "string"
+      ? error
+      : typeof (error as any)?.message === "string"
+        ? (error as any).message
+        : "Erro ao redefinir senha.";
+
+  const normalized = message.toLowerCase();
+
+  if (
+    normalized.includes("token inválido") ||
+    normalized.includes("token invalido") ||
+    normalized.includes("expirado")
+  ) {
+    return "Esse link de redefinição é inválido ou expirou.";
+  }
+
+  if (normalized.includes("senha precisa ter ao menos 8")) {
+    return "A senha precisa ter ao menos 8 caracteres.";
+  }
+
+  return message;
+}
+
 export default function ResetPasswordPage() {
   const [, navigate] = useLocation();
   const resetPasswordMutation = trpc.nexo.auth.resetPassword.useMutation();
@@ -31,9 +56,9 @@ export default function ResetPasswordPage() {
 
   const errorText = useMemo(() => {
     if (localError) return localError;
-    const err = resetPasswordMutation.error as any;
-    if (typeof err?.message === "string") return err.message;
-    return null;
+    return resetPasswordMutation.error
+      ? normalizeErrorMessage(resetPasswordMutation.error)
+      : null;
   }, [localError, resetPasswordMutation.error]);
 
   const submit = async (e: React.FormEvent) => {
@@ -66,12 +91,8 @@ export default function ResetPasswordPage() {
         password,
       });
       setDone(true);
-    } catch (err: any) {
-      setLocalError(
-        typeof err?.message === "string"
-          ? err.message
-          : "Erro ao redefinir senha."
-      );
+    } catch (err) {
+      setLocalError(normalizeErrorMessage(err));
     }
   };
 

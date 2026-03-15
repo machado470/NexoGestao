@@ -1,8 +1,9 @@
-import { Body, Controller, Post, Get, UseGuards, Request, Res } from '@nestjs/common'
+import { Body, Controller, Get, Post, Request, Res, UseGuards } from '@nestjs/common'
 import { AuthGuard } from '@nestjs/passport'
+import { Throttle } from '@nestjs/throttler'
+
 import { AuthService } from './auth.service'
 import { Public } from './decorators/public.decorator'
-import { Throttle } from '@nestjs/throttler'
 
 @Controller('auth')
 export class AuthController {
@@ -26,21 +27,21 @@ export class AuthController {
   @Public()
   @Post('login')
   @Throttle({ short: { limit: 5, ttl: 60000 } })
-  async login(
-    @Body() body: { email: string; password: string },
-  ) {
+  async login(@Body() body: { email: string; password: string }) {
     return this.auth.login(body.email, body.password)
   }
 
   @Public()
   @Get('google')
   @UseGuards(AuthGuard('google'))
-  async googleAuth(@Request() req) {}
+  async googleAuth(@Request() _req: any) {
+    return
+  }
 
   @Public()
   @Get('google/callback')
   @UseGuards(AuthGuard('google'))
-  async googleAuthRedirect(@Request() req, @Res() res) {
+  async googleAuthRedirect(@Request() req: any, @Res() res: any) {
     const result = await this.auth.validateGoogleUser(req.user)
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000'
     return res.redirect(`${frontendUrl}/auth/callback?token=${result.token}`)
@@ -63,6 +64,9 @@ export class AuthController {
   @Public()
   @Post('logout')
   async logout() {
-    return { success: true }
+    return {
+      success: true,
+      message: 'Logout efetuado com sucesso.',
+    }
   }
 }

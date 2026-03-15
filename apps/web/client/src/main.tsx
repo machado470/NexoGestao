@@ -1,31 +1,51 @@
 import { trpc } from "@/lib/trpc";
-import { UNAUTHED_ERR_MSG } from '@shared/const';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { httpBatchLink, TRPCClientError } from "@trpc/client";
 import { createRoot } from "react-dom/client";
 import superjson from "superjson";
+
 import App from "./App";
 import { getLoginUrl } from "./const";
 import "./index.css";
 import { initSentry } from "./lib/sentry";
 
-// 🚨 Inicializar Sentry para monitoramento de erros (ativado se VITE_SENTRY_DSN estiver configurado)
-initSentry()
+// Inicializar Sentry se configurado
+initSentry();
 
 const queryClient = new QueryClient();
 
+const shouldRedirectToLogin = (error: unknown): boolean => {
+  if (!(error instanceof TRPCClientError)) return false;
+
+  const message = String(error.message ?? "").toLowerCase();
+
+  return (
+    message.includes("não autenticado") ||
+    message.includes("unauthorized") ||
+    message.includes("unauthenticated") ||
+    message.includes("jwt") ||
+    message.includes("token inválido") ||
+    message.includes("token invalido")
+  );
+};
+
 const redirectToLoginIfUnauthorized = (error: unknown) => {
-  if (!(error instanceof TRPCClientError)) return;
   if (typeof window === "undefined") return;
+  if (!shouldRedirectToLogin(error)) return;
 
-  const isUnauthorized = error.message === UNAUTHED_ERR_MSG;
+  const currentPath = window.location.pathname;
+  const isAlreadyPublic =
+    currentPath === "/login" ||
+    currentPath === "/register" ||
+    currentPath === "/forgot-password" ||
+    currentPath === "/reset-password";
 
-  if (!isUnauthorized) return;
+  if (isAlreadyPublic) return;
 
   window.location.href = getLoginUrl();
 };
 
-queryClient.getQueryCache().subscribe(event => {
+queryClient.getQueryCache().subscribe((event) => {
   if (event.type === "updated" && event.action.type === "error") {
     const error = event.query.state.error;
     redirectToLoginIfUnauthorized(error);
@@ -33,7 +53,7 @@ queryClient.getQueryCache().subscribe(event => {
   }
 });
 
-queryClient.getMutationCache().subscribe(event => {
+queryClient.getMutationCache().subscribe((event) => {
   if (event.type === "updated" && event.action.type === "error") {
     const error = event.mutation.state.error;
     redirectToLoginIfUnauthorized(error);

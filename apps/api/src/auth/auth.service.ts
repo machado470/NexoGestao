@@ -1,23 +1,24 @@
 import {
-  Injectable,
-  UnauthorizedException,
-  Logger,
-  ConflictException,
   BadRequestException,
+  ConflictException,
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+  UnauthorizedException,
 } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import { JwtService } from '@nestjs/jwt'
 import * as bcrypt from 'bcrypt'
 import { Resend } from 'resend'
 import { v4 as uuidv4 } from 'uuid'
 
-import { PrismaService } from '../prisma/prisma.service'
 import { AnalyticsService, UsageMetricEvent } from '../analytics/analytics.service'
-import { ConfigService } from '@nestjs/config'
+import { PrismaService } from '../prisma/prisma.service'
 
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name)
-  private resend: Resend | null = null
+  private readonly resend: Resend | null = null
 
   constructor(
     private readonly prisma: PrismaService,
@@ -63,6 +64,25 @@ export class AuthService {
 
       i++
       slug = `${base}-${i}`
+    }
+  }
+
+  private generateToken(user: any) {
+    const token = this.jwt.sign({
+      sub: user.id,
+      role: user.role,
+      orgId: user.orgId,
+      personId: user.person?.id,
+    })
+
+    return {
+      token,
+      user: {
+        id: user.id,
+        role: user.role,
+        orgId: user.orgId,
+        personId: user.person?.id,
+      },
     }
   }
 
@@ -115,7 +135,7 @@ export class AuthService {
         },
       })
 
-      const user = await tx.user.create({
+      return tx.user.create({
         data: {
           email,
           password: passwordHash,
@@ -136,8 +156,6 @@ export class AuthService {
           person: true,
         },
       })
-
-      return user
     })
 
     return {
@@ -191,27 +209,12 @@ export class AuthService {
     return this.generateToken(user)
   }
 
-  private generateToken(user: any) {
-    const token = this.jwt.sign({
-      sub: user.id,
-      role: user.role,
-      orgId: user.orgId,
-      personId: user.person?.id,
-    })
-
-    return {
-      token,
-      user: {
-        id: user.id,
-        role: user.role,
-        orgId: user.orgId,
-        personId: user.person?.id,
-      },
-    }
-  }
-
   async forgotPassword(email: string) {
     const normalizedEmail = (email ?? '').trim().toLowerCase()
+
+    if (!normalizedEmail) {
+      throw new BadRequestException('Email é obrigatório')
+    }
 
     const user = await this.prisma.user.findUnique({
       where: { email: normalizedEmail },
@@ -224,6 +227,12 @@ export class AuthService {
       }
     }
 
+    if (!this.resend) {
+      throw new ServiceUnavailableException(
+        'Recuperação de senha por e-mail não está disponível no momento.',
+      )
+    }
+
     const token = uuidv4()
     const expiresAt = new Date()
     expiresAt.setHours(expiresAt.getHours() + 1)
@@ -231,27 +240,6 @@ export class AuthService {
     const frontendUrl =
       this.config.get<string>('FRONTEND_URL') || 'http://localhost:3001'
     const resetLink = `${frontendUrl}/reset-password?token=${token}`
-
-    if (this.resend) {
-      try {
-        await this.resend.emails.send({
-          from: this.config.get<string>('EMAIL_FROM') || 'onboarding@resend.dev',
-          to: normalizedEmail,
-          subject: 'Recuperação de Senha - NexoGestao',
-          html: `<p>Você solicitou a recuperação de senha. Clique no link abaixo para redefinir:</p><a href="${resetLink}">${resetLink}</a><p>Este link expira em 1 hora.</p>`,
-        })
-      } catch (error) {
-        this.logger.error(
-          `Erro ao enviar e-mail de recuperação: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        )
-      }
-    } else {
-      this.logger.warn(
-        `Recuperação de senha solicitada para ${normalizedEmail}, mas o Resend não está configurado.`,
-      )
-    }
 
     await this.prisma.user.update({
       where: { id: user.id },
@@ -261,6 +249,25 @@ export class AuthService {
       },
     })
 
+    try {
+      await this.resend.emails.send({
+        from: this.config.get<string>('EMAIL_FROM') || 'onboarding@resend.dev',
+        to: normalizedEmail,
+        subject: 'Recuperação de Senha - NexoGestao',
+        html: `<p>Você solicitou a recuperação de senha. Clique no link abaixo para redefinir:</p><a href="${resetLink}">${resetLink}</a><p>Este link expira em 1 hora.</p>`,
+      })
+    } catch (error) {
+      this.logger.error(
+        `Erro ao enviar e-mail de recuperação: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      )
+
+      throw new ServiceUnavailableException(
+        'Não foi possível enviar o e-mail de recuperação no momento.',
+      )
+    }
+
     return {
       success: true,
       message: 'Se o e-mail existir, um link de recuperação será enviado.',
@@ -268,13 +275,19 @@ export class AuthService {
   }
 
   async resetPassword(token: string, password: string) {
+    const normalizedToken = (token ?? '').trim()
+
+    if (!normalizedToken) {
+      throw new BadRequestException('Token é obrigatório')
+    }
+
     if (!password || password.length < 8) {
       throw new BadRequestException('A senha precisa ter ao menos 8 caracteres')
     }
 
     const user = await this.prisma.user.findFirst({
       where: {
-        resetToken: token,
+        resetToken: normalizedToken,
         resetTokenExpiresAt: {
           gt: new Date(),
         },
@@ -296,11 +309,22 @@ export class AuthService {
       },
     })
 
-    return { success: true, message: 'Senha redefinida com sucesso.' }
+    return {
+      success: true,
+      message: 'Senha redefinida com sucesso.',
+    }
   }
 
   async login(email: string, password: string) {
     const normalizedEmail = (email ?? '').trim().toLowerCase()
+
+    if (!normalizedEmail) {
+      throw new BadRequestException('Email é obrigatório')
+    }
+
+    if (!password) {
+      throw new BadRequestException('Senha é obrigatória')
+    }
 
     const user = await this.prisma.user.findUnique({
       where: { email: normalizedEmail },
@@ -320,6 +344,7 @@ export class AuthService {
     }
 
     const valid = await bcrypt.compare(password, user.password)
+
     if (!valid) {
       throw new UnauthorizedException('Senha inválida')
     }
@@ -327,8 +352,7 @@ export class AuthService {
     const result = this.generateToken(user)
 
     try {
-      const loginEvent =
-        (UsageMetricEvent as any)?.LOGIN ?? 'LOGIN'
+      const loginEvent = (UsageMetricEvent as any)?.LOGIN ?? 'LOGIN'
 
       await this.analytics.track({
         orgId: user.orgId,
@@ -344,6 +368,10 @@ export class AuthService {
       )
     }
 
-    return result
+    return {
+      success: true,
+      message: 'Login efetuado com sucesso.',
+      ...result,
+    }
   }
 }

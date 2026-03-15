@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useEffect, useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
+import { normalizeRole, type Role } from "@/lib/rbac";
 import type { AppRouter } from "../../../server/routers";
 import type { inferRouterOutputs } from "@trpc/server";
 
@@ -8,8 +9,10 @@ type SessionMeOutput = RouterOutputs["session"]["me"];
 type SessionPayload = Exclude<SessionMeOutput, null>;
 type SessionUser = SessionPayload["data"]["user"];
 
+type AuthUser = (SessionUser & { normalizedRole: Role | null }) | null;
+
 interface AuthContextType {
-  user: SessionUser | null;
+  user: AuthUser;
   loading: boolean;
   isInitializing: boolean;
   isSubmitting: boolean;
@@ -26,6 +29,7 @@ interface AuthContextType {
   refresh: () => Promise<void>;
   payload: SessionMeOutput;
   redirectTo: string;
+  role: Role | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -73,9 +77,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const nextPayload = result.data ?? null;
         utils.session.me.setData(undefined, nextPayload);
 
-        const user = nextPayload?.data?.user ?? null;
+        const nextUser = nextPayload?.data?.user ?? null;
 
-        if (!user) {
+        if (!nextUser) {
           throw new Error("Sessão não foi carregada após o login.");
         }
       } catch (err) {
@@ -110,9 +114,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const nextPayload = result.data ?? null;
         utils.session.me.setData(undefined, nextPayload);
 
-        const user = nextPayload?.data?.user ?? null;
+        const nextUser = nextPayload?.data?.user ?? null;
 
-        if (!user) {
+        if (!nextUser) {
           throw new Error("Conta criada, mas a sessão não foi carregada.");
         }
       } catch (err) {
@@ -144,10 +148,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const payload: SessionMeOutput = meQuery.data ?? null;
 
-  const user: SessionUser | null = useMemo(() => {
-    if (!payload) return null;
-    return payload.data?.user ?? null;
+  const user: AuthUser = useMemo(() => {
+    const rawUser = payload?.data?.user ?? null;
+
+    if (!rawUser) return null;
+
+    return {
+      ...rawUser,
+      normalizedRole: normalizeRole(rawUser.role),
+    };
   }, [payload]);
+
+  const role = useMemo(() => {
+    return user?.normalizedRole ?? null;
+  }, [user]);
 
   const redirectTo = useMemo(() => {
     return payload?.data?.redirect ?? "/dashboard";
@@ -167,6 +181,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user,
       payload,
       redirectTo,
+      role,
       loading,
       isInitializing,
       isSubmitting,
@@ -187,6 +202,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user,
     payload,
     redirectTo,
+    role,
     loading,
     isInitializing,
     isSubmitting,

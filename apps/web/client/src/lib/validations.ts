@@ -75,7 +75,7 @@ export type PersonFormData = z.infer<typeof personSchema>
 // Login validation
 export const loginSchema = z.object({
   email: z.string().email('Email inválido'),
-  password: z.string().min(6, 'Senha deve ter pelo menos 6 caracteres'),
+  password: z.string().min(8, 'Senha deve ter pelo menos 8 caracteres'),
 })
 
 export type LoginFormData = z.infer<typeof loginSchema>
@@ -85,7 +85,7 @@ export const registerSchema = z
   .object({
     name: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres'),
     email: z.string().email('Email inválido'),
-    password: z.string().min(6, 'Senha deve ter pelo menos 6 caracteres'),
+    password: z.string().min(8, 'Senha deve ter pelo menos 8 caracteres'),
     confirmPassword: z.string(),
     organizationName: z
       .string()

@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -8,6 +9,7 @@ import {
   Phone,
   MessageCircle,
   Search,
+  AlertTriangle,
 } from "lucide-react";
 
 interface ConversationMessage {
@@ -66,10 +68,18 @@ function normalizeMessages(payload: any): ConversationMessage[] {
   }));
 }
 
+function normalizeCustomers(payload: any): any[] {
+  const rows = Array.isArray(payload?.data)
+    ? payload.data
+    : Array.isArray(payload)
+      ? payload
+      : [];
+
+  return rows;
+}
+
 export default function WhatsAppPage() {
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(
-    null
-  );
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [messageInput, setMessageInput] = useState("");
   const [conversations, setConversations] = useState<ConversationThread[]>([]);
@@ -82,18 +92,21 @@ export default function WhatsAppPage() {
     { enabled: !!selectedCustomerId }
   );
 
-  const createMessageMutation = trpc.nexo.whatsapp.send.useMutation();
+  const createMessageMutation = trpc.nexo.whatsapp.send.useMutation({
+    onSuccess: () => {
+      toast.success("Mensagem enviada.");
+    },
+    onError: (error) => {
+      toast.error(error.message || "Erro ao enviar mensagem.");
+    },
+  });
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [whatsappMessagesQuery.data]);
 
   useEffect(() => {
-    const customerList = Array.isArray((customersQuery.data as any)?.data)
-      ? (customersQuery.data as any).data
-      : Array.isArray(customersQuery.data)
-        ? customersQuery.data
-        : [];
+    const customerList = normalizeCustomers(customersQuery.data);
 
     const convos: ConversationThread[] = customerList.map((customer: any) => ({
       customerId: String(customer.id),
@@ -140,31 +153,38 @@ export default function WhatsAppPage() {
     );
   }, [conversations, selectedCustomerId]);
 
+  const filteredConversations = useMemo(() => {
+    const term = searchQuery.toLowerCase();
+
+    return conversations.filter((conversation) => {
+      return (
+        conversation.customerName.toLowerCase().includes(term) ||
+        conversation.whatsappNumber?.includes(searchQuery)
+      );
+    });
+  }, [conversations, searchQuery]);
+
   const handleSendMessage = async () => {
     if (!messageInput.trim() || !selectedCustomerId) return;
+
+    if (!selectedConversation?.whatsappNumber) {
+      toast.error("Este cliente não possui número de WhatsApp.");
+      return;
+    }
 
     try {
       await createMessageMutation.mutateAsync({
         customerId: selectedCustomerId,
         content: messageInput.trim(),
-        toPhone: selectedConversation?.whatsappNumber,
+        toPhone: selectedConversation.whatsappNumber,
       });
 
       setMessageInput("");
       await whatsappMessagesQuery.refetch();
-    } catch (error) {
-      console.error("Erro ao enviar mensagem:", error);
+    } catch {
+      // toast já tratado no mutation
     }
   };
-
-  const filteredConversations = conversations.filter((conversation) => {
-    const term = searchQuery.toLowerCase();
-
-    return (
-      conversation.customerName.toLowerCase().includes(term) ||
-      conversation.whatsappNumber?.includes(searchQuery)
-    );
-  });
 
   const formatTime = (date: string | Date) => {
     return new Date(date).toLocaleTimeString("pt-BR", {
@@ -172,6 +192,30 @@ export default function WhatsAppPage() {
       minute: "2-digit",
     });
   };
+
+  if (customersQuery.isLoading) {
+    return (
+      <div className="flex h-[80vh] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+      </div>
+    );
+  }
+
+  if (customersQuery.isError) {
+    return (
+      <div className="space-y-6 p-6">
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
+          <div className="flex items-center gap-2 font-medium">
+            <AlertTriangle className="h-4 w-4" />
+            Erro ao carregar conversas
+          </div>
+          <p className="mt-2 text-sm">
+            Não foi possível carregar os clientes para o módulo de WhatsApp.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
@@ -193,11 +237,7 @@ export default function WhatsAppPage() {
         </div>
 
         <div className="flex-1 overflow-y-auto">
-          {customersQuery.isLoading ? (
-            <div className="flex h-full items-center justify-center">
-              <Loader2 className="h-6 w-6 animate-spin text-orange-500" />
-            </div>
-          ) : filteredConversations.length === 0 ? (
+          {filteredConversations.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center text-gray-500">
               <MessageCircle className="mb-2 h-12 w-12 opacity-50" />
               <p>Nenhuma conversa encontrada</p>
@@ -269,6 +309,10 @@ export default function WhatsAppPage() {
               {whatsappMessagesQuery.isLoading ? (
                 <div className="flex h-full items-center justify-center">
                   <Loader2 className="h-6 w-6 animate-spin text-orange-500" />
+                </div>
+              ) : whatsappMessagesQuery.isError ? (
+                <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
+                  Erro ao carregar mensagens desta conversa.
                 </div>
               ) : selectedConversation.messages.length === 0 ? (
                 <div className="flex h-full flex-col items-center justify-center text-gray-500">

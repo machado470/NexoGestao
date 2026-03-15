@@ -15,6 +15,17 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+function normalizeErrorMessage(error: unknown): string {
+  const message =
+    typeof error === "string"
+      ? error
+      : typeof (error as any)?.message === "string"
+        ? (error as any).message
+        : "Erro ao solicitar redefinição de senha.";
+
+  return message;
+}
+
 export default function ForgotPasswordPage() {
   const [, navigate] = useLocation();
   const forgotPasswordMutation = trpc.nexo.auth.forgotPassword.useMutation();
@@ -25,9 +36,9 @@ export default function ForgotPasswordPage() {
 
   const errorText = useMemo(() => {
     if (localError) return localError;
-    const err = forgotPasswordMutation.error as any;
-    if (typeof err?.message === "string") return err.message;
-    return null;
+    return forgotPasswordMutation.error
+      ? normalizeErrorMessage(forgotPasswordMutation.error)
+      : null;
   }, [localError, forgotPasswordMutation.error]);
 
   const submit = async (e: React.FormEvent) => {
@@ -44,12 +55,8 @@ export default function ForgotPasswordPage() {
     try {
       await forgotPasswordMutation.mutateAsync({ email: normalizedEmail });
       setDone(true);
-    } catch (err: any) {
-      setLocalError(
-        typeof err?.message === "string"
-          ? err.message
-          : "Erro ao solicitar redefinição de senha."
-      );
+    } catch (err) {
+      setLocalError(normalizeErrorMessage(err));
     }
   };
 

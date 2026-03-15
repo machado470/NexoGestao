@@ -47,6 +47,27 @@ function clearTokenCookie(ctx: CtxLike) {
   });
 }
 
+function extractErrorMessage(body: any, status: number, text: string): string {
+  const message =
+    body?.message ||
+    body?.error ||
+    body?.data?.message ||
+    text ||
+    `API error: ${status}`;
+
+  const normalized = String(message).trim();
+
+  if (status === 401) {
+    return normalized || "Não autenticado";
+  }
+
+  if (status === 403) {
+    return normalized || "Sem permissão";
+  }
+
+  return normalized;
+}
+
 async function nexoFetch(path: string, options: RequestInit = {}) {
   const url = `${NEXO_API_URL}${path}`;
 
@@ -68,14 +89,8 @@ async function nexoFetch(path: string, options: RequestInit = {}) {
   }
 
   if (!response.ok) {
-    const message =
-      body?.message ||
-      body?.error ||
-      body?.data?.message ||
-      text ||
-      `API error: ${response.status}`;
-
-    throw new Error(String(message));
+    const message = extractErrorMessage(body, response.status, text);
+    throw new Error(message);
   }
 
   return body;
@@ -131,7 +146,7 @@ export const nexoProxyRouter = router({
       }),
 
     login: publicProcedure
-      .input(z.object({ email: z.string().email(), password: z.string() }))
+      .input(z.object({ email: z.string().email(), password: z.string().min(8) }))
       .mutation(async ({ input, ctx }) => {
         const result = await nexoFetch("/auth/login", {
           method: "POST",
@@ -167,7 +182,7 @@ export const nexoProxyRouter = router({
       }),
 
     resetPassword: publicProcedure
-      .input(z.object({ token: z.string(), password: z.string().min(8) }))
+      .input(z.object({ token: z.string().min(1), password: z.string().min(8) }))
       .mutation(async ({ input }) => {
         return await nexoFetch("/auth/reset-password", {
           method: "POST",
@@ -179,12 +194,31 @@ export const nexoProxyRouter = router({
       const authHeader = getAuthHeader(ctx as CtxLike);
 
       if (!authHeader) {
-        throw new Error("Não autenticado");
+        return null;
       }
 
-      return await nexoFetch("/me", {
-        headers: { Authorization: authHeader },
-      });
+      try {
+        return await nexoFetch("/me", {
+          headers: { Authorization: authHeader },
+        });
+      } catch (error) {
+        const message =
+          typeof (error as any)?.message === "string"
+            ? (error as any).message.toLowerCase()
+            : "";
+
+        if (
+          message.includes("não autenticado") ||
+          message.includes("unauthorized") ||
+          message.includes("jwt") ||
+          message.includes("token")
+        ) {
+          clearTokenCookie(ctx as CtxLike);
+          return null;
+        }
+
+        throw error;
+      }
     }),
   }),
 
@@ -352,6 +386,13 @@ export const nexoProxyRouter = router({
     list: publicProcedure.query(async ({ ctx }) => {
       const authHeader = getAuthHeader(ctx as CtxLike);
       return await nexoFetch("/people", {
+        headers: authHeader ? { Authorization: authHeader } : {},
+      });
+    }),
+
+    statsLinked: publicProcedure.query(async ({ ctx }) => {
+      const authHeader = getAuthHeader(ctx as CtxLike);
+      return await nexoFetch("/people/stats/linked", {
         headers: authHeader ? { Authorization: authHeader } : {},
       });
     }),

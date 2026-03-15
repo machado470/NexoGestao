@@ -109,6 +109,8 @@ A autenticação básica existe.
 Login e registro já existem no web.
 Sessão via BFF também existe.
 Há caminho para onboarding e redirecionamento.
+Os papéis de usuário já foram padronizados para `ADMIN`, `MANAGER`, `STAFF` e `VIEWER`.
+Schema, migration, convites, seeds e guards já foram alinhados para esse novo modelo.
 
 ## O que ainda falta
 - fluxo robusto de recuperação de senha realmente funcionando ponta a ponta
@@ -116,7 +118,8 @@ Há caminho para onboarding e redirecionamento.
 - tratamento de erros mais consistente
 - proteção de rotas mais explícita no frontend
 - controle melhor de estados de loading e sessão expirada
-- política clara de papéis e permissões por tela
+- política clara de papéis e permissões por tela no frontend
+- alinhar definitivamente frontend e backend no consumo de roles e permissões
 
 ## Impacto
 Sem isso, a entrada no sistema funciona, mas ainda não transmite produto maduro.
@@ -241,6 +244,7 @@ P0
 A comunicação operacional é pilar oficial do sistema.
 O WhatsApp é o canal principal definido na documentação.
 A proposta do sistema é comunicação contextual vinculada a eventos operacionais.
+O módulo já está alinhado ao novo modelo de papéis no backend, mas ainda precisa fechar o fluxo operacional completo.
 
 ## O que ainda falta
 - envio automático realmente amarrado a eventos
@@ -472,6 +476,7 @@ Depois a nave espacial.
 - [ ] forgot password
 - [ ] reset password
 - [ ] proteção de rota
+- [ ] alinhamento completo de permissões por role no frontend
 
 ## Fluxo customers
 - [ ] listagem
@@ -582,7 +587,6 @@ Ele precisa parecer inevitável para a operação.
 
 Quando cliente, agenda, execução, cobrança, pagamento, comunicação, risco e governança fluírem sem atrito, aí sim a plataforma vira bicho de verdade.
 
-
 ---
 
 # 14. P0 IMEDIATO — PRÓXIMA RODADA DE EXECUÇÃO
@@ -609,6 +613,7 @@ Fechar o ciclo principal do produto com o menor número possível de lacunas vis
 - logout limpar sessão corretamente
 - rota protegida não vazar
 - recuperação de senha tiver fluxo real ou ficar explicitamente desativada no produto
+- permissões por tela respeitarem o novo modelo de roles
 
 ---
 
@@ -714,6 +719,7 @@ Fechar o ciclo principal do produto com o menor número possível de lacunas vis
 - sessão persiste certo
 - sessão expira sem quebrar UI
 - erro de login aparece limpo
+- frontend respeita permissões reais por papel
 
 ## Customer pronto
 - cliente nasce limpo

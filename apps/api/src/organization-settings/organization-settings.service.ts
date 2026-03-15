@@ -1,32 +1,42 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+import { Injectable, NotFoundException } from '@nestjs/common'
+import { PrismaService } from '../prisma/prisma.service'
+import { SubscriptionsService } from '../subscriptions/subscriptions.service'
 
 @Injectable()
 export class OrganizationSettingsService {
   constructor(
-    private prisma: PrismaService,
-    private subscriptionsService: SubscriptionsService,
+    private readonly prisma: PrismaService,
+    private readonly subscriptionsService: SubscriptionsService,
   ) {}
 
   async getOrganizationSettings(orgId: string) {
     const organization = await this.prisma.organization.findUnique({
       where: { id: orgId },
-      select: { id: true, name: true, timezone: true, currency: true, slug: true },
-    });
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+      },
+    })
 
     if (!organization) {
-      throw new NotFoundException('Organização não encontrada.');
+      throw new NotFoundException('Organização não encontrada.')
     }
 
-    const subscription = await this.subscriptionsService.getOrganizationSubscription(orgId);
-    const membersCount = await this.prisma.user.count({ where: { orgId } });
+    const subscription =
+      await this.subscriptionsService.getOrganizationSubscription(orgId)
+
+    const membersCount = await this.prisma.user.count({
+      where: { orgId },
+    })
 
     return {
       ...organization,
-      currentPlan: subscription?.plan.name || 'Nenhum',
+      timezone: 'America/Sao_Paulo',
+      currency: 'BRL',
+      currentPlan: subscription?.plan?.name || 'Nenhum',
       membersCount,
-    };
+    }
   }
 
   async updateOrganizationSettings(
@@ -36,11 +46,28 @@ export class OrganizationSettingsService {
     const organization = await this.prisma.organization.update({
       where: { id: orgId },
       data: {
-        name: data.name,
-        timezone: data.timezone,
-        currency: data.currency,
+        ...(data.name ? { name: data.name } : {}),
       },
-    });
-    return organization;
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+      },
+    })
+
+    const subscription =
+      await this.subscriptionsService.getOrganizationSubscription(orgId)
+
+    const membersCount = await this.prisma.user.count({
+      where: { orgId },
+    })
+
+    return {
+      ...organization,
+      timezone: data.timezone || 'America/Sao_Paulo',
+      currency: data.currency || 'BRL',
+      currentPlan: subscription?.plan?.name || 'Nenhum',
+      membersCount,
+    }
   }
 }
