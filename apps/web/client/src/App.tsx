@@ -83,12 +83,14 @@ function ProtectedRoute({
   component: Component,
   allowedRoles,
   requireCompletedOnboarding = false,
+  onboardingOnly = false,
 }: {
   component: React.ComponentType;
   allowedRoles?: Role[];
   requireCompletedOnboarding?: boolean;
+  onboardingOnly?: boolean;
 }) {
-  const { isAuthenticated, isInitializing, redirectTo, payload, role } = useAuth();
+  const { isAuthenticated, isInitializing, payload, role } = useAuth();
   const [, navigate] = useLocation();
 
   const requiresOnboarding = Boolean(payload?.data?.requiresOnboarding);
@@ -106,21 +108,16 @@ function ProtectedRoute({
       return;
     }
 
-    if (!requireCompletedOnboarding && !requiresOnboarding && redirectTo === "/dashboard") {
-      // segue normal
-    }
-
-    if (allowedRoles?.length && (!role || !allowedRoles.includes(role))) {
+    if (onboardingOnly && !requiresOnboarding) {
       navigate("/dashboard");
+      return;
     }
   }, [
     isAuthenticated,
     isInitializing,
-    redirectTo,
     navigate,
-    allowedRoles,
-    role,
     requireCompletedOnboarding,
+    onboardingOnly,
     requiresOnboarding,
   ]);
 
@@ -133,6 +130,10 @@ function ProtectedRoute({
   }
 
   if (requireCompletedOnboarding && requiresOnboarding) {
+    return null;
+  }
+
+  if (onboardingOnly && !requiresOnboarding) {
     return null;
   }
 
@@ -188,7 +189,9 @@ function Router() {
 
       <Route
         path="/onboarding"
-        component={() => <ProtectedRoute component={Onboarding} />}
+        component={() => (
+          <ProtectedRoute onboardingOnly component={Onboarding} />
+        )}
       />
 
       <Route
