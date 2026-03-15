@@ -210,29 +210,6 @@ export function MainLayout({ children }: MainLayoutProps) {
     });
   }, [role]);
 
-  const currentRouteAllowed = useMemo(() => {
-    return visibleMenuItems.some((item) => item.route === location);
-  }, [visibleMenuItems, location]);
-
-  useEffect(() => {
-    if (!role) return;
-    if (location === "/onboarding") return;
-    if (location === "/dashboard") return;
-    if (
-      location === "/" ||
-      location === "/login" ||
-      location === "/register" ||
-      location === "/forgot-password" ||
-      location === "/reset-password"
-    ) {
-      return;
-    }
-
-    if (!currentRouteAllowed) {
-      navigate("/dashboard");
-    }
-  }, [role, location, currentRouteAllowed, navigate]);
-
   const handleNavigate = (route: string) => {
     navigate(route);
 
@@ -407,3 +384,4 @@ export function MainLayout({ children }: MainLayoutProps) {
     </div>
   );
 }
+
