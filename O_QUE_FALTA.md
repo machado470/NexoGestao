@@ -1,356 +1,774 @@
-# 🔴 O Que Falta no NexoGestão
-
-**Análise:** 02/03/2026  
-**Status:** Identificação de gaps para produção
-
----
-
-## 1. CRÍTICO - Bloqueadores para Produção
-
-### 1.1 Email Não Funciona ⚠️
-**Impacto:** ALTO - Usuários não conseguem recuperar senha  
-**Localização:** `server/_core/email.ts`  
-**Status:** Estrutura pronta, sem integração real
-
-**O que falta:**
-- [ ] Integração com SendGrid/AWS SES/Resend
-- [ ] Variáveis de ambiente (SENDGRID_API_KEY ou equivalente)
-- [ ] Template de email HTML profissional
-- [ ] Fila de emails (Bull/BullMQ) para retry automático
-- [ ] Logging de emails enviados
-
-**Impacto no Sistema:**
-- Recuperação de senha não envia email real
-- Notificações de novos agendamentos não são enviadas
-- Confirmação de cadastro não é enviada
+# O QUE FALTA NO NexoGestão
+## Auditoria funcional real para fechar gaps de produto
+**Análise:** 14/03/2026  
+**Status:** revisão orientada a produção  
+**Objetivo:** identificar o que ainda impede o NexoGestão de operar como produto coerente, utilizável e vendável
 
 ---
 
-### 1.2 Pagamento Não Funciona ⚠️
-**Impacto:** ALTO - Ninguém paga pelo plano  
-**Localização:** `client/src/pages/PlansPage.tsx`, `server/routers/plans.ts`  
-**Status:** UI pronta, sem integração de pagamento
+# 1. CONTEXTO
 
-**O que falta:**
-- [ ] Integração Stripe/Mercado Pago
-- [ ] Webhook de confirmação de pagamento
-- [ ] Atualização automática de subscription após pagamento
-- [ ] Recebimento de notificações de pagamento
-- [ ] Histórico de transações
-- [ ] Cancelamento de plano com reembolso
+O NexoGestão já possui uma base arquitetural forte.
 
-**Impacto no Sistema:**
-- Usuários não conseguem fazer upgrade
-- Plano fica sempre "Free"
-- Sem receita para a plataforma
+O fluxo estrutural oficial do sistema é:
 
----
+cliente  
+→ agendamento  
+→ ordem de serviço  
+→ execução  
+→ cobrança  
+→ pagamento  
+→ histórico operacional  
+→ análise de risco  
+→ governança operacional
 
-### 1.3 Validação de Limites por Plano ⚠️
-**Impacto:** ALTO - Qualquer um usa features premium  
-**Localização:** Todas as páginas CRUD  
-**Status:** Não implementado
+Ou seja: o produto já tem espinha dorsal clara.
 
-**O que falta:**
-- [ ] Middleware para validar plano antes de criar item
-- [ ] Bloqueio de criação quando atingiu limite
-- [ ] Toast/Modal informando limite atingido
-- [ ] Upgrade sugerido quando limite próximo
-- [ ] Contador de uso atual vs limite
-
-**Exemplo:**
-```typescript
-// Falta isso em cada CRUD
-if (userPlan === 'free' && customerCount >= 5) {
-  throw new Error("Limite de 5 clientes atingido. Faça upgrade para Pro");
-}
-```
-
-**Impacto no Sistema:**
-- Usuário free pode criar 50 clientes (limite é 5)
-- Usuário free pode criar 100 agendamentos (limite é 10)
-- Sem controle de uso
+O que falta agora não é mais “inventar módulo”.
+O que falta é **fechar ciclo**, **eliminar buraco funcional** e **fazer backend + frontend + operação falarem a mesma língua**.
 
 ---
 
-## 2. IMPORTANTE - Funcionalidades Faltando
+# 2. RESUMO EXECUTIVO
 
-### 2.1 Integração Service Order → Charge ⚠️
-**Impacto:** MÉDIO - Fluxo de negócio quebrado  
-**Localização:** `ServiceOrdersPage.tsx`, `server/routers/service-tracking.ts`  
-**Status:** Não conectado
+## Estado atual
+A base técnica do sistema está boa.
+Os módulos centrais existem.
+O backend está mais limpo.
+A arquitetura está coerente.
+O frontend já cobre partes importantes da operação.
 
-**O que falta:**
-- [ ] Botão "Gerar Cobrança" em ordem de serviço finalizada
-- [ ] Criar automaticamente charge quando ordem é finalizada
-- [ ] Copiar valor da ordem para charge
-- [ ] Copiar cliente da ordem para charge
-- [ ] Histórico de cobranças geradas da ordem
+## Problema real atual
+Ainda existem lacunas entre:
 
-**Fluxo esperado:**
-1. Criar Ordem de Serviço (R$ 500)
-2. Marcar como finalizada
-3. Sistema gera Charge de R$ 500 automaticamente
-4. Cliente vê na página de Financeiro
+- o que a arquitetura promete
+- o que o backend expõe
+- o que o frontend realmente usa
+- o que o usuário final consegue executar até o fim
 
----
-
-### 2.2 Integração Notas Fiscais ⚠️
-**Impacto:** MÉDIO - Compliance fiscal  
-**Localização:** `InvoicesPage.tsx`, `server/routers/invoices.ts`  
-**Status:** CRUD básico, sem integração
-
-**O que falta:**
-- [ ] Gerar número de NF sequencial
-- [ ] Integração com API de NF-e (opcional)
-- [ ] Validação de CNPJ/CPF
-- [ ] Cálculo automático de impostos
-- [ ] Geração de PDF da NF
-- [ ] Envio de NF por email
-- [ ] Histórico de NF emitidas
+## Diagnóstico direto
+O NexoGestão já deixou de ser “só projeto”.
+Agora o risco não é falta de estrutura.
+O risco é ficar com cara de sistema grande, mas com fluxo quebrado no uso real.
 
 ---
 
-### 2.3 Integração Despesas ⚠️
-**Impacto:** MÉDIO - Relatório financeiro incompleto  
-**Localização:** `ExpensesPage.tsx`, `server/routers/expenses.ts`  
-**Status:** CRUD básico
+# 3. ORDEM DE PRIORIDADE REAL
 
-**O que falta:**
-- [ ] Categorias de despesas (Aluguel, Salário, Materiais, etc)
-- [ ] Integração em Relatório Financeiro
-- [ ] Cálculo de Lucro Líquido (Receita - Despesas)
-- [ ] Gráfico de Despesas por Categoria
-- [ ] Orçamento vs Realizado
-- [ ] Alertas de despesa acima do orçamento
+## P0 — Fechar fluxo operacional central
+Precisamos garantir que o fluxo principal funcione sem gambiarra:
 
----
+cliente  
+→ agendamento  
+→ ordem de serviço  
+→ execução  
+→ cobrança  
+→ pagamento  
+→ timeline  
+→ risco  
+→ governança
 
-### 2.4 Relatórios em PDF ⚠️
-**Impacto:** MÉDIO - Usuários querem exportar dados  
-**Localização:** Todas as páginas  
-**Status:** Não implementado
+Se esse ciclo não estiver sólido, o resto vira enfeite caro.
 
-**O que falta:**
-- [ ] Botão "Exportar PDF" em cada página
-- [ ] Template profissional de PDF
-- [ ] Incluir logo da empresa
-- [ ] Gráficos em PDF
-- [ ] Tabelas formatadas
-- [ ] Rodapé com data e hora
+## P1 — Fechar integrações críticas de produto
+Prioridade imediata:
 
----
+- auth
+- customers
+- appointments
+- service orders
+- finance
+- whatsapp
 
-### 2.5 Histórico de Contatos ⚠️
-**Impacto:** MÉDIO - Rastreamento de comunicação  
-**Localização:** `CustomersPage.tsx`  
-**Status:** Não implementado
+## P2 — Expor o que já existe no backend mas ainda está subutilizado
+Especialmente:
 
-**O que falta:**
-- [ ] Tabela de histórico de contatos por cliente
-- [ ] Data, hora, tipo (email, WhatsApp, ligação)
-- [ ] Descrição do contato
-- [ ] Usuário que fez o contato
-- [ ] Integração com WhatsApp (mostrar mensagens)
-- [ ] Timeline visual
+- timeline
+- risk
+- governance
+- notifications
+- reports
+- organization settings
+- plans / subscriptions / billing
+- automation
+- audit
 
----
-
-## 3. IMPORTANTE - Validações e Regras
-
-### 3.1 Validação de Força de Senha
-**Impacto:** MÉDIO - Segurança  
-**Localização:** `Register.tsx`, `ResetPasswordPage.tsx`  
-**Status:** Apenas comprimento mínimo
-
-**O que falta:**
-- [ ] Exigir maiúsculas
-- [ ] Exigir números
-- [ ] Exigir caracteres especiais
-- [ ] Validação em tempo real com feedback visual
-- [ ] Barra de força de senha
-- [ ] Sugestões de melhoria
+## P3 — Só depois ampliar inteligência, analytics e automação avançada
+Antes disso, seria perfumaria com diploma.
 
 ---
 
-### 3.2 Validação de Email
-**Impacto:** MÉDIO - Qualidade de dados  
-**Localização:** `Register.tsx`, `CustomersPage.tsx`  
-**Status:** Apenas verificação básica
-
-**O que falta:**
-- [ ] Verificação de email duplicado
-- [ ] Confirmação de email (enviar código)
-- [ ] Validação de domínio (não permitir @test.com)
-- [ ] Detecção de typos comuns (gmial.com → gmail.com)
+# 4. GAPS FUNCIONAIS POR ÁREA
 
 ---
 
-### 3.3 Validação de CNPJ/CPF
-**Impacto:** MÉDIO - Compliance  
-**Localização:** `CustomersPage.tsx`, `PeoplePage.tsx`  
-**Status:** Não implementado
+# 4.1 AUTH
 
-**O que falta:**
-- [ ] Validação de CNPJ (empresa)
-- [ ] Validação de CPF (pessoa)
-- [ ] Cálculo de dígito verificador
-- [ ] Máscara de entrada (XX.XXX.XXX/XXXX-XX)
+## Situação atual
+A autenticação básica existe.
+Login e registro já existem no web.
+Sessão via BFF também existe.
+Há caminho para onboarding e redirecionamento.
 
----
+## O que ainda falta
+- fluxo robusto de recuperação de senha realmente funcionando ponta a ponta
+- confirmação de email
+- tratamento de erros mais consistente
+- proteção de rotas mais explícita no frontend
+- controle melhor de estados de loading e sessão expirada
+- política clara de papéis e permissões por tela
 
-### 3.4 Validação de Telefone
-**Impacto:** BAIXO - UX  
-**Localização:** `CustomersPage.tsx`, `WhatsAppPage.tsx`  
-**Status:** Sem máscara
+## Impacto
+Sem isso, a entrada no sistema funciona, mas ainda não transmite produto maduro.
 
-**O que falta:**
-- [ ] Máscara de telefone (XX) XXXXX-XXXX
-- [ ] Validação de DDD
-- [ ] Suporte para WhatsApp (+55)
-
----
-
-## 4. IMPORTANTE - Integrações Externas
-
-### 4.1 Google OAuth
-**Impacto:** MÉDIO - UX de login  
-**Localização:** `server/_core/google-oauth.ts`  
-**Status:** Infraestrutura pronta
-
-**O que falta:**
-- [ ] GOOGLE_OAUTH_CLIENT_ID
-- [ ] GOOGLE_OAUTH_CLIENT_SECRET
-- [ ] Testar fluxo completo
-- [ ] Botão em Login/Register
+## Prioridade
+P0
 
 ---
 
-### 4.2 WhatsApp Business API
-**Impacto:** MÉDIO - Comunicação  
-**Localização:** `server/routers/whatsapp-webhook.ts`  
-**Status:** Estrutura pronta
+# 4.2 CUSTOMERS
 
-**O que falta:**
-- [ ] WHATSAPP_BUSINESS_ACCOUNT_ID
-- [ ] WHATSAPP_BUSINESS_PHONE_NUMBER_ID
-- [ ] WHATSAPP_API_TOKEN
-- [ ] Testar webhook
-- [ ] Enviar mensagens reais
+## Situação atual
+Clientes já existem como entidade central do sistema.
+O modelo operacional oficial coloca Customer como base do relacionamento comercial.
 
----
+## O que ainda falta
+- endereço completo estruturado
+- histórico de contato
+- notas operacionais úteis
+- visualização mais rica do workspace do cliente
+- timeline de cliente integrada de forma forte no frontend
+- padronização de filtros e busca
+- estados mais claros de cliente ativo/inativo
+- preparação para múltiplos serviços por cliente
 
-### 4.3 Google Maps
-**Impacto:** BAIXO - Localização  
-**Localização:** `client/src/components/Map.tsx`  
-**Status:** Componente pronto
+## Gap principal
+Hoje cliente existe.
+Mas ainda não está plenamente tratado como “centro da operação”.
 
-**O que falta:**
-- [ ] Integrar em página de clientes (endereço)
-- [ ] Mostrar localização de serviços
-- [ ] Calcular rota entre endereços
+## Impacto
+Isso afeta agendamento, cobrança, comunicação e histórico.
 
----
-
-## 5. MELHORIAS - Nice to Have
-
-### 5.1 Notificações em Tempo Real
-- [ ] WebSocket para atualizações live
-- [ ] Notificação de novo agendamento
-- [ ] Notificação de cobrança vencida
-- [ ] Notificação de novo cliente
-
-### 5.2 Busca Avançada
-- [ ] Busca global em todas as páginas
-- [ ] Filtros avançados
-- [ ] Salvar buscas frequentes
-
-### 5.3 Temas Customizáveis
-- [ ] Usuário escolher cor primária
-- [ ] Salvar preferência
-- [ ] Logo da empresa customizável
-
-### 5.4 Auditoria e Logs
-- [ ] Log de todas as ações (criar, editar, deletar)
-- [ ] Quem fez o quê e quando
-- [ ] Restaurar versão anterior
-
-### 5.5 Backup Automático
-- [ ] Backup diário dos dados
-- [ ] Restauração de backup
-- [ ] Retenção de 30 dias
+## Prioridade
+P0
 
 ---
 
-## 6. Checklist de Priorização
+# 4.3 APPOINTMENTS
 
-### 🔴 CRÍTICO (Implementar Agora)
-- [ ] Email funcional
-- [ ] Pagamento funcional
-- [ ] Validação de limites por plano
-- [ ] Service Order → Charge
+## Situação atual
+Agendamento existe e já faz parte do fluxo oficial.
 
-### 🟠 IMPORTANTE (Próximas 2 semanas)
-- [ ] Notas Fiscais integradas
-- [ ] Despesas em relatório
-- [ ] Relatórios em PDF
-- [ ] Histórico de contatos
-- [ ] Validações (senha, email, CNPJ/CPF)
+## O que ainda falta
+- calendário visual melhor
+- confirmação real de agendamento
+- lembrete automático
+- remarcação robusta
+- cancelamento com motivo
+- disponibilidade real de horário
+- status operacional mais claros
+- integração melhor com comunicação
 
-### 🟡 LEGAL (Próximo mês)
-- [ ] Google OAuth com credenciais
-- [ ] WhatsApp Business API
-- [ ] Google Maps integrado
-- [ ] Notificações em tempo real
+## Gap principal
+O agendamento existe como registro.
+Ainda precisa virar um fluxo operacional confiável.
 
-### 🟢 NICE TO HAVE (Quando tiver tempo)
-- [ ] Busca avançada
-- [ ] Temas customizáveis
-- [ ] Auditoria e logs
-- [ ] Backup automático
+## Impacto
+Sem isso, agenda vira só tabela bonitinha com cosplay de controle.
+
+## Prioridade
+P0
 
 ---
 
-## 7. Estimativa de Trabalho
+# 4.4 SERVICE ORDERS
 
-| Item | Complexidade | Tempo | Prioridade |
-|------|-------------|-------|-----------|
-| Email | Média | 2h | 🔴 |
-| Pagamento | Alta | 6h | 🔴 |
-| Validação de Limites | Média | 3h | 🔴 |
-| Service Order → Charge | Média | 2h | 🔴 |
-| Notas Fiscais | Média | 4h | 🟠 |
-| Despesas em Relatório | Baixa | 2h | 🟠 |
-| Relatórios PDF | Média | 4h | 🟠 |
-| Histórico de Contatos | Baixa | 2h | 🟠 |
-| Validações | Baixa | 3h | 🟠 |
-| Google OAuth | Baixa | 1h | 🟡 |
-| WhatsApp API | Média | 3h | 🟡 |
-| Google Maps | Baixa | 2h | 🟡 |
+## Situação atual
+Ordem de serviço já existe e é peça central do modelo operacional.
+Também já aparece no frontend.
 
-**Total Crítico:** 13h  
-**Total Importante:** 15h  
-**Total Legal:** 6h  
+## O que ainda falta
+- vinculação mais clara com execução real
+- início e fim de execução mais consistentes
+- campos operacionais úteis no fechamento da OS
+- atualização de status com regras melhores
+- geração automática de cobrança ao concluir serviço
+- vínculo mais forte entre OS, timeline e risco
+- eventual suporte a anexos e evidências futuras
 
----
+## Gap principal
+A OS já existe, mas ainda precisa ser a “unidade real de execução” do produto.
 
-## Conclusão
+## Impacto
+Sem isso, o sistema controla cadastro, mas não controla bem a entrega.
 
-O NexoGestão está **95% funcional**, mas precisa de:
-
-1. **Email real** para recuperação de senha
-2. **Pagamento real** para monetização
-3. **Validação de limites** para controlar uso por plano
-4. **Integração Service Order → Charge** para fluxo de negócio
-
-Depois disso, é **100% pronto para produção**.
-
-**Tempo estimado para crítico:** 13 horas  
-**Tempo estimado para importante:** 15 horas  
-**Tempo estimado para legal:** 6 horas  
-
-**Total:** ~34 horas de desenvolvimento
+## Prioridade
+P0
 
 ---
 
-**Última atualização:** 02/03/2026 14:50 GMT-3
+# 4.5 FINANCE
+
+## Situação atual
+O sistema financeiro oficial gira em torno de Charge e Payment.
+Esse fluxo está definido na arquitetura e no documento financeiro.
+
+## O que ainda falta
+- pagamento realmente integrado e fluindo bem no produto
+- fechamento completo cobrança → pagamento → atualização de status
+- geração automática de cobrança após conclusão de serviço
+- visão mais forte por cliente
+- mais consistência entre charges, invoices, launches e expenses
+- dashboard financeiro mais operacional
+- lembretes automáticos de cobrança
+- confirmação automática de pagamento em timeline e comunicação
+- futura camada de billing SaaS separada do financeiro operacional
+
+## Gap principal
+O financeiro existe, mas ainda está parcialmente fragmentado entre módulos.
+
+## Impacto
+É um dos pontos mais críticos porque encosta diretamente em receita.
+
+## Prioridade
+P0
+
+---
+
+# 4.6 WHATSAPP
+
+## Situação atual
+A comunicação operacional é pilar oficial do sistema.
+O WhatsApp é o canal principal definido na documentação.
+A proposta do sistema é comunicação contextual vinculada a eventos operacionais.
+
+## O que ainda falta
+- envio automático realmente amarrado a eventos
+- templates padronizados por tipo
+- confirmação de agendamento automática
+- lembrete de serviço
+- envio de link de pagamento
+- confirmação de pagamento
+- tratamento de falhas e retry
+- histórico melhor por entidade operacional
+- status de entrega mais confiável
+- integração sólida com timeline
+
+## Gap principal
+Hoje o WhatsApp tende a existir mais como capacidade técnica do que como motor operacional fechado.
+
+## Impacto
+Esse módulo é diferencial comercial.
+Se estiver meia-bomba, o produto perde força de venda.
+
+## Prioridade
+P0
+
+---
+
+# 5. GAPS TRANSVERSAIS
+
+---
+
+# 5.1 TIMELINE
+
+## Situação atual
+A timeline é fonte oficial de histórico operacional.
+Ela deve registrar eventos centrais do sistema.
+
+## O que ainda falta
+- uso mais forte no frontend
+- visualização por cliente
+- visualização por ordem de serviço
+- visualização financeira
+- filtros por tipo de evento
+- consistência de metadados
+- garantia de que eventos críticos estão sendo gerados em todos os fluxos principais
+
+## Gap principal
+A timeline é central na arquitetura, mas ainda não está explorada no produto na mesma proporção.
+
+## Prioridade
+P1
+
+---
+
+# 5.2 RISK ENGINE
+
+## Situação atual
+O motor de risco é um dos diferenciais centrais do NexoGestão.
+Ele já faz parte da visão oficial da plataforma.
+
+## O que ainda falta
+- tornar o risco mais visível no frontend operacional
+- explicar claramente por que o risco mudou
+- ligar eventos operacionais ao score de forma mais transparente
+- exibir histórico de risco
+- tornar o impacto do risco mais acionável para o usuário
+
+## Gap principal
+O risco já existe como inteligência interna.
+Ainda precisa aparecer como valor prático para a operação.
+
+## Prioridade
+P1
+
+---
+
+# 5.3 GOVERNANÇA
+
+## Situação atual
+Governança é pilar oficial da plataforma.
+Já existe conceito de execução de governança, políticas e enforcement.
+
+## O que ainda falta
+- experiência mais clara para leitura de execuções
+- maior ligação com alertas operacionais
+- explicação das decisões tomadas
+- exibição melhor das transições de estado operacional
+- visão administrativa mais forte
+- correlação mais clara com risco e timeline
+
+## Gap principal
+A governança existe.
+Mas ainda precisa parecer menos “coisa interna do sistema” e mais “controle útil para o gestor”.
+
+## Prioridade
+P1
+
+---
+
+# 5.4 AUDITORIA
+
+## Situação atual
+Auditoria e histórico estão previstos como parte da arquitetura.
+
+## O que ainda falta
+- persistência forte e consistente dos logs críticos
+- interface de consulta
+- auditoria por entidade
+- auditoria por usuário
+- diferenciação clara entre timeline operacional e auditoria administrativa
+
+## Gap principal
+Sem auditoria robusta, o sistema perde força institucional e maturidade.
+
+## Prioridade
+P1
+
+---
+
+# 5.5 NOTIFICAÇÕES
+
+## Situação atual
+O sistema prevê Notification Center em tempo real.
+
+## O que ainda falta
+- uso consistente no frontend
+- alertas úteis e priorizados
+- integração com eventos reais
+- agrupamento por severidade
+- leitura/não leitura
+- integração com governança, financeiro e operação
+
+## Prioridade
+P1
+
+---
+
+# 6. MÓDULOS DO BACKEND QUE PARECEM SUBUTILIZADOS PELO WEB
+
+Esses módulos existem ou estão registrados na arquitetura/plataforma, mas ainda não parecem explorados como deveriam no produto final:
+
+- Risk
+- Governance
+- Timeline
+- Audit
+- Notifications
+- Reports
+- Organization Settings
+- Plans
+- Subscriptions
+- Billing
+- Automation
+- Analytics
+- Pending / Exceptions / Corrective Actions
+- Invites
+- Email
+
+## Diagnóstico
+Aqui mora um risco clássico:
+backend rico + frontend magro = produto com potencial alto e percepção baixa.
+
+---
+
+# 7. O QUE FALTA PARA FICAR “VENDA REAL”
+
+## Falta fechar estes ciclos de forma impecável:
+
+### 7.1 Ciclo operacional base
+- criar cliente
+- agendar
+- gerar OS
+- executar
+- cobrar
+- receber
+- registrar histórico
+
+### 7.2 Ciclo de comunicação
+- confirmar
+- lembrar
+- cobrar
+- avisar
+- registrar entrega/falha
+
+### 7.3 Ciclo de controle
+- registrar evento
+- recalcular risco
+- atualizar governança
+- notificar responsável
+
+### 7.4 Ciclo administrativo
+- autenticar
+- definir permissão
+- configurar organização
+- consultar histórico
+- analisar operação
+
+---
+
+# 8. O QUE NÃO É PRIORIDADE AGORA
+
+Não é hora de abrir mais frente antes de fechar produto base.
+
+## Segurar por enquanto:
+- múltiplos canais além do WhatsApp
+- analytics rebuscado demais
+- automação mega configurável
+- inteligência preditiva sofisticada
+- upload de arquivos avançado
+- integrações externas demais
+- relatórios super complexos
+- machine learning e foguete de Marte
+
+Primeiro o arroz.
+Depois a nave espacial.
+
+---
+
+# 9. CHECKLIST EXECUTÁVEL DE PRÓXIMA AUDITORIA
+
+## Backend vs frontend
+- [ ] mapear todas as rotas consumidas pelo frontend
+- [ ] mapear rotas existentes no backend sem uso no web
+- [ ] validar consistência de payloads
+- [ ] validar erros e retornos padronizados
+
+## Fluxo auth
+- [ ] login
+- [ ] registro
+- [ ] sessão
+- [ ] logout
+- [ ] forgot password
+- [ ] reset password
+- [ ] proteção de rota
+
+## Fluxo customers
+- [ ] listagem
+- [ ] criação
+- [ ] edição
+- [ ] dados completos
+- [ ] timeline por cliente
+- [ ] histórico de contato
+
+## Fluxo appointments
+- [ ] criação
+- [ ] confirmação
+- [ ] remarcação
+- [ ] cancelamento
+- [ ] lembrete
+- [ ] vínculo com cliente
+
+## Fluxo service orders
+- [ ] criação
+- [ ] atualização de status
+- [ ] início de execução
+- [ ] conclusão
+- [ ] vínculo com cobrança
+- [ ] timeline operacional
+
+## Fluxo financeiro
+- [ ] criação de cobrança
+- [ ] listagem
+- [ ] cobrança vencida
+- [ ] pagamento
+- [ ] atualização de status
+- [ ] comunicação financeira
+
+## Fluxo WhatsApp
+- [ ] envio manual
+- [ ] envio automático
+- [ ] templates
+- [ ] status de entrega
+- [ ] retry
+- [ ] registro na timeline
+
+## Controle operacional
+- [ ] timeline funcionando
+- [ ] risco recalculando
+- [ ] governança reagindo
+- [ ] alertas aparecendo
+
+---
+
+# 10. DEFINIÇÃO HONESTA DO MOMENTO ATUAL
+
+O NexoGestão já tem cara de plataforma.
+
+Mas para virar produto operacional forte de verdade, ainda precisa:
+
+- fechar os ciclos principais
+- reduzir lacunas entre backend e frontend
+- tornar comunicação e financeiro realmente confiáveis
+- expor melhor risco, timeline e governança
+- transformar módulos existentes em valor visível para o usuário
+
+---
+
+# 11. CONCLUSÃO
+
+A fase de “limpar entulho” já avançou bastante.
+
+Agora a meta correta é:
+
+**parar de expandir lateralmente**
+e
+**começar a fechar verticalmente**
+
+Ou seja:
+
+menos módulo novo  
+mais fluxo completo
+
+menos promessa  
+mais operação funcionando de ponta a ponta
+
+menos “já temos backend pra isso”  
+mais “o usuário realmente consegue usar isso até o fim”
+
+---
+
+# 12. PRÓXIMO FOCO RECOMENDADO
+
+## Ordem sugerida
+1. auth
+2. customers
+3. appointments
+4. service orders
+5. finance
+6. whatsapp
+7. timeline
+8. risk
+9. governance
+10. settings / plans / billing / reports
+
+---
+
+# 13. FRASE-GUIA DO PRODUTO
+
+O NexoGestão não precisa parecer enorme.
+
+Ele precisa parecer inevitável para a operação.
+
+Quando cliente, agenda, execução, cobrança, pagamento, comunicação, risco e governança fluírem sem atrito, aí sim a plataforma vira bicho de verdade.
+
+
+---
+
+# 14. P0 IMEDIATO — PRÓXIMA RODADA DE EXECUÇÃO
+
+## Objetivo
+Fechar o ciclo principal do produto com o menor número possível de lacunas visíveis para operação real.
+
+## Ordem prática de ataque
+
+### P0.1 Auth
+**Meta:** autenticação sem fricção e sem buraco de sessão
+
+**Revisar:**
+- `apps/web/client/src/contexts/AuthContext.tsx`
+- `apps/web/client/src/pages/Login.tsx`
+- `apps/web/client/src/pages/Register.tsx`
+- `apps/web/client/src/pages/ForgotPasswordPage.tsx`
+- `apps/web/client/src/pages/ResetPasswordPage.tsx`
+- `apps/web/server/routers/nexo-proxy.ts`
+- `apps/api/src/auth/*`
+
+**Pronto quando:**
+- login funcionar sem estado inconsistente
+- logout limpar sessão corretamente
+- rota protegida não vazar
+- recuperação de senha tiver fluxo real ou ficar explicitamente desativada no produto
+
+---
+
+### P0.2 Customers
+**Meta:** cliente virar centro operacional real
+
+**Revisar:**
+- `apps/web/client/src/pages/CustomersPage.tsx`
+- `apps/web/server/routers/nexo-proxy.ts`
+- `apps/api/src/customers/*`
+- `apps/api/src/timeline/*`
+- `apps/api/src/whatsapp/*`
+
+**Pronto quando:**
+- criar, editar e listar cliente funcionar sem ruído
+- cliente tiver dados realmente úteis para operação
+- ações posteriores do sistema conseguirem partir do cliente sem remendo
+
+---
+
+### P0.3 Appointments
+**Meta:** agenda confiável, não só cadastro de horário
+
+**Revisar:**
+- `apps/web/client/src/pages/AppointmentsPage.tsx`
+- `apps/api/src/appointments/*`
+- `apps/api/src/customers/*`
+- `apps/api/src/whatsapp/*`
+- `apps/api/src/timeline/*`
+
+**Pronto quando:**
+- criar e listar agendamento funcionar bem
+- status fizer sentido
+- cliente vinculado corretamente
+- base pronta para confirmação e lembrete
+
+---
+
+### P0.4 Service Orders
+**Meta:** OS virar núcleo real de execução
+
+**Revisar:**
+- `apps/web/client/src/pages/ServiceOrdersPage.tsx`
+- `apps/api/src/service-orders/*`
+- `apps/api/src/execution/*`
+- `apps/api/src/timeline/*`
+- `apps/api/src/risk/*`
+
+**Pronto quando:**
+- OS puder ser criada, iniciada, concluída e visualizada sem ambiguidade
+- execução alterar estado de forma coerente
+- conclusão preparar terreno para cobrança
+
+---
+
+### P0.5 Finance
+**Meta:** cobrança e pagamento fecharem ciclo de receita
+
+**Revisar:**
+- `apps/web/client/src/pages/FinancesPage.tsx`
+- `apps/web/client/src/pages/ExpensesPage.tsx`
+- `apps/web/client/src/pages/InvoicesPage.tsx`
+- `apps/web/client/src/pages/LaunchesPage.tsx`
+- `apps/api/src/finance/*`
+- `apps/api/src/payments/*`
+- `apps/api/src/invoices/*`
+- `apps/api/src/expenses/*`
+- `apps/api/src/launches/*`
+
+**Pronto quando:**
+- cobrança for criada corretamente
+- status financeiro fizer sentido
+- pagamento atualizar o ciclo
+- operação enxergar o que recebeu, o que falta e o que venceu
+
+---
+
+### P0.6 WhatsApp
+**Meta:** comunicação operacional real, não módulo decorativo
+
+**Revisar:**
+- `apps/web/client/src/pages/WhatsAppPage.tsx`
+- `apps/api/src/whatsapp/*`
+- `apps/api/src/notifications/*`
+- `apps/api/src/timeline/*`
+- `apps/api/src/service-orders/*`
+- `apps/api/src/appointments/*`
+- `apps/api/src/finance/*`
+
+**Pronto quando:**
+- mensagens puderem ser enviadas com contexto
+- eventos importantes prepararem comunicação
+- histórico fizer sentido
+- falhas não sumirem no vazio
+
+---
+
+# 15. CRITÉRIO DE PRONTO POR FLUXO
+
+## Auth pronto
+- usuário entra
+- usuário sai
+- sessão persiste certo
+- sessão expira sem quebrar UI
+- erro de login aparece limpo
+
+## Customer pronto
+- cliente nasce limpo
+- cliente edita limpo
+- cliente aparece onde precisa aparecer
+- cliente sustenta agendamento, OS e cobrança
+
+## Appointment pronto
+- agenda cria
+- agenda lista
+- agenda atualiza
+- agenda conversa com cliente
+- agenda prepara comunicação
+
+## Service Order pronta
+- OS nasce
+- OS executa
+- OS conclui
+- OS registra evento
+- OS prepara financeiro
+
+## Finance pronto
+- cobrança nasce
+- cobrança muda de status
+- pagamento fecha ciclo
+- histórico financeiro bate com operação
+
+## WhatsApp pronto
+- mensagem sai com contexto
+- evento relevante pode disparar mensagem
+- histórico fica rastreável
+- falha fica visível
+
+---
+
+# 16. PERGUNTA-MESTRE PARA CADA MÓDULO
+
+Antes de mexer em qualquer área, responder:
+
+**isso aqui fecha um fluxo real de operação ou só aumenta volume de sistema?**
+
+Se fechar fluxo, continua.  
+Se só aumentar volume, segura.
+
+---
+
+# 17. PRÓXIMA SAÍDA ESPERADA DA AUDITORIA
+
+Depois da próxima revisão técnica, o ideal é gerar um novo documento com este formato:
+
+- rotas backend usadas pelo frontend
+- rotas backend sem uso
+- páginas com fluxo completo
+- páginas com fluxo parcial
+- TODOs críticos de produto
+- P0 fechado
+- P1 pendente
+- decisão do que não entra agora
