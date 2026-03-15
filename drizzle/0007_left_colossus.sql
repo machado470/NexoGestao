@@ -1,1 +1,0 @@
-ALTER TABLE `organizations` MODIFY COLUMN `password` text NOT NULL;

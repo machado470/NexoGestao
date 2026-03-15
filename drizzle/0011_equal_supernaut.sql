@@ -1,1 +1,0 @@
-ALTER TABLE `users` ADD `organizationId` int DEFAULT 1 NOT NULL;
