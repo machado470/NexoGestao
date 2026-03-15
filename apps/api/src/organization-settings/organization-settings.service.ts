@@ -16,6 +16,8 @@ export class OrganizationSettingsService {
         id: true,
         name: true,
         slug: true,
+        timezone: true,
+        currency: true,
       },
     })
 
@@ -32,8 +34,6 @@ export class OrganizationSettingsService {
 
     return {
       ...organization,
-      timezone: 'America/Sao_Paulo',
-      currency: 'BRL',
       currentPlan: subscription?.plan?.name || 'Nenhum',
       membersCount,
     }
@@ -47,11 +47,15 @@ export class OrganizationSettingsService {
       where: { id: orgId },
       data: {
         ...(data.name ? { name: data.name } : {}),
+        ...(data.timezone ? { timezone: data.timezone } : {}),
+        ...(data.currency ? { currency: data.currency } : {}),
       },
       select: {
         id: true,
         name: true,
         slug: true,
+        timezone: true,
+        currency: true,
       },
     })
 
@@ -64,8 +68,6 @@ export class OrganizationSettingsService {
 
     return {
       ...organization,
-      timezone: data.timezone || 'America/Sao_Paulo',
-      currency: data.currency || 'BRL',
       currentPlan: subscription?.plan?.name || 'Nenhum',
       membersCount,
     }

@@ -12,6 +12,8 @@ model Organization {
   name               String
   slug               String             @unique
   requiresOnboarding Boolean            @default(true)
+  timezone           String             @default("America/Sao_Paulo")
+  currency           String             @default("BRL")
   createdAt          DateTime           @default(now())
   appointments       Appointment[]
   auditEvents        AuditEvent[]
