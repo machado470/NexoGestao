@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -9,14 +10,132 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, AlertCircle } from "lucide-react";
+import {
+  Loader2,
+  AlertCircle,
+  Plus,
+  Pencil,
+  CheckCircle2,
+  Trash2,
+  RefreshCw,
+  Search,
+  X,
+} from "lucide-react";
+import { CreateChargeModal } from "@/components/CreateChargeModal";
+import { EditChargeModal } from "@/components/EditChargeModal";
+
+type ChargeStatusFilter = "ALL" | "PENDING" | "PAID" | "OVERDUE" | "CANCELED";
+
+function formatMoney(value: number) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(value);
+}
 
 export default function FinancesPage() {
+  const utils = trpc.useUtils();
+
   const [page, setPage] = useState(1);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [editChargeId, setEditChargeId] = useState<string | null>(null);
+  const [searchInput, setSearchInput] = useState("");
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<ChargeStatusFilter>("ALL");
+
   const limit = 20;
 
-  const chargesQuery = trpc.finance.charges.list.useQuery({ page, limit });
+  const chargesQuery = trpc.finance.charges.list.useQuery({
+    page,
+    limit,
+    q: query || undefined,
+    status: statusFilter === "ALL" ? undefined : statusFilter,
+  });
+
   const statsQuery = trpc.finance.charges.stats.useQuery({});
+
+  const payCharge = trpc.finance.charges.pay.useMutation({
+    onSuccess: async () => {
+      toast.success("Pagamento registrado com sucesso");
+      await Promise.all([
+        chargesQuery.refetch(),
+        statsQuery.refetch(),
+        utils.finance.charges.list.invalidate(),
+        utils.finance.charges.stats.invalidate(),
+      ]);
+    },
+    onError: (error) => {
+      toast.error(error.message || "Erro ao registrar pagamento");
+    },
+  });
+
+  const deleteCharge = trpc.finance.charges.delete.useMutation({
+    onSuccess: async () => {
+      toast.success("Cobrança excluída com sucesso");
+      await Promise.all([
+        chargesQuery.refetch(),
+        statsQuery.refetch(),
+        utils.finance.charges.list.invalidate(),
+        utils.finance.charges.stats.invalidate(),
+      ]);
+    },
+    onError: (error) => {
+      toast.error(error.message || "Erro ao excluir cobrança");
+    },
+  });
+
+  const refreshAll = async () => {
+    await Promise.all([
+      chargesQuery.refetch(),
+      statsQuery.refetch(),
+      utils.finance.charges.list.invalidate(),
+      utils.finance.charges.stats.invalidate(),
+    ]);
+  };
+
+  const handleApplyFilters = () => {
+    setPage(1);
+    setQuery(searchInput.trim());
+  };
+
+  const handleClearFilters = () => {
+    setPage(1);
+    setSearchInput("");
+    setQuery("");
+    setStatusFilter("ALL");
+  };
+
+  const handleChangeStatusFilter = (value: ChargeStatusFilter) => {
+    setPage(1);
+    setStatusFilter(value);
+  };
+
+  const handlePayCharge = async (charge: any) => {
+    const amountCents = Number(charge?.amountCents ?? 0);
+
+    if (!amountCents || amountCents <= 0) {
+      toast.error("Valor da cobrança inválido para pagamento");
+      return;
+    }
+
+    await payCharge.mutateAsync({
+      chargeId: String(charge.id),
+      method: "PIX",
+      amountCents,
+    });
+  };
+
+  const handleDeleteCharge = async (charge: any) => {
+    const confirmed = window.confirm(
+      `Excluir a cobrança de ${charge?.customer?.name || "cliente"}?`,
+    );
+
+    if (!confirmed) return;
+
+    await deleteCharge.mutateAsync({
+      id: String(charge.id),
+    });
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -48,10 +167,29 @@ export default function FinancesPage() {
     }
   };
 
+  const getStatusFilterLabel = (status: ChargeStatusFilter) => {
+    switch (status) {
+      case "ALL":
+        return "Todos";
+      case "PAID":
+        return "Pago";
+      case "PENDING":
+        return "Pendente";
+      case "OVERDUE":
+        return "Vencido";
+      case "CANCELED":
+        return "Cancelado";
+      default:
+        return status;
+    }
+  };
+
+  const isSubmitting = payCharge.isPending || deleteCharge.isPending;
+
   if (chargesQuery.isLoading || statsQuery.isLoading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+      <div className="flex h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
       </div>
     );
   }
@@ -65,188 +203,343 @@ export default function FinancesPage() {
     pages: 1,
   };
 
+  const paidCount = useMemo(
+    () => charges.filter((charge: any) => charge.status === "PAID").length,
+    [charges],
+  );
+
+  const hasActiveFilters = Boolean(query) || statusFilter !== "ALL";
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Financeiro</h1>
-        <p className="text-gray-600 dark:text-gray-400">
-          Gestão de cobranças e receitas
-        </p>
-      </div>
+    <>
+      <CreateChargeModal
+        isOpen={createModalOpen}
+        onClose={() => setCreateModalOpen(false)}
+        onSuccess={() => {
+          void refreshAll();
+        }}
+      />
 
-      {stats && (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">
-                Total de Cobranças
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-600">
-                {stats.totalCharges}
-              </div>
-              <p className="mt-1 text-xs text-gray-500">Todas as cobranças</p>
-            </CardContent>
-          </Card>
+      <EditChargeModal
+        isOpen={!!editChargeId}
+        chargeId={editChargeId}
+        onClose={() => setEditChargeId(null)}
+        onSuccess={() => {
+          void refreshAll();
+        }}
+      />
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">
-                Cobranças Pagas
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">
-                R$ {Number(stats.totalPaidAmount || 0).toFixed(2)}
-              </div>
-              <p className="mt-1 text-xs text-gray-500">
-                {stats.totalPaid} cobranças
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">
-                Cobranças Pendentes
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-yellow-600">
-                R$ {Number(stats.totalPendingAmount || 0).toFixed(2)}
-              </div>
-              <p className="mt-1 text-xs text-gray-500">
-                {stats.totalPending} cobranças
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">
-                Cobranças Vencidas
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-600">
-                R$ {Number(stats.totalOverdueAmount || 0).toFixed(2)}
-              </div>
-              <p className="mt-1 text-xs text-gray-500">
-                {stats.totalOverdue} cobranças
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {stats && stats.totalOverdue > 0 && (
-        <Card className="border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20">
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-red-600" />
-              <CardTitle className="text-red-900 dark:text-red-400">
-                {stats.totalOverdue} Cobranças Vencidas
-              </CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-red-800 dark:text-red-300">
-              Total em atraso: R$ {Number(stats.totalOverdueAmount || 0).toFixed(2)}
+      <div className="space-y-6">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Financeiro</h1>
+            <p className="text-gray-600 dark:text-gray-400">
+              Gestão de cobranças e receitas
             </p>
-          </CardContent>
-        </Card>
-      )}
+          </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Cobranças</CardTitle>
-          <CardDescription>
-            Página {pagination.page} de {pagination.pages}
-          </CardDescription>
-        </CardHeader>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                void refreshAll();
+              }}
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Atualizar
+            </Button>
 
-        <CardContent>
-          {charges.length > 0 ? (
-            <div className="space-y-4">
-              {charges.map((charge: any) => (
-                <div
-                  key={charge.id}
-                  className="rounded-lg border p-4 transition hover:bg-gray-50 dark:hover:bg-gray-800/50"
-                >
-                  <div className="mb-3 flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900 dark:text-white">
-                        {charge.notes || `Cobrança #${charge.id}`}
-                      </h3>
-                      <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                        Cliente: {charge.customer?.name || "N/A"}
-                      </p>
-                    </div>
+            <Button
+              onClick={() => setCreateModalOpen(true)}
+              className="bg-orange-500 text-white hover:bg-orange-600"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Nova cobrança
+            </Button>
+          </div>
+        </div>
 
-                    <Badge className={getStatusColor(charge.status)}>
-                      {getStatusLabel(charge.status)}
-                    </Badge>
-                  </div>
+        {stats && (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">
+                  Total de Cobranças
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-blue-600">
+                  {stats.totalCharges}
+                </div>
+                <p className="mt-1 text-xs text-gray-500">Todas as cobranças</p>
+              </CardContent>
+            </Card>
 
-                  <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-3">
-                    <div>
-                      <p className="text-gray-600 dark:text-gray-400">Valor</p>
-                      <p className="font-semibold text-gray-900 dark:text-white">
-                        R$ {(Number(charge.amountCents || 0) / 100).toFixed(2)}
-                      </p>
-                    </div>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">
+                  Cobranças Pagas
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-600">
+                  {formatMoney(Number(stats.totalPaidAmount || 0))}
+                </div>
+                <p className="mt-1 text-xs text-gray-500">
+                  {stats.totalPaid} cobranças
+                </p>
+              </CardContent>
+            </Card>
 
-                    <div>
-                      <p className="text-gray-600 dark:text-gray-400">Vencimento</p>
-                      <p className="font-semibold text-gray-900 dark:text-white">
-                        {charge.dueDate
-                          ? new Date(charge.dueDate).toLocaleDateString("pt-BR")
-                          : "N/A"}
-                      </p>
-                    </div>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">
+                  Cobranças Pendentes
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-yellow-600">
+                  {formatMoney(Number(stats.totalPendingAmount || 0))}
+                </div>
+                <p className="mt-1 text-xs text-gray-500">
+                  {stats.totalPending} cobranças
+                </p>
+              </CardContent>
+            </Card>
 
-                    {charge.paidAt && (
-                      <div>
-                        <p className="text-gray-600 dark:text-gray-400">Pagamento</p>
-                        <p className="font-semibold text-green-600">
-                          {new Date(charge.paidAt).toLocaleDateString("pt-BR")}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">
+                  Cobranças Vencidas
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-red-600">
+                  {formatMoney(Number(stats.totalOverdueAmount || 0))}
+                </div>
+                <p className="mt-1 text-xs text-gray-500">
+                  {stats.totalOverdue} cobranças
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {stats && stats.totalOverdue > 0 && (
+          <Card className="border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-red-600" />
+                <CardTitle className="text-red-900 dark:text-red-400">
+                  {stats.totalOverdue} Cobranças Vencidas
+                </CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-red-800 dark:text-red-300">
+                Total em atraso: {formatMoney(Number(stats.totalOverdueAmount || 0))}
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
+        <Card>
+          <CardHeader className="space-y-4">
+            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <div>
+                <CardTitle>Cobranças</CardTitle>
+                <CardDescription>
+                  Página {pagination.page} de {pagination.pages}
+                </CardDescription>
+              </div>
+
+              <div className="text-sm text-gray-500">
+                Exibidas: {charges.length} • Pagas nesta página: {paidCount}
+              </div>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-[1fr_220px_auto_auto]">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      handleApplyFilters();
+                    }
+                  }}
+                  placeholder="Buscar por cliente, telefone ou O.S."
+                  className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-10 pr-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                />
+              </div>
+
+              <select
+                value={statusFilter}
+                onChange={(e) =>
+                  handleChangeStatusFilter(e.target.value as ChargeStatusFilter)
+                }
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+              >
+                <option value="ALL">Todos os status</option>
+                <option value="PENDING">Pendentes</option>
+                <option value="PAID">Pagas</option>
+                <option value="OVERDUE">Vencidas</option>
+                <option value="CANCELED">Canceladas</option>
+              </select>
+
+              <Button onClick={handleApplyFilters}>
+                Buscar
+              </Button>
+
+              <Button
+                variant="outline"
+                onClick={handleClearFilters}
+                disabled={!hasActiveFilters && !searchInput}
+              >
+                <X className="mr-2 h-4 w-4" />
+                Limpar
+              </Button>
+            </div>
+
+            {hasActiveFilters && (
+              <div className="flex flex-wrap gap-2 text-sm text-gray-500">
+                {query && (
+                  <span className="rounded-full border px-3 py-1">
+                    Busca: {query}
+                  </span>
+                )}
+                {statusFilter !== "ALL" && (
+                  <span className="rounded-full border px-3 py-1">
+                    Status: {getStatusFilterLabel(statusFilter)}
+                  </span>
+                )}
+              </div>
+            )}
+          </CardHeader>
+
+          <CardContent>
+            {charges.length > 0 ? (
+              <div className="space-y-4">
+                {charges.map((charge: any) => (
+                  <div
+                    key={charge.id}
+                    className="rounded-lg border p-4 transition hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                  >
+                    <div className="mb-3 flex items-start justify-between gap-4">
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-gray-900 dark:text-white">
+                          {charge.notes?.trim() || `Cobrança #${charge.id.slice(0, 8)}`}
+                        </h3>
+                        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                          Cliente: {charge.customer?.name || "N/A"}
                         </p>
                       </div>
-                    )}
+
+                      <Badge className={getStatusColor(charge.status)}>
+                        {getStatusLabel(charge.status)}
+                      </Badge>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-3">
+                      <div>
+                        <p className="text-gray-600 dark:text-gray-400">Valor</p>
+                        <p className="font-semibold text-gray-900 dark:text-white">
+                          {formatMoney(Number(charge.amountCents || 0) / 100)}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="text-gray-600 dark:text-gray-400">Vencimento</p>
+                        <p className="font-semibold text-gray-900 dark:text-white">
+                          {charge.dueDate
+                            ? new Date(charge.dueDate).toLocaleDateString("pt-BR")
+                            : "N/A"}
+                        </p>
+                      </div>
+
+                      {charge.paidAt && (
+                        <div>
+                          <p className="text-gray-600 dark:text-gray-400">Pagamento</p>
+                          <p className="font-semibold text-green-600">
+                            {new Date(charge.paidAt).toLocaleDateString("pt-BR")}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mt-4 flex flex-wrap gap-2 border-t pt-4">
+                      {(charge.status === "PENDING" || charge.status === "OVERDUE") && (
+                        <Button
+                          size="sm"
+                          onClick={() => void handlePayCharge(charge)}
+                          disabled={isSubmitting}
+                          className="bg-green-600 text-white hover:bg-green-700"
+                        >
+                          <CheckCircle2 className="mr-2 h-4 w-4" />
+                          Registrar pagamento
+                        </Button>
+                      )}
+
+                      {charge.status !== "PAID" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setEditChargeId(String(charge.id))}
+                          disabled={isSubmitting}
+                        >
+                          <Pencil className="mr-2 h-4 w-4" />
+                          Editar
+                        </Button>
+                      )}
+
+                      {charge.status !== "PAID" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => void handleDeleteCharge(charge)}
+                          disabled={isSubmitting}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Excluir
+                        </Button>
+                      )}
+                    </div>
                   </div>
+                ))}
+
+                <div className="mt-6 flex items-center justify-between border-t pt-4">
+                  <Button
+                    onClick={() => setPage(Math.max(1, page - 1))}
+                    disabled={page === 1}
+                    variant="outline"
+                  >
+                    Anterior
+                  </Button>
+
+                  <span className="text-sm text-gray-600">
+                    Página {pagination.page} de {pagination.pages}
+                  </span>
+
+                  <Button
+                    onClick={() => setPage(page + 1)}
+                    disabled={page >= pagination.pages}
+                    variant="outline"
+                  >
+                    Próxima
+                  </Button>
                 </div>
-              ))}
-
-              <div className="mt-6 flex items-center justify-between border-t pt-4">
-                <Button
-                  onClick={() => setPage(Math.max(1, page - 1))}
-                  disabled={page === 1}
-                  variant="outline"
-                >
-                  Anterior
-                </Button>
-
-                <span className="text-sm text-gray-600">
-                  Página {pagination.page} de {pagination.pages}
-                </span>
-
-                <Button
-                  onClick={() => setPage(page + 1)}
-                  disabled={page >= pagination.pages}
-                  variant="outline"
-                >
-                  Próxima
-                </Button>
               </div>
-            </div>
-          ) : (
-            <div className="py-8 text-center text-gray-500">
-              Nenhuma cobrança encontrada
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+            ) : (
+              <div className="py-8 text-center text-gray-500">
+                Nenhuma cobrança encontrada
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </>
   );
 }

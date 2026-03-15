@@ -14,7 +14,6 @@ export const financeRouter = router({
       .input(
         z.object({
           customerId: z.union([z.string(), z.number()]).transform((v) => String(v)),
-          description: z.string().optional(),
           amount: z.number().min(0.01, "Valor deve ser maior que 0").optional(),
           amountCents: z.number().int().min(1).optional(),
           dueDate: z.coerce.date(),
@@ -101,24 +100,19 @@ export const financeRouter = router({
       .input(
         z.object({
           id: z.union([z.string(), z.number()]).transform((v) => String(v)),
-          description: z.string().min(1).optional(),
           amount: z.number().min(0.01).optional(),
           amountCents: z.number().int().min(1).optional(),
           dueDate: z.coerce.date().optional(),
-          paidAt: z.coerce.date().optional(),
-          paidDate: z.coerce.date().optional(),
-          status: z.enum(["PENDING", "PAID", "OVERDUE", "CANCELED"]).optional(),
+          status: z.enum(["PENDING", "OVERDUE", "CANCELED"]).optional(),
           notes: z.string().optional(),
         }),
       )
       .mutation(async ({ input, ctx }) => {
-        const { id, amount, amountCents: amountCentsInput, paidDate, ...rest } = input;
+        const { id, amount, amountCents: amountCentsInput, ...rest } = input;
 
         const amountCents =
           amountCentsInput ??
           (amount ? Math.round(amount * 100) : undefined);
-
-        const paidAt = rest.paidAt ?? paidDate;
 
         const raw = await nexoFetch<any>(ctx.req, `/finance/charges/${id}`, {
           method: "PATCH",
@@ -126,7 +120,6 @@ export const financeRouter = router({
             ...rest,
             amountCents,
             dueDate: rest.dueDate ? rest.dueDate.toISOString() : undefined,
-            paidAt: paidAt ? paidAt.toISOString() : undefined,
           }),
         });
 
@@ -178,7 +171,7 @@ export const financeRouter = router({
         z.object({
           chargeId: z.union([z.string(), z.number()]).transform((v) => String(v)),
           method: z.enum(["PIX", "CASH", "CARD", "TRANSFER", "OTHER"]).default("PIX"),
-          amountCents: z.number().int().min(1).optional(),
+          amountCents: z.number().int().min(1),
         }),
       )
       .mutation(async ({ input, ctx }) => {

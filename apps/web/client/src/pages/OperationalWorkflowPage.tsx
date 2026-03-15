@@ -40,10 +40,26 @@ export default function OperationalWorkflowPage() {
         chargesQuery.refetch(),
         alertsQuery.refetch(),
         utils.finance.charges.list.invalidate(),
+        utils.finance.charges.stats.invalidate(),
       ]);
     },
     onError: (error) => {
       toast.error(error.message || "Erro ao atualizar cobrança");
+    },
+  });
+
+  const payCharge = trpc.finance.charges.pay.useMutation({
+    onSuccess: async () => {
+      toast.success("Pagamento registrado com sucesso");
+      await Promise.all([
+        chargesQuery.refetch(),
+        alertsQuery.refetch(),
+        utils.finance.charges.list.invalidate(),
+        utils.finance.charges.stats.invalidate(),
+      ]);
+    },
+    onError: (error) => {
+      toast.error(error.message || "Erro ao registrar pagamento");
     },
   });
 
@@ -67,6 +83,8 @@ export default function OperationalWorkflowPage() {
     );
   }, [serviceOrders]);
 
+  const isSubmitting = updateCharge.isPending || payCharge.isPending;
+
   const markChargeOverdue = async (id: string) => {
     await updateCharge.mutateAsync({
       id,
@@ -75,11 +93,17 @@ export default function OperationalWorkflowPage() {
   };
 
   const markChargePaid = async (id: string, amountCents?: number) => {
-    await updateCharge.mutateAsync({
-      id,
-      status: "PAID",
-      paidAt: new Date(),
-      amountCents: Number(amountCents ?? 0) || undefined,
+    const safeAmountCents = Number(amountCents ?? 0);
+
+    if (!safeAmountCents || safeAmountCents <= 0) {
+      toast.error("Valor da cobrança inválido para registrar pagamento");
+      return;
+    }
+
+    await payCharge.mutateAsync({
+      chargeId: id,
+      method: "PIX",
+      amountCents: safeAmountCents,
     });
   };
 
@@ -185,7 +209,7 @@ export default function OperationalWorkflowPage() {
                         size="sm"
                         variant="outline"
                         onClick={() => void markChargeOverdue(String(charge.id))}
-                        disabled={updateCharge.isPending}
+                        disabled={isSubmitting}
                       >
                         Marcar vencida
                       </Button>
@@ -198,7 +222,7 @@ export default function OperationalWorkflowPage() {
                             Number(charge.amountCents ?? 0),
                           )
                         }
-                        disabled={updateCharge.isPending}
+                        disabled={isSubmitting}
                       >
                         <CheckCircle2 className="mr-1 h-4 w-4" />
                         Marcar paga

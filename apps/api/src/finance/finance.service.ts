@@ -428,8 +428,11 @@ export class FinanceService {
 
       if (!charge) throw new NotFoundException('Cobrança não encontrada')
       if (charge.status === 'PAID') return { alreadyPaid: true }
-      if (charge.status !== 'PENDING') {
-        throw new BadRequestException('Transição inválida: somente PENDING → PAID')
+
+      if (!['PENDING', 'OVERDUE'].includes(charge.status)) {
+        throw new BadRequestException(
+          'Transição inválida: somente PENDING/OVERDUE → PAID',
+        )
       }
 
       if (input.amountCents !== charge.amountCents) {
@@ -454,7 +457,11 @@ export class FinanceService {
       }
 
       const transition = await tx.charge.updateMany({
-        where: { id: charge.id, orgId: input.orgId, status: 'PENDING' },
+        where: {
+          id: charge.id,
+          orgId: input.orgId,
+          status: { in: ['PENDING', 'OVERDUE'] },
+        },
         data: {
           status: 'PAID',
           paidAt: now,
@@ -533,6 +540,7 @@ export class FinanceService {
         where: { id: charge.id, orgId: input.orgId },
         include: { customer: { select: { id: true, phone: true } } },
       })
+
       if (paidCharge?.customer?.phone) {
         await this.whatsapp.queueMessage({
           orgId: input.orgId,
@@ -700,6 +708,7 @@ export class FinanceService {
         status: true,
         dueDate: true,
         paidAt: true,
+        notes: true,
         createdAt: true,
         updatedAt: true,
         customer: true,
@@ -810,6 +819,12 @@ export class FinanceService {
   async updateCharge(input: any) {
     const { id, orgId, actorUserId, actorPersonId, ...data } = input
 
+    if (data.status === 'PAID' || data.paidAt) {
+      throw new BadRequestException(
+        'Use o fluxo de pagamento para marcar a cobrança como paga',
+      )
+    }
+
     const updated = await this.prisma.$transaction(async (tx) => {
       const ownership = await tx.charge.findFirst({
         where: { id, orgId },
@@ -823,7 +838,6 @@ export class FinanceService {
         data: {
           amountCents: data.amountCents,
           dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
-          paidAt: data.paidAt ? new Date(data.paidAt) : undefined,
           status: data.status,
           notes: data.notes,
         },

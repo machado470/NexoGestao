@@ -17,7 +17,6 @@ export function CreateChargeModal({
 }: CreateChargeModalProps) {
   const [formData, setFormData] = useState({
     customerId: "",
-    description: "",
     amount: "",
     dueDate: "",
     notes: "",
@@ -28,7 +27,6 @@ export function CreateChargeModal({
       toast.success("Cobrança criada com sucesso!");
       setFormData({
         customerId: "",
-        description: "",
         amount: "",
         dueDate: "",
         notes: "",
@@ -54,11 +52,6 @@ export function CreateChargeModal({
       return;
     }
 
-    if (!formData.description.trim()) {
-      toast.error("Descrição é obrigatória");
-      return;
-    }
-
     if (!formData.amount) {
       toast.error("Valor é obrigatório");
       return;
@@ -77,7 +70,6 @@ export function CreateChargeModal({
 
     await createCharge.mutateAsync({
       customerId: formData.customerId,
-      description: formData.description.trim(),
       amount,
       dueDate: new Date(`${formData.dueDate}T12:00:00`),
       notes: formData.notes.trim() || undefined,
@@ -97,6 +89,7 @@ export function CreateChargeModal({
           <button
             onClick={onClose}
             className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+            type="button"
           >
             <X className="h-5 w-5" />
           </button>
@@ -127,21 +120,6 @@ export function CreateChargeModal({
                 </option>
               ))}
             </select>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Descrição *
-            </label>
-            <input
-              type="text"
-              value={formData.description}
-              onChange={(e) =>
-                setFormData({ ...formData, description: e.target.value })
-              }
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-              placeholder="Ex: Serviço de consultoria"
-            />
           </div>
 
           <div>
@@ -196,6 +174,7 @@ export function CreateChargeModal({
             onClick={onClose}
             variant="outline"
             className="text-gray-700 dark:text-gray-300"
+            type="button"
           >
             Cancelar
           </Button>
@@ -204,6 +183,7 @@ export function CreateChargeModal({
             onClick={() => void submitCharge()}
             disabled={createCharge.isPending}
             className="bg-orange-500 text-white hover:bg-orange-600"
+            type="button"
           >
             {createCharge.isPending ? (
               <>
