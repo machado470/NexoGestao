@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { Loader2, X } from "lucide-react";
@@ -23,7 +23,11 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
 
   const customerQuery = trpc.nexo.customers.getById.useQuery(
     { id: idStr! },
-    { enabled: open && !!idStr, retry: false, refetchOnWindowFocus: false }
+    {
+      enabled: open && !!idStr,
+      retry: false,
+      refetchOnWindowFocus: false,
+    }
   );
 
   const updateMutation = trpc.nexo.customers.update.useMutation({
@@ -32,7 +36,9 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
       onSaved?.();
       onClose();
     },
-    onError: (err: any) => toast.error(err.message || "Erro ao atualizar cliente"),
+    onError: (err: any) => {
+      toast.error(err.message || "Erro ao atualizar cliente");
+    },
   });
 
   const customer = useMemo(() => {
@@ -57,8 +63,6 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
     setNotes("");
     setActive(true);
   }, [open, customer]);
-
-  if (!open) return null;
 
   const submit = async () => {
     if (!idStr) return;
@@ -88,6 +92,8 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
     });
   };
 
+  if (!open) return null;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
@@ -97,6 +103,7 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
             Editar Cliente
           </h2>
+
           <button
             type="button"
             onClick={onClose}
@@ -121,31 +128,31 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
                 <input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                  className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                   placeholder="Ex: Cliente Demo"
                 />
               </div>
 
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Telefone *
+                  Telefone / WhatsApp *
                 </label>
                 <input
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                  className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                   placeholder="Ex: +5547999999999"
                 />
               </div>
 
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Email (opcional)
+                  Email
                 </label>
                 <input
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                  className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                   placeholder="cliente@demo.com"
                   type="email"
                 />
@@ -153,14 +160,14 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
 
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Observações (opcional)
+                  Observações
                 </label>
                 <textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                  placeholder="Observações úteis sobre o cliente"
-                  rows={3}
+                  className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                  placeholder="Informações úteis sobre o cliente"
+                  rows={4}
                 />
               </div>
 
@@ -170,7 +177,7 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
                     Cliente ativo
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Desative para tirar o cliente do fluxo operacional sem apagar histórico.
+                    Desative para tirar o cliente do fluxo sem apagar histórico.
                   </p>
                 </div>
 
@@ -194,6 +201,7 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
           <Button type="button" variant="outline" onClick={onClose}>
             Cancelar
           </Button>
+
           <Button
             type="button"
             onClick={submit}

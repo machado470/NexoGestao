@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, type ComponentType, type ReactNode } from "react";
 import { Route, Switch, useLocation } from "wouter";
 import { Loader } from "lucide-react";
 
@@ -42,8 +42,8 @@ import OperationsDashboardPage from "./pages/OperationsDashboardPage";
 
 function FullScreenLoader() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-      <Loader className="w-8 h-8 animate-spin text-orange-500" />
+    <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-900">
+      <Loader className="h-8 w-8 animate-spin text-orange-500" />
     </div>
   );
 }
@@ -60,7 +60,7 @@ function FullScreenMessage({
   onAction?: () => void;
 }) {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-6 dark:bg-gray-900">
+    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-6 dark:bg-gray-900">
       <div className="w-full max-w-md rounded-2xl border bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
         <h1 className="text-xl font-semibold">{title}</h1>
         <p className="mt-2 text-sm text-muted-foreground">{description}</p>
@@ -86,7 +86,7 @@ function ProtectedRoute({
   requireCompletedOnboarding = false,
   onboardingOnly = false,
 }: {
-  component: React.ComponentType;
+  component: ComponentType;
   allowedRoles?: Role[];
   permissions?: Permission[];
   requireCompletedOnboarding?: boolean;
@@ -112,14 +112,13 @@ function ProtectedRoute({
 
     if (onboardingOnly && !requiresOnboarding) {
       navigate("/dashboard");
-      return;
     }
   }, [
     isAuthenticated,
     isInitializing,
     navigate,
-    requireCompletedOnboarding,
     onboardingOnly,
+    requireCompletedOnboarding,
     requiresOnboarding,
   ]);
 
@@ -164,7 +163,7 @@ function ProtectedRoute({
   return <Component />;
 }
 
-function PublicRoute({ component: Component }: { component: React.ComponentType }) {
+function PublicRoute({ component: Component }: { component: ComponentType }) {
   const { isAuthenticated, isInitializing, redirectTo } = useAuth();
   const [, navigate] = useLocation();
 
@@ -172,7 +171,7 @@ function PublicRoute({ component: Component }: { component: React.ComponentType 
     if (!isInitializing && isAuthenticated) {
       navigate(redirectTo || "/dashboard");
     }
-  }, [isAuthenticated, isInitializing, redirectTo, navigate]);
+  }, [isAuthenticated, isInitializing, navigate, redirectTo]);
 
   if (isInitializing) {
     return <FullScreenLoader />;
@@ -185,293 +184,210 @@ function PublicRoute({ component: Component }: { component: React.ComponentType 
   return <Component />;
 }
 
+function withMainLayout(Page: ComponentType) {
+  return function LayoutWrappedPage() {
+    return (
+      <MainLayout>
+        <Page />
+      </MainLayout>
+    );
+  };
+}
+
+function protectedPage(
+  Page: ComponentType,
+  options?: {
+    allowedRoles?: Role[];
+    permissions?: Permission[];
+    requireCompletedOnboarding?: boolean;
+    onboardingOnly?: boolean;
+  }
+) {
+  const WrappedPage = withMainLayout(Page);
+
+  return function ProtectedPageRoute() {
+    return (
+      <ProtectedRoute
+        component={WrappedPage}
+        allowedRoles={options?.allowedRoles}
+        permissions={options?.permissions}
+        requireCompletedOnboarding={options?.requireCompletedOnboarding}
+        onboardingOnly={options?.onboardingOnly}
+      />
+    );
+  };
+}
+
+function publicPage(Page: ComponentType) {
+  return function PublicPageRoute() {
+    return <PublicRoute component={Page} />;
+  };
+}
+
+function onboardingPage(Page: ComponentType) {
+  return function OnboardingPageRoute() {
+    return <ProtectedRoute onboardingOnly component={Page} />;
+  };
+}
+
+function RouteShell({ children }: { children: ReactNode }) {
+  return <>{children}</>;
+}
+
+const DashboardRoute = protectedPage(Dashboard, {
+  requireCompletedOnboarding: true,
+});
+
+const CustomersRoute = protectedPage(CustomersPage, {
+  requireCompletedOnboarding: true,
+  permissions: ["customers:read"],
+});
+
+const AppointmentsRoute = protectedPage(AppointmentsPage, {
+  requireCompletedOnboarding: true,
+  permissions: ["appointments:read"],
+});
+
+const ServiceOrdersRoute = protectedPage(ServiceOrdersPage, {
+  requireCompletedOnboarding: true,
+  permissions: ["orders:read"],
+});
+
+const FinancesRoute = protectedPage(FinancesPage, {
+  requireCompletedOnboarding: true,
+  permissions: ["finance:read"],
+});
+
+const PeopleRoute = protectedPage(PeoplePage, {
+  requireCompletedOnboarding: true,
+  allowedRoles: ["ADMIN", "MANAGER"],
+});
+
+const GovernanceRoute = protectedPage(GovernancePage, {
+  requireCompletedOnboarding: true,
+  allowedRoles: ["ADMIN", "MANAGER", "VIEWER"],
+});
+
+const ExecutiveDashboardRoute = protectedPage(ExecutiveDashboard, {
+  requireCompletedOnboarding: true,
+  allowedRoles: ["ADMIN", "MANAGER", "VIEWER"],
+});
+
+const ExecutiveDashboardNewRoute = protectedPage(ExecutiveDashboardNew, {
+  requireCompletedOnboarding: true,
+  allowedRoles: ["ADMIN", "MANAGER", "VIEWER"],
+});
+
+const WhatsAppRoute = protectedPage(WhatsAppPage, {
+  requireCompletedOnboarding: true,
+  allowedRoles: ["ADMIN", "MANAGER", "STAFF"],
+});
+
+const LaunchesRoute = protectedPage(LaunchesPage, {
+  requireCompletedOnboarding: true,
+  allowedRoles: ["ADMIN", "MANAGER"],
+});
+
+const InvoicesRoute = protectedPage(InvoicesPage, {
+  requireCompletedOnboarding: true,
+  allowedRoles: ["ADMIN", "MANAGER"],
+});
+
+const ExpensesRoute = protectedPage(ExpensesPage, {
+  requireCompletedOnboarding: true,
+  allowedRoles: ["ADMIN", "MANAGER"],
+});
+
+const ReferralsRoute = protectedPage(ReferralsPage, {
+  requireCompletedOnboarding: true,
+  allowedRoles: ["ADMIN", "MANAGER"],
+});
+
+const CalendarRoute = protectedPage(CalendarPage, {
+  requireCompletedOnboarding: true,
+  permissions: ["appointments:read"],
+});
+
+const SettingsRoute = protectedPage(SettingsPage, {
+  requireCompletedOnboarding: true,
+  permissions: ["settings:manage"],
+});
+
+const TimelineRoute = protectedPage(TimelinePage, {
+  requireCompletedOnboarding: true,
+  allowedRoles: ["ADMIN", "MANAGER", "VIEWER"],
+});
+
+const OperationsRoute = protectedPage(OperationalWorkflowPage, {
+  requireCompletedOnboarding: true,
+  allowedRoles: ["ADMIN", "MANAGER", "STAFF"],
+});
+
+const OperationsDashboardRoute = protectedPage(OperationsDashboardPage, {
+  requireCompletedOnboarding: true,
+  allowedRoles: ["ADMIN", "MANAGER", "STAFF"],
+});
+
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={() => <PublicRoute component={Landing} />} />
-      <Route path="/login" component={() => <PublicRoute component={Login} />} />
-      <Route path="/register" component={() => <PublicRoute component={Register} />} />
-      <Route
-        path="/forgot-password"
-        component={() => <PublicRoute component={ForgotPasswordPage} />}
-      />
-      <Route
-        path="/reset-password"
-        component={() => <PublicRoute component={ResetPasswordPage} />}
-      />
+      <Route path="/">
+        <RouteShell>
+          {publicPage(Landing)()}
+        </RouteShell>
+      </Route>
 
-      <Route
-        path="/onboarding"
-        component={() => <ProtectedRoute onboardingOnly component={Onboarding} />}
-      />
+      <Route path="/login">
+        <RouteShell>
+          {publicPage(Login)()}
+        </RouteShell>
+      </Route>
 
-      <Route
-        path="/dashboard"
-        component={() => (
-          <ProtectedRoute
-            requireCompletedOnboarding
-            component={() => (
-              <MainLayout>
-                <Dashboard />
-              </MainLayout>
-            )}
-          />
-        )}
-      />
-      <Route
-        path="/customers"
-        component={() => (
-          <ProtectedRoute
-            requireCompletedOnboarding
-            permissions={["customers:read"]}
-            component={() => (
-              <MainLayout>
-                <CustomersPage />
-              </MainLayout>
-            )}
-          />
-        )}
-      />
-      <Route
-        path="/appointments"
-        component={() => (
-          <ProtectedRoute
-            requireCompletedOnboarding
-            permissions={["appointments:read"]}
-            component={() => (
-              <MainLayout>
-                <AppointmentsPage />
-              </MainLayout>
-            )}
-          />
-        )}
-      />
-      <Route
-        path="/service-orders"
-        component={() => (
-          <ProtectedRoute
-            requireCompletedOnboarding
-            permissions={["orders:read"]}
-            component={() => (
-              <MainLayout>
-                <ServiceOrdersPage />
-              </MainLayout>
-            )}
-          />
-        )}
-      />
-      <Route
-        path="/finances"
-        component={() => (
-          <ProtectedRoute
-            requireCompletedOnboarding
-            permissions={["finance:read"]}
-            component={() => (
-              <MainLayout>
-                <FinancesPage />
-              </MainLayout>
-            )}
-          />
-        )}
-      />
-      <Route
-        path="/people"
-        component={() => (
-          <ProtectedRoute
-            requireCompletedOnboarding
-            allowedRoles={["ADMIN", "MANAGER"]}
-            component={() => (
-              <MainLayout>
-                <PeoplePage />
-              </MainLayout>
-            )}
-          />
-        )}
-      />
-      <Route
-        path="/governance"
-        component={() => (
-          <ProtectedRoute
-            requireCompletedOnboarding
-            allowedRoles={["ADMIN", "MANAGER", "VIEWER"]}
-            component={() => (
-              <MainLayout>
-                <GovernancePage />
-              </MainLayout>
-            )}
-          />
-        )}
-      />
-      <Route
-        path="/executive-dashboard"
-        component={() => (
-          <ProtectedRoute
-            requireCompletedOnboarding
-            allowedRoles={["ADMIN", "MANAGER", "VIEWER"]}
-            component={() => (
-              <MainLayout>
-                <ExecutiveDashboard />
-              </MainLayout>
-            )}
-          />
-        )}
-      />
-      <Route
-        path="/executive-dashboard-new"
-        component={() => (
-          <ProtectedRoute
-            requireCompletedOnboarding
-            allowedRoles={["ADMIN", "MANAGER", "VIEWER"]}
-            component={() => (
-              <MainLayout>
-                <ExecutiveDashboardNew />
-              </MainLayout>
-            )}
-          />
-        )}
-      />
-      <Route
-        path="/whatsapp"
-        component={() => (
-          <ProtectedRoute
-            requireCompletedOnboarding
-            allowedRoles={["ADMIN", "MANAGER", "STAFF"]}
-            component={() => (
-              <MainLayout>
-                <WhatsAppPage />
-              </MainLayout>
-            )}
-          />
-        )}
-      />
-      <Route
-        path="/launches"
-        component={() => (
-          <ProtectedRoute
-            requireCompletedOnboarding
-            allowedRoles={["ADMIN", "MANAGER"]}
-            component={() => (
-              <MainLayout>
-                <LaunchesPage />
-              </MainLayout>
-            )}
-          />
-        )}
-      />
-      <Route
-        path="/invoices"
-        component={() => (
-          <ProtectedRoute
-            requireCompletedOnboarding
-            allowedRoles={["ADMIN", "MANAGER"]}
-            component={() => (
-              <MainLayout>
-                <InvoicesPage />
-              </MainLayout>
-            )}
-          />
-        )}
-      />
-      <Route
-        path="/expenses"
-        component={() => (
-          <ProtectedRoute
-            requireCompletedOnboarding
-            allowedRoles={["ADMIN", "MANAGER"]}
-            component={() => (
-              <MainLayout>
-                <ExpensesPage />
-              </MainLayout>
-            )}
-          />
-        )}
-      />
-      <Route
-        path="/referrals"
-        component={() => (
-          <ProtectedRoute
-            requireCompletedOnboarding
-            allowedRoles={["ADMIN", "MANAGER"]}
-            component={() => (
-              <MainLayout>
-                <ReferralsPage />
-              </MainLayout>
-            )}
-          />
-        )}
-      />
-      <Route
-        path="/calendar"
-        component={() => (
-          <ProtectedRoute
-            requireCompletedOnboarding
-            permissions={["appointments:read"]}
-            component={() => (
-              <MainLayout>
-                <CalendarPage />
-              </MainLayout>
-            )}
-          />
-        )}
-      />
-      <Route
-        path="/settings"
-        component={() => (
-          <ProtectedRoute
-            requireCompletedOnboarding
-            permissions={["settings:manage"]}
-            component={() => (
-              <MainLayout>
-                <SettingsPage />
-              </MainLayout>
-            )}
-          />
-        )}
-      />
-      <Route
-        path="/timeline"
-        component={() => (
-          <ProtectedRoute
-            requireCompletedOnboarding
-            allowedRoles={["ADMIN", "MANAGER", "VIEWER"]}
-            component={() => (
-              <MainLayout>
-                <TimelinePage />
-              </MainLayout>
-            )}
-          />
-        )}
-      />
-      <Route
-        path="/operations"
-        component={() => (
-          <ProtectedRoute
-            requireCompletedOnboarding
-            allowedRoles={["ADMIN", "MANAGER", "STAFF"]}
-            component={() => (
-              <MainLayout>
-                <OperationalWorkflowPage />
-              </MainLayout>
-            )}
-          />
-        )}
-      />
-      <Route
-        path="/dashboard/operations"
-        component={() => (
-          <ProtectedRoute
-            requireCompletedOnboarding
-            allowedRoles={["ADMIN", "MANAGER", "STAFF"]}
-            component={() => (
-              <MainLayout>
-                <OperationsDashboardPage />
-              </MainLayout>
-            )}
-          />
-        )}
-      />
+      <Route path="/register">
+        <RouteShell>
+          {publicPage(Register)()}
+        </RouteShell>
+      </Route>
 
-      <Route path="/about" component={() => <About />} />
+      <Route path="/forgot-password">
+        <RouteShell>
+          {publicPage(ForgotPasswordPage)()}
+        </RouteShell>
+      </Route>
+
+      <Route path="/reset-password">
+        <RouteShell>
+          {publicPage(ResetPasswordPage)()}
+        </RouteShell>
+      </Route>
+
+      <Route path="/onboarding">
+        <RouteShell>
+          {onboardingPage(Onboarding)()}
+        </RouteShell>
+      </Route>
+
+      <Route path="/dashboard" component={DashboardRoute} />
+      <Route path="/customers" component={CustomersRoute} />
+      <Route path="/appointments" component={AppointmentsRoute} />
+      <Route path="/service-orders" component={ServiceOrdersRoute} />
+      <Route path="/finances" component={FinancesRoute} />
+      <Route path="/people" component={PeopleRoute} />
+      <Route path="/governance" component={GovernanceRoute} />
+      <Route path="/executive-dashboard" component={ExecutiveDashboardRoute} />
+      <Route path="/executive-dashboard-new" component={ExecutiveDashboardNewRoute} />
+      <Route path="/whatsapp" component={WhatsAppRoute} />
+      <Route path="/launches" component={LaunchesRoute} />
+      <Route path="/invoices" component={InvoicesRoute} />
+      <Route path="/expenses" component={ExpensesRoute} />
+      <Route path="/referrals" component={ReferralsRoute} />
+      <Route path="/calendar" component={CalendarRoute} />
+      <Route path="/settings" component={SettingsRoute} />
+      <Route path="/timeline" component={TimelineRoute} />
+      <Route path="/operations" component={OperationsRoute} />
+      <Route path="/dashboard/operations" component={OperationsDashboardRoute} />
+
+      <Route path="/about" component={About} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>

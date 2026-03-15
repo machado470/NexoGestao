@@ -8,6 +8,7 @@ import {
   User,
   Calendar,
   AlertCircle,
+  Wallet,
 } from "lucide-react";
 import CreateServiceOrderModal from "@/components/CreateServiceOrderModal";
 import { toast } from "sonner";
@@ -143,6 +144,8 @@ export default function ServiceOrdersPage() {
   const limit = 20;
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [statusFilter, setStatusFilter] = useState<ServiceOrderStatus | "">("");
+  const [processingId, setProcessingId] = useState<string | null>(null);
+  const utils = trpc.useUtils();
 
   const listQuery = trpc.nexo.serviceOrders.list.useQuery(
     {
@@ -168,6 +171,26 @@ export default function ServiceOrdersPage() {
     },
     onError: (err) => {
       toast.error(err.message || "Erro ao atualizar OS");
+    },
+    onSettled: () => {
+      setProcessingId(null);
+    },
+  });
+
+  const generateChargeMutation = trpc.finance.charges.create.useMutation({
+    onSuccess: async () => {
+      toast.success("Cobrança gerada com sucesso!");
+      await Promise.all([
+        listQuery.refetch(),
+        utils.finance.charges.list.invalidate(),
+        utils.finance.charges.stats.invalidate(),
+      ]);
+    },
+    onError: (err) => {
+      toast.error(err.message || "Erro ao gerar cobrança");
+    },
+    onSettled: () => {
+      setProcessingId(null);
     },
   });
 
@@ -205,6 +228,7 @@ export default function ServiceOrdersPage() {
   }, [listQuery.error]);
 
   const handleStatusChange = (id: string, newStatus: ServiceOrderStatus) => {
+    setProcessingId(id);
     updateMutation.mutate({
       id,
       data: { status: newStatus },
@@ -212,27 +236,45 @@ export default function ServiceOrdersPage() {
   };
 
   const handleStartExecution = (id: string) => {
-    updateMutation.mutate(
-      { id, data: { status: "IN_PROGRESS" } },
-      {
-        onSuccess: () => {
-          toast.success("Execução iniciada.");
-          void listQuery.refetch();
-        },
-      }
-    );
+    setProcessingId(id);
+    updateMutation.mutate({
+      id,
+      data: { status: "IN_PROGRESS" },
+    });
   };
 
   const handleFinishExecution = (id: string) => {
-    updateMutation.mutate(
-      { id, data: { status: "DONE" } },
-      {
-        onSuccess: () => {
-          toast.success("Execução finalizada.");
-          void listQuery.refetch();
-        },
-      }
-    );
+    setProcessingId(id);
+    updateMutation.mutate({
+      id,
+      data: { status: "DONE" },
+    });
+  };
+
+  const handleGenerateCharge = async (serviceOrder: ServiceOrder) => {
+    if (!serviceOrder.customerId) {
+      toast.error("OS sem cliente vinculado.");
+      return;
+    }
+
+    if (!serviceOrder.amountCents || serviceOrder.amountCents <= 0) {
+      toast.error("Defina um valor válido na OS antes de gerar cobrança.");
+      return;
+    }
+
+    setProcessingId(serviceOrder.id);
+
+    try {
+      await generateChargeMutation.mutateAsync({
+        customerId: serviceOrder.customerId,
+        serviceOrderId: serviceOrder.id,
+        amountCents: serviceOrder.amountCents,
+        dueDate: serviceOrder.dueDate ?? new Date().toISOString(),
+        notes: `Cobrança gerada manualmente para OS: ${serviceOrder.title}`,
+      });
+    } catch {
+      // toast já tratado
+    }
   };
 
   const total = serviceOrders.length;
@@ -311,6 +353,7 @@ export default function ServiceOrdersPage() {
           (status) => (
             <button
               key={status || "ALL"}
+              type="button"
               onClick={() => {
                 setStatusFilter(status);
                 setPage(1);
@@ -359,104 +402,144 @@ export default function ServiceOrdersPage() {
 
       {serviceOrders.length > 0 && (
         <div className="space-y-3">
-          {serviceOrders.map((os) => (
-            <div
-              key={os.id}
-              className="rounded-xl border border-gray-200 bg-white p-4 transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-800"
-            >
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0 flex-1">
+          {serviceOrders.map((os) => {
+            const isProcessing = processingId === os.id;
+
+            return (
+              <div
+                key={os.id}
+                className="rounded-xl border border-gray-200 bg-white p-4 transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-800"
+              >
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="truncate font-semibold text-gray-900 dark:text-white">
+                        {os.title}
+                      </h3>
+
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                          STATUS_COLORS[os.status]
+                        }`}
+                      >
+                        {STATUS_LABELS[os.status]}
+                      </span>
+
+                      <span
+                        className={`text-xs font-medium ${getPriorityColor(os.priority)}`}
+                      >
+                        ● {getPriorityLabel(os.priority)}
+                      </span>
+                    </div>
+
+                    {os.description && (
+                      <p className="mt-1 line-clamp-2 text-sm text-gray-500 dark:text-gray-400">
+                        {os.description}
+                      </p>
+                    )}
+
+                    <div className="mt-2 flex flex-wrap items-center gap-4 text-xs text-gray-400 dark:text-gray-500">
+                      <span className="flex items-center gap-1">
+                        <User className="h-3 w-3" />
+                        {os.customer?.name ?? "Cliente não identificado"}
+                      </span>
+
+                      <span className="flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        Criada em {formatDate(os.createdAt)}
+                      </span>
+
+                      <span>Agendada para {formatDateTime(os.scheduledFor)}</span>
+
+                      <span>Valor {formatCurrency(os.amountCents)}</span>
+
+                      <span>Vencimento {formatDate(os.dueDate)}</span>
+                    </div>
+
+                    {os.assignedTo?.name ? (
+                      <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                        Responsável: {os.assignedTo.name}
+                      </p>
+                    ) : null}
+
+                    {os.appointmentId ? (
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        Agendamento vinculado: {os.appointmentId}
+                      </p>
+                    ) : null}
+
+                    {os.finishedAt ? (
+                      <p className="mt-1 text-xs text-green-600 dark:text-green-400">
+                        Finalizada em {formatDateTime(os.finishedAt)}
+                      </p>
+                    ) : null}
+                  </div>
+
                   <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="truncate font-semibold text-gray-900 dark:text-white">
-                      {os.title}
-                    </h3>
-
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                        STATUS_COLORS[os.status]
-                      }`}
+                    <select
+                      value={os.status}
+                      onChange={(e) =>
+                        handleStatusChange(os.id, e.target.value as ServiceOrderStatus)
+                      }
+                      disabled={updateMutation.isPending || isProcessing}
+                      className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300"
                     >
-                      {STATUS_LABELS[os.status]}
-                    </span>
+                      {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
 
-                    <span
-                      className={`text-xs font-medium ${getPriorityColor(os.priority)}`}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleStartExecution(os.id)}
+                      disabled={
+                        os.status === "IN_PROGRESS" ||
+                        os.status === "DONE" ||
+                        os.status === "CANCELED" ||
+                        updateMutation.isPending ||
+                        isProcessing
+                      }
                     >
-                      ● {getPriorityLabel(os.priority)}
-                    </span>
+                      Iniciar execução
+                    </Button>
+
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleFinishExecution(os.id)}
+                      disabled={
+                        os.status !== "IN_PROGRESS" ||
+                        updateMutation.isPending ||
+                        isProcessing
+                      }
+                    >
+                      Finalizar execução
+                    </Button>
+
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => void handleGenerateCharge(os)}
+                      disabled={
+                        generateChargeMutation.isPending ||
+                        isProcessing ||
+                        os.status !== "DONE" ||
+                        !os.amountCents ||
+                        os.amountCents <= 0
+                      }
+                      className="gap-2"
+                    >
+                      <Wallet className="h-4 w-4" />
+                      Gerar cobrança
+                    </Button>
                   </div>
-
-                  {os.description && (
-                    <p className="mt-1 line-clamp-2 text-sm text-gray-500 dark:text-gray-400">
-                      {os.description}
-                    </p>
-                  )}
-
-                  <div className="mt-2 flex flex-wrap items-center gap-4 text-xs text-gray-400 dark:text-gray-500">
-                    <span className="flex items-center gap-1">
-                      <User className="h-3 w-3" />
-                      {os.customer?.name ?? "Cliente não identificado"}
-                    </span>
-
-                    <span className="flex items-center gap-1">
-                      <Calendar className="h-3 w-3" />
-                      Criada em {formatDate(os.createdAt)}
-                    </span>
-
-                    <span>Agendada para {formatDateTime(os.scheduledFor)}</span>
-
-                    <span>Valor {formatCurrency(os.amountCents)}</span>
-                  </div>
-
-                  {os.assignedTo?.name ? (
-                    <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                      Responsável: {os.assignedTo.name}
-                    </p>
-                  ) : null}
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <select
-                    value={os.status}
-                    onChange={(e) =>
-                      handleStatusChange(os.id, e.target.value as ServiceOrderStatus)
-                    }
-                    disabled={updateMutation.isPending}
-                    className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300"
-                  >
-                    {Object.entries(STATUS_LABELS).map(([value, label]) => (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
-
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleStartExecution(os.id)}
-                    disabled={
-                      os.status === "IN_PROGRESS" ||
-                      os.status === "DONE" ||
-                      os.status === "CANCELED" ||
-                      updateMutation.isPending
-                    }
-                  >
-                    Iniciar execução
-                  </Button>
-
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleFinishExecution(os.id)}
-                    disabled={os.status !== "IN_PROGRESS" || updateMutation.isPending}
-                  >
-                    Finalizar execução
-                  </Button>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

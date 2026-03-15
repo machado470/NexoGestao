@@ -26,6 +26,49 @@ import { EditChargeModal } from "@/components/EditChargeModal";
 
 type ChargeStatusFilter = "ALL" | "PENDING" | "PAID" | "OVERDUE" | "CANCELED";
 
+type ChargeStatus = "PENDING" | "PAID" | "OVERDUE" | "CANCELED";
+
+type Charge = {
+  id: string;
+  serviceOrderId?: string | null;
+  customerId: string;
+  amountCents: number;
+  status: ChargeStatus;
+  dueDate: string;
+  paidAt?: string | null;
+  createdAt?: string;
+  notes?: string | null;
+  customer?: {
+    id: string;
+    name: string;
+    phone?: string | null;
+  } | null;
+  serviceOrder?: {
+    id: string;
+    title: string;
+    status?: string;
+  } | null;
+};
+
+type ChargesMeta = {
+  page: number;
+  limit: number;
+  total: number;
+  pages: number;
+  orderBy?: string;
+  direction?: string;
+};
+
+type ChargeStats = {
+  totalCharges: number;
+  totalPaid: number;
+  totalPaidAmount: number;
+  totalPending: number;
+  totalPendingAmount: number;
+  totalOverdue: number;
+  totalOverdueAmount: number;
+};
+
 function formatMoney(value: number) {
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
@@ -110,7 +153,7 @@ export default function FinancesPage() {
     setStatusFilter(value);
   };
 
-  const handlePayCharge = async (charge: any) => {
+  const handlePayCharge = async (charge: Charge) => {
     const amountCents = Number(charge?.amountCents ?? 0);
 
     if (!amountCents || amountCents <= 0) {
@@ -125,9 +168,9 @@ export default function FinancesPage() {
     });
   };
 
-  const handleDeleteCharge = async (charge: any) => {
+  const handleDeleteCharge = async (charge: Charge) => {
     const confirmed = window.confirm(
-      `Excluir a cobrança de ${charge?.customer?.name || "cliente"}?`,
+      `Excluir a cobrança de ${charge?.customer?.name || "cliente"}?`
     );
 
     if (!confirmed) return;
@@ -194,18 +237,23 @@ export default function FinancesPage() {
     );
   }
 
-  const stats = statsQuery.data;
-  const charges = chargesQuery.data?.data || [];
-  const pagination = chargesQuery.data?.pagination || {
+  const statsPayload = statsQuery.data as any;
+  const stats = (statsPayload?.data ?? statsPayload ?? null) as ChargeStats | null;
+
+  const chargesPayload = chargesQuery.data as any;
+  const chargesData = chargesPayload?.data ?? chargesPayload ?? {};
+  const charges = (chargesData?.items ?? []) as Charge[];
+
+  const pagination = (chargesData?.meta ?? {
     page: 1,
     limit: 20,
     total: 0,
     pages: 1,
-  };
+  }) as ChargesMeta;
 
   const paidCount = useMemo(
-    () => charges.filter((charge: any) => charge.status === "PAID").length,
-    [charges],
+    () => charges.filter((charge) => charge.status === "PAID").length,
+    [charges]
   );
 
   const hasActiveFilters = Boolean(query) || statusFilter !== "ALL";
@@ -389,9 +437,7 @@ export default function FinancesPage() {
                 <option value="CANCELED">Canceladas</option>
               </select>
 
-              <Button onClick={handleApplyFilters}>
-                Buscar
-              </Button>
+              <Button onClick={handleApplyFilters}>Buscar</Button>
 
               <Button
                 variant="outline"
@@ -422,7 +468,7 @@ export default function FinancesPage() {
           <CardContent>
             {charges.length > 0 ? (
               <div className="space-y-4">
-                {charges.map((charge: any) => (
+                {charges.map((charge) => (
                   <div
                     key={charge.id}
                     className="rounded-lg border p-4 transition hover:bg-gray-50 dark:hover:bg-gray-800/50"
@@ -430,11 +476,18 @@ export default function FinancesPage() {
                     <div className="mb-3 flex items-start justify-between gap-4">
                       <div className="flex-1">
                         <h3 className="font-semibold text-gray-900 dark:text-white">
-                          {charge.notes?.trim() || `Cobrança #${charge.id.slice(0, 8)}`}
+                          {charge.notes?.trim() ||
+                            charge.serviceOrder?.title ||
+                            `Cobrança #${charge.id.slice(0, 8)}`}
                         </h3>
                         <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
                           Cliente: {charge.customer?.name || "N/A"}
                         </p>
+                        {charge.serviceOrder?.title ? (
+                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            O.S.: {charge.serviceOrder.title}
+                          </p>
+                        ) : null}
                       </div>
 
                       <Badge className={getStatusColor(charge.status)}>
@@ -442,7 +495,7 @@ export default function FinancesPage() {
                       </Badge>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-3">
+                    <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
                       <div>
                         <p className="text-gray-600 dark:text-gray-400">Valor</p>
                         <p className="font-semibold text-gray-900 dark:text-white">
@@ -459,14 +512,23 @@ export default function FinancesPage() {
                         </p>
                       </div>
 
-                      {charge.paidAt && (
+                      <div>
+                        <p className="text-gray-600 dark:text-gray-400">Criada em</p>
+                        <p className="font-semibold text-gray-900 dark:text-white">
+                          {charge.createdAt
+                            ? new Date(charge.createdAt).toLocaleDateString("pt-BR")
+                            : "N/A"}
+                        </p>
+                      </div>
+
+                      {charge.paidAt ? (
                         <div>
                           <p className="text-gray-600 dark:text-gray-400">Pagamento</p>
                           <p className="font-semibold text-green-600">
                             {new Date(charge.paidAt).toLocaleDateString("pt-BR")}
                           </p>
                         </div>
-                      )}
+                      ) : null}
                     </div>
 
                     <div className="mt-4 flex flex-wrap gap-2 border-t pt-4">

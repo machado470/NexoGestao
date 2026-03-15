@@ -20,7 +20,7 @@ export default function CreateCustomerModal({ open, onOpenChange, onCreated }: P
   const createCustomer = trpc.nexo.customers.create.useMutation();
 
   const canSubmit = useMemo(() => {
-    return name.trim().length > 0 && phone.trim().length > 0;
+    return name.trim().length >= 2 && phone.trim().length >= 10;
   }, [name, phone]);
 
   const reset = () => {
@@ -76,6 +76,7 @@ export default function CreateCustomerModal({ open, onOpenChange, onCreated }: P
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
             Novo Cliente
           </h2>
+
           <button
             type="button"
             onClick={close}
@@ -93,34 +94,34 @@ export default function CreateCustomerModal({ open, onOpenChange, onCreated }: P
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
               placeholder="Ex: Cliente Demo"
             />
           </div>
 
           <div>
             <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Telefone *
+              Telefone / WhatsApp *
             </label>
             <input
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
               placeholder="Ex: +5547999999999"
             />
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              Dica: pode mandar com +55 ou só números. O backend normaliza.
+              Pode mandar com +55 ou só números. O backend normaliza.
             </p>
           </div>
 
           <div>
             <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Email (opcional)
+              Email
             </label>
             <input
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
               placeholder="cliente@demo.com"
               type="email"
             />
@@ -128,14 +129,14 @@ export default function CreateCustomerModal({ open, onOpenChange, onCreated }: P
 
           <div>
             <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Observações (opcional)
+              Observações
             </label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-              placeholder="Observações úteis sobre o cliente"
-              rows={3}
+              className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              placeholder="Informações úteis sobre o cliente"
+              rows={4}
             />
           </div>
         </div>
@@ -144,6 +145,7 @@ export default function CreateCustomerModal({ open, onOpenChange, onCreated }: P
           <Button type="button" variant="outline" onClick={close}>
             Cancelar
           </Button>
+
           <Button
             type="button"
             onClick={submit}

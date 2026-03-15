@@ -1,7 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
-import { Plus, Loader, Calendar, RefreshCcw } from "lucide-react";
+import {
+  Plus,
+  Loader,
+  Calendar,
+  RefreshCcw,
+  CheckCircle2,
+  Ban,
+  Clock3,
+  CheckCheck,
+} from "lucide-react";
 import { CreateAppointmentModal } from "@/components/CreateAppointmentModal";
 import { toast } from "sonner";
 
@@ -11,13 +20,15 @@ type CustomerRef = {
   phone?: string | null;
 };
 
+type AppointmentStatus = "SCHEDULED" | "CONFIRMED" | "DONE" | "CANCELED" | "NO_SHOW";
+
 type Appointment = {
   id: string;
   customerId: string;
   customer?: CustomerRef | null;
   startsAt: string;
   endsAt: string | null;
-  status: "SCHEDULED" | "CONFIRMED" | "DONE" | "CANCELED" | "NO_SHOW";
+  status: AppointmentStatus;
   notes: string | null;
   createdAt?: string;
 };
@@ -44,8 +55,8 @@ function truncateText(value?: string | null, max = 60) {
   return `${text.slice(0, max)}...`;
 }
 
-function getStatusLabel(status: Appointment["status"]) {
-  const labels: Record<Appointment["status"], string> = {
+function getStatusLabel(status: AppointmentStatus) {
+  const labels: Record<AppointmentStatus, string> = {
     SCHEDULED: "Agendado",
     CONFIRMED: "Confirmado",
     DONE: "Concluído",
@@ -56,14 +67,16 @@ function getStatusLabel(status: Appointment["status"]) {
   return labels[status] ?? status;
 }
 
-function getStatusColor(status: Appointment["status"]) {
-  const colors: Record<Appointment["status"], string> = {
+function getStatusColor(status: AppointmentStatus) {
+  const colors: Record<AppointmentStatus, string> = {
     SCHEDULED:
       "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
     CONFIRMED:
       "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-    DONE: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400",
-    CANCELED: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
+    DONE:
+      "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400",
+    CANCELED:
+      "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
     NO_SHOW:
       "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
   };
@@ -73,15 +86,33 @@ function getStatusColor(status: Appointment["status"]) {
 
 export default function AppointmentsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<AppointmentStatus | "">("");
+  const [processingId, setProcessingId] = useState<string | null>(null);
 
-  const listAppointments = trpc.nexo.appointments.list.useQuery(undefined, {
-    retry: false,
-    refetchOnWindowFocus: false,
-  });
+  const listAppointments = trpc.nexo.appointments.list.useQuery(
+    statusFilter ? { status: statusFilter } : undefined,
+    {
+      retry: false,
+      refetchOnWindowFocus: false,
+    }
+  );
 
   const listCustomers = trpc.nexo.customers.list.useQuery(undefined, {
     retry: false,
     refetchOnWindowFocus: false,
+  });
+
+  const updateAppointment = trpc.nexo.appointments.update.useMutation({
+    onSuccess: () => {
+      toast.success("Agendamento atualizado com sucesso!");
+      void listAppointments.refetch();
+    },
+    onError: (error) => {
+      toast.error(error.message || "Erro ao atualizar agendamento");
+    },
+    onSettled: () => {
+      setProcessingId(null);
+    },
   });
 
   const appointments = useMemo(() => {
@@ -122,6 +153,19 @@ export default function AppointmentsPage() {
 
   const handleCreateSuccess = () => {
     void listAppointments.refetch();
+  };
+
+  const handleUpdateStatus = async (appointmentId: string, status: AppointmentStatus) => {
+    setProcessingId(appointmentId);
+
+    try {
+      await updateAppointment.mutateAsync({
+        id: appointmentId,
+        data: { status },
+      });
+    } catch {
+      // toast já tratado no mutation
+    }
   };
 
   return (
@@ -188,6 +232,25 @@ export default function AppointmentsPage() {
         </div>
       </div>
 
+      <div className="flex flex-wrap gap-2">
+        {(["", "SCHEDULED", "CONFIRMED", "DONE", "CANCELED", "NO_SHOW"] as const).map(
+          (status) => (
+            <button
+              key={status || "ALL"}
+              type="button"
+              onClick={() => setStatusFilter(status)}
+              className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${
+                statusFilter === status
+                  ? "bg-orange-500 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+              }`}
+            >
+              {status === "" ? "Todos" : getStatusLabel(status)}
+            </button>
+          )
+        )}
+      </div>
+
       <div className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
         <div className="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
           <p className="text-sm font-medium text-gray-900 dark:text-white">Lista</p>
@@ -217,45 +280,120 @@ export default function AppointmentsPage() {
                   <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
                     Observações
                   </th>
+                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
+                    Ações
+                  </th>
                 </tr>
               </thead>
 
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {appointments.map((appointment) => (
-                  <tr
-                    key={appointment.id}
-                    className="hover:bg-gray-50 dark:hover:bg-gray-900/30"
-                  >
-                    <td className="px-4 py-3 text-gray-900 dark:text-white">
-                      {appointment.customer?.name ?? "Cliente não identificado"}
-                    </td>
+                {appointments.map((appointment) => {
+                  const isProcessing = processingId === appointment.id;
 
-                    <td className="px-4 py-3 text-gray-700 dark:text-gray-300">
-                      {formatDateTime(appointment.startsAt)}
-                    </td>
-
-                    <td className="px-4 py-3 text-gray-700 dark:text-gray-300">
-                      {formatDateTime(appointment.endsAt)}
-                    </td>
-
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${getStatusColor(
-                          appointment.status
-                        )}`}
-                      >
-                        {getStatusLabel(appointment.status)}
-                      </span>
-                    </td>
-
-                    <td
-                      className="max-w-[280px] px-4 py-3 text-gray-700 dark:text-gray-300"
-                      title={appointment.notes ?? ""}
+                  return (
+                    <tr
+                      key={appointment.id}
+                      className="hover:bg-gray-50 dark:hover:bg-gray-900/30"
                     >
-                      {truncateText(appointment.notes)}
-                    </td>
-                  </tr>
-                ))}
+                      <td className="px-4 py-3 text-gray-900 dark:text-white">
+                        {appointment.customer?.name ?? "Cliente não identificado"}
+                      </td>
+
+                      <td className="px-4 py-3 text-gray-700 dark:text-gray-300">
+                        {formatDateTime(appointment.startsAt)}
+                      </td>
+
+                      <td className="px-4 py-3 text-gray-700 dark:text-gray-300">
+                        {formatDateTime(appointment.endsAt)}
+                      </td>
+
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${getStatusColor(
+                            appointment.status
+                          )}`}
+                        >
+                          {getStatusLabel(appointment.status)}
+                        </span>
+                      </td>
+
+                      <td
+                        className="max-w-[280px] px-4 py-3 text-gray-700 dark:text-gray-300"
+                        title={appointment.notes ?? ""}
+                      >
+                        {truncateText(appointment.notes)}
+                      </td>
+
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="gap-2"
+                            onClick={() => void handleUpdateStatus(appointment.id, "CONFIRMED")}
+                            disabled={
+                              isProcessing ||
+                              updateAppointment.isPending ||
+                              appointment.status !== "SCHEDULED"
+                            }
+                          >
+                            <CheckCheck className="h-4 w-4" />
+                            Confirmar
+                          </Button>
+
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="gap-2"
+                            onClick={() => void handleUpdateStatus(appointment.id, "DONE")}
+                            disabled={
+                              isProcessing ||
+                              updateAppointment.isPending ||
+                              !["SCHEDULED", "CONFIRMED"].includes(appointment.status)
+                            }
+                          >
+                            <CheckCircle2 className="h-4 w-4" />
+                            Concluir
+                          </Button>
+
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="gap-2"
+                            onClick={() => void handleUpdateStatus(appointment.id, "NO_SHOW")}
+                            disabled={
+                              isProcessing ||
+                              updateAppointment.isPending ||
+                              !["SCHEDULED", "CONFIRMED"].includes(appointment.status)
+                            }
+                          >
+                            <Clock3 className="h-4 w-4" />
+                            No-show
+                          </Button>
+
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="gap-2 text-red-600 hover:text-red-700"
+                            onClick={() => void handleUpdateStatus(appointment.id, "CANCELED")}
+                            disabled={
+                              isProcessing ||
+                              updateAppointment.isPending ||
+                              !["SCHEDULED", "CONFIRMED"].includes(appointment.status)
+                            }
+                          >
+                            <Ban className="h-4 w-4" />
+                            Cancelar
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

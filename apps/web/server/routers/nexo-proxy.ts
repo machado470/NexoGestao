@@ -21,6 +21,7 @@ function getTokenFromCookie(ctx: CtxLike): string | null {
 
 function getAuthHeader(ctx: CtxLike): string | null {
   const header = ctx?.req?.headers?.authorization;
+
   if (typeof header === "string" && header.trim().length > 0) {
     return header;
   }
@@ -36,6 +37,16 @@ function setTokenCookie(ctx: CtxLike, token: string) {
     ...cookieOptions,
     maxAge: 7 * 24 * 60 * 60 * 1000,
   });
+}
+
+function extractToken(result: any): string | null {
+  return (
+    result?.data?.token ||
+    result?.token ||
+    result?.accessToken ||
+    result?.data?.accessToken ||
+    null
+  );
 }
 
 function extractErrorMessage(body: any, status: number, text: string): string {
@@ -56,7 +67,25 @@ function extractErrorMessage(body: any, status: number, text: string): string {
     return normalized || "Sem permissão";
   }
 
+  if (status === 404) {
+    return normalized || "Recurso não encontrado";
+  }
+
   return normalized;
+}
+
+function buildQuery(input?: Record<string, unknown> | null): string {
+  if (!input) return "";
+
+  const params = new URLSearchParams();
+
+  Object.entries(input).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === "") return;
+    params.set(key, String(value));
+  });
+
+  const query = params.toString();
+  return query ? `?${query}` : "";
 }
 
 async function nexoFetch(path: string, options: RequestInit = {}) {
@@ -87,6 +116,52 @@ async function nexoFetch(path: string, options: RequestInit = {}) {
   return body;
 }
 
+async function authedFetch(ctx: CtxLike, path: string, options: RequestInit = {}) {
+  const authHeader = getAuthHeader(ctx);
+
+  return nexoFetch(path, {
+    ...options,
+    headers: {
+      ...(options.headers || {}),
+      ...(authHeader ? { Authorization: authHeader } : {}),
+    },
+  });
+}
+
+async function authedGet(
+  ctx: CtxLike,
+  path: string,
+  query?: Record<string, unknown> | null
+) {
+  return authedFetch(ctx, `${path}${buildQuery(query)}`);
+}
+
+async function authedPost(ctx: CtxLike, path: string, body?: unknown) {
+  return authedFetch(ctx, path, {
+    method: "POST",
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+}
+
+async function authedPatch(ctx: CtxLike, path: string, body?: unknown) {
+  return authedFetch(ctx, path, {
+    method: "PATCH",
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+}
+
+async function authedDelete(ctx: CtxLike, path: string) {
+  return authedFetch(ctx, path, {
+    method: "DELETE",
+  });
+}
+
+const idInput = z.object({ id: z.string().min(1) });
+const updateInput = z.object({
+  id: z.string().min(1),
+  data: z.any(),
+});
+
 export const nexoProxyRouter = router({
   bootstrap: router({
     firstAdmin: publicProcedure
@@ -99,7 +174,7 @@ export const nexoProxyRouter = router({
         })
       )
       .mutation(async ({ input }) => {
-        return await nexoFetch("/bootstrap/first-admin", {
+        return nexoFetch("/bootstrap/first-admin", {
           method: "POST",
           body: JSON.stringify(input),
         });
@@ -122,11 +197,7 @@ export const nexoProxyRouter = router({
           body: JSON.stringify(input),
         });
 
-        const token =
-          result?.data?.token ||
-          result?.token ||
-          result?.accessToken ||
-          result?.data?.accessToken;
+        const token = extractToken(result);
 
         if (!token) {
           throw new Error("Cadastro não retornou token.");
@@ -137,18 +208,19 @@ export const nexoProxyRouter = router({
       }),
 
     login: publicProcedure
-      .input(z.object({ email: z.string().email(), password: z.string().min(8) }))
+      .input(
+        z.object({
+          email: z.string().email(),
+          password: z.string().min(8),
+        })
+      )
       .mutation(async ({ input, ctx }) => {
         const result = await nexoFetch("/auth/login", {
           method: "POST",
           body: JSON.stringify(input),
         });
 
-        const token =
-          result?.data?.token ||
-          result?.token ||
-          result?.accessToken ||
-          result?.data?.accessToken;
+        const token = extractToken(result);
 
         if (!token) {
           throw new Error("Login não retornou token.");
@@ -161,16 +233,21 @@ export const nexoProxyRouter = router({
     forgotPassword: publicProcedure
       .input(z.object({ email: z.string().email() }))
       .mutation(async ({ input }) => {
-        return await nexoFetch("/auth/forgot-password", {
+        return nexoFetch("/auth/forgot-password", {
           method: "POST",
           body: JSON.stringify(input),
         });
       }),
 
     resetPassword: publicProcedure
-      .input(z.object({ token: z.string().min(1), password: z.string().min(8) }))
+      .input(
+        z.object({
+          token: z.string().min(1),
+          password: z.string().min(8),
+        })
+      )
       .mutation(async ({ input }) => {
-        return await nexoFetch("/auth/reset-password", {
+        return nexoFetch("/auth/reset-password", {
           method: "POST",
           body: JSON.stringify(input),
         });
@@ -179,220 +256,132 @@ export const nexoProxyRouter = router({
 
   customers: router({
     list: publicProcedure.query(async ({ ctx }) => {
-      const authHeader = getAuthHeader(ctx as CtxLike);
-      return await nexoFetch("/customers", {
-        headers: authHeader ? { Authorization: authHeader } : {},
-      });
+      return authedGet(ctx as CtxLike, "/customers");
     }),
 
-    getById: publicProcedure
-      .input(z.object({ id: z.string() }))
-      .query(async ({ input, ctx }) => {
-        const authHeader = getAuthHeader(ctx as CtxLike);
-        return await nexoFetch(`/customers/${input.id}`, {
-          headers: authHeader ? { Authorization: authHeader } : {},
-        });
-      }),
+    getById: publicProcedure.input(idInput).query(async ({ input, ctx }) => {
+      return authedGet(ctx as CtxLike, `/customers/${input.id}`);
+    }),
 
-    workspace: publicProcedure
-      .input(z.object({ id: z.string() }))
-      .query(async ({ input, ctx }) => {
-        const authHeader = getAuthHeader(ctx as CtxLike);
-        return await nexoFetch(`/customers/${input.id}/workspace`, {
-          headers: authHeader ? { Authorization: authHeader } : {},
-        });
-      }),
+    workspace: publicProcedure.input(idInput).query(async ({ input, ctx }) => {
+      return authedGet(ctx as CtxLike, `/customers/${input.id}/workspace`);
+    }),
 
     create: publicProcedure.input(z.any()).mutation(async ({ input, ctx }) => {
-      const authHeader = getAuthHeader(ctx as CtxLike);
-      return await nexoFetch("/customers", {
-        method: "POST",
-        body: JSON.stringify(input),
-        headers: authHeader ? { Authorization: authHeader } : {},
-      });
+      return authedPost(ctx as CtxLike, "/customers", input);
     }),
 
-    update: publicProcedure
-      .input(z.object({ id: z.string(), data: z.any() }))
-      .mutation(async ({ input, ctx }) => {
-        const authHeader = getAuthHeader(ctx as CtxLike);
-        return await nexoFetch(`/customers/${input.id}`, {
-          method: "PATCH",
-          body: JSON.stringify(input.data),
-          headers: authHeader ? { Authorization: authHeader } : {},
-        });
-      }),
+    update: publicProcedure.input(updateInput).mutation(async ({ input, ctx }) => {
+      return authedPatch(ctx as CtxLike, `/customers/${input.id}`, input.data);
+    }),
   }),
 
   timeline: router({
     listByCustomer: publicProcedure
-      .input(z.object({ customerId: z.string(), limit: z.number().optional() }))
+      .input(
+        z.object({
+          customerId: z.string().min(1),
+          limit: z.number().optional(),
+        })
+      )
       .query(async ({ input, ctx }) => {
-        const authHeader = getAuthHeader(ctx as CtxLike);
-        const query = input.limit ? `?limit=${input.limit}` : "";
-
-        return await nexoFetch(`/timeline/customers/${input.customerId}${query}`, {
-          headers: authHeader ? { Authorization: authHeader } : {},
+        return authedGet(ctx as CtxLike, `/timeline/customers/${input.customerId}`, {
+          limit: input.limit,
         });
       }),
   }),
 
   appointments: router({
     list: publicProcedure.input(z.any().optional()).query(async ({ input, ctx }) => {
-      const authHeader = getAuthHeader(ctx as CtxLike);
-      const query = input ? `?${new URLSearchParams(input).toString()}` : "";
-
-      return await nexoFetch(`/appointments${query}`, {
-        headers: authHeader ? { Authorization: authHeader } : {},
-      });
+      return authedGet(ctx as CtxLike, "/appointments", input ?? undefined);
     }),
 
-    getById: publicProcedure
-      .input(z.object({ id: z.string() }))
-      .query(async ({ input, ctx }) => {
-        const authHeader = getAuthHeader(ctx as CtxLike);
-        return await nexoFetch(`/appointments/${input.id}`, {
-          headers: authHeader ? { Authorization: authHeader } : {},
-        });
-      }),
+    getById: publicProcedure.input(idInput).query(async ({ input, ctx }) => {
+      return authedGet(ctx as CtxLike, `/appointments/${input.id}`);
+    }),
 
     create: publicProcedure.input(z.any()).mutation(async ({ input, ctx }) => {
-      const authHeader = getAuthHeader(ctx as CtxLike);
-      return await nexoFetch("/appointments", {
-        method: "POST",
-        body: JSON.stringify(input),
-        headers: authHeader ? { Authorization: authHeader } : {},
-      });
+      return authedPost(ctx as CtxLike, "/appointments", input);
     }),
 
-    update: publicProcedure
-      .input(z.object({ id: z.string(), data: z.any() }))
-      .mutation(async ({ input, ctx }) => {
-        const authHeader = getAuthHeader(ctx as CtxLike);
-        return await nexoFetch(`/appointments/${input.id}`, {
-          method: "PATCH",
-          body: JSON.stringify(input.data),
-          headers: authHeader ? { Authorization: authHeader } : {},
-        });
-      }),
+    update: publicProcedure.input(updateInput).mutation(async ({ input, ctx }) => {
+      return authedPatch(ctx as CtxLike, `/appointments/${input.id}`, input.data);
+    }),
 
-    delete: publicProcedure
-      .input(z.object({ id: z.string() }))
-      .mutation(async ({ input, ctx }) => {
-        const authHeader = getAuthHeader(ctx as CtxLike);
-        return await nexoFetch(`/appointments/${input.id}`, {
-          method: "DELETE",
-          headers: authHeader ? { Authorization: authHeader } : {},
-        });
-      }),
+    delete: publicProcedure.input(idInput).mutation(async ({ input, ctx }) => {
+      return authedDelete(ctx as CtxLike, `/appointments/${input.id}`);
+    }),
   }),
 
   serviceOrders: router({
     list: publicProcedure.input(z.any().optional()).query(async ({ input, ctx }) => {
-      const authHeader = getAuthHeader(ctx as CtxLike);
-      const query = input ? `?${new URLSearchParams(input).toString()}` : "";
-
-      return await nexoFetch(`/service-orders${query}`, {
-        headers: authHeader ? { Authorization: authHeader } : {},
-      });
+      return authedGet(ctx as CtxLike, "/service-orders", input ?? undefined);
     }),
 
-    getById: publicProcedure
-      .input(z.object({ id: z.string() }))
-      .query(async ({ input, ctx }) => {
-        const authHeader = getAuthHeader(ctx as CtxLike);
-        return await nexoFetch(`/service-orders/${input.id}`, {
-          headers: authHeader ? { Authorization: authHeader } : {},
-        });
-      }),
+    getById: publicProcedure.input(idInput).query(async ({ input, ctx }) => {
+      return authedGet(ctx as CtxLike, `/service-orders/${input.id}`);
+    }),
 
     create: publicProcedure.input(z.any()).mutation(async ({ input, ctx }) => {
-      const authHeader = getAuthHeader(ctx as CtxLike);
-      return await nexoFetch("/service-orders", {
-        method: "POST",
-        body: JSON.stringify(input),
-        headers: authHeader ? { Authorization: authHeader } : {},
-      });
+      return authedPost(ctx as CtxLike, "/service-orders", input);
     }),
 
-    update: publicProcedure
-      .input(z.object({ id: z.string(), data: z.any() }))
-      .mutation(async ({ input, ctx }) => {
-        const authHeader = getAuthHeader(ctx as CtxLike);
-        return await nexoFetch(`/service-orders/${input.id}`, {
-          method: "PATCH",
-          body: JSON.stringify(input.data),
-          headers: authHeader ? { Authorization: authHeader } : {},
-        });
-      }),
+    update: publicProcedure.input(updateInput).mutation(async ({ input, ctx }) => {
+      return authedPatch(ctx as CtxLike, `/service-orders/${input.id}`, input.data);
+    }),
 
-    delete: publicProcedure
-      .input(z.object({ id: z.string() }))
-      .mutation(async ({ input, ctx }) => {
-        const authHeader = getAuthHeader(ctx as CtxLike);
-        return await nexoFetch(`/service-orders/${input.id}`, {
-          method: "DELETE",
-          headers: authHeader ? { Authorization: authHeader } : {},
-        });
-      }),
+    delete: publicProcedure.input(idInput).mutation(async ({ input, ctx }) => {
+      return authedDelete(ctx as CtxLike, `/service-orders/${input.id}`);
+    }),
+
+    generateCharge: publicProcedure.input(idInput).mutation(async ({ input, ctx }) => {
+      return authedPost(
+        ctx as CtxLike,
+        `/service-orders/${input.id}/generate-charge`
+      );
+    }),
   }),
 
   whatsapp: router({
     messages: publicProcedure
-      .input(z.object({ customerId: z.string() }))
+      .input(z.object({ customerId: z.string().min(1) }))
       .query(async ({ input, ctx }) => {
-        const authHeader = getAuthHeader(ctx as CtxLike);
-        return await nexoFetch(`/whatsapp/messages/${input.customerId}`, {
-          headers: authHeader ? { Authorization: authHeader } : {},
-        });
+        return authedGet(ctx as CtxLike, `/whatsapp/messages/${input.customerId}`);
       }),
 
     send: publicProcedure.input(z.any()).mutation(async ({ input, ctx }) => {
-      const authHeader = getAuthHeader(ctx as CtxLike);
-      return await nexoFetch("/whatsapp/messages", {
-        method: "POST",
-        body: JSON.stringify(input),
-        headers: authHeader ? { Authorization: authHeader } : {},
-      });
+      return authedPost(ctx as CtxLike, "/whatsapp/messages", input);
     }),
 
     updateStatus: publicProcedure
-      .input(z.object({ id: z.string(), status: z.string() }))
+      .input(
+        z.object({
+          id: z.string().min(1),
+          status: z.string().min(1),
+        })
+      )
       .mutation(async ({ input, ctx }) => {
-        const authHeader = getAuthHeader(ctx as CtxLike);
-        return await nexoFetch(`/whatsapp/messages/${input.id}/status`, {
-          method: "PATCH",
-          body: JSON.stringify({ status: input.status }),
-          headers: authHeader ? { Authorization: authHeader } : {},
-        });
+        return authedPatch(
+          ctx as CtxLike,
+          `/whatsapp/messages/${input.id}/status`,
+          { status: input.status }
+        );
       }),
   }),
 
   onboarding: router({
     complete: publicProcedure.mutation(async ({ ctx }) => {
-      const authHeader = getAuthHeader(ctx as CtxLike);
-      return await nexoFetch("/onboarding/complete", {
-        method: "POST",
-        headers: authHeader ? { Authorization: authHeader } : {},
-      });
+      return authedPost(ctx as CtxLike, "/onboarding/complete");
     }),
   }),
 
   settings: router({
     get: publicProcedure.query(async ({ ctx }) => {
-      const authHeader = getAuthHeader(ctx as CtxLike);
-      return await nexoFetch("/organization-settings", {
-        headers: authHeader ? { Authorization: authHeader } : {},
-      });
+      return authedGet(ctx as CtxLike, "/organization-settings");
     }),
 
     update: publicProcedure.input(z.any()).mutation(async ({ input, ctx }) => {
-      const authHeader = getAuthHeader(ctx as CtxLike);
-      return await nexoFetch("/organization-settings", {
-        method: "PATCH",
-        body: JSON.stringify(input),
-        headers: authHeader ? { Authorization: authHeader } : {},
-      });
+      return authedPatch(ctx as CtxLike, "/organization-settings", input);
     }),
   }),
 });

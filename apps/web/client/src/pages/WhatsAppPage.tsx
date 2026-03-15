@@ -10,6 +10,8 @@ import {
   MessageCircle,
   Search,
   AlertTriangle,
+  RefreshCcw,
+  UserCircle2,
 } from "lucide-react";
 
 interface ConversationMessage {
@@ -46,6 +48,13 @@ function mapStatus(value: unknown): ConversationMessage["status"] {
   return "sent";
 }
 
+function mapDirection(value: unknown): ConversationMessage["direction"] {
+  const direction = String(value ?? "").toUpperCase();
+
+  if (direction === "INBOUND" || direction === "RECEIVED") return "inbound";
+  return "outbound";
+}
+
 function normalizeMessages(payload: any): ConversationMessage[] {
   const rows = Array.isArray(payload?.data)
     ? payload.data
@@ -53,17 +62,17 @@ function normalizeMessages(payload: any): ConversationMessage[] {
       ? payload
       : [];
 
-  return rows.map((msg: any) => ({
-    id: String(msg?.id ?? crypto.randomUUID()),
+  return rows.map((msg: any, index: number) => ({
+    id: String(msg?.id ?? `${msg?.createdAt ?? "msg"}-${index}`),
     customerId: msg?.customerId ? String(msg.customerId) : undefined,
-    direction: "outbound",
-    content: String(msg?.renderedText ?? msg?.content ?? ""),
+    direction: mapDirection(msg?.direction),
+    content: String(msg?.renderedText ?? msg?.content ?? "").trim(),
     status: mapStatus(msg?.status),
     createdAt: msg?.createdAt
       ? String(msg.createdAt)
       : new Date().toISOString(),
     mediaUrl: msg?.mediaUrl ? String(msg.mediaUrl) : undefined,
-    senderNumber: undefined,
+    senderNumber: msg?.fromPhone ? String(msg.fromPhone) : undefined,
     receiverNumber: msg?.toPhone ? String(msg.toPhone) : undefined,
   }));
 }
@@ -78,6 +87,59 @@ function normalizeCustomers(payload: any): any[] {
   return rows;
 }
 
+function formatDateTime(value?: string | null) {
+  if (!value) return "—";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return "—";
+
+  return date.toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function formatTime(value?: string | null) {
+  if (!value) return "—";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return "—";
+
+  return date.toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function truncateText(value?: string | null, max = 52) {
+  const text = (value ?? "").trim();
+  if (!text) return "Sem mensagem";
+  if (text.length <= max) return text;
+  return `${text.slice(0, max)}...`;
+}
+
+function getMessageStatusLabel(status: ConversationMessage["status"]) {
+  switch (status) {
+    case "pending":
+      return "Pendente";
+    case "sent":
+      return "Enviada";
+    case "delivered":
+      return "Entregue";
+    case "read":
+      return "Lida";
+    case "failed":
+      return "Falhou";
+    default:
+      return status;
+  }
+}
+
 export default function WhatsAppPage() {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -85,11 +147,18 @@ export default function WhatsAppPage() {
   const [conversations, setConversations] = useState<ConversationThread[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const customersQuery = trpc.nexo.customers.list.useQuery();
+  const customersQuery = trpc.nexo.customers.list.useQuery(undefined, {
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
 
   const whatsappMessagesQuery = trpc.nexo.whatsapp.messages.useQuery(
     { customerId: selectedCustomerId || "" },
-    { enabled: !!selectedCustomerId }
+    {
+      enabled: Boolean(selectedCustomerId),
+      retry: false,
+      refetchOnWindowFocus: false,
+    }
   );
 
   const createMessageMutation = trpc.nexo.whatsapp.send.useMutation({
@@ -103,20 +172,49 @@ export default function WhatsAppPage() {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [whatsappMessagesQuery.data]);
+  }, [whatsappMessagesQuery.data, selectedCustomerId]);
+
+  useEffect(() => {
+    if (customersQuery.error) {
+      toast.error("Erro ao carregar clientes: " + customersQuery.error.message);
+    }
+  }, [customersQuery.error]);
+
+  useEffect(() => {
+    if (whatsappMessagesQuery.error) {
+      toast.error("Erro ao carregar mensagens: " + whatsappMessagesQuery.error.message);
+    }
+  }, [whatsappMessagesQuery.error]);
 
   useEffect(() => {
     const customerList = normalizeCustomers(customersQuery.data);
 
     const convos: ConversationThread[] = customerList.map((customer: any) => ({
       customerId: String(customer.id),
-      customerName: customer.name,
-      whatsappNumber: customer.phone || undefined,
+      customerName: String(customer.name ?? "Cliente"),
+      whatsappNumber: customer.phone ? String(customer.phone) : undefined,
       unreadCount: 0,
       messages: [],
     }));
 
-    setConversations(convos);
+    setConversations((prev) => {
+      const messagesByCustomer = new Map(
+        prev.map((conversation) => [conversation.customerId, conversation.messages])
+      );
+
+      return convos.map((conversation) => {
+        const existingMessages = messagesByCustomer.get(conversation.customerId) ?? [];
+        const lastMessage = existingMessages[existingMessages.length - 1];
+
+        return {
+          ...conversation,
+          messages: existingMessages,
+          lastMessage: lastMessage?.content,
+          lastMessageTime: lastMessage?.createdAt,
+          unreadCount: 0,
+        };
+      });
+    });
 
     if (!selectedCustomerId && convos.length > 0) {
       setSelectedCustomerId(convos[0].customerId);
@@ -129,13 +227,13 @@ export default function WhatsAppPage() {
     const messages = normalizeMessages(whatsappMessagesQuery.data);
 
     setConversations((prev) =>
-      prev.map((conv) => {
-        if (conv.customerId !== selectedCustomerId) return conv;
+      prev.map((conversation) => {
+        if (conversation.customerId !== selectedCustomerId) return conversation;
 
         const lastMessage = messages[messages.length - 1];
 
         return {
-          ...conv,
+          ...conversation,
           messages,
           lastMessage: lastMessage?.content,
           lastMessageTime: lastMessage?.createdAt,
@@ -154,12 +252,14 @@ export default function WhatsAppPage() {
   }, [conversations, selectedCustomerId]);
 
   const filteredConversations = useMemo(() => {
-    const term = searchQuery.toLowerCase();
+    const term = searchQuery.trim().toLowerCase();
+
+    if (!term) return conversations;
 
     return conversations.filter((conversation) => {
       return (
         conversation.customerName.toLowerCase().includes(term) ||
-        conversation.whatsappNumber?.includes(searchQuery)
+        String(conversation.whatsappNumber ?? "").includes(searchQuery)
       );
     });
   }, [conversations, searchQuery]);
@@ -182,15 +282,17 @@ export default function WhatsAppPage() {
       setMessageInput("");
       await whatsappMessagesQuery.refetch();
     } catch {
-      // toast já tratado no mutation
+      // toast já tratado
     }
   };
 
-  const formatTime = (date: string | Date) => {
-    return new Date(date).toLocaleTimeString("pt-BR", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+  const handleRefreshConversation = async () => {
+    if (!selectedCustomerId) return;
+    await whatsappMessagesQuery.refetch();
+  };
+
+  const handleRefreshCustomers = async () => {
+    await customersQuery.refetch();
   };
 
   if (customersQuery.isLoading) {
@@ -218,12 +320,29 @@ export default function WhatsAppPage() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="flex w-80 flex-col border-r border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+    <div className="flex h-[calc(100vh-120px)] overflow-hidden rounded-xl border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-900">
+      <div className="flex w-full max-w-sm flex-col border-r border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
         <div className="border-b border-gray-200 p-4 dark:border-gray-700">
-          <h1 className="mb-4 text-2xl font-bold text-gray-900 dark:text-white">
-            WhatsApp
-          </h1>
+          <div className="mb-4 flex items-center justify-between gap-2">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                WhatsApp
+              </h1>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                Conversas operacionais com clientes
+              </p>
+            </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => void handleRefreshCustomers()}
+              className="shrink-0"
+            >
+              <RefreshCcw className="h-4 w-4" />
+            </Button>
+          </div>
 
           <div className="relative">
             <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
@@ -238,71 +357,104 @@ export default function WhatsAppPage() {
 
         <div className="flex-1 overflow-y-auto">
           {filteredConversations.length === 0 ? (
-            <div className="flex h-full flex-col items-center justify-center text-gray-500">
+            <div className="flex h-full flex-col items-center justify-center px-6 text-center text-gray-500">
               <MessageCircle className="mb-2 h-12 w-12 opacity-50" />
               <p>Nenhuma conversa encontrada</p>
             </div>
           ) : (
-            filteredConversations.map((conversation) => (
-              <button
-                key={conversation.customerId}
-                onClick={() => setSelectedCustomerId(conversation.customerId)}
-                className={`w-full border-b border-gray-100 p-4 text-left transition-colors dark:border-gray-700 ${
-                  selectedCustomerId === conversation.customerId
-                    ? "border-l-4 border-l-orange-500 bg-orange-50 dark:bg-orange-900/20"
-                    : "hover:bg-gray-50 dark:hover:bg-gray-700"
-                }`}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="min-w-0 flex-1">
-                    <h3 className="truncate font-semibold text-gray-900 dark:text-white">
-                      {conversation.customerName}
-                    </h3>
-                    <p className="truncate text-sm text-gray-500 dark:text-gray-400">
-                      {conversation.whatsappNumber || "Sem número"}
-                    </p>
+            filteredConversations.map((conversation) => {
+              const isSelected = selectedCustomerId === conversation.customerId;
 
-                    {conversation.lastMessage && (
-                      <p className="mt-1 truncate text-xs text-gray-600 dark:text-gray-300">
-                        {conversation.lastMessage}
+              return (
+                <button
+                  key={conversation.customerId}
+                  type="button"
+                  onClick={() => setSelectedCustomerId(conversation.customerId)}
+                  className={`w-full border-b border-gray-100 p-4 text-left transition-colors dark:border-gray-700 ${
+                    isSelected
+                      ? "border-l-4 border-l-orange-500 bg-orange-50 dark:bg-orange-900/20"
+                      : "hover:bg-gray-50 dark:hover:bg-gray-700"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <h3 className="truncate font-semibold text-gray-900 dark:text-white">
+                        {conversation.customerName}
+                      </h3>
+
+                      <p className="truncate text-sm text-gray-500 dark:text-gray-400">
+                        {conversation.whatsappNumber || "Sem número"}
                       </p>
-                    )}
-                  </div>
 
-                  {conversation.unreadCount && conversation.unreadCount > 0 && (
-                    <span className="ml-2 flex h-6 w-6 items-center justify-center rounded-full bg-orange-500 text-xs text-white">
-                      {conversation.unreadCount}
-                    </span>
-                  )}
-                </div>
-              </button>
-            ))
+                      <p className="mt-1 truncate text-xs text-gray-600 dark:text-gray-300">
+                        {truncateText(conversation.lastMessage)}
+                      </p>
+                    </div>
+
+                    <div className="flex flex-col items-end gap-2">
+                      <span className="text-[11px] text-gray-400 dark:text-gray-500">
+                        {conversation.lastMessageTime
+                          ? formatTime(conversation.lastMessageTime)
+                          : "—"}
+                      </span>
+
+                      {conversation.unreadCount && conversation.unreadCount > 0 ? (
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-orange-500 text-xs text-white">
+                          {conversation.unreadCount}
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                </button>
+              );
+            })
           )}
         </div>
       </div>
 
-      <div className="flex flex-1 flex-col bg-white dark:bg-gray-800">
+      <div className="flex min-w-0 flex-1 flex-col bg-white dark:bg-gray-800">
         {selectedConversation ? (
           <>
             <div className="flex items-center justify-between border-b border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-              <div className="flex items-center gap-3">
+              <div className="flex min-w-0 items-center gap-3">
                 <div className="flex h-12 w-12 items-center justify-center rounded-full bg-orange-100 dark:bg-orange-900">
-                  <MessageCircle className="h-6 w-6 text-orange-500" />
+                  <UserCircle2 className="h-6 w-6 text-orange-500" />
                 </div>
 
-                <div>
-                  <h2 className="font-semibold text-gray-900 dark:text-white">
+                <div className="min-w-0">
+                  <h2 className="truncate font-semibold text-gray-900 dark:text-white">
                     {selectedConversation.customerName}
                   </h2>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                  <p className="truncate text-sm text-gray-500 dark:text-gray-400">
                     {selectedConversation.whatsappNumber || "Sem número"}
                   </p>
                 </div>
               </div>
 
-              <Button variant="ghost" size="icon">
-                <Phone className="h-5 w-5" />
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => void handleRefreshConversation()}
+                  disabled={!selectedCustomerId || whatsappMessagesQuery.isFetching}
+                >
+                  <RefreshCcw
+                    className={`h-4 w-4 ${whatsappMessagesQuery.isFetching ? "animate-spin" : ""}`}
+                  />
+                </Button>
+
+                <Button type="button" variant="ghost" size="icon" disabled>
+                  <Phone className="h-5 w-5" />
+                </Button>
+              </div>
+            </div>
+
+            <div className="border-b border-gray-200 bg-gray-50 px-4 py-3 text-xs text-gray-500 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-400">
+              Última atualização:{" "}
+              {selectedConversation.lastMessageTime
+                ? formatDateTime(selectedConversation.lastMessageTime)
+                : "sem mensagens"}
             </div>
 
             <div className="flex-1 space-y-4 overflow-y-auto bg-gray-50 p-4 dark:bg-gray-900">
@@ -315,9 +467,12 @@ export default function WhatsAppPage() {
                   Erro ao carregar mensagens desta conversa.
                 </div>
               ) : selectedConversation.messages.length === 0 ? (
-                <div className="flex h-full flex-col items-center justify-center text-gray-500">
+                <div className="flex h-full flex-col items-center justify-center text-center text-gray-500">
                   <MessageCircle className="mb-2 h-12 w-12 opacity-50" />
                   <p>Nenhuma mensagem ainda</p>
+                  <p className="mt-1 text-sm">
+                    Envie a primeira mensagem para iniciar o histórico.
+                  </p>
                 </div>
               ) : (
                 selectedConversation.messages.map((message) => (
@@ -330,38 +485,34 @@ export default function WhatsAppPage() {
                     }`}
                   >
                     <div
-                      className={`max-w-xs rounded-lg px-4 py-2 lg:max-w-md ${
+                      className={`max-w-xs rounded-lg px-4 py-3 shadow-sm lg:max-w-md ${
                         message.direction === "outbound"
                           ? "rounded-br-none bg-orange-500 text-white"
                           : "rounded-bl-none bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-white"
                       }`}
                     >
-                      <p className="break-words">{message.content}</p>
+                      <p className="break-words text-sm">{message.content || "Mensagem vazia"}</p>
 
-                      {message.mediaUrl && (
+                      {message.mediaUrl ? (
                         <a
                           href={message.mediaUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="mt-2 block text-xs underline opacity-75 hover:opacity-100"
+                          className="mt-2 block text-xs underline opacity-80 hover:opacity-100"
                         >
                           📎 Mídia anexada
                         </a>
-                      )}
+                      ) : null}
 
-                      <p className="mt-1 text-xs opacity-75">
-                        {formatTime(message.createdAt)}
-                      </p>
+                      <div className="mt-2 flex items-center justify-between gap-3 text-[11px] opacity-80">
+                        <span>{formatTime(message.createdAt)}</span>
 
-                      {message.direction === "outbound" && (
-                        <p className="text-xs opacity-75">
-                          {message.status === "delivered" && "✓✓"}
-                          {message.status === "read" && "✓✓"}
-                          {message.status === "sent" && "✓"}
-                          {message.status === "pending" && "⏱"}
-                          {message.status === "failed" && "✗"}
-                        </p>
-                      )}
+                        {message.direction === "outbound" ? (
+                          <span>{getMessageStatusLabel(message.status)}</span>
+                        ) : (
+                          <span>Recebida</span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))
@@ -371,6 +522,12 @@ export default function WhatsAppPage() {
             </div>
 
             <div className="border-t border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+              {!selectedConversation.whatsappNumber ? (
+                <div className="mb-3 rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 text-sm text-yellow-800 dark:border-yellow-900/60 dark:bg-yellow-950/30 dark:text-yellow-300">
+                  Este cliente não possui número de WhatsApp cadastrado.
+                </div>
+              ) : null}
+
               <div className="flex gap-2">
                 <Input
                   placeholder="Digite uma mensagem..."
@@ -383,12 +540,16 @@ export default function WhatsAppPage() {
                     }
                   }}
                   className="flex-1"
+                  disabled={!selectedConversation.whatsappNumber}
                 />
 
                 <Button
+                  type="button"
                   onClick={() => void handleSendMessage()}
                   disabled={
-                    createMessageMutation.isPending || !messageInput.trim()
+                    createMessageMutation.isPending ||
+                    !messageInput.trim() ||
+                    !selectedConversation.whatsappNumber
                   }
                   className="bg-orange-500 hover:bg-orange-600"
                 >
@@ -402,11 +563,11 @@ export default function WhatsAppPage() {
             </div>
           </>
         ) : (
-          <div className="flex flex-1 flex-col items-center justify-center text-gray-500">
+          <div className="flex flex-1 flex-col items-center justify-center text-center text-gray-500">
             <MessageCircle className="mb-4 h-16 w-16 opacity-50" />
             <p className="text-lg font-semibold">Selecione uma conversa</p>
             <p className="text-sm">
-              Escolha um cliente para começar a conversar
+              Escolha um cliente para ver o histórico e enviar mensagens.
             </p>
           </div>
         )}
