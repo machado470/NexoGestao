@@ -12,9 +12,6 @@ export class DashboardService {
     private readonly cache: MemoryCacheService,
   ) {}
 
-  /**
-   * Retorna métricas operacionais gerais do sistema (com cache de 1 min)
-   */
   async getMetrics(orgId: string) {
     return this.cache.getOrSet(
       `dashboard:metrics:${orgId}`,
@@ -46,21 +43,52 @@ export class DashboardService {
     ] = await Promise.all([
       this.prisma.customer.count({ where: { orgId, active: true } }),
       this.prisma.serviceOrder.count({ where: { orgId } }),
-      this.prisma.serviceOrder.count({ where: { orgId, status: { in: ['OPEN', 'ASSIGNED'] } } }),
       this.prisma.serviceOrder.count({
-        where: { orgId, status: { in: ['OPEN', 'ASSIGNED', 'IN_PROGRESS'] }, dueDate: { lt: now } },
+        where: { orgId, status: { in: ['OPEN', 'ASSIGNED'] } },
       }),
-      this.prisma.payment.aggregate({ where: { orgId, createdAt: { gte: startOfWeek } }, _sum: { amountCents: true } }),
-      this.prisma.charge.aggregate({ where: { orgId, status: { in: ['PENDING', 'OVERDUE'] } }, _sum: { amountCents: true } }),
-      this.prisma.serviceOrder.count({ where: { orgId, status: 'IN_PROGRESS' } }),
-      this.prisma.serviceOrder.count({ where: { orgId, status: 'DONE' } }),
       this.prisma.serviceOrder.count({
-        where: { orgId, status: { in: ['OPEN', 'ASSIGNED', 'IN_PROGRESS'] }, dueDate: { lt: now } },
+        where: {
+          orgId,
+          status: { in: ['OPEN', 'ASSIGNED', 'IN_PROGRESS'] },
+          dueDate: { lt: now },
+        },
       }),
-      this.prisma.correctiveAction.count({ where: { person: { orgId }, status: 'OPEN' } }),
-      this.prisma.charge.aggregate({ where: { orgId }, _sum: { amountCents: true } }),
-      this.prisma.charge.aggregate({ where: { orgId, status: 'PAID' }, _sum: { amountCents: true } }),
-      this.prisma.charge.aggregate({ where: { orgId, status: { in: ['PENDING', 'OVERDUE'] } }, _sum: { amountCents: true } }),
+      this.prisma.payment.aggregate({
+        where: { orgId, createdAt: { gte: startOfWeek } },
+        _sum: { amountCents: true },
+      }),
+      this.prisma.charge.aggregate({
+        where: { orgId, status: { in: ['PENDING', 'OVERDUE'] } },
+        _sum: { amountCents: true },
+      }),
+      this.prisma.serviceOrder.count({
+        where: { orgId, status: 'IN_PROGRESS' },
+      }),
+      this.prisma.serviceOrder.count({
+        where: { orgId, status: 'DONE' },
+      }),
+      this.prisma.serviceOrder.count({
+        where: {
+          orgId,
+          status: { in: ['OPEN', 'ASSIGNED', 'IN_PROGRESS'] },
+          dueDate: { lt: now },
+        },
+      }),
+      this.prisma.correctiveAction.count({
+        where: { person: { orgId }, status: 'OPEN' },
+      }),
+      this.prisma.charge.aggregate({
+        where: { orgId },
+        _sum: { amountCents: true },
+      }),
+      this.prisma.charge.aggregate({
+        where: { orgId, status: 'PAID' },
+        _sum: { amountCents: true },
+      }),
+      this.prisma.charge.aggregate({
+        where: { orgId, status: { in: ['PENDING', 'OVERDUE'] } },
+        _sum: { amountCents: true },
+      }),
     ])
 
     return {
@@ -80,9 +108,6 @@ export class DashboardService {
     }
   }
 
-  /**
-   * Alertas operacionais: ordens atrasadas, cobranças vencidas, serviços do dia, clientes com pagamento pendente
-   */
   async getAlerts(orgId: string) {
     return this.cache.getOrSet(
       `dashboard:alerts:${orgId}`,
@@ -104,7 +129,6 @@ export class DashboardService {
       todayAppointments,
       customersWithPending,
     ] = await Promise.all([
-      // Ordens atrasadas
       this.prisma.serviceOrder.findMany({
         where: {
           orgId,
@@ -122,7 +146,6 @@ export class DashboardService {
         take: 10,
       }),
 
-      // Cobranças vencidas
       this.prisma.charge.findMany({
         where: {
           orgId,
@@ -140,7 +163,6 @@ export class DashboardService {
         take: 10,
       }),
 
-      // Serviços do dia (agendamentos de hoje)
       this.prisma.appointment.findMany({
         where: {
           orgId,
@@ -149,8 +171,9 @@ export class DashboardService {
         },
         select: {
           id: true,
-          title: true,
           startsAt: true,
+          endsAt: true,
+          notes: true,
           status: true,
           customer: { select: { id: true, name: true } },
         },
@@ -158,7 +181,6 @@ export class DashboardService {
         take: 10,
       }),
 
-      // Clientes com pagamento pendente
       this.prisma.customer.findMany({
         where: {
           orgId,
@@ -189,29 +211,42 @@ export class DashboardService {
       },
       overdueCharges: {
         count: overdueCharges.length,
-        totalAmountCents: overdueCharges.reduce((sum, c) => sum + c.amountCents, 0),
+        totalAmountCents: overdueCharges.reduce(
+          (sum, c) => sum + c.amountCents,
+          0,
+        ),
         items: overdueCharges,
       },
       todayServices: {
         count: todayAppointments.length,
-        items: todayAppointments,
+        items: todayAppointments.map((appointment) => ({
+          id: appointment.id,
+          startsAt: appointment.startsAt,
+          endsAt: appointment.endsAt,
+          status: appointment.status,
+          notes: appointment.notes,
+          customer: appointment.customer,
+          label:
+            appointment.notes?.trim() ||
+            `Agendamento com ${appointment.customer.name}`,
+        })),
       },
       customersWithPending: {
         count: customersWithPending.length,
-        items: customersWithPending.map(c => ({
+        items: customersWithPending.map((c) => ({
           id: c.id,
           name: c.name,
           phone: c.phone,
           pendingCharges: c.charges.length,
-          totalPendingCents: c.charges.reduce((sum, ch) => sum + ch.amountCents, 0),
+          totalPendingCents: c.charges.reduce(
+            (sum, ch) => sum + ch.amountCents,
+            0,
+          ),
         })),
       },
     }
   }
 
-  /**
-   * Retorna dados de faturamento por período (últimos 12 meses) - cache 5 min
-   */
   async getRevenueData(orgId: string) {
     return this.cache.getOrSet(
       `dashboard:revenue:${orgId}`,
@@ -226,7 +261,10 @@ export class DashboardService {
 
     for (let i = 11; i >= 0; i--) {
       const date = new Date(now.getFullYear(), now.getMonth() - i, 1)
-      const monthName = date.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })
+      const monthName = date.toLocaleDateString('pt-BR', {
+        month: 'short',
+        year: '2-digit',
+      })
       months.push({ month: monthName, date, revenue: 0 })
     }
 
@@ -239,9 +277,15 @@ export class DashboardService {
     })
 
     payments.forEach((payment) => {
-      const paymentMonth = new Date(payment.createdAt.getFullYear(), payment.createdAt.getMonth(), 1)
+      const paymentMonth = new Date(
+        payment.createdAt.getFullYear(),
+        payment.createdAt.getMonth(),
+        1,
+      )
       const monthIndex = months.findIndex(
-        (m) => m.date.getFullYear() === paymentMonth.getFullYear() && m.date.getMonth() === paymentMonth.getMonth(),
+        (m) =>
+          m.date.getFullYear() === paymentMonth.getFullYear() &&
+          m.date.getMonth() === paymentMonth.getMonth(),
       )
       if (monthIndex !== -1) months[monthIndex].revenue += payment.amountCents
     })
@@ -249,9 +293,6 @@ export class DashboardService {
     return months.map((m) => ({ month: m.month, revenue: m.revenue / 100 }))
   }
 
-  /**
-   * Retorna crescimento de clientes por mês (últimos 12 meses) - cache 5 min
-   */
   async getCustomerGrowth(orgId: string) {
     return this.cache.getOrSet(
       `dashboard:growth:${orgId}`,
@@ -262,11 +303,19 @@ export class DashboardService {
 
   private async _fetchCustomerGrowth(orgId: string) {
     const now = new Date()
-    const months: Array<{ month: string; date: Date; newCustomers: number; totalCustomers: number }> = []
+    const months: Array<{
+      month: string
+      date: Date
+      newCustomers: number
+      totalCustomers: number
+    }> = []
 
     for (let i = 11; i >= 0; i--) {
       const date = new Date(now.getFullYear(), now.getMonth() - i, 1)
-      const monthName = date.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })
+      const monthName = date.toLocaleDateString('pt-BR', {
+        month: 'short',
+        year: '2-digit',
+      })
       months.push({ month: monthName, date, newCustomers: 0, totalCustomers: 0 })
     }
 
@@ -280,17 +329,30 @@ export class DashboardService {
     })
 
     customers.forEach((customer) => {
-      const customerMonth = new Date(customer.createdAt.getFullYear(), customer.createdAt.getMonth(), 1)
+      const customerMonth = new Date(
+        customer.createdAt.getFullYear(),
+        customer.createdAt.getMonth(),
+        1,
+      )
       const monthIndex = months.findIndex(
-        (m) => m.date.getFullYear() === customerMonth.getFullYear() && m.date.getMonth() === customerMonth.getMonth(),
+        (m) =>
+          m.date.getFullYear() === customerMonth.getFullYear() &&
+          m.date.getMonth() === customerMonth.getMonth(),
       )
       if (monthIndex !== -1) months[monthIndex].newCustomers += 1
     })
 
     let cumulative = 0
-    months.forEach((m) => { cumulative += m.newCustomers; m.totalCustomers = cumulative })
+    months.forEach((m) => {
+      cumulative += m.newCustomers
+      m.totalCustomers = cumulative
+    })
 
-    return months.map((m) => ({ month: m.month, newCustomers: m.newCustomers, totalCustomers: m.totalCustomers }))
+    return months.map((m) => ({
+      month: m.month,
+      newCustomers: m.newCustomers,
+      totalCustomers: m.totalCustomers,
+    }))
   }
 
   async getServiceOrdersStatus(orgId: string) {
@@ -302,14 +364,26 @@ export class DashboardService {
   }
 
   private async _fetchServiceOrdersStatus(orgId: string) {
-    const [openCount, assignedCount, inProgressCount, doneCount, canceledCount] = await Promise.all([
-      this.prisma.serviceOrder.count({ where: { orgId, status: 'OPEN' } }),
-      this.prisma.serviceOrder.count({ where: { orgId, status: 'ASSIGNED' } }),
-      this.prisma.serviceOrder.count({ where: { orgId, status: 'IN_PROGRESS' } }),
-      this.prisma.serviceOrder.count({ where: { orgId, status: 'DONE' } }),
-      this.prisma.serviceOrder.count({ where: { orgId, status: 'CANCELED' } }),
-    ])
-    return { open: openCount, assigned: assignedCount, inProgress: inProgressCount, completed: doneCount, cancelled: canceledCount }
+    const [openCount, assignedCount, inProgressCount, doneCount, canceledCount] =
+      await Promise.all([
+        this.prisma.serviceOrder.count({ where: { orgId, status: 'OPEN' } }),
+        this.prisma.serviceOrder.count({ where: { orgId, status: 'ASSIGNED' } }),
+        this.prisma.serviceOrder.count({
+          where: { orgId, status: 'IN_PROGRESS' },
+        }),
+        this.prisma.serviceOrder.count({ where: { orgId, status: 'DONE' } }),
+        this.prisma.serviceOrder.count({
+          where: { orgId, status: 'CANCELED' },
+        }),
+      ])
+
+    return {
+      open: openCount,
+      assigned: assignedCount,
+      inProgress: inProgressCount,
+      completed: doneCount,
+      cancelled: canceledCount,
+    }
   }
 
   async getChargesStatus(orgId: string) {
@@ -321,13 +395,20 @@ export class DashboardService {
   }
 
   private async _fetchChargesStatus(orgId: string) {
-    const [pendingCount, paidCount, overdueCount, canceledCount] = await Promise.all([
-      this.prisma.charge.count({ where: { orgId, status: 'PENDING' } }),
-      this.prisma.charge.count({ where: { orgId, status: 'PAID' } }),
-      this.prisma.charge.count({ where: { orgId, status: 'OVERDUE' } }),
-      this.prisma.charge.count({ where: { orgId, status: 'CANCELED' } }),
-    ])
-    return { pending: pendingCount, paid: paidCount, overdue: overdueCount, cancelled: canceledCount }
+    const [pendingCount, paidCount, overdueCount, canceledCount] =
+      await Promise.all([
+        this.prisma.charge.count({ where: { orgId, status: 'PENDING' } }),
+        this.prisma.charge.count({ where: { orgId, status: 'PAID' } }),
+        this.prisma.charge.count({ where: { orgId, status: 'OVERDUE' } }),
+        this.prisma.charge.count({ where: { orgId, status: 'CANCELED' } }),
+      ])
+
+    return {
+      pending: pendingCount,
+      paid: paidCount,
+      overdue: overdueCount,
+      cancelled: canceledCount,
+    }
   }
 
   invalidateCache(orgId: string): void {

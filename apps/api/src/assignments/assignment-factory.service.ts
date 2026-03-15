@@ -33,17 +33,18 @@ export class AssignmentFactoryService {
         id: { in: params.personIds ?? [] },
         orgId: params.orgId,
         active: true,
-        role: 'COLLABORATOR',
+        role: 'STAFF',
       },
       select: { id: true },
     })
 
-    const personIds = people.map(p => p.id)
+    const personIds = people.map((p) => p.id)
+
     if (personIds.length === 0) {
       return { assigned: 0 }
     }
 
-    const result = await this.prisma.$transaction(async tx => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const existing = await tx.assignment.findMany({
         where: {
           trackId: track.id,
@@ -52,10 +53,10 @@ export class AssignmentFactoryService {
         select: { personId: true },
       })
 
-      const existingSet = new Set(existing.map(e => e.personId))
+      const existingSet = new Set(existing.map((e) => e.personId))
       const toCreate = personIds
-        .filter(pid => !existingSet.has(pid))
-        .map(pid => ({
+        .filter((pid) => !existingSet.has(pid))
+        .map((pid) => ({
           personId: pid,
           trackId: track.id,
           progress: 0,
@@ -73,20 +74,19 @@ export class AssignmentFactoryService {
       const created = await tx.assignment.findMany({
         where: {
           trackId: track.id,
-          personId: { in: toCreate.map(x => x.personId) },
+          personId: { in: toCreate.map((x) => x.personId) },
         },
         select: { personId: true },
       })
 
       return {
-        createdIds: created.map(c => c.personId),
+        createdIds: created.map((c) => c.personId),
         createdCount: created.length,
       }
     })
 
-    // Timeline: atribuição criada
     await Promise.all(
-      result.createdIds.map(personId =>
+      result.createdIds.map((personId) =>
         this.timeline.log({
           orgId: params.orgId,
           action: 'ASSIGNMENT_CREATED',
@@ -97,9 +97,8 @@ export class AssignmentFactoryService {
       ),
     )
 
-    // PUSH: recalc risco imediatamente (fecha o loop)
     await Promise.all(
-      result.createdIds.map(personId =>
+      result.createdIds.map((personId) =>
         this.risk.recalculatePersonRisk(personId, 'ASSIGNMENT_CREATED'),
       ),
     )

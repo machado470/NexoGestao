@@ -43,15 +43,12 @@ export const PLAN_LIMITS: Record<string, QuotaLimits> = {
 
 @Injectable()
 export class QuotasService {
-
   private readonly logger = new Logger(QuotasService.name)
 
   constructor(private prisma: PrismaService) {}
 
   async getOrgPlan(orgId: string): Promise<string> {
-
     try {
-
       const subscription = await this.prisma.subscription.findUnique({
         where: { orgId },
         include: { plan: true },
@@ -75,9 +72,7 @@ export class QuotasService {
       }
 
       return subscription.plan.name
-
     } catch (err) {
-
       const message =
         err instanceof Error ? err.message : 'erro desconhecido'
 
@@ -86,9 +81,7 @@ export class QuotasService {
       )
 
       return 'FREE'
-
     }
-
   }
 
   getQuotaLimits(plan: string): QuotaLimits {
@@ -96,7 +89,6 @@ export class QuotasService {
   }
 
   async canCreateCustomer(orgId: string): Promise<boolean> {
-
     const plan = await this.getOrgPlan(orgId)
     const limits = this.getQuotaLimits(plan)
 
@@ -105,11 +97,9 @@ export class QuotasService {
     const count = await this.prisma.customer.count({ where: { orgId } })
 
     return count < limits.customers
-
   }
 
   async canCreateAppointment(orgId: string): Promise<boolean> {
-
     const plan = await this.getOrgPlan(orgId)
     const limits = this.getQuotaLimits(plan)
 
@@ -120,11 +110,9 @@ export class QuotasService {
     })
 
     return count < limits.appointments
-
   }
 
   async canCreateServiceOrder(orgId: string): Promise<boolean> {
-
     const plan = await this.getOrgPlan(orgId)
     const limits = this.getQuotaLimits(plan)
 
@@ -135,11 +123,9 @@ export class QuotasService {
     })
 
     return count < limits.serviceOrders
-
   }
 
-  async canAddCollaborator(orgId: string): Promise<boolean> {
-
+  async canAddStaffMember(orgId: string): Promise<boolean> {
     const plan = await this.getOrgPlan(orgId)
     const limits = this.getQuotaLimits(plan)
 
@@ -150,11 +136,9 @@ export class QuotasService {
     })
 
     return count < limits.users
-
   }
 
   async getQuotaUsage(orgId: string) {
-
     const plan = await this.getOrgPlan(orgId)
     const limits = this.getQuotaLimits(plan)
 
@@ -203,7 +187,6 @@ export class QuotasService {
         },
       },
     }
-
   }
 
   async validateQuota(
@@ -212,16 +195,14 @@ export class QuotasService {
       | 'CREATE_CUSTOMER'
       | 'CREATE_APPOINTMENT'
       | 'CREATE_SERVICE_ORDER'
-      | 'ADD_COLLABORATOR',
+      | 'ADD_STAFF_MEMBER',
   ): Promise<void> {
-
     const plan = await this.getOrgPlan(orgId)
 
     let canProceed = false
     let resourceName = ''
 
     switch (action) {
-
       case 'CREATE_CUSTOMER':
         canProceed = await this.canCreateCustomer(orgId)
         resourceName = 'cliente'
@@ -237,15 +218,13 @@ export class QuotasService {
         resourceName = 'ordem de serviço'
         break
 
-      case 'ADD_COLLABORATOR':
-        canProceed = await this.canAddCollaborator(orgId)
-        resourceName = 'colaborador'
+      case 'ADD_STAFF_MEMBER':
+        canProceed = await this.canAddStaffMember(orgId)
+        resourceName = 'membro da equipe'
         break
-
     }
 
     if (!canProceed) {
-
       this.logger.warn(
         `Quota excedida: ${action} | org=${orgId} | plano=${plan}`,
       )
@@ -254,9 +233,6 @@ export class QuotasService {
         `Limite de ${resourceName}s atingido para o plano ${plan}. ` +
           `Faça upgrade para continuar.`,
       )
-
     }
-
   }
-
 }

@@ -6,8 +6,13 @@ import {
   Patch,
   Post,
   UseGuards,
+  BadRequestException,
 } from '@nestjs/common'
-import { WhatsAppEntityType, WhatsAppMessageStatus, WhatsAppMessageType } from '@prisma/client'
+import {
+  WhatsAppEntityType,
+  WhatsAppMessageStatus,
+  WhatsAppMessageType,
+} from '@prisma/client'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
 import { Roles } from '../auth/decorators/roles.decorator'
@@ -38,15 +43,50 @@ export class WhatsAppController {
   @Post('messages')
   @Roles('ADMIN')
   async sendMessage(@Org() orgId: string, @Body() body: any) {
+    if (!body?.customerId) {
+      throw new BadRequestException('customerId é obrigatório')
+    }
+
+    if (!body?.content || !String(body.content).trim()) {
+      throw new BadRequestException('content é obrigatório')
+    }
+
+    const customer = await this.prisma.customer.findFirst({
+      where: {
+        id: body.customerId,
+        orgId,
+      },
+      select: {
+        id: true,
+        phone: true,
+      },
+    })
+
+    if (!customer) {
+      throw new BadRequestException('Cliente não encontrado')
+    }
+
+    const toPhone =
+      String(body?.toPhone ?? '').trim() ||
+      String(body?.receiverNumber ?? '').trim() ||
+      String(customer.phone ?? '').trim()
+
+    if (!toPhone) {
+      throw new BadRequestException(
+        'Telefone do cliente não encontrado para envio de WhatsApp',
+      )
+    }
+
     return this.whatsapp.queueMessage({
       orgId,
       customerId: body.customerId,
-      toPhone: body.toPhone,
+      toPhone,
       entityType: (body.entityType || 'SERVICE_ORDER') as WhatsAppEntityType,
       entityId: body.entityId || body.customerId,
-      messageType: (body.messageType || 'EXECUTION_CONFIRMATION') as WhatsAppMessageType,
+      messageType: (body.messageType ||
+        'EXECUTION_CONFIRMATION') as WhatsAppMessageType,
       messageKey: `manual-${Date.now()}`,
-      renderedText: body.content,
+      renderedText: String(body.content).trim(),
     })
   }
 

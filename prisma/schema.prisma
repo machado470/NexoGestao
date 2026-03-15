@@ -567,7 +567,9 @@ enum UsageMetricEvent {
 
 enum UserRole {
   ADMIN
-  COLLABORATOR
+  MANAGER
+  STAFF
+  VIEWER
 }
 
 enum RiskLevel {

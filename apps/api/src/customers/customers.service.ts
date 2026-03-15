@@ -9,7 +9,7 @@ import { AuditService } from '../audit/audit.service'
 import { NotificationsService } from '../notifications/notifications.service'
 import { OnboardingService } from '../onboarding/onboarding.service'
 import { AUDIT_ACTIONS } from '../audit/audit.actions'
-import { AnalyticsService } from '../analytics/analytics.service'
+import { AnalyticsService, UsageMetricEvent } from '../analytics/analytics.service'
 
 function normalizeEmail(v?: string): string | null {
   const s = (v ?? '').trim().toLowerCase()
@@ -34,6 +34,7 @@ export class CustomersService {
 
   async list(orgId: string) {
     if (!orgId) throw new BadRequestException('orgId é obrigatório')
+
     return this.prisma.customer.findMany({
       where: { orgId },
       orderBy: { createdAt: 'desc' },
@@ -200,7 +201,9 @@ export class CustomersService {
     void this.analytics.track({
       orgId: params.orgId,
       userId: params.createdBy ?? undefined,
-      event: 'LOGIN' as any,
+      event:
+        (UsageMetricEvent as any)?.CUSTOMER_CREATED ??
+        (UsageMetricEvent as any)?.LOGIN,
       metadata: {
         source: 'customer_create',
         customerId: created.id,
@@ -240,7 +243,7 @@ export class CustomersService {
 
     if (!before) throw new NotFoundException('Cliente não encontrado')
 
-    const data: any = {}
+    const data: Record<string, unknown> = {}
 
     if (typeof params.data.name === 'string') {
       const v = params.data.name.trim()

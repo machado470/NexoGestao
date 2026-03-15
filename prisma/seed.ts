@@ -213,14 +213,14 @@ async function ensureDemoAppointments(orgId: string) {
   return created
 }
 
-async function ensureDemoCollaborators(orgId: string) {
+async function ensureDemoStaff(orgId: string) {
   const existing = await prisma.person.count({
-    where: { orgId, role: 'COLLABORATOR', active: true },
+    where: { orgId, role: 'STAFF', active: true },
   })
 
   if (existing > 0) {
     const people = await prisma.person.findMany({
-      where: { orgId, role: 'COLLABORATOR', active: true },
+      where: { orgId, role: 'STAFF', active: true },
       select: { id: true, name: true },
       orderBy: { createdAt: 'asc' },
     })
@@ -242,13 +242,13 @@ async function ensureDemoCollaborators(orgId: string) {
         name,
         orgId,
         active: true,
-        role: 'COLLABORATOR',
+        role: 'STAFF',
       },
     })
   }
 
   const people = await prisma.person.findMany({
-    where: { orgId, role: 'COLLABORATOR', active: true },
+    where: { orgId, role: 'STAFF', active: true },
     select: { id: true, name: true },
     orderBy: { createdAt: 'asc' },
   })
@@ -386,10 +386,10 @@ async function ensureDemoAssignments(orgId: string, personIds: string[], trackId
   return created
 }
 
-function pickAssigneeId(collabIds: string[], seed: number) {
-  if (collabIds.length === 0) return null
-  const idx = Math.abs(seed) % collabIds.length
-  return collabIds[idx]
+function pickAssigneeId(staffIds: string[], seed: number) {
+  if (staffIds.length === 0) return null
+  const idx = Math.abs(seed) % staffIds.length
+  return staffIds[idx]
 }
 
 function shouldHaveAssignee(status: ServiceOrderStatus) {
@@ -418,13 +418,13 @@ async function ensureDemoServiceOrders(
   })
   if (customers.length === 0) return 0
 
-  const collabs = await prisma.person.findMany({
-    where: { orgId, role: 'COLLABORATOR', active: true },
+  const staff = await prisma.person.findMany({
+    where: { orgId, role: 'STAFF', active: true },
     select: { id: true },
     orderBy: { createdAt: 'asc' },
     take: 50,
   })
-  const collabIds = collabs.map((c) => c.id)
+  const staffIds = staff.map((c) => c.id)
 
   const appts = await prisma.appointment.findMany({
     where: { orgId },
@@ -482,7 +482,7 @@ async function ensureDemoServiceOrders(
     }
 
     const assignedToPersonId =
-      shouldHaveAssignee(p.status) ? pickAssigneeId(collabIds, i + p.customerIndex * 10) : null
+      shouldHaveAssignee(p.status) ? pickAssigneeId(staffIds, i + p.customerIndex * 10) : null
 
     const so = await prisma.serviceOrder.create({
       data: {
@@ -686,10 +686,10 @@ async function main() {
   const customersCreated = await ensureDemoCustomers(org.id)
   const appointmentsCreated = await ensureDemoAppointments(org.id)
 
-  const collabs = await ensureDemoCollaborators(org.id)
+  const staff = await ensureDemoStaff(org.id)
   const tracks = await ensureDemoTracks(org.id)
 
-  const personIds = collabs.people.map((p) => p.id)
+  const personIds = staff.people.map((p) => p.id)
   const trackIds = tracks.tracks.map((t) => t.id)
 
   const assignmentsCreated = await ensureDemoAssignments(org.id, personIds, trackIds)
@@ -702,7 +702,7 @@ async function main() {
   console.log('🔑 Credenciais DEMO:', { email: admin.email, password: admin.password })
   console.log(`👥 Customers DEMO criados agora: ${customersCreated}`)
   console.log(`📅 Appointments DEMO criados agora: ${appointmentsCreated}`)
-  console.log(`👥 Collaborators DEMO criados agora: ${collabs.created} (total=${collabs.people.length})`)
+  console.log(`👥 Staff DEMO criado agora: ${staff.created} (total=${staff.people.length})`)
   console.log(`📚 Tracks DEMO criadas agora: ${tracks.created} (total=${tracks.tracks.length})`)
   console.log(`🧷 Assignments DEMO criados agora: ${assignmentsCreated}`)
   console.log(`🧾 ServiceOrders DEMO criadas agora: ${serviceOrdersCreated}`)

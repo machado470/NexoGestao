@@ -32,6 +32,18 @@ interface ConversationThread {
   messages: ConversationMessage[];
 }
 
+function mapStatus(value: unknown): ConversationMessage["status"] {
+  const status = String(value ?? "").toUpperCase();
+
+  if (status === "QUEUED" || status === "SENDING") return "pending";
+  if (status === "SENT") return "sent";
+  if (status === "DELIVERED") return "delivered";
+  if (status === "READ") return "read";
+  if (status === "FAILED" || status === "CANCELED") return "failed";
+
+  return "sent";
+}
+
 function normalizeMessages(payload: any): ConversationMessage[] {
   const rows = Array.isArray(payload?.data)
     ? payload.data
@@ -42,24 +54,15 @@ function normalizeMessages(payload: any): ConversationMessage[] {
   return rows.map((msg: any) => ({
     id: String(msg?.id ?? crypto.randomUUID()),
     customerId: msg?.customerId ? String(msg.customerId) : undefined,
-    direction: msg?.direction === "inbound" ? "inbound" : "outbound",
-    content: String(msg?.content ?? ""),
-    status:
-      msg?.status === "pending" ||
-      msg?.status === "sent" ||
-      msg?.status === "delivered" ||
-      msg?.status === "read" ||
-      msg?.status === "failed"
-        ? msg.status
-        : "sent",
+    direction: "outbound",
+    content: String(msg?.renderedText ?? msg?.content ?? ""),
+    status: mapStatus(msg?.status),
     createdAt: msg?.createdAt
       ? String(msg.createdAt)
       : new Date().toISOString(),
     mediaUrl: msg?.mediaUrl ? String(msg.mediaUrl) : undefined,
-    senderNumber: msg?.senderNumber ? String(msg.senderNumber) : undefined,
-    receiverNumber: msg?.receiverNumber
-      ? String(msg.receiverNumber)
-      : undefined,
+    senderNumber: undefined,
+    receiverNumber: msg?.toPhone ? String(msg.toPhone) : undefined,
   }));
 }
 
@@ -123,9 +126,7 @@ export default function WhatsAppPage() {
           messages,
           lastMessage: lastMessage?.content,
           lastMessageTime: lastMessage?.createdAt,
-          unreadCount: messages.filter(
-            (msg) => msg.direction === "inbound" && msg.status !== "read"
-          ).length,
+          unreadCount: 0,
         };
       })
     );
@@ -145,10 +146,8 @@ export default function WhatsAppPage() {
     try {
       await createMessageMutation.mutateAsync({
         customerId: selectedCustomerId,
-        direction: "outbound",
         content: messageInput.trim(),
-        senderNumber: "+55 (seu número)",
-        receiverNumber: selectedConversation?.whatsappNumber,
+        toPhone: selectedConversation?.whatsappNumber,
       });
 
       setMessageInput("");
