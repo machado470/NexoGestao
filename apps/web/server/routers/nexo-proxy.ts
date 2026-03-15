@@ -382,51 +382,6 @@ export const nexoProxyRouter = router({
       }),
   }),
 
-  people: router({
-    list: publicProcedure.query(async ({ ctx }) => {
-      const authHeader = getAuthHeader(ctx as CtxLike);
-      return await nexoFetch("/people", {
-        headers: authHeader ? { Authorization: authHeader } : {},
-      });
-    }),
-
-    statsLinked: publicProcedure.query(async ({ ctx }) => {
-      const authHeader = getAuthHeader(ctx as CtxLike);
-      return await nexoFetch("/people/stats/linked", {
-        headers: authHeader ? { Authorization: authHeader } : {},
-      });
-    }),
-
-    getById: publicProcedure
-      .input(z.object({ id: z.string() }))
-      .query(async ({ input, ctx }) => {
-        const authHeader = getAuthHeader(ctx as CtxLike);
-        return await nexoFetch(`/people/${input.id}`, {
-          headers: authHeader ? { Authorization: authHeader } : {},
-        });
-      }),
-
-    create: publicProcedure.input(z.any()).mutation(async ({ input, ctx }) => {
-      const authHeader = getAuthHeader(ctx as CtxLike);
-      return await nexoFetch("/people", {
-        method: "POST",
-        body: JSON.stringify(input),
-        headers: authHeader ? { Authorization: authHeader } : {},
-      });
-    }),
-
-    update: publicProcedure
-      .input(z.object({ id: z.string(), data: z.any() }))
-      .mutation(async ({ input, ctx }) => {
-        const authHeader = getAuthHeader(ctx as CtxLike);
-        return await nexoFetch(`/people/${input.id}`, {
-          method: "PATCH",
-          body: JSON.stringify(input.data),
-          headers: authHeader ? { Authorization: authHeader } : {},
-        });
-      }),
-  }),
-
   whatsapp: router({
     messages: publicProcedure
       .input(z.object({ customerId: z.string() }))
