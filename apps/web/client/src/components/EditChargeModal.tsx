@@ -11,6 +11,17 @@ interface EditChargeModalProps {
   chargeId: string | null;
 }
 
+function parseAmountToCents(raw: string): number | null {
+  const normalized = raw.replace(",", ".").trim();
+  const amount = Number(normalized);
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return null;
+  }
+
+  return Math.round(amount * 100);
+}
+
 export function EditChargeModal({
   isOpen,
   onClose,
@@ -26,7 +37,11 @@ export function EditChargeModal({
 
   const getCharge = trpc.finance.charges.getById.useQuery(
     { id: chargeId || "" },
-    { enabled: isOpen && !!chargeId }
+    {
+      enabled: isOpen && !!chargeId,
+      retry: false,
+      refetchOnWindowFocus: false,
+    }
   );
 
   const updateCharge = trpc.finance.charges.update.useMutation({
@@ -43,22 +58,23 @@ export function EditChargeModal({
   useEffect(() => {
     if (!getCharge.data) return;
 
-    const charge = getCharge.data as any;
+    const payload = getCharge.data as any;
+    const charge = payload?.data ?? payload ?? null;
 
     setFormData({
-      amount: charge.amountCents
-        ? (Number(charge.amountCents) / 100).toString()
+      amount: charge?.amountCents
+        ? (Number(charge.amountCents) / 100).toFixed(2)
         : "",
-      dueDate: charge.dueDate
+      dueDate: charge?.dueDate
         ? new Date(charge.dueDate).toISOString().split("T")[0]
         : "",
-      status: charge.status || "PENDING",
-      notes: charge.notes || "",
+      status: charge?.status || "PENDING",
+      notes: charge?.notes || "",
     });
   }, [getCharge.data]);
 
   const submitUpdate = async () => {
-    if (!formData.amount) {
+    if (!formData.amount.trim()) {
       toast.error("Valor é obrigatório");
       return;
     }
@@ -68,8 +84,8 @@ export function EditChargeModal({
       return;
     }
 
-    const amount = parseFloat(formData.amount);
-    if (isNaN(amount) || amount <= 0) {
+    const amountCents = parseAmountToCents(formData.amount);
+    if (!amountCents) {
       toast.error("Valor deve ser maior que 0");
       return;
     }
@@ -83,8 +99,8 @@ export function EditChargeModal({
 
     await updateCharge.mutateAsync({
       id: chargeId,
-      amount,
-      dueDate: new Date(`${formData.dueDate}T12:00:00`),
+      amountCents,
+      dueDate: new Date(`${formData.dueDate}T12:00:00`).toISOString(),
       status: formData.status as "PENDING" | "OVERDUE" | "CANCELED",
       notes: formData.notes.trim() || undefined,
     });
@@ -102,7 +118,8 @@ export function EditChargeModal({
     );
   }
 
-  const charge = getCharge.data as any;
+  const payload = getCharge.data as any;
+  const charge = payload?.data ?? payload ?? null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -121,6 +138,7 @@ export function EditChargeModal({
             onClick={onClose}
             className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
             type="button"
+            disabled={updateCharge.isPending}
           >
             <X className="h-5 w-5" />
           </button>
@@ -138,15 +156,14 @@ export function EditChargeModal({
               Valor (R$) *
             </label>
             <input
-              type="number"
-              step="0.01"
-              min="0.01"
+              type="text"
+              inputMode="decimal"
               value={formData.amount}
               onChange={(e) =>
                 setFormData({ ...formData, amount: e.target.value })
               }
               className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-              placeholder="100.00"
+              placeholder="100,00"
             />
           </div>
 
@@ -206,6 +223,7 @@ export function EditChargeModal({
             variant="outline"
             className="text-gray-700 dark:text-gray-300"
             type="button"
+            disabled={updateCharge.isPending}
           >
             Cancelar
           </Button>

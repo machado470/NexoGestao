@@ -335,10 +335,7 @@ export const nexoProxyRouter = router({
     }),
 
     generateCharge: publicProcedure.input(idInput).mutation(async ({ input, ctx }) => {
-      return authedPost(
-        ctx as CtxLike,
-        `/service-orders/${input.id}/generate-charge`
-      );
+      return authedPost(ctx as CtxLike, `/service-orders/${input.id}/generate-charge`);
     }),
   }),
 

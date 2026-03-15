@@ -46,7 +46,7 @@ export const serviceOrderSchema = z.object({
   description: z.string().optional(),
   priority: z.number().int().min(1).max(5).default(2),
   scheduledFor: z.string().optional().or(z.literal("")),
-  amount: z.number().positive("Valor deve ser maior que 0").optional(),
+  amountCents: z.number().int().positive("Valor deve ser maior que 0").optional(),
   dueDate: z.string().optional().or(z.literal("")),
 });
 
@@ -56,7 +56,7 @@ export type ServiceOrderFormData = z.infer<typeof serviceOrderSchema>;
 export const chargeSchema = z.object({
   customerId: z.string().min(1, "Selecione um cliente"),
   serviceOrderId: z.string().optional(),
-  amount: z.number().positive("Valor deve ser maior que 0"),
+  amountCents: z.number().int().positive("Valor deve ser maior que 0"),
   dueDate: z.string().min(1, "Selecione uma data de vencimento"),
   notes: z.string().optional(),
   paymentMethod: z.enum(["PIX", "CASH", "CARD", "TRANSFER", "OTHER"]).optional(),

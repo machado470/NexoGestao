@@ -10,6 +10,17 @@ interface CreateChargeModalProps {
   onSuccess: () => void;
 }
 
+function parseAmountToCents(raw: string): number | null {
+  const normalized = raw.replace(",", ".").trim();
+  const amount = Number(normalized);
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return null;
+  }
+
+  return Math.round(amount * 100);
+}
+
 export function CreateChargeModal({
   isOpen,
   onClose,
@@ -39,7 +50,11 @@ export function CreateChargeModal({
     },
   });
 
-  const { data: customersResponse } = trpc.nexo.customers.list.useQuery();
+  const { data: customersResponse } = trpc.nexo.customers.list.useQuery(undefined, {
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
   const customers = Array.isArray((customersResponse as any)?.data)
     ? (customersResponse as any).data
     : Array.isArray(customersResponse)
@@ -52,7 +67,7 @@ export function CreateChargeModal({
       return;
     }
 
-    if (!formData.amount) {
+    if (!formData.amount.trim()) {
       toast.error("Valor é obrigatório");
       return;
     }
@@ -62,16 +77,16 @@ export function CreateChargeModal({
       return;
     }
 
-    const amount = parseFloat(formData.amount);
-    if (isNaN(amount) || amount <= 0) {
+    const amountCents = parseAmountToCents(formData.amount);
+    if (!amountCents) {
       toast.error("Valor deve ser maior que 0");
       return;
     }
 
     await createCharge.mutateAsync({
       customerId: formData.customerId,
-      amount,
-      dueDate: new Date(`${formData.dueDate}T12:00:00`),
+      amountCents,
+      dueDate: new Date(`${formData.dueDate}T12:00:00`).toISOString(),
       notes: formData.notes.trim() || undefined,
     });
   };
@@ -90,6 +105,7 @@ export function CreateChargeModal({
             onClick={onClose}
             className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
             type="button"
+            disabled={createCharge.isPending}
           >
             <X className="h-5 w-5" />
           </button>
@@ -127,15 +143,14 @@ export function CreateChargeModal({
               Valor (R$) *
             </label>
             <input
-              type="number"
-              step="0.01"
-              min="0.01"
+              type="text"
+              inputMode="decimal"
               value={formData.amount}
               onChange={(e) =>
                 setFormData({ ...formData, amount: e.target.value })
               }
               className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-              placeholder="100.00"
+              placeholder="100,00"
             />
           </div>
 
@@ -175,6 +190,7 @@ export function CreateChargeModal({
             variant="outline"
             className="text-gray-700 dark:text-gray-300"
             type="button"
+            disabled={createCharge.isPending}
           >
             Cancelar
           </Button>

@@ -177,7 +177,7 @@ export default function ServiceOrdersPage() {
     },
   });
 
-  const generateChargeMutation = trpc.finance.charges.create.useMutation({
+  const generateChargeMutation = trpc.nexo.serviceOrders.generateCharge.useMutation({
     onSuccess: async () => {
       toast.success("Cobrança gerada com sucesso!");
       await Promise.all([
@@ -196,8 +196,8 @@ export default function ServiceOrdersPage() {
 
   const serviceOrders = useMemo(() => {
     const payload = listQuery.data;
-    const rows = Array.isArray(payload?.data)
-      ? payload.data
+    const rows = Array.isArray((payload as any)?.data)
+      ? (payload as any).data
       : Array.isArray(payload)
         ? payload
         : [];
@@ -205,12 +205,12 @@ export default function ServiceOrdersPage() {
     return rows as ServiceOrder[];
   }, [listQuery.data]);
 
-  const pagination = listQuery.data?.pagination;
+  const pagination = (listQuery.data as any)?.pagination ?? (listQuery.data as any)?.data?.pagination;
 
   const customers = useMemo(() => {
     const payload = customersQuery.data;
-    const rows = Array.isArray(payload?.data)
-      ? payload.data
+    const rows = Array.isArray((payload as any)?.data)
+      ? (payload as any).data
       : Array.isArray(payload)
         ? payload
         : [];
@@ -266,11 +266,7 @@ export default function ServiceOrdersPage() {
 
     try {
       await generateChargeMutation.mutateAsync({
-        customerId: serviceOrder.customerId,
-        serviceOrderId: serviceOrder.id,
-        amountCents: serviceOrder.amountCents,
-        dueDate: serviceOrder.dueDate ?? new Date().toISOString(),
-        notes: `Cobrança gerada manualmente para OS: ${serviceOrder.title}`,
+        id: serviceOrder.id,
       });
     } catch {
       // toast já tratado
