@@ -1,37 +1,38 @@
-import { useRef, useState, useCallback } from "react";
+import { useMemo, useRef, useState, useCallback } from "react";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin, { type DateClickArg } from "@fullcalendar/interaction";
-import type { EventDropArg } from "@fullcalendar/core";
-import type { EventClickArg, EventInput } from "@fullcalendar/core";
+import type { EventClickArg, EventDropArg, EventInput } from "@fullcalendar/core";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { CalendarDays, Plus, X, Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
-// ─── Status colors ──────────────────────────────────────────────────────────
 const STATUS_COLORS: Record<string, string> = {
   SCHEDULED: "#3b82f6",
   CONFIRMED: "#22c55e",
-  IN_PROGRESS: "#f59e0b",
   DONE: "#10b981",
   CANCELED: "#ef4444",
   NO_SHOW: "#6b7280",
 };
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-interface AppointmentEvent {
+type CustomerRef = {
   id: string;
-  title: string;
+  name: string;
+  phone?: string | null;
+};
+
+type AppointmentEvent = {
+  id: string;
+  customerId: string;
+  customer?: CustomerRef | null;
   startsAt: string;
-  endsAt: string;
-  status: string;
-  customer?: { id: string; name: string };
-  description?: string | null;
+  endsAt: string | null;
+  status: "SCHEDULED" | "CONFIRMED" | "DONE" | "CANCELED" | "NO_SHOW";
   notes?: string | null;
-}
+};
 
 interface CreateModalState {
   open: boolean;
@@ -44,7 +45,59 @@ interface DetailModalState {
   event: AppointmentEvent | null;
 }
 
-// ─── Create Appointment Modal ─────────────────────────────────────────────────
+function formatDateTimeLocalInput(date: Date) {
+  const pad = (value: number) => String(value).padStart(2, "0");
+
+  const year = date.getFullYear();
+  const month = pad(date.getMonth() + 1);
+  const day = pad(date.getDate());
+  const hours = pad(date.getHours());
+  const minutes = pad(date.getMinutes());
+
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+function getStatusLabel(status: AppointmentEvent["status"]) {
+  const labels: Record<AppointmentEvent["status"], string> = {
+    SCHEDULED: "Agendado",
+    CONFIRMED: "Confirmado",
+    DONE: "Concluído",
+    CANCELED: "Cancelado",
+    NO_SHOW: "Não compareceu",
+  };
+
+  return labels[status];
+}
+
+function CalendarSkeleton() {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <Skeleton className="h-8 w-48" />
+        <div className="flex gap-2">
+          <Skeleton className="h-8 w-20" />
+          <Skeleton className="h-8 w-20" />
+          <Skeleton className="h-8 w-20" />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-7 gap-1">
+        {Array.from({ length: 7 }).map((_, i) => (
+          <Skeleton key={i} className="h-8" />
+        ))}
+      </div>
+
+      {Array.from({ length: 5 }).map((_, row) => (
+        <div key={row} className="grid grid-cols-7 gap-1">
+          {Array.from({ length: 7 }).map((_, col) => (
+            <Skeleton key={col} className="h-24" />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function CreateAppointmentModal({
   state,
   onClose,
@@ -58,12 +111,10 @@ function CreateAppointmentModal({
 }) {
   const [form, setForm] = useState({
     customerId: "",
-    title: "",
-    description: "",
-    notes: "",
-    status: "SCHEDULED",
     startsAt: state.startStr,
     endsAt: state.endStr,
+    status: "SCHEDULED" as AppointmentEvent["status"],
+    notes: "",
   });
 
   const createMutation = trpc.nexo.appointments.create.useMutation({
@@ -71,6 +122,13 @@ function CreateAppointmentModal({
       toast.success("Agendamento criado com sucesso!");
       onSuccess();
       onClose();
+      setForm({
+        customerId: "",
+        startsAt: "",
+        endsAt: "",
+        status: "SCHEDULED",
+        notes: "",
+      });
     },
     onError: (err) => {
       toast.error("Erro ao criar agendamento: " + err.message);
@@ -79,136 +137,142 @@ function CreateAppointmentModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.customerId || !form.title || !form.startsAt) {
-      toast.error("Cliente, título e data/hora de início são obrigatórios");
+
+    if (!form.customerId || !form.startsAt) {
+      toast.error("Cliente e data/hora de início são obrigatórios");
       return;
     }
+
+    if (
+      form.endsAt &&
+      new Date(form.endsAt).getTime() <= new Date(form.startsAt).getTime()
+    ) {
+      toast.error("Data/hora final deve ser maior que a inicial");
+      return;
+    }
+
     createMutation.mutate({
       customerId: form.customerId,
-      title: form.title,
-      description: form.description || undefined,
-      notes: form.notes || undefined,
-      status: form.status,
       startsAt: form.startsAt,
       endsAt: form.endsAt || undefined,
+      status: form.status,
+      notes: form.notes.trim() || undefined,
     });
   };
 
   if (!state.open) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-gray-700">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-md rounded-xl bg-white shadow-xl dark:bg-gray-800">
+        <div className="flex items-center justify-between border-b border-gray-200 p-5 dark:border-gray-700">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
             Novo Agendamento
           </h2>
           <button
             onClick={onClose}
-            className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+            className="rounded-lg p-1 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700"
+            type="button"
           >
-            <X className="w-5 h-5 text-gray-500" />
+            <X className="h-5 w-5 text-gray-500" />
           </button>
         </div>
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+
+        <form onSubmit={handleSubmit} className="space-y-4 p-5">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
               Cliente *
             </label>
             <select
               value={form.customerId}
-              onChange={(e) => setForm({ ...form, customerId: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm"
+              onChange={(e) => setForm((prev) => ({ ...prev, customerId: e.target.value }))}
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
             >
               <option value="">Selecione um cliente</option>
-              {customers.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
+              {customers.map((customer) => (
+                <option key={customer.id} value={customer.id}>
+                  {customer.name}
                 </option>
               ))}
             </select>
           </div>
+
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Título *
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Início *
             </label>
             <input
-              type="text"
-              value={form.title}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
-              placeholder="Ex: Consulta de rotina"
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm"
+              type="datetime-local"
+              value={form.startsAt}
+              onChange={(e) => setForm((prev) => ({ ...prev, startsAt: e.target.value }))}
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Início *
-              </label>
-              <input
-                type="datetime-local"
-                value={form.startsAt}
-                onChange={(e) => setForm({ ...form, startsAt: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Fim
-              </label>
-              <input
-                type="datetime-local"
-                value={form.endsAt}
-                onChange={(e) => setForm({ ...form, endsAt: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm"
-              />
-            </div>
-          </div>
+
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Fim
+            </label>
+            <input
+              type="datetime-local"
+              value={form.endsAt}
+              onChange={(e) => setForm((prev) => ({ ...prev, endsAt: e.target.value }))}
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
               Status
             </label>
             <select
               value={form.status}
-              onChange={(e) => setForm({ ...form, status: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm"
+              onChange={(e) =>
+                setForm((prev) => ({
+                  ...prev,
+                  status: e.target.value as AppointmentEvent["status"],
+                }))
+              }
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
             >
               <option value="SCHEDULED">Agendado</option>
               <option value="CONFIRMED">Confirmado</option>
+              <option value="DONE">Concluído</option>
+              <option value="CANCELED">Cancelado</option>
+              <option value="NO_SHOW">Não compareceu</option>
             </select>
           </div>
+
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Descrição
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Observações
             </label>
             <textarea
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              rows={2}
-              placeholder="Detalhes do agendamento..."
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm resize-none"
+              value={form.notes}
+              onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
+              rows={3}
+              placeholder="Observações do agendamento"
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
             />
           </div>
+
           <div className="flex gap-3 pt-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              className="flex-1"
-            >
+            <Button type="button" variant="outline" onClick={onClose} className="flex-1">
               Cancelar
             </Button>
             <Button
               type="submit"
               disabled={createMutation.isPending}
-              className="flex-1 bg-orange-500 hover:bg-orange-600 text-white"
+              className="flex-1 bg-orange-500 text-white hover:bg-orange-600"
             >
               {createMutation.isPending ? (
-                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Criando...
+                </>
               ) : (
-                <Plus className="w-4 h-4 mr-2" />
+                "Criar"
               )}
-              Criar
             </Button>
           </div>
         </form>
@@ -217,7 +281,6 @@ function CreateAppointmentModal({
   );
 }
 
-// ─── Detail Modal ─────────────────────────────────────────────────────────────
 function EventDetailModal({
   state,
   onClose,
@@ -240,97 +303,93 @@ function EventDetailModal({
 
   if (!state.open || !state.event) return null;
 
-  const ev = state.event;
-  const statusLabel: Record<string, string> = {
-    SCHEDULED: "Agendado",
-    CONFIRMED: "Confirmado",
-    IN_PROGRESS: "Em Andamento",
-    DONE: "Concluído",
-    CANCELED: "Cancelado",
-    NO_SHOW: "Não Compareceu",
-  };
+  const event = state.event;
 
-  const handleStatusChange = (newStatus: string) => {
-    updateMutation.mutate({ id: ev.id, data: { status: newStatus } });
+  const handleStatusChange = (newStatus: AppointmentEvent["status"]) => {
+    updateMutation.mutate({
+      id: event.id,
+      data: { status: newStatus },
+    });
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-sm">
-        <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white truncate pr-2">
-            {ev.title}
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-sm rounded-xl bg-white shadow-xl dark:bg-gray-800">
+        <div className="flex items-center justify-between border-b border-gray-200 p-5 dark:border-gray-700">
+          <h2 className="pr-2 text-lg font-semibold text-gray-900 dark:text-white">
+            Detalhes do Agendamento
           </h2>
           <button
             onClick={onClose}
-            className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors flex-shrink-0"
+            className="rounded-lg p-1 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700"
+            type="button"
           >
-            <X className="w-5 h-5 text-gray-500" />
+            <X className="h-5 w-5 text-gray-500" />
           </button>
         </div>
-        <div className="p-5 space-y-3">
-          {ev.customer && (
-            <div>
-              <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                Cliente
-              </span>
-              <p className="text-sm text-gray-900 dark:text-white mt-0.5">
-                {ev.customer.name}
-              </p>
-            </div>
-          )}
+
+        <div className="space-y-3 p-5">
           <div>
-            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+            <span className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+              Cliente
+            </span>
+            <p className="mt-0.5 text-sm text-gray-900 dark:text-white">
+              {event.customer?.name ?? "Cliente não identificado"}
+            </p>
+          </div>
+
+          <div>
+            <span className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
               Início
             </span>
-            <p className="text-sm text-gray-900 dark:text-white mt-0.5">
-              {new Date(ev.startsAt).toLocaleString("pt-BR")}
+            <p className="mt-0.5 text-sm text-gray-900 dark:text-white">
+              {new Date(event.startsAt).toLocaleString("pt-BR")}
             </p>
           </div>
+
           <div>
-            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+            <span className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
               Fim
             </span>
-            <p className="text-sm text-gray-900 dark:text-white mt-0.5">
-              {new Date(ev.endsAt).toLocaleString("pt-BR")}
+            <p className="mt-0.5 text-sm text-gray-900 dark:text-white">
+              {event.endsAt ? new Date(event.endsAt).toLocaleString("pt-BR") : "—"}
             </p>
           </div>
-          {ev.description && (
-            <div>
-              <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                Descrição
-              </span>
-              <p className="text-sm text-gray-900 dark:text-white mt-0.5">
-                {ev.description}
-              </p>
-            </div>
-          )}
+
           <div>
-            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+            <span className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
               Status
             </span>
             <div className="mt-1.5">
               <select
-                value={ev.status}
-                onChange={(e) => handleStatusChange(e.target.value)}
+                value={event.status}
+                onChange={(e) =>
+                  handleStatusChange(e.target.value as AppointmentEvent["status"])
+                }
                 disabled={updateMutation.isPending}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm"
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
               >
-                {Object.entries(statusLabel).map(([val, label]) => (
-                  <option key={val} value={val}>
-                    {label}
-                  </option>
-                ))}
+                <option value="SCHEDULED">Agendado</option>
+                <option value="CONFIRMED">Confirmado</option>
+                <option value="DONE">Concluído</option>
+                <option value="CANCELED">Cancelado</option>
+                <option value="NO_SHOW">Não compareceu</option>
               </select>
             </div>
           </div>
+
+          <div>
+            <span className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+              Observações
+            </span>
+            <p className="mt-0.5 text-sm text-gray-900 dark:text-white">
+              {event.notes?.trim() ? event.notes : "—"}
+            </p>
+          </div>
         </div>
+
         <div className="px-5 pb-5">
-          <Button
-            variant="outline"
-            onClick={onClose}
-            className="w-full"
-          >
+          <Button variant="outline" onClick={onClose} className="w-full">
             Fechar
           </Button>
         </div>
@@ -339,35 +398,6 @@ function EventDetailModal({
   );
 }
 
-// ─── Calendar Skeleton ────────────────────────────────────────────────────────
-function CalendarSkeleton() {
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <Skeleton className="h-8 w-48" />
-        <div className="flex gap-2">
-          <Skeleton className="h-8 w-20" />
-          <Skeleton className="h-8 w-20" />
-          <Skeleton className="h-8 w-20" />
-        </div>
-      </div>
-      <div className="grid grid-cols-7 gap-1">
-        {Array.from({ length: 7 }).map((_, i) => (
-          <Skeleton key={i} className="h-8" />
-        ))}
-      </div>
-      {Array.from({ length: 5 }).map((_, row) => (
-        <div key={row} className="grid grid-cols-7 gap-1">
-          {Array.from({ length: 7 }).map((_, col) => (
-            <Skeleton key={col} className="h-24" />
-          ))}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ─── Main CalendarPage ────────────────────────────────────────────────────────
 export default function CalendarPage() {
   const calendarRef = useRef<FullCalendar>(null);
   const [createModal, setCreateModal] = useState<CreateModalState>({
@@ -380,13 +410,11 @@ export default function CalendarPage() {
     event: null,
   });
 
-  // Buscar agendamentos via nexo proxy
   const appointmentsQuery = trpc.nexo.appointments.list.useQuery(undefined, {
     retry: false,
     refetchOnWindowFocus: false,
   });
 
-  // Buscar clientes para o modal de criação
   const customersQuery = trpc.nexo.customers.list.useQuery(undefined, {
     retry: false,
     refetchOnWindowFocus: false,
@@ -395,55 +423,65 @@ export default function CalendarPage() {
   const updateMutation = trpc.nexo.appointments.update.useMutation({
     onSuccess: () => {
       toast.success("Agendamento atualizado!");
-      appointmentsQuery.refetch();
+      void appointmentsQuery.refetch();
     },
     onError: (err) => {
       toast.error("Erro ao atualizar: " + err.message);
-      appointmentsQuery.refetch(); // reverter visualmente
+      void appointmentsQuery.refetch();
     },
   });
 
-  // Transformar appointments em eventos do FullCalendar
-  const rawAppointments: AppointmentEvent[] = Array.isArray(
-    appointmentsQuery.data?.data
-  )
-    ? (appointmentsQuery.data.data as AppointmentEvent[])
-    : Array.isArray(appointmentsQuery.data)
-    ? (appointmentsQuery.data as AppointmentEvent[])
-    : [];
+  const rawAppointments = useMemo(() => {
+    const payload = appointmentsQuery.data;
+    const rows = Array.isArray(payload?.data)
+      ? payload.data
+      : Array.isArray(payload)
+        ? payload
+        : [];
 
-  const events: EventInput[] = rawAppointments.map((appt) => ({
-    id: String(appt.id),
-    title: appt.customer
-      ? `${appt.title} — ${appt.customer.name}`
-      : appt.title,
-    start: appt.startsAt,
-    end: appt.endsAt,
-    backgroundColor: STATUS_COLORS[appt.status] ?? "#6b7280",
-    borderColor: STATUS_COLORS[appt.status] ?? "#6b7280",
-    extendedProps: { ...appt },
-  }));
+    return rows as AppointmentEvent[];
+  }, [appointmentsQuery.data]);
 
-  const customers: Array<{ id: string; name: string }> = Array.isArray(
-    customersQuery.data?.data
-  )
-    ? (customersQuery.data.data as Array<{ id: string; name: string }>)
-    : [];
+  const events: EventInput[] = useMemo(() => {
+    return rawAppointments.map((appointment) => ({
+      id: String(appointment.id),
+      title: appointment.customer?.name ?? "Agendamento",
+      start: appointment.startsAt,
+      end: appointment.endsAt ?? undefined,
+      backgroundColor: STATUS_COLORS[appointment.status] ?? "#6b7280",
+      borderColor: STATUS_COLORS[appointment.status] ?? "#6b7280",
+      extendedProps: appointment,
+    }));
+  }, [rawAppointments]);
 
-  // Handlers
+  const customers = useMemo(() => {
+    const payload = customersQuery.data;
+    const rows = Array.isArray(payload?.data)
+      ? payload.data
+      : Array.isArray(payload)
+        ? payload
+        : [];
+
+    return rows.map((customer: any) => ({
+      id: String(customer.id),
+      name: String(customer.name),
+    }));
+  }, [customersQuery.data]);
+
   const handleDateClick = useCallback((arg: DateClickArg) => {
-    const startStr = arg.dateStr.includes("T")
-      ? arg.dateStr.slice(0, 16)
-      : `${arg.dateStr}T09:00`;
-    const endDate = new Date(startStr);
-    endDate.setMinutes(endDate.getMinutes() + 60);
-    const endStr = endDate.toISOString().slice(0, 16);
-    setCreateModal({ open: true, startStr, endStr });
+    const startDate = arg.date;
+    const endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
+
+    setCreateModal({
+      open: true,
+      startStr: formatDateTimeLocalInput(startDate),
+      endStr: formatDateTimeLocalInput(endDate),
+    });
   }, []);
 
   const handleEventClick = useCallback((arg: EventClickArg) => {
-    const appt = arg.event.extendedProps as AppointmentEvent;
-    setDetailModal({ open: true, event: appt });
+    const appointment = arg.event.extendedProps as AppointmentEvent;
+    setDetailModal({ open: true, event: appointment });
   }, []);
 
   const handleEventDrop = useCallback(
@@ -451,10 +489,12 @@ export default function CalendarPage() {
       const id = arg.event.id;
       const newStart = arg.event.start;
       const newEnd = arg.event.end;
+
       if (!newStart) {
         arg.revert();
         return;
       }
+
       updateMutation.mutate({
         id,
         data: {
@@ -467,63 +507,62 @@ export default function CalendarPage() {
   );
 
   const handleCreateSuccess = useCallback(() => {
-    appointmentsQuery.refetch();
+    void appointmentsQuery.refetch();
   }, [appointmentsQuery]);
 
-  const isLoading = appointmentsQuery.isLoading;
-
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <CalendarDays className="w-8 h-8 text-orange-500" />
+          <h1 className="flex items-center gap-2 text-3xl font-bold text-gray-900 dark:text-white">
+            <CalendarDays className="h-8 w-8 text-orange-500" />
             Calendário
           </h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
-            Visualize e gerencie todos os agendamentos
+          <p className="mt-1 text-gray-600 dark:text-gray-400">
+            Visualize e gerencie os agendamentos da operação.
           </p>
         </div>
+
         <Button
           onClick={() => {
             const now = new Date();
-            const startStr = now.toISOString().slice(0, 16);
             const end = new Date(now.getTime() + 60 * 60 * 1000);
-            const endStr = end.toISOString().slice(0, 16);
-            setCreateModal({ open: true, startStr, endStr });
+
+            setCreateModal({
+              open: true,
+              startStr: formatDateTimeLocalInput(now),
+              endStr: formatDateTimeLocalInput(end),
+            });
           }}
-          className="bg-orange-500 hover:bg-orange-600 text-white gap-2"
+          className="gap-2 bg-orange-500 text-white hover:bg-orange-600"
         >
-          <Plus className="w-4 h-4" />
+          <Plus className="h-4 w-4" />
           Novo Agendamento
         </Button>
       </div>
 
-      {/* Legend */}
       <div className="flex flex-wrap gap-3">
-        {Object.entries({
-          SCHEDULED: "Agendado",
-          CONFIRMED: "Confirmado",
-          IN_PROGRESS: "Em Andamento",
-          DONE: "Concluído",
-          CANCELED: "Cancelado",
-        }).map(([status, label]) => (
+        {(
+          [
+            ["SCHEDULED", "Agendado"],
+            ["CONFIRMED", "Confirmado"],
+            ["DONE", "Concluído"],
+            ["CANCELED", "Cancelado"],
+            ["NO_SHOW", "Não compareceu"],
+          ] as const
+        ).map(([status, label]) => (
           <div key={status} className="flex items-center gap-1.5">
             <div
-              className="w-3 h-3 rounded-full"
+              className="h-3 w-3 rounded-full"
               style={{ backgroundColor: STATUS_COLORS[status] }}
             />
-            <span className="text-xs text-gray-600 dark:text-gray-400">
-              {label}
-            </span>
+            <span className="text-xs text-gray-600 dark:text-gray-400">{label}</span>
           </div>
         ))}
       </div>
 
-      {/* Calendar */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 overflow-hidden">
-        {isLoading ? (
+      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+        {appointmentsQuery.isLoading ? (
           <CalendarSkeleton />
         ) : (
           <FullCalendar
@@ -546,11 +585,11 @@ export default function CalendarPage() {
             slotMinTime="06:00:00"
             slotMaxTime="22:00:00"
             allDaySlot={false}
-            editable={true}
-            selectable={true}
-            selectMirror={true}
-            dayMaxEvents={true}
-            weekends={true}
+            editable
+            selectable
+            selectMirror
+            dayMaxEvents
+            weekends
             events={events}
             dateClick={handleDateClick}
             eventClick={handleEventClick}
@@ -567,17 +606,17 @@ export default function CalendarPage() {
         )}
       </div>
 
-      {/* Modals */}
       <CreateAppointmentModal
         state={createModal}
         onClose={() => setCreateModal({ open: false, startStr: "", endStr: "" })}
         onSuccess={handleCreateSuccess}
         customers={customers}
       />
+
       <EventDetailModal
         state={detailModal}
         onClose={() => setDetailModal({ open: false, event: null })}
-        onUpdate={() => appointmentsQuery.refetch()}
+        onUpdate={() => void appointmentsQuery.refetch()}
       />
     </div>
   );

@@ -11,34 +11,28 @@ interface CreateAppointmentModalProps {
   customers: Array<{ id: string | number; name: string }>;
 }
 
+type AppointmentStatus = "SCHEDULED" | "CONFIRMED" | "DONE" | "CANCELED" | "NO_SHOW";
+
+const INITIAL_FORM = {
+  customerId: "",
+  startsAt: "",
+  endsAt: "",
+  status: "SCHEDULED" as AppointmentStatus,
+  notes: "",
+};
+
 export function CreateAppointmentModal({
   isOpen,
   onClose,
   onSuccess,
   customers,
 }: CreateAppointmentModalProps) {
-  const [formData, setFormData] = useState({
-    customerId: "",
-    title: "",
-    description: "",
-    startsAt: "",
-    endsAt: "",
-    status: "SCHEDULED" as const,
-    notes: "",
-  });
+  const [formData, setFormData] = useState(INITIAL_FORM);
 
   const createAppointment = trpc.nexo.appointments.create.useMutation({
     onSuccess: () => {
       toast.success("Agendamento criado com sucesso!");
-      setFormData({
-        customerId: "",
-        title: "",
-        description: "",
-        startsAt: "",
-        endsAt: "",
-        status: "SCHEDULED",
-        notes: "",
-      });
+      setFormData(INITIAL_FORM);
       onSuccess();
       onClose();
     },
@@ -47,42 +41,58 @@ export function CreateAppointmentModal({
     },
   });
 
+  const handleClose = () => {
+    if (createAppointment.isPending) return;
+    setFormData(INITIAL_FORM);
+    onClose();
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.customerId || !formData.title || !formData.startsAt) {
-      toast.error("Cliente, título e data/hora são obrigatórios");
+
+    if (!formData.customerId || !formData.startsAt) {
+      toast.error("Cliente e data/hora de início são obrigatórios");
       return;
     }
+
+    if (
+      formData.endsAt &&
+      new Date(formData.endsAt).getTime() <= new Date(formData.startsAt).getTime()
+    ) {
+      toast.error("Data/hora final deve ser maior que a inicial");
+      return;
+    }
+
     createAppointment.mutate({
       customerId: formData.customerId,
-      title: formData.title,
-      description: formData.description,
-      startsAt: new Date(formData.startsAt),
+      startsAt: formData.startsAt,
+      endsAt: formData.endsAt || undefined,
       status: formData.status,
-      notes: formData.notes,
+      notes: formData.notes.trim() || undefined,
     });
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
-        <div className="flex justify-between items-center mb-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-lg dark:bg-gray-800">
+        <div className="mb-4 flex items-center justify-between">
           <h2 className="text-xl font-bold text-gray-900 dark:text-white">
             Novo Agendamento
           </h2>
           <button
-            onClick={onClose}
-            className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+            onClick={handleClose}
+            className="rounded p-1 hover:bg-gray-100 dark:hover:bg-gray-700"
+            type="button"
           >
-            <X className="w-5 h-5" />
+            <X className="h-5 w-5" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
               Cliente *
             </label>
             <select
@@ -90,7 +100,7 @@ export function CreateAppointmentModal({
               onChange={(e) =>
                 setFormData({ ...formData, customerId: e.target.value })
               }
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
             >
               <option value="">Selecione um cliente</option>
               {customers.map((customer) => (
@@ -102,37 +112,7 @@ export function CreateAppointmentModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Título *
-            </label>
-            <input
-              type="text"
-              value={formData.title}
-              onChange={(e) =>
-                setFormData({ ...formData, title: e.target.value })
-              }
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-              placeholder="Título do agendamento"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Descrição
-            </label>
-            <textarea
-              value={formData.description}
-              onChange={(e) =>
-                setFormData({ ...formData, description: e.target.value })
-              }
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-              placeholder="Descrição do agendamento"
-              rows={2}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
               Data/Hora Início *
             </label>
             <input
@@ -141,12 +121,12 @@ export function CreateAppointmentModal({
               onChange={(e) =>
                 setFormData({ ...formData, startsAt: e.target.value })
               }
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
               Data/Hora Fim
             </label>
             <input
@@ -155,12 +135,12 @@ export function CreateAppointmentModal({
               onChange={(e) =>
                 setFormData({ ...formData, endsAt: e.target.value })
               }
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
               Status
             </label>
             <select
@@ -168,31 +148,31 @@ export function CreateAppointmentModal({
               onChange={(e) =>
                 setFormData({
                   ...formData,
-                  status: e.target.value as any,
+                  status: e.target.value as AppointmentStatus,
                 })
               }
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
             >
               <option value="SCHEDULED">Agendado</option>
               <option value="CONFIRMED">Confirmado</option>
               <option value="DONE">Concluído</option>
               <option value="CANCELED">Cancelado</option>
-              <option value="NO_SHOW">Não Compareceu</option>
+              <option value="NO_SHOW">Não compareceu</option>
             </select>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Notas
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Observações
             </label>
             <textarea
               value={formData.notes}
               onChange={(e) =>
                 setFormData({ ...formData, notes: e.target.value })
               }
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
               placeholder="Observações"
-              rows={2}
+              rows={3}
             />
           </div>
 
@@ -200,19 +180,20 @@ export function CreateAppointmentModal({
             <Button
               type="button"
               variant="outline"
-              onClick={onClose}
+              onClick={handleClose}
               className="flex-1"
+              disabled={createAppointment.isPending}
             >
               Cancelar
             </Button>
             <Button
               type="submit"
               disabled={createAppointment.isPending}
-              className="flex-1 bg-orange-500 hover:bg-orange-600 text-white"
+              className="flex-1 bg-orange-500 text-white hover:bg-orange-600"
             >
               {createAppointment.isPending ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Criando...
                 </>
               ) : (

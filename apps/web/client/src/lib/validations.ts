@@ -15,31 +15,38 @@ export const customerSchema = z.object({
 export type CustomerFormData = z.infer<typeof customerSchema>
 
 // Appointment validation
-export const appointmentSchema = z.object({
-  customerId: z.string().min(1, 'Selecione um cliente'),
-  serviceType: z.string().min(1, 'Selecione um tipo de serviço'),
-  date: z.string().min(1, 'Selecione uma data'),
-  time: z.string().regex(/^\d{2}:\d{2}$/, 'Horário inválido'),
-  duration: z.number().positive('Duração deve ser maior que 0'),
-  notes: z.string().optional(),
-  status: z
-    .enum(['SCHEDULED', 'CONFIRMED', 'DONE', 'CANCELED', 'NO_SHOW'])
-    .default('SCHEDULED'),
-})
+export const appointmentSchema = z
+  .object({
+    customerId: z.string().min(1, 'Selecione um cliente'),
+    startsAt: z.string().min(1, 'Selecione a data/hora de início'),
+    endsAt: z.string().optional().or(z.literal('')),
+    status: z
+      .enum(['SCHEDULED', 'CONFIRMED', 'DONE', 'CANCELED', 'NO_SHOW'])
+      .default('SCHEDULED'),
+    notes: z.string().optional(),
+  })
+  .refine(
+    (data) => {
+      if (!data.endsAt) return true
+      return new Date(data.endsAt).getTime() > new Date(data.startsAt).getTime()
+    },
+    {
+      message: 'Data/hora final deve ser maior que a inicial',
+      path: ['endsAt'],
+    },
+  )
 
 export type AppointmentFormData = z.infer<typeof appointmentSchema>
 
 // Service Order validation
 export const serviceOrderSchema = z.object({
   customerId: z.string().min(1, 'Selecione um cliente'),
-  appointmentId: z.string().optional(),
-  description: z.string().min(10, 'Descrição deve ter pelo menos 10 caracteres'),
-  value: z.number().positive('Valor deve ser maior que 0'),
-  status: z
-    .enum(['OPEN', 'ASSIGNED', 'IN_PROGRESS', 'DONE', 'CANCELED'])
-    .default('OPEN'),
-  dueDate: z.string().optional(),
-  notes: z.string().optional(),
+  title: z.string().min(2, 'Título deve ter pelo menos 2 caracteres'),
+  description: z.string().optional(),
+  priority: z.number().int().min(1).max(5).default(2),
+  scheduledFor: z.string().optional().or(z.literal('')),
+  amount: z.number().positive('Valor deve ser maior que 0').optional(),
+  dueDate: z.string().optional().or(z.literal('')),
 })
 
 export type ServiceOrderFormData = z.infer<typeof serviceOrderSchema>
@@ -50,10 +57,8 @@ export const chargeSchema = z.object({
   serviceOrderId: z.string().optional(),
   amount: z.number().positive('Valor deve ser maior que 0'),
   dueDate: z.string().min(1, 'Selecione uma data de vencimento'),
-  description: z.string().optional(),
-  status: z.enum(['PENDING', 'PAID', 'OVERDUE', 'CANCELED']).default('PENDING'),
-  paymentMethod: z.enum(['PIX', 'CASH', 'CARD', 'TRANSFER', 'OTHER']).optional(),
   notes: z.string().optional(),
+  paymentMethod: z.enum(['PIX', 'CASH', 'CARD', 'TRANSFER', 'OTHER']).optional(),
 })
 
 export type ChargeFormData = z.infer<typeof chargeSchema>

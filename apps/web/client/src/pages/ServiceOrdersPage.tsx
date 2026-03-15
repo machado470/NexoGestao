@@ -1,77 +1,219 @@
-import React, { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
-import { Plus, RefreshCw, ClipboardList, User, Calendar, AlertCircle } from "lucide-react";
+import {
+  Plus,
+  RefreshCw,
+  ClipboardList,
+  User,
+  Calendar,
+  AlertCircle,
+} from "lucide-react";
 import CreateServiceOrderModal from "@/components/CreateServiceOrderModal";
 import { toast } from "sonner";
 
-const STATUS_LABELS: Record<string, string> = {
+type ServiceOrderStatus =
+  | "OPEN"
+  | "ASSIGNED"
+  | "IN_PROGRESS"
+  | "DONE"
+  | "CANCELED";
+
+type CustomerRef = {
+  id: string;
+  name: string;
+  phone?: string | null;
+};
+
+type AssignedPersonRef = {
+  id: string;
+  name: string;
+};
+
+type ServiceOrder = {
+  id: string;
+  customerId: string;
+  customer?: CustomerRef | null;
+  assignedToPersonId?: string | null;
+  assignedTo?: AssignedPersonRef | null;
+  appointmentId?: string | null;
+  title: string;
+  description?: string | null;
+  status: ServiceOrderStatus;
+  priority?: number | null;
+  scheduledFor?: string | null;
+  startedAt?: string | null;
+  finishedAt?: string | null;
+  amountCents?: number | null;
+  dueDate?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+const STATUS_LABELS: Record<ServiceOrderStatus, string> = {
   OPEN: "Aberta",
   ASSIGNED: "Atribuída",
-  IN_PROGRESS: "Em Andamento",
+  IN_PROGRESS: "Em andamento",
   DONE: "Concluída",
   CANCELED: "Cancelada",
 };
 
-const STATUS_COLORS: Record<string, string> = {
-  OPEN: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-  ASSIGNED: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
-  IN_PROGRESS: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
-  DONE: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+const STATUS_COLORS: Record<ServiceOrderStatus, string> = {
+  OPEN: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
+  ASSIGNED: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300",
+  IN_PROGRESS:
+    "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300",
+  DONE: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
   CANCELED: "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300",
 };
 
-const PRIORITY_LABELS: Record<string, string> = {
-  LOW: "Baixa",
-  MEDIUM: "Média",
-  HIGH: "Alta",
-  URGENT: "Urgente",
-};
+function getPriorityLabel(priority?: number | null) {
+  switch (priority) {
+    case 1:
+      return "Muito baixa";
+    case 2:
+      return "Baixa";
+    case 3:
+      return "Média";
+    case 4:
+      return "Alta";
+    case 5:
+      return "Urgente";
+    default:
+      return "Baixa";
+  }
+}
 
-const PRIORITY_COLORS: Record<string, string> = {
-  LOW: "text-gray-500",
-  MEDIUM: "text-blue-500",
-  HIGH: "text-orange-500",
-  URGENT: "text-red-500",
-};
+function getPriorityColor(priority?: number | null) {
+  switch (priority) {
+    case 5:
+      return "text-red-500";
+    case 4:
+      return "text-orange-500";
+    case 3:
+      return "text-blue-500";
+    case 2:
+      return "text-gray-500";
+    case 1:
+      return "text-zinc-400";
+    default:
+      return "text-gray-500";
+  }
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return "—";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+
+  return date.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
+function formatDateTime(value?: string | null) {
+  if (!value) return "—";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+
+  return date.toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function formatCurrency(cents?: number | null) {
+  const amount = Number(cents ?? 0);
+
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(amount / 100);
+}
 
 export default function ServiceOrdersPage() {
   const [page, setPage] = useState(1);
   const limit = 20;
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<ServiceOrderStatus | "">("");
 
-  const listQuery = trpc.nexo.serviceOrders.list.useQuery({ page, limit });
+  const listQuery = trpc.nexo.serviceOrders.list.useQuery(
+    {
+      page,
+      limit,
+      ...(statusFilter ? { status: statusFilter } : {}),
+    },
+    {
+      retry: false,
+      refetchOnWindowFocus: false,
+    }
+  );
+
+  const customersQuery = trpc.nexo.customers.list.useQuery(undefined, {
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
   const updateMutation = trpc.nexo.serviceOrders.update.useMutation({
     onSuccess: () => {
       toast.success("OS atualizada com sucesso!");
       void listQuery.refetch();
     },
-    onError: (err) => toast.error(err.message || "Erro ao atualizar OS"),
-  });
-
-  const deleteMutation = trpc.nexo.serviceOrders.delete.useMutation({
-    onSuccess: () => {
-      toast.success("OS removida!");
-      void listQuery.refetch();
+    onError: (err) => {
+      toast.error(err.message || "Erro ao atualizar OS");
     },
-    onError: (err) => toast.error(err.message || "Erro ao remover OS"),
   });
 
-  const serviceOrders = (listQuery.data?.data ?? []) as any[];
+  const serviceOrders = useMemo(() => {
+    const payload = listQuery.data;
+    const rows = Array.isArray(payload?.data)
+      ? payload.data
+      : Array.isArray(payload)
+        ? payload
+        : [];
+
+    return rows as ServiceOrder[];
+  }, [listQuery.data]);
+
   const pagination = listQuery.data?.pagination;
 
-  const filtered = statusFilter
-    ? serviceOrders.filter((os) => os.status === statusFilter)
-    : serviceOrders;
+  const customers = useMemo(() => {
+    const payload = customersQuery.data;
+    const rows = Array.isArray(payload?.data)
+      ? payload.data
+      : Array.isArray(payload)
+        ? payload
+        : [];
 
-  const handleStatusChange = (id: number | string, newStatus: string) => {
-    updateMutation.mutate({ id: String(id), data: { status: newStatus as any } });
+    return rows.map((customer: any) => ({
+      id: String(customer.id),
+      name: String(customer.name),
+    }));
+  }, [customersQuery.data]);
+
+  useEffect(() => {
+    if (listQuery.error) {
+      toast.error("Erro ao carregar ordens de serviço: " + listQuery.error.message);
+    }
+  }, [listQuery.error]);
+
+  const handleStatusChange = (id: string, newStatus: ServiceOrderStatus) => {
+    updateMutation.mutate({
+      id,
+      data: { status: newStatus },
+    });
   };
 
-  const handleStartExecution = (id: number | string) => {
+  const handleStartExecution = (id: string) => {
     updateMutation.mutate(
-      { id: String(id), data: { status: "IN_PROGRESS" as any } },
+      { id, data: { status: "IN_PROGRESS" } },
       {
         onSuccess: () => {
           toast.success("Execução iniciada.");
@@ -81,9 +223,9 @@ export default function ServiceOrdersPage() {
     );
   };
 
-  const handleFinishExecution = (id: number | string) => {
+  const handleFinishExecution = (id: string) => {
     updateMutation.mutate(
-      { id: String(id), data: { status: "DONE" as any } },
+      { id, data: { status: "DONE" } },
       {
         onSuccess: () => {
           toast.success("Execução finalizada.");
@@ -93,18 +235,26 @@ export default function ServiceOrdersPage() {
     );
   };
 
+  const total = serviceOrders.length;
+  const totalOpen = serviceOrders.filter((os) => os.status === "OPEN").length;
+  const totalInProgress = serviceOrders.filter(
+    (os) => os.status === "IN_PROGRESS"
+  ).length;
+  const totalDone = serviceOrders.filter((os) => os.status === "DONE").length;
+
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="space-y-6 p-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <ClipboardList className="w-6 h-6 text-orange-500" />
+          <h1 className="flex items-center gap-2 text-2xl font-bold text-gray-900 dark:text-white">
+            <ClipboardList className="h-6 w-6 text-orange-500" />
             Ordens de Serviço
           </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Gerencie todas as ordens de serviço da sua organização
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            Gerencie as ordens de serviço operacionais da sua organização.
           </p>
         </div>
+
         <div className="flex gap-2">
           <Button
             variant="outline"
@@ -112,122 +262,172 @@ export default function ServiceOrdersPage() {
             onClick={() => void listQuery.refetch()}
             disabled={listQuery.isFetching}
           >
-            <RefreshCw className={`w-4 h-4 mr-1 ${listQuery.isFetching ? "animate-spin" : ""}`} />
+            <RefreshCw
+              className={`mr-1 h-4 w-4 ${listQuery.isFetching ? "animate-spin" : ""}`}
+            />
             Atualizar
           </Button>
+
           <Button
             onClick={() => setShowCreateModal(true)}
-            className="bg-orange-500 hover:bg-orange-600 text-white"
+            className="bg-orange-500 text-white hover:bg-orange-600"
           >
-            <Plus className="w-4 h-4 mr-1" />
+            <Plus className="mr-1 h-4 w-4" />
             Nova OS
           </Button>
         </div>
       </div>
 
-      <div className="flex gap-2 flex-wrap">
-        {["", "OPEN", "ASSIGNED", "IN_PROGRESS", "DONE", "CANCELED"].map((s) => (
-          <button
-            key={s}
-            onClick={() => setStatusFilter(s)}
-            className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-              statusFilter === s
-                ? "bg-orange-500 text-white"
-                : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-            }`}
-          >
-            {s === "" ? "Todos" : STATUS_LABELS[s] ?? s}
-          </button>
-        ))}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+        <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+          <p className="text-sm text-gray-600 dark:text-gray-400">Total</p>
+          <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">{total}</p>
+        </div>
+
+        <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+          <p className="text-sm text-gray-600 dark:text-gray-400">Abertas</p>
+          <p className="mt-1 text-2xl font-bold text-blue-600 dark:text-blue-400">
+            {totalOpen}
+          </p>
+        </div>
+
+        <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+          <p className="text-sm text-gray-600 dark:text-gray-400">Em andamento</p>
+          <p className="mt-1 text-2xl font-bold text-orange-600 dark:text-orange-400">
+            {totalInProgress}
+          </p>
+        </div>
+
+        <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+          <p className="text-sm text-gray-600 dark:text-gray-400">Concluídas</p>
+          <p className="mt-1 text-2xl font-bold text-green-600 dark:text-green-400">
+            {totalDone}
+          </p>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {(["", "OPEN", "ASSIGNED", "IN_PROGRESS", "DONE", "CANCELED"] as const).map(
+          (status) => (
+            <button
+              key={status || "ALL"}
+              onClick={() => {
+                setStatusFilter(status);
+                setPage(1);
+              }}
+              className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${
+                statusFilter === status
+                  ? "bg-orange-500 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+              }`}
+            >
+              {status === "" ? "Todos" : STATUS_LABELS[status]}
+            </button>
+          )
+        )}
       </div>
 
       {listQuery.isLoading && (
         <div className="flex items-center justify-center py-12">
-          <RefreshCw className="w-6 h-6 animate-spin text-orange-500" />
+          <RefreshCw className="h-6 w-6 animate-spin text-orange-500" />
           <span className="ml-2 text-gray-500">Carregando...</span>
         </div>
       )}
 
       {listQuery.isError && (
-        <div className="flex items-center gap-2 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg text-red-600 dark:text-red-400">
-          <AlertCircle className="w-5 h-5" />
+        <div className="flex items-center gap-2 rounded-lg bg-red-50 p-4 text-red-600 dark:bg-red-900/20 dark:text-red-400">
+          <AlertCircle className="h-5 w-5" />
           <span>Erro ao carregar ordens de serviço. Tente novamente.</span>
         </div>
       )}
 
-      {!listQuery.isLoading && !listQuery.isError && filtered.length === 0 && (
-        <div className="text-center py-12">
-          <ClipboardList className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
-          <p className="text-gray-500 dark:text-gray-400">Nenhuma ordem de serviço encontrada.</p>
+      {!listQuery.isLoading && !listQuery.isError && serviceOrders.length === 0 && (
+        <div className="py-12 text-center">
+          <ClipboardList className="mx-auto mb-3 h-12 w-12 text-gray-300 dark:text-gray-600" />
+          <p className="text-gray-500 dark:text-gray-400">
+            Nenhuma ordem de serviço encontrada.
+          </p>
           <Button
             onClick={() => setShowCreateModal(true)}
-            className="mt-4 bg-orange-500 hover:bg-orange-600 text-white"
+            className="mt-4 bg-orange-500 text-white hover:bg-orange-600"
           >
-            <Plus className="w-4 h-4 mr-1" />
+            <Plus className="mr-1 h-4 w-4" />
             Criar primeira OS
           </Button>
         </div>
       )}
 
-      {filtered.length > 0 && (
+      {serviceOrders.length > 0 && (
         <div className="space-y-3">
-          {filtered.map((os: any) => (
+          {serviceOrders.map((os) => (
             <div
               key={os.id}
-              className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md transition-shadow"
+              className="rounded-xl border border-gray-200 bg-white p-4 transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-800"
             >
-              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="font-semibold text-gray-900 dark:text-white truncate">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="truncate font-semibold text-gray-900 dark:text-white">
                       {os.title}
                     </h3>
+
                     <span
-                      className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                        STATUS_COLORS[os.status] ?? "bg-gray-100 text-gray-700"
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                        STATUS_COLORS[os.status]
                       }`}
                     >
-                      {STATUS_LABELS[os.status] ?? os.status}
+                      {STATUS_LABELS[os.status]}
                     </span>
-                    {os.priority && (
-                      <span
-                        className={`text-xs font-medium ${
-                          PRIORITY_COLORS[os.priority] ?? "text-gray-500"
-                        }`}
-                      >
-                        ● {PRIORITY_LABELS[os.priority] ?? os.priority}
-                      </span>
-                    )}
+
+                    <span
+                      className={`text-xs font-medium ${getPriorityColor(os.priority)}`}
+                    >
+                      ● {getPriorityLabel(os.priority)}
+                    </span>
                   </div>
+
                   {os.description && (
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">
+                    <p className="mt-1 line-clamp-2 text-sm text-gray-500 dark:text-gray-400">
                       {os.description}
                     </p>
                   )}
-                  <div className="flex items-center gap-4 mt-2 text-xs text-gray-400 dark:text-gray-500 flex-wrap">
-                    {os.customer && (
-                      <span className="flex items-center gap-1">
-                        <User className="w-3 h-3" />
-                        {os.customer.name}
-                      </span>
-                    )}
-                    {os.createdAt && (
-                      <span className="flex items-center gap-1">
-                        <Calendar className="w-3 h-3" />
-                        {new Date(os.createdAt).toLocaleDateString("pt-BR")}
-                      </span>
-                    )}
+
+                  <div className="mt-2 flex flex-wrap items-center gap-4 text-xs text-gray-400 dark:text-gray-500">
+                    <span className="flex items-center gap-1">
+                      <User className="h-3 w-3" />
+                      {os.customer?.name ?? "Cliente não identificado"}
+                    </span>
+
+                    <span className="flex items-center gap-1">
+                      <Calendar className="h-3 w-3" />
+                      Criada em {formatDate(os.createdAt)}
+                    </span>
+
+                    <span>Agendada para {formatDateTime(os.scheduledFor)}</span>
+
+                    <span>Valor {formatCurrency(os.amountCents)}</span>
                   </div>
+
+                  {os.assignedTo?.name ? (
+                    <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                      Responsável: {os.assignedTo.name}
+                    </p>
+                  ) : null}
                 </div>
-                <div className="flex gap-2 items-center flex-shrink-0 flex-wrap">
+
+                <div className="flex flex-wrap items-center gap-2">
                   <select
                     value={os.status}
-                    onChange={(e) => handleStatusChange(os.id, e.target.value)}
+                    onChange={(e) =>
+                      handleStatusChange(os.id, e.target.value as ServiceOrderStatus)
+                    }
                     disabled={updateMutation.isPending}
-                    className="text-xs border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                    className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300"
                   >
-                    {Object.entries(STATUS_LABELS).map(([val, label]) => (
-                      <option key={val} value={val}>{label}</option>
+                    {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
                     ))}
                   </select>
 
@@ -235,7 +435,12 @@ export default function ServiceOrdersPage() {
                     size="sm"
                     variant="outline"
                     onClick={() => handleStartExecution(os.id)}
-                    disabled={os.status === "IN_PROGRESS" || os.status === "DONE" || updateMutation.isPending}
+                    disabled={
+                      os.status === "IN_PROGRESS" ||
+                      os.status === "DONE" ||
+                      os.status === "CANCELED" ||
+                      updateMutation.isPending
+                    }
                   >
                     Iniciar execução
                   </Button>
@@ -248,20 +453,6 @@ export default function ServiceOrdersPage() {
                   >
                     Finalizar execução
                   </Button>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      if (confirm("Remover esta OS?")) {
-                        deleteMutation.mutate({ id: String(os.id) });
-                      }
-                    }}
-                    disabled={deleteMutation.isPending}
-                    className="text-red-500 border-red-200 hover:bg-red-50 dark:hover:bg-red-900/20 text-xs px-2 py-1"
-                  >
-                    Remover
-                  </Button>
                 </div>
               </div>
             </div>
@@ -271,11 +462,27 @@ export default function ServiceOrdersPage() {
 
       {pagination && pagination.pages > 1 && (
         <div className="flex items-center justify-center gap-2 pt-4">
-          <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPage((current) => Math.max(1, current - 1))}
+            disabled={page <= 1}
+          >
             Anterior
           </Button>
-          <span className="text-sm text-gray-500">{page} / {pagination.pages}</span>
-          <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.min(pagination.pages, p + 1))} disabled={page >= pagination.pages}>
+
+          <span className="text-sm text-gray-500">
+            {page} / {pagination.pages}
+          </span>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              setPage((current) => Math.min(pagination.pages, current + 1))
+            }
+            disabled={page >= pagination.pages}
+          >
             Próxima
           </Button>
         </div>
@@ -288,6 +495,7 @@ export default function ServiceOrdersPage() {
           void listQuery.refetch();
           toast.success("OS criada com sucesso!");
         }}
+        customers={customers}
       />
     </div>
   );

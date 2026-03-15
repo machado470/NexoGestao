@@ -14,6 +14,7 @@ export default function CreateCustomerModal({ open, onOpenChange, onCreated }: P
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
+  const [notes, setNotes] = useState("");
 
   const createCustomer = trpc.nexo.customers.create.useMutation();
 
@@ -25,6 +26,7 @@ export default function CreateCustomerModal({ open, onOpenChange, onCreated }: P
     setName("");
     setPhone("");
     setEmail("");
+    setNotes("");
   };
 
   const close = () => {
@@ -42,6 +44,7 @@ export default function CreateCustomerModal({ open, onOpenChange, onCreated }: P
         name: name.trim(),
         phone: phone.trim(),
         email: email.trim().length ? email.trim() : undefined,
+        notes: notes.trim().length ? notes.trim() : undefined,
       });
 
       toast.success("Cliente criado com sucesso!");
@@ -59,62 +62,76 @@ export default function CreateCustomerModal({ open, onOpenChange, onCreated }: P
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
       <div className="absolute inset-0 bg-black/40" onClick={close} />
 
-      <div className="relative w-full max-w-lg rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-xl">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-700">
+      <div className="relative w-full max-w-lg rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-800">
+        <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4 dark:border-gray-700">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
             Novo Cliente
           </h2>
           <button
             type="button"
             onClick={close}
-            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+            className="rounded-lg p-2 hover:bg-gray-100 dark:hover:bg-gray-700"
           >
-            <X className="w-4 h-4 text-gray-700 dark:text-gray-300" />
+            <X className="h-4 w-4 text-gray-700 dark:text-gray-300" />
           </button>
         </div>
 
-        <div className="p-5 space-y-4">
+        <div className="space-y-4 p-5">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
               Nome *
             </label>
             <input
               value={name}
-              onChange={e => setName(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              onChange={(e) => setName(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
               placeholder="Ex: Cliente Demo"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
               Telefone *
             </label>
             <input
               value={phone}
-              onChange={e => setPhone(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              onChange={(e) => setPhone(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
               placeholder="Ex: +5547999999999"
             />
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               Dica: pode mandar com +55 ou só números. O backend normaliza.
             </p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
               Email (opcional)
             </label>
             <input
               value={email}
-              onChange={e => setEmail(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
               placeholder="cliente@demo.com"
+              type="email"
+            />
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Observações (opcional)
+            </label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              placeholder="Observações úteis sobre o cliente"
+              rows={3}
             />
           </div>
         </div>
 
-        <div className="px-5 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-end gap-2">
+        <div className="flex items-center justify-end gap-2 border-t border-gray-200 px-5 py-4 dark:border-gray-700">
           <Button type="button" variant="outline" onClick={close}>
             Cancelar
           </Button>
@@ -122,11 +139,11 @@ export default function CreateCustomerModal({ open, onOpenChange, onCreated }: P
             type="button"
             onClick={submit}
             disabled={createCustomer.isPending || !canSubmit}
-            className="bg-orange-500 hover:bg-orange-600 text-white"
+            className="bg-orange-500 text-white hover:bg-orange-600"
           >
             {createCustomer.isPending ? (
               <span className="inline-flex items-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin" />
                 Salvando...
               </span>
             ) : (
