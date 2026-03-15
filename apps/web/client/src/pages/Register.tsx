@@ -51,7 +51,7 @@ function normalizeErrorMessage(error: unknown): string {
 }
 
 export default function Register() {
-  const { isSubmitting, error, register } = useAuth();
+  const { isSubmitting, error, register, redirectTo } = useAuth();
   const [, navigate] = useLocation();
 
   const [formData, setFormData] = useState({
@@ -100,7 +100,7 @@ export default function Register() {
         password: formData.password,
       });
 
-      navigate("/onboarding");
+      navigate(redirectTo || "/onboarding");
     } catch (err) {
       setLocalError(normalizeErrorMessage(err));
     }

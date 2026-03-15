@@ -3,6 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Loader2, X } from "lucide-react";
+import { customerSchema } from "@/lib/validations";
 
 type Props = {
   open: boolean;
@@ -34,17 +35,25 @@ export default function CreateCustomerModal({ open, onOpenChange, onCreated }: P
   };
 
   const submit = async () => {
-    if (!canSubmit) {
-      toast.error("Nome e telefone são obrigatórios.");
+    const parsed = customerSchema.safeParse({
+      name: name.trim(),
+      phone: phone.trim(),
+      email: email.trim(),
+      notes: notes.trim(),
+    });
+
+    if (!parsed.success) {
+      const firstError = parsed.error.issues[0]?.message ?? "Dados inválidos.";
+      toast.error(firstError);
       return;
     }
 
     try {
       await createCustomer.mutateAsync({
-        name: name.trim(),
-        phone: phone.trim(),
-        email: email.trim().length ? email.trim() : undefined,
-        notes: notes.trim().length ? notes.trim() : undefined,
+        name: parsed.data.name,
+        phone: parsed.data.phone,
+        email: parsed.data.email || undefined,
+        notes: parsed.data.notes?.trim() ? parsed.data.notes.trim() : undefined,
       });
 
       toast.success("Cliente criado com sucesso!");

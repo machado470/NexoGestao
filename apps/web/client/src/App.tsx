@@ -10,7 +10,7 @@ import { MainLayout } from "./components/MainLayout";
 import { NotificationCenter } from "./components/NotificationCenter";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import type { Role } from "./lib/rbac";
+import { canAny, type Permission, type Role } from "./lib/rbac";
 
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
@@ -82,11 +82,13 @@ function FullScreenMessage({
 function ProtectedRoute({
   component: Component,
   allowedRoles,
+  permissions,
   requireCompletedOnboarding = false,
   onboardingOnly = false,
 }: {
   component: React.ComponentType;
   allowedRoles?: Role[];
+  permissions?: Permission[];
   requireCompletedOnboarding?: boolean;
   onboardingOnly?: boolean;
 }) {
@@ -148,6 +150,17 @@ function ProtectedRoute({
     );
   }
 
+  if (permissions?.length && (!role || !canAny(role, permissions))) {
+    return (
+      <FullScreenMessage
+        title="Acesso restrito"
+        description="Seu perfil não tem permissão para acessar esta área."
+        actionLabel="Voltar ao dashboard"
+        onAction={() => navigate("/dashboard")}
+      />
+    );
+  }
+
   return <Component />;
 }
 
@@ -189,9 +202,7 @@ function Router() {
 
       <Route
         path="/onboarding"
-        component={() => (
-          <ProtectedRoute onboardingOnly component={Onboarding} />
-        )}
+        component={() => <ProtectedRoute onboardingOnly component={Onboarding} />}
       />
 
       <Route
@@ -212,7 +223,7 @@ function Router() {
         component={() => (
           <ProtectedRoute
             requireCompletedOnboarding
-            allowedRoles={["ADMIN", "MANAGER", "STAFF", "VIEWER"]}
+            permissions={["customers:read"]}
             component={() => (
               <MainLayout>
                 <CustomersPage />
@@ -226,7 +237,7 @@ function Router() {
         component={() => (
           <ProtectedRoute
             requireCompletedOnboarding
-            allowedRoles={["ADMIN", "MANAGER", "STAFF", "VIEWER"]}
+            permissions={["appointments:read"]}
             component={() => (
               <MainLayout>
                 <AppointmentsPage />
@@ -240,7 +251,7 @@ function Router() {
         component={() => (
           <ProtectedRoute
             requireCompletedOnboarding
-            allowedRoles={["ADMIN", "MANAGER", "STAFF", "VIEWER"]}
+            permissions={["orders:read"]}
             component={() => (
               <MainLayout>
                 <ServiceOrdersPage />
@@ -254,7 +265,7 @@ function Router() {
         component={() => (
           <ProtectedRoute
             requireCompletedOnboarding
-            allowedRoles={["ADMIN", "MANAGER", "STAFF", "VIEWER"]}
+            permissions={["finance:read"]}
             component={() => (
               <MainLayout>
                 <FinancesPage />
@@ -394,7 +405,7 @@ function Router() {
         component={() => (
           <ProtectedRoute
             requireCompletedOnboarding
-            allowedRoles={["ADMIN", "MANAGER", "STAFF", "VIEWER"]}
+            permissions={["appointments:read"]}
             component={() => (
               <MainLayout>
                 <CalendarPage />
@@ -408,7 +419,7 @@ function Router() {
         component={() => (
           <ProtectedRoute
             requireCompletedOnboarding
-            allowedRoles={["ADMIN"]}
+            permissions={["settings:manage"]}
             component={() => (
               <MainLayout>
                 <SettingsPage />

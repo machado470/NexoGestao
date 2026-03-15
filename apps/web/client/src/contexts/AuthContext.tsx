@@ -136,15 +136,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await logoutMutation.mutateAsync();
       utils.session.me.setData(undefined, null);
-      await meQuery.refetch();
-      utils.session.me.setData(undefined, null);
     } catch (err) {
       setLocalError(err);
       throw err;
     } finally {
       setLocalLoading(false);
     }
-  }, [logoutMutation, meQuery, utils]);
+  }, [logoutMutation, utils]);
 
   const payload: SessionMeOutput = meQuery.data ?? null;
 
@@ -216,16 +214,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     logout,
     refresh,
   ]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    try {
-      localStorage.setItem("nexogestao-session", JSON.stringify(payload));
-    } catch {
-      // ignore
-    }
-  }, [payload]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

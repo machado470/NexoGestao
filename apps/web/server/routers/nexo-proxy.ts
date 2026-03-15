@@ -38,15 +38,6 @@ function setTokenCookie(ctx: CtxLike, token: string) {
   });
 }
 
-function clearTokenCookie(ctx: CtxLike) {
-  const cookieOptions = getSessionCookieOptions(ctx.req);
-
-  ctx.res.cookie(NEXO_TOKEN_COOKIE, "", {
-    ...cookieOptions,
-    maxAge: 0,
-  });
-}
-
 function extractErrorMessage(body: any, status: number, text: string): string {
   const message =
     body?.message ||
@@ -167,11 +158,6 @@ export const nexoProxyRouter = router({
         return result;
       }),
 
-    logout: publicProcedure.mutation(async ({ ctx }) => {
-      clearTokenCookie(ctx as CtxLike);
-      return { ok: true };
-    }),
-
     forgotPassword: publicProcedure
       .input(z.object({ email: z.string().email() }))
       .mutation(async ({ input }) => {
@@ -189,37 +175,6 @@ export const nexoProxyRouter = router({
           body: JSON.stringify(input),
         });
       }),
-
-    me: publicProcedure.query(async ({ ctx }) => {
-      const authHeader = getAuthHeader(ctx as CtxLike);
-
-      if (!authHeader) {
-        return null;
-      }
-
-      try {
-        return await nexoFetch("/me", {
-          headers: { Authorization: authHeader },
-        });
-      } catch (error) {
-        const message =
-          typeof (error as any)?.message === "string"
-            ? (error as any).message.toLowerCase()
-            : "";
-
-        if (
-          message.includes("não autenticado") ||
-          message.includes("unauthorized") ||
-          message.includes("jwt") ||
-          message.includes("token")
-        ) {
-          clearTokenCookie(ctx as CtxLike);
-          return null;
-        }
-
-        throw error;
-      }
-    }),
   }),
 
   customers: router({

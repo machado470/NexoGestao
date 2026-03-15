@@ -60,13 +60,4 @@ export class AuthController {
   async resetPassword(@Body() body: { token: string; password: string }) {
     return this.auth.resetPassword(body.token, body.password)
   }
-
-  @Public()
-  @Post('logout')
-  async logout() {
-    return {
-      success: true,
-      message: 'Logout efetuado com sucesso.',
-    }
-  }
 }

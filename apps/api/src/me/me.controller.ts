@@ -1,4 +1,4 @@
-import { Controller, Get, Req, UseGuards } from '@nestjs/common'
+import { Controller, Get, Req, UnauthorizedException, UseGuards } from '@nestjs/common'
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { PrismaService } from '../prisma/prisma.service'
@@ -29,6 +29,10 @@ export class MeController {
           },
         })
       : null
+
+    if (user && orgId && user.orgId !== orgId) {
+      throw new UnauthorizedException('Sessão inválida para esta organização')
+    }
 
     const org = orgId
       ? await this.prisma.organization.findUnique({

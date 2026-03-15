@@ -23,6 +23,17 @@ function normalizeErrorMessage(error: unknown): string {
         ? (error as any).message
         : "Erro ao solicitar redefinição de senha.";
 
+  const normalized = message.toLowerCase();
+
+  if (
+    normalized.includes("não está disponível no momento") ||
+    normalized.includes("nao esta disponivel no momento") ||
+    normalized.includes("recuperação de senha por e-mail") ||
+    normalized.includes("recuperacao de senha por e-mail")
+  ) {
+    return "A recuperação por e-mail ainda não está disponível neste ambiente.";
+  }
+
   return message;
 }
 

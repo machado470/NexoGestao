@@ -67,8 +67,9 @@ export function MainLayout({ children }: MainLayoutProps) {
   const handleLogout = async () => {
     try {
       await logout();
-    } finally {
       navigate("/");
+    } catch {
+      // mantém o usuário na tela atual se o logout falhar
     }
   };
 
@@ -384,4 +385,3 @@ export function MainLayout({ children }: MainLayoutProps) {
     </div>
   );
 }
-
