@@ -16,6 +16,7 @@ import { launchesRouter } from "./routers/launches";
 import { referralsRouter } from "./routers/referrals";
 import { aiRouter } from "./routers/ai";
 import { financeAdvancedRouter } from "./routers/finance-advanced";
+import { paymentsRouter } from "./routers/payments";
 
 const NEXO_TOKEN_COOKIE = "nexo_token";
 
@@ -36,6 +37,7 @@ export const appRouter = router({
   referrals: referralsRouter,
   ai: aiRouter,
   financeAdvanced: financeAdvancedRouter,
+  payments: paymentsRouter,
 
   session: router({
     me: publicProcedure.query(async ({ ctx }) => {

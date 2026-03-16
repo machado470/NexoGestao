@@ -20,6 +20,7 @@ import {
   RefreshCw,
   Search,
   X,
+  CreditCard,
 } from "lucide-react";
 import { CreateChargeModal } from "@/components/CreateChargeModal";
 import { EditChargeModal } from "@/components/EditChargeModal";
@@ -112,6 +113,12 @@ export default function FinancesPage() {
     },
   });
 
+  const checkoutCharge = trpc.payments.checkout.useMutation({
+    onError: (error) => {
+      toast.error(error.message || "Erro ao gerar checkout");
+    },
+  });
+
   const deleteCharge = trpc.finance.charges.delete.useMutation({
     onSuccess: async () => {
       toast.success("Cobrança excluída com sucesso");
@@ -166,6 +173,45 @@ export default function FinancesPage() {
       method: "PIX",
       amountCents,
     });
+  };
+
+  const handleCheckoutCharge = async (charge: Charge) => {
+    const amountCents = Number(charge?.amountCents ?? 0);
+
+    if (!amountCents || amountCents <= 0) {
+      toast.error("Valor da cobrança inválido para checkout");
+      return;
+    }
+
+    if (!charge.customerId) {
+      toast.error("Cobrança sem cliente vinculado");
+      return;
+    }
+
+    const description =
+      charge.notes?.trim() ||
+      charge.serviceOrder?.title ||
+      `Cobrança #${String(charge.id).slice(0, 8)}`;
+
+    const origin = window.location.origin;
+
+    const result = await checkoutCharge.mutateAsync({
+      chargeId: String(charge.id),
+      customerId: String(charge.customerId),
+      amount: amountCents,
+      description,
+      successUrl: `${origin}/finances?checkout=success&chargeId=${String(charge.id)}`,
+      cancelUrl: `${origin}/finances?checkout=cancel&chargeId=${String(charge.id)}`,
+    });
+
+    const checkoutUrl = result?.checkoutUrl;
+
+    if (!checkoutUrl) {
+      toast.error("Checkout retornado sem URL");
+      return;
+    }
+
+    window.location.href = checkoutUrl;
   };
 
   const handleDeleteCharge = async (charge: Charge) => {
@@ -227,7 +273,8 @@ export default function FinancesPage() {
     }
   };
 
-  const isSubmitting = payCharge.isPending || deleteCharge.isPending;
+  const isSubmitting =
+    payCharge.isPending || deleteCharge.isPending || checkoutCharge.isPending;
 
   if (chargesQuery.isLoading || statsQuery.isLoading) {
     return (
@@ -241,10 +288,9 @@ export default function FinancesPage() {
   const stats = (statsPayload?.data ?? statsPayload ?? null) as ChargeStats | null;
 
   const chargesPayload = chargesQuery.data as any;
-  const chargesData = chargesPayload?.data ?? chargesPayload ?? {};
-  const charges = (chargesData?.items ?? []) as Charge[];
+  const charges = (chargesPayload?.data ?? []) as Charge[];
 
-  const pagination = (chargesData?.meta ?? {
+  const pagination = (chargesPayload?.pagination ?? {
     page: 1,
     limit: 20,
     total: 0,
@@ -533,15 +579,27 @@ export default function FinancesPage() {
 
                     <div className="mt-4 flex flex-wrap gap-2 border-t pt-4">
                       {(charge.status === "PENDING" || charge.status === "OVERDUE") && (
-                        <Button
-                          size="sm"
-                          onClick={() => void handlePayCharge(charge)}
-                          disabled={isSubmitting}
-                          className="bg-green-600 text-white hover:bg-green-700"
-                        >
-                          <CheckCircle2 className="mr-2 h-4 w-4" />
-                          Registrar pagamento
-                        </Button>
+                        <>
+                          <Button
+                            size="sm"
+                            onClick={() => void handleCheckoutCharge(charge)}
+                            disabled={isSubmitting}
+                            variant="outline"
+                          >
+                            <CreditCard className="mr-2 h-4 w-4" />
+                            Gerar checkout
+                          </Button>
+
+                          <Button
+                            size="sm"
+                            onClick={() => void handlePayCharge(charge)}
+                            disabled={isSubmitting}
+                            className="bg-green-600 text-white hover:bg-green-700"
+                          >
+                            <CheckCircle2 className="mr-2 h-4 w-4" />
+                            Registrar pagamento
+                          </Button>
+                        </>
                       )}
 
                       {charge.status !== "PAID" && (

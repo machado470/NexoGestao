@@ -44,16 +44,6 @@ export type AutomationActionType = (typeof AutomationActionType)[keyof typeof Au
 
 export type Person = { id: string; name: string } & Record<string, unknown>
 export type AuditEvent = { id: string; action: string; context?: string | null; createdAt: Date; person?: Pick<Person, 'name'> | null } & Record<string, unknown>
-export namespace $Enums {
-  export type ChargeStatus = (typeof ChargeStatus)[keyof typeof ChargeStatus]
-  export type PaymentMethod = (typeof PaymentMethod)[keyof typeof PaymentMethod]
-}
-export const $Enums = { ChargeStatus, PaymentMethod }
-
-export namespace Prisma {
-  export class PrismaClientKnownRequestError extends Error { code = 'P0000'; meta?: unknown }
-  export class PrismaClientValidationError extends Error {}
-}
 
 export class PrismaClient {
   [key: string]: any
@@ -72,10 +62,36 @@ export class PrismaClient {
   async $queryRawUnsafe<T = unknown>(..._args: unknown[]): Promise<T> {
     return undefined as T
   }
+
   async $transaction<T>(input: Promise<T>[]): Promise<T[]>
   async $transaction<T>(fn: (tx: this) => Promise<T>): Promise<T>
   async $transaction<T>(input: Promise<T>[] | ((tx: this) => Promise<T>)): Promise<T | T[]> {
     if (typeof input === 'function') return input(this)
     return Promise.all(input)
+  }
+}
+
+export namespace $Enums {
+  export type ChargeStatus = (typeof ChargeStatus)[keyof typeof ChargeStatus]
+  export type PaymentMethod = (typeof PaymentMethod)[keyof typeof PaymentMethod]
+}
+export const $Enums = { ChargeStatus, PaymentMethod }
+
+export namespace Prisma {
+  export class PrismaClientKnownRequestError extends Error {
+    code = 'P0000'
+    meta?: unknown
+  }
+
+  export class PrismaClientValidationError extends Error {}
+
+  export type TransactionClient = PrismaClient
+
+  export type ChargeUpdateManyMutationInput = {
+    amountCents?: number
+    dueDate?: Date
+    notes?: string | null
+    status?: 'PENDING' | 'PAID' | 'OVERDUE' | 'CANCELED'
+    paidAt?: Date | null
   }
 }

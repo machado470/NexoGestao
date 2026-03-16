@@ -63,6 +63,12 @@ export default function OperationalWorkflowPage() {
     },
   });
 
+  const checkoutCharge = trpc.payments.checkout.useMutation({
+    onError: (error) => {
+      toast.error(error.message || "Erro ao gerar checkout");
+    },
+  });
+
   const serviceOrders = Array.isArray((serviceOrdersQuery.data as any)?.data)
     ? (serviceOrdersQuery.data as any).data
     : Array.isArray(serviceOrdersQuery.data)
@@ -83,7 +89,8 @@ export default function OperationalWorkflowPage() {
     );
   }, [serviceOrders]);
 
-  const isSubmitting = updateCharge.isPending || payCharge.isPending;
+  const isSubmitting =
+    updateCharge.isPending || payCharge.isPending || checkoutCharge.isPending;
 
   const markChargeOverdue = async (id: string) => {
     await updateCharge.mutateAsync({
@@ -105,6 +112,45 @@ export default function OperationalWorkflowPage() {
       method: "PIX",
       amountCents: safeAmountCents,
     });
+  };
+
+  const generateCheckout = async (charge: any) => {
+    const amountCents = Number(charge?.amountCents ?? 0);
+
+    if (!amountCents || amountCents <= 0) {
+      toast.error("Valor da cobrança inválido para checkout");
+      return;
+    }
+
+    if (!charge?.customerId) {
+      toast.error("Cobrança sem cliente vinculado");
+      return;
+    }
+
+    const description =
+      charge?.notes?.trim() ||
+      charge?.serviceOrder?.title ||
+      `Cobrança #${String(charge.id).slice(0, 8)}`;
+
+    const origin = window.location.origin;
+
+    const result = await checkoutCharge.mutateAsync({
+      chargeId: String(charge.id),
+      customerId: String(charge.customerId),
+      amount: amountCents,
+      description,
+      successUrl: `${origin}/operations?checkout=success&chargeId=${String(charge.id)}`,
+      cancelUrl: `${origin}/operations?checkout=cancel&chargeId=${String(charge.id)}`,
+    });
+
+    const checkoutUrl = result?.checkoutUrl;
+
+    if (!checkoutUrl) {
+      toast.error("Checkout retornado sem URL");
+      return;
+    }
+
+    window.location.href = checkoutUrl;
   };
 
   return (
@@ -212,6 +258,16 @@ export default function OperationalWorkflowPage() {
                         disabled={isSubmitting}
                       >
                         Marcar vencida
+                      </Button>
+
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => void generateCheckout(charge)}
+                        disabled={isSubmitting}
+                      >
+                        <CreditCard className="mr-1 h-4 w-4" />
+                        Checkout
                       </Button>
 
                       <Button

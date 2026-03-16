@@ -979,17 +979,36 @@ export class FinanceService {
       )
     }
 
+    if (
+      existing.status === 'CANCELED' &&
+      (data.amountCents !== undefined ||
+        data.dueDate !== undefined ||
+        data.status !== undefined)
+    ) {
+      throw new BadRequestException(
+        'Cobrança cancelada não pode ter valor, vencimento ou status alterados manualmente',
+      )
+    }
+
     if (data.status === 'CANCELED' && existing.status === 'PAID') {
       throw new BadRequestException('Cobrança paga não pode ser cancelada')
     }
 
     const patch: Prisma.ChargeUpdateManyMutationInput = {}
 
+    let nextAmountCents = existing.amountCents
+    let nextDueDate = existing.dueDate
+    let nextNotes = existing.notes ?? null
+    let nextStatus = existing.status
+
     if (data.amountCents !== undefined) {
       if (!Number.isFinite(data.amountCents) || data.amountCents <= 0) {
         throw new BadRequestException('amountCents inválido')
       }
-      patch.amountCents = Math.floor(data.amountCents)
+
+      const normalizedAmount = Math.floor(data.amountCents)
+      patch.amountCents = normalizedAmount
+      nextAmountCents = normalizedAmount
     }
 
     if (data.dueDate !== undefined) {
@@ -997,15 +1016,30 @@ export class FinanceService {
       if (Number.isNaN(parsed.getTime())) {
         throw new BadRequestException('dueDate inválido')
       }
+
       patch.dueDate = parsed
+      nextDueDate = parsed
     }
 
     if (data.notes !== undefined) {
-      patch.notes = data.notes?.trim() ? data.notes.trim() : null
+      const normalizedNotes = data.notes?.trim() ? data.notes.trim() : null
+      patch.notes = normalizedNotes
+      nextNotes = normalizedNotes
     }
 
     if (data.status === 'CANCELED') {
       patch.status = 'CANCELED'
+      nextStatus = 'CANCELED'
+    }
+
+    const changed =
+      nextAmountCents !== existing.amountCents ||
+      nextDueDate.getTime() !== existing.dueDate.getTime() ||
+      nextNotes !== (existing.notes ?? null) ||
+      nextStatus !== existing.status
+
+    if (!changed) {
+      throw new BadRequestException('Nenhuma alteração efetiva informada')
     }
 
     if (Object.keys(patch).length === 0) {
@@ -1137,7 +1171,7 @@ export class FinanceService {
 
     await this.audit.log({
       orgId: input.orgId,
-      action: AUDIT_ACTIONS.CHARGE_UPDATED,
+      action: AUDIT_ACTIONS.CHARGE_DELETED,
       actorUserId: input.actorUserId,
       actorPersonId: input.actorPersonId,
       personId: input.actorPersonId,

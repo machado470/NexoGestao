@@ -123,10 +123,17 @@ export default function OperationsDashboardPage() {
         chargesQuery.refetch(),
         alertsQuery.refetch(),
         utils.finance.charges.list.invalidate(),
+        utils.finance.charges.stats.invalidate(),
       ]);
     },
     onError: (error) => {
       toast.error(error.message || "Erro ao registrar pagamento");
+    },
+  });
+
+  const checkoutCharge = trpc.payments.checkout.useMutation({
+    onError: (error) => {
+      toast.error(error.message || "Erro ao gerar checkout");
     },
   });
 
@@ -196,6 +203,63 @@ export default function OperationsDashboardPage() {
       }
     );
   };
+
+  const handleRegisterPayment = (charge: any) => {
+    const amountCents = Number(charge?.amountCents ?? 0);
+
+    if (!amountCents || amountCents <= 0) {
+      toast.error("Valor da cobrança inválido para registrar pagamento");
+      return;
+    }
+
+    registerPayment.mutate({
+      chargeId: String(charge.id),
+      method: "CASH",
+      amountCents,
+    });
+  };
+
+  const handleGenerateCheckout = async (charge: any) => {
+    const amountCents = Number(charge?.amountCents ?? 0);
+
+    if (!amountCents || amountCents <= 0) {
+      toast.error("Valor da cobrança inválido para checkout");
+      return;
+    }
+
+    if (!charge?.customerId) {
+      toast.error("Cobrança sem cliente vinculado");
+      return;
+    }
+
+    const description =
+      charge?.notes?.trim() ||
+      charge?.serviceOrder?.title ||
+      `Cobrança #${String(charge.id).slice(0, 8)}`;
+
+    const origin = window.location.origin;
+
+    const result = await checkoutCharge.mutateAsync({
+      chargeId: String(charge.id),
+      customerId: String(charge.customerId),
+      amount: amountCents,
+      description,
+      successUrl: `${origin}/dashboard/operations?checkout=success&chargeId=${String(charge.id)}`,
+      cancelUrl: `${origin}/dashboard/operations?checkout=cancel&chargeId=${String(charge.id)}`,
+    });
+
+    const checkoutUrl = result?.checkoutUrl;
+
+    if (!checkoutUrl) {
+      toast.error("Checkout retornado sem URL");
+      return;
+    }
+
+    window.location.href = checkoutUrl;
+  };
+
+  const isFinanceSubmitting =
+    registerPayment.isPending || checkoutCharge.isPending;
 
   return (
     <div className="space-y-6 p-6">
@@ -390,19 +454,25 @@ export default function OperationsDashboardPage() {
                   </p>
                 </div>
 
-                <Button
-                  size="sm"
-                  onClick={() =>
-                    registerPayment.mutate({
-                      chargeId: String(charge.id),
-                      method: "CASH",
-                      amountCents: Number(charge.amountCents),
-                    })
-                  }
-                  disabled={registerPayment.isPending}
-                >
-                  Registrar pagamento
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void handleGenerateCheckout(charge)}
+                    disabled={isFinanceSubmitting}
+                  >
+                    <CreditCard className="mr-1 h-4 w-4" />
+                    Checkout
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    onClick={() => handleRegisterPayment(charge)}
+                    disabled={isFinanceSubmitting}
+                  >
+                    Registrar pagamento
+                  </Button>
+                </div>
               </div>
             ))}
           </CardContent>

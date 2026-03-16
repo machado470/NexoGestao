@@ -19,7 +19,7 @@ async function bootstrap() {
   const logger = new Logger('Bootstrap')
 
   try {
-    const app = await NestFactory.create(AppModule)
+    const app = await NestFactory.create(AppModule, { rawBody: true })
 
     app.use(
       helmet({

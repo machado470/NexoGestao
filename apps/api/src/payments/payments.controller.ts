@@ -14,15 +14,10 @@ import { RolesGuard } from '../auth/guards/roles.guard'
 import { Roles } from '../auth/decorators/roles.decorator'
 import { Org } from '../auth/decorators/org.decorator'
 import { PaymentsService } from './payments.service'
-import { ConfigService } from '@nestjs/config'
-import * as crypto from 'crypto'
 
 @Controller('payments')
 export class PaymentsController {
-  constructor(
-    private readonly payments: PaymentsService,
-    private readonly config: ConfigService,
-  ) {}
+  constructor(private readonly payments: PaymentsService) {}
 
   /**
    * Cria uma sessão de checkout no Stripe
@@ -34,6 +29,7 @@ export class PaymentsController {
     @Org() orgId: string,
     @Body()
     body: {
+      chargeId: string
       customerId: string
       amount: number
       description: string
@@ -42,6 +38,8 @@ export class PaymentsController {
     },
   ) {
     const result = await this.payments.createCheckoutSession({
+      orgId,
+      chargeId: body.chargeId,
       customerId: body.customerId,
       amount: body.amount,
       description: body.description,
@@ -60,27 +58,14 @@ export class PaymentsController {
     @Req() req: RawBodyRequest<any>,
     @Headers('stripe-signature') signature: string,
   ) {
-    const stripeSecret = this.config.get<string>('STRIPE_WEBHOOK_SECRET')
-
-    if (!stripeSecret || !signature) {
-      return { ok: false, error: 'Webhook não configurado' }
+    if (!signature) {
+      return { ok: false, error: 'Assinatura ausente' }
     }
 
     try {
-      // Verificar assinatura do webhook
-      const hash = crypto
-        .createHmac('sha256', stripeSecret)
-        .update(req.rawBody)
-        .digest('hex')
-
-      if (hash !== signature) {
-        return { ok: false, error: 'Assinatura inválida' }
-      }
-
-      const payload = JSON.parse(req.rawBody.toString())
-      await this.payments.processWebhook(payload)
-
-      return { ok: true }
+      const rawBody = req.rawBody ?? Buffer.from(JSON.stringify(req.body))
+      const result = await this.payments.handleWebhook(rawBody, signature)
+      return { ok: true, data: result }
     } catch (error) {
       console.error('Erro ao processar webhook Stripe:', error)
       return { ok: false, error: String(error) }
