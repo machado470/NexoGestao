@@ -4,13 +4,13 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common'
+import { $Enums, Prisma } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
 import { TimelineService } from '../timeline/timeline.service'
 import { AuditService } from '../audit/audit.service'
 import { NotificationsService } from '../notifications/notifications.service'
 import { OnboardingService } from '../onboarding/onboarding.service'
 import { AUDIT_ACTIONS } from '../audit/audit.actions'
-import { $Enums, Prisma } from '@prisma/client'
 import { ChargesQueryDto } from './dto/charges-query.dto'
 import { WhatsAppService } from '../whatsapp/whatsapp.service'
 import { RiskService } from '../risk/risk.service'
@@ -26,7 +26,36 @@ function isUuidLike(s: string): boolean {
   )
 }
 
-type DbClient = PrismaService | any
+type DbClient = PrismaService | Prisma.TransactionClient
+
+type CreateChargeInput = {
+  orgId: string
+  actorUserId: string | null
+  actorPersonId: string | null
+  customerId: string
+  serviceOrderId?: string | null
+  amountCents: number
+  dueDate: Date | string
+  notes?: string | null
+}
+
+type UpdateChargeInput = {
+  id: string
+  orgId: string
+  actorUserId: string | null
+  actorPersonId: string | null
+  amountCents?: number
+  dueDate?: string
+  status?: 'CANCELED'
+  notes?: string
+}
+
+type DeleteChargeInput = {
+  id: string
+  orgId: string
+  actorUserId: string | null
+  actorPersonId: string | null
+}
 
 function isUniqueViolation(error: unknown): boolean {
   return (
@@ -139,6 +168,7 @@ export class FinanceService {
         amountCents: input.amountCents,
         dueDate: new Date(input.dueDate),
         status: 'PENDING',
+        notes: input.description ?? null,
       },
     })
   }
@@ -234,7 +264,7 @@ export class FinanceService {
     dueDate?: Date | string | null
     actorUserId?: string | null
     actorPersonId?: string | null
-    tx?: any
+    tx?: Prisma.TransactionClient
   }) {
     const amountCents = input.amountCents ?? 0
     if (amountCents <= 0) return { created: false }
@@ -267,7 +297,14 @@ export class FinanceService {
     const finalDueDate =
       dueDate ?? new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)
 
-    const run = async (tx: any) => {
+    const run = async (tx: Prisma.TransactionClient) => {
+      await tx.$queryRaw`
+        SELECT id
+        FROM "ServiceOrder"
+        WHERE id = ${input.serviceOrderId} AND "orgId" = ${input.orgId}
+        FOR UPDATE
+      `
+
       const existing = await tx.charge.findFirst({
         where: {
           orgId: input.orgId,
@@ -300,33 +337,17 @@ export class FinanceService {
         return { created: false, chargeId: existing.id }
       }
 
-      let created: { id: string }
-      try {
-        created = await tx.charge.create({
-          data: {
-            orgId: input.orgId,
-            serviceOrderId: input.serviceOrderId,
-            customerId,
-            amountCents,
-            status: 'PENDING',
-            dueDate: finalDueDate,
-          },
-          select: { id: true },
-        })
-      } catch (error) {
-        if (!isUniqueViolation(error)) throw error
-
-        const concurrent = await tx.charge.findFirst({
-          where: {
-            orgId: input.orgId,
-            serviceOrderId: input.serviceOrderId,
-          },
-          select: { id: true },
-        })
-
-        if (!concurrent) throw error
-        return { created: false, chargeId: concurrent.id }
-      }
+      const created = await tx.charge.create({
+        data: {
+          orgId: input.orgId,
+          serviceOrderId: input.serviceOrderId,
+          customerId,
+          amountCents,
+          status: 'PENDING',
+          dueDate: finalDueDate,
+        },
+        select: { id: true },
+      })
 
       await tx.timelineEvent.create({
         data: {
@@ -376,7 +397,7 @@ export class FinanceService {
     })
 
     if (chargeWithCustomer?.customer?.phone) {
-      await this.whatsapp.queueMessage({
+      await this.whatsapp.enqueueMessage({
         orgId: input.orgId,
         customerId,
         toPhone: chargeWithCustomer.customer.phone,
@@ -400,6 +421,7 @@ export class FinanceService {
         source: 'service_order_done',
       }),
     )
+
     return result
   }
 
@@ -413,14 +435,27 @@ export class FinanceService {
   }) {
     const now = new Date()
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`
+        SELECT id
+        FROM "Charge"
+        WHERE id = ${input.chargeId} AND "orgId" = ${input.orgId}
+        FOR UPDATE
+      `
+
       const charge = await tx.charge.findFirst({
         where: { id: input.chargeId, orgId: input.orgId },
-        select: { id: true, amountCents: true, status: true },
+        select: {
+          id: true,
+          customerId: true,
+          amountCents: true,
+          status: true,
+          customer: { select: { id: true, phone: true } },
+        },
       })
 
       if (!charge) throw new NotFoundException('Cobrança não encontrada')
-      if (charge.status === 'PAID') return { alreadyPaid: true }
+      if (charge.status === 'PAID') return { alreadyPaid: true as const }
 
       if (!['PENDING', 'OVERDUE'].includes(charge.status)) {
         throw new BadRequestException(
@@ -432,22 +467,42 @@ export class FinanceService {
         throw new BadRequestException('Valor do pagamento diferente da cobrança')
       }
 
-      let payment: { id: string }
-      try {
-        payment = await tx.payment.create({
-          data: {
+      const existingPayment = await tx.payment.findFirst({
+        where: { orgId: input.orgId, chargeId: charge.id },
+        select: { id: true },
+      })
+
+      if (existingPayment) {
+        await tx.charge.updateMany({
+          where: {
+            id: charge.id,
             orgId: input.orgId,
-            chargeId: charge.id,
-            amountCents: input.amountCents,
-            method: input.method,
+            status: { in: ['PENDING', 'OVERDUE'] },
+          },
+          data: {
+            status: 'PAID',
             paidAt: now,
           },
-          select: { id: true },
         })
-      } catch (error) {
-        if (!isUniqueViolation(error)) throw error
-        return { alreadyPaid: true }
+
+        return {
+          alreadyPaid: true as const,
+          paymentId: existingPayment.id,
+          customerId: charge.customerId,
+          customerPhone: charge.customer?.phone ?? null,
+        }
       }
+
+      const payment = await tx.payment.create({
+        data: {
+          orgId: input.orgId,
+          chargeId: charge.id,
+          amountCents: input.amountCents,
+          method: input.method,
+          paidAt: now,
+        },
+        select: { id: true },
+      })
 
       const transition = await tx.charge.updateMany({
         where: {
@@ -462,7 +517,12 @@ export class FinanceService {
       })
 
       if (transition.count === 0) {
-        return { alreadyPaid: true }
+        return {
+          alreadyPaid: true as const,
+          paymentId: payment.id,
+          customerId: charge.customerId,
+          customerPhone: charge.customer?.phone ?? null,
+        }
       }
 
       await tx.timelineEvent.create({
@@ -521,46 +581,55 @@ export class FinanceService {
         },
       })
 
-      await this.notificationsService.createNotification(
-        input.orgId,
-        'PAYMENT_RECEIVED',
-        `Pagamento de ${input.amountCents / 100} recebido para cobrança ${charge.id}.`,
-        input.actorUserId ?? undefined,
-        { chargeId: charge.id, paymentId: payment.id },
-      )
-
-      const paidCharge = await this.prisma.charge.findFirst({
-        where: { id: charge.id, orgId: input.orgId },
-        include: { customer: { select: { id: true, phone: true } } },
-      })
-
-      if (paidCharge?.customer?.phone) {
-        await this.whatsapp.queueMessage({
-          orgId: input.orgId,
-          customerId: paidCharge.customer.id,
-          toPhone: paidCharge.customer.phone,
-          entityType: 'CHARGE',
-          entityId: charge.id,
-          messageType: 'RECEIPT',
-          messageKey: `charge:${charge.id}:receipt:${payment.id}`,
-          renderedText: 'Pagamento recebido com sucesso. Obrigado! ✅',
-        })
+      return {
+        paymentId: payment.id,
+        customerId: charge.customerId,
+        customerPhone: charge.customer?.phone ?? null,
       }
-
-      this.metrics.increment('paymentsProcessed')
-      this.logger.log(
-        JSON.stringify({
-          event: 'payment_processed',
-          requestId: this.requestContext.requestId,
-          userId: input.actorUserId ?? this.requestContext.userId,
-          orgId: input.orgId,
-          chargeId: charge.id,
-          paymentId: payment.id,
-          amountCents: input.amountCents,
-        }),
-      )
-      return { paymentId: payment.id }
     })
+
+    if ('alreadyPaid' in result && result.alreadyPaid) {
+      return {
+        alreadyPaid: true,
+        paymentId: result.paymentId ?? undefined,
+      }
+    }
+
+    await this.notificationsService.createNotification(
+      input.orgId,
+      'PAYMENT_RECEIVED',
+      `Pagamento de ${input.amountCents / 100} recebido para cobrança ${input.chargeId}.`,
+      input.actorUserId ?? undefined,
+      { chargeId: input.chargeId, paymentId: result.paymentId },
+    )
+
+    if (result.customerPhone) {
+      await this.whatsapp.enqueueMessage({
+        orgId: input.orgId,
+        customerId: result.customerId,
+        toPhone: result.customerPhone,
+        entityType: 'CHARGE',
+        entityId: input.chargeId,
+        messageType: 'RECEIPT',
+        messageKey: `charge:${input.chargeId}:receipt:${result.paymentId}`,
+        renderedText: 'Pagamento recebido com sucesso. Obrigado! ✅',
+      })
+    }
+
+    this.metrics.increment('paymentsProcessed')
+    this.logger.log(
+      JSON.stringify({
+        event: 'payment_processed',
+        requestId: this.requestContext.requestId,
+        userId: input.actorUserId ?? this.requestContext.userId,
+        orgId: input.orgId,
+        chargeId: input.chargeId,
+        paymentId: result.paymentId,
+        amountCents: input.amountCents,
+      }),
+    )
+
+    return { paymentId: result.paymentId }
   }
 
   async exportChargesCsv(orgId: string) {
@@ -768,18 +837,75 @@ export class FinanceService {
     }))
   }
 
-  async createCharge(input: any) {
+  async createCharge(input: CreateChargeInput) {
     const { orgId, actorUserId, actorPersonId, ...data } = input
+
+    if (!data.customerId) {
+      throw new BadRequestException('customerId é obrigatório')
+    }
+
+    if (!Number.isFinite(data.amountCents) || data.amountCents <= 0) {
+      throw new BadRequestException('amountCents inválido')
+    }
+
+    const dueDate =
+      data.dueDate instanceof Date ? data.dueDate : new Date(data.dueDate)
+
+    if (Number.isNaN(dueDate.getTime())) {
+      throw new BadRequestException('dueDate inválido')
+    }
+
+    const customer = await this.prisma.customer.findFirst({
+      where: { id: data.customerId, orgId },
+      select: { id: true, name: true },
+    })
+
+    if (!customer) {
+      throw new BadRequestException('Cliente inválido para este org')
+    }
+
+    if (data.serviceOrderId) {
+      const serviceOrder = await this.prisma.serviceOrder.findFirst({
+        where: { id: data.serviceOrderId, orgId },
+        select: { id: true, customerId: true },
+      })
+
+      if (!serviceOrder) {
+        throw new BadRequestException('serviceOrderId inválido para este org')
+      }
+
+      if (serviceOrder.customerId !== data.customerId) {
+        throw new BadRequestException(
+          'serviceOrderId não pertence ao mesmo customerId',
+        )
+      }
+    }
 
     const charge = await this.prisma.charge.create({
       data: {
         orgId,
         customerId: data.customerId,
         amountCents: data.amountCents,
-        dueDate: new Date(data.dueDate),
-        notes: data.notes,
-        serviceOrderId: data.serviceOrderId,
+        dueDate,
+        notes: data.notes ?? null,
+        serviceOrderId: data.serviceOrderId ?? null,
         status: 'PENDING',
+      },
+    })
+
+    await this.timeline.log({
+      orgId,
+      personId: actorPersonId,
+      action: 'CHARGE_CREATED',
+      description: 'Cobrança criada manualmente',
+      metadata: {
+        chargeId: charge.id,
+        customerId: charge.customerId,
+        serviceOrderId: charge.serviceOrderId,
+        amountCents: charge.amountCents,
+        dueDate: charge.dueDate.toISOString(),
+        actorUserId,
+        actorPersonId,
       },
     })
 
@@ -788,11 +914,20 @@ export class FinanceService {
       action: AUDIT_ACTIONS.CHARGE_CREATED,
       actorUserId,
       actorPersonId,
+      personId: actorPersonId,
       entityType: 'CHARGE',
       entityId: charge.id,
       context: 'Cobrança criada manualmente',
-      metadata: { requestId: this.requestContext.requestId },
+      metadata: {
+        customerId: charge.customerId,
+        serviceOrderId: charge.serviceOrderId,
+        amountCents: charge.amountCents,
+        dueDate: charge.dueDate.toISOString(),
+        requestId: this.requestContext.requestId,
+      },
     })
+
+    await this.onboardingService.completeOnboardingStep(orgId, 'createCharge')
 
     this.metrics.increment('chargesCreated')
     this.logger.log(
@@ -809,65 +944,218 @@ export class FinanceService {
     return charge
   }
 
-  async updateCharge(input: any) {
+  async updateCharge(input: UpdateChargeInput) {
     const { id, orgId, actorUserId, actorPersonId, ...data } = input
 
-    if (data.status === 'PAID' || data.paidAt) {
+    const existing = await this.prisma.charge.findFirst({
+      where: { id, orgId },
+      select: {
+        id: true,
+        customerId: true,
+        serviceOrderId: true,
+        amountCents: true,
+        dueDate: true,
+        status: true,
+        notes: true,
+      },
+    })
+
+    if (!existing) throw new NotFoundException('Cobrança não encontrada')
+
+    if (data.status && data.status !== 'CANCELED') {
       throw new BadRequestException(
-        'Use o fluxo de pagamento para marcar a cobrança como paga',
+        'Atualização manual de status permite apenas CANCELED',
       )
     }
 
-    const updated = await this.prisma.$transaction(async (tx) => {
-      const ownership = await tx.charge.findFirst({
-        where: { id, orgId },
-        select: { id: true },
-      })
+    if (
+      existing.status === 'PAID' &&
+      (data.amountCents !== undefined ||
+        data.dueDate !== undefined ||
+        data.status !== undefined)
+    ) {
+      throw new BadRequestException(
+        'Cobrança paga não pode ter valor, vencimento ou status alterados manualmente',
+      )
+    }
 
-      if (!ownership) throw new NotFoundException('Cobrança não encontrada')
+    if (data.status === 'CANCELED' && existing.status === 'PAID') {
+      throw new BadRequestException('Cobrança paga não pode ser cancelada')
+    }
 
-      const result = await tx.charge.updateMany({
-        where: { id, orgId },
-        data: {
-          amountCents: data.amountCents,
-          dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
-          status: data.status,
-          notes: data.notes,
+    const patch: Prisma.ChargeUpdateManyMutationInput = {}
+
+    if (data.amountCents !== undefined) {
+      if (!Number.isFinite(data.amountCents) || data.amountCents <= 0) {
+        throw new BadRequestException('amountCents inválido')
+      }
+      patch.amountCents = Math.floor(data.amountCents)
+    }
+
+    if (data.dueDate !== undefined) {
+      const parsed = new Date(data.dueDate)
+      if (Number.isNaN(parsed.getTime())) {
+        throw new BadRequestException('dueDate inválido')
+      }
+      patch.dueDate = parsed
+    }
+
+    if (data.notes !== undefined) {
+      patch.notes = data.notes?.trim() ? data.notes.trim() : null
+    }
+
+    if (data.status === 'CANCELED') {
+      patch.status = 'CANCELED'
+    }
+
+    if (Object.keys(patch).length === 0) {
+      throw new BadRequestException('Nenhum campo para atualizar')
+    }
+
+    const result = await this.prisma.charge.updateMany({
+      where: { id, orgId },
+      data: patch,
+    })
+
+    if (result.count === 0) throw new NotFoundException('Cobrança não encontrada')
+
+    const updated = await this.prisma.charge.findFirst({
+      where: { id, orgId },
+    })
+
+    if (!updated) throw new NotFoundException('Cobrança não encontrada')
+
+    await this.timeline.log({
+      orgId,
+      personId: actorPersonId,
+      action: updated.status === 'CANCELED' ? 'CHARGE_CANCELED' : 'CHARGE_UPDATED',
+      description:
+        updated.status === 'CANCELED'
+          ? 'Cobrança cancelada manualmente'
+          : 'Cobrança atualizada manualmente',
+      metadata: {
+        chargeId: updated.id,
+        customerId: updated.customerId,
+        serviceOrderId: updated.serviceOrderId,
+        actorUserId,
+        actorPersonId,
+        before: {
+          amountCents: existing.amountCents,
+          dueDate: existing.dueDate.toISOString(),
+          status: existing.status,
+          notes: existing.notes ?? null,
         },
-      })
-
-      if (result.count === 0) throw new NotFoundException('Cobrança não encontrada')
-
-      return tx.charge.findFirst({ where: { id, orgId } })
+        after: {
+          amountCents: updated.amountCents,
+          dueDate: updated.dueDate.toISOString(),
+          status: updated.status,
+          notes: updated.notes ?? null,
+        },
+      },
     })
 
     await this.audit.log({
       orgId,
-      action: AUDIT_ACTIONS.CHARGE_UPDATED,
+      action:
+        updated.status === 'CANCELED'
+          ? AUDIT_ACTIONS.CHARGE_CANCELED
+          : AUDIT_ACTIONS.CHARGE_UPDATED,
       actorUserId,
       actorPersonId,
+      personId: actorPersonId,
       entityType: 'CHARGE',
       entityId: id,
-      context: 'Cobrança atualizada manualmente',
+      context:
+        updated.status === 'CANCELED'
+          ? 'Cobrança cancelada manualmente'
+          : 'Cobrança atualizada manualmente',
+      metadata: {
+        before: {
+          amountCents: existing.amountCents,
+          dueDate: existing.dueDate.toISOString(),
+          status: existing.status,
+          notes: existing.notes ?? null,
+        },
+        after: {
+          amountCents: updated.amountCents,
+          dueDate: updated.dueDate.toISOString(),
+          status: updated.status,
+          notes: updated.notes ?? null,
+        },
+        requestId: this.requestContext.requestId,
+      },
     })
 
     return updated
   }
 
-  async deleteCharge(orgId: string, id: string) {
-    await this.prisma.$transaction(async (tx) => {
-      const ownership = await tx.charge.findFirst({
-        where: { id, orgId },
-        select: { id: true },
-      })
+  async deleteCharge(input: DeleteChargeInput) {
+    const charge = await this.prisma.charge.findFirst({
+      where: { id: input.id, orgId: input.orgId },
+      select: {
+        id: true,
+        customerId: true,
+        serviceOrderId: true,
+        amountCents: true,
+        dueDate: true,
+        status: true,
+      },
+    })
 
-      if (!ownership) throw new NotFoundException('Cobrança não encontrada')
+    if (!charge) throw new NotFoundException('Cobrança não encontrada')
 
-      const deleted = await tx.charge.deleteMany({
-        where: { id, orgId },
-      })
+    if (charge.status === 'PAID') {
+      throw new BadRequestException('Cobrança paga não pode ser excluída')
+    }
 
-      if (deleted.count === 0) throw new NotFoundException('Cobrança não encontrada')
+    const paymentCount = await this.prisma.payment.count({
+      where: { orgId: input.orgId, chargeId: input.id },
+    })
+
+    if (paymentCount > 0) {
+      throw new BadRequestException(
+        'Cobrança com pagamento registrado não pode ser excluída',
+      )
+    }
+
+    await this.timeline.log({
+      orgId: input.orgId,
+      personId: input.actorPersonId,
+      action: 'CHARGE_DELETED',
+      description: 'Cobrança excluída manualmente',
+      metadata: {
+        chargeId: charge.id,
+        customerId: charge.customerId,
+        serviceOrderId: charge.serviceOrderId,
+        amountCents: charge.amountCents,
+        dueDate: charge.dueDate.toISOString(),
+        status: charge.status,
+        actorUserId: input.actorUserId,
+        actorPersonId: input.actorPersonId,
+      },
+    })
+
+    await this.audit.log({
+      orgId: input.orgId,
+      action: AUDIT_ACTIONS.CHARGE_UPDATED,
+      actorUserId: input.actorUserId,
+      actorPersonId: input.actorPersonId,
+      personId: input.actorPersonId,
+      entityType: 'CHARGE',
+      entityId: input.id,
+      context: 'Cobrança excluída manualmente',
+      metadata: {
+        customerId: charge.customerId,
+        serviceOrderId: charge.serviceOrderId,
+        amountCents: charge.amountCents,
+        dueDate: charge.dueDate.toISOString(),
+        status: charge.status,
+        requestId: this.requestContext.requestId,
+      },
+    })
+
+    await this.prisma.charge.delete({
+      where: { id: input.id },
     })
   }
 }

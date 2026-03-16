@@ -7,22 +7,21 @@ import {
   UseGuards,
   Query,
   Res,
+  Patch,
+  Delete,
 } from '@nestjs/common'
+import { Throttle } from '@nestjs/throttler'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
 import { Roles } from '../auth/decorators/roles.decorator'
 import { Org } from '../auth/decorators/org.decorator'
 import { User } from '../auth/decorators/user.decorator'
-
 import { OperationalStateGuard } from '../people/operational-state.guard'
-
 import { FinanceService } from './finance.service'
 import { CreatePaymentDto } from './dto/create-payment.dto'
 import { ChargesQueryDto } from './dto/charges-query.dto'
 import { CreateChargeDto } from './dto/create-charge.dto'
 import { UpdateChargeDto } from './dto/update-charge.dto'
-import { Patch, Delete } from '@nestjs/common'
-import { Throttle } from '@nestjs/throttler'
 
 @UseGuards(JwtAuthGuard, RolesGuard, OperationalStateGuard)
 @Controller('finance')
@@ -45,17 +44,14 @@ export class FinanceController {
 
   @Get('charges')
   @Roles('ADMIN', 'MANAGER')
-  async listCharges(
-    @Org() orgId: string,
-    @Query() query: ChargesQueryDto,
-  ) {
+  async listCharges(@Org() orgId: string, @Query() query: ChargesQueryDto) {
     const data = await this.finance.listCharges(orgId, query)
-    return { ok: true, data } // data = { items, meta }
+    return { ok: true, data }
   }
 
   @Get('charges/export')
   @Roles('ADMIN', 'MANAGER')
-  async exportCharges(@Org() orgId: string, @Res() res) {
+  async exportCharges(@Org() orgId: string, @Res() res: any) {
     const csv = await this.finance.exportChargesCsv(orgId)
     res.set('Content-Type', 'text/csv')
     res.attachment(`charges-${orgId}-${Date.now()}.csv`)
@@ -99,6 +95,7 @@ export class FinanceController {
       actorUserId,
       actorPersonId,
     })
+
     return { ok: true, data }
   }
 
@@ -120,13 +117,27 @@ export class FinanceController {
       actorUserId,
       actorPersonId,
     })
+
     return { ok: true, data }
   }
 
   @Delete('charges/:id')
   @Roles('ADMIN', 'MANAGER')
-  async deleteCharge(@Org() orgId: string, @Param('id') id: string) {
-    await this.finance.deleteCharge(orgId, id)
+  async deleteCharge(
+    @Org() orgId: string,
+    @User() user: any,
+    @Param('id') id: string,
+  ) {
+    const actorUserId = user?.userId ?? user?.sub ?? null
+    const actorPersonId = user?.personId ?? null
+
+    await this.finance.deleteCharge({
+      orgId,
+      id,
+      actorUserId,
+      actorPersonId,
+    })
+
     return { ok: true }
   }
 

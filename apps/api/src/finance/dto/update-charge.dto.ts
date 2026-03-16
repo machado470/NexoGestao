@@ -1,6 +1,6 @@
 import { IsOptional, IsString, IsNumber, IsDateString, IsIn, Min } from 'class-validator'
 
-const ALLOWED_STATUSES = ['PENDING', 'OVERDUE', 'PAID', 'CANCELED'] as const
+const ALLOWED_STATUSES = ['CANCELED'] as const
 
 export class UpdateChargeDto {
   @IsNumber()
@@ -11,10 +11,6 @@ export class UpdateChargeDto {
   @IsDateString()
   @IsOptional()
   dueDate?: string
-
-  @IsDateString()
-  @IsOptional()
-  paidAt?: string
 
   @IsString()
   @IsOptional()
