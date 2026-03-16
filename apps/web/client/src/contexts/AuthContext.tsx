@@ -34,6 +34,10 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const utils = trpc.useUtils();
 
@@ -56,6 +60,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [meQuery.isFetched, meQuery.error]);
 
+  const loadSessionAfterAuth = useCallback(async () => {
+    const attempts = 4;
+    const delays = [0, 150, 300, 600];
+
+    for (let index = 0; index < attempts; index++) {
+      if (delays[index] > 0) {
+        await sleep(delays[index]);
+      }
+
+      const result = await meQuery.refetch();
+      const nextPayload = result.data ?? null;
+
+      utils.session.me.setData(undefined, nextPayload);
+
+      const nextUser = nextPayload?.data?.user ?? null;
+
+      if (nextUser) {
+        return nextPayload;
+      }
+    }
+
+    throw new Error("Sessão não foi carregada após o login.");
+  }, [meQuery, utils]);
+
   const refresh = useCallback(async () => {
     setLocalError(null);
     const result = await meQuery.refetch();
@@ -73,15 +101,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           password,
         });
 
-        const result = await meQuery.refetch();
-        const nextPayload = result.data ?? null;
-        utils.session.me.setData(undefined, nextPayload);
-
-        const nextUser = nextPayload?.data?.user ?? null;
-
-        if (!nextUser) {
-          throw new Error("Sessão não foi carregada após o login.");
-        }
+        await loadSessionAfterAuth();
       } catch (err) {
         setLocalError(err);
         throw err;
@@ -89,7 +109,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLocalLoading(false);
       }
     },
-    [loginMutation, meQuery, utils]
+    [loginMutation, loadSessionAfterAuth]
   );
 
   const register = useCallback(
@@ -110,15 +130,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           password: payload.password,
         });
 
-        const result = await meQuery.refetch();
-        const nextPayload = result.data ?? null;
-        utils.session.me.setData(undefined, nextPayload);
-
-        const nextUser = nextPayload?.data?.user ?? null;
-
-        if (!nextUser) {
-          throw new Error("Conta criada, mas a sessão não foi carregada.");
-        }
+        await loadSessionAfterAuth();
       } catch (err) {
         setLocalError(err);
         throw err;
@@ -126,7 +138,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLocalLoading(false);
       }
     },
-    [registerMutation, meQuery, utils]
+    [registerMutation, loadSessionAfterAuth]
   );
 
   const logout = useCallback(async () => {
@@ -136,6 +148,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await logoutMutation.mutateAsync();
       utils.session.me.setData(undefined, null);
+      await utils.session.me.invalidate();
     } catch (err) {
       setLocalError(err);
       throw err;

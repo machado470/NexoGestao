@@ -146,6 +146,7 @@ export class FinanceService {
   async sendPaymentReminder(input: {
     orgId: string
     customerId: string
+    chargeId?: string
     chargeTitle?: string
   }) {
     const customer = await this.prisma.customer.findFirst({
@@ -160,9 +161,9 @@ export class FinanceService {
       customerId: input.customerId,
       toPhone: customer.phone,
       entityType: 'CHARGE',
-      entityId: input.customerId,
+      entityId: input.chargeId ?? input.customerId,
       messageType: 'PAYMENT_REMINDER',
-      messageKey: `charge:reminder:${input.customerId}:${Date.now()}`,
+      messageKey: `charge:reminder:${input.chargeId ?? input.customerId}:${Date.now()}`,
       renderedText: `Lembrete de pagamento: ${input.chargeTitle ?? 'cobrança pendente'}.`,
     })
   }
@@ -369,14 +370,6 @@ export class FinanceService {
 
     if (!result.created) return result
 
-    await this.notificationsService.createNotification(
-      input.orgId,
-      'CUSTOMER_CREATED',
-      `Cobrança de ${amountCents / 100} para O.S. ${input.serviceOrderId} criada. Vencimento: ${finalDueDate.toLocaleDateString()}.`,
-      input.actorUserId ?? null,
-      { chargeId: result.chargeId, serviceOrderId: input.serviceOrderId },
-    )
-
     const chargeWithCustomer = await this.prisma.charge.findFirst({
       where: { id: result.chargeId, orgId: input.orgId },
       include: { customer: { select: { phone: true } } },
@@ -532,7 +525,7 @@ export class FinanceService {
         input.orgId,
         'PAYMENT_RECEIVED',
         `Pagamento de ${input.amountCents / 100} recebido para cobrança ${charge.id}.`,
-        input.actorUserId,
+        input.actorUserId ?? undefined,
         { chargeId: charge.id, paymentId: payment.id },
       )
 
