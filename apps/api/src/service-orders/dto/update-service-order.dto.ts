@@ -4,12 +4,11 @@ import {
   IsOptional,
   IsString,
   Max,
-  Min,
   MaxLength,
+  Min,
   ValidateIf,
 } from 'class-validator'
 
-// Enums alinhados com o schema Prisma: ServiceOrderStatus
 const SERVICE_ORDER_STATUSES = [
   'OPEN',
   'ASSIGNED',
@@ -43,22 +42,23 @@ export class UpdateServiceOrderDto {
   @IsIn(SERVICE_ORDER_STATUSES as unknown as string[])
   status?: (typeof SERVICE_ORDER_STATUSES)[number]
 
-  // pode ser null (desatribuir). class-validator não valida null por padrão,
-  // então usamos ValidateIf pra validar apenas quando for string.
+  // Pode ser null para desatribuir.
   @IsOptional()
   @ValidateIf((_, v) => typeof v === 'string')
   @IsString()
   assignedToPersonId?: string | null
 
-  // 💰 Finance (MVP): valor da cobrança ao concluir a O.S.
+  // Valor opcional para cobrança vinculada à O.S.
   @IsOptional()
   @IsInt()
   @Min(1)
   @Max(1_000_000_000)
   amountCents?: number
 
-  // 💰 Finance (MVP): vencimento da cobrança (ISO string).
-  // Se não vier e a cobrança for criada, usamos default +3 dias.
+  // Vencimento opcional.
+  // Se vier string vazia, o service pode limpar.
+  // Se houver amountCents e dueDate continuar ausente,
+  // o service aplica vencimento padrão de +3 dias.
   @IsOptional()
   @IsString()
   dueDate?: string

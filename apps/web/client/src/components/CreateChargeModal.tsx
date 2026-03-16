@@ -3,12 +3,27 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { X, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { chargeSchema } from "@/lib/validations";
 
 interface CreateChargeModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
 }
+
+type FormState = {
+  customerId: string;
+  amount: string;
+  dueDate: string;
+  notes: string;
+};
+
+const INITIAL_FORM: FormState = {
+  customerId: "",
+  amount: "",
+  dueDate: "",
+  notes: "",
+};
 
 function parseAmountToCents(raw: string): number | null {
   const normalized = raw.replace(",", ".").trim();
@@ -26,22 +41,12 @@ export function CreateChargeModal({
   onClose,
   onSuccess,
 }: CreateChargeModalProps) {
-  const [formData, setFormData] = useState({
-    customerId: "",
-    amount: "",
-    dueDate: "",
-    notes: "",
-  });
+  const [formData, setFormData] = useState<FormState>(INITIAL_FORM);
 
   const createCharge = trpc.finance.charges.create.useMutation({
     onSuccess: () => {
       toast.success("Cobrança criada com sucesso!");
-      setFormData({
-        customerId: "",
-        amount: "",
-        dueDate: "",
-        notes: "",
-      });
+      setFormData(INITIAL_FORM);
       onSuccess();
       onClose();
     },
@@ -61,33 +66,38 @@ export function CreateChargeModal({
       ? customersResponse
       : [];
 
+  const handleClose = () => {
+    if (createCharge.isPending) return;
+    setFormData(INITIAL_FORM);
+    onClose();
+  };
+
   const submitCharge = async () => {
-    if (!formData.customerId || formData.customerId === "0") {
-      toast.error("Cliente é obrigatório");
-      return;
-    }
+    const customerId = formData.customerId.trim();
+    const amount = formData.amount.trim();
+    const dueDate = formData.dueDate;
+    const notes = formData.notes.trim();
 
-    if (!formData.amount.trim()) {
-      toast.error("Valor é obrigatório");
-      return;
-    }
+    const amountCents = parseAmountToCents(amount);
 
-    if (!formData.dueDate) {
-      toast.error("Data de vencimento é obrigatória");
-      return;
-    }
+    const parsed = chargeSchema.safeParse({
+      customerId,
+      amountCents: amountCents ?? 0,
+      dueDate,
+      notes: notes || undefined,
+    });
 
-    const amountCents = parseAmountToCents(formData.amount);
-    if (!amountCents) {
-      toast.error("Valor deve ser maior que 0");
+    if (!parsed.success) {
+      const firstError = parsed.error.issues[0]?.message || "Dados inválidos";
+      toast.error(firstError);
       return;
     }
 
     await createCharge.mutateAsync({
-      customerId: formData.customerId,
-      amountCents,
-      dueDate: new Date(`${formData.dueDate}T12:00:00`).toISOString(),
-      notes: formData.notes.trim() || undefined,
+      customerId: parsed.data.customerId,
+      amountCents: parsed.data.amountCents,
+      dueDate: new Date(`${parsed.data.dueDate}T12:00:00`).toISOString(),
+      notes: parsed.data.notes || undefined,
     });
   };
 
@@ -102,7 +112,7 @@ export function CreateChargeModal({
           </h2>
 
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
             type="button"
             disabled={createCharge.isPending}
@@ -128,6 +138,7 @@ export function CreateChargeModal({
                 setFormData({ ...formData, customerId: e.target.value })
               }
               className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              disabled={createCharge.isPending}
             >
               <option value="">Selecione um cliente</option>
               {customers.map((customer: any) => (
@@ -151,6 +162,7 @@ export function CreateChargeModal({
               }
               className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
               placeholder="100,00"
+              disabled={createCharge.isPending}
             />
           </div>
 
@@ -165,6 +177,7 @@ export function CreateChargeModal({
                 setFormData({ ...formData, dueDate: e.target.value })
               }
               className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              disabled={createCharge.isPending}
             />
           </div>
 
@@ -180,13 +193,14 @@ export function CreateChargeModal({
               className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
               placeholder="Adicione notas sobre a cobrança"
               rows={3}
+              disabled={createCharge.isPending}
             />
           </div>
         </form>
 
         <div className="flex justify-end gap-3 border-t border-gray-200 p-6 dark:border-gray-700">
           <Button
-            onClick={onClose}
+            onClick={handleClose}
             variant="outline"
             className="text-gray-700 dark:text-gray-300"
             type="button"

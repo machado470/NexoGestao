@@ -3,6 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Loader2, X } from "lucide-react";
+import { serviceOrderSchema } from "@/lib/validations";
 
 type Props = {
   open: boolean;
@@ -31,6 +32,18 @@ const INITIAL_FORM: FormState = {
   dueDate: "",
 };
 
+function parseAmountToCents(raw: string): number | undefined {
+  const normalized = raw.replace(",", ".").trim();
+  if (!normalized) return undefined;
+
+  const value = Number(normalized);
+  if (!Number.isFinite(value) || value <= 0) {
+    return undefined;
+  }
+
+  return Math.round(value * 100);
+}
+
 export default function CreateServiceOrderModal({
   open,
   onClose,
@@ -51,7 +64,10 @@ export default function CreateServiceOrderModal({
   });
 
   const canSubmit = useMemo(() => {
-    return formData.customerId.trim().length > 0 && formData.title.trim().length > 0;
+    return (
+      formData.customerId.trim().length > 0 &&
+      formData.title.trim().length > 0
+    );
   }, [formData.customerId, formData.title]);
 
   const handleClose = () => {
@@ -61,35 +77,44 @@ export default function CreateServiceOrderModal({
   };
 
   const submit = async () => {
-    if (!canSubmit) {
-      toast.error("Cliente e título são obrigatórios.");
-      return;
-    }
-
     const priority = Number(formData.priority);
-    if (!Number.isFinite(priority) || priority < 1 || priority > 5) {
+    if (!Number.isFinite(priority)) {
       toast.error("Prioridade inválida.");
       return;
     }
 
-    let amountCents: number | undefined = undefined;
-    if (formData.amount.trim()) {
-      const normalized = Number(formData.amount.replace(",", "."));
-      if (!Number.isFinite(normalized) || normalized <= 0) {
-        toast.error("Valor inválido.");
-        return;
-      }
-      amountCents = Math.round(normalized * 100);
+    const amountCents = parseAmountToCents(formData.amount);
+
+    if (formData.amount.trim() && amountCents === undefined) {
+      toast.error("Valor inválido.");
+      return;
     }
 
-    await createMutation.mutateAsync({
-      customerId: formData.customerId,
+    const parsed = serviceOrderSchema.safeParse({
+      customerId: formData.customerId.trim(),
       title: formData.title.trim(),
       description: formData.description.trim() || undefined,
       priority,
-      scheduledFor: formData.scheduledFor || undefined,
+      scheduledFor: formData.scheduledFor.trim() || "",
       amountCents,
-      dueDate: formData.dueDate || undefined,
+      dueDate: formData.dueDate.trim() || "",
+    });
+
+    if (!parsed.success) {
+      const firstError =
+        parsed.error.issues[0]?.message || "Dados inválidos para criar a O.S.";
+      toast.error(firstError);
+      return;
+    }
+
+    await createMutation.mutateAsync({
+      customerId: parsed.data.customerId,
+      title: parsed.data.title,
+      description: parsed.data.description || undefined,
+      priority: parsed.data.priority,
+      scheduledFor: parsed.data.scheduledFor || undefined,
+      amountCents: parsed.data.amountCents,
+      dueDate: parsed.data.dueDate || undefined,
     });
   };
 
@@ -104,6 +129,7 @@ export default function CreateServiceOrderModal({
             onClick={handleClose}
             className="rounded-lg p-2 hover:bg-gray-100 dark:hover:bg-zinc-800"
             type="button"
+            disabled={createMutation.isPending}
           >
             <X className="h-4 w-4" />
           </button>
@@ -118,6 +144,7 @@ export default function CreateServiceOrderModal({
               onChange={(e) =>
                 setFormData((state) => ({ ...state, customerId: e.target.value }))
               }
+              disabled={createMutation.isPending}
             >
               <option value="">Selecione um cliente</option>
               {customers.map((customer) => (
@@ -137,6 +164,7 @@ export default function CreateServiceOrderModal({
               onChange={(e) =>
                 setFormData((state) => ({ ...state, title: e.target.value }))
               }
+              disabled={createMutation.isPending}
             />
           </div>
 
@@ -150,6 +178,7 @@ export default function CreateServiceOrderModal({
               onChange={(e) =>
                 setFormData((state) => ({ ...state, description: e.target.value }))
               }
+              disabled={createMutation.isPending}
             />
           </div>
 
@@ -162,6 +191,7 @@ export default function CreateServiceOrderModal({
                 onChange={(e) =>
                   setFormData((state) => ({ ...state, priority: e.target.value }))
                 }
+                disabled={createMutation.isPending}
               >
                 <option value="1">Muito baixa</option>
                 <option value="2">Baixa</option>
@@ -180,6 +210,7 @@ export default function CreateServiceOrderModal({
                 onChange={(e) =>
                   setFormData((state) => ({ ...state, scheduledFor: e.target.value }))
                 }
+                disabled={createMutation.isPending}
               />
             </div>
           </div>
@@ -194,6 +225,7 @@ export default function CreateServiceOrderModal({
                 onChange={(e) =>
                   setFormData((state) => ({ ...state, amount: e.target.value }))
                 }
+                disabled={createMutation.isPending}
               />
             </div>
 
@@ -206,6 +238,7 @@ export default function CreateServiceOrderModal({
                 onChange={(e) =>
                   setFormData((state) => ({ ...state, dueDate: e.target.value }))
                 }
+                disabled={createMutation.isPending}
               />
             </div>
           </div>
@@ -213,7 +246,7 @@ export default function CreateServiceOrderModal({
 
         <div className="mt-5 flex gap-2">
           <Button
-            onClick={submit}
+            onClick={() => void submit()}
             disabled={createMutation.isPending || !canSubmit}
             className="flex-1 bg-black px-4 py-2 text-white hover:bg-zinc-800 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
           >

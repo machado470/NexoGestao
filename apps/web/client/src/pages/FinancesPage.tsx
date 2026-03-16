@@ -288,9 +288,9 @@ export default function FinancesPage() {
   const stats = (statsPayload?.data ?? statsPayload ?? null) as ChargeStats | null;
 
   const chargesPayload = chargesQuery.data as any;
-  const charges = (chargesPayload?.data ?? []) as Charge[];
+  const charges = (chargesPayload?.data?.items ?? []) as Charge[];
 
-  const pagination = (chargesPayload?.pagination ?? {
+  const pagination = (chargesPayload?.data?.meta ?? {
     page: 1,
     limit: 20,
     total: 0,

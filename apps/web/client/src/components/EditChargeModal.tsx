@@ -3,6 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { X, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { chargeEditSchema } from "@/lib/validations";
 
 interface EditChargeModalProps {
   isOpen: boolean;
@@ -68,41 +69,35 @@ export function EditChargeModal({
       dueDate: charge?.dueDate
         ? new Date(charge.dueDate).toISOString().split("T")[0]
         : "",
-      status: charge?.status || "PENDING",
+      status: charge?.status === "CANCELED" ? "CANCELED" : "PENDING",
       notes: charge?.notes || "",
     });
   }, [getCharge.data]);
 
   const submitUpdate = async () => {
-    if (!formData.amount.trim()) {
-      toast.error("Valor é obrigatório");
-      return;
-    }
-
-    if (!formData.dueDate) {
-      toast.error("Data de vencimento é obrigatória");
-      return;
-    }
-
-    const amountCents = parseAmountToCents(formData.amount);
-    if (!amountCents) {
-      toast.error("Valor deve ser maior que 0");
-      return;
-    }
-
     if (!chargeId) return;
 
-    if (formData.status === "PAID") {
-      toast.error("Para marcar como paga, use o fluxo de pagamento.");
+    const amountCents = parseAmountToCents(formData.amount);
+
+    const parsed = chargeEditSchema.safeParse({
+      amountCents: amountCents ?? 0,
+      dueDate: formData.dueDate,
+      status: formData.status === "CANCELED" ? "CANCELED" : "PENDING",
+      notes: formData.notes.trim() || undefined,
+    });
+
+    if (!parsed.success) {
+      const firstError = parsed.error.issues[0]?.message || "Dados inválidos";
+      toast.error(firstError);
       return;
     }
 
     await updateCharge.mutateAsync({
       id: chargeId,
-      amountCents,
-      dueDate: new Date(`${formData.dueDate}T12:00:00`).toISOString(),
-      status: formData.status as "PENDING" | "OVERDUE" | "CANCELED",
-      notes: formData.notes.trim() || undefined,
+      amountCents: parsed.data.amountCents,
+      dueDate: new Date(`${parsed.data.dueDate}T12:00:00`).toISOString(),
+      status: parsed.data.status === "CANCELED" ? "CANCELED" : undefined,
+      notes: parsed.data.notes || undefined,
     });
   };
 
@@ -120,6 +115,9 @@ export function EditChargeModal({
 
   const payload = getCharge.data as any;
   const charge = payload?.data ?? payload ?? null;
+  const isCanceled = charge?.status === "CANCELED";
+  const isPaid = charge?.status === "PAID";
+  const disableEditing = isCanceled || isPaid;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -162,8 +160,9 @@ export function EditChargeModal({
               onChange={(e) =>
                 setFormData({ ...formData, amount: e.target.value })
               }
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
               placeholder="100,00"
+              disabled={disableEditing || updateCharge.isPending}
             />
           </div>
 
@@ -177,7 +176,8 @@ export function EditChargeModal({
               onChange={(e) =>
                 setFormData({ ...formData, dueDate: e.target.value })
               }
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              disabled={disableEditing || updateCharge.isPending}
             />
           </div>
 
@@ -190,14 +190,14 @@ export function EditChargeModal({
               onChange={(e) =>
                 setFormData({ ...formData, status: e.target.value })
               }
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              disabled={disableEditing || updateCharge.isPending}
             >
-              <option value="PENDING">Pendente</option>
-              <option value="OVERDUE">Vencido</option>
-              <option value="CANCELED">Cancelado</option>
+              <option value="PENDING">Manter ativa</option>
+              <option value="CANCELED">Cancelar cobrança</option>
             </select>
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              Cobranças pagas devem ser registradas pelo fluxo de pagamento.
+              O backend só permite cancelamento manual. Cobranças pagas devem usar o fluxo de pagamento.
             </p>
           </div>
 
@@ -210,11 +210,24 @@ export function EditChargeModal({
               onChange={(e) =>
                 setFormData({ ...formData, notes: e.target.value })
               }
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
               placeholder="Adicione notas sobre a cobrança"
               rows={3}
+              disabled={updateCharge.isPending}
             />
           </div>
+
+          {isPaid && (
+            <p className="rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700 dark:bg-green-900/20 dark:text-green-300">
+              Esta cobrança já foi paga e não pode ter valor, vencimento ou status alterados.
+            </p>
+          )}
+
+          {isCanceled && (
+            <p className="rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-700 dark:bg-gray-700/50 dark:text-gray-300">
+              Esta cobrança já está cancelada. Só as notas podem ser ajustadas.
+            </p>
+          )}
         </form>
 
         <div className="flex justify-end gap-3 border-t border-gray-200 p-6 dark:border-gray-700">

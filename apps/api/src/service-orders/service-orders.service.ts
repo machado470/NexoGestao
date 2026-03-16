@@ -45,6 +45,47 @@ function statusToAction(status: ServiceOrderStatus): string {
   }
 }
 
+function addDays(base: Date, days: number): Date {
+  return new Date(base.getTime() + days * 24 * 60 * 60 * 1000)
+}
+
+function parseOptionalDate(label: string, value?: string): Date | null {
+  if (typeof value !== 'string') return null
+
+  const raw = value.trim()
+  if (!raw) return null
+
+  const parsed = new Date(raw)
+  if (Number.isNaN(parsed.getTime())) {
+    throw new BadRequestException(`${label} inválido (use ISO)`)
+  }
+
+  return parsed
+}
+
+function normalizeAmount(value?: number): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null
+
+  const normalized = Math.floor(value)
+  if (normalized <= 0) {
+    throw new BadRequestException('amountCents inválido')
+  }
+
+  return normalized
+}
+
+function resolveDueDateForServiceOrder(params: {
+  amountCents: number | null
+  dueDate: Date | null
+  referenceDate?: Date | null
+}): Date | null {
+  if (params.dueDate) return params.dueDate
+  if (!params.amountCents || params.amountCents <= 0) return null
+
+  const base = params.referenceDate ?? new Date()
+  return addDays(base, 3)
+}
+
 @Injectable()
 export class ServiceOrdersService {
   constructor(
@@ -198,32 +239,15 @@ export class ServiceOrdersService {
         ? Math.min(5, Math.max(1, Math.floor(params.priority)))
         : 2
 
-    let scheduledFor: Date | null = null
-    if (typeof params.scheduledFor === 'string' && params.scheduledFor.trim()) {
-      const d = new Date(params.scheduledFor.trim())
-      if (Number.isNaN(d.getTime())) {
-        throw new BadRequestException('scheduledFor inválido (use ISO)')
-      }
-      scheduledFor = d
-    }
+    const scheduledFor = parseOptionalDate('scheduledFor', params.scheduledFor)
+    const rawDueDate = parseOptionalDate('dueDate', params.dueDate)
+    const amountCents = normalizeAmount(params.amountCents)
 
-    let dueDateValue: Date | null = null
-    if (typeof params.dueDate === 'string' && params.dueDate.trim()) {
-      const d = new Date(params.dueDate.trim())
-      if (Number.isNaN(d.getTime())) {
-        throw new BadRequestException('dueDate inválido (use ISO)')
-      }
-      dueDateValue = d
-    }
-
-    const amountCents =
-      typeof params.amountCents === 'number' && Number.isFinite(params.amountCents)
-        ? Math.floor(params.amountCents)
-        : null
-
-    if (amountCents !== null && amountCents <= 0) {
-      throw new BadRequestException('amountCents inválido')
-    }
+    const dueDateValue = resolveDueDateForServiceOrder({
+      amountCents,
+      dueDate: rawDueDate,
+      referenceDate: scheduledFor,
+    })
 
     const customer = await this.prisma.customer.findFirst({
       where: { id: params.customerId, orgId: params.orgId },
@@ -385,12 +409,10 @@ export class ServiceOrdersService {
         customerId: true,
         amountCents: true,
         dueDate: true,
+        scheduledFor: true,
       },
     })
     if (!existing) throw new NotFoundException('Ordem de serviço não encontrada')
-
-    const amountCents = params.data.amountCents
-    const dueDate = params.data.dueDate
 
     const patch: any = {}
 
@@ -411,46 +433,28 @@ export class ServiceOrdersService {
       patch.priority = Math.min(5, Math.max(1, Math.floor(params.data.priority)))
     }
 
+    let nextScheduledFor = existing.scheduledFor ?? null
     if (typeof params.data.scheduledFor === 'string') {
-      const s = params.data.scheduledFor.trim()
-      if (!s) {
-        patch.scheduledFor = null
-      } else {
-        const d = new Date(s)
-        if (Number.isNaN(d.getTime())) {
-          throw new BadRequestException('scheduledFor inválido (use ISO)')
-        }
-        patch.scheduledFor = d
-      }
+      const parsed = parseOptionalDate('scheduledFor', params.data.scheduledFor)
+      patch.scheduledFor = parsed
+      nextScheduledFor = parsed
     }
 
+    let nextAmountCents = existing.amountCents ?? null
     if (params.data.amountCents !== undefined) {
-      if (
-        typeof params.data.amountCents !== 'number' ||
-        !Number.isFinite(params.data.amountCents)
-      ) {
-        throw new BadRequestException('amountCents inválido')
-      }
-
-      const normalizedAmount = Math.floor(params.data.amountCents)
-      if (normalizedAmount <= 0) {
-        throw new BadRequestException('amountCents inválido')
-      }
-
+      const normalizedAmount = normalizeAmount(params.data.amountCents)
       patch.amountCents = normalizedAmount
+      nextAmountCents = normalizedAmount
     }
+
+    let dueDateTouched = false
+    let nextDueDate = existing.dueDate ?? null
 
     if (params.data.dueDate !== undefined) {
-      const s = (params.data.dueDate ?? '').trim()
-      if (!s) {
-        patch.dueDate = null
-      } else {
-        const d = new Date(s)
-        if (Number.isNaN(d.getTime())) {
-          throw new BadRequestException('dueDate inválido (use ISO)')
-        }
-        patch.dueDate = d
-      }
+      dueDateTouched = true
+      const parsed = parseOptionalDate('dueDate', params.data.dueDate)
+      patch.dueDate = parsed
+      nextDueDate = parsed
     }
 
     if (typeof params.data.status === 'string') {
@@ -481,6 +485,16 @@ export class ServiceOrdersService {
       } else {
         throw new BadRequestException('assignedToPersonId inválido')
       }
+    }
+
+    if (!dueDateTouched && nextAmountCents && !nextDueDate) {
+      const autoDueDate = resolveDueDateForServiceOrder({
+        amountCents: nextAmountCents,
+        dueDate: null,
+        referenceDate: nextScheduledFor,
+      })
+      patch.dueDate = autoDueDate
+      nextDueDate = autoDueDate
     }
 
     if (patch.assignedToPersonId && !patch.status && existing.status === 'OPEN') {
@@ -586,7 +600,7 @@ export class ServiceOrdersService {
           serviceOrderId: updated.id,
           customerId: updated.customerId,
           customerPhone: updated.customer?.phone ?? null,
-          amountCents: updated.amountCents ?? amountCents,
+          amountCents: updated.amountCents ?? null,
           entityId: updated.id,
         },
       })
@@ -598,8 +612,8 @@ export class ServiceOrdersService {
           customerId: updated.customerId,
           actorUserId: params.updatedBy,
           actorPersonId: params.personId,
-          amountCents: updated.amountCents ?? amountCents,
-          dueDate: updated.dueDate ?? dueDate ?? null,
+          amountCents: updated.amountCents ?? null,
+          dueDate: updated.dueDate ?? null,
         })
       } catch (err) {
         console.warn(

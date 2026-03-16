@@ -18,13 +18,13 @@ export type CustomerFormData = z.infer<typeof customerSchema>;
 // Appointment validation
 export const appointmentSchema = z
   .object({
-    customerId: z.string().min(1, "Selecione um cliente"),
-    startsAt: z.string().min(1, "Selecione a data/hora de início"),
-    endsAt: z.string().optional().or(z.literal("")),
+    customerId: z.string().trim().min(1, "Selecione um cliente"),
+    startsAt: z.string().trim().min(1, "Selecione a data/hora de início"),
+    endsAt: z.string().trim().optional().or(z.literal("")),
     status: z
       .enum(["SCHEDULED", "CONFIRMED", "DONE", "CANCELED", "NO_SHOW"])
       .default("SCHEDULED"),
-    notes: z.string().optional(),
+    notes: z.string().trim().optional(),
   })
   .refine(
     (data) => {
@@ -41,28 +41,38 @@ export type AppointmentFormData = z.infer<typeof appointmentSchema>;
 
 // Service Order validation
 export const serviceOrderSchema = z.object({
-  customerId: z.string().min(1, "Selecione um cliente"),
+  customerId: z.string().trim().min(1, "Selecione um cliente"),
   title: z.string().trim().min(2, "Título deve ter pelo menos 2 caracteres"),
-  description: z.string().optional(),
+  description: z.string().trim().optional(),
   priority: z.number().int().min(1).max(5).default(2),
-  scheduledFor: z.string().optional().or(z.literal("")),
+  scheduledFor: z.string().trim().optional().or(z.literal("")),
   amountCents: z.number().int().positive("Valor deve ser maior que 0").optional(),
-  dueDate: z.string().optional().or(z.literal("")),
+  dueDate: z.string().trim().optional().or(z.literal("")),
 });
 
 export type ServiceOrderFormData = z.infer<typeof serviceOrderSchema>;
 
 // Charge validation
 export const chargeSchema = z.object({
-  customerId: z.string().min(1, "Selecione um cliente"),
-  serviceOrderId: z.string().optional(),
+  customerId: z.string().trim().min(1, "Selecione um cliente"),
+  serviceOrderId: z.string().trim().optional().or(z.literal("")),
   amountCents: z.number().int().positive("Valor deve ser maior que 0"),
-  dueDate: z.string().min(1, "Selecione uma data de vencimento"),
-  notes: z.string().optional(),
+  dueDate: z.string().trim().min(1, "Selecione uma data de vencimento"),
+  notes: z.string().trim().optional(),
   paymentMethod: z.enum(["PIX", "CASH", "CARD", "TRANSFER", "OTHER"]).optional(),
 });
 
 export type ChargeFormData = z.infer<typeof chargeSchema>;
+
+// Charge edit validation
+export const chargeEditSchema = z.object({
+  amountCents: z.number().int().positive("Valor deve ser maior que 0"),
+  dueDate: z.string().trim().min(1, "Selecione uma data de vencimento"),
+  status: z.enum(["PENDING", "CANCELED"]).default("PENDING"),
+  notes: z.string().trim().optional(),
+});
+
+export type ChargeEditFormData = z.infer<typeof chargeEditSchema>;
 
 // Person validation
 export const personSchema = z.object({

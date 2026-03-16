@@ -51,6 +51,23 @@ type ServiceOrder = {
   updatedAt?: string;
 };
 
+type ServiceOrdersPagination = {
+  page: number;
+  limit: number;
+  total: number;
+  pages: number;
+};
+
+type ServiceOrdersListResult = {
+  data: ServiceOrder[];
+  pagination: ServiceOrdersPagination;
+};
+
+type GenerateChargeResponse = {
+  created?: boolean;
+  chargeId?: string;
+};
+
 const STATUS_LABELS: Record<ServiceOrderStatus, string> = {
   OPEN: "Aberta",
   ASSIGNED: "Atribuída",
@@ -178,14 +195,6 @@ export default function ServiceOrdersPage() {
   });
 
   const generateChargeMutation = trpc.nexo.serviceOrders.generateCharge.useMutation({
-    onSuccess: async () => {
-      toast.success("Cobrança gerada com sucesso!");
-      await Promise.all([
-        listQuery.refetch(),
-        utils.finance.charges.list.invalidate(),
-        utils.finance.charges.stats.invalidate(),
-      ]);
-    },
     onError: (err) => {
       toast.error(err.message || "Erro ao gerar cobrança");
     },
@@ -194,18 +203,27 @@ export default function ServiceOrdersPage() {
     },
   });
 
+  const serviceOrdersResult = (listQuery.data ??
+    {
+      data: [],
+      pagination: {
+        page: 1,
+        limit,
+        total: 0,
+        pages: 1,
+      },
+    }) as ServiceOrdersListResult;
+
   const serviceOrders = useMemo(() => {
-    const payload = listQuery.data;
-    const rows = Array.isArray((payload as any)?.data)
-      ? (payload as any).data
-      : Array.isArray(payload)
-        ? payload
-        : [];
+    return Array.isArray(serviceOrdersResult.data) ? serviceOrdersResult.data : [];
+  }, [serviceOrdersResult]);
 
-    return rows as ServiceOrder[];
-  }, [listQuery.data]);
-
-  const pagination = (listQuery.data as any)?.pagination ?? (listQuery.data as any)?.data?.pagination;
+  const pagination = serviceOrdersResult.pagination ?? {
+    page: 1,
+    limit,
+    total: 0,
+    pages: 1,
+  };
 
   const customers = useMemo(() => {
     const payload = customersQuery.data;
@@ -265,9 +283,27 @@ export default function ServiceOrdersPage() {
     setProcessingId(serviceOrder.id);
 
     try {
-      await generateChargeMutation.mutateAsync({
+      const payload = (await generateChargeMutation.mutateAsync({
         id: serviceOrder.id,
-      });
+      })) as GenerateChargeResponse;
+
+      await Promise.all([
+        listQuery.refetch(),
+        utils.finance.charges.list.invalidate(),
+        utils.finance.charges.stats.invalidate(),
+      ]);
+
+      if (payload?.created) {
+        toast.success("Cobrança gerada com sucesso!");
+        return;
+      }
+
+      if (payload?.chargeId) {
+        toast.success("Cobrança já existia e foi reaproveitada.");
+        return;
+      }
+
+      toast.success("Verificação de cobrança concluída.");
     } catch {
       // toast já tratado
     }
