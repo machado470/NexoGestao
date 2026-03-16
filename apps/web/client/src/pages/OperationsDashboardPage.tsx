@@ -18,12 +18,13 @@ import {
   CreditCard,
   PlayCircle,
   RefreshCw,
+  TimerReset,
   Wrench,
 } from "lucide-react";
 
 const SERVICE_STATUS_LABELS: Record<string, string> = {
   OPEN: "Não iniciada",
-  ASSIGNED: "Não iniciada",
+  ASSIGNED: "Atribuída",
   IN_PROGRESS: "Em execução",
   DONE: "Concluída",
   CANCELED: "Cancelada",
@@ -52,6 +53,31 @@ function formatCurrency(cents?: number) {
     style: "currency",
     currency: "BRL",
   }).format((Number(cents ?? 0)) / 100);
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return "—";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+
+  return date.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
+function formatTime(value?: string | null) {
+  if (!value) return "--:--";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "--:--";
+
+  return date.toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function statusTone(status?: string) {
@@ -92,16 +118,26 @@ export default function OperationsDashboardPage() {
     to: todayEnd.toISOString(),
   });
 
-  const serviceOrdersQuery = trpc.nexo.serviceOrders.list.useQuery({
-    page: 1,
-    limit: 50,
-  });
+  const serviceOrdersQuery = trpc.nexo.serviceOrders.list.useQuery(
+    {
+      page: 1,
+      limit: 50,
+    },
+    {
+      refetchOnWindowFocus: false,
+    }
+  );
 
-  const chargesQuery = trpc.finance.charges.list.useQuery({
-    page: 1,
-    limit: 50,
-    status: "PENDING",
-  });
+  const chargesQuery = trpc.finance.charges.list.useQuery(
+    {
+      page: 1,
+      limit: 50,
+      status: "PENDING",
+    },
+    {
+      refetchOnWindowFocus: false,
+    }
+  );
 
   const alertsQuery = trpc.dashboard.alerts.useQuery(undefined, {
     refetchOnWindowFocus: false,
@@ -109,7 +145,11 @@ export default function OperationsDashboardPage() {
 
   const updateServiceOrder = trpc.nexo.serviceOrders.update.useMutation({
     onSuccess: async () => {
-      await serviceOrdersQuery.refetch();
+      await Promise.all([
+        serviceOrdersQuery.refetch(),
+        chargesQuery.refetch(),
+        alertsQuery.refetch(),
+      ]);
     },
     onError: (error) => {
       toast.error(error.message || "Erro ao atualizar ordem de serviço");
@@ -146,7 +186,10 @@ export default function OperationsDashboardPage() {
   }, [serviceOrdersQuery.data]);
 
   const pendingCharges = useMemo(() => {
-    return normalizeArrayPayload(chargesQuery.data);
+    const payload = chargesQuery.data as any;
+    return Array.isArray(payload?.data?.items)
+      ? payload.data.items
+      : normalizeArrayPayload(chargesQuery.data);
   }, [chargesQuery.data]);
 
   const todayServiceOrders = useMemo(() => {
@@ -181,6 +224,35 @@ export default function OperationsDashboardPage() {
   const lateServices = Array.isArray(alerts?.overdueOrders?.items)
     ? alerts.overdueOrders.items
     : [];
+
+  const todayOpenOrders = useMemo(() => {
+    return todayServiceOrders.filter((order: any) =>
+      ["OPEN", "ASSIGNED"].includes(order?.status)
+    );
+  }, [todayServiceOrders]);
+
+  const todayInProgressOrders = useMemo(() => {
+    return todayServiceOrders.filter(
+      (order: any) => order?.status === "IN_PROGRESS"
+    );
+  }, [todayServiceOrders]);
+
+  const todayDoneOrders = useMemo(() => {
+    return todayServiceOrders.filter((order: any) => order?.status === "DONE");
+  }, [todayServiceOrders]);
+
+  const doneOrdersWithoutCharge = useMemo(() => {
+    const pendingOrKnownChargeServiceOrderIds = new Set(
+      pendingCharges
+        .map((charge: any) => charge?.serviceOrderId)
+        .filter((value: any) => typeof value === "string" && value.length > 0)
+    );
+
+    return serviceOrders.filter((order: any) => {
+      if (order?.status !== "DONE") return false;
+      return !pendingOrKnownChargeServiceOrderIds.has(String(order.id));
+    });
+  }, [pendingCharges, serviceOrders]);
 
   const handleStartExecution = (id: string) => {
     updateServiceOrder.mutate(
@@ -270,7 +342,8 @@ export default function OperationsDashboardPage() {
             Dashboard Operacional
           </h1>
           <p className="text-sm text-muted-foreground">
-            Gestão diária de agendamentos, execução de serviços e cobranças.
+            Gestão diária de agendamentos, execução, cobrança e leitura rápida
+            do fluxo.
           </p>
         </div>
 
@@ -288,7 +361,7 @@ export default function OperationsDashboardPage() {
         </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>Agendamentos de hoje</CardDescription>
@@ -298,8 +371,15 @@ export default function OperationsDashboardPage() {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>Ordens de serviço de hoje</CardDescription>
+            <CardDescription>OS de hoje</CardDescription>
             <CardTitle>{todayServiceOrders.length}</CardTitle>
+          </CardHeader>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Em execução agora</CardDescription>
+            <CardTitle>{todayInProgressOrders.length}</CardTitle>
           </CardHeader>
         </Card>
 
@@ -308,6 +388,46 @@ export default function OperationsDashboardPage() {
             <CardDescription>Cobranças pendentes</CardDescription>
             <CardTitle>{formatCurrency(pendingTotalCents)}</CardTitle>
           </CardHeader>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card className="border-blue-200">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">OS aguardando ação</CardTitle>
+            <CardDescription>
+              Abertas ou atribuídas para hoje
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">
+              {todayOpenOrders.length}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-amber-200">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">OS em execução</CardTitle>
+            <CardDescription>Serviços rodando agora</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-amber-600">
+              {todayInProgressOrders.length}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-red-200">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Concluídas sem cobrança</CardTitle>
+            <CardDescription>Possível gargalo do fluxo</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">
+              {doneOrdersWithoutCharge.length}
+            </div>
+          </CardContent>
         </Card>
       </div>
 
@@ -337,15 +457,7 @@ export default function OperationsDashboardPage() {
                     {appointment.title || "Agendamento"}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {appointment.startsAt
-                      ? new Date(appointment.startsAt).toLocaleTimeString(
-                          "pt-BR",
-                          {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          }
-                        )
-                      : "--:--"}
+                    {formatTime(appointment.startsAt)}
                     {appointment.customer?.name
                       ? ` • ${appointment.customer.name}`
                       : ""}
@@ -363,8 +475,11 @@ export default function OperationsDashboardPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <Clock3 className="h-4 w-4" />
-              Ordens de serviço (hoje)
+              Ordens de serviço de hoje
             </CardTitle>
+            <CardDescription>
+              Abertas, em execução e concluídas no dia.
+            </CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-3">
@@ -380,7 +495,10 @@ export default function OperationsDashboardPage() {
                   <div>
                     <p className="text-sm font-medium">{order.title}</p>
                     <p className="text-xs text-muted-foreground">
-                      {order.customer?.name || "Sem cliente"}
+                      {order.customer?.name || "Sem cliente"} •{" "}
+                      {formatTime(
+                        order?.scheduledFor || order?.appointment?.startsAt
+                      )}
                     </p>
                   </div>
                   <Badge className={statusTone(order.status)}>
@@ -396,6 +514,7 @@ export default function OperationsDashboardPage() {
                     disabled={
                       order.status === "IN_PROGRESS" ||
                       order.status === "DONE" ||
+                      order.status === "CANCELED" ||
                       updateServiceOrder.isPending
                     }
                   >
@@ -428,6 +547,9 @@ export default function OperationsDashboardPage() {
               <CreditCard className="h-4 w-4" />
               Cobranças pendentes e pagamentos
             </CardTitle>
+            <CardDescription>
+              Com vínculo visível entre cliente, O.S. e vencimento.
+            </CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-3">
@@ -442,15 +564,20 @@ export default function OperationsDashboardPage() {
                 key={charge.id}
                 className="flex items-center justify-between gap-3 rounded border p-3"
               >
-                <div>
+                <div className="min-w-0">
                   <p className="text-sm font-medium">
                     {charge.customer?.name || "Cliente"}
                   </p>
+
                   <p className="text-xs text-muted-foreground">
                     {formatCurrency(charge.amountCents)} • Venc.{" "}
-                    {charge.dueDate
-                      ? new Date(charge.dueDate).toLocaleDateString("pt-BR")
-                      : "-"}
+                    {charge.dueDate ? formatDate(charge.dueDate) : "-"}
+                  </p>
+
+                  <p className="truncate text-xs text-muted-foreground">
+                    {charge.serviceOrder?.title
+                      ? `O.S.: ${charge.serviceOrder.title}`
+                      : "Cobrança manual ou sem O.S. vinculada"}
                   </p>
                 </div>
 
@@ -485,7 +612,7 @@ export default function OperationsDashboardPage() {
               Alertas operacionais
             </CardTitle>
             <CardDescription>
-              Cobranças vencidas e serviços atrasados.
+              Onde o fluxo está pedindo socorro sem sutileza.
             </CardDescription>
           </CardHeader>
 
@@ -503,7 +630,12 @@ export default function OperationsDashboardPage() {
 
                 {overdueCharges.slice(0, 5).map((charge: any) => (
                   <div key={charge.id} className="rounded border p-2 text-sm">
-                    {charge.customer?.name} • {formatCurrency(charge.amountCents)}
+                    <p className="font-medium">
+                      {charge.customer?.name || "Cliente"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatCurrency(charge.amountCents)}
+                    </p>
                   </div>
                 ))}
               </div>
@@ -522,8 +654,35 @@ export default function OperationsDashboardPage() {
 
                 {lateServices.slice(0, 5).map((service: any) => (
                   <div key={service.id} className="rounded border p-2 text-sm">
-                    {service.title}
-                    {service.customer?.name ? ` • ${service.customer.name}` : ""}
+                    <p className="font-medium">{service.title}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {service.customer?.name
+                        ? service.customer.name
+                        : "Sem cliente"}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="mb-2 text-sm font-medium">
+                O.S. concluídas sem cobrança ({doneOrdersWithoutCharge.length})
+              </p>
+              <div className="space-y-2">
+                {doneOrdersWithoutCharge.length === 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Nenhuma O.S. concluída sem cobrança aparente.
+                  </p>
+                )}
+
+                {doneOrdersWithoutCharge.slice(0, 5).map((order: any) => (
+                  <div key={order.id} className="rounded border p-2 text-sm">
+                    <p className="font-medium">{order.title}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {order.customer?.name || "Sem cliente"} • Finalizada{" "}
+                      {order.finishedAt ? formatDate(order.finishedAt) : "recentemente"}
+                    </p>
                   </div>
                 ))}
               </div>
@@ -531,6 +690,52 @@ export default function OperationsDashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <TimerReset className="h-4 w-4" />
+            Leitura rápida do ciclo
+          </CardTitle>
+          <CardDescription>
+            O que já andou e onde ainda existe atrito.
+          </CardDescription>
+        </CardHeader>
+
+        <CardContent className="grid gap-3 md:grid-cols-3">
+          <div className="rounded-lg border p-3">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+              Agendado
+            </p>
+            <p className="mt-1 text-lg font-semibold">{appointments.length}</p>
+            <p className="text-xs text-muted-foreground">
+              Compromissos previstos para hoje.
+            </p>
+          </div>
+
+          <div className="rounded-lg border p-3">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+              Executado
+            </p>
+            <p className="mt-1 text-lg font-semibold">{todayDoneOrders.length}</p>
+            <p className="text-xs text-muted-foreground">
+              Ordens concluídas no dia.
+            </p>
+          </div>
+
+          <div className="rounded-lg border p-3">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+              A cobrar
+            </p>
+            <p className="mt-1 text-lg font-semibold">
+              {doneOrdersWithoutCharge.length}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Concluídas que merecem revisão financeira.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

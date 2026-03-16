@@ -11,6 +11,21 @@ type CtxLike = {
   res: any;
 };
 
+type ServiceOrderListResponse = {
+  data: any[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
+};
+
+type GenerateChargeResponse = {
+  created?: boolean;
+  chargeId?: string;
+};
+
 function getTokenFromCookie(ctx: CtxLike): string | null {
   const raw = ctx?.req?.headers?.cookie;
   if (!raw || typeof raw !== "string") return null;
@@ -86,6 +101,48 @@ function buildQuery(input?: Record<string, unknown> | null): string {
 
   const query = params.toString();
   return query ? `?${query}` : "";
+}
+
+function normalizeServiceOrdersListResult(payload: any): ServiceOrderListResponse {
+  const rawData = Array.isArray(payload?.data)
+    ? payload.data
+    : Array.isArray(payload)
+      ? payload
+      : [];
+
+  const rawPagination = payload?.pagination;
+
+  return {
+    data: rawData,
+    pagination: {
+      page: Number(rawPagination?.page ?? 1),
+      limit: Number(rawPagination?.limit ?? rawData.length ?? 20),
+      total: Number(rawPagination?.total ?? rawData.length ?? 0),
+      pages: Number(rawPagination?.pages ?? 1),
+    },
+  };
+}
+
+function normalizeGenerateChargeResult(payload: any): GenerateChargeResponse {
+  const source =
+    payload && typeof payload === "object" && payload.data && typeof payload.data === "object"
+      ? payload.data
+      : payload;
+
+  if (!source || typeof source !== "object") {
+    return {};
+  }
+
+  return {
+    created:
+      typeof source.created === "boolean"
+        ? source.created
+        : undefined,
+    chargeId:
+      typeof source.chargeId === "string" && source.chargeId.trim().length > 0
+        ? source.chargeId
+        : undefined,
+  };
 }
 
 async function nexoFetch(path: string, options: RequestInit = {}) {
@@ -315,7 +372,13 @@ export const nexoProxyRouter = router({
 
   serviceOrders: router({
     list: publicProcedure.input(z.any().optional()).query(async ({ input, ctx }) => {
-      return authedGet(ctx as CtxLike, "/service-orders", input ?? undefined);
+      const result = await authedGet(
+        ctx as CtxLike,
+        "/service-orders",
+        input ?? undefined
+      );
+
+      return normalizeServiceOrdersListResult(result);
     }),
 
     getById: publicProcedure.input(idInput).query(async ({ input, ctx }) => {
@@ -335,7 +398,12 @@ export const nexoProxyRouter = router({
     }),
 
     generateCharge: publicProcedure.input(idInput).mutation(async ({ input, ctx }) => {
-      return authedPost(ctx as CtxLike, `/service-orders/${input.id}/generate-charge`);
+      const result = await authedPost(
+        ctx as CtxLike,
+        `/service-orders/${input.id}/generate-charge`
+      );
+
+      return normalizeGenerateChargeResult(result);
     }),
   }),
 

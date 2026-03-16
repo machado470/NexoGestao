@@ -9,6 +9,11 @@ import {
   Filter,
   Search,
   FileJson,
+  Receipt,
+  Wrench,
+  CircleCheck,
+  AlertTriangle,
+  Clock3,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -42,8 +47,32 @@ function formatDateTime(value?: string | null) {
   });
 }
 
+function getEventKey(event: TimelineEvent) {
+  return String(event.action ?? event.type ?? "EVENT").toUpperCase();
+}
+
 function getEventLabel(event: TimelineEvent) {
-  return event.action ?? event.type ?? "EVENT";
+  const key = getEventKey(event);
+
+  const labels: Record<string, string> = {
+    SERVICE_ORDER_CREATED: "O.S. criada",
+    SERVICE_ORDER_UPDATED: "O.S. atualizada",
+    SERVICE_ORDER_ASSIGNED: "O.S. atribuída",
+    SERVICE_ORDER_STARTED: "Execução iniciada",
+    SERVICE_ORDER_DONE: "Execução concluída",
+    SERVICE_ORDER_CANCELED: "O.S. cancelada",
+    CHARGE_CREATED: "Cobrança criada",
+    CHARGE_UPDATED: "Cobrança atualizada",
+    CHARGE_CANCELED: "Cobrança cancelada",
+    CHARGE_PAID: "Cobrança paga",
+    CHARGE_OVERDUE: "Cobrança vencida",
+    APPOINTMENT_CREATED: "Agendamento criado",
+    APPOINTMENT_UPDATED: "Agendamento atualizado",
+    APPOINTMENT_CONFIRMED: "Agendamento confirmado",
+    APPOINTMENT_CANCELED: "Agendamento cancelado",
+  };
+
+  return labels[key] ?? key.split("_").join(" ");
 }
 
 function getEventTone(action?: string | null) {
@@ -77,6 +106,80 @@ function getEventTone(action?: string | null) {
   }
 
   return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
+}
+
+function getEventIcon(event: TimelineEvent) {
+  const key = getEventKey(event);
+
+  if (key.includes("CHARGE") || key.includes("PAYMENT")) {
+    return Receipt;
+  }
+
+  if (key.includes("DONE") || key.includes("PAID") || key.includes("CONFIRMED")) {
+    return CircleCheck;
+  }
+
+  if (key.includes("OVERDUE") || key.includes("CANCELED")) {
+    return AlertTriangle;
+  }
+
+  if (key.includes("SERVICE_ORDER") || key.includes("EXECUTION")) {
+    return Wrench;
+  }
+
+  return Clock3;
+}
+
+function getEventSummary(event: TimelineEvent) {
+  const metadata = (event.metadata ?? {}) as Record<string, any>;
+  const serviceOrderId = metadata?.serviceOrderId;
+  const chargeId = metadata?.chargeId;
+  const paymentId = metadata?.paymentId;
+  const amountCents = metadata?.amountCents;
+  const status = metadata?.status;
+  const dueDate = metadata?.dueDate;
+
+  const pieces: string[] = [];
+
+  if (serviceOrderId) {
+    pieces.push(`O.S. #${String(serviceOrderId).slice(0, 8)}`);
+  }
+
+  if (chargeId) {
+    pieces.push(`Cobrança #${String(chargeId).slice(0, 8)}`);
+  }
+
+  if (paymentId) {
+    pieces.push(`Pagamento #${String(paymentId).slice(0, 8)}`);
+  }
+
+  if (typeof amountCents === "number" && Number.isFinite(amountCents)) {
+    pieces.push(
+      new Intl.NumberFormat("pt-BR", {
+        style: "currency",
+        currency: "BRL",
+      }).format(amountCents / 100)
+    );
+  }
+
+  if (typeof status === "string" && status.trim()) {
+    pieces.push(`Status ${status}`);
+  }
+
+  if (typeof dueDate === "string" && dueDate.trim()) {
+    const date = new Date(dueDate);
+    if (!Number.isNaN(date.getTime())) {
+      pieces.push(
+        `Venc. ${date.toLocaleDateString("pt-BR", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+        })}`
+      );
+    }
+  }
+
+  return pieces.join(" • ");
 }
 
 export default function TimelinePage() {
@@ -132,14 +235,32 @@ export default function TimelinePage() {
       const action = getEventLabel(event).toLowerCase();
       const description = String(event.description ?? "").toLowerCase();
       const metadata = JSON.stringify(event.metadata ?? {}).toLowerCase();
+      const summary = getEventSummary(event).toLowerCase();
 
       return (
         action.includes(term) ||
         description.includes(term) ||
-        metadata.includes(term)
+        metadata.includes(term) ||
+        summary.includes(term)
       );
     });
   }, [events, search]);
+
+  const stats = useMemo(() => {
+    return {
+      total: filteredEvents.length,
+      serviceOrders: filteredEvents.filter((event) =>
+        getEventKey(event).includes("SERVICE_ORDER")
+      ).length,
+      charges: filteredEvents.filter((event) =>
+        getEventKey(event).includes("CHARGE")
+      ).length,
+      payments: filteredEvents.filter((event) =>
+        getEventKey(event).includes("PAID") ||
+        getEventKey(event).includes("PAYMENT")
+      ).length,
+    };
+  }, [filteredEvents]);
 
   useEffect(() => {
     if (!customerId && customers.length > 0) {
@@ -159,7 +280,8 @@ export default function TimelinePage() {
     }
   }, [timelineQuery.error]);
 
-  const selectedCustomer = customers.find((customer) => customer.id === customerId) ?? null;
+  const selectedCustomer =
+    customers.find((customer) => customer.id === customerId) ?? null;
 
   return (
     <div className="space-y-6 p-6">
@@ -170,7 +292,7 @@ export default function TimelinePage() {
             Timeline do Cliente
           </h1>
           <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-            Histórico operacional consolidado por cliente.
+            Leitura humana do histórico operacional e financeiro por cliente.
           </p>
         </div>
 
@@ -196,6 +318,36 @@ export default function TimelinePage() {
             <FileJson className="h-4 w-4" />
             {showMetadata ? "Ocultar metadata" : "Mostrar metadata"}
           </Button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+        <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+          <p className="text-sm text-gray-500 dark:text-gray-400">Eventos</p>
+          <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">
+            {stats.total}
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+          <p className="text-sm text-gray-500 dark:text-gray-400">Eventos de O.S.</p>
+          <p className="mt-1 text-2xl font-bold text-blue-600 dark:text-blue-400">
+            {stats.serviceOrders}
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+          <p className="text-sm text-gray-500 dark:text-gray-400">Eventos de cobrança</p>
+          <p className="mt-1 text-2xl font-bold text-orange-600 dark:text-orange-400">
+            {stats.charges}
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+          <p className="text-sm text-gray-500 dark:text-gray-400">Pagamentos</p>
+          <p className="mt-1 text-2xl font-bold text-green-600 dark:text-green-400">
+            {stats.payments}
+          </p>
         </div>
       </div>
 
@@ -247,7 +399,7 @@ export default function TimelinePage() {
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Ação, descrição, metadata..."
+                  placeholder="O.S., cobrança, pagamento..."
                   className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-10 pr-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
                 />
               </div>
@@ -289,45 +441,57 @@ export default function TimelinePage() {
             </div>
           ) : (
             <div className="space-y-4">
-              {filteredEvents.map((event) => (
-                <div
-                  key={event.id}
-                  className="rounded-xl border border-gray-200 p-4 dark:border-gray-700"
-                >
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span
-                          className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${getEventTone(
-                            event.action ?? event.type
-                          )}`}
-                        >
-                          {getEventLabel(event)}
-                        </span>
+              {filteredEvents.map((event) => {
+                const Icon = getEventIcon(event);
+                const summary = getEventSummary(event);
 
-                        <span className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-                          <User className="h-3 w-3" />
-                          Evento #{event.id.slice(0, 8)}
-                        </span>
+                return (
+                  <div
+                    key={event.id}
+                    className="rounded-xl border border-gray-200 p-4 dark:border-gray-700"
+                  >
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span
+                            className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium ${getEventTone(
+                              event.action ?? event.type
+                            )}`}
+                          >
+                            <Icon className="h-3.5 w-3.5" />
+                            {getEventLabel(event)}
+                          </span>
+
+                          <span className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+                            <User className="h-3 w-3" />
+                            Evento #{event.id.slice(0, 8)}
+                          </span>
+                        </div>
+
+                        <p className="mt-3 text-sm text-gray-900 dark:text-white">
+                          {event.description?.trim() || "Sem descrição."}
+                        </p>
+
+                        {summary ? (
+                          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                            {summary}
+                          </p>
+                        ) : null}
                       </div>
 
-                      <p className="mt-3 text-sm text-gray-900 dark:text-white">
-                        {event.description?.trim() || "Sem descrição."}
-                      </p>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        {formatDateTime(event.createdAt)}
+                      </div>
                     </div>
 
-                    <div className="text-xs text-gray-500 dark:text-gray-400">
-                      {formatDateTime(event.createdAt)}
-                    </div>
+                    {showMetadata && event.metadata ? (
+                      <pre className="mt-4 overflow-x-auto rounded-lg bg-gray-50 p-3 text-xs text-gray-700 dark:bg-gray-900 dark:text-gray-300">
+                        {JSON.stringify(event.metadata, null, 2)}
+                      </pre>
+                    ) : null}
                   </div>
-
-                  {showMetadata && event.metadata ? (
-                    <pre className="mt-4 overflow-x-auto rounded-lg bg-gray-50 p-3 text-xs text-gray-700 dark:bg-gray-900 dark:text-gray-300">
-                      {JSON.stringify(event.metadata, null, 2)}
-                    </pre>
-                  ) : null}
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

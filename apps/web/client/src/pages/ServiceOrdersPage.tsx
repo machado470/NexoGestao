@@ -9,6 +9,9 @@ import {
   Calendar,
   AlertCircle,
   Wallet,
+  CheckCircle2,
+  Clock3,
+  Receipt,
 } from "lucide-react";
 import CreateServiceOrderModal from "@/components/CreateServiceOrderModal";
 import { toast } from "sonner";
@@ -66,6 +69,17 @@ type ServiceOrdersListResult = {
 type GenerateChargeResponse = {
   created?: boolean;
   chargeId?: string;
+};
+
+type ChargeStatus = "PENDING" | "PAID" | "OVERDUE" | "CANCELED";
+
+type ChargeRef = {
+  id: string;
+  serviceOrderId?: string | null;
+  customerId: string;
+  amountCents: number;
+  status: ChargeStatus;
+  dueDate?: string | null;
 };
 
 const STATUS_LABELS: Record<ServiceOrderStatus, string> = {
@@ -156,6 +170,44 @@ function formatCurrency(cents?: number | null) {
   }).format(amount / 100);
 }
 
+function getChargeBadge(charge?: ChargeRef | null) {
+  if (!charge) {
+    return {
+      label: "Sem cobrança",
+      className:
+        "bg-gray-100 text-gray-700 dark:bg-gray-700/50 dark:text-gray-300",
+    };
+  }
+
+  switch (charge.status) {
+    case "PAID":
+      return {
+        label: "Cobrança paga",
+        className:
+          "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
+      };
+    case "OVERDUE":
+      return {
+        label: "Cobrança vencida",
+        className:
+          "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",
+      };
+    case "CANCELED":
+      return {
+        label: "Cobrança cancelada",
+        className:
+          "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300",
+      };
+    case "PENDING":
+    default:
+      return {
+        label: "Cobrança pendente",
+        className:
+          "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300",
+      };
+  }
+}
+
 export default function ServiceOrdersPage() {
   const [page, setPage] = useState(1);
   const limit = 20;
@@ -176,6 +228,17 @@ export default function ServiceOrdersPage() {
     }
   );
 
+  const chargesQuery = trpc.finance.charges.list.useQuery(
+    {
+      page: 1,
+      limit: 100,
+    },
+    {
+      retry: false,
+      refetchOnWindowFocus: false,
+    }
+  );
+
   const customersQuery = trpc.nexo.customers.list.useQuery(undefined, {
     retry: false,
     refetchOnWindowFocus: false,
@@ -184,7 +247,7 @@ export default function ServiceOrdersPage() {
   const updateMutation = trpc.nexo.serviceOrders.update.useMutation({
     onSuccess: () => {
       toast.success("OS atualizada com sucesso!");
-      void listQuery.refetch();
+      void Promise.all([listQuery.refetch(), chargesQuery.refetch()]);
     },
     onError: (err) => {
       toast.error(err.message || "Erro ao atualizar OS");
@@ -225,6 +288,48 @@ export default function ServiceOrdersPage() {
     pages: 1,
   };
 
+  const charges = useMemo(() => {
+    const payload = chargesQuery.data as any;
+    const rows = Array.isArray(payload?.data?.items)
+      ? payload.data.items
+      : Array.isArray(payload?.items)
+        ? payload.items
+        : Array.isArray(payload?.data)
+          ? payload.data
+          : Array.isArray(payload)
+            ? payload
+            : [];
+
+    return rows as ChargeRef[];
+  }, [chargesQuery.data]);
+
+  const chargeByServiceOrderId = useMemo(() => {
+    const map = new Map<string, ChargeRef>();
+
+    for (const charge of charges) {
+      if (!charge?.serviceOrderId) continue;
+
+      const current = map.get(String(charge.serviceOrderId));
+      if (!current) {
+        map.set(String(charge.serviceOrderId), charge);
+        continue;
+      }
+
+      const priority: Record<ChargeStatus, number> = {
+        OVERDUE: 4,
+        PENDING: 3,
+        PAID: 2,
+        CANCELED: 1,
+      };
+
+      if (priority[charge.status] > priority[current.status]) {
+        map.set(String(charge.serviceOrderId), charge);
+      }
+    }
+
+    return map;
+  }, [charges]);
+
   const customers = useMemo(() => {
     const payload = customersQuery.data;
     const rows = Array.isArray((payload as any)?.data)
@@ -244,6 +349,12 @@ export default function ServiceOrdersPage() {
       toast.error("Erro ao carregar ordens de serviço: " + listQuery.error.message);
     }
   }, [listQuery.error]);
+
+  useEffect(() => {
+    if (chargesQuery.error) {
+      toast.error("Erro ao carregar cobranças vinculadas: " + chargesQuery.error.message);
+    }
+  }, [chargesQuery.error]);
 
   const handleStatusChange = (id: string, newStatus: ServiceOrderStatus) => {
     setProcessingId(id);
@@ -289,6 +400,7 @@ export default function ServiceOrdersPage() {
 
       await Promise.all([
         listQuery.refetch(),
+        chargesQuery.refetch(),
         utils.finance.charges.list.invalidate(),
         utils.finance.charges.stats.invalidate(),
       ]);
@@ -316,6 +428,17 @@ export default function ServiceOrdersPage() {
   ).length;
   const totalDone = serviceOrders.filter((os) => os.status === "DONE").length;
 
+  const doneWithCharge = serviceOrders.filter((os) => {
+    if (os.status !== "DONE") return false;
+    return chargeByServiceOrderId.has(os.id);
+  }).length;
+
+  const doneWithoutCharge = serviceOrders.filter((os) => {
+    if (os.status !== "DONE") return false;
+    if (!os.amountCents || os.amountCents <= 0) return false;
+    return !chargeByServiceOrderId.has(os.id);
+  }).length;
+
   return (
     <div className="space-y-6 p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -325,7 +448,7 @@ export default function ServiceOrdersPage() {
             Ordens de Serviço
           </h1>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Gerencie as ordens de serviço operacionais da sua organização.
+            Gerencie execução, fechamento e vínculo financeiro das O.S.
           </p>
         </div>
 
@@ -333,11 +456,13 @@ export default function ServiceOrdersPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => void listQuery.refetch()}
-            disabled={listQuery.isFetching}
+            onClick={() => void Promise.all([listQuery.refetch(), chargesQuery.refetch()])}
+            disabled={listQuery.isFetching || chargesQuery.isFetching}
           >
             <RefreshCw
-              className={`mr-1 h-4 w-4 ${listQuery.isFetching ? "animate-spin" : ""}`}
+              className={`mr-1 h-4 w-4 ${
+                listQuery.isFetching || chargesQuery.isFetching ? "animate-spin" : ""
+              }`}
             />
             Atualizar
           </Button>
@@ -352,7 +477,7 @@ export default function ServiceOrdersPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
         <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
           <p className="text-sm text-gray-600 dark:text-gray-400">Total</p>
           <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">{total}</p>
@@ -373,9 +498,16 @@ export default function ServiceOrdersPage() {
         </div>
 
         <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-          <p className="text-sm text-gray-600 dark:text-gray-400">Concluídas</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400">Concluídas c/ cobrança</p>
           <p className="mt-1 text-2xl font-bold text-green-600 dark:text-green-400">
-            {totalDone}
+            {doneWithCharge}
+          </p>
+        </div>
+
+        <div className="rounded-lg border border-red-200 bg-white p-4 dark:border-red-800 dark:bg-gray-800">
+          <p className="text-sm text-gray-600 dark:text-gray-400">Concluídas sem cobrança</p>
+          <p className="mt-1 text-2xl font-bold text-red-600 dark:text-red-400">
+            {doneWithoutCharge}
           </p>
         </div>
       </div>
@@ -436,6 +568,13 @@ export default function ServiceOrdersPage() {
         <div className="space-y-3">
           {serviceOrders.map((os) => {
             const isProcessing = processingId === os.id;
+            const charge = chargeByServiceOrderId.get(os.id) ?? null;
+            const chargeBadge = getChargeBadge(charge);
+            const canGenerateCharge =
+              os.status === "DONE" &&
+              !!os.amountCents &&
+              os.amountCents > 0 &&
+              !charge;
 
             return (
               <div
@@ -462,6 +601,12 @@ export default function ServiceOrdersPage() {
                       >
                         ● {getPriorityLabel(os.priority)}
                       </span>
+
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${chargeBadge.className}`}
+                      >
+                        {chargeBadge.label}
+                      </span>
                     </div>
 
                     {os.description && (
@@ -481,7 +626,10 @@ export default function ServiceOrdersPage() {
                         Criada em {formatDate(os.createdAt)}
                       </span>
 
-                      <span>Agendada para {formatDateTime(os.scheduledFor)}</span>
+                      <span className="flex items-center gap-1">
+                        <Clock3 className="h-3 w-3" />
+                        Agendada para {formatDateTime(os.scheduledFor)}
+                      </span>
 
                       <span>Valor {formatCurrency(os.amountCents)}</span>
 
@@ -504,6 +652,40 @@ export default function ServiceOrdersPage() {
                       <p className="mt-1 text-xs text-green-600 dark:text-green-400">
                         Finalizada em {formatDateTime(os.finishedAt)}
                       </p>
+                    ) : null}
+
+                    {charge ? (
+                      <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs dark:border-gray-700 dark:bg-gray-900/40">
+                        <p className="flex items-center gap-1 font-medium text-gray-900 dark:text-white">
+                          <Receipt className="h-3.5 w-3.5" />
+                          Cobrança vinculada
+                        </p>
+                        <p className="mt-1 text-gray-500 dark:text-gray-400">
+                          Status: {charge.status} • Valor {formatCurrency(charge.amountCents)} •
+                          Vencimento {formatDate(charge.dueDate)}
+                        </p>
+                      </div>
+                    ) : null}
+
+                    {os.status === "DONE" && (!os.amountCents || os.amountCents <= 0) ? (
+                      <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-300">
+                        O.S. concluída sem valor definido. Sem valor, não há cobrança para gerar.
+                      </div>
+                    ) : null}
+
+                    {os.status === "DONE" &&
+                    os.amountCents &&
+                    os.amountCents > 0 &&
+                    !charge ? (
+                      <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-800 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-300">
+                        O.S. concluída com valor definido, mas ainda sem cobrança vinculada.
+                      </div>
+                    ) : null}
+
+                    {charge?.status === "PAID" ? (
+                      <div className="mt-3 rounded-lg border border-green-200 bg-green-50 p-3 text-xs text-green-800 dark:border-green-900/50 dark:bg-green-900/20 dark:text-green-300">
+                        Fluxo financeiro fechado para esta O.S.
+                      </div>
                     ) : null}
                   </div>
 
@@ -553,19 +735,17 @@ export default function ServiceOrdersPage() {
 
                     <Button
                       size="sm"
-                      variant="outline"
+                      variant={canGenerateCharge ? "default" : "outline"}
                       onClick={() => void handleGenerateCharge(os)}
                       disabled={
                         generateChargeMutation.isPending ||
                         isProcessing ||
-                        os.status !== "DONE" ||
-                        !os.amountCents ||
-                        os.amountCents <= 0
+                        !canGenerateCharge
                       }
                       className="gap-2"
                     >
                       <Wallet className="h-4 w-4" />
-                      Gerar cobrança
+                      {charge ? "Cobrança vinculada" : "Gerar cobrança"}
                     </Button>
                   </div>
                 </div>
