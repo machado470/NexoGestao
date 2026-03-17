@@ -197,11 +197,6 @@ export default function FinancesPage() {
   };
 
   const handleBackToServiceOrders = () => {
-    if (!serviceOrderIdFromUrl) {
-      navigate("/service-orders");
-      return;
-    }
-
     navigate("/service-orders");
   };
 
@@ -326,14 +321,6 @@ export default function FinancesPage() {
   const isSubmitting =
     payCharge.isPending || deleteCharge.isPending || checkoutCharge.isPending;
 
-  if (chargesQuery.isLoading || (!isServiceOrderScoped && statsQuery.isLoading)) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
-      </div>
-    );
-  }
-
   const statsPayload = statsQuery.data as any;
   const stats = (statsPayload?.data ?? statsPayload ?? null) as ChargeStats | null;
 
@@ -354,15 +341,20 @@ export default function FinancesPage() {
     }
   ) as ChargesMeta;
 
-  const paidCount = useMemo(
-    () => charges.filter((charge) => charge.status === "PAID").length,
-    [charges]
-  );
+  const paidCount = charges.filter((charge) => charge.status === "PAID").length;
 
   const hasActiveFilters =
     Boolean(query) ||
     statusFilter !== "ALL" ||
     Boolean(serviceOrderIdFromUrl);
+
+  if (chargesQuery.isLoading || (!isServiceOrderScoped && statsQuery.isLoading)) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+      </div>
+    );
+  }
 
   return (
     <>
