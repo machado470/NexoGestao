@@ -78,6 +78,15 @@ function formatMoney(value: number) {
   }).format(value);
 }
 
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error && typeof error === "object" && "message" in error) {
+    const message = String((error as { message?: unknown }).message ?? "").trim();
+    if (message) return message;
+  }
+
+  return fallback;
+}
+
 export default function FinancesPage() {
   const { isAuthenticated, isInitializing } = useAuth();
   const canLoadFinance = isAuthenticated && !isInitializing;
@@ -141,6 +150,12 @@ export default function FinancesPage() {
           ? `Checkout concluído para cobrança ${checkoutChargeIdFromUrl.slice(0, 8)}.`
           : "Checkout concluído com sucesso."
       );
+      void Promise.all([
+        chargesQuery.refetch(),
+        utils.finance.charges.list.invalidate(),
+        utils.finance.charges.stats.invalidate(),
+        ...(isServiceOrderScoped ? [] : [statsQuery.refetch()]),
+      ]);
     } else if (checkoutStatusFromUrl === "cancel") {
       toast.error(
         checkoutChargeIdFromUrl
@@ -150,7 +165,16 @@ export default function FinancesPage() {
     }
 
     navigate("/finances", { replace: true });
-  }, [checkoutStatusFromUrl, checkoutChargeIdFromUrl, navigate]);
+  }, [
+    checkoutStatusFromUrl,
+    checkoutChargeIdFromUrl,
+    navigate,
+    chargesQuery,
+    statsQuery,
+    utils.finance.charges.list,
+    utils.finance.charges.stats,
+    isServiceOrderScoped,
+  ]);
 
   const payCharge = trpc.finance.charges.pay.useMutation({
     onSuccess: async () => {
@@ -367,6 +391,16 @@ export default function FinancesPage() {
     statusFilter !== "ALL" ||
     Boolean(serviceOrderIdFromUrl);
 
+  const hasError =
+    chargesQuery.isError || (!isServiceOrderScoped && statsQuery.isError);
+
+  const errorMessage =
+    getErrorMessage(chargesQuery.error, "") ||
+    (!isServiceOrderScoped
+      ? getErrorMessage(statsQuery.error, "")
+      : "") ||
+    "Não foi possível carregar o financeiro agora.";
+
   if (isInitializing) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -391,6 +425,18 @@ export default function FinancesPage() {
     return (
       <div className="flex h-screen items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+      </div>
+    );
+  }
+
+  if (hasError) {
+    return (
+      <div className="space-y-6 p-6">
+        <Card className="border-red-200 bg-red-50 dark:border-red-900/60 dark:bg-red-950/40">
+          <CardContent className="pt-6 text-sm text-red-700 dark:text-red-300">
+            {errorMessage}
+          </CardContent>
+        </Card>
       </div>
     );
   }

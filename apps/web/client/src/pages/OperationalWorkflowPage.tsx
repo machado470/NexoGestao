@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
+import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -18,11 +19,28 @@ function formatCurrency(cents?: number) {
   }).format((Number(cents ?? 0)) / 100);
 }
 
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error && typeof error === "object" && "message" in error) {
+    const message = String((error as { message?: unknown }).message ?? "").trim();
+    if (message) return message;
+  }
+
+  return fallback;
+}
+
 export default function OperationalWorkflowPage() {
   const { isAuthenticated, isInitializing } = useAuth();
   const canQuery = isAuthenticated && !isInitializing;
-
   const utils = trpc.useUtils();
+  const [location, navigate] = useLocation();
+
+  const searchParams = useMemo(() => {
+    const queryString = location.includes("?") ? location.split("?")[1] : "";
+    return new URLSearchParams(queryString);
+  }, [location]);
+
+  const checkoutStatusFromUrl = searchParams.get("checkout")?.trim() || "";
+  const checkoutChargeIdFromUrl = searchParams.get("chargeId")?.trim() || "";
 
   const chargesQuery = trpc.finance.charges.list.useQuery(
     {
@@ -54,6 +72,26 @@ export default function OperationalWorkflowPage() {
     retry: false,
     refetchOnWindowFocus: false,
   });
+
+  useEffect(() => {
+    if (!checkoutStatusFromUrl) return;
+
+    if (checkoutStatusFromUrl === "success") {
+      toast.success(
+        checkoutChargeIdFromUrl
+          ? `Checkout concluído para cobrança ${checkoutChargeIdFromUrl.slice(0, 8)}.`
+          : "Checkout concluído com sucesso."
+      );
+    } else if (checkoutStatusFromUrl === "cancel") {
+      toast.error(
+        checkoutChargeIdFromUrl
+          ? `Checkout cancelado para cobrança ${checkoutChargeIdFromUrl.slice(0, 8)}.`
+          : "Checkout cancelado."
+      );
+    }
+
+    navigate("/operations", { replace: true });
+  }, [checkoutStatusFromUrl, checkoutChargeIdFromUrl, navigate]);
 
   const updateCharge = trpc.finance.charges.update.useMutation({
     onSuccess: async () => {
@@ -91,19 +129,32 @@ export default function OperationalWorkflowPage() {
     },
   });
 
-  const serviceOrders = Array.isArray((serviceOrdersQuery.data as any)?.data)
-    ? (serviceOrdersQuery.data as any).data
-    : Array.isArray(serviceOrdersQuery.data)
-      ? serviceOrdersQuery.data
-      : [];
+  const serviceOrders = useMemo(() => {
+    const payload: any = serviceOrdersQuery.data;
+    if (Array.isArray(payload?.data)) return payload.data;
+    if (Array.isArray(payload)) return payload;
+    return [];
+  }, [serviceOrdersQuery.data]);
 
-  const charges = Array.isArray((chargesQuery.data as any)?.data)
-    ? (chargesQuery.data as any).data
+  const charges = useMemo(() => {
+    const payload: any = chargesQuery.data;
+    if (Array.isArray(payload?.data)) return payload.data;
+    if (Array.isArray(payload?.items)) return payload.items;
+    return [];
+  }, [chargesQuery.data]);
+
+  const alerts = useMemo(() => {
+    const payload: any = alertsQuery.data;
+    return payload?.data ?? payload ?? null;
+  }, [alertsQuery.data]);
+
+  const overdueOrders = Array.isArray(alerts?.overdueOrders?.items)
+    ? alerts.overdueOrders.items
     : [];
 
-  const alerts: any = alertsQuery.data ?? {};
-  const overdueOrders = alerts?.overdueOrders?.items ?? [];
-  const overdueCharges = alerts?.overdueCharges?.items ?? [];
+  const overdueCharges = Array.isArray(alerts?.overdueCharges?.items)
+    ? alerts.overdueCharges.items
+    : [];
 
   const openOrders = useMemo(() => {
     return serviceOrders.filter((item: any) =>
@@ -113,6 +164,18 @@ export default function OperationalWorkflowPage() {
 
   const isSubmitting =
     updateCharge.isPending || payCharge.isPending || checkoutCharge.isPending;
+
+  const isLoading =
+    chargesQuery.isLoading || serviceOrdersQuery.isLoading || alertsQuery.isLoading;
+
+  const hasError =
+    chargesQuery.isError || serviceOrdersQuery.isError || alertsQuery.isError;
+
+  const errorMessage =
+    getErrorMessage(chargesQuery.error, "") ||
+    getErrorMessage(serviceOrdersQuery.error, "") ||
+    getErrorMessage(alertsQuery.error, "") ||
+    "Não foi possível carregar o fluxo operacional agora.";
 
   const markChargeOverdue = async (id: string) => {
     await updateCharge.mutateAsync({
@@ -190,6 +253,26 @@ export default function OperationalWorkflowPage() {
       <div className="space-y-6 p-6">
         <div className="rounded-xl border p-4 text-sm text-muted-foreground">
           Faça login para visualizar o fluxo operacional.
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6 p-6">
+        <div className="rounded-xl border p-4 text-sm text-muted-foreground">
+          Carregando fluxo operacional...
+        </div>
+      </div>
+    );
+  }
+
+  if (hasError) {
+    return (
+      <div className="space-y-6 p-6">
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
+          {errorMessage}
         </div>
       </div>
     );

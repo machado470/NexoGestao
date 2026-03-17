@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
+import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -109,13 +110,31 @@ function normalizeAlertsPayload(payload: any) {
   return payload?.data ?? payload ?? {};
 }
 
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error && typeof error === "object" && "message" in error) {
+    const message = String((error as { message?: unknown }).message ?? "").trim();
+    if (message) return message;
+  }
+
+  return fallback;
+}
+
 export default function OperationsDashboardPage() {
   const { isAuthenticated, isInitializing } = useAuth();
   const canQuery = isAuthenticated && !isInitializing;
 
   const utils = trpc.useUtils();
+  const [location, navigate] = useLocation();
   const todayStart = startOfToday();
   const todayEnd = endOfToday();
+
+  const searchParams = useMemo(() => {
+    const queryString = location.includes("?") ? location.split("?")[1] : "";
+    return new URLSearchParams(queryString);
+  }, [location]);
+
+  const checkoutStatusFromUrl = searchParams.get("checkout")?.trim() || "";
+  const checkoutChargeIdFromUrl = searchParams.get("chargeId")?.trim() || "";
 
   const appointmentsQuery = trpc.nexo.appointments.list.useQuery(
     {
@@ -159,6 +178,41 @@ export default function OperationsDashboardPage() {
     retry: false,
     refetchOnWindowFocus: false,
   });
+
+  useEffect(() => {
+    if (!checkoutStatusFromUrl) return;
+
+    if (checkoutStatusFromUrl === "success") {
+      toast.success(
+        checkoutChargeIdFromUrl
+          ? `Checkout concluído para cobrança ${checkoutChargeIdFromUrl.slice(0, 8)}.`
+          : "Checkout concluído com sucesso."
+      );
+
+      void Promise.all([
+        chargesQuery.refetch(),
+        alertsQuery.refetch(),
+        utils.finance.charges.list.invalidate(),
+        utils.finance.charges.stats.invalidate(),
+      ]);
+    } else if (checkoutStatusFromUrl === "cancel") {
+      toast.error(
+        checkoutChargeIdFromUrl
+          ? `Checkout cancelado para cobrança ${checkoutChargeIdFromUrl.slice(0, 8)}.`
+          : "Checkout cancelado."
+      );
+    }
+
+    navigate("/dashboard/operations", { replace: true });
+  }, [
+    checkoutStatusFromUrl,
+    checkoutChargeIdFromUrl,
+    navigate,
+    chargesQuery,
+    alertsQuery,
+    utils.finance.charges.list,
+    utils.finance.charges.stats,
+  ]);
 
   const updateServiceOrder = trpc.nexo.serviceOrders.update.useMutation({
     onSuccess: async () => {
@@ -350,6 +404,25 @@ export default function OperationsDashboardPage() {
   const isFinanceSubmitting =
     registerPayment.isPending || checkoutCharge.isPending;
 
+  const isLoading =
+    appointmentsQuery.isLoading ||
+    serviceOrdersQuery.isLoading ||
+    chargesQuery.isLoading ||
+    alertsQuery.isLoading;
+
+  const hasError =
+    appointmentsQuery.isError ||
+    serviceOrdersQuery.isError ||
+    chargesQuery.isError ||
+    alertsQuery.isError;
+
+  const errorMessage =
+    getErrorMessage(appointmentsQuery.error, "") ||
+    getErrorMessage(serviceOrdersQuery.error, "") ||
+    getErrorMessage(chargesQuery.error, "") ||
+    getErrorMessage(alertsQuery.error, "") ||
+    "Não foi possível carregar o dashboard operacional agora.";
+
   if (isInitializing) {
     return (
       <div className="space-y-6 p-6">
@@ -365,6 +438,26 @@ export default function OperationsDashboardPage() {
       <div className="space-y-6 p-6">
         <div className="rounded-xl border p-4 text-sm text-muted-foreground">
           Faça login para visualizar o dashboard operacional.
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6 p-6">
+        <div className="rounded-xl border p-4 text-sm text-muted-foreground">
+          Carregando dashboard operacional...
+        </div>
+      </div>
+    );
+  }
+
+  if (hasError) {
+    return (
+      <div className="space-y-6 p-6">
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
+          {errorMessage}
         </div>
       </div>
     );

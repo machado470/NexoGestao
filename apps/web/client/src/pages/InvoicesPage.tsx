@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 
 type InvoiceStatus = "DRAFT" | "ISSUED" | "PAID" | "CANCELLED";
+type EditableInvoiceStatus = "DRAFT" | "ISSUED" | "CANCELLED";
 
 const STATUS_LABEL: Record<InvoiceStatus, string> = {
   DRAFT: "Rascunho",
@@ -26,7 +27,7 @@ export default function InvoicesPage() {
     number: "",
     amount: "",
     customerId: "",
-    status: "DRAFT" as InvoiceStatus,
+    status: "DRAFT" as EditableInvoiceStatus,
     notes: "",
   });
 
@@ -127,7 +128,7 @@ export default function InvoicesPage() {
     });
   };
 
-  const onStatusChange = async (id: string, status: InvoiceStatus) => {
+  const onStatusChange = async (id: string, status: EditableInvoiceStatus) => {
     await updateMutation.mutateAsync({
       id,
       status,
@@ -171,6 +172,11 @@ export default function InvoicesPage() {
         >
           {openCreate ? "Fechar" : "Nova fatura"}
         </button>
+      </div>
+
+      <div className="rounded border p-3 text-sm opacity-80">
+        Fatura é documento comercial. Pagamento real deve ser registrado no
+        fluxo financeiro de cobranças/pagamentos.
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -224,12 +230,14 @@ export default function InvoicesPage() {
             className="w-full rounded border p-2"
             value={draft.status}
             onChange={(e) =>
-              setDraft((s) => ({ ...s, status: e.target.value as InvoiceStatus }))
+              setDraft((s) => ({
+                ...s,
+                status: e.target.value as EditableInvoiceStatus,
+              }))
             }
           >
             <option value="DRAFT">Rascunho</option>
             <option value="ISSUED">Emitida</option>
-            <option value="PAID">Paga</option>
             <option value="CANCELLED">Cancelada</option>
           </select>
 
@@ -258,60 +266,71 @@ export default function InvoicesPage() {
         ) : invoices.length === 0 ? (
           <div>Nenhuma fatura encontrada.</div>
         ) : (
-          invoices.map((inv: any) => (
-            <div
-              key={inv.id}
-              className="flex flex-col gap-3 rounded border p-3 md:flex-row md:items-center md:justify-between"
-            >
-              <div>
-                <div className="font-medium">{inv.number}</div>
-                <div className="text-xs opacity-70">
-                  {STATUS_LABEL[(inv.status as InvoiceStatus) ?? "DRAFT"] ??
-                    inv.status}
-                </div>
-                {inv.customer?.name ? (
+          invoices.map((inv: any) => {
+            const isPaid = inv.status === "PAID";
+            const editableStatus = (
+              isPaid ? "ISSUED" : inv.status
+            ) as EditableInvoiceStatus;
+
+            return (
+              <div
+                key={inv.id}
+                className="flex flex-col gap-3 rounded border p-3 md:flex-row md:items-center md:justify-between"
+              >
+                <div>
+                  <div className="font-medium">{inv.number}</div>
                   <div className="text-xs opacity-70">
-                    Cliente: {inv.customer.name}
+                    {STATUS_LABEL[(inv.status as InvoiceStatus) ?? "DRAFT"] ??
+                      inv.status}
                   </div>
-                ) : null}
-                {inv.notes ? (
-                  <div className="mt-1 text-xs opacity-70">{inv.notes}</div>
-                ) : null}
+                  {inv.customer?.name ? (
+                    <div className="text-xs opacity-70">
+                      Cliente: {inv.customer.name}
+                    </div>
+                  ) : null}
+                  {inv.notes ? (
+                    <div className="mt-1 text-xs opacity-70">{inv.notes}</div>
+                  ) : null}
+                  {isPaid ? (
+                    <div className="mt-1 text-xs text-amber-700">
+                      Pagamento registrado fora deste módulo.
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="min-w-[90px]">
+                    R$ {formatCurrencyFromCents(inv.amountCents ?? 0)}
+                  </span>
+
+                  <select
+                    value={editableStatus}
+                    onChange={(e) =>
+                      void onStatusChange(
+                        String(inv.id),
+                        e.target.value as EditableInvoiceStatus
+                      )
+                    }
+                    className="rounded border p-1 text-xs"
+                    disabled={updateMutation.isPending || isPaid}
+                  >
+                    <option value="DRAFT">DRAFT</option>
+                    <option value="ISSUED">ISSUED</option>
+                    <option value="CANCELLED">CANCELLED</option>
+                  </select>
+
+                  <button
+                    type="button"
+                    className="rounded border px-2 py-1 text-xs text-red-600 disabled:opacity-60"
+                    onClick={() => void onDelete(String(inv.id))}
+                    disabled={deleteMutation.isPending || inv.status === "PAID"}
+                  >
+                    Excluir
+                  </button>
+                </div>
               </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="min-w-[90px]">
-                  R$ {formatCurrencyFromCents(inv.amountCents ?? 0)}
-                </span>
-
-                <select
-                  value={inv.status}
-                  onChange={(e) =>
-                    void onStatusChange(
-                      String(inv.id),
-                      e.target.value as InvoiceStatus
-                    )
-                  }
-                  className="rounded border p-1 text-xs"
-                  disabled={updateMutation.isPending}
-                >
-                  <option value="DRAFT">DRAFT</option>
-                  <option value="ISSUED">ISSUED</option>
-                  <option value="PAID">PAID</option>
-                  <option value="CANCELLED">CANCELLED</option>
-                </select>
-
-                <button
-                  type="button"
-                  className="rounded border px-2 py-1 text-xs text-red-600 disabled:opacity-60"
-                  onClick={() => void onDelete(String(inv.id))}
-                  disabled={deleteMutation.isPending || inv.status === "PAID"}
-                >
-                  Excluir
-                </button>
-              </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 
