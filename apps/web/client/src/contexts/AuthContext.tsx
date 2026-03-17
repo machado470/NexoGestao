@@ -7,7 +7,7 @@ import type { inferRouterOutputs } from "@trpc/server";
 type RouterOutputs = inferRouterOutputs<AppRouter>;
 type SessionMeOutput = RouterOutputs["session"]["me"];
 type SessionPayload = Exclude<SessionMeOutput, null>;
-type SessionUser = SessionPayload["data"]["user"];
+type SessionUser = NonNullable<SessionPayload["data"]>["data"]["user"];
 
 type AuthUser = (SessionUser & { normalizedRole: Role | null }) | null;
 
@@ -36,6 +36,10 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function getSessionData(payload: SessionMeOutput) {
+  return payload?.data?.data ?? null;
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -74,7 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       utils.session.me.setData(undefined, nextPayload);
 
-      const nextUser = nextPayload?.data?.user ?? null;
+      const nextUser = getSessionData(nextPayload)?.user ?? null;
 
       if (nextUser) {
         return nextPayload;
@@ -160,7 +164,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const payload: SessionMeOutput = meQuery.data ?? null;
 
   const user: AuthUser = useMemo(() => {
-    const rawUser = payload?.data?.user ?? null;
+    const rawUser = getSessionData(payload)?.user ?? null;
 
     if (!rawUser) return null;
 
@@ -175,7 +179,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [user]);
 
   const redirectTo = useMemo(() => {
-    return payload?.data?.redirect ?? "/dashboard";
+    return getSessionData(payload)?.redirect ?? "/dashboard";
   }, [payload]);
 
   const isSubmitting =
