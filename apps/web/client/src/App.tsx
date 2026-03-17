@@ -260,7 +260,7 @@ const FinancesRoute = protectedPage(FinancesPage, {
 
 const PeopleRoute = protectedPage(PeoplePage, {
   requireCompletedOnboarding: true,
-  allowedRoles: ["ADMIN", "MANAGER"],
+  allowedRoles: ["ADMIN"],
 });
 
 const GovernanceRoute = protectedPage(GovernancePage, {
@@ -310,7 +310,7 @@ const CalendarRoute = protectedPage(CalendarPage, {
 
 const SettingsRoute = protectedPage(SettingsPage, {
   requireCompletedOnboarding: true,
-  permissions: ["settings:manage"],
+  allowedRoles: ["ADMIN"],
 });
 
 const TimelineRoute = protectedPage(TimelinePage, {
@@ -332,39 +332,27 @@ function Router() {
   return (
     <Switch>
       <Route path="/">
-        <RouteShell>
-          {publicPage(Landing)()}
-        </RouteShell>
+        <RouteShell>{publicPage(Landing)()}</RouteShell>
       </Route>
 
       <Route path="/login">
-        <RouteShell>
-          {publicPage(Login)()}
-        </RouteShell>
+        <RouteShell>{publicPage(Login)()}</RouteShell>
       </Route>
 
       <Route path="/register">
-        <RouteShell>
-          {publicPage(Register)()}
-        </RouteShell>
+        <RouteShell>{publicPage(Register)()}</RouteShell>
       </Route>
 
       <Route path="/forgot-password">
-        <RouteShell>
-          {publicPage(ForgotPasswordPage)()}
-        </RouteShell>
+        <RouteShell>{publicPage(ForgotPasswordPage)()}</RouteShell>
       </Route>
 
       <Route path="/reset-password">
-        <RouteShell>
-          {publicPage(ResetPasswordPage)()}
-        </RouteShell>
+        <RouteShell>{publicPage(ResetPasswordPage)()}</RouteShell>
       </Route>
 
       <Route path="/onboarding">
-        <RouteShell>
-          {onboardingPage(Onboarding)()}
-        </RouteShell>
+        <RouteShell>{onboardingPage(Onboarding)()}</RouteShell>
       </Route>
 
       <Route path="/dashboard" component={DashboardRoute} />
@@ -375,7 +363,10 @@ function Router() {
       <Route path="/people" component={PeopleRoute} />
       <Route path="/governance" component={GovernanceRoute} />
       <Route path="/executive-dashboard" component={ExecutiveDashboardRoute} />
-      <Route path="/executive-dashboard-new" component={ExecutiveDashboardNewRoute} />
+      <Route
+        path="/executive-dashboard-new"
+        component={ExecutiveDashboardNewRoute}
+      />
       <Route path="/whatsapp" component={WhatsAppRoute} />
       <Route path="/launches" component={LaunchesRoute} />
       <Route path="/invoices" component={InvoicesRoute} />
