@@ -1,5 +1,6 @@
 import React from "react";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/contexts/AuthContext";
 
 function formatDate(value?: string | Date | null) {
   if (!value) return "N/A";
@@ -17,9 +18,30 @@ function formatRiskLevel(score?: number | null) {
 }
 
 export default function GovernancePage() {
-  const summaryQuery = trpc.governance.summary.useQuery();
-  const runsQuery = trpc.governance.runs.useQuery({ limit: 20 });
-  const autoScoreQuery = trpc.governance.autoScore.useQuery();
+  const { isAuthenticated, isInitializing } = useAuth();
+
+  const canLoadGovernance = isAuthenticated && !isInitializing;
+
+  const summaryQuery = trpc.governance.summary.useQuery(undefined, {
+    enabled: canLoadGovernance,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
+  const runsQuery = trpc.governance.runs.useQuery(
+    { limit: 20 },
+    {
+      enabled: canLoadGovernance,
+      retry: false,
+      refetchOnWindowFocus: false,
+    }
+  );
+
+  const autoScoreQuery = trpc.governance.autoScore.useQuery(undefined, {
+    enabled: canLoadGovernance,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
 
   const summary: any = summaryQuery.data ?? {};
   const runs: any[] = Array.isArray(runsQuery.data) ? runsQuery.data : [];
@@ -27,6 +49,26 @@ export default function GovernancePage() {
 
   const isLoading =
     summaryQuery.isLoading || runsQuery.isLoading || autoScoreQuery.isLoading;
+
+  if (isInitializing) {
+    return (
+      <div className="p-6 space-y-6">
+        <div className="rounded-2xl border p-4 dark:border-zinc-800">
+          Carregando sessão...
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="p-6 space-y-6">
+        <div className="rounded-2xl border p-4 text-sm text-zinc-500 dark:border-zinc-800">
+          Faça login para visualizar a governança.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -141,7 +183,7 @@ export default function GovernancePage() {
                 autoScore.factors.map((factor: any, index: number) => (
                   <div
                     key={`${factor?.name ?? "factor"}-${index}`}
-                    className="rounded-xl border p-3 dark:border-zinc-800 flex items-center justify-between"
+                    className="flex items-center justify-between rounded-xl border p-3 dark:border-zinc-800"
                   >
                     <div className="font-medium">{factor?.name ?? "Fator"}</div>
                     <div className="text-sm opacity-80">
@@ -183,8 +225,7 @@ export default function GovernancePage() {
                           Score institucional: {Number(run.institutionalRiskScore ?? 0)}
                         </div>
                         <div className="text-sm opacity-70">
-                          Avaliados: {Number(run.evaluated ?? 0)} • Warnings: {Number(run.warnings ?? 0)} •
-                          Corretivas: {Number(run.correctives ?? 0)}
+                          Avaliados: {Number(run.evaluated ?? 0)} • Warnings: {Number(run.warnings ?? 0)} • Corretivas: {Number(run.correctives ?? 0)}
                         </div>
                       </div>
 
@@ -222,7 +263,7 @@ export default function GovernancePage() {
                 {summary.trend.map((item: any, index: number) => (
                   <div
                     key={`${item?.createdAt ?? "trend"}-${index}`}
-                    className="rounded-xl border p-3 dark:border-zinc-800 flex flex-col gap-1 md:flex-row md:items-center md:justify-between"
+                    className="flex flex-col gap-1 rounded-xl border p-3 dark:border-zinc-800 md:flex-row md:items-center md:justify-between"
                   >
                     <div className="font-medium">{formatDate(item?.createdAt)}</div>
                     <div className="text-sm opacity-70">

@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import {
   RefreshCw,
@@ -18,20 +19,41 @@ function formatCurrency(cents?: number) {
 }
 
 export default function OperationalWorkflowPage() {
+  const { isAuthenticated, isInitializing } = useAuth();
+  const canQuery = isAuthenticated && !isInitializing;
+
   const utils = trpc.useUtils();
 
-  const chargesQuery = trpc.finance.charges.list.useQuery({
-    page: 1,
-    limit: 50,
-    status: "PENDING",
-  });
+  const chargesQuery = trpc.finance.charges.list.useQuery(
+    {
+      page: 1,
+      limit: 50,
+      status: "PENDING",
+    },
+    {
+      enabled: canQuery,
+      retry: false,
+      refetchOnWindowFocus: false,
+    }
+  );
 
-  const serviceOrdersQuery = trpc.nexo.serviceOrders.list.useQuery({
-    page: 1,
-    limit: 50,
-  });
+  const serviceOrdersQuery = trpc.nexo.serviceOrders.list.useQuery(
+    {
+      page: 1,
+      limit: 50,
+    },
+    {
+      enabled: canQuery,
+      retry: false,
+      refetchOnWindowFocus: false,
+    }
+  );
 
-  const alertsQuery = trpc.dashboard.alerts.useQuery();
+  const alertsQuery = trpc.dashboard.alerts.useQuery(undefined, {
+    enabled: canQuery,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
 
   const updateCharge = trpc.finance.charges.update.useMutation({
     onSuccess: async () => {
@@ -85,7 +107,7 @@ export default function OperationalWorkflowPage() {
 
   const openOrders = useMemo(() => {
     return serviceOrders.filter((item: any) =>
-      ["OPEN", "ASSIGNED", "IN_PROGRESS"].includes(String(item?.status ?? "")),
+      ["OPEN", "ASSIGNED", "IN_PROGRESS"].includes(String(item?.status ?? ""))
     );
   }, [serviceOrders]);
 
@@ -152,6 +174,26 @@ export default function OperationalWorkflowPage() {
 
     window.location.href = checkoutUrl;
   };
+
+  if (isInitializing) {
+    return (
+      <div className="space-y-6 p-6">
+        <div className="rounded-xl border p-4 text-sm text-muted-foreground">
+          Carregando sessão...
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="space-y-6 p-6">
+        <div className="rounded-xl border p-4 text-sm text-muted-foreground">
+          Faça login para visualizar o fluxo operacional.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 p-6">
@@ -275,7 +317,7 @@ export default function OperationalWorkflowPage() {
                         onClick={() =>
                           void markChargePaid(
                             String(charge.id),
-                            Number(charge.amountCents ?? 0),
+                            Number(charge.amountCents ?? 0)
                           )
                         }
                         disabled={isSubmitting}

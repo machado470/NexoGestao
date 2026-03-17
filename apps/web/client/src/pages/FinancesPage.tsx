@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -27,7 +28,6 @@ import { CreateChargeModal } from "@/components/CreateChargeModal";
 import { EditChargeModal } from "@/components/EditChargeModal";
 
 type ChargeStatusFilter = "ALL" | "PENDING" | "PAID" | "OVERDUE" | "CANCELED";
-
 type ChargeStatus = "PENDING" | "PAID" | "OVERDUE" | "CANCELED";
 
 type Charge = {
@@ -79,6 +79,9 @@ function formatMoney(value: number) {
 }
 
 export default function FinancesPage() {
+  const { isAuthenticated, isInitializing } = useAuth();
+  const canLoadFinance = isAuthenticated && !isInitializing;
+
   const utils = trpc.useUtils();
   const [location, navigate] = useLocation();
 
@@ -101,15 +104,29 @@ export default function FinancesPage() {
 
   const limit = 20;
 
-  const chargesQuery = trpc.finance.charges.list.useQuery({
-    page,
-    limit,
-    q: query || undefined,
-    status: statusFilter === "ALL" ? undefined : statusFilter,
-    serviceOrderId: serviceOrderIdFromUrl || undefined,
-  });
+  const chargesQuery = trpc.finance.charges.list.useQuery(
+    {
+      page,
+      limit,
+      q: query || undefined,
+      status: statusFilter === "ALL" ? undefined : statusFilter,
+      serviceOrderId: serviceOrderIdFromUrl || undefined,
+    },
+    {
+      enabled: canLoadFinance,
+      retry: false,
+      refetchOnWindowFocus: false,
+    }
+  );
 
-  const statsQuery = trpc.finance.charges.stats.useQuery({}, { enabled: !isServiceOrderScoped });
+  const statsQuery = trpc.finance.charges.stats.useQuery(
+    {},
+    {
+      enabled: canLoadFinance && !isServiceOrderScoped,
+      retry: false,
+      refetchOnWindowFocus: false,
+    }
+  );
 
   useEffect(() => {
     setPage(1);
@@ -172,6 +189,8 @@ export default function FinancesPage() {
   });
 
   const refreshAll = async () => {
+    if (!canLoadFinance) return;
+
     await Promise.all([
       chargesQuery.refetch(),
       utils.finance.charges.list.invalidate(),
@@ -347,6 +366,26 @@ export default function FinancesPage() {
     Boolean(query) ||
     statusFilter !== "ALL" ||
     Boolean(serviceOrderIdFromUrl);
+
+  if (isInitializing) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="space-y-6 p-6">
+        <Card>
+          <CardContent className="pt-6 text-sm text-gray-500">
+            Faça login para visualizar o financeiro.
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (chargesQuery.isLoading || (!isServiceOrderScoped && statsQuery.isLoading)) {
     return (

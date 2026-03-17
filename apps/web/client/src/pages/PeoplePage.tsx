@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/contexts/AuthContext";
 
 function getStateLabel(value?: string | null) {
   switch (value) {
@@ -17,8 +18,21 @@ function getStateLabel(value?: string | null) {
 }
 
 export default function PeoplePage() {
-  const listPeople = trpc.people.list.useQuery();
-  const statsLinked = trpc.people.statsLinked.useQuery();
+  const { isAuthenticated, isInitializing } = useAuth();
+
+  const canLoadPeople = isAuthenticated && !isInitializing;
+
+  const listPeople = trpc.people.list.useQuery(undefined, {
+    enabled: canLoadPeople,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
+  const statsLinked = trpc.people.statsLinked.useQuery(undefined, {
+    enabled: canLoadPeople,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
 
   const people = useMemo(() => {
     const payload = (listPeople.data as any)?.data ?? listPeople.data ?? [];
@@ -29,6 +43,26 @@ export default function PeoplePage() {
     const payload = (statsLinked.data as any)?.data ?? statsLinked.data ?? null;
     return typeof payload?.count === "number" ? payload.count : 0;
   }, [statsLinked.data]);
+
+  if (isInitializing) {
+    return (
+      <div className="p-6">
+        <div className="rounded-2xl border p-4 dark:border-zinc-800">
+          Carregando sessão...
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="p-6">
+        <div className="rounded-2xl border p-4 text-sm text-zinc-500 dark:border-zinc-800">
+          Faça login para visualizar pessoas.
+        </div>
+      </div>
+    );
+  }
 
   if (listPeople.isLoading) {
     return (

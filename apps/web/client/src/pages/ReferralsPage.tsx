@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Copy, Gift, Users, TrendingUp, Share2, Check } from "lucide-react";
@@ -9,14 +10,35 @@ function formatMoney(value: number) {
 }
 
 export default function ReferralsPage() {
+  const { isAuthenticated, isInitializing } = useAuth();
+  const canQuery = isAuthenticated && !isInitializing;
+
   const [referralCode, setReferralCode] = useState<string>("");
   const [referralUrl, setReferralUrl] = useState<string>("");
   const [copied, setCopied] = useState(false);
 
   const generateCodeMutation = trpc.referrals.generateCode.useMutation();
-  const statsQuery = trpc.referrals.stats.useQuery({ page: 1, limit: 100 });
-  const referralsQuery = trpc.referrals.list.useQuery({ page: 1, limit: 20 });
-  const creditsQuery = trpc.referrals.getBalance.useQuery();
+  const statsQuery = trpc.referrals.stats.useQuery(
+    { page: 1, limit: 100 },
+    {
+      enabled: canQuery,
+      retry: false,
+      refetchOnWindowFocus: false,
+    }
+  );
+  const referralsQuery = trpc.referrals.list.useQuery(
+    { page: 1, limit: 20 },
+    {
+      enabled: canQuery,
+      retry: false,
+      refetchOnWindowFocus: false,
+    }
+  );
+  const creditsQuery = trpc.referrals.getBalance.useQuery(undefined, {
+    enabled: canQuery,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
 
   useEffect(() => {
     if (generateCodeMutation.data) {
@@ -43,22 +65,42 @@ export default function ReferralsPage() {
   const isLoading =
     statsQuery.isLoading || referralsQuery.isLoading || creditsQuery.isLoading;
 
+  if (isInitializing) {
+    return (
+      <div className="mx-auto w-full max-w-6xl space-y-8 p-6">
+        <div className="rounded-xl border p-4 text-sm opacity-70">
+          Carregando sessão...
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="mx-auto w-full max-w-6xl space-y-8 p-6">
+        <div className="rounded-xl border p-4 text-sm opacity-70">
+          Faça login para visualizar referências.
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="w-full max-w-6xl mx-auto space-y-8">
+    <div className="mx-auto w-full max-w-6xl space-y-8">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+        <h1 className="mb-2 text-3xl font-bold text-gray-900 dark:text-white">
           Sistema de Referências
         </h1>
-        <p className="text-lg text-gray-600 dark:text-gray-300 italic font-semibold">
+        <p className="text-lg font-semibold italic text-gray-600 dark:text-gray-300">
           "Se você conecta pessoas, você faz parte do valor"
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400 flex items-center gap-2">
-              <Users className="w-4 h-4" />
+            <CardTitle className="flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-400">
+              <Users className="h-4 w-4" />
               Total de Referências
             </CardTitle>
           </CardHeader>
@@ -66,7 +108,7 @@ export default function ReferralsPage() {
             <p className="text-2xl font-bold text-gray-900 dark:text-white">
               {isLoading ? "..." : stats?.totalReferrals ?? 0}
             </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               {isLoading ? "..." : stats?.completedReferrals ?? 0} concluídas
             </p>
           </CardContent>
@@ -74,8 +116,8 @@ export default function ReferralsPage() {
 
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400 flex items-center gap-2">
-              <Gift className="w-4 h-4" />
+            <CardTitle className="flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-400">
+              <Gift className="h-4 w-4" />
               Créditos Ganhos
             </CardTitle>
           </CardHeader>
@@ -83,7 +125,7 @@ export default function ReferralsPage() {
             <p className="text-2xl font-bold text-green-600 dark:text-green-400">
               {isLoading ? "..." : formatMoney(stats?.totalCredits ?? 0)}
             </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               Total acumulado
             </p>
           </CardContent>
@@ -91,8 +133,8 @@ export default function ReferralsPage() {
 
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400 flex items-center gap-2">
-              <TrendingUp className="w-4 h-4" />
+            <CardTitle className="flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-400">
+              <TrendingUp className="h-4 w-4" />
               Disponíveis
             </CardTitle>
           </CardHeader>
@@ -100,7 +142,7 @@ export default function ReferralsPage() {
             <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
               {isLoading ? "..." : formatMoney(credits?.available ?? 0)}
             </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               Pronto para usar
             </p>
           </CardContent>
@@ -108,8 +150,8 @@ export default function ReferralsPage() {
 
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400 flex items-center gap-2">
-              <Check className="w-4 h-4" />
+            <CardTitle className="flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-400">
+              <Check className="h-4 w-4" />
               Utilizados
             </CardTitle>
           </CardHeader>
@@ -117,7 +159,7 @@ export default function ReferralsPage() {
             <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">
               {isLoading ? "..." : formatMoney(credits?.used ?? 0)}
             </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               Já resgatados
             </p>
           </CardContent>
@@ -127,38 +169,39 @@ export default function ReferralsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Share2 className="w-5 h-5" />
+            <Share2 className="h-5 w-5" />
             Seu Código de Referência
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Compartilhe este link com seus contatos e ganhe créditos para cada pessoa que se cadastrar.
+            Compartilhe este link com seus contatos e ganhe créditos para cada
+            pessoa que se cadastrar.
           </p>
 
           {referralCode ? (
             <div className="space-y-3">
               <div className="flex items-center gap-2">
-                <div className="flex-1 bg-gray-100 dark:bg-gray-800 p-3 rounded-lg border border-gray-300 dark:border-gray-700">
-                  <p className="text-sm font-mono text-gray-900 dark:text-white break-all">
+                <div className="flex-1 rounded-lg border border-gray-300 bg-gray-100 p-3 dark:border-gray-700 dark:bg-gray-800">
+                  <p className="break-all font-mono text-sm text-gray-900 dark:text-white">
                     {referralUrl}
                   </p>
                 </div>
 
                 <Button
-                  onClick={handleCopyCode}
+                  onClick={() => void handleCopyCode()}
                   variant="outline"
                   size="sm"
                   className="flex-shrink-0"
                 >
                   {copied ? (
                     <>
-                      <Check className="w-4 h-4 mr-2" />
+                      <Check className="mr-2 h-4 w-4" />
                       Copiado
                     </>
                   ) : (
                     <>
-                      <Copy className="w-4 h-4 mr-2" />
+                      <Copy className="mr-2 h-4 w-4" />
                       Copiar
                     </>
                   )}
@@ -171,7 +214,10 @@ export default function ReferralsPage() {
                   size="sm"
                   onClick={() => {
                     const text = `Confira este sistema de gestão: ${referralUrl}`;
-                    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
+                    window.open(
+                      `https://wa.me/?text=${encodeURIComponent(text)}`,
+                      "_blank"
+                    );
                   }}
                 >
                   Compartilhar no WhatsApp
@@ -182,7 +228,9 @@ export default function ReferralsPage() {
                   size="sm"
                   onClick={() => {
                     window.open(
-                      `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(referralUrl)}`,
+                      `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
+                        referralUrl
+                      )}`,
                       "_blank"
                     );
                   }}
@@ -193,7 +241,7 @@ export default function ReferralsPage() {
             </div>
           ) : (
             <Button
-              onClick={handleGenerateCode}
+              onClick={() => void handleGenerateCode()}
               className="w-full"
               disabled={generateCodeMutation.isPending}
             >
@@ -211,7 +259,7 @@ export default function ReferralsPage() {
         </CardHeader>
         <CardContent>
           {referralsQuery.isLoading ? (
-            <div className="text-center py-8 text-gray-600 dark:text-gray-400">
+            <div className="py-8 text-center text-gray-600 dark:text-gray-400">
               Carregando referências...
             </div>
           ) : referrals.length > 0 ? (
@@ -219,19 +267,19 @@ export default function ReferralsPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-200 dark:border-gray-700">
-                    <th className="text-left py-3 px-4 font-medium text-gray-700 dark:text-gray-300">
+                    <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300">
                       Nome
                     </th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-700 dark:text-gray-300">
+                    <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300">
                       Email
                     </th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-700 dark:text-gray-300">
+                    <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300">
                       Crédito Ganho
                     </th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-700 dark:text-gray-300">
+                    <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300">
                       Status
                     </th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-700 dark:text-gray-300">
+                    <th className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300">
                       Data
                     </th>
                   </tr>
@@ -240,23 +288,25 @@ export default function ReferralsPage() {
                   {referrals.map((referral: any) => (
                     <tr
                       key={referral.id}
-                      className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                      className="border-b border-gray-100 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/50"
                     >
-                      <td className="py-3 px-4 text-gray-900 dark:text-white">
+                      <td className="px-4 py-3 text-gray-900 dark:text-white">
                         {referral.referredUserName || "N/A"}
                       </td>
-                      <td className="py-3 px-4 text-gray-600 dark:text-gray-400">
+                      <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
                         {referral.referredUserEmail || "N/A"}
                       </td>
-                      <td className="py-3 px-4 text-green-600 dark:text-green-400 font-semibold">
+                      <td className="px-4 py-3 font-semibold text-green-600 dark:text-green-400">
                         {formatMoney(referral.creditAmount ?? 0)}
                       </td>
-                      <td className="py-3 px-4 text-gray-600 dark:text-gray-400">
+                      <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
                         {referral.status || "N/A"}
                       </td>
-                      <td className="py-3 px-4 text-gray-600 dark:text-gray-400">
+                      <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
                         {referral.createdAt
-                          ? new Date(referral.createdAt).toLocaleDateString("pt-BR")
+                          ? new Date(referral.createdAt).toLocaleDateString(
+                              "pt-BR"
+                            )
                           : "N/A"}
                       </td>
                     </tr>
@@ -265,10 +315,11 @@ export default function ReferralsPage() {
               </table>
             </div>
           ) : (
-            <div className="text-center py-8">
-              <Users className="w-12 h-12 text-gray-400 dark:text-gray-600 mx-auto mb-3 opacity-50" />
+            <div className="py-8 text-center">
+              <Users className="mx-auto mb-3 h-12 w-12 opacity-50 dark:text-gray-600" />
               <p className="text-gray-600 dark:text-gray-400">
-                Você ainda não tem nenhuma referência. Comece a compartilhar seu código.
+                Você ainda não tem nenhuma referência. Comece a compartilhar seu
+                código.
               </p>
             </div>
           )}

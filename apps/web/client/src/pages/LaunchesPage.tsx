@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/contexts/AuthContext";
 
 type UiType = "income" | "expense" | "transfer" | "";
 type ApiType = "INCOME" | "EXPENSE" | "TRANSFER";
@@ -13,21 +14,56 @@ function mapLaunchType(t: UiType): ApiType | undefined {
 }
 
 export default function LaunchesPage() {
+  const { isAuthenticated, isInitializing } = useAuth();
+  const canQuery = isAuthenticated && !isInitializing;
+
   const [page, setPage] = useState(1);
   const limit = 20;
 
   const [filterType, setFilterType] = useState<UiType>("");
   const apiType = useMemo(() => mapLaunchType(filterType), [filterType]);
 
-  const listQuery = trpc.launches.list.useQuery({ page, limit, type: apiType });
-  const summaryQuery = trpc.launches.summary.useQuery();
+  const listQuery = trpc.launches.list.useQuery(
+    { page, limit, type: apiType },
+    {
+      enabled: canQuery,
+      retry: false,
+      refetchOnWindowFocus: false,
+    }
+  );
+
+  const summaryQuery = trpc.launches.summary.useQuery(undefined, {
+    enabled: canQuery,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
 
   const items = listQuery.data?.data ?? [];
-  const pages = listQuery.data?.pagination.pages ?? 1;
+  const pages = listQuery.data?.pagination?.pages ?? 1;
 
   const income = (summaryQuery.data as any)?.income ?? 0;
   const expense = (summaryQuery.data as any)?.expense ?? 0;
   const balance = (summaryQuery.data as any)?.balance ?? 0;
+
+  if (isInitializing) {
+    return (
+      <div className="p-6">
+        <div className="rounded-2xl border p-4 dark:border-zinc-800">
+          Carregando sessão...
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="p-6">
+        <div className="rounded-2xl border p-4 text-sm opacity-70 dark:border-zinc-800">
+          Faça login para visualizar lançamentos.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6">
@@ -52,15 +88,21 @@ export default function LaunchesPage() {
       <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-3">
         <div className="rounded-2xl border p-4 dark:border-zinc-800">
           <div className="text-sm opacity-70">Entradas</div>
-          <div className="text-lg font-semibold">R$ {(income / 100).toFixed(2)}</div>
+          <div className="text-lg font-semibold">
+            R$ {(income / 100).toFixed(2)}
+          </div>
         </div>
         <div className="rounded-2xl border p-4 dark:border-zinc-800">
           <div className="text-sm opacity-70">Saídas</div>
-          <div className="text-lg font-semibold">R$ {(expense / 100).toFixed(2)}</div>
+          <div className="text-lg font-semibold">
+            R$ {(expense / 100).toFixed(2)}
+          </div>
         </div>
         <div className="rounded-2xl border p-4 dark:border-zinc-800">
           <div className="text-sm opacity-70">Saldo</div>
-          <div className="text-lg font-semibold">R$ {(balance / 100).toFixed(2)}</div>
+          <div className="text-lg font-semibold">
+            R$ {(balance / 100).toFixed(2)}
+          </div>
         </div>
       </div>
 
@@ -80,7 +122,9 @@ export default function LaunchesPage() {
                   <div className="text-sm opacity-70">{l.type}</div>
                 </div>
                 <div className="text-right">
-                  <div className="font-semibold">R$ {((l.amount ?? 0) / 100).toFixed(2)}</div>
+                  <div className="font-semibold">
+                    R$ {((l.amount ?? 0) / 100).toFixed(2)}
+                  </div>
                 </div>
               </div>
             ))}
@@ -89,6 +133,7 @@ export default function LaunchesPage() {
 
         <div className="mt-4 flex items-center justify-between">
           <button
+            type="button"
             className="rounded-lg border px-3 py-2 disabled:opacity-50 dark:border-zinc-800"
             disabled={page <= 1}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
@@ -99,6 +144,7 @@ export default function LaunchesPage() {
             Página {page} de {pages}
           </div>
           <button
+            type="button"
             className="rounded-lg border px-3 py-2 disabled:opacity-50 dark:border-zinc-800"
             disabled={page >= pages}
             onClick={() => setPage((p) => Math.min(pages, p + 1))}

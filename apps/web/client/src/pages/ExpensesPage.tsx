@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 const CATEGORY_OPTIONS = [
   "OPERATIONAL",
@@ -21,6 +22,9 @@ function formatCurrencyFromCents(value?: number) {
 }
 
 export default function ExpensesPage() {
+  const { isAuthenticated, isInitializing } = useAuth();
+  const canQuery = isAuthenticated && !isInitializing;
+
   const [page, setPage] = useState(1);
   const [openCreate, setOpenCreate] = useState(false);
   const [draft, setDraft] = useState({
@@ -33,8 +37,20 @@ export default function ExpensesPage() {
 
   const limit = 20;
 
-  const listQuery = trpc.expenses.list.useQuery({ page, limit });
-  const summaryQuery = trpc.expenses.summary.useQuery();
+  const listQuery = trpc.expenses.list.useQuery(
+    { page, limit },
+    {
+      enabled: canQuery,
+      retry: false,
+      refetchOnWindowFocus: false,
+    }
+  );
+
+  const summaryQuery = trpc.expenses.summary.useQuery(undefined, {
+    enabled: canQuery,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
 
   const createMutation = trpc.expenses.create.useMutation({
     onSuccess: () => {
@@ -62,7 +78,10 @@ export default function ExpensesPage() {
     onError: (err) => toast.error(err.message || "Erro ao remover despesa"),
   });
 
-  const payload: any = listQuery.data ?? { data: [], pagination: { pages: 1 } };
+  const payload: any = listQuery.data ?? {
+    data: [],
+    pagination: { pages: 1 },
+  };
   const expenses: any[] = Array.isArray(payload?.data) ? payload.data : [];
   const pages = Number(payload?.pagination?.pages ?? 1);
 
@@ -76,16 +95,19 @@ export default function ExpensesPage() {
 
   const onCreate = async () => {
     if (!draft.description.trim()) {
-      return toast.error("Descrição obrigatória");
+      toast.error("Descrição obrigatória");
+      return;
     }
 
     const amount = Number(draft.amount);
     if (!amount || amount <= 0) {
-      return toast.error("Valor deve ser maior que zero");
+      toast.error("Valor deve ser maior que zero");
+      return;
     }
 
     if (!draft.date) {
-      return toast.error("Data obrigatória");
+      toast.error("Data obrigatória");
+      return;
     }
 
     await createMutation.mutateAsync({
@@ -97,11 +119,32 @@ export default function ExpensesPage() {
     });
   };
 
+  if (isInitializing) {
+    return (
+      <div className="space-y-4 p-6">
+        <div className="rounded border p-4 text-sm opacity-70">
+          Carregando sessão...
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="space-y-4 p-6">
+        <div className="rounded border p-4 text-sm opacity-70">
+          Faça login para visualizar despesas.
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="p-6 space-y-4">
+    <div className="space-y-4 p-6">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Despesas</h1>
         <button
+          type="button"
           className="rounded border px-3 py-2"
           onClick={() => setOpenCreate((v) => !v)}
         >
@@ -148,7 +191,7 @@ export default function ExpensesPage() {
       )}
 
       {openCreate && (
-        <div className="rounded border p-3 space-y-2">
+        <div className="space-y-2 rounded border p-3">
           <input
             className="w-full rounded border p-2"
             placeholder="Descrição"
@@ -199,6 +242,7 @@ export default function ExpensesPage() {
           />
 
           <button
+            type="button"
             className="rounded bg-black px-3 py-2 text-white"
             onClick={() => void onCreate()}
             disabled={createMutation.isPending}
@@ -228,15 +272,18 @@ export default function ExpensesPage() {
                     : "-"}
                 </div>
                 {expense.notes ? (
-                  <div className="text-xs opacity-70 mt-1">{expense.notes}</div>
+                  <div className="mt-1 text-xs opacity-70">{expense.notes}</div>
                 ) : null}
               </div>
 
               <div className="flex items-center gap-2">
                 <div>{formatCurrencyFromCents(expense.amountCents)}</div>
                 <button
+                  type="button"
                   className="rounded border px-2 py-1 text-xs text-red-600"
-                  onClick={() => deleteMutation.mutate({ id: String(expense.id) })}
+                  onClick={() =>
+                    deleteMutation.mutate({ id: String(expense.id) })
+                  }
                 >
                   Excluir
                 </button>
@@ -248,6 +295,7 @@ export default function ExpensesPage() {
 
       <div className="flex items-center justify-between">
         <button
+          type="button"
           className="rounded border px-3 py-2"
           disabled={page <= 1}
           onClick={() => setPage((p) => p - 1)}
@@ -260,6 +308,7 @@ export default function ExpensesPage() {
         </span>
 
         <button
+          type="button"
           className="rounded border px-3 py-2"
           disabled={page >= pages}
           onClick={() => setPage((p) => p + 1)}

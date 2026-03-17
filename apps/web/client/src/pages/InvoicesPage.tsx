@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 type InvoiceStatus = "DRAFT" | "ISSUED" | "PAID" | "CANCELLED";
 
@@ -16,6 +17,9 @@ function formatCurrencyFromCents(value: number) {
 }
 
 export default function InvoicesPage() {
+  const { isAuthenticated, isInitializing } = useAuth();
+  const canQuery = isAuthenticated && !isInitializing;
+
   const [page, setPage] = useState(1);
   const [openCreate, setOpenCreate] = useState(false);
   const [draft, setDraft] = useState({
@@ -28,8 +32,20 @@ export default function InvoicesPage() {
 
   const utils = trpc.useUtils();
 
-  const listQuery = trpc.invoices.list.useQuery({ page, limit: 20 });
-  const summaryQuery = trpc.invoices.summary.useQuery();
+  const listQuery = trpc.invoices.list.useQuery(
+    { page, limit: 20 },
+    {
+      enabled: canQuery,
+      retry: false,
+      refetchOnWindowFocus: false,
+    }
+  );
+
+  const summaryQuery = trpc.invoices.summary.useQuery(undefined, {
+    enabled: canQuery,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
 
   const createMutation = trpc.invoices.create.useMutation({
     onSuccess: async () => {
@@ -73,10 +89,17 @@ export default function InvoicesPage() {
   });
 
   const payload = useMemo(() => {
-    const raw: any = listQuery.data ?? { data: [], pagination: { page: 1, pages: 1 } };
+    const raw: any =
+      listQuery.data ?? { data: [], pagination: { page: 1, pages: 1 } };
+
     return {
       data: Array.isArray(raw?.data) ? raw.data : [],
-      pagination: raw?.pagination ?? { page: 1, limit: 20, total: 0, pages: 1 },
+      pagination: raw?.pagination ?? {
+        page: 1,
+        limit: 20,
+        total: 0,
+        pages: 1,
+      },
     };
   }, [listQuery.data]);
 
@@ -117,11 +140,32 @@ export default function InvoicesPage() {
 
   const summary: any = summaryQuery.data ?? {};
 
+  if (isInitializing) {
+    return (
+      <div className="p-6 space-y-4">
+        <div className="rounded border p-4 text-sm opacity-70">
+          Carregando sessão...
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="p-6 space-y-4">
+        <div className="rounded border p-4 text-sm opacity-70">
+          Faça login para visualizar faturas.
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Faturas</h1>
         <button
+          type="button"
           className="rounded border px-3 py-2"
           onClick={() => setOpenCreate((v) => !v)}
         >
@@ -145,19 +189,23 @@ export default function InvoicesPage() {
       </div>
 
       {openCreate && (
-        <div className="rounded border p-3 space-y-2">
+        <div className="space-y-2 rounded border p-3">
           <input
             className="w-full rounded border p-2"
             placeholder="Número"
             value={draft.number}
-            onChange={(e) => setDraft((s) => ({ ...s, number: e.target.value }))}
+            onChange={(e) =>
+              setDraft((s) => ({ ...s, number: e.target.value }))
+            }
           />
 
           <input
             className="w-full rounded border p-2"
             placeholder="Customer ID (opcional)"
             value={draft.customerId}
-            onChange={(e) => setDraft((s) => ({ ...s, customerId: e.target.value }))}
+            onChange={(e) =>
+              setDraft((s) => ({ ...s, customerId: e.target.value }))
+            }
           />
 
           <input
@@ -167,7 +215,9 @@ export default function InvoicesPage() {
             step="0.01"
             placeholder="Valor"
             value={draft.amount}
-            onChange={(e) => setDraft((s) => ({ ...s, amount: e.target.value }))}
+            onChange={(e) =>
+              setDraft((s) => ({ ...s, amount: e.target.value }))
+            }
           />
 
           <select
@@ -192,6 +242,7 @@ export default function InvoicesPage() {
           />
 
           <button
+            type="button"
             className="rounded bg-black px-3 py-2 text-white disabled:opacity-60"
             onClick={onCreate}
             disabled={createMutation.isPending}
@@ -201,7 +252,7 @@ export default function InvoicesPage() {
         </div>
       )}
 
-      <div className="rounded border p-3 space-y-2">
+      <div className="space-y-2 rounded border p-3">
         {listQuery.isLoading ? (
           <div>Carregando...</div>
         ) : invoices.length === 0 ? (
@@ -215,10 +266,13 @@ export default function InvoicesPage() {
               <div>
                 <div className="font-medium">{inv.number}</div>
                 <div className="text-xs opacity-70">
-                  {STATUS_LABEL[(inv.status as InvoiceStatus) ?? "DRAFT"] ?? inv.status}
+                  {STATUS_LABEL[(inv.status as InvoiceStatus) ?? "DRAFT"] ??
+                    inv.status}
                 </div>
                 {inv.customer?.name ? (
-                  <div className="text-xs opacity-70">Cliente: {inv.customer.name}</div>
+                  <div className="text-xs opacity-70">
+                    Cliente: {inv.customer.name}
+                  </div>
                 ) : null}
                 {inv.notes ? (
                   <div className="mt-1 text-xs opacity-70">{inv.notes}</div>
@@ -233,7 +287,10 @@ export default function InvoicesPage() {
                 <select
                   value={inv.status}
                   onChange={(e) =>
-                    onStatusChange(String(inv.id), e.target.value as InvoiceStatus)
+                    void onStatusChange(
+                      String(inv.id),
+                      e.target.value as InvoiceStatus
+                    )
                   }
                   className="rounded border p-1 text-xs"
                   disabled={updateMutation.isPending}
@@ -245,8 +302,9 @@ export default function InvoicesPage() {
                 </select>
 
                 <button
+                  type="button"
                   className="rounded border px-2 py-1 text-xs text-red-600 disabled:opacity-60"
-                  onClick={() => onDelete(String(inv.id))}
+                  onClick={() => void onDelete(String(inv.id))}
                   disabled={deleteMutation.isPending || inv.status === "PAID"}
                 >
                   Excluir
@@ -259,6 +317,7 @@ export default function InvoicesPage() {
 
       <div className="flex items-center justify-between">
         <button
+          type="button"
           className="rounded border px-3 py-2"
           disabled={page <= 1}
           onClick={() => setPage((p) => p - 1)}
@@ -269,6 +328,7 @@ export default function InvoicesPage() {
           {page} / {pages}
         </span>
         <button
+          type="button"
           className="rounded border px-3 py-2"
           disabled={page >= pages}
           onClick={() => setPage((p) => p + 1)}

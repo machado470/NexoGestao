@@ -23,8 +23,10 @@ const BASE_PROGRESS: Progress = {
 
 export default function Onboarding() {
   const [, navigate] = useLocation();
-  const { user } = useAuth();
+  const { user, isAuthenticated, isInitializing } = useAuth();
   const utils = trpc.useUtils();
+
+  const canQuery = isAuthenticated && !isInitializing;
 
   const [progress, setProgress] = useState<Progress>(BASE_PROGRESS);
   const [error, setError] = useState<string | null>(null);
@@ -41,19 +43,47 @@ export default function Onboarding() {
     [user?.id]
   );
 
-  const customersQuery = trpc.nexo.customers.list.useQuery();
-  const appointmentsQuery = trpc.nexo.appointments.list.useQuery({
-    page: 1,
-    limit: 20,
-  } as any);
-  const serviceOrdersQuery = trpc.nexo.serviceOrders.list.useQuery({
-    page: 1,
-    limit: 20,
-  } as any);
-  const chargesQuery = trpc.finance.charges.list.useQuery({
-    page: 1,
-    limit: 20,
+  const customersQuery = trpc.nexo.customers.list.useQuery(undefined, {
+    enabled: canQuery,
+    retry: false,
+    refetchOnWindowFocus: false,
   });
+
+  const appointmentsQuery = trpc.nexo.appointments.list.useQuery(
+    {
+      page: 1,
+      limit: 20,
+    } as any,
+    {
+      enabled: canQuery,
+      retry: false,
+      refetchOnWindowFocus: false,
+    }
+  );
+
+  const serviceOrdersQuery = trpc.nexo.serviceOrders.list.useQuery(
+    {
+      page: 1,
+      limit: 20,
+    } as any,
+    {
+      enabled: canQuery,
+      retry: false,
+      refetchOnWindowFocus: false,
+    }
+  );
+
+  const chargesQuery = trpc.finance.charges.list.useQuery(
+    {
+      page: 1,
+      limit: 20,
+    },
+    {
+      enabled: canQuery,
+      retry: false,
+      refetchOnWindowFocus: false,
+    }
+  );
 
   const companyMutation = trpc.nexo.settings.update.useMutation();
   const customerMutation = trpc.nexo.customers.create.useMutation();
@@ -79,6 +109,8 @@ export default function Onboarding() {
   }, [progress, storageKey]);
 
   useEffect(() => {
+    if (!canQuery) return;
+
     const customersPayload =
       (customersQuery.data as any)?.data ?? customersQuery.data ?? [];
     const appointmentsPayload =
@@ -112,6 +144,7 @@ export default function Onboarding() {
       charge: prev.charge || hasCharge,
     }));
   }, [
+    canQuery,
     customersQuery.data,
     appointmentsQuery.data,
     serviceOrdersQuery.data,
@@ -136,6 +169,30 @@ export default function Onboarding() {
     await completeOnboardingMutation.mutateAsync();
     navigate("/dashboard");
   };
+
+  if (isInitializing) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-6 dark:bg-gray-900">
+        <div className="mx-auto max-w-3xl space-y-4">
+          <div className="rounded-xl border bg-white p-4 dark:bg-zinc-900">
+            Carregando sessão...
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-6 dark:bg-gray-900">
+        <div className="mx-auto max-w-3xl space-y-4">
+          <div className="rounded-xl border bg-white p-4 dark:bg-zinc-900">
+            Faça login para continuar o onboarding.
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 p-6 dark:bg-gray-900">

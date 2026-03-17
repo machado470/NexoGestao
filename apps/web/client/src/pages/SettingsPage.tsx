@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   Settings,
   Building2,
@@ -25,9 +26,16 @@ function normalizeSettingsPayload(payload: any) {
 }
 
 export default function SettingsPage() {
+  const { isAuthenticated, isInitializing } = useAuth();
+  const canLoadSettings = isAuthenticated && !isInitializing;
+
   const utils = trpc.useUtils();
 
-  const settingsQuery = trpc.nexo.settings.get.useQuery();
+  const settingsQuery = trpc.nexo.settings.get.useQuery(undefined, {
+    enabled: canLoadSettings,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
 
   const updateSettingsMutation = trpc.nexo.settings.update.useMutation({
     onSuccess: async () => {
@@ -73,9 +81,26 @@ export default function SettingsPage() {
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
     const { name, value } = e.target;
-
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
+
+  if (isInitializing) {
+    return (
+      <div className="flex h-[80vh] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="space-y-6 p-6">
+        <div className="rounded-xl border p-4 text-sm text-zinc-500 dark:border-zinc-800">
+          Faça login para visualizar configurações.
+        </div>
+      </div>
+    );
+  }
 
   if (settingsQuery.isLoading) {
     return (

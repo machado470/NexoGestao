@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -109,14 +110,24 @@ function normalizeAlertsPayload(payload: any) {
 }
 
 export default function OperationsDashboardPage() {
+  const { isAuthenticated, isInitializing } = useAuth();
+  const canQuery = isAuthenticated && !isInitializing;
+
   const utils = trpc.useUtils();
   const todayStart = startOfToday();
   const todayEnd = endOfToday();
 
-  const appointmentsQuery = trpc.nexo.appointments.list.useQuery({
-    from: todayStart.toISOString(),
-    to: todayEnd.toISOString(),
-  });
+  const appointmentsQuery = trpc.nexo.appointments.list.useQuery(
+    {
+      from: todayStart.toISOString(),
+      to: todayEnd.toISOString(),
+    },
+    {
+      enabled: canQuery,
+      retry: false,
+      refetchOnWindowFocus: false,
+    }
+  );
 
   const serviceOrdersQuery = trpc.nexo.serviceOrders.list.useQuery(
     {
@@ -124,6 +135,8 @@ export default function OperationsDashboardPage() {
       limit: 50,
     },
     {
+      enabled: canQuery,
+      retry: false,
       refetchOnWindowFocus: false,
     }
   );
@@ -135,11 +148,15 @@ export default function OperationsDashboardPage() {
       status: "PENDING",
     },
     {
+      enabled: canQuery,
+      retry: false,
       refetchOnWindowFocus: false,
     }
   );
 
   const alertsQuery = trpc.dashboard.alerts.useQuery(undefined, {
+    enabled: canQuery,
+    retry: false,
     refetchOnWindowFocus: false,
   });
 
@@ -332,6 +349,26 @@ export default function OperationsDashboardPage() {
 
   const isFinanceSubmitting =
     registerPayment.isPending || checkoutCharge.isPending;
+
+  if (isInitializing) {
+    return (
+      <div className="space-y-6 p-6">
+        <div className="rounded-xl border p-4 text-sm text-muted-foreground">
+          Carregando sessão...
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="space-y-6 p-6">
+        <div className="rounded-xl border p-4 text-sm text-muted-foreground">
+          Faça login para visualizar o dashboard operacional.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 p-6">

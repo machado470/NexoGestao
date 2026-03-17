@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/contexts/AuthContext";
 
 function formatCurrency(cents: number): string {
   return new Intl.NumberFormat("pt-BR", {
@@ -68,23 +69,61 @@ function AlertCard({
 }
 
 export default function Dashboard() {
+  const { isAuthenticated, isInitializing } = useAuth();
+
+  const canLoadDashboard = isAuthenticated && !isInitializing;
+
   const alertsQuery = trpc.dashboard.alerts.useQuery(undefined, {
-    refetchInterval: 60_000,
+    enabled: canLoadDashboard,
+    refetchInterval: canLoadDashboard ? 60_000 : false,
+    retry: false,
+    refetchOnWindowFocus: false,
   });
 
   const metricsQuery = trpc.dashboard.kpis.useQuery(undefined, {
-    refetchInterval: 60_000,
+    enabled: canLoadDashboard,
+    refetchInterval: canLoadDashboard ? 60_000 : false,
+    retry: false,
+    refetchOnWindowFocus: false,
   });
 
   const notificationsQuery = trpc.dashboard.notifications.useQuery(
     { limit: 8 },
     {
-      refetchInterval: 30_000,
+      enabled: canLoadDashboard,
+      refetchInterval: canLoadDashboard ? 30_000 : false,
+      retry: false,
+      refetchOnWindowFocus: false,
     }
   );
 
   const alerts = (alertsQuery.data as any)?.data ?? alertsQuery.data;
   const metrics = (metricsQuery.data as any)?.data ?? metricsQuery.data;
+
+  const notifications = Array.isArray(notificationsQuery.data)
+    ? notificationsQuery.data
+    : [];
+
+  if (isInitializing) {
+    return (
+      <div className="p-6 space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold">Dashboard</h1>
+          <span className="text-sm text-zinc-500">Carregando sessão...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="p-6 space-y-6">
+        <div className="rounded-2xl border p-4 text-sm text-zinc-500 dark:border-zinc-800">
+          Faça login para visualizar o dashboard.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -136,26 +175,24 @@ export default function Dashboard() {
           <div className="rounded-2xl border p-4 text-sm text-zinc-500 dark:border-zinc-800">
             Carregando notificações...
           </div>
-        ) : notificationsQuery.data && notificationsQuery.data.length > 0 ? (
+        ) : notifications.length > 0 ? (
           <div className="space-y-2">
-            {notificationsQuery.data.map(
-              (notification: DashboardNotification) => (
-                <div
-                  key={notification.id}
-                  className="rounded-2xl border p-3 dark:border-zinc-800"
-                >
-                  <div className="text-sm font-semibold">
-                    {notification.title}
-                  </div>
-                  <div className="text-sm text-zinc-600 dark:text-zinc-300">
-                    {notification.message}
-                  </div>
-                  <div className="mt-1 text-xs text-zinc-500">
-                    {new Date(notification.createdAt).toLocaleString("pt-BR")}
-                  </div>
+            {notifications.map((notification: DashboardNotification) => (
+              <div
+                key={notification.id}
+                className="rounded-2xl border p-3 dark:border-zinc-800"
+              >
+                <div className="text-sm font-semibold">
+                  {notification.title}
                 </div>
-              )
-            )}
+                <div className="text-sm text-zinc-600 dark:text-zinc-300">
+                  {notification.message}
+                </div>
+                <div className="mt-1 text-xs text-zinc-500">
+                  {new Date(notification.createdAt).toLocaleString("pt-BR")}
+                </div>
+              </div>
+            ))}
           </div>
         ) : (
           <div className="rounded-2xl border p-4 text-sm text-zinc-500 dark:border-zinc-800">

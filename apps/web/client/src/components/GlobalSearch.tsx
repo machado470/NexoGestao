@@ -10,6 +10,7 @@ import {
   Loader,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface SearchResult {
   id: string | number;
@@ -29,6 +30,9 @@ function formatCurrencyFromCharge(charge: any) {
 }
 
 export function GlobalSearch() {
+  const { isAuthenticated, isInitializing } = useAuth();
+  const canQuery = isAuthenticated && !isInitializing;
+
   const [, navigate] = useLocation();
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
@@ -38,24 +42,44 @@ export function GlobalSearch() {
 
   const customersQuery = trpc.nexo.customers.list.useQuery(undefined, {
     enabled: false,
+    retry: false,
+    refetchOnWindowFocus: false,
   });
 
   const appointmentsQuery = trpc.nexo.appointments.list.useQuery(
     { page: 1, limit: 1000 },
-    { enabled: false }
+    {
+      enabled: false,
+      retry: false,
+      refetchOnWindowFocus: false,
+    }
   );
 
   const serviceOrdersQuery = trpc.nexo.serviceOrders.list.useQuery(
     { page: 1, limit: 1000 },
-    { enabled: false }
+    {
+      enabled: false,
+      retry: false,
+      refetchOnWindowFocus: false,
+    }
   );
 
   const chargesQuery = trpc.finance.charges.list.useQuery(
     { page: 1, limit: 1000 },
-    { enabled: false }
+    {
+      enabled: false,
+      retry: false,
+      refetchOnWindowFocus: false,
+    }
   );
 
   useEffect(() => {
+    if (!canQuery) {
+      setResults([]);
+      setIsSearching(false);
+      return;
+    }
+
     if (query.trim().length < 2) {
       setResults([]);
       setIsSearching(false);
@@ -115,7 +139,7 @@ export function GlobalSearch() {
               type: "customer",
               title: customer.name,
               subtitle: customer.email || customer.phone || "Cliente",
-              icon: <Users className="w-4 h-4" />,
+              icon: <Users className="h-4 w-4" />,
               route: "/customers",
             });
           }
@@ -132,7 +156,7 @@ export function GlobalSearch() {
               subtitle: appointment.startsAt
                 ? new Date(appointment.startsAt).toLocaleDateString("pt-BR")
                 : "Sem data",
-              icon: <Calendar className="w-4 h-4" />,
+              icon: <Calendar className="h-4 w-4" />,
               route: "/appointments",
             });
           }
@@ -147,22 +171,24 @@ export function GlobalSearch() {
               type: "serviceOrder",
               title: serviceOrder.title || "Ordem de serviço",
               subtitle: serviceOrder.status || "Sem status",
-              icon: <Briefcase className="w-4 h-4" />,
+              icon: <Briefcase className="h-4 w-4" />,
               route: "/service-orders",
             });
           }
         });
 
         chargesList.forEach((charge: any) => {
-          const description = String(charge?.description ?? "").toLowerCase();
+          const description = String(
+            charge?.description ?? charge?.notes ?? ""
+          ).toLowerCase();
 
           if (description.includes(searchTerm)) {
             foundResults.push({
               id: charge.id,
               type: "charge",
-              title: charge.description || "Cobrança",
+              title: charge.description || charge.notes || "Cobrança",
               subtitle: formatCurrencyFromCharge(charge),
-              icon: <DollarSign className="w-4 h-4" />,
+              icon: <DollarSign className="h-4 w-4" />,
               route: "/finances",
             });
           }
@@ -176,7 +202,7 @@ export function GlobalSearch() {
         setResults([]);
         setIsSearching(false);
       });
-  }, [query]);
+  }, [canQuery, query]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -203,22 +229,26 @@ export function GlobalSearch() {
   return (
     <div ref={searchRef} className="relative w-full max-w-md">
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-gray-400 pointer-events-none dark:text-gray-600" />
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-gray-400 dark:text-gray-600" />
 
         <input
           type="text"
-          placeholder="Buscar clientes, agendamentos..."
+          placeholder={
+            canQuery ? "Buscar clientes, agendamentos..." : "Faça login para buscar"
+          }
           value={query}
+          disabled={!canQuery}
           onChange={(e) => {
             setQuery(e.target.value);
             setIsOpen(true);
           }}
           onFocus={() => setIsOpen(true)}
-          className="w-full rounded-lg border border-gray-200 bg-gray-100 py-2 pl-10 pr-10 text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+          className="w-full rounded-lg border border-gray-200 bg-gray-100 py-2 pl-10 pr-10 text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
         />
 
         {query && (
           <button
+            type="button"
             onClick={() => {
               setQuery("");
               setResults([]);
@@ -230,7 +260,7 @@ export function GlobalSearch() {
         )}
       </div>
 
-      {isOpen && (
+      {isOpen && canQuery && (
         <div className="absolute left-0 right-0 top-full z-50 mt-2 rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800">
           {isSearching ? (
             <div className="flex items-center justify-center gap-2 p-4 text-gray-600 dark:text-gray-400">
@@ -242,6 +272,7 @@ export function GlobalSearch() {
               {results.map((result) => (
                 <button
                   key={`${result.type}-${result.id}`}
+                  type="button"
                   onClick={() => handleSelectResult(result)}
                   className="flex w-full items-center gap-3 border-b border-gray-100 px-4 py-3 text-left transition-colors hover:bg-gray-50 last:border-b-0 dark:border-gray-700 dark:hover:bg-gray-700"
                 >
