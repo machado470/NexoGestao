@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -79,6 +80,17 @@ function formatMoney(value: number) {
 
 export default function FinancesPage() {
   const utils = trpc.useUtils();
+  const [location, navigate] = useLocation();
+
+  const searchParams = useMemo(() => {
+    const queryString = location.includes("?") ? location.split("?")[1] : "";
+    return new URLSearchParams(queryString);
+  }, [location]);
+
+  const serviceOrderIdFromUrl = searchParams.get("serviceOrderId")?.trim() || "";
+  const checkoutStatusFromUrl = searchParams.get("checkout")?.trim() || "";
+  const checkoutChargeIdFromUrl = searchParams.get("chargeId")?.trim() || "";
+  const isServiceOrderScoped = Boolean(serviceOrderIdFromUrl);
 
   const [page, setPage] = useState(1);
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -94,18 +106,43 @@ export default function FinancesPage() {
     limit,
     q: query || undefined,
     status: statusFilter === "ALL" ? undefined : statusFilter,
+    serviceOrderId: serviceOrderIdFromUrl || undefined,
   });
 
-  const statsQuery = trpc.finance.charges.stats.useQuery({});
+  const statsQuery = trpc.finance.charges.stats.useQuery({}, { enabled: !isServiceOrderScoped });
+
+  useEffect(() => {
+    setPage(1);
+  }, [query, statusFilter, serviceOrderIdFromUrl]);
+
+  useEffect(() => {
+    if (!checkoutStatusFromUrl) return;
+
+    if (checkoutStatusFromUrl === "success") {
+      toast.success(
+        checkoutChargeIdFromUrl
+          ? `Checkout concluído para cobrança ${checkoutChargeIdFromUrl.slice(0, 8)}.`
+          : "Checkout concluído com sucesso."
+      );
+    } else if (checkoutStatusFromUrl === "cancel") {
+      toast.error(
+        checkoutChargeIdFromUrl
+          ? `Checkout cancelado para cobrança ${checkoutChargeIdFromUrl.slice(0, 8)}.`
+          : "Checkout cancelado."
+      );
+    }
+
+    navigate("/finances", { replace: true });
+  }, [checkoutStatusFromUrl, checkoutChargeIdFromUrl, navigate]);
 
   const payCharge = trpc.finance.charges.pay.useMutation({
     onSuccess: async () => {
       toast.success("Pagamento registrado com sucesso");
       await Promise.all([
         chargesQuery.refetch(),
-        statsQuery.refetch(),
         utils.finance.charges.list.invalidate(),
         utils.finance.charges.stats.invalidate(),
+        ...(isServiceOrderScoped ? [] : [statsQuery.refetch()]),
       ]);
     },
     onError: (error) => {
@@ -124,9 +161,9 @@ export default function FinancesPage() {
       toast.success("Cobrança excluída com sucesso");
       await Promise.all([
         chargesQuery.refetch(),
-        statsQuery.refetch(),
         utils.finance.charges.list.invalidate(),
         utils.finance.charges.stats.invalidate(),
+        ...(isServiceOrderScoped ? [] : [statsQuery.refetch()]),
       ]);
     },
     onError: (error) => {
@@ -137,9 +174,9 @@ export default function FinancesPage() {
   const refreshAll = async () => {
     await Promise.all([
       chargesQuery.refetch(),
-      statsQuery.refetch(),
       utils.finance.charges.list.invalidate(),
       utils.finance.charges.stats.invalidate(),
+      ...(isServiceOrderScoped ? [] : [statsQuery.refetch()]),
     ]);
   };
 
@@ -153,6 +190,19 @@ export default function FinancesPage() {
     setSearchInput("");
     setQuery("");
     setStatusFilter("ALL");
+  };
+
+  const handleClearServiceOrderFilter = () => {
+    navigate("/finances");
+  };
+
+  const handleBackToServiceOrders = () => {
+    if (!serviceOrderIdFromUrl) {
+      navigate("/service-orders");
+      return;
+    }
+
+    navigate("/service-orders");
   };
 
   const handleChangeStatusFilter = (value: ChargeStatusFilter) => {
@@ -276,7 +326,7 @@ export default function FinancesPage() {
   const isSubmitting =
     payCharge.isPending || deleteCharge.isPending || checkoutCharge.isPending;
 
-  if (chargesQuery.isLoading || statsQuery.isLoading) {
+  if (chargesQuery.isLoading || (!isServiceOrderScoped && statsQuery.isLoading)) {
     return (
       <div className="flex h-screen items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
@@ -288,21 +338,31 @@ export default function FinancesPage() {
   const stats = (statsPayload?.data ?? statsPayload ?? null) as ChargeStats | null;
 
   const chargesPayload = chargesQuery.data as any;
-  const charges = (chargesPayload?.data?.items ?? []) as Charge[];
+  const charges = (
+    chargesPayload?.data ??
+    chargesPayload?.items ??
+    []
+  ) as Charge[];
 
-  const pagination = (chargesPayload?.data?.meta ?? {
-    page: 1,
-    limit: 20,
-    total: 0,
-    pages: 1,
-  }) as ChargesMeta;
+  const pagination = (
+    chargesPayload?.pagination ??
+    chargesPayload?.meta ?? {
+      page: 1,
+      limit: 20,
+      total: 0,
+      pages: 1,
+    }
+  ) as ChargesMeta;
 
   const paidCount = useMemo(
     () => charges.filter((charge) => charge.status === "PAID").length,
     [charges]
   );
 
-  const hasActiveFilters = Boolean(query) || statusFilter !== "ALL";
+  const hasActiveFilters =
+    Boolean(query) ||
+    statusFilter !== "ALL" ||
+    Boolean(serviceOrderIdFromUrl);
 
   return (
     <>
@@ -326,13 +386,23 @@ export default function FinancesPage() {
       <div className="space-y-6">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Financeiro</h1>
+            <h1 className="text-3xl font-bold">
+              {isServiceOrderScoped ? "Cobrança da O.S." : "Financeiro"}
+            </h1>
             <p className="text-gray-600 dark:text-gray-400">
-              Gestão de cobranças e receitas
+              {isServiceOrderScoped
+                ? "Visualização financeira vinculada a uma ordem de serviço."
+                : "Gestão de cobranças e receitas"}
             </p>
           </div>
 
           <div className="flex flex-wrap gap-2">
+            {isServiceOrderScoped ? (
+              <Button variant="outline" onClick={handleBackToServiceOrders}>
+                Voltar para ordens de serviço
+              </Button>
+            ) : null}
+
             <Button
               variant="outline"
               onClick={() => {
@@ -353,7 +423,27 @@ export default function FinancesPage() {
           </div>
         </div>
 
-        {stats && (
+        {serviceOrderIdFromUrl ? (
+          <Card className="border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-900/20">
+            <CardContent className="flex flex-col gap-3 pt-6 md:flex-row md:items-center md:justify-between">
+              <div>
+                <p className="text-sm font-medium text-orange-900 dark:text-orange-300">
+                  Exibindo cobranças da O.S. {serviceOrderIdFromUrl.slice(0, 8)}
+                </p>
+                <p className="text-xs text-orange-800 dark:text-orange-400">
+                  A lista foi filtrada a partir da ordem de serviço.
+                </p>
+              </div>
+
+              <Button variant="outline" onClick={handleClearServiceOrderFilter}>
+                <X className="mr-2 h-4 w-4" />
+                Limpar filtro da O.S.
+              </Button>
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {!isServiceOrderScoped && stats && (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Card>
               <CardHeader className="pb-2">
@@ -419,7 +509,7 @@ export default function FinancesPage() {
           </div>
         )}
 
-        {stats && stats.totalOverdue > 0 && (
+        {!isServiceOrderScoped && stats && stats.totalOverdue > 0 && (
           <Card className="border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20">
             <CardHeader>
               <div className="flex items-center gap-2">
@@ -497,6 +587,11 @@ export default function FinancesPage() {
 
             {hasActiveFilters && (
               <div className="flex flex-wrap gap-2 text-sm text-gray-500">
+                {serviceOrderIdFromUrl && (
+                  <span className="rounded-full border px-3 py-1">
+                    O.S.: {serviceOrderIdFromUrl.slice(0, 8)}
+                  </span>
+                )}
                 {query && (
                   <span className="rounded-full border px-3 py-1">
                     Busca: {query}

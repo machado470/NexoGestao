@@ -50,6 +50,7 @@ export const financeRouter = router({
           .extend({
             status: z.enum(["PENDING", "PAID", "OVERDUE", "CANCELED"]).optional(),
             q: z.string().optional(),
+            serviceOrderId: z.string().optional(),
           })
           .optional(),
       )
@@ -62,6 +63,7 @@ export const financeRouter = router({
         params.set("limit", String(limit));
         if (input?.status) params.set("status", input.status);
         if (input?.q) params.set("q", input.q);
+        if (input?.serviceOrderId) params.set("serviceOrderId", input.serviceOrderId);
 
         const raw = await nexoFetch<any>(
           ctx.req,

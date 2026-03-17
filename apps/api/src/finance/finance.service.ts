@@ -85,7 +85,9 @@ export class FinanceService {
     const now = new Date()
     const overdue = await this.prisma.charge.findMany({
       where: { orgId, status: 'PENDING', dueDate: { lt: now } },
-      include: { customer: { select: { id: true, phone: true } } },
+      include: {
+        customer: { select: { id: true, phone: true } },
+      },
       take: 200,
     })
 
@@ -99,7 +101,14 @@ export class FinanceService {
         orgId,
         action: 'CHARGE_OVERDUE',
         description: 'Cobrança movida para vencida (automação)',
-        metadata: { chargeId: charge.id, customerId: charge.customerId },
+        metadata: {
+          chargeId: charge.id,
+          customerId: charge.customerId,
+          serviceOrderId: charge.serviceOrderId ?? null,
+          amountCents: charge.amountCents,
+          dueDate: charge.dueDate?.toISOString?.() ?? null,
+          status: 'OVERDUE',
+        },
       })
 
       if (charge.customer?.phone) {
@@ -448,7 +457,9 @@ export class FinanceService {
         select: {
           id: true,
           customerId: true,
+          serviceOrderId: true,
           amountCents: true,
+          dueDate: true,
           status: true,
           customer: { select: { id: true, phone: true } },
         },
@@ -534,7 +545,11 @@ export class FinanceService {
           metadata: {
             chargeId: charge.id,
             paymentId: payment.id,
+            customerId: charge.customerId,
+            serviceOrderId: charge.serviceOrderId ?? null,
             amountCents: input.amountCents,
+            dueDate: charge.dueDate?.toISOString?.() ?? null,
+            status: 'PAID',
             method: input.method,
             actorUserId: input.actorUserId ?? null,
             actorPersonId: input.actorPersonId ?? null,

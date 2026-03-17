@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,7 +10,6 @@ import {
   Calendar,
   AlertCircle,
   Wallet,
-  CheckCircle2,
   Clock3,
   Receipt,
 } from "lucide-react";
@@ -209,6 +209,7 @@ function getChargeBadge(charge?: ChargeRef | null) {
 }
 
 export default function ServiceOrdersPage() {
+  const [, navigate] = useLocation();
   const [page, setPage] = useState(1);
   const limit = 20;
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -228,42 +229,9 @@ export default function ServiceOrdersPage() {
     }
   );
 
-  const chargesQuery = trpc.finance.charges.list.useQuery(
-    {
-      page: 1,
-      limit: 100,
-    },
-    {
-      retry: false,
-      refetchOnWindowFocus: false,
-    }
-  );
-
   const customersQuery = trpc.nexo.customers.list.useQuery(undefined, {
     retry: false,
     refetchOnWindowFocus: false,
-  });
-
-  const updateMutation = trpc.nexo.serviceOrders.update.useMutation({
-    onSuccess: () => {
-      toast.success("OS atualizada com sucesso!");
-      void Promise.all([listQuery.refetch(), chargesQuery.refetch()]);
-    },
-    onError: (err) => {
-      toast.error(err.message || "Erro ao atualizar OS");
-    },
-    onSettled: () => {
-      setProcessingId(null);
-    },
-  });
-
-  const generateChargeMutation = trpc.nexo.serviceOrders.generateCharge.useMutation({
-    onError: (err) => {
-      toast.error(err.message || "Erro ao gerar cobrança");
-    },
-    onSettled: () => {
-      setProcessingId(null);
-    },
   });
 
   const serviceOrdersResult = (listQuery.data ??
@@ -288,20 +256,65 @@ export default function ServiceOrdersPage() {
     pages: 1,
   };
 
+  const visibleServiceOrderIds = useMemo(() => {
+    return serviceOrders.map((os) => String(os.id));
+  }, [serviceOrders]);
+
+  const chargeQueries = trpc.useQueries((t) =>
+    visibleServiceOrderIds.map((serviceOrderId) =>
+      t.finance.charges.list({
+        page: 1,
+        limit: 10,
+        serviceOrderId,
+      })
+    )
+  );
+
+  const updateMutation = trpc.nexo.serviceOrders.update.useMutation({
+    onSuccess: () => {
+      toast.success("OS atualizada com sucesso!");
+      void Promise.all([
+        listQuery.refetch(),
+        ...chargeQueries.map((query) => query.refetch()),
+      ]);
+    },
+    onError: (err) => {
+      toast.error(err.message || "Erro ao atualizar OS");
+    },
+    onSettled: () => {
+      setProcessingId(null);
+    },
+  });
+
+  const generateChargeMutation = trpc.nexo.serviceOrders.generateCharge.useMutation({
+    onError: (err) => {
+      toast.error(err.message || "Erro ao gerar cobrança");
+    },
+    onSettled: () => {
+      setProcessingId(null);
+    },
+  });
+
   const charges = useMemo(() => {
-    const payload = chargesQuery.data as any;
-    const rows = Array.isArray(payload?.data?.items)
-      ? payload.data.items
-      : Array.isArray(payload?.items)
-        ? payload.items
-        : Array.isArray(payload?.data)
-          ? payload.data
+    const rows: ChargeRef[] = [];
+
+    for (const query of chargeQueries) {
+      const payload = query.data as any;
+      const items = Array.isArray(payload?.data)
+        ? payload.data
+        : Array.isArray(payload?.items)
+          ? payload.items
           : Array.isArray(payload)
             ? payload
             : [];
 
-    return rows as ChargeRef[];
-  }, [chargesQuery.data]);
+      for (const item of items) {
+        rows.push(item as ChargeRef);
+      }
+    }
+
+    return rows;
+  }, [chargeQueries]);
 
   const chargeByServiceOrderId = useMemo(() => {
     const map = new Map<string, ChargeRef>();
@@ -351,10 +364,11 @@ export default function ServiceOrdersPage() {
   }, [listQuery.error]);
 
   useEffect(() => {
-    if (chargesQuery.error) {
-      toast.error("Erro ao carregar cobranças vinculadas: " + chargesQuery.error.message);
+    const firstError = chargeQueries.find((query) => query.error)?.error;
+    if (firstError) {
+      toast.error("Erro ao carregar cobranças vinculadas: " + firstError.message);
     }
-  }, [chargesQuery.error]);
+  }, [chargeQueries]);
 
   const handleStatusChange = (id: string, newStatus: ServiceOrderStatus) => {
     setProcessingId(id);
@@ -400,7 +414,7 @@ export default function ServiceOrdersPage() {
 
       await Promise.all([
         listQuery.refetch(),
-        chargesQuery.refetch(),
+        ...chargeQueries.map((query) => query.refetch()),
         utils.finance.charges.list.invalidate(),
         utils.finance.charges.stats.invalidate(),
       ]);
@@ -421,12 +435,15 @@ export default function ServiceOrdersPage() {
     }
   };
 
+  const handleOpenCharge = (serviceOrderId: string) => {
+    navigate(`/finances?serviceOrderId=${encodeURIComponent(serviceOrderId)}`);
+  };
+
   const total = serviceOrders.length;
   const totalOpen = serviceOrders.filter((os) => os.status === "OPEN").length;
   const totalInProgress = serviceOrders.filter(
     (os) => os.status === "IN_PROGRESS"
   ).length;
-  const totalDone = serviceOrders.filter((os) => os.status === "DONE").length;
 
   const doneWithCharge = serviceOrders.filter((os) => {
     if (os.status !== "DONE") return false;
@@ -438,6 +455,8 @@ export default function ServiceOrdersPage() {
     if (!os.amountCents || os.amountCents <= 0) return false;
     return !chargeByServiceOrderId.has(os.id);
   }).length;
+
+  const isAnyChargeFetching = chargeQueries.some((query) => query.isFetching);
 
   return (
     <div className="space-y-6 p-6">
@@ -456,12 +475,17 @@ export default function ServiceOrdersPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => void Promise.all([listQuery.refetch(), chargesQuery.refetch()])}
-            disabled={listQuery.isFetching || chargesQuery.isFetching}
+            onClick={() =>
+              void Promise.all([
+                listQuery.refetch(),
+                ...chargeQueries.map((query) => query.refetch()),
+              ])
+            }
+            disabled={listQuery.isFetching || isAnyChargeFetching}
           >
             <RefreshCw
               className={`mr-1 h-4 w-4 ${
-                listQuery.isFetching || chargesQuery.isFetching ? "animate-spin" : ""
+                listQuery.isFetching || isAnyChargeFetching ? "animate-spin" : ""
               }`}
             />
             Atualizar
@@ -736,16 +760,25 @@ export default function ServiceOrdersPage() {
                     <Button
                       size="sm"
                       variant={canGenerateCharge ? "default" : "outline"}
-                      onClick={() => void handleGenerateCharge(os)}
-                      disabled={
-                        generateChargeMutation.isPending ||
-                        isProcessing ||
-                        !canGenerateCharge
-                      }
+                      onClick={() => {
+                        if (canGenerateCharge) {
+                          void handleGenerateCharge(os);
+                          return;
+                        }
+
+                        if (charge) {
+                          handleOpenCharge(os.id);
+                        }
+                      }}
+                      disabled={generateChargeMutation.isPending || isProcessing}
                       className="gap-2"
                     >
                       <Wallet className="h-4 w-4" />
-                      {charge ? "Cobrança vinculada" : "Gerar cobrança"}
+                      {canGenerateCharge
+                        ? "Gerar cobrança"
+                        : charge
+                          ? "Ver cobrança"
+                          : "Cobrança indisponível"}
                     </Button>
                   </div>
                 </div>

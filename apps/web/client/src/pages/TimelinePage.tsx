@@ -64,6 +64,7 @@ function getEventLabel(event: TimelineEvent) {
     CHARGE_CREATED: "Cobrança criada",
     CHARGE_UPDATED: "Cobrança atualizada",
     CHARGE_CANCELED: "Cobrança cancelada",
+    CHARGE_DELETED: "Cobrança excluída",
     CHARGE_PAID: "Cobrança paga",
     CHARGE_OVERDUE: "Cobrança vencida",
     APPOINTMENT_CREATED: "Agendamento criado",
@@ -138,6 +139,7 @@ function getEventSummary(event: TimelineEvent) {
   const amountCents = metadata?.amountCents;
   const status = metadata?.status;
   const dueDate = metadata?.dueDate;
+  const method = metadata?.method;
 
   const pieces: string[] = [];
 
@@ -162,8 +164,31 @@ function getEventSummary(event: TimelineEvent) {
     );
   }
 
+  if (typeof method === "string" && method.trim()) {
+    const methodLabels: Record<string, string> = {
+      PIX: "PIX",
+      CASH: "Dinheiro",
+      CARD: "Cartão",
+      TRANSFER: "Transferência",
+      OTHER: "Outro",
+    };
+
+    pieces.push(`Via ${methodLabels[method] ?? method}`);
+  }
+
   if (typeof status === "string" && status.trim()) {
-    pieces.push(`Status ${status}`);
+    const statusLabels: Record<string, string> = {
+      PENDING: "Pendente",
+      PAID: "Pago",
+      OVERDUE: "Vencida",
+      CANCELED: "Cancelada",
+      OPEN: "Aberta",
+      ASSIGNED: "Atribuída",
+      IN_PROGRESS: "Em andamento",
+      DONE: "Concluída",
+    };
+
+    pieces.push(`Status ${statusLabels[status] ?? status}`);
   }
 
   if (typeof dueDate === "string" && dueDate.trim()) {
