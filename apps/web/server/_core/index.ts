@@ -47,7 +47,7 @@ async function startServer() {
 
   app.get("/api/notification-center/stream", async (req, res) => {
     const me = await fetchNexoMe(req);
-    const orgId = me?.data?.user?.orgId;
+    const orgId = me?.user?.orgId ?? me?.data?.user?.orgId;
 
     if (!orgId) {
       res.status(401).json({ ok: false, error: "Unauthorized" });

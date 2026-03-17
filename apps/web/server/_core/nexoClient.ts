@@ -1,7 +1,6 @@
-// apps/web/server/_core/nexoClient.ts
 import cookie from "cookie";
 
-const NEXO_API_URL = process.env.NEXO_API_URL || "http://localhost:3000";
+const NEXO_API_URL = process.env.NEXO_API_URL || "http://127.0.0.1:3000";
 const NEXO_TOKEN_COOKIE = "nexo_token";
 
 function getNexoTokenFromReq(req: any): string | null {

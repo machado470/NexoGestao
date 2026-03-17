@@ -1,9 +1,9 @@
-import { publicProcedure, router } from "../_core/trpc";
+import { publicProcedure, protectedProcedure, router } from "../_core/trpc";
 import { z } from "zod";
 import cookie from "cookie";
 import { getSessionCookieOptions } from "../_core/cookies";
 
-const NEXO_API_URL = process.env.NEXO_API_URL || "http://localhost:3000";
+const NEXO_API_URL = process.env.NEXO_API_URL || "http://127.0.0.1:3000";
 const NEXO_TOKEN_COOKIE = "nexo_token";
 
 type CtxLike = {
@@ -441,11 +441,11 @@ export const nexoProxyRouter = router({
   }),
 
   settings: router({
-    get: publicProcedure.query(async ({ ctx }) => {
+    get: protectedProcedure.query(async ({ ctx }) => {
       return authedGet(ctx as CtxLike, "/organization-settings");
     }),
 
-    update: publicProcedure.input(z.any()).mutation(async ({ input, ctx }) => {
+    update: protectedProcedure.input(z.any()).mutation(async ({ input, ctx }) => {
       return authedPatch(ctx as CtxLike, "/organization-settings", input);
     }),
   }),
