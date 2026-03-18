@@ -3,6 +3,11 @@ import { useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { useChargeActions } from "@/hooks/useChargeActions";
 import { trpc } from "@/lib/trpc";
+import {
+  getErrorMessage,
+  normalizeAlertsPayload,
+  normalizeArrayPayload,
+} from "@/lib/query-helpers";
 import { Button } from "@/components/ui/button";
 import {
   RefreshCw,
@@ -11,34 +16,6 @@ import {
   AlertTriangle,
   CreditCard,
 } from "lucide-react";
-
-function formatCurrency(cents?: number) {
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  }).format((Number(cents ?? 0)) / 100);
-}
-
-function getErrorMessage(error: unknown, fallback: string) {
-  if (error && typeof error === "object" && "message" in error) {
-    const message = String((error as { message?: unknown }).message ?? "").trim();
-    if (message) return message;
-  }
-
-  return fallback;
-}
-
-function normalizeArrayPayload(payload: any): any[] {
-  if (Array.isArray(payload?.data?.items)) return payload.data.items;
-  if (Array.isArray(payload?.data)) return payload.data;
-  if (Array.isArray(payload?.items)) return payload.items;
-  if (Array.isArray(payload)) return payload;
-  return [];
-}
-
-function normalizeAlertsPayload(payload: any) {
-  return payload?.data ?? payload ?? {};
-}
 
 export default function OperationalWorkflowPage() {
   const { isAuthenticated, isInitializing } = useAuth();
@@ -80,10 +57,7 @@ export default function OperationalWorkflowPage() {
     location,
     navigate,
     returnPath: "/operations",
-    refreshActions: [
-      () => chargesQuery.refetch(),
-      () => alertsQuery.refetch(),
-    ],
+    refreshActions: [() => chargesQuery.refetch(), () => alertsQuery.refetch()],
   });
 
   const serviceOrders = useMemo(() => {
@@ -269,7 +243,10 @@ export default function OperationalWorkflowPage() {
                       </div>
                       <div className="text-sm text-muted-foreground">
                         {charge.customer?.name || "Sem cliente"} •{" "}
-                        {formatCurrency(charge.amountCents)}
+                        {new Intl.NumberFormat("pt-BR", {
+                          style: "currency",
+                          currency: "BRL",
+                        }).format((Number(charge.amountCents ?? 0)) / 100)}
                       </div>
                     </div>
 
@@ -317,7 +294,10 @@ export default function OperationalWorkflowPage() {
                     {charge.customer?.name || "Cliente"}
                   </div>
                   <div className="text-muted-foreground">
-                    {formatCurrency(charge.amountCents)}
+                    {new Intl.NumberFormat("pt-BR", {
+                      style: "currency",
+                      currency: "BRL",
+                    }).format((Number(charge.amountCents ?? 0)) / 100)}
                   </div>
                 </div>
               ))}

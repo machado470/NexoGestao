@@ -4,6 +4,7 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useChargeActions } from "@/hooks/useChargeActions";
+import { getErrorMessage } from "@/lib/query-helpers";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -77,15 +78,6 @@ function formatMoney(value: number) {
     style: "currency",
     currency: "BRL",
   }).format(value);
-}
-
-function getErrorMessage(error: unknown, fallback: string) {
-  if (error && typeof error === "object" && "message" in error) {
-    const message = String((error as { message?: unknown }).message ?? "").trim();
-    if (message) return message;
-  }
-
-  return fallback;
 }
 
 function normalizeChargesPayload(payload: any): Charge[] {

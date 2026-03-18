@@ -4,6 +4,11 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useChargeActions } from "@/hooks/useChargeActions";
+import {
+  getErrorMessage,
+  normalizeAlertsPayload,
+  normalizeArrayPayload,
+} from "@/lib/query-helpers";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -100,27 +105,6 @@ function statusTone(status?: string) {
   return "bg-gray-100 text-gray-700";
 }
 
-function normalizeArrayPayload(payload: any): any[] {
-  if (Array.isArray(payload?.data?.items)) return payload.data.items;
-  if (Array.isArray(payload?.data)) return payload.data;
-  if (Array.isArray(payload?.items)) return payload.items;
-  if (Array.isArray(payload)) return payload;
-  return [];
-}
-
-function normalizeAlertsPayload(payload: any) {
-  return payload?.data ?? payload ?? {};
-}
-
-function getErrorMessage(error: unknown, fallback: string) {
-  if (error && typeof error === "object" && "message" in error) {
-    const message = String((error as { message?: unknown }).message ?? "").trim();
-    if (message) return message;
-  }
-
-  return fallback;
-}
-
 export default function OperationsDashboardPage() {
   const { isAuthenticated, isInitializing } = useAuth();
   const canQuery = isAuthenticated && !isInitializing;
@@ -177,10 +161,7 @@ export default function OperationsDashboardPage() {
       location,
       navigate,
       returnPath: "/dashboard/operations",
-      refreshActions: [
-        () => chargesQuery.refetch(),
-        () => alertsQuery.refetch(),
-      ],
+      refreshActions: [() => chargesQuery.refetch(), () => alertsQuery.refetch()],
     });
 
   const updateServiceOrder = trpc.nexo.serviceOrders.update.useMutation({

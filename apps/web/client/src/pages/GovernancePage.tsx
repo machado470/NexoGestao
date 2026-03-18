@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
 import { trpc } from "@/lib/trpc";
+import { getErrorMessage } from "@/lib/query-helpers";
 import { useAuth } from "@/contexts/AuthContext";
 
 function formatDate(value?: string | Date | null) {
@@ -26,15 +27,6 @@ function formatCurrency(cents?: number | null) {
     style: "currency",
     currency: "BRL",
   }).format((Number(cents ?? 0)) / 100);
-}
-
-function getErrorMessage(error: unknown, fallback: string) {
-  if (error && typeof error === "object" && "message" in error) {
-    const message = String((error as { message?: unknown }).message ?? "").trim();
-    if (message) return message;
-  }
-
-  return fallback;
 }
 
 export default function GovernancePage() {
