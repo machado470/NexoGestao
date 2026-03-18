@@ -14,7 +14,30 @@ const STATUS_LABEL: Record<InvoiceStatus, string> = {
 };
 
 function formatCurrencyFromCents(value: number) {
-  return (Number(value || 0) / 100).toFixed(2);
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format((Number(value || 0)) / 100);
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return "N/A";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "N/A";
+
+  return date.toLocaleDateString("pt-BR");
+}
+
+function normalizeSummary(raw: any) {
+  const payload = raw?.data ?? raw ?? {};
+
+  return {
+    total: Number(payload?.total ?? 0),
+    totalIssued: Number(payload?.totalIssued ?? 0),
+    totalPaid: Number(payload?.totalPaid ?? 0),
+    pending: Number(payload?.pending ?? 0),
+  };
 }
 
 export default function InvoicesPage() {
@@ -23,18 +46,24 @@ export default function InvoicesPage() {
 
   const [page, setPage] = useState(1);
   const [openCreate, setOpenCreate] = useState(false);
+  const [searchInput, setSearchInput] = useState("");
+  const [query, setQuery] = useState("");
   const [draft, setDraft] = useState({
     number: "",
     amount: "",
-    customerId: "",
     status: "DRAFT" as EditableInvoiceStatus,
     notes: "",
+    description: "",
   });
 
   const utils = trpc.useUtils();
 
   const listQuery = trpc.invoices.list.useQuery(
-    { page, limit: 20 },
+    {
+      page,
+      limit: 20,
+      q: query || undefined,
+    },
     {
       enabled: canQuery,
       retry: false,
@@ -57,9 +86,9 @@ export default function InvoicesPage() {
       setDraft({
         number: "",
         amount: "",
-        customerId: "",
         status: "DRAFT",
         notes: "",
+        description: "",
       });
     },
     onError: (error) => {
@@ -106,6 +135,18 @@ export default function InvoicesPage() {
 
   const invoices: any[] = payload.data;
   const pages = payload.pagination?.pages ?? 1;
+  const summary = normalizeSummary(summaryQuery.data);
+
+  const handleApplySearch = () => {
+    setPage(1);
+    setQuery(searchInput.trim());
+  };
+
+  const handleClearSearch = () => {
+    setPage(1);
+    setSearchInput("");
+    setQuery("");
+  };
 
   const onCreate = async () => {
     if (!draft.number.trim()) {
@@ -120,11 +161,11 @@ export default function InvoicesPage() {
     }
 
     await createMutation.mutateAsync({
-      customerId: draft.customerId.trim() || undefined,
       number: draft.number.trim(),
       amount,
       status: draft.status,
       notes: draft.notes.trim() || undefined,
+      description: draft.description.trim() || undefined,
     });
   };
 
@@ -138,8 +179,6 @@ export default function InvoicesPage() {
   const onDelete = async (id: string) => {
     await deleteMutation.mutateAsync({ id });
   };
-
-  const summary: any = summaryQuery.data ?? {};
 
   if (isInitializing) {
     return (
@@ -163,8 +202,14 @@ export default function InvoicesPage() {
 
   return (
     <div className="p-6 space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Faturas</h1>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold">Faturas</h1>
+          <p className="text-sm opacity-70">
+            Módulo documental comercial. Pagamento real continua no financeiro.
+          </p>
+        </div>
+
         <button
           type="button"
           className="rounded border px-3 py-2"
@@ -175,23 +220,56 @@ export default function InvoicesPage() {
       </div>
 
       <div className="rounded border p-3 text-sm opacity-80">
-        Fatura é documento comercial. Pagamento real deve ser registrado no
-        fluxo financeiro de cobranças/pagamentos.
+        Fatura não quita cobrança automaticamente. Para registrar pagamento, use
+        o fluxo financeiro de cobranças/pagamentos.
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <div className="rounded border p-3">
-          Total emitido: R$ {formatCurrencyFromCents(summary?.totalIssued ?? 0)}
+          Total emitido: {formatCurrencyFromCents(summary.totalIssued)}
         </div>
         <div className="rounded border p-3">
-          Total pago: R$ {formatCurrencyFromCents(summary?.totalPaid ?? 0)}
+          Total pago: {formatCurrencyFromCents(summary.totalPaid)}
         </div>
         <div className="rounded border p-3">
-          Total geral: R$ {formatCurrencyFromCents(summary?.total ?? 0)}
+          Total geral: {formatCurrencyFromCents(summary.total)}
         </div>
-        <div className="rounded border p-3">
-          Pendentes: {summary?.pending ?? 0}
+        <div className="rounded border p-3">Pendentes: {summary.pending}</div>
+      </div>
+
+      <div className="rounded border p-3 space-y-3">
+        <div className="flex flex-col gap-2 md:flex-row">
+          <input
+            className="w-full rounded border p-2"
+            placeholder="Buscar por número ou descrição"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleApplySearch();
+            }}
+          />
+
+          <button
+            type="button"
+            className="rounded border px-3 py-2"
+            onClick={handleApplySearch}
+          >
+            Buscar
+          </button>
+
+          <button
+            type="button"
+            className="rounded border px-3 py-2"
+            onClick={handleClearSearch}
+            disabled={!query && !searchInput}
+          >
+            Limpar
+          </button>
         </div>
+
+        {query ? (
+          <div className="text-xs opacity-70">Busca ativa: {query}</div>
+        ) : null}
       </div>
 
       {openCreate && (
@@ -202,15 +280,6 @@ export default function InvoicesPage() {
             value={draft.number}
             onChange={(e) =>
               setDraft((s) => ({ ...s, number: e.target.value }))
-            }
-          />
-
-          <input
-            className="w-full rounded border p-2"
-            placeholder="Customer ID (opcional)"
-            value={draft.customerId}
-            onChange={(e) =>
-              setDraft((s) => ({ ...s, customerId: e.target.value }))
             }
           />
 
@@ -241,6 +310,15 @@ export default function InvoicesPage() {
             <option value="CANCELLED">Cancelada</option>
           </select>
 
+          <input
+            className="w-full rounded border p-2"
+            placeholder="Descrição (opcional)"
+            value={draft.description}
+            onChange={(e) =>
+              setDraft((s) => ({ ...s, description: e.target.value }))
+            }
+          />
+
           <textarea
             className="w-full rounded border p-2"
             placeholder="Observações (opcional)"
@@ -248,6 +326,11 @@ export default function InvoicesPage() {
             onChange={(e) => setDraft((s) => ({ ...s, notes: e.target.value }))}
             rows={3}
           />
+
+          <div className="text-xs opacity-70">
+            Cliente pode permanecer não vinculado nesta fase. O objetivo aqui é
+            emissão documental, não liquidação financeira.
+          </div>
 
           <button
             type="button"
@@ -277,20 +360,33 @@ export default function InvoicesPage() {
                 key={inv.id}
                 className="flex flex-col gap-3 rounded border p-3 md:flex-row md:items-center md:justify-between"
               >
-                <div>
+                <div className="min-w-0">
                   <div className="font-medium">{inv.number}</div>
+
                   <div className="text-xs opacity-70">
                     {STATUS_LABEL[(inv.status as InvoiceStatus) ?? "DRAFT"] ??
                       inv.status}
                   </div>
-                  {inv.customer?.name ? (
-                    <div className="text-xs opacity-70">
-                      Cliente: {inv.customer.name}
+
+                  <div className="mt-1 text-xs opacity-70">
+                    Cliente: {inv.customer?.name || "Não vinculado"}
+                  </div>
+
+                  {inv.description ? (
+                    <div className="mt-1 text-xs opacity-70">
+                      Descrição: {inv.description}
                     </div>
                   ) : null}
+
+                  <div className="mt-1 text-xs opacity-70">
+                    Emissão: {formatDate(inv.issuedAt)} • Vencimento:{" "}
+                    {formatDate(inv.dueDate)}
+                  </div>
+
                   {inv.notes ? (
                     <div className="mt-1 text-xs opacity-70">{inv.notes}</div>
                   ) : null}
+
                   {isPaid ? (
                     <div className="mt-1 text-xs text-amber-700">
                       Pagamento registrado fora deste módulo.
@@ -299,8 +395,8 @@ export default function InvoicesPage() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="min-w-[90px]">
-                    R$ {formatCurrencyFromCents(inv.amountCents ?? 0)}
+                  <span className="min-w-[120px] text-sm font-medium">
+                    {formatCurrencyFromCents(inv.amountCents ?? 0)}
                   </span>
 
                   <select
@@ -314,9 +410,9 @@ export default function InvoicesPage() {
                     className="rounded border p-1 text-xs"
                     disabled={updateMutation.isPending || isPaid}
                   >
-                    <option value="DRAFT">DRAFT</option>
-                    <option value="ISSUED">ISSUED</option>
-                    <option value="CANCELLED">CANCELLED</option>
+                    <option value="DRAFT">Rascunho</option>
+                    <option value="ISSUED">Emitida</option>
+                    <option value="CANCELLED">Cancelada</option>
                   </select>
 
                   <button
