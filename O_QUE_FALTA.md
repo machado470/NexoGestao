@@ -77,10 +77,11 @@ O sistema já possui, em operação funcional:
 - despesas
 - dashboard operacional
 - workflow operacional
-- páginas administrativas relevantes
+- páginas administrativas relevantes com base real de uso
 
 O backend já entrega módulos e serviços que sustentam produto real.  
-O frontend já deixou de ser casca e passou a operar fluxos centrais de verdade.
+O frontend já deixou de ser casca e passou a operar fluxos centrais de verdade.  
+Nos módulos administrativos, várias telas antes cruas ou inconsistentes já passaram por endurecimento de UX, normalização de payload e redução de fluxos duplicados.
 
 ## Diagnóstico direto
 
@@ -291,7 +292,7 @@ O módulo financeiro já é real.
   - fatura
   - despesa
 
-Hoje o financeiro não está ausente.
+Hoje o financeiro não está ausente.  
 O que falta é mais clareza e costura fina.
 
 ---
@@ -392,9 +393,18 @@ Timeline hoje já é parte funcional do produto, não promessa.
 
 Despesas já tem presença real e deixou de ser buraco primário.
 
+### Já funciona
+- listagem real
+- summary
+- create
+- delete
+- feedback de ação
+- estados de loading/erro
+- leitura administrativa mais consistente
+
 ### O que ainda falta
 - costura mais clara com lançamentos e visão financeira consolidada
-- exposição melhor na leitura administrativa
+- exposição melhor na leitura administrativa consolidada
 
 ---
 
@@ -436,6 +446,8 @@ People saiu do estado cru.
 - visão de estado operacional
 - vínculo com usuário visível
 - leitura de risco
+- feedback melhor de ação e carregamento
+- remoção de ruído técnico no frontend
 
 ### O que falta para ficar verde total
 - filtro/busca
@@ -444,7 +456,7 @@ People saiu do estado cru.
 - vínculo explícito pessoa ↔ usuário
 - talvez timeline/contexto por pessoa
 
-É módulo utilizável. Falta maturidade final.
+É módulo utilizável e já mais limpo do que antes. Falta maturidade final.
 
 ---
 
@@ -484,14 +496,17 @@ Hoje já deixou de ser vitrine.
 - filtro por texto
 - filtro por status
 - leitura documental explícita
+- feedback visual melhor nas ações
+- loading por item em update/delete
+- fluxo mais coeso após remoção de duplicidade de criação
 
 ### O que falta para ficar verde total
 - UX mais elegante
-- talvez uso do modal dedicado
 - vínculo mais claro com cliente/cobrança em fases futuras
 - leitura melhor para operação administrativa
+- eventualmente sair do create inline para um fluxo ainda mais refinado
 
-Já é módulo real.  
+Já é módulo real e mais consistente do que antes.  
 Só ainda não está “liso”.
 
 ---
@@ -545,7 +560,7 @@ Existe base, mas ainda falta transformar em centro de operação forte.
 ## 6.4 Remarcação / disponibilidade / agenda mais madura
 **Status:** [~]
 
-Agendamento já existe.
+Agendamento já existe.  
 O que falta é elevar a ergonomia operacional.
 
 ### Falta
@@ -573,7 +588,7 @@ O fechamento de execução ainda pode ficar muito mais forte.
 ## 6.6 Frontend explorar melhor o backend rico
 **Status:** [~]
 
-Continua verdadeiro:
+Continua verdadeiro:  
 o backend já faz mais do que o frontend comunica.
 
 ### Áreas ainda subexpostas
@@ -585,7 +600,7 @@ o backend já faz mais do que o frontend comunica.
 - billing/plans/subscriptions
 - pending / exceptions / corrective actions
 
-O risco aqui não é falta de motor.
+O risco aqui não é falta de motor.  
 É percepção baixa de um motor que já existe.
 
 ---
@@ -648,7 +663,7 @@ Segurar por enquanto:
 - [x] edição
 - [x] workspace operacional
 - [~] timeline por cliente mais forte
-- [~] histórico de contato mais maduro
+- [x] histórico de contato com base real melhorada
 
 ## Appointments
 - [x] criação
@@ -691,6 +706,8 @@ Segurar por enquanto:
 - [~] invoices
 - [ ] audit UI
 - [~] notifications mais maduras
+- [x] referrals com UX endurecida e leitura mais confiável
+- [x] expenses com fluxo administrativo mais consistente
 
 ---
 
@@ -721,8 +738,8 @@ O NexoGestão já não precisa provar que consegue existir.
 
 Agora ele precisa provar que consegue fechar operação com clareza, confiança e zero cara de remendo.
 
-Menos módulo novo.
+Menos módulo novo.  
 Mais nitidez.
 
-Menos “tem backend pra isso”.
+Menos “tem backend pra isso”.  
 Mais “o usuário viu, entendeu e usou até o fim”.
