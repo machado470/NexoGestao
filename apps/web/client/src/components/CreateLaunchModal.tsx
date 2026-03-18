@@ -1,132 +1,232 @@
-import React, { useState } from "react";
+import { useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc";
+import { toast } from "sonner";
+import { Loader2, PlusCircle, X } from "lucide-react";
 
 type Props = {
   open: boolean;
   onClose: () => void;
-  onCreated?: () => void;
+  onSaved: () => void;
 };
 
-function normalizeLaunchType(t: string): "INCOME" | "EXPENSE" | "TRANSFER" {
-  if (t === "income") return "INCOME";
-  if (t === "expense") return "EXPENSE";
-  if (t === "transfer") return "TRANSFER";
-  // fallback seguro
-  return "EXPENSE";
-}
+type LaunchType = "INCOME" | "EXPENSE" | "TRANSFER";
 
-export default function CreateLaunchModal({ open, onClose, onCreated }: Props) {
-  const createMutation = trpc.launches.create.useMutation();
+type FormData = {
+  description: string;
+  amount: string;
+  type: LaunchType;
+  date: string;
+  category: string;
+  account: string;
+  notes: string;
+};
 
-  const [formData, setFormData] = useState({
-    description: "",
-    amount: "",
-    type: "expense",
-    date: "",
-    category: "",
-    account: "",
-    notes: "",
+const DEFAULT_FORM: FormData = {
+  description: "",
+  amount: "",
+  type: "INCOME",
+  date: new Date().toISOString().slice(0, 10),
+  category: "",
+  account: "",
+  notes: "",
+};
+
+export default function CreateLaunchModal({
+  open,
+  onClose,
+  onSaved,
+}: Props) {
+  const [formData, setFormData] = useState<FormData>(DEFAULT_FORM);
+
+  useEffect(() => {
+    if (!open) {
+      setFormData(DEFAULT_FORM);
+    }
+  }, [open]);
+
+  const createMutation = trpc.launches.create.useMutation({
+    onSuccess: () => {
+      toast.success("Lançamento criado com sucesso.");
+      setFormData(DEFAULT_FORM);
+      onSaved();
+      onClose();
+    },
+    onError: (error) => {
+      toast.error(error.message || "Erro ao criar lançamento.");
+    },
   });
 
   if (!open) return null;
 
-  const submit = async () => {
-    const amount = parseFloat(formData.amount || "0");
-    if (!formData.description || !amount || !formData.date || !formData.category) return;
+  const handleChange = (field: keyof FormData, value: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
 
-    await createMutation.mutateAsync({
-      description: formData.description,
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const description = formData.description.trim();
+    const category = formData.category.trim();
+    const account = formData.account.trim();
+    const notes = formData.notes.trim();
+    const amount = Number(formData.amount);
+
+    if (!description) {
+      toast.error("Informe a descrição do lançamento.");
+      return;
+    }
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast.error("Informe um valor válido maior que zero.");
+      return;
+    }
+
+    if (!category) {
+      toast.error("Informe a categoria do lançamento.");
+      return;
+    }
+
+    if (!formData.date) {
+      toast.error("Informe a data do lançamento.");
+      return;
+    }
+
+    createMutation.mutate({
+      description,
       amount,
-      type: normalizeLaunchType(formData.type), // ✅ uppercase
-      date: new Date(formData.date),
-      category: formData.category,
-      account: formData.account ? formData.account : undefined,
-      notes: formData.notes ? formData.notes : undefined,
+      type: formData.type,
+      date: new Date(`${formData.date}T12:00:00`),
+      category,
+      account: account || undefined,
+      notes: notes || undefined,
     });
-
-    onCreated?.();
-    onClose();
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-zinc-900">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Novo Lançamento</h2>
-          <button onClick={onClose} className="text-sm opacity-70 hover:opacity-100">
-            Fechar
-          </button>
-        </div>
+      <div className="w-full max-w-2xl rounded-2xl border bg-white shadow-xl dark:border-zinc-800 dark:bg-zinc-950">
+        <div className="flex items-center justify-between border-b p-4 dark:border-zinc-800">
+          <div className="flex items-center gap-2">
+            <PlusCircle className="h-5 w-5 text-orange-500" />
+            <h2 className="text-lg font-semibold">Novo lançamento</h2>
+          </div>
 
-        <div className="space-y-3">
-          <input
-            className="w-full rounded-lg border p-2 dark:bg-zinc-950"
-            placeholder="Descrição"
-            value={formData.description}
-            onChange={(e) => setFormData((s) => ({ ...s, description: e.target.value }))}
-          />
-          <input
-            className="w-full rounded-lg border p-2 dark:bg-zinc-950"
-            placeholder="Valor (ex: 120.50)"
-            value={formData.amount}
-            onChange={(e) => setFormData((s) => ({ ...s, amount: e.target.value }))}
-          />
-
-          <select
-            className="w-full rounded-lg border p-2 dark:bg-zinc-950"
-            value={formData.type}
-            onChange={(e) => setFormData((s) => ({ ...s, type: e.target.value }))}
-          >
-            <option value="income">Entrada</option>
-            <option value="expense">Saída</option>
-            <option value="transfer">Transferência</option>
-          </select>
-
-          <input
-            type="date"
-            className="w-full rounded-lg border p-2 dark:bg-zinc-950"
-            value={formData.date}
-            onChange={(e) => setFormData((s) => ({ ...s, date: e.target.value }))}
-          />
-
-          <input
-            className="w-full rounded-lg border p-2 dark:bg-zinc-950"
-            placeholder="Categoria"
-            value={formData.category}
-            onChange={(e) => setFormData((s) => ({ ...s, category: e.target.value }))}
-          />
-
-          <input
-            className="w-full rounded-lg border p-2 dark:bg-zinc-950"
-            placeholder="Conta (opcional)"
-            value={formData.account}
-            onChange={(e) => setFormData((s) => ({ ...s, account: e.target.value }))}
-          />
-
-          <textarea
-            className="w-full rounded-lg border p-2 dark:bg-zinc-950"
-            placeholder="Notas (opcional)"
-            value={formData.notes}
-            onChange={(e) => setFormData((s) => ({ ...s, notes: e.target.value }))}
-          />
-        </div>
-
-        <div className="mt-5 flex gap-2">
           <button
-            onClick={submit}
-            disabled={createMutation.isPending}
-            className="flex-1 rounded-lg bg-black px-4 py-2 text-white disabled:opacity-50 dark:bg-white dark:text-black"
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-2 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-900"
           >
-            {createMutation.isPending ? "Salvando..." : "Criar"}
-          </button>
-          <button onClick={onClose} className="rounded-lg border px-4 py-2 dark:border-zinc-700">
-            Cancelar
+            <X className="h-4 w-4" />
           </button>
         </div>
 
-        {createMutation.error ? (
-          <p className="mt-3 text-sm text-red-500">Erro ao criar lançamento.</p>
-        ) : null}
+        <form onSubmit={handleSubmit} className="space-y-4 p-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2 md:col-span-2">
+              <label className="text-sm font-medium">Descrição</label>
+              <input
+                value={formData.description}
+                onChange={(e) => handleChange("description", e.target.value)}
+                className="w-full rounded-md border bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-zinc-800"
+                placeholder="Ex: pagamento fornecedor, aporte caixa, transferência interna"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Valor</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={formData.amount}
+                onChange={(e) => handleChange("amount", e.target.value)}
+                className="w-full rounded-md border bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-zinc-800"
+                placeholder="0,00"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Tipo</label>
+              <select
+                value={formData.type}
+                onChange={(e) => handleChange("type", e.target.value)}
+                className="w-full rounded-md border bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-zinc-800"
+              >
+                <option value="INCOME">Entrada</option>
+                <option value="EXPENSE">Saída</option>
+                <option value="TRANSFER">Transferência</option>
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Categoria</label>
+              <input
+                value={formData.category}
+                onChange={(e) => handleChange("category", e.target.value)}
+                className="w-full rounded-md border bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-zinc-800"
+                placeholder="Ex: Operacional, Caixa, Fornecedor"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Conta</label>
+              <input
+                value={formData.account}
+                onChange={(e) => handleChange("account", e.target.value)}
+                className="w-full rounded-md border bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-zinc-800"
+                placeholder="Ex: Caixa principal, Banco, Nubank PJ"
+              />
+            </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <label className="text-sm font-medium">Data</label>
+              <input
+                type="date"
+                value={formData.date}
+                onChange={(e) => handleChange("date", e.target.value)}
+                className="w-full rounded-md border bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-zinc-800"
+              />
+            </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <label className="text-sm font-medium">Observações</label>
+              <textarea
+                value={formData.notes}
+                onChange={(e) => handleChange("notes", e.target.value)}
+                rows={4}
+                className="w-full rounded-md border bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-zinc-800"
+                placeholder="Observações opcionais sobre o lançamento"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-2 border-t pt-4 dark:border-zinc-800">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={createMutation.isPending}
+              className="rounded-md border px-4 py-2 text-sm font-medium transition-colors hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
+            >
+              Cancelar
+            </button>
+
+            <button
+              type="submit"
+              disabled={createMutation.isPending}
+              className="inline-flex items-center gap-2 rounded-md bg-orange-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600 disabled:opacity-50"
+            >
+              {createMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <PlusCircle className="h-4 w-4" />
+              )}
+              Criar lançamento
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

@@ -1,9 +1,48 @@
 import React, { useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/contexts/AuthContext";
+import {
+  AlertTriangle,
+  ArrowDownCircle,
+  ArrowUpCircle,
+  Calendar,
+  Loader2,
+  Plus,
+  RefreshCw,
+  Wallet,
+} from "lucide-react";
+import CreateLaunchModal from "@/components/CreateLaunchModal";
 
 type UiType = "income" | "expense" | "transfer" | "";
 type ApiType = "INCOME" | "EXPENSE" | "TRANSFER";
+
+type LaunchItem = {
+  id: string;
+  description: string;
+  amountCents: number;
+  type: ApiType;
+  category: string | null;
+  account: string | null;
+  notes: string | null;
+  date: string;
+};
+
+type LaunchListResponse = {
+  data: LaunchItem[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
+};
+
+type LaunchSummaryResponse = {
+  income: number;
+  expense: number;
+  transfer: number;
+  balance: number;
+};
 
 function mapLaunchType(t: UiType): ApiType | undefined {
   if (!t) return undefined;
@@ -13,18 +52,175 @@ function mapLaunchType(t: UiType): ApiType | undefined {
   return undefined;
 }
 
+function formatCurrencyFromCents(value: number) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format((Number(value || 0)) / 100);
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return "Sem data";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Data inválida";
+  }
+
+  return new Intl.DateTimeFormat("pt-BR").format(date);
+}
+
+function normalizeListPayload(payload: unknown): LaunchListResponse {
+  const raw = (payload as { data?: unknown } | null | undefined)?.data ?? payload;
+
+  if (!raw || typeof raw !== "object") {
+    return {
+      data: [],
+      pagination: { page: 1, limit: 20, total: 0, pages: 1 },
+    };
+  }
+
+  const candidate = raw as Partial<LaunchListResponse>;
+  const rawItems = Array.isArray(candidate.data) ? candidate.data : [];
+
+  const data: LaunchItem[] = rawItems.map((item) => {
+    const launch = (item ?? {}) as Partial<LaunchItem>;
+
+    return {
+      id: typeof launch.id === "string" ? launch.id : "",
+      description:
+        typeof launch.description === "string" && launch.description.trim()
+          ? launch.description
+          : "Sem descrição",
+      amountCents:
+        typeof launch.amountCents === "number" && Number.isFinite(launch.amountCents)
+          ? launch.amountCents
+          : 0,
+      type:
+        launch.type === "INCOME" ||
+        launch.type === "EXPENSE" ||
+        launch.type === "TRANSFER"
+          ? launch.type
+          : "INCOME",
+      category: typeof launch.category === "string" ? launch.category : null,
+      account: typeof launch.account === "string" ? launch.account : null,
+      notes: typeof launch.notes === "string" ? launch.notes : null,
+      date: typeof launch.date === "string" ? launch.date : "",
+    };
+  });
+
+  const pagination = candidate.pagination as
+    | LaunchListResponse["pagination"]
+    | undefined;
+
+  return {
+    data,
+    pagination: {
+      page:
+        typeof pagination?.page === "number" && Number.isFinite(pagination.page)
+          ? pagination.page
+          : 1,
+      limit:
+        typeof pagination?.limit === "number" && Number.isFinite(pagination.limit)
+          ? pagination.limit
+          : 20,
+      total:
+        typeof pagination?.total === "number" && Number.isFinite(pagination.total)
+          ? pagination.total
+          : data.length,
+      pages:
+        typeof pagination?.pages === "number" && Number.isFinite(pagination.pages)
+          ? Math.max(1, pagination.pages)
+          : 1,
+    },
+  };
+}
+
+function normalizeSummaryPayload(payload: unknown): LaunchSummaryResponse {
+  const raw = (payload as { data?: unknown } | null | undefined)?.data ?? payload;
+
+  if (!raw || typeof raw !== "object") {
+    return {
+      income: 0,
+      expense: 0,
+      transfer: 0,
+      balance: 0,
+    };
+  }
+
+  const candidate = raw as Partial<LaunchSummaryResponse>;
+
+  return {
+    income:
+      typeof candidate.income === "number" && Number.isFinite(candidate.income)
+        ? candidate.income
+        : 0,
+    expense:
+      typeof candidate.expense === "number" && Number.isFinite(candidate.expense)
+        ? candidate.expense
+        : 0,
+    transfer:
+      typeof candidate.transfer === "number" && Number.isFinite(candidate.transfer)
+        ? candidate.transfer
+        : 0,
+    balance:
+      typeof candidate.balance === "number" && Number.isFinite(candidate.balance)
+        ? candidate.balance
+        : 0,
+  };
+}
+
+function getTypeLabel(type: ApiType) {
+  switch (type) {
+    case "INCOME":
+      return "Entrada";
+    case "EXPENSE":
+      return "Saída";
+    case "TRANSFER":
+      return "Transferência";
+    default:
+      return type;
+  }
+}
+
+function getTypeBadgeClass(type: ApiType) {
+  switch (type) {
+    case "INCOME":
+      return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300";
+    case "EXPENSE":
+      return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300";
+    case "TRANSFER":
+      return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
+    default:
+      return "bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-300";
+  }
+}
+
 export default function LaunchesPage() {
   const { isAuthenticated, isInitializing } = useAuth();
   const canQuery = isAuthenticated && !isInitializing;
 
+  const utils = trpc.useUtils();
+
   const [page, setPage] = useState(1);
+  const [createOpen, setCreateOpen] = useState(false);
   const limit = 20;
 
   const [filterType, setFilterType] = useState<UiType>("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+
   const apiType = useMemo(() => mapLaunchType(filterType), [filterType]);
 
   const listQuery = trpc.launches.list.useQuery(
-    { page, limit, type: apiType },
+    {
+      page,
+      limit,
+      type: apiType,
+      from: from || undefined,
+      to: to || undefined,
+    },
     {
       enabled: canQuery,
       retry: false,
@@ -38,19 +234,32 @@ export default function LaunchesPage() {
     refetchOnWindowFocus: false,
   });
 
-  const items = listQuery.data?.data ?? [];
-  const pages = listQuery.data?.pagination?.pages ?? 1;
+  const listData = useMemo(() => normalizeListPayload(listQuery.data), [listQuery.data]);
+  const summaryData = useMemo(
+    () => normalizeSummaryPayload(summaryQuery.data),
+    [summaryQuery.data]
+  );
 
-  const income = (summaryQuery.data as any)?.income ?? 0;
-  const expense = (summaryQuery.data as any)?.expense ?? 0;
-  const balance = (summaryQuery.data as any)?.balance ?? 0;
+  const items = listData.data;
+  const pages = listData.pagination.pages;
+
+  const handleRefresh = async () => {
+    await Promise.all([listQuery.refetch(), summaryQuery.refetch()]);
+  };
+
+  const handleSaved = async () => {
+    setCreateOpen(false);
+    setPage(1);
+    await Promise.all([
+      utils.launches.list.invalidate(),
+      utils.launches.summary.invalidate(),
+    ]);
+  };
 
   if (isInitializing) {
     return (
-      <div className="p-6">
-        <div className="rounded-2xl border p-4 dark:border-zinc-800">
-          Carregando sessão...
-        </div>
+      <div className="flex h-[80vh] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
       </div>
     );
   }
@@ -66,93 +275,242 @@ export default function LaunchesPage() {
   }
 
   return (
-    <div className="p-6">
-      <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Lançamentos</h1>
+    <>
+      <CreateLaunchModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onSaved={() => void handleSaved()}
+      />
 
-        <select
-          className="rounded-lg border p-2 dark:bg-zinc-950"
-          value={filterType}
-          onChange={(e) => {
-            setPage(1);
-            setFilterType(e.target.value as UiType);
-          }}
-        >
-          <option value="">Todos</option>
-          <option value="income">Entrada</option>
-          <option value="expense">Saída</option>
-          <option value="transfer">Transferência</option>
-        </select>
-      </div>
+      <div className="space-y-6 p-6">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold">Lançamentos</h1>
+            <p className="mt-1 text-sm opacity-70">
+              Controle manual de entradas, saídas e transferências da operação.
+            </p>
+          </div>
 
-      <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-3">
-        <div className="rounded-2xl border p-4 dark:border-zinc-800">
-          <div className="text-sm opacity-70">Entradas</div>
-          <div className="text-lg font-semibold">
-            R$ {(income / 100).toFixed(2)}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void handleRefresh()}
+              className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Atualizar
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setCreateOpen(true)}
+              className="inline-flex items-center gap-2 rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600"
+            >
+              <Plus className="h-4 w-4" />
+              Novo lançamento
+            </button>
           </div>
         </div>
-        <div className="rounded-2xl border p-4 dark:border-zinc-800">
-          <div className="text-sm opacity-70">Saídas</div>
-          <div className="text-lg font-semibold">
-            R$ {(expense / 100).toFixed(2)}
-          </div>
-        </div>
-        <div className="rounded-2xl border p-4 dark:border-zinc-800">
-          <div className="text-sm opacity-70">Saldo</div>
-          <div className="text-lg font-semibold">
-            R$ {(balance / 100).toFixed(2)}
-          </div>
-        </div>
-      </div>
 
-      <div className="rounded-2xl border p-4 dark:border-zinc-800">
-        {listQuery.isLoading ? (
-          <div>Carregando...</div>
-        ) : (
-          <div className="space-y-2">
-            {items.length === 0 ? <div>Nenhum lançamento.</div> : null}
-            {items.map((l: any) => (
-              <div
-                key={l.id}
-                className="flex items-center justify-between rounded-xl border p-3 dark:border-zinc-800"
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+          <div className="rounded-2xl border p-4 dark:border-zinc-800">
+            <div className="flex items-center gap-2 text-sm opacity-70">
+              <ArrowUpCircle className="h-4 w-4" />
+              Entradas
+            </div>
+            <div className="mt-2 text-xl font-semibold">
+              {formatCurrencyFromCents(summaryData.income)}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border p-4 dark:border-zinc-800">
+            <div className="flex items-center gap-2 text-sm opacity-70">
+              <ArrowDownCircle className="h-4 w-4" />
+              Saídas
+            </div>
+            <div className="mt-2 text-xl font-semibold">
+              {formatCurrencyFromCents(summaryData.expense)}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border p-4 dark:border-zinc-800">
+            <div className="flex items-center gap-2 text-sm opacity-70">
+              <RefreshCw className="h-4 w-4" />
+              Transferências
+            </div>
+            <div className="mt-2 text-xl font-semibold">
+              {formatCurrencyFromCents(summaryData.transfer)}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border p-4 dark:border-zinc-800">
+            <div className="flex items-center gap-2 text-sm opacity-70">
+              <Wallet className="h-4 w-4" />
+              Saldo
+            </div>
+            <div className="mt-2 text-xl font-semibold">
+              {formatCurrencyFromCents(summaryData.balance)}
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border p-4 dark:border-zinc-800">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+            <div>
+              <label className="mb-2 block text-sm font-medium">Tipo</label>
+              <select
+                className="w-full rounded-lg border p-2 dark:border-zinc-800 dark:bg-zinc-950"
+                value={filterType}
+                onChange={(e) => {
+                  setPage(1);
+                  setFilterType(e.target.value as UiType);
+                }}
               >
-                <div>
-                  <div className="font-medium">{l.description}</div>
-                  <div className="text-sm opacity-70">{l.type}</div>
-                </div>
-                <div className="text-right">
-                  <div className="font-semibold">
-                    R$ {((l.amount ?? 0) / 100).toFixed(2)}
+                <option value="">Todos</option>
+                <option value="income">Entrada</option>
+                <option value="expense">Saída</option>
+                <option value="transfer">Transferência</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-medium">De</label>
+              <input
+                type="date"
+                value={from}
+                onChange={(e) => {
+                  setPage(1);
+                  setFrom(e.target.value);
+                }}
+                className="w-full rounded-lg border p-2 dark:border-zinc-800 dark:bg-zinc-950"
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-medium">Até</label>
+              <input
+                type="date"
+                value={to}
+                onChange={(e) => {
+                  setPage(1);
+                  setTo(e.target.value);
+                }}
+                className="w-full rounded-lg border p-2 dark:border-zinc-800 dark:bg-zinc-950"
+              />
+            </div>
+
+            <div className="flex items-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setPage(1);
+                  setFilterType("");
+                  setFrom("");
+                  setTo("");
+                }}
+                className="w-full rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
+              >
+                Limpar filtros
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border p-4 dark:border-zinc-800">
+          {listQuery.isLoading ? (
+            <div className="flex items-center justify-center py-10">
+              <Loader2 className="h-6 w-6 animate-spin text-orange-500" />
+            </div>
+          ) : listQuery.isError ? (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
+              <div className="flex items-center gap-2 font-medium">
+                <AlertTriangle className="h-4 w-4" />
+                Erro ao carregar lançamentos
+              </div>
+              <p className="mt-2 text-sm">
+                Não foi possível carregar os lançamentos agora.
+              </p>
+            </div>
+          ) : items.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-3 py-10 text-center">
+              <Calendar className="h-10 w-10 opacity-40" />
+              <div>
+                <div className="font-medium">Nenhum lançamento encontrado</div>
+                <p className="mt-1 text-sm opacity-70">
+                  Ajuste os filtros ou cadastre um novo lançamento manual.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCreateOpen(true)}
+                className="inline-flex items-center gap-2 rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600"
+              >
+                <Plus className="h-4 w-4" />
+                Novo lançamento
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {items.map((launch) => (
+                <div
+                  key={launch.id}
+                  className="flex flex-col gap-4 rounded-xl border p-4 dark:border-zinc-800 lg:flex-row lg:items-center lg:justify-between"
+                >
+                  <div className="min-w-0 space-y-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="font-medium">{launch.description}</div>
+                      <span
+                        className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${getTypeBadgeClass(
+                          launch.type
+                        )}`}
+                      >
+                        {getTypeLabel(launch.type)}
+                      </span>
+                    </div>
+
+                    <div className="grid gap-1 text-sm opacity-80">
+                      <div>Categoria: {launch.category || "N/A"}</div>
+                      <div>Conta: {launch.account || "N/A"}</div>
+                      <div>Data: {formatDate(launch.date)}</div>
+                      {launch.notes ? <div>Observações: {launch.notes}</div> : null}
+                    </div>
+                  </div>
+
+                  <div className="text-right">
+                    <div className="text-lg font-semibold">
+                      {formatCurrencyFromCents(launch.amountCents)}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
 
-        <div className="mt-4 flex items-center justify-between">
-          <button
-            type="button"
-            className="rounded-lg border px-3 py-2 disabled:opacity-50 dark:border-zinc-800"
-            disabled={page <= 1}
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-          >
-            Anterior
-          </button>
-          <div className="text-sm opacity-70">
-            Página {page} de {pages}
+          <div className="mt-4 flex items-center justify-between">
+            <button
+              type="button"
+              className="rounded-lg border px-3 py-2 disabled:opacity-50 dark:border-zinc-800"
+              disabled={page <= 1}
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+            >
+              Anterior
+            </button>
+
+            <div className="text-sm opacity-70">
+              Página {page} de {pages}
+            </div>
+
+            <button
+              type="button"
+              className="rounded-lg border px-3 py-2 disabled:opacity-50 dark:border-zinc-800"
+              disabled={page >= pages}
+              onClick={() => setPage((current) => Math.min(pages, current + 1))}
+            >
+              Próxima
+            </button>
           </div>
-          <button
-            type="button"
-            className="rounded-lg border px-3 py-2 disabled:opacity-50 dark:border-zinc-800"
-            disabled={page >= pages}
-            onClick={() => setPage((p) => Math.min(pages, p + 1))}
-          >
-            Próxima
-          </button>
         </div>
       </div>
-    </div>
+    </>
   );
 }
