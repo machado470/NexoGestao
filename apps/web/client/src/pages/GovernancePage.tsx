@@ -21,6 +21,13 @@ function formatRiskLevel(score?: number | null) {
   return "Sem score";
 }
 
+function formatCurrency(cents?: number | null) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format((Number(cents ?? 0)) / 100);
+}
+
 function getErrorMessage(error: unknown, fallback: string) {
   if (error && typeof error === "object" && "message" in error) {
     const message = String((error as { message?: unknown }).message ?? "").trim();
@@ -55,6 +62,12 @@ export default function GovernancePage() {
     refetchOnWindowFocus: false,
   });
 
+  const alertsQuery = trpc.dashboard.alerts.useQuery(undefined, {
+    enabled: canLoadGovernance,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
   const summary = useMemo(() => {
     const payload: any = summaryQuery.data;
     return payload?.data ?? payload ?? null;
@@ -73,16 +86,44 @@ export default function GovernancePage() {
     return payload?.data ?? payload ?? null;
   }, [autoScoreQuery.data]);
 
+  const alerts = useMemo(() => {
+    const payload: any = alertsQuery.data;
+    return payload?.data ?? payload ?? {};
+  }, [alertsQuery.data]);
+
+  const overdueCharges = Array.isArray(alerts?.overdueCharges?.items)
+    ? alerts.overdueCharges.items
+    : [];
+
+  const overdueOrders = Array.isArray(alerts?.overdueOrders?.items)
+    ? alerts.overdueOrders.items
+    : [];
+
+  const doneOrdersWithoutCharge = Array.isArray(alerts?.doneOrdersWithoutCharge?.items)
+    ? alerts.doneOrdersWithoutCharge.items
+    : [];
+
+  const customersWithPending = Array.isArray(alerts?.customersWithPending?.items)
+    ? alerts.customersWithPending.items
+    : [];
+
   const isLoading =
-    summaryQuery.isLoading || runsQuery.isLoading || autoScoreQuery.isLoading;
+    summaryQuery.isLoading ||
+    runsQuery.isLoading ||
+    autoScoreQuery.isLoading ||
+    alertsQuery.isLoading;
 
   const hasError =
-    summaryQuery.isError || runsQuery.isError || autoScoreQuery.isError;
+    summaryQuery.isError ||
+    runsQuery.isError ||
+    autoScoreQuery.isError ||
+    alertsQuery.isError;
 
   const errorMessage =
     getErrorMessage(summaryQuery.error, "") ||
     getErrorMessage(runsQuery.error, "") ||
     getErrorMessage(autoScoreQuery.error, "") ||
+    getErrorMessage(alertsQuery.error, "") ||
     "Não foi possível carregar a governança agora.";
 
   if (isInitializing) {
@@ -192,6 +233,141 @@ export default function GovernancePage() {
           <div className="text-sm opacity-70">Duração do último ciclo</div>
           <div className="mt-2 text-2xl font-semibold">
             {Number(summary?.durationMs ?? 0)} ms
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border p-4 dark:border-zinc-800">
+        <div className="mb-3">
+          <h2 className="text-lg font-semibold">Alertas operacionais vivos</h2>
+          <p className="text-sm opacity-70">
+            O que está pressionando a operação e ajuda a explicar o score atual.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-xl border p-3 dark:border-zinc-800">
+            <div className="text-sm opacity-70">Cobranças vencidas</div>
+            <div className="mt-1 text-2xl font-semibold">
+              {Number(alerts?.overdueCharges?.count ?? 0)}
+            </div>
+            <div className="text-xs opacity-70">
+              {formatCurrency(alerts?.overdueCharges?.totalAmountCents ?? 0)}
+            </div>
+          </div>
+
+          <div className="rounded-xl border p-3 dark:border-zinc-800">
+            <div className="text-sm opacity-70">Serviços atrasados</div>
+            <div className="mt-1 text-2xl font-semibold">
+              {Number(alerts?.overdueOrders?.count ?? 0)}
+            </div>
+            <div className="text-xs opacity-70">Ordens fora do prazo</div>
+          </div>
+
+          <div className="rounded-xl border p-3 dark:border-zinc-800">
+            <div className="text-sm opacity-70">Concluídas sem cobrança</div>
+            <div className="mt-1 text-2xl font-semibold">
+              {Number(alerts?.doneOrdersWithoutCharge?.count ?? 0)}
+            </div>
+            <div className="text-xs opacity-70">Gargalo financeiro atual</div>
+          </div>
+
+          <div className="rounded-xl border p-3 dark:border-zinc-800">
+            <div className="text-sm opacity-70">Clientes com pendência</div>
+            <div className="mt-1 text-2xl font-semibold">
+              {Number(alerts?.customersWithPending?.count ?? 0)}
+            </div>
+            <div className="text-xs opacity-70">Exigem follow-up</div>
+          </div>
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold">Cobranças vencidas</h3>
+            {overdueCharges.length > 0 ? (
+              overdueCharges.slice(0, 5).map((charge: any) => (
+                <div
+                  key={charge.id}
+                  className="rounded-xl border p-3 dark:border-zinc-800"
+                >
+                  <div className="font-medium">
+                    {charge.customer?.name || "Cliente"}
+                  </div>
+                  <div className="text-sm opacity-70">
+                    {formatCurrency(charge.amountCents)} • Venc. {formatDate(charge.dueDate)}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-sm opacity-70">
+                Nenhuma cobrança vencida no momento.
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold">Serviços atrasados</h3>
+            {overdueOrders.length > 0 ? (
+              overdueOrders.slice(0, 5).map((order: any) => (
+                <div
+                  key={order.id}
+                  className="rounded-xl border p-3 dark:border-zinc-800"
+                >
+                  <div className="font-medium">{order.title}</div>
+                  <div className="text-sm opacity-70">
+                    {order.customer?.name || "Sem cliente"} • Prazo {formatDate(order.dueDate)}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-sm opacity-70">
+                Nenhum serviço atrasado no momento.
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold">O.S. concluídas sem cobrança</h3>
+            {doneOrdersWithoutCharge.length > 0 ? (
+              doneOrdersWithoutCharge.slice(0, 5).map((order: any) => (
+                <div
+                  key={order.id}
+                  className="rounded-xl border p-3 dark:border-zinc-800"
+                >
+                  <div className="font-medium">{order.title}</div>
+                  <div className="text-sm opacity-70">
+                    {order.customer?.name || "Sem cliente"} • Finalizada em{" "}
+                    {formatDate(order.finishedAt || order.createdAt)}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-sm opacity-70">
+                Nenhuma O.S. concluída sem cobrança aparente.
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold">Clientes com pendência</h3>
+            {customersWithPending.length > 0 ? (
+              customersWithPending.slice(0, 5).map((customer: any) => (
+                <div
+                  key={customer.id}
+                  className="rounded-xl border p-3 dark:border-zinc-800"
+                >
+                  <div className="font-medium">{customer.name}</div>
+                  <div className="text-sm opacity-70">
+                    {Number(customer.pendingCharges ?? 0)} pendência(s) •{" "}
+                    {formatCurrency(customer.totalPendingCents ?? 0)}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-sm opacity-70">
+                Nenhum cliente com pendência no momento.
+              </div>
+            )}
           </div>
         </div>
       </div>

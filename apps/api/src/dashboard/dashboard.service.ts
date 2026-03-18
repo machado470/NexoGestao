@@ -128,6 +128,7 @@ export class DashboardService {
       overdueCharges,
       todayAppointments,
       customersWithPending,
+      doneOrdersWithoutCharge,
     ] = await Promise.all([
       this.prisma.serviceOrder.findMany({
         where: {
@@ -158,6 +159,7 @@ export class DashboardService {
           dueDate: true,
           status: true,
           customer: { select: { id: true, name: true } },
+          serviceOrderId: true,
         },
         orderBy: { dueDate: 'asc' },
         take: 10,
@@ -202,6 +204,28 @@ export class DashboardService {
         },
         take: 10,
       }),
+
+      this.prisma.serviceOrder.findMany({
+        where: {
+          orgId,
+          status: 'DONE',
+          charges: {
+            none: {},
+          },
+        },
+        select: {
+          id: true,
+          title: true,
+          finishedAt: true,
+          createdAt: true,
+          customer: { select: { id: true, name: true } },
+        },
+        orderBy: [
+          { finishedAt: 'desc' },
+          { createdAt: 'desc' },
+        ],
+        take: 10,
+      }),
     ])
 
     return {
@@ -242,6 +266,16 @@ export class DashboardService {
             (sum, ch) => sum + ch.amountCents,
             0,
           ),
+        })),
+      },
+      doneOrdersWithoutCharge: {
+        count: doneOrdersWithoutCharge.length,
+        items: doneOrdersWithoutCharge.map((order) => ({
+          id: order.id,
+          title: order.title,
+          finishedAt: order.finishedAt,
+          createdAt: order.createdAt,
+          customer: order.customer,
         })),
       },
     }
