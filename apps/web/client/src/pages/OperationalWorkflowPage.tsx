@@ -1,8 +1,8 @@
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { useLocation } from "wouter";
-import { trpc } from "@/lib/trpc";
-import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { useChargeActions } from "@/hooks/useChargeActions";
+import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import {
   RefreshCw,
@@ -28,19 +28,22 @@ function getErrorMessage(error: unknown, fallback: string) {
   return fallback;
 }
 
+function normalizeArrayPayload(payload: any): any[] {
+  if (Array.isArray(payload?.data?.items)) return payload.data.items;
+  if (Array.isArray(payload?.data)) return payload.data;
+  if (Array.isArray(payload?.items)) return payload.items;
+  if (Array.isArray(payload)) return payload;
+  return [];
+}
+
+function normalizeAlertsPayload(payload: any) {
+  return payload?.data ?? payload ?? {};
+}
+
 export default function OperationalWorkflowPage() {
   const { isAuthenticated, isInitializing } = useAuth();
   const canQuery = isAuthenticated && !isInitializing;
-  const utils = trpc.useUtils();
   const [location, navigate] = useLocation();
-
-  const searchParams = useMemo(() => {
-    const queryString = location.includes("?") ? location.split("?")[1] : "";
-    return new URLSearchParams(queryString);
-  }, [location]);
-
-  const checkoutStatusFromUrl = searchParams.get("checkout")?.trim() || "";
-  const checkoutChargeIdFromUrl = searchParams.get("chargeId")?.trim() || "";
 
   const chargesQuery = trpc.finance.charges.list.useQuery(
     {
@@ -73,64 +76,26 @@ export default function OperationalWorkflowPage() {
     refetchOnWindowFocus: false,
   });
 
-  useEffect(() => {
-    if (!checkoutStatusFromUrl) return;
-
-    if (checkoutStatusFromUrl === "success") {
-      toast.success(
-        checkoutChargeIdFromUrl
-          ? `Checkout concluído para cobrança ${checkoutChargeIdFromUrl.slice(0, 8)}.`
-          : "Checkout concluído com sucesso."
-      );
-    } else if (checkoutStatusFromUrl === "cancel") {
-      toast.error(
-        checkoutChargeIdFromUrl
-          ? `Checkout cancelado para cobrança ${checkoutChargeIdFromUrl.slice(0, 8)}.`
-          : "Checkout cancelado."
-      );
-    }
-
-    navigate("/operations", { replace: true });
-  }, [checkoutStatusFromUrl, checkoutChargeIdFromUrl, navigate]);
-
-  const payCharge = trpc.finance.charges.pay.useMutation({
-    onSuccess: async () => {
-      toast.success("Pagamento registrado com sucesso");
-      await Promise.all([
-        chargesQuery.refetch(),
-        alertsQuery.refetch(),
-        utils.finance.charges.list.invalidate(),
-        utils.finance.charges.stats.invalidate(),
-      ]);
-    },
-    onError: (error) => {
-      toast.error(error.message || "Erro ao registrar pagamento");
-    },
-  });
-
-  const checkoutCharge = trpc.payments.checkout.useMutation({
-    onError: (error) => {
-      toast.error(error.message || "Erro ao gerar checkout");
-    },
+  const { registerPayment, generateCheckout, isSubmitting } = useChargeActions({
+    location,
+    navigate,
+    returnPath: "/operations",
+    refreshActions: [
+      () => chargesQuery.refetch(),
+      () => alertsQuery.refetch(),
+    ],
   });
 
   const serviceOrders = useMemo(() => {
-    const payload: any = serviceOrdersQuery.data;
-    if (Array.isArray(payload?.data)) return payload.data;
-    if (Array.isArray(payload)) return payload;
-    return [];
+    return normalizeArrayPayload(serviceOrdersQuery.data);
   }, [serviceOrdersQuery.data]);
 
   const charges = useMemo(() => {
-    const payload: any = chargesQuery.data;
-    if (Array.isArray(payload?.data)) return payload.data;
-    if (Array.isArray(payload?.items)) return payload.items;
-    return [];
+    return normalizeArrayPayload(chargesQuery.data);
   }, [chargesQuery.data]);
 
   const alerts = useMemo(() => {
-    const payload: any = alertsQuery.data;
-    return payload?.data ?? payload ?? null;
+    return normalizeAlertsPayload(alertsQuery.data);
   }, [alertsQuery.data]);
 
   const overdueOrders = Array.isArray(alerts?.overdueOrders?.items)
@@ -141,13 +106,15 @@ export default function OperationalWorkflowPage() {
     ? alerts.overdueCharges.items
     : [];
 
+  const doneOrdersWithoutCharge = Array.isArray(alerts?.doneOrdersWithoutCharge?.items)
+    ? alerts.doneOrdersWithoutCharge.items
+    : [];
+
   const openOrders = useMemo(() => {
     return serviceOrders.filter((item: any) =>
       ["OPEN", "ASSIGNED", "IN_PROGRESS"].includes(String(item?.status ?? ""))
     );
   }, [serviceOrders]);
-
-  const isSubmitting = payCharge.isPending || checkoutCharge.isPending;
 
   const isLoading =
     chargesQuery.isLoading || serviceOrdersQuery.isLoading || alertsQuery.isLoading;
@@ -160,60 +127,6 @@ export default function OperationalWorkflowPage() {
     getErrorMessage(serviceOrdersQuery.error, "") ||
     getErrorMessage(alertsQuery.error, "") ||
     "Não foi possível carregar o fluxo operacional agora.";
-
-  const markChargePaid = async (id: string, amountCents?: number) => {
-    const safeAmountCents = Number(amountCents ?? 0);
-
-    if (!safeAmountCents || safeAmountCents <= 0) {
-      toast.error("Valor da cobrança inválido para registrar pagamento");
-      return;
-    }
-
-    await payCharge.mutateAsync({
-      chargeId: id,
-      method: "PIX",
-      amountCents: safeAmountCents,
-    });
-  };
-
-  const generateCheckout = async (charge: any) => {
-    const amountCents = Number(charge?.amountCents ?? 0);
-
-    if (!amountCents || amountCents <= 0) {
-      toast.error("Valor da cobrança inválido para checkout");
-      return;
-    }
-
-    if (!charge?.customerId) {
-      toast.error("Cobrança sem cliente vinculado");
-      return;
-    }
-
-    const description =
-      charge?.notes?.trim() ||
-      charge?.serviceOrder?.title ||
-      `Cobrança #${String(charge.id).slice(0, 8)}`;
-
-    const origin = window.location.origin;
-
-    const result = await checkoutCharge.mutateAsync({
-      chargeId: String(charge.id),
-      customerId: String(charge.customerId),
-      amount: amountCents,
-      description,
-      successUrl: `${origin}/operations?checkout=success&chargeId=${String(charge.id)}`,
-      cancelUrl: `${origin}/operations?checkout=cancel&chargeId=${String(charge.id)}`,
-    });
-
-    const checkoutUrl = result?.checkoutUrl;
-
-    if (!checkoutUrl) {
-      toast.error("Checkout retornado sem URL");
-      return;
-    }
-
-    window.location.href = checkoutUrl;
-  };
 
   if (isInitializing) {
     return (
@@ -261,7 +174,7 @@ export default function OperationalWorkflowPage() {
         <div>
           <h1 className="text-2xl font-bold">Fluxo Operacional</h1>
           <p className="text-sm text-muted-foreground">
-            Acompanhe ordens abertas, cobranças pendentes e alertas.
+            Acompanhe ordens abertas, cobranças pendentes e alertas reais do fluxo.
           </p>
         </div>
 
@@ -278,7 +191,7 @@ export default function OperationalWorkflowPage() {
         </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
         <div className="rounded-xl border p-4">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Clock3 className="h-4 w-4" />
@@ -298,11 +211,17 @@ export default function OperationalWorkflowPage() {
         <div className="rounded-xl border p-4">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <AlertTriangle className="h-4 w-4" />
-            Alertas críticos
+            Cobranças vencidas
           </div>
-          <div className="mt-2 text-2xl font-bold">
-            {overdueOrders.length + overdueCharges.length}
+          <div className="mt-2 text-2xl font-bold">{overdueCharges.length}</div>
+        </div>
+
+        <div className="rounded-xl border p-4">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <AlertTriangle className="h-4 w-4" />
+            Concluídas sem cobrança
           </div>
+          <div className="mt-2 text-2xl font-bold">{doneOrdersWithoutCharge.length}</div>
         </div>
       </div>
 
@@ -344,7 +263,9 @@ export default function OperationalWorkflowPage() {
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <div className="font-medium">
-                        {charge.notes || "Cobrança"}
+                        {charge.notes?.trim() ||
+                          charge.serviceOrder?.title ||
+                          "Cobrança"}
                       </div>
                       <div className="text-sm text-muted-foreground">
                         {charge.customer?.name || "Sem cliente"} •{" "}
@@ -365,18 +286,61 @@ export default function OperationalWorkflowPage() {
 
                       <Button
                         size="sm"
-                        onClick={() =>
-                          void markChargePaid(
-                            String(charge.id),
-                            Number(charge.amountCents ?? 0)
-                          )
-                        }
+                        onClick={() => void registerPayment(charge, "PIX")}
                         disabled={isSubmitting}
                       >
                         <CheckCircle2 className="mr-1 h-4 w-4" />
                         Marcar paga
                       </Button>
                     </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="rounded-xl border p-4">
+          <h2 className="mb-3 font-semibold">Cobranças vencidas</h2>
+
+          {overdueCharges.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Nenhuma cobrança vencida.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {overdueCharges.slice(0, 5).map((charge: any) => (
+                <div key={charge.id} className="rounded-lg border p-3 text-sm">
+                  <div className="font-medium">
+                    {charge.customer?.name || "Cliente"}
+                  </div>
+                  <div className="text-muted-foreground">
+                    {formatCurrency(charge.amountCents)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-xl border p-4">
+          <h2 className="mb-3 font-semibold">O.S. concluídas sem cobrança</h2>
+
+          {doneOrdersWithoutCharge.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Nenhuma O.S. concluída sem cobrança aparente.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {doneOrdersWithoutCharge.slice(0, 5).map((order: any) => (
+                <div key={order.id} className="rounded-lg border p-3 text-sm">
+                  <div className="font-medium">
+                    {order.title || "Ordem de serviço"}
+                  </div>
+                  <div className="text-muted-foreground">
+                    {order.customer?.name || "Sem cliente"}
                   </div>
                 </div>
               ))}

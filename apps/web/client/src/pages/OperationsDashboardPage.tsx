@@ -1,8 +1,9 @@
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { useChargeActions } from "@/hooks/useChargeActions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -100,6 +101,7 @@ function statusTone(status?: string) {
 }
 
 function normalizeArrayPayload(payload: any): any[] {
+  if (Array.isArray(payload?.data?.items)) return payload.data.items;
   if (Array.isArray(payload?.data)) return payload.data;
   if (Array.isArray(payload?.items)) return payload.items;
   if (Array.isArray(payload)) return payload;
@@ -123,18 +125,9 @@ export default function OperationsDashboardPage() {
   const { isAuthenticated, isInitializing } = useAuth();
   const canQuery = isAuthenticated && !isInitializing;
 
-  const utils = trpc.useUtils();
   const [location, navigate] = useLocation();
   const todayStart = startOfToday();
   const todayEnd = endOfToday();
-
-  const searchParams = useMemo(() => {
-    const queryString = location.includes("?") ? location.split("?")[1] : "";
-    return new URLSearchParams(queryString);
-  }, [location]);
-
-  const checkoutStatusFromUrl = searchParams.get("checkout")?.trim() || "";
-  const checkoutChargeIdFromUrl = searchParams.get("chargeId")?.trim() || "";
 
   const appointmentsQuery = trpc.nexo.appointments.list.useQuery(
     {
@@ -179,40 +172,16 @@ export default function OperationsDashboardPage() {
     refetchOnWindowFocus: false,
   });
 
-  useEffect(() => {
-    if (!checkoutStatusFromUrl) return;
-
-    if (checkoutStatusFromUrl === "success") {
-      toast.success(
-        checkoutChargeIdFromUrl
-          ? `Checkout concluído para cobrança ${checkoutChargeIdFromUrl.slice(0, 8)}.`
-          : "Checkout concluído com sucesso."
-      );
-
-      void Promise.all([
-        chargesQuery.refetch(),
-        alertsQuery.refetch(),
-        utils.finance.charges.list.invalidate(),
-        utils.finance.charges.stats.invalidate(),
-      ]);
-    } else if (checkoutStatusFromUrl === "cancel") {
-      toast.error(
-        checkoutChargeIdFromUrl
-          ? `Checkout cancelado para cobrança ${checkoutChargeIdFromUrl.slice(0, 8)}.`
-          : "Checkout cancelado."
-      );
-    }
-
-    navigate("/dashboard/operations", { replace: true });
-  }, [
-    checkoutStatusFromUrl,
-    checkoutChargeIdFromUrl,
-    navigate,
-    chargesQuery,
-    alertsQuery,
-    utils.finance.charges.list,
-    utils.finance.charges.stats,
-  ]);
+  const { registerPayment, generateCheckout, isSubmitting: isFinanceSubmitting } =
+    useChargeActions({
+      location,
+      navigate,
+      returnPath: "/dashboard/operations",
+      refreshActions: [
+        () => chargesQuery.refetch(),
+        () => alertsQuery.refetch(),
+      ],
+    });
 
   const updateServiceOrder = trpc.nexo.serviceOrders.update.useMutation({
     onSuccess: async () => {
@@ -227,27 +196,6 @@ export default function OperationsDashboardPage() {
     },
   });
 
-  const registerPayment = trpc.finance.charges.pay.useMutation({
-    onSuccess: async () => {
-      toast.success("Pagamento registrado.");
-      await Promise.all([
-        chargesQuery.refetch(),
-        alertsQuery.refetch(),
-        utils.finance.charges.list.invalidate(),
-        utils.finance.charges.stats.invalidate(),
-      ]);
-    },
-    onError: (error) => {
-      toast.error(error.message || "Erro ao registrar pagamento");
-    },
-  });
-
-  const checkoutCharge = trpc.payments.checkout.useMutation({
-    onError: (error) => {
-      toast.error(error.message || "Erro ao gerar checkout");
-    },
-  });
-
   const appointments = useMemo(() => {
     return normalizeArrayPayload(appointmentsQuery.data);
   }, [appointmentsQuery.data]);
@@ -257,10 +205,7 @@ export default function OperationsDashboardPage() {
   }, [serviceOrdersQuery.data]);
 
   const pendingCharges = useMemo(() => {
-    const payload = chargesQuery.data as any;
-    return Array.isArray(payload?.data?.items)
-      ? payload.data.items
-      : normalizeArrayPayload(chargesQuery.data);
+    return normalizeArrayPayload(chargesQuery.data);
   }, [chargesQuery.data]);
 
   const todayServiceOrders = useMemo(() => {
@@ -337,63 +282,6 @@ export default function OperationsDashboardPage() {
       }
     );
   };
-
-  const handleRegisterPayment = (charge: any) => {
-    const amountCents = Number(charge?.amountCents ?? 0);
-
-    if (!amountCents || amountCents <= 0) {
-      toast.error("Valor da cobrança inválido para registrar pagamento");
-      return;
-    }
-
-    registerPayment.mutate({
-      chargeId: String(charge.id),
-      method: "CASH",
-      amountCents,
-    });
-  };
-
-  const handleGenerateCheckout = async (charge: any) => {
-    const amountCents = Number(charge?.amountCents ?? 0);
-
-    if (!amountCents || amountCents <= 0) {
-      toast.error("Valor da cobrança inválido para checkout");
-      return;
-    }
-
-    if (!charge?.customerId) {
-      toast.error("Cobrança sem cliente vinculado");
-      return;
-    }
-
-    const description =
-      charge?.notes?.trim() ||
-      charge?.serviceOrder?.title ||
-      `Cobrança #${String(charge.id).slice(0, 8)}`;
-
-    const origin = window.location.origin;
-
-    const result = await checkoutCharge.mutateAsync({
-      chargeId: String(charge.id),
-      customerId: String(charge.customerId),
-      amount: amountCents,
-      description,
-      successUrl: `${origin}/dashboard/operations?checkout=success&chargeId=${String(charge.id)}`,
-      cancelUrl: `${origin}/dashboard/operations?checkout=cancel&chargeId=${String(charge.id)}`,
-    });
-
-    const checkoutUrl = result?.checkoutUrl;
-
-    if (!checkoutUrl) {
-      toast.error("Checkout retornado sem URL");
-      return;
-    }
-
-    window.location.href = checkoutUrl;
-  };
-
-  const isFinanceSubmitting =
-    registerPayment.isPending || checkoutCharge.isPending;
 
   const isLoading =
     appointmentsQuery.isLoading ||
@@ -706,7 +594,7 @@ export default function OperationsDashboardPage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => void handleGenerateCheckout(charge)}
+                    onClick={() => void generateCheckout(charge)}
                     disabled={isFinanceSubmitting}
                   >
                     <CreditCard className="mr-1 h-4 w-4" />
@@ -715,7 +603,7 @@ export default function OperationsDashboardPage() {
 
                   <Button
                     size="sm"
-                    onClick={() => handleRegisterPayment(charge)}
+                    onClick={() => void registerPayment(charge, "PIX")}
                     disabled={isFinanceSubmitting}
                   >
                     Registrar pagamento

@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { useChargeActions } from "@/hooks/useChargeActions";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -87,6 +88,14 @@ function getErrorMessage(error: unknown, fallback: string) {
   return fallback;
 }
 
+function normalizeChargesPayload(payload: any): Charge[] {
+  if (Array.isArray(payload?.data?.items)) return payload.data.items as Charge[];
+  if (Array.isArray(payload?.data)) return payload.data as Charge[];
+  if (Array.isArray(payload?.items)) return payload.items as Charge[];
+  if (Array.isArray(payload)) return payload as Charge[];
+  return [];
+}
+
 export default function FinancesPage() {
   const { isAuthenticated, isInitializing } = useAuth();
   const canLoadFinance = isAuthenticated && !isInitializing;
@@ -100,8 +109,6 @@ export default function FinancesPage() {
   }, [location]);
 
   const serviceOrderIdFromUrl = searchParams.get("serviceOrderId")?.trim() || "";
-  const checkoutStatusFromUrl = searchParams.get("checkout")?.trim() || "";
-  const checkoutChargeIdFromUrl = searchParams.get("chargeId")?.trim() || "";
   const isServiceOrderScoped = Boolean(serviceOrderIdFromUrl);
 
   const [page, setPage] = useState(1);
@@ -141,60 +148,33 @@ export default function FinancesPage() {
     setPage(1);
   }, [query, statusFilter, serviceOrderIdFromUrl]);
 
-  useEffect(() => {
-    if (!checkoutStatusFromUrl) return;
+  const refreshQueriesOnly = async () => {
+    await Promise.all([
+      chargesQuery.refetch(),
+      ...(isServiceOrderScoped ? [] : [statsQuery.refetch()]),
+    ]);
+  };
 
-    if (checkoutStatusFromUrl === "success") {
-      toast.success(
-        checkoutChargeIdFromUrl
-          ? `Checkout concluído para cobrança ${checkoutChargeIdFromUrl.slice(0, 8)}.`
-          : "Checkout concluído com sucesso."
-      );
-      void Promise.all([
-        chargesQuery.refetch(),
-        utils.finance.charges.list.invalidate(),
-        utils.finance.charges.stats.invalidate(),
-        ...(isServiceOrderScoped ? [] : [statsQuery.refetch()]),
-      ]);
-    } else if (checkoutStatusFromUrl === "cancel") {
-      toast.error(
-        checkoutChargeIdFromUrl
-          ? `Checkout cancelado para cobrança ${checkoutChargeIdFromUrl.slice(0, 8)}.`
-          : "Checkout cancelado."
-      );
-    }
+  const refreshAll = async () => {
+    if (!canLoadFinance) return;
 
-    navigate("/finances", { replace: true });
-  }, [
-    checkoutStatusFromUrl,
-    checkoutChargeIdFromUrl,
+    await Promise.all([
+      chargesQuery.refetch(),
+      utils.finance.charges.list.invalidate(),
+      utils.finance.charges.stats.invalidate(),
+      ...(isServiceOrderScoped ? [] : [statsQuery.refetch()]),
+    ]);
+  };
+
+  const {
+    registerPayment,
+    generateCheckout,
+    isSubmitting: isChargeActionSubmitting,
+  } = useChargeActions({
+    location,
     navigate,
-    chargesQuery,
-    statsQuery,
-    utils.finance.charges.list,
-    utils.finance.charges.stats,
-    isServiceOrderScoped,
-  ]);
-
-  const payCharge = trpc.finance.charges.pay.useMutation({
-    onSuccess: async () => {
-      toast.success("Pagamento registrado com sucesso");
-      await Promise.all([
-        chargesQuery.refetch(),
-        utils.finance.charges.list.invalidate(),
-        utils.finance.charges.stats.invalidate(),
-        ...(isServiceOrderScoped ? [] : [statsQuery.refetch()]),
-      ]);
-    },
-    onError: (error) => {
-      toast.error(error.message || "Erro ao registrar pagamento");
-    },
-  });
-
-  const checkoutCharge = trpc.payments.checkout.useMutation({
-    onError: (error) => {
-      toast.error(error.message || "Erro ao gerar checkout");
-    },
+    returnPath: "/finances",
+    refreshActions: [refreshQueriesOnly],
   });
 
   const deleteCharge = trpc.finance.charges.delete.useMutation({
@@ -211,17 +191,6 @@ export default function FinancesPage() {
       toast.error(error.message || "Erro ao excluir cobrança");
     },
   });
-
-  const refreshAll = async () => {
-    if (!canLoadFinance) return;
-
-    await Promise.all([
-      chargesQuery.refetch(),
-      utils.finance.charges.list.invalidate(),
-      utils.finance.charges.stats.invalidate(),
-      ...(isServiceOrderScoped ? [] : [statsQuery.refetch()]),
-    ]);
-  };
 
   const handleApplyFilters = () => {
     setPage(1);
@@ -246,60 +215,6 @@ export default function FinancesPage() {
   const handleChangeStatusFilter = (value: ChargeStatusFilter) => {
     setPage(1);
     setStatusFilter(value);
-  };
-
-  const handlePayCharge = async (charge: Charge) => {
-    const amountCents = Number(charge?.amountCents ?? 0);
-
-    if (!amountCents || amountCents <= 0) {
-      toast.error("Valor da cobrança inválido para pagamento");
-      return;
-    }
-
-    await payCharge.mutateAsync({
-      chargeId: String(charge.id),
-      method: "PIX",
-      amountCents,
-    });
-  };
-
-  const handleCheckoutCharge = async (charge: Charge) => {
-    const amountCents = Number(charge?.amountCents ?? 0);
-
-    if (!amountCents || amountCents <= 0) {
-      toast.error("Valor da cobrança inválido para checkout");
-      return;
-    }
-
-    if (!charge.customerId) {
-      toast.error("Cobrança sem cliente vinculado");
-      return;
-    }
-
-    const description =
-      charge.notes?.trim() ||
-      charge.serviceOrder?.title ||
-      `Cobrança #${String(charge.id).slice(0, 8)}`;
-
-    const origin = window.location.origin;
-
-    const result = await checkoutCharge.mutateAsync({
-      chargeId: String(charge.id),
-      customerId: String(charge.customerId),
-      amount: amountCents,
-      description,
-      successUrl: `${origin}/finances?checkout=success&chargeId=${String(charge.id)}`,
-      cancelUrl: `${origin}/finances?checkout=cancel&chargeId=${String(charge.id)}`,
-    });
-
-    const checkoutUrl = result?.checkoutUrl;
-
-    if (!checkoutUrl) {
-      toast.error("Checkout retornado sem URL");
-      return;
-    }
-
-    window.location.href = checkoutUrl;
   };
 
   const handleDeleteCharge = async (charge: Charge) => {
@@ -361,18 +276,13 @@ export default function FinancesPage() {
     }
   };
 
-  const isSubmitting =
-    payCharge.isPending || deleteCharge.isPending || checkoutCharge.isPending;
+  const isSubmitting = deleteCharge.isPending || isChargeActionSubmitting;
 
   const statsPayload = statsQuery.data as any;
   const stats = (statsPayload?.data ?? statsPayload ?? null) as ChargeStats | null;
 
   const chargesPayload = chargesQuery.data as any;
-  const charges = (
-    chargesPayload?.data ??
-    chargesPayload?.items ??
-    []
-  ) as Charge[];
+  const charges = normalizeChargesPayload(chargesPayload);
 
   const pagination = (
     chargesPayload?.pagination ??
@@ -754,7 +664,7 @@ export default function FinancesPage() {
                         <>
                           <Button
                             size="sm"
-                            onClick={() => void handleCheckoutCharge(charge)}
+                            onClick={() => void generateCheckout(charge)}
                             disabled={isSubmitting}
                             variant="outline"
                           >
@@ -764,7 +674,7 @@ export default function FinancesPage() {
 
                           <Button
                             size="sm"
-                            onClick={() => void handlePayCharge(charge)}
+                            onClick={() => void registerPayment(charge, "PIX")}
                             disabled={isSubmitting}
                             className="bg-green-600 text-white hover:bg-green-700"
                           >
