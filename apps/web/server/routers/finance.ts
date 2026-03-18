@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
 import { nexoFetch } from "../_core/nexoClient";
-import { emitOperationalNotification } from "../_core/operationalNotifications";
 
 const paginationInput = z.object({
   page: z.number().int().positive().default(1),
@@ -19,7 +18,7 @@ export const financeRouter = router({
           dueDate: z.coerce.date(),
           notes: z.string().optional(),
           serviceOrderId: z.string().optional(),
-        }),
+        })
       )
       .mutation(async ({ input, ctx }) => {
         const amountCents =
@@ -52,7 +51,7 @@ export const financeRouter = router({
             q: z.string().optional(),
             serviceOrderId: z.string().optional(),
           })
-          .optional(),
+          .optional()
       )
       .query(async ({ input, ctx }) => {
         const page = input?.page ?? 1;
@@ -68,7 +67,7 @@ export const financeRouter = router({
         const raw = await nexoFetch<any>(
           ctx.req,
           `/finance/charges?${params.toString()}`,
-          { method: "GET" },
+          { method: "GET" }
         );
 
         const payload = raw?.data ?? raw;
@@ -88,7 +87,7 @@ export const financeRouter = router({
       .input(
         z.object({
           id: z.union([z.string(), z.number()]).transform((v) => String(v)),
-        }),
+        })
       )
       .query(async ({ input, ctx }) => {
         const raw = await nexoFetch<any>(ctx.req, `/finance/charges/${input.id}`, {
@@ -105,9 +104,9 @@ export const financeRouter = router({
           amount: z.number().min(0.01).optional(),
           amountCents: z.number().int().min(1).optional(),
           dueDate: z.coerce.date().optional(),
-          status: z.enum(["PENDING", "OVERDUE", "CANCELED"]).optional(),
+          status: z.enum(["PENDING", "CANCELED"]).optional(),
           notes: z.string().optional(),
-        }),
+        })
       )
       .mutation(async ({ input, ctx }) => {
         const { id, amount, amountCents: amountCentsInput, ...rest } = input;
@@ -125,14 +124,6 @@ export const financeRouter = router({
           }),
         });
 
-        if (ctx.user?.organizationId && input.status === "OVERDUE") {
-          await emitOperationalNotification({
-            orgId: ctx.user.organizationId,
-            type: "PAYMENT_OVERDUE",
-            metadata: { chargeId: id },
-          });
-        }
-
         return raw?.data ?? raw;
       }),
 
@@ -140,7 +131,7 @@ export const financeRouter = router({
       .input(
         z.object({
           id: z.union([z.string(), z.number()]).transform((v) => String(v)),
-        }),
+        })
       )
       .mutation(async ({ input, ctx }) => {
         const raw = await nexoFetch<any>(ctx.req, `/finance/charges/${input.id}`, {
@@ -174,7 +165,7 @@ export const financeRouter = router({
           chargeId: z.union([z.string(), z.number()]).transform((v) => String(v)),
           method: z.enum(["PIX", "CASH", "CARD", "TRANSFER", "OTHER"]).default("PIX"),
           amountCents: z.number().int().min(1),
-        }),
+        })
       )
       .mutation(async ({ input, ctx }) => {
         const raw = await nexoFetch<any>(
@@ -186,7 +177,7 @@ export const financeRouter = router({
               method: input.method,
               amountCents: input.amountCents,
             }),
-          },
+          }
         );
 
         return raw?.data ?? raw;

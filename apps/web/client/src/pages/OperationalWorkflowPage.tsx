@@ -93,21 +93,6 @@ export default function OperationalWorkflowPage() {
     navigate("/operations", { replace: true });
   }, [checkoutStatusFromUrl, checkoutChargeIdFromUrl, navigate]);
 
-  const updateCharge = trpc.finance.charges.update.useMutation({
-    onSuccess: async () => {
-      toast.success("Cobrança atualizada");
-      await Promise.all([
-        chargesQuery.refetch(),
-        alertsQuery.refetch(),
-        utils.finance.charges.list.invalidate(),
-        utils.finance.charges.stats.invalidate(),
-      ]);
-    },
-    onError: (error) => {
-      toast.error(error.message || "Erro ao atualizar cobrança");
-    },
-  });
-
   const payCharge = trpc.finance.charges.pay.useMutation({
     onSuccess: async () => {
       toast.success("Pagamento registrado com sucesso");
@@ -162,8 +147,7 @@ export default function OperationalWorkflowPage() {
     );
   }, [serviceOrders]);
 
-  const isSubmitting =
-    updateCharge.isPending || payCharge.isPending || checkoutCharge.isPending;
+  const isSubmitting = payCharge.isPending || checkoutCharge.isPending;
 
   const isLoading =
     chargesQuery.isLoading || serviceOrdersQuery.isLoading || alertsQuery.isLoading;
@@ -176,13 +160,6 @@ export default function OperationalWorkflowPage() {
     getErrorMessage(serviceOrdersQuery.error, "") ||
     getErrorMessage(alertsQuery.error, "") ||
     "Não foi possível carregar o fluxo operacional agora.";
-
-  const markChargeOverdue = async (id: string) => {
-    await updateCharge.mutateAsync({
-      id,
-      status: "OVERDUE",
-    });
-  };
 
   const markChargePaid = async (id: string, amountCents?: number) => {
     const safeAmountCents = Number(amountCents ?? 0);
@@ -376,15 +353,6 @@ export default function OperationalWorkflowPage() {
                     </div>
 
                     <div className="flex flex-wrap gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => void markChargeOverdue(String(charge.id))}
-                        disabled={isSubmitting}
-                      >
-                        Marcar vencida
-                      </Button>
-
                       <Button
                         size="sm"
                         variant="outline"
