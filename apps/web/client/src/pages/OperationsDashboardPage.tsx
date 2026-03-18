@@ -296,6 +296,10 @@ export default function OperationsDashboardPage() {
     ? alerts.overdueOrders.items
     : [];
 
+  const doneOrdersWithoutCharge = Array.isArray(alerts?.doneOrdersWithoutCharge?.items)
+    ? alerts.doneOrdersWithoutCharge.items
+    : [];
+
   const todayOpenOrders = useMemo(() => {
     return todayServiceOrders.filter((order: any) =>
       ["OPEN", "ASSIGNED"].includes(order?.status)
@@ -311,19 +315,6 @@ export default function OperationsDashboardPage() {
   const todayDoneOrders = useMemo(() => {
     return todayServiceOrders.filter((order: any) => order?.status === "DONE");
   }, [todayServiceOrders]);
-
-  const doneOrdersWithoutCharge = useMemo(() => {
-    const pendingOrKnownChargeServiceOrderIds = new Set(
-      pendingCharges
-        .map((charge: any) => charge?.serviceOrderId)
-        .filter((value: any) => typeof value === "string" && value.length > 0)
-    );
-
-    return serviceOrders.filter((order: any) => {
-      if (order?.status !== "DONE") return false;
-      return !pendingOrKnownChargeServiceOrderIds.has(String(order.id));
-    });
-  }, [pendingCharges, serviceOrders]);
 
   const handleStartExecution = (id: string) => {
     updateServiceOrder.mutate(
