@@ -221,6 +221,8 @@ export default function InvoicesPage() {
   const [searchInput, setSearchInput] = useState("");
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<InvoiceStatus | "">("");
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [draft, setDraft] = useState({
     number: "",
     amount: "",
@@ -275,12 +277,14 @@ export default function InvoicesPage() {
   const updateMutation = trpc.invoices.update.useMutation({
     onSuccess: async () => {
       toast.success("Fatura atualizada.");
+      setUpdatingId(null);
       await Promise.all([
         utils.invoices.list.invalidate(),
         utils.invoices.summary.invalidate(),
       ]);
     },
     onError: (error) => {
+      setUpdatingId(null);
       toast.error(error.message || "Erro ao atualizar fatura.");
     },
   });
@@ -288,12 +292,14 @@ export default function InvoicesPage() {
   const deleteMutation = trpc.invoices.delete.useMutation({
     onSuccess: async () => {
       toast.success("Fatura removida.");
+      setDeletingId(null);
       await Promise.all([
         utils.invoices.list.invalidate(),
         utils.invoices.summary.invalidate(),
       ]);
     },
     onError: (error) => {
+      setDeletingId(null);
       toast.error(error.message || "Erro ao remover fatura.");
     },
   });
@@ -341,6 +347,7 @@ export default function InvoicesPage() {
   };
 
   const onStatusChange = async (id: string, status: EditableInvoiceStatus) => {
+    setUpdatingId(id);
     await updateMutation.mutateAsync({
       id,
       status,
@@ -350,6 +357,8 @@ export default function InvoicesPage() {
   const onDelete = async (id: string) => {
     const confirmed = window.confirm("Excluir esta fatura?");
     if (!confirmed) return;
+
+    setDeletingId(id);
     await deleteMutation.mutateAsync({ id });
   };
 
@@ -364,7 +373,7 @@ export default function InvoicesPage() {
   if (!isAuthenticated) {
     return (
       <div className="p-6 space-y-4">
-        <div className="rounded border p-4 text-sm opacity-70 dark:border-zinc-800">
+        <div className="rounded-xl border p-4 text-sm opacity-70 dark:border-zinc-800">
           Faça login para visualizar faturas.
         </div>
       </div>
@@ -384,7 +393,7 @@ export default function InvoicesPage() {
         <div className="flex items-center gap-2">
           <button
             type="button"
-            className="inline-flex items-center gap-2 rounded border px-3 py-2"
+            className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
             onClick={() => void handleRefresh()}
           >
             <RefreshCw className="h-4 w-4" />
@@ -393,7 +402,7 @@ export default function InvoicesPage() {
 
           <button
             type="button"
-            className="inline-flex items-center gap-2 rounded border px-3 py-2"
+            className="inline-flex items-center gap-2 rounded-lg bg-orange-500 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600"
             onClick={() => setOpenCreate((value) => !value)}
           >
             <Plus className="h-4 w-4" />
@@ -402,27 +411,37 @@ export default function InvoicesPage() {
         </div>
       </div>
 
-      <div className="rounded border p-3 text-sm opacity-80 dark:border-zinc-800">
+      <div className="rounded-xl border p-3 text-sm opacity-80 dark:border-zinc-800">
         Fatura não quita cobrança automaticamente. Para registrar pagamento, use o
         fluxo financeiro de cobranças e pagamentos.
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <div className="rounded border p-3 dark:border-zinc-800">
-          Total emitido: {formatCurrencyFromCents(summary.totalIssued)}
+        <div className="rounded-xl border p-3 dark:border-zinc-800">
+          <div className="text-sm opacity-70">Total emitido</div>
+          <div className="mt-1 text-lg font-semibold">
+            {formatCurrencyFromCents(summary.totalIssued)}
+          </div>
         </div>
-        <div className="rounded border p-3 dark:border-zinc-800">
-          Total pago: {formatCurrencyFromCents(summary.totalPaid)}
+        <div className="rounded-xl border p-3 dark:border-zinc-800">
+          <div className="text-sm opacity-70">Total pago</div>
+          <div className="mt-1 text-lg font-semibold">
+            {formatCurrencyFromCents(summary.totalPaid)}
+          </div>
         </div>
-        <div className="rounded border p-3 dark:border-zinc-800">
-          Total geral: {formatCurrencyFromCents(summary.total)}
+        <div className="rounded-xl border p-3 dark:border-zinc-800">
+          <div className="text-sm opacity-70">Total geral</div>
+          <div className="mt-1 text-lg font-semibold">
+            {formatCurrencyFromCents(summary.total)}
+          </div>
         </div>
-        <div className="rounded border p-3 dark:border-zinc-800">
-          Pendentes: {summary.pending}
+        <div className="rounded-xl border p-3 dark:border-zinc-800">
+          <div className="text-sm opacity-70">Pendentes</div>
+          <div className="mt-1 text-lg font-semibold">{summary.pending}</div>
         </div>
       </div>
 
-      <div className="rounded border p-3 space-y-3 dark:border-zinc-800">
+      <div className="rounded-xl border p-3 space-y-3 dark:border-zinc-800">
         <div className="flex flex-col gap-2 md:flex-row">
           <div className="relative w-full">
             <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 opacity-50" />
@@ -479,7 +498,7 @@ export default function InvoicesPage() {
       </div>
 
       {openCreate ? (
-        <div className="space-y-2 rounded border p-3 dark:border-zinc-800">
+        <div className="space-y-2 rounded-xl border p-3 dark:border-zinc-800">
           <div className="flex items-center gap-2 text-sm font-medium">
             <FileText className="h-4 w-4" />
             Nova fatura
@@ -556,7 +575,7 @@ export default function InvoicesPage() {
         </div>
       ) : null}
 
-      <div className="space-y-2 rounded border p-3 dark:border-zinc-800">
+      <div className="space-y-2 rounded-xl border p-3 dark:border-zinc-800">
         {listQuery.isLoading ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-6 w-6 animate-spin text-orange-500" />
@@ -572,8 +591,9 @@ export default function InvoicesPage() {
             </p>
           </div>
         ) : invoices.length === 0 ? (
-          <div className="py-8 text-center">
-            <div className="font-medium">Nenhuma fatura encontrada.</div>
+          <div className="py-10 text-center">
+            <FileText className="mx-auto mb-3 h-10 w-10 opacity-40" />
+            <div className="font-medium">Nenhuma fatura encontrada</div>
             <div className="mt-1 text-sm opacity-70">
               Ajuste os filtros ou crie uma nova fatura.
             </div>
@@ -586,7 +606,7 @@ export default function InvoicesPage() {
             return (
               <div
                 key={inv.id}
-                className="flex flex-col gap-3 rounded border p-3 md:flex-row md:items-center md:justify-between dark:border-zinc-800"
+                className="flex flex-col gap-3 rounded-xl border p-3 md:flex-row md:items-center md:justify-between dark:border-zinc-800"
               >
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
@@ -639,7 +659,7 @@ export default function InvoicesPage() {
                       )
                     }
                     className="rounded border p-1 text-xs dark:border-zinc-800 dark:bg-zinc-950"
-                    disabled={updateMutation.isPending || isPaid}
+                    disabled={(updateMutation.isPending && updatingId === inv.id) || isPaid}
                   >
                     <option value="DRAFT">Rascunho</option>
                     <option value="ISSUED">Emitida</option>
@@ -650,9 +670,13 @@ export default function InvoicesPage() {
                     type="button"
                     className="inline-flex items-center gap-1 rounded border px-2 py-1 text-xs text-red-600 disabled:opacity-60 dark:border-zinc-800 dark:text-red-300"
                     onClick={() => void onDelete(inv.id)}
-                    disabled={deleteMutation.isPending || inv.status === "PAID"}
+                    disabled={(deleteMutation.isPending && deletingId === inv.id) || inv.status === "PAID"}
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
+                    {deleteMutation.isPending && deletingId === inv.id ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-3.5 w-3.5" />
+                    )}
                     Excluir
                   </button>
                 </div>
@@ -672,7 +696,7 @@ export default function InvoicesPage() {
           Anterior
         </button>
 
-        <span>
+        <span className="text-sm opacity-70">
           {page} / {pages}
         </span>
 

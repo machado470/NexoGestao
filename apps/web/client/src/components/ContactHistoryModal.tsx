@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -12,10 +13,120 @@ import {
 } from "@/components/ui/dialog";
 import { Loader2, Phone, Mail, MessageCircle, User, Plus, Trash2 } from "lucide-react";
 
+type ContactType = "phone" | "email" | "whatsapp" | "in_person" | "other";
+
+type ContactHistoryItem = {
+  id: string;
+  contactType: ContactType;
+  subject: string;
+  description: string | null;
+  notes: string | null;
+  contactedBy: string | null;
+  createdAt: string | null;
+};
+
 interface ContactHistoryModalProps {
   customerId: string;
   customerName: string;
   trigger?: React.ReactNode;
+}
+
+function normalizeContactHistoryPayload(payload: unknown): ContactHistoryItem[] {
+  const raw = (payload as { data?: unknown } | null | undefined)?.data ?? payload;
+
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+
+  return raw.map((item) => {
+    const candidate = (item ?? {}) as Partial<ContactHistoryItem>;
+
+    return {
+      id: typeof candidate.id === "string" ? candidate.id : "",
+      contactType:
+        candidate.contactType === "phone" ||
+        candidate.contactType === "email" ||
+        candidate.contactType === "whatsapp" ||
+        candidate.contactType === "in_person" ||
+        candidate.contactType === "other"
+          ? candidate.contactType
+          : "other",
+      subject:
+        typeof candidate.subject === "string" && candidate.subject.trim()
+          ? candidate.subject
+          : "Sem assunto",
+      description:
+        typeof candidate.description === "string" ? candidate.description : null,
+      notes: typeof candidate.notes === "string" ? candidate.notes : null,
+      contactedBy:
+        typeof candidate.contactedBy === "string" ? candidate.contactedBy : null,
+      createdAt:
+        typeof candidate.createdAt === "string" ? candidate.createdAt : null,
+    };
+  });
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return "Data indisponível";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Data inválida";
+  }
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function getContactTypeIcon(type: ContactType) {
+  switch (type) {
+    case "phone":
+      return <Phone className="h-4 w-4" />;
+    case "email":
+      return <Mail className="h-4 w-4" />;
+    case "whatsapp":
+      return <MessageCircle className="h-4 w-4" />;
+    case "in_person":
+      return <User className="h-4 w-4" />;
+    default:
+      return <MessageCircle className="h-4 w-4" />;
+  }
+}
+
+function getContactTypeLabel(type: ContactType) {
+  switch (type) {
+    case "phone":
+      return "Telefone";
+    case "email":
+      return "Email";
+    case "whatsapp":
+      return "WhatsApp";
+    case "in_person":
+      return "Presencial";
+    default:
+      return "Outro";
+  }
+}
+
+function getContactTypeColor(type: ContactType) {
+  switch (type) {
+    case "phone":
+      return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
+    case "email":
+      return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300";
+    case "whatsapp":
+      return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300";
+    case "in_person":
+      return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300";
+    default:
+      return "bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-300";
+  }
 }
 
 export function ContactHistoryModal({
@@ -24,102 +135,77 @@ export function ContactHistoryModal({
   trigger,
 }: ContactHistoryModalProps) {
   const [open, setOpen] = useState(false);
-  const [contactType, setContactType] = useState<"phone" | "email" | "whatsapp" | "in_person" | "other">("whatsapp");
+  const [contactType, setContactType] = useState<ContactType>("whatsapp");
   const [subject, setSubject] = useState("");
   const [description, setDescription] = useState("");
   const [notes, setNotes] = useState("");
   const [contactedBy, setContactedBy] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  // Queries
   const contactHistoryQuery = trpc.contact.getContactHistory.useQuery(
     { customerId },
-    { enabled: open }
+    {
+      enabled: open,
+      retry: false,
+      refetchOnWindowFocus: false,
+    }
   );
 
-  // Mutations
-  const createContactMutation = trpc.contact.createContactHistory.useMutation();
-  const deleteContactMutation = trpc.contact.deleteContactHistory.useMutation();
-
-  // Enviar novo contato
-  const handleCreateContact = async () => {
-    if (!subject.trim()) return;
-
-    try {
-      await createContactMutation.mutateAsync({
-        customerId,
-        contactType,
-        subject,
-        description: description || undefined,
-        notes: notes || undefined,
-        contactedBy: contactedBy || undefined,
-      });
-
-      // Limpar formulário
+  const createContactMutation = trpc.contact.createContactHistory.useMutation({
+    onSuccess: async () => {
+      toast.success("Contato registrado com sucesso.");
       setSubject("");
       setDescription("");
       setNotes("");
       setContactedBy("");
-
-      // Refetch
+      setContactType("whatsapp");
       await contactHistoryQuery.refetch();
-    } catch (error) {
-      console.error("Erro ao criar contato:", error);
-    }
-  };
+    },
+    onError: (error) => {
+      toast.error(error.message || "Erro ao registrar contato.");
+    },
+  });
 
-  // Deletar contato
-  const handleDeleteContact = async (id: string) => {
-    if (!confirm("Tem certeza que deseja deletar este contato?")) return;
-
-    try {
-      await deleteContactMutation.mutateAsync({ id });
+  const deleteContactMutation = trpc.contact.deleteContactHistory.useMutation({
+    onSuccess: async () => {
+      toast.success("Contato removido com sucesso.");
+      setDeletingId(null);
       await contactHistoryQuery.refetch();
-    } catch (error) {
-      console.error("Erro ao deletar contato:", error);
-    }
-  };
+    },
+    onError: (error) => {
+      setDeletingId(null);
+      toast.error(error.message || "Erro ao remover contato.");
+    },
+  });
 
-  // Ícone do tipo de contato
-  const getContactTypeIcon = (type: string) => {
-    switch (type) {
-      case "phone":
-        return <Phone className="w-4 h-4" />;
-      case "email":
-        return <Mail className="w-4 h-4" />;
-      case "whatsapp":
-        return <MessageCircle className="w-4 h-4" />;
-      case "in_person":
-        return <User className="w-4 h-4" />;
-      default:
-        return <MessageCircle className="w-4 h-4" />;
-    }
-  };
+  const contacts = useMemo(() => {
+    return normalizeContactHistoryPayload(contactHistoryQuery.data);
+  }, [contactHistoryQuery.data]);
 
-  // Cor do tipo de contato
-  const getContactTypeColor = (type: string) => {
-    switch (type) {
-      case "phone":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300";
-      case "email":
-        return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300";
-      case "whatsapp":
-        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300";
-      case "in_person":
-        return "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300";
-      default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300";
-    }
-  };
+  const handleCreateContact = async () => {
+    const trimmedSubject = subject.trim();
 
-  // Formatar data
-  const formatDate = (date: string | Date) => {
-    return new Date(date).toLocaleDateString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
+    if (!trimmedSubject) {
+      toast.error("Informe o assunto do contato.");
+      return;
+    }
+
+    await createContactMutation.mutateAsync({
+      customerId,
+      contactType,
+      subject: trimmedSubject,
+      description: description.trim() || undefined,
+      notes: notes.trim() || undefined,
+      contactedBy: contactedBy.trim() || undefined,
     });
+  };
+
+  const handleDeleteContact = async (id: string) => {
+    const confirmed = window.confirm("Tem certeza que deseja remover este contato?");
+    if (!confirmed) return;
+
+    setDeletingId(id);
+    await deleteContactMutation.mutateAsync({ id });
   };
 
   return (
@@ -127,43 +213,33 @@ export function ContactHistoryModal({
       <DialogTrigger asChild>
         {trigger || (
           <Button variant="outline" size="sm">
-            <MessageCircle className="w-4 h-4 mr-2" />
+            <MessageCircle className="mr-2 h-4 w-4" />
             Histórico de Contatos
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+
+      <DialogContent className="max-h-[80vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Histórico de Contatos - {customerName}</DialogTitle>
+          <DialogTitle>Histórico de Contatos — {customerName}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6">
-          {/* Novo Contato */}
-          <Card className="p-4 bg-gray-50 dark:bg-gray-900 border-dashed">
-            <h3 className="font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-              <Plus className="w-4 h-4" />
+          <Card className="border-dashed bg-gray-50 p-4 dark:bg-gray-900">
+            <h3 className="mb-4 flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
+              <Plus className="h-4 w-4" />
               Registrar Novo Contato
             </h3>
 
             <div className="space-y-3">
-              {/* Tipo de Contato */}
               <div>
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-2">
+                <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Tipo de Contato
                 </label>
                 <select
                   value={contactType}
-                  onChange={(e) =>
-                    setContactType(
-                      e.target.value as
-                        | "phone"
-                        | "email"
-                        | "whatsapp"
-                        | "in_person"
-                        | "other"
-                    )
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                  onChange={(e) => setContactType(e.target.value as ContactType)}
+                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
                 >
                   <option value="whatsapp">WhatsApp</option>
                   <option value="phone">Telefone</option>
@@ -173,9 +249,8 @@ export function ContactHistoryModal({
                 </select>
               </div>
 
-              {/* Assunto */}
               <div>
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-2">
+                <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Assunto *
                 </label>
                 <Input
@@ -185,37 +260,34 @@ export function ContactHistoryModal({
                 />
               </div>
 
-              {/* Descrição */}
               <div>
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-2">
+                <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Descrição
                 </label>
                 <textarea
                   placeholder="Detalhes do contato..."
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white resize-none"
+                  className="w-full resize-none rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
                   rows={2}
                 />
               </div>
 
-              {/* Notas */}
               <div>
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-2">
+                <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Notas
                 </label>
                 <textarea
                   placeholder="Notas adicionais..."
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white resize-none"
+                  className="w-full resize-none rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
                   rows={2}
                 />
               </div>
 
-              {/* Quem fez contato */}
               <div>
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-2">
+                <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Quem fez o contato
                 </label>
                 <Input
@@ -226,18 +298,18 @@ export function ContactHistoryModal({
               </div>
 
               <Button
-                onClick={handleCreateContact}
+                onClick={() => void handleCreateContact()}
                 disabled={createContactMutation.isPending || !subject.trim()}
                 className="w-full bg-orange-500 hover:bg-orange-600"
               >
                 {createContactMutation.isPending ? (
                   <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Salvando...
                   </>
                 ) : (
                   <>
-                    <Plus className="w-4 h-4 mr-2" />
+                    <Plus className="mr-2 h-4 w-4" />
                     Registrar Contato
                   </>
                 )}
@@ -245,42 +317,43 @@ export function ContactHistoryModal({
             </div>
           </Card>
 
-          {/* Lista de Contatos */}
           <div>
-            <h3 className="font-semibold text-gray-900 dark:text-white mb-3">
+            <h3 className="mb-3 font-semibold text-gray-900 dark:text-white">
               Contatos Anteriores
             </h3>
 
             {contactHistoryQuery.isLoading ? (
               <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin text-orange-500" />
+                <Loader2 className="h-6 w-6 animate-spin text-orange-500" />
               </div>
-            ) : contactHistoryQuery.data?.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                <MessageCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                <p>Nenhum contato registrado ainda</p>
+            ) : contactHistoryQuery.isError ? (
+              <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
+                Não foi possível carregar o histórico de contatos agora.
+              </div>
+            ) : contacts.length === 0 ? (
+              <div className="py-8 text-center text-gray-500">
+                <MessageCircle className="mx-auto mb-2 h-12 w-12 opacity-50" />
+                <p>Nenhum contato registrado ainda.</p>
               </div>
             ) : (
-              <div className="space-y-3 max-h-96 overflow-y-auto">
-                {contactHistoryQuery.data?.map((contact: any) => (
+              <div className="max-h-96 space-y-3 overflow-y-auto">
+                {contacts.map((contact) => (
                   <Card
                     key={contact.id}
-                    className="p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
+                    className="border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800"
                   >
                     <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="mb-2 flex items-center gap-2">
                           <span
-                            className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${getContactTypeColor(
+                            className={`inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium ${getContactTypeColor(
                               contact.contactType
                             )}`}
                           >
                             {getContactTypeIcon(contact.contactType)}
-                            {contact.contactType === "in_person"
-                              ? "Presencial"
-                              : contact.contactType.charAt(0).toUpperCase() +
-                                contact.contactType.slice(1)}
+                            {getContactTypeLabel(contact.contactType)}
                           </span>
+
                           <span className="text-xs text-gray-500 dark:text-gray-400">
                             {formatDate(contact.createdAt)}
                           </span>
@@ -290,36 +363,36 @@ export function ContactHistoryModal({
                           {contact.subject}
                         </h4>
 
-                        {contact.description && (
-                          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                        {contact.description ? (
+                          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
                             {contact.description}
                           </p>
-                        )}
+                        ) : null}
 
-                        {contact.notes && (
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 italic">
+                        {contact.notes ? (
+                          <p className="mt-1 text-xs italic text-gray-500 dark:text-gray-400">
                             Notas: {contact.notes}
                           </p>
-                        )}
+                        ) : null}
 
-                        {contact.contactedBy && (
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        {contact.contactedBy ? (
+                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                             Por: {contact.contactedBy}
                           </p>
-                        )}
+                        ) : null}
                       </div>
 
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleDeleteContact(contact.id)}
-                        disabled={deleteContactMutation.isPending}
-                        className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                        onClick={() => void handleDeleteContact(contact.id)}
+                        disabled={deleteContactMutation.isPending && deletingId === contact.id}
+                        className="text-red-500 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-900/20"
                       >
-                        {deleteContactMutation.isPending ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
+                        {deleteContactMutation.isPending && deletingId === contact.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
                         ) : (
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="h-4 w-4" />
                         )}
                       </Button>
                     </div>

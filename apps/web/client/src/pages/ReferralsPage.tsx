@@ -1,23 +1,208 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
+import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Copy, Gift, Users, TrendingUp, Share2, Check } from "lucide-react";
+import {
+  AlertTriangle,
+  Check,
+  Copy,
+  Gift,
+  Loader2,
+  Share2,
+  TrendingUp,
+  Users,
+} from "lucide-react";
+
+type ReferralStats = {
+  totalReferrals: number;
+  completedReferrals: number;
+  totalCredits: number;
+};
+
+type ReferralBalance = {
+  available: number;
+  used: number;
+};
+
+type ReferralItem = {
+  id: string;
+  referredUserName: string | null;
+  referredUserEmail: string | null;
+  creditAmount: number;
+  status: string | null;
+  createdAt: string | null;
+};
+
+type ReferralListResponse = {
+  data: ReferralItem[];
+};
+
+type GenerateCodeResponse = {
+  code: string;
+  referralUrl: string;
+};
 
 function formatMoney(value: number) {
   return `R$ ${Number(value || 0).toFixed(2)}`;
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return "N/A";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "N/A";
+  }
+
+  return new Intl.DateTimeFormat("pt-BR").format(date);
+}
+
+function normalizeStatsPayload(payload: unknown): ReferralStats {
+  const raw = (payload as { data?: unknown } | null | undefined)?.data ?? payload;
+
+  if (!raw || typeof raw !== "object") {
+    return {
+      totalReferrals: 0,
+      completedReferrals: 0,
+      totalCredits: 0,
+    };
+  }
+
+  const candidate = raw as Partial<ReferralStats>;
+
+  return {
+    totalReferrals:
+      typeof candidate.totalReferrals === "number" &&
+      Number.isFinite(candidate.totalReferrals)
+        ? candidate.totalReferrals
+        : 0,
+    completedReferrals:
+      typeof candidate.completedReferrals === "number" &&
+      Number.isFinite(candidate.completedReferrals)
+        ? candidate.completedReferrals
+        : 0,
+    totalCredits:
+      typeof candidate.totalCredits === "number" &&
+      Number.isFinite(candidate.totalCredits)
+        ? candidate.totalCredits
+        : 0,
+  };
+}
+
+function normalizeBalancePayload(payload: unknown): ReferralBalance {
+  const raw = (payload as { data?: unknown } | null | undefined)?.data ?? payload;
+
+  if (!raw || typeof raw !== "object") {
+    return {
+      available: 0,
+      used: 0,
+    };
+  }
+
+  const candidate = raw as Partial<ReferralBalance>;
+
+  return {
+    available:
+      typeof candidate.available === "number" && Number.isFinite(candidate.available)
+        ? candidate.available
+        : 0,
+    used: typeof candidate.used === "number" && Number.isFinite(candidate.used)
+      ? candidate.used
+      : 0,
+  };
+}
+
+function normalizeListPayload(payload: unknown): ReferralItem[] {
+  const raw = (payload as { data?: unknown } | null | undefined)?.data ?? payload;
+
+  if (Array.isArray(raw)) {
+    return raw.map((item) => normalizeReferralItem(item));
+  }
+
+  if (raw && typeof raw === "object" && Array.isArray((raw as ReferralListResponse).data)) {
+    return (raw as ReferralListResponse).data.map((item) => normalizeReferralItem(item));
+  }
+
+  return [];
+}
+
+function normalizeReferralItem(item: unknown): ReferralItem {
+  const candidate = (item ?? {}) as Partial<ReferralItem>;
+
+  return {
+    id: typeof candidate.id === "string" ? candidate.id : "",
+    referredUserName:
+      typeof candidate.referredUserName === "string"
+        ? candidate.referredUserName
+        : null,
+    referredUserEmail:
+      typeof candidate.referredUserEmail === "string"
+        ? candidate.referredUserEmail
+        : null,
+    creditAmount:
+      typeof candidate.creditAmount === "number" && Number.isFinite(candidate.creditAmount)
+        ? candidate.creditAmount
+        : 0,
+    status: typeof candidate.status === "string" ? candidate.status : null,
+    createdAt: typeof candidate.createdAt === "string" ? candidate.createdAt : null,
+  };
+}
+
+function normalizeGenerateCodePayload(payload: unknown): GenerateCodeResponse | null {
+  const raw = (payload as { data?: unknown } | null | undefined)?.data ?? payload;
+
+  if (!raw || typeof raw !== "object") {
+    return null;
+  }
+
+  const candidate = raw as Partial<GenerateCodeResponse>;
+
+  return {
+    code: typeof candidate.code === "string" ? candidate.code : "",
+    referralUrl:
+      typeof candidate.referralUrl === "string" ? candidate.referralUrl : "",
+  };
+}
+
+function getReferralStatusLabel(status?: string | null) {
+  switch (status) {
+    case "PENDING":
+      return "Pendente";
+    case "COMPLETED":
+      return "Concluída";
+    case "CANCELLED":
+      return "Cancelada";
+    case "EXPIRED":
+      return "Expirada";
+    default:
+      return status || "N/A";
+  }
 }
 
 export default function ReferralsPage() {
   const { isAuthenticated, isInitializing } = useAuth();
   const canQuery = isAuthenticated && !isInitializing;
 
-  const [referralCode, setReferralCode] = useState<string>("");
-  const [referralUrl, setReferralUrl] = useState<string>("");
+  const [referralCode, setReferralCode] = useState("");
+  const [referralUrl, setReferralUrl] = useState("");
   const [copied, setCopied] = useState(false);
 
-  const generateCodeMutation = trpc.referrals.generateCode.useMutation();
+  const generateCodeMutation = trpc.referrals.generateCode.useMutation({
+    onSuccess: (data) => {
+      const normalized = normalizeGenerateCodePayload(data);
+
+      setReferralCode(normalized?.code ?? "");
+      setReferralUrl(normalized?.referralUrl ?? "");
+      toast.success("Código de referência gerado com sucesso.");
+    },
+    onError: (error) => {
+      toast.error(error.message || "Erro ao gerar código de referência.");
+    },
+  });
+
   const statsQuery = trpc.referrals.stats.useQuery(
     { page: 1, limit: 100 },
     {
@@ -26,6 +211,7 @@ export default function ReferralsPage() {
       refetchOnWindowFocus: false,
     }
   );
+
   const referralsQuery = trpc.referrals.list.useQuery(
     { page: 1, limit: 20 },
     {
@@ -34,6 +220,7 @@ export default function ReferralsPage() {
       refetchOnWindowFocus: false,
     }
   );
+
   const creditsQuery = trpc.referrals.getBalance.useQuery(undefined, {
     enabled: canQuery,
     retry: false,
@@ -41,34 +228,53 @@ export default function ReferralsPage() {
   });
 
   useEffect(() => {
-    if (generateCodeMutation.data) {
-      setReferralCode(generateCodeMutation.data.code ?? "");
-      setReferralUrl(generateCodeMutation.data.referralUrl ?? "");
-    }
+    if (!generateCodeMutation.data) return;
+
+    const normalized = normalizeGenerateCodePayload(generateCodeMutation.data);
+    setReferralCode(normalized?.code ?? "");
+    setReferralUrl(normalized?.referralUrl ?? "");
   }, [generateCodeMutation.data]);
+
+  const stats = useMemo(() => normalizeStatsPayload(statsQuery.data), [statsQuery.data]);
+  const credits = useMemo(
+    () => normalizeBalancePayload(creditsQuery.data),
+    [creditsQuery.data]
+  );
+  const referrals = useMemo(
+    () => normalizeListPayload(referralsQuery.data),
+    [referralsQuery.data]
+  );
+
+  const isLoadingCards =
+    statsQuery.isLoading || referralsQuery.isLoading || creditsQuery.isLoading;
+
+  const hasTopLevelError =
+    statsQuery.isError || creditsQuery.isError;
 
   const handleGenerateCode = async () => {
     await generateCodeMutation.mutateAsync();
   };
 
   const handleCopyCode = async () => {
-    if (!referralUrl) return;
-    await navigator.clipboard.writeText(referralUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (!referralUrl) {
+      toast.error("Nenhum link de referência disponível para copiar.");
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(referralUrl);
+      setCopied(true);
+      toast.success("Link copiado com sucesso.");
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Não foi possível copiar o link.");
+    }
   };
-
-  const stats = statsQuery.data;
-  const credits = creditsQuery.data;
-  const referrals = referralsQuery.data?.data ?? [];
-
-  const isLoading =
-    statsQuery.isLoading || referralsQuery.isLoading || creditsQuery.isLoading;
 
   if (isInitializing) {
     return (
       <div className="mx-auto w-full max-w-6xl space-y-8 p-6">
-        <div className="rounded-xl border p-4 text-sm opacity-70">
+        <div className="rounded-xl border p-4 text-sm opacity-70 dark:border-zinc-800">
           Carregando sessão...
         </div>
       </div>
@@ -78,7 +284,7 @@ export default function ReferralsPage() {
   if (!isAuthenticated) {
     return (
       <div className="mx-auto w-full max-w-6xl space-y-8 p-6">
-        <div className="rounded-xl border p-4 text-sm opacity-70">
+        <div className="rounded-xl border p-4 text-sm opacity-70 dark:border-zinc-800">
           Faça login para visualizar referências.
         </div>
       </div>
@@ -86,7 +292,7 @@ export default function ReferralsPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-8">
+    <div className="mx-auto w-full max-w-6xl space-y-8 p-6">
       <div>
         <h1 className="mb-2 text-3xl font-bold text-gray-900 dark:text-white">
           Sistema de Referências
@@ -95,6 +301,18 @@ export default function ReferralsPage() {
           "Se você conecta pessoas, você faz parte do valor"
         </p>
       </div>
+
+      {hasTopLevelError ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
+          <div className="flex items-center gap-2 font-medium">
+            <AlertTriangle className="h-4 w-4" />
+            Erro ao carregar dados de referências
+          </div>
+          <p className="mt-2">
+            Parte dos indicadores não pôde ser carregada agora.
+          </p>
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
@@ -106,10 +324,10 @@ export default function ReferralsPage() {
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-gray-900 dark:text-white">
-              {isLoading ? "..." : stats?.totalReferrals ?? 0}
+              {isLoadingCards ? "..." : stats.totalReferrals}
             </p>
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              {isLoading ? "..." : stats?.completedReferrals ?? 0} concluídas
+              {isLoadingCards ? "..." : stats.completedReferrals} concluídas
             </p>
           </CardContent>
         </Card>
@@ -123,7 +341,7 @@ export default function ReferralsPage() {
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-              {isLoading ? "..." : formatMoney(stats?.totalCredits ?? 0)}
+              {isLoadingCards ? "..." : formatMoney(stats.totalCredits)}
             </p>
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               Total acumulado
@@ -140,7 +358,7 @@ export default function ReferralsPage() {
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-              {isLoading ? "..." : formatMoney(credits?.available ?? 0)}
+              {isLoadingCards ? "..." : formatMoney(credits.available)}
             </p>
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               Pronto para usar
@@ -157,7 +375,7 @@ export default function ReferralsPage() {
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-              {isLoading ? "..." : formatMoney(credits?.used ?? 0)}
+              {isLoadingCards ? "..." : formatMoney(credits.used)}
             </p>
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               Já resgatados
@@ -175,8 +393,7 @@ export default function ReferralsPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Compartilhe este link com seus contatos e ganhe créditos para cada
-            pessoa que se cadastrar.
+            Compartilhe este link com seus contatos e ganhe créditos para cada pessoa que se cadastrar.
           </p>
 
           {referralCode ? (
@@ -245,9 +462,14 @@ export default function ReferralsPage() {
               className="w-full"
               disabled={generateCodeMutation.isPending}
             >
-              {generateCodeMutation.isPending
-                ? "Gerando..."
-                : "Gerar Código de Referência"}
+              {generateCodeMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Gerando...
+                </>
+              ) : (
+                "Gerar Código de Referência"
+              )}
             </Button>
           )}
         </CardContent>
@@ -261,6 +483,16 @@ export default function ReferralsPage() {
           {referralsQuery.isLoading ? (
             <div className="py-8 text-center text-gray-600 dark:text-gray-400">
               Carregando referências...
+            </div>
+          ) : referralsQuery.isError ? (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
+              <div className="flex items-center gap-2 font-medium">
+                <AlertTriangle className="h-4 w-4" />
+                Erro ao carregar referências
+              </div>
+              <p className="mt-2">
+                Não foi possível carregar a lista de indicações agora.
+              </p>
             </div>
           ) : referrals.length > 0 ? (
             <div className="overflow-x-auto">
@@ -285,7 +517,7 @@ export default function ReferralsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {referrals.map((referral: any) => (
+                  {referrals.map((referral) => (
                     <tr
                       key={referral.id}
                       className="border-b border-gray-100 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/50"
@@ -297,17 +529,13 @@ export default function ReferralsPage() {
                         {referral.referredUserEmail || "N/A"}
                       </td>
                       <td className="px-4 py-3 font-semibold text-green-600 dark:text-green-400">
-                        {formatMoney(referral.creditAmount ?? 0)}
+                        {formatMoney(referral.creditAmount)}
                       </td>
                       <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
-                        {referral.status || "N/A"}
+                        {getReferralStatusLabel(referral.status)}
                       </td>
                       <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
-                        {referral.createdAt
-                          ? new Date(referral.createdAt).toLocaleDateString(
-                              "pt-BR"
-                            )
-                          : "N/A"}
+                        {formatDate(referral.createdAt)}
                       </td>
                     </tr>
                   ))}
@@ -318,8 +546,7 @@ export default function ReferralsPage() {
             <div className="py-8 text-center">
               <Users className="mx-auto mb-3 h-12 w-12 opacity-50 dark:text-gray-600" />
               <p className="text-gray-600 dark:text-gray-400">
-                Você ainda não tem nenhuma referência. Comece a compartilhar seu
-                código.
+                Você ainda não tem nenhuma referência. Comece a compartilhar seu código.
               </p>
             </div>
           )}

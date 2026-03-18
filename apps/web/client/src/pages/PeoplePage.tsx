@@ -10,7 +10,6 @@ import {
   ShieldAlert,
   UserCheck,
   Users,
-  UserX,
   Pencil,
   Power,
 } from "lucide-react";
