@@ -644,6 +644,41 @@ export class FinanceService {
       }),
     )
 
+    try {
+      await this.risk.recalculateCustomerOperationalRisk(
+        input.orgId,
+        result.customerId,
+        'PAYMENT_RECEIVED',
+      )
+    } catch (err) {
+      this.logger.warn(
+        `Falha ao recalcular risco após pagamento. orgId=${input.orgId} chargeId=${input.chargeId} customerId=${result.customerId} err=${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      )
+    }
+
+    try {
+      await this.automation.executeTrigger({
+        orgId: input.orgId,
+        trigger: 'PAYMENT_RECEIVED',
+        payload: {
+          chargeId: input.chargeId,
+          paymentId: result.paymentId,
+          customerId: result.customerId,
+          customerPhone: result.customerPhone ?? null,
+          amountCents: input.amountCents,
+          entityId: input.chargeId,
+        },
+      })
+    } catch (err) {
+      this.logger.warn(
+        `Falha ao executar automação PAYMENT_RECEIVED. orgId=${input.orgId} chargeId=${input.chargeId} paymentId=${result.paymentId} err=${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      )
+    }
+
     return { paymentId: result.paymentId }
   }
 

@@ -86,6 +86,15 @@ function resolveDueDateForServiceOrder(params: {
   return addDays(base, 3)
 }
 
+type FinancialSummary = {
+  hasCharge: boolean
+  chargeId: string | null
+  chargeStatus: 'PENDING' | 'PAID' | 'OVERDUE' | 'CANCELED' | null
+  chargeAmountCents: number | null
+  chargeDueDate: Date | null
+  paidAt: Date | null
+}
+
 @Injectable()
 export class ServiceOrdersService {
   constructor(
@@ -138,6 +147,115 @@ export class ServiceOrdersService {
     }
   }
 
+  private buildFinancialSummary(
+    charge?:
+      | {
+          id: string
+          status: 'PENDING' | 'PAID' | 'OVERDUE' | 'CANCELED'
+          amountCents: number
+          dueDate: Date
+          paidAt: Date | null
+        }
+      | null,
+  ): FinancialSummary {
+    if (!charge) {
+      return {
+        hasCharge: false,
+        chargeId: null,
+        chargeStatus: null,
+        chargeAmountCents: null,
+        chargeDueDate: null,
+        paidAt: null,
+      }
+    }
+
+    return {
+      hasCharge: true,
+      chargeId: charge.id,
+      chargeStatus: charge.status,
+      chargeAmountCents: charge.amountCents,
+      chargeDueDate: charge.dueDate,
+      paidAt: charge.paidAt ?? null,
+    }
+  }
+
+  private async attachFinancialSummary<T extends { id: string }>(
+    orgId: string,
+    serviceOrders: T[],
+  ): Promise<Array<T & { financialSummary: FinancialSummary }>> {
+    if (serviceOrders.length === 0) return []
+
+    const serviceOrderIds = serviceOrders.map((item) => item.id)
+
+    const charges = await this.prisma.charge.findMany({
+      where: {
+        orgId,
+        serviceOrderId: { in: serviceOrderIds },
+      },
+      select: {
+        id: true,
+        serviceOrderId: true,
+        status: true,
+        amountCents: true,
+        dueDate: true,
+        paidAt: true,
+        createdAt: true,
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    })
+
+    const priority: Record<'OVERDUE' | 'PENDING' | 'PAID' | 'CANCELED', number> = {
+      OVERDUE: 4,
+      PENDING: 3,
+      PAID: 2,
+      CANCELED: 1,
+    }
+
+    const chargeByServiceOrderId = new Map<
+      string,
+      {
+        id: string
+        status: 'PENDING' | 'PAID' | 'OVERDUE' | 'CANCELED'
+        amountCents: number
+        dueDate: Date
+        paidAt: Date | null
+      }
+    >()
+
+    for (const charge of charges) {
+      if (!charge.serviceOrderId) continue
+
+      const current = chargeByServiceOrderId.get(charge.serviceOrderId)
+      if (!current) {
+        chargeByServiceOrderId.set(charge.serviceOrderId, {
+          id: charge.id,
+          status: charge.status,
+          amountCents: charge.amountCents,
+          dueDate: charge.dueDate,
+          paidAt: charge.paidAt ?? null,
+        })
+        continue
+      }
+
+      if (priority[charge.status] > priority[current.status]) {
+        chargeByServiceOrderId.set(charge.serviceOrderId, {
+          id: charge.id,
+          status: charge.status,
+          amountCents: charge.amountCents,
+          dueDate: charge.dueDate,
+          paidAt: charge.paidAt ?? null,
+        })
+      }
+    }
+
+    return serviceOrders.map((serviceOrder) => ({
+      ...serviceOrder,
+      financialSummary: this.buildFinancialSummary(
+        chargeByServiceOrderId.get(serviceOrder.id) ?? null,
+      ),
+    }))
+  }
+
   async list(
     orgId: string,
     filters: {
@@ -168,7 +286,7 @@ export class ServiceOrdersService {
       where.status = filters.status
     }
 
-    const [data, total] = await Promise.all([
+    const [rows, total] = await Promise.all([
       this.prisma.serviceOrder.findMany({
         where,
         orderBy: { createdAt: 'desc' },
@@ -184,6 +302,8 @@ export class ServiceOrdersService {
       }),
       this.prisma.serviceOrder.count({ where }),
     ])
+
+    const data = await this.attachFinancialSummary(orgId, rows)
 
     return {
       data,
@@ -207,7 +327,14 @@ export class ServiceOrdersService {
     })
 
     if (!os) throw new NotFoundException('Ordem de serviço não encontrada')
-    return os
+
+    const [enriched] = await this.attachFinancialSummary(orgId, [os])
+
+    if (!enriched) {
+      throw new NotFoundException('Ordem de serviço não encontrada')
+    }
+
+    return enriched
   }
 
   async create(params: {
@@ -355,7 +482,8 @@ export class ServiceOrdersService {
     await this.syncOperationalForPeople(params.orgId, [created.assignedToPersonId])
     await this.onboardingService.completeOnboardingStep(params.orgId, 'createService')
 
-    return created
+    const [enriched] = await this.attachFinancialSummary(params.orgId, [created])
+    return enriched ?? { ...created, financialSummary: this.buildFinancialSummary(null) }
   }
 
   async checkAndNotifyOverdueServiceOrders() {
@@ -636,6 +764,7 @@ export class ServiceOrdersService {
 
     await this.syncOperationalForPeople(params.orgId, impacted)
 
-    return updated
+    const [enriched] = await this.attachFinancialSummary(params.orgId, [updated])
+    return enriched ?? { ...updated, financialSummary: this.buildFinancialSummary(null) }
   }
 }

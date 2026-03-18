@@ -23,6 +23,8 @@ type ServiceOrderStatus =
   | "DONE"
   | "CANCELED";
 
+type ChargeStatus = "PENDING" | "PAID" | "OVERDUE" | "CANCELED";
+
 type CustomerRef = {
   id: string;
   name: string;
@@ -32,6 +34,15 @@ type CustomerRef = {
 type AssignedPersonRef = {
   id: string;
   name: string;
+};
+
+type FinancialSummary = {
+  hasCharge: boolean;
+  chargeId: string | null;
+  chargeStatus: ChargeStatus | null;
+  chargeAmountCents: number | null;
+  chargeDueDate?: string | null;
+  paidAt?: string | null;
 };
 
 type ServiceOrder = {
@@ -52,6 +63,7 @@ type ServiceOrder = {
   dueDate?: string | null;
   createdAt?: string;
   updatedAt?: string;
+  financialSummary?: FinancialSummary | null;
 };
 
 type ServiceOrdersPagination = {
@@ -69,17 +81,6 @@ type ServiceOrdersListResult = {
 type GenerateChargeResponse = {
   created?: boolean;
   chargeId?: string;
-};
-
-type ChargeStatus = "PENDING" | "PAID" | "OVERDUE" | "CANCELED";
-
-type ChargeRef = {
-  id: string;
-  serviceOrderId?: string | null;
-  customerId: string;
-  amountCents: number;
-  status: ChargeStatus;
-  dueDate?: string | null;
 };
 
 const STATUS_LABELS: Record<ServiceOrderStatus, string> = {
@@ -170,8 +171,8 @@ function formatCurrency(cents?: number | null) {
   }).format(amount / 100);
 }
 
-function getChargeBadge(charge?: ChargeRef | null) {
-  if (!charge) {
+function getChargeBadge(financialSummary?: FinancialSummary | null) {
+  if (!financialSummary?.hasCharge || !financialSummary.chargeStatus) {
     return {
       label: "Sem cobrança",
       className:
@@ -179,7 +180,7 @@ function getChargeBadge(charge?: ChargeRef | null) {
     };
   }
 
-  switch (charge.status) {
+  switch (financialSummary.chargeStatus) {
     case "PAID":
       return {
         label: "Cobrança paga",
@@ -234,16 +235,15 @@ export default function ServiceOrdersPage() {
     refetchOnWindowFocus: false,
   });
 
-  const serviceOrdersResult = (listQuery.data ??
-    {
-      data: [],
-      pagination: {
-        page: 1,
-        limit,
-        total: 0,
-        pages: 1,
-      },
-    }) as ServiceOrdersListResult;
+  const serviceOrdersResult = (listQuery.data ?? {
+    data: [],
+    pagination: {
+      page: 1,
+      limit,
+      total: 0,
+      pages: 1,
+    },
+  }) as ServiceOrdersListResult;
 
   const serviceOrders = useMemo(() => {
     return Array.isArray(serviceOrdersResult.data) ? serviceOrdersResult.data : [];
@@ -256,27 +256,10 @@ export default function ServiceOrdersPage() {
     pages: 1,
   };
 
-  const visibleServiceOrderIds = useMemo(() => {
-    return serviceOrders.map((os) => String(os.id));
-  }, [serviceOrders]);
-
-  const chargeQueries = trpc.useQueries((t) =>
-    visibleServiceOrderIds.map((serviceOrderId) =>
-      t.finance.charges.list({
-        page: 1,
-        limit: 10,
-        serviceOrderId,
-      })
-    )
-  );
-
   const updateMutation = trpc.nexo.serviceOrders.update.useMutation({
     onSuccess: () => {
       toast.success("OS atualizada com sucesso!");
-      void Promise.all([
-        listQuery.refetch(),
-        ...chargeQueries.map((query) => query.refetch()),
-      ]);
+      void listQuery.refetch();
     },
     onError: (err) => {
       toast.error(err.message || "Erro ao atualizar OS");
@@ -294,54 +277,6 @@ export default function ServiceOrdersPage() {
       setProcessingId(null);
     },
   });
-
-  const charges = useMemo(() => {
-    const rows: ChargeRef[] = [];
-
-    for (const query of chargeQueries) {
-      const payload = query.data as any;
-      const items = Array.isArray(payload?.data)
-        ? payload.data
-        : Array.isArray(payload?.items)
-          ? payload.items
-          : Array.isArray(payload)
-            ? payload
-            : [];
-
-      for (const item of items) {
-        rows.push(item as ChargeRef);
-      }
-    }
-
-    return rows;
-  }, [chargeQueries]);
-
-  const chargeByServiceOrderId = useMemo(() => {
-    const map = new Map<string, ChargeRef>();
-
-    for (const charge of charges) {
-      if (!charge?.serviceOrderId) continue;
-
-      const current = map.get(String(charge.serviceOrderId));
-      if (!current) {
-        map.set(String(charge.serviceOrderId), charge);
-        continue;
-      }
-
-      const priority: Record<ChargeStatus, number> = {
-        OVERDUE: 4,
-        PENDING: 3,
-        PAID: 2,
-        CANCELED: 1,
-      };
-
-      if (priority[charge.status] > priority[current.status]) {
-        map.set(String(charge.serviceOrderId), charge);
-      }
-    }
-
-    return map;
-  }, [charges]);
 
   const customers = useMemo(() => {
     const payload = customersQuery.data;
@@ -362,13 +297,6 @@ export default function ServiceOrdersPage() {
       toast.error("Erro ao carregar ordens de serviço: " + listQuery.error.message);
     }
   }, [listQuery.error]);
-
-  useEffect(() => {
-    const firstError = chargeQueries.find((query) => query.error)?.error;
-    if (firstError) {
-      toast.error("Erro ao carregar cobranças vinculadas: " + firstError.message);
-    }
-  }, [chargeQueries]);
 
   const handleStatusChange = (id: string, newStatus: ServiceOrderStatus) => {
     setProcessingId(id);
@@ -414,7 +342,6 @@ export default function ServiceOrdersPage() {
 
       await Promise.all([
         listQuery.refetch(),
-        ...chargeQueries.map((query) => query.refetch()),
         utils.finance.charges.list.invalidate(),
         utils.finance.charges.stats.invalidate(),
       ]);
@@ -447,16 +374,14 @@ export default function ServiceOrdersPage() {
 
   const doneWithCharge = serviceOrders.filter((os) => {
     if (os.status !== "DONE") return false;
-    return chargeByServiceOrderId.has(os.id);
+    return Boolean(os.financialSummary?.hasCharge);
   }).length;
 
   const doneWithoutCharge = serviceOrders.filter((os) => {
     if (os.status !== "DONE") return false;
     if (!os.amountCents || os.amountCents <= 0) return false;
-    return !chargeByServiceOrderId.has(os.id);
+    return !os.financialSummary?.hasCharge;
   }).length;
-
-  const isAnyChargeFetching = chargeQueries.some((query) => query.isFetching);
 
   return (
     <div className="space-y-6 p-6">
@@ -475,18 +400,11 @@ export default function ServiceOrdersPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() =>
-              void Promise.all([
-                listQuery.refetch(),
-                ...chargeQueries.map((query) => query.refetch()),
-              ])
-            }
-            disabled={listQuery.isFetching || isAnyChargeFetching}
+            onClick={() => void listQuery.refetch()}
+            disabled={listQuery.isFetching}
           >
             <RefreshCw
-              className={`mr-1 h-4 w-4 ${
-                listQuery.isFetching || isAnyChargeFetching ? "animate-spin" : ""
-              }`}
+              className={`mr-1 h-4 w-4 ${listQuery.isFetching ? "animate-spin" : ""}`}
             />
             Atualizar
           </Button>
@@ -592,13 +510,13 @@ export default function ServiceOrdersPage() {
         <div className="space-y-3">
           {serviceOrders.map((os) => {
             const isProcessing = processingId === os.id;
-            const charge = chargeByServiceOrderId.get(os.id) ?? null;
-            const chargeBadge = getChargeBadge(charge);
+            const financialSummary = os.financialSummary ?? null;
+            const chargeBadge = getChargeBadge(financialSummary);
             const canGenerateCharge =
               os.status === "DONE" &&
               !!os.amountCents &&
               os.amountCents > 0 &&
-              !charge;
+              !financialSummary?.hasCharge;
 
             return (
               <div
@@ -678,16 +596,22 @@ export default function ServiceOrdersPage() {
                       </p>
                     ) : null}
 
-                    {charge ? (
+                    {financialSummary?.hasCharge ? (
                       <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs dark:border-gray-700 dark:bg-gray-900/40">
                         <p className="flex items-center gap-1 font-medium text-gray-900 dark:text-white">
                           <Receipt className="h-3.5 w-3.5" />
                           Cobrança vinculada
                         </p>
                         <p className="mt-1 text-gray-500 dark:text-gray-400">
-                          Status: {charge.status} • Valor {formatCurrency(charge.amountCents)} •
-                          Vencimento {formatDate(charge.dueDate)}
+                          Status: {financialSummary.chargeStatus ?? "—"} • Valor{" "}
+                          {formatCurrency(financialSummary.chargeAmountCents)} • Vencimento{" "}
+                          {formatDate(financialSummary.chargeDueDate)}
                         </p>
+                        {financialSummary.paidAt ? (
+                          <p className="mt-1 text-green-600 dark:text-green-400">
+                            Pago em {formatDateTime(financialSummary.paidAt)}
+                          </p>
+                        ) : null}
                       </div>
                     ) : null}
 
@@ -700,13 +624,13 @@ export default function ServiceOrdersPage() {
                     {os.status === "DONE" &&
                     os.amountCents &&
                     os.amountCents > 0 &&
-                    !charge ? (
+                    !financialSummary?.hasCharge ? (
                       <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-800 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-300">
                         O.S. concluída com valor definido, mas ainda sem cobrança vinculada.
                       </div>
                     ) : null}
 
-                    {charge?.status === "PAID" ? (
+                    {financialSummary?.chargeStatus === "PAID" ? (
                       <div className="mt-3 rounded-lg border border-green-200 bg-green-50 p-3 text-xs text-green-800 dark:border-green-900/50 dark:bg-green-900/20 dark:text-green-300">
                         Fluxo financeiro fechado para esta O.S.
                       </div>
@@ -766,7 +690,7 @@ export default function ServiceOrdersPage() {
                           return;
                         }
 
-                        if (charge) {
+                        if (financialSummary?.hasCharge) {
                           handleOpenCharge(os.id);
                         }
                       }}
@@ -776,7 +700,7 @@ export default function ServiceOrdersPage() {
                       <Wallet className="h-4 w-4" />
                       {canGenerateCharge
                         ? "Gerar cobrança"
-                        : charge
+                        : financialSummary?.hasCharge
                           ? "Ver cobrança"
                           : "Cobrança indisponível"}
                     </Button>
