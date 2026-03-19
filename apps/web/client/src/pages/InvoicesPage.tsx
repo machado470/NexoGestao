@@ -10,6 +10,7 @@ import {
   RefreshCw,
   Search,
   Trash2,
+  ReceiptText,
 } from "lucide-react";
 
 type InvoiceStatus = "DRAFT" | "ISSUED" | "PAID" | "CANCELLED";
@@ -362,6 +363,8 @@ export default function InvoicesPage() {
     await deleteMutation.mutateAsync({ id });
   };
 
+  const hasFilters = Boolean(query) || Boolean(statusFilter);
+
   if (isInitializing) {
     return (
       <div className="flex h-[80vh] items-center justify-center">
@@ -384,9 +387,12 @@ export default function InvoicesPage() {
     <div className="space-y-4 p-6">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Faturas</h1>
+          <h1 className="flex items-center gap-2 text-2xl font-semibold">
+            <ReceiptText className="h-6 w-6 text-orange-500" />
+            Faturas
+          </h1>
           <p className="text-sm opacity-70">
-            Módulo documental comercial. Pagamento real continua no financeiro.
+            Gestão documental comercial. Liquidação financeira continua no módulo de cobranças e pagamentos.
           </p>
         </div>
 
@@ -412,8 +418,7 @@ export default function InvoicesPage() {
       </div>
 
       <div className="rounded-xl border p-3 text-sm opacity-80 dark:border-zinc-800">
-        Fatura não quita cobrança automaticamente. Para registrar pagamento, use o
-        fluxo financeiro de cobranças e pagamentos.
+        Esta área registra faturas comerciais. O pagamento não é quitado automaticamente aqui.
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -423,18 +428,21 @@ export default function InvoicesPage() {
             {formatCurrencyFromCents(summary.totalIssued)}
           </div>
         </div>
+
         <div className="rounded-xl border p-3 dark:border-zinc-800">
           <div className="text-sm opacity-70">Total pago</div>
           <div className="mt-1 text-lg font-semibold">
             {formatCurrencyFromCents(summary.totalPaid)}
           </div>
         </div>
+
         <div className="rounded-xl border p-3 dark:border-zinc-800">
           <div className="text-sm opacity-70">Total geral</div>
           <div className="mt-1 text-lg font-semibold">
             {formatCurrencyFromCents(summary.total)}
           </div>
         </div>
+
         <div className="rounded-xl border p-3 dark:border-zinc-800">
           <div className="text-sm opacity-70">Pendentes</div>
           <div className="mt-1 text-lg font-semibold">{summary.pending}</div>
@@ -483,71 +491,81 @@ export default function InvoicesPage() {
             type="button"
             className="rounded border px-3 py-2"
             onClick={handleClearSearch}
-            disabled={!query && !searchInput && !statusFilter}
+            disabled={!hasFilters && !searchInput}
           >
             Limpar
           </button>
         </div>
 
-        {query || statusFilter ? (
-          <div className="text-xs opacity-70">
-            {query ? `Busca ativa: ${query}` : "Busca sem texto"}{" "}
-            {statusFilter ? `• Status: ${STATUS_LABEL[statusFilter]}` : ""}
+        {hasFilters ? (
+          <div className="flex flex-wrap gap-2 text-xs opacity-70">
+            {query ? (
+              <span className="rounded-full border px-3 py-1">
+                Busca: {query}
+              </span>
+            ) : null}
+            {statusFilter ? (
+              <span className="rounded-full border px-3 py-1">
+                Status: {STATUS_LABEL[statusFilter]}
+              </span>
+            ) : null}
           </div>
         ) : null}
       </div>
 
       {openCreate ? (
-        <div className="space-y-2 rounded-xl border p-3 dark:border-zinc-800">
+        <div className="space-y-3 rounded-xl border p-4 dark:border-zinc-800">
           <div className="flex items-center gap-2 text-sm font-medium">
-            <FileText className="h-4 w-4" />
+            <FileText className="h-4 w-4 text-orange-500" />
             Nova fatura
           </div>
 
-          <input
-            className="w-full rounded border p-2 dark:border-zinc-800 dark:bg-zinc-950"
-            placeholder="Número"
-            value={draft.number}
-            onChange={(e) =>
-              setDraft((state) => ({ ...state, number: e.target.value }))
-            }
-          />
+          <div className="grid gap-3 md:grid-cols-2">
+            <input
+              className="w-full rounded border p-2 dark:border-zinc-800 dark:bg-zinc-950"
+              placeholder="Número da fatura"
+              value={draft.number}
+              onChange={(e) =>
+                setDraft((state) => ({ ...state, number: e.target.value }))
+              }
+            />
 
-          <input
-            className="w-full rounded border p-2 dark:border-zinc-800 dark:bg-zinc-950"
-            type="number"
-            min="0.01"
-            step="0.01"
-            placeholder="Valor"
-            value={draft.amount}
-            onChange={(e) =>
-              setDraft((state) => ({ ...state, amount: e.target.value }))
-            }
-          />
+            <input
+              className="w-full rounded border p-2 dark:border-zinc-800 dark:bg-zinc-950"
+              type="number"
+              min="0.01"
+              step="0.01"
+              placeholder="Valor"
+              value={draft.amount}
+              onChange={(e) =>
+                setDraft((state) => ({ ...state, amount: e.target.value }))
+              }
+            />
 
-          <select
-            className="w-full rounded border p-2 dark:border-zinc-800 dark:bg-zinc-950"
-            value={draft.status}
-            onChange={(e) =>
-              setDraft((state) => ({
-                ...state,
-                status: e.target.value as EditableInvoiceStatus,
-              }))
-            }
-          >
-            <option value="DRAFT">Rascunho</option>
-            <option value="ISSUED">Emitida</option>
-            <option value="CANCELLED">Cancelada</option>
-          </select>
+            <select
+              className="w-full rounded border p-2 dark:border-zinc-800 dark:bg-zinc-950"
+              value={draft.status}
+              onChange={(e) =>
+                setDraft((state) => ({
+                  ...state,
+                  status: e.target.value as EditableInvoiceStatus,
+                }))
+              }
+            >
+              <option value="DRAFT">Rascunho</option>
+              <option value="ISSUED">Emitida</option>
+              <option value="CANCELLED">Cancelada</option>
+            </select>
 
-          <input
-            className="w-full rounded border p-2 dark:border-zinc-800 dark:bg-zinc-950"
-            placeholder="Descrição (opcional)"
-            value={draft.description}
-            onChange={(e) =>
-              setDraft((state) => ({ ...state, description: e.target.value }))
-            }
-          />
+            <input
+              className="w-full rounded border p-2 dark:border-zinc-800 dark:bg-zinc-950"
+              placeholder="Descrição (opcional)"
+              value={draft.description}
+              onChange={(e) =>
+                setDraft((state) => ({ ...state, description: e.target.value }))
+              }
+            />
+          </div>
 
           <textarea
             className="w-full rounded border p-2 dark:border-zinc-800 dark:bg-zinc-950"
@@ -560,22 +578,31 @@ export default function InvoicesPage() {
           />
 
           <div className="text-xs opacity-70">
-            Cliente pode permanecer não vinculado nesta fase. O objetivo aqui é
-            emissão documental, não liquidação financeira.
+            Nesta fase, a fatura ainda pode existir sem vínculo direto com cliente. O foco aqui é o registro documental comercial.
           </div>
 
-          <button
-            type="button"
-            className="rounded bg-black px-3 py-2 text-white disabled:opacity-60 dark:bg-white dark:text-black"
-            onClick={() => void onCreate()}
-            disabled={createMutation.isPending}
-          >
-            {createMutation.isPending ? "Salvando..." : "Salvar"}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="rounded bg-black px-3 py-2 text-white disabled:opacity-60 dark:bg-white dark:text-black"
+              onClick={() => void onCreate()}
+              disabled={createMutation.isPending}
+            >
+              {createMutation.isPending ? "Salvando..." : "Salvar fatura"}
+            </button>
+
+            <button
+              type="button"
+              className="rounded border px-3 py-2 dark:border-zinc-800"
+              onClick={() => setOpenCreate(false)}
+            >
+              Cancelar
+            </button>
+          </div>
         </div>
       ) : null}
 
-      <div className="space-y-2 rounded-xl border p-3 dark:border-zinc-800">
+      <div className="space-y-3 rounded-xl border p-3 dark:border-zinc-800">
         {listQuery.isLoading ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-6 w-6 animate-spin text-orange-500" />
@@ -606,7 +633,7 @@ export default function InvoicesPage() {
             return (
               <div
                 key={inv.id}
-                className="flex flex-col gap-3 rounded-xl border p-3 md:flex-row md:items-center md:justify-between dark:border-zinc-800"
+                className="flex flex-col gap-3 rounded-xl border p-4 md:flex-row md:items-center md:justify-between dark:border-zinc-800"
               >
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
@@ -646,7 +673,7 @@ export default function InvoicesPage() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="min-w-[120px] text-sm font-medium">
+                  <span className="min-w-[120px] text-sm font-semibold">
                     {formatCurrencyFromCents(inv.amountCents)}
                   </span>
 
@@ -697,7 +724,7 @@ export default function InvoicesPage() {
         </button>
 
         <span className="text-sm opacity-70">
-          {page} / {pages}
+          Página {page} de {pages}
         </span>
 
         <button

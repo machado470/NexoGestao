@@ -242,8 +242,8 @@ function getOperationalStage(os: ServiceOrder) {
       return {
         label: "Aguardando início",
         description: os.assignedToPersonId
-          ? "A O.S. já tem responsável e pode avançar para atribuição formal."
-          : "A O.S. existe, mas ainda não foi colocada em execução.",
+          ? "Já possui responsável definido."
+          : "Ainda sem responsável definido.",
         className:
           "border-blue-200 bg-blue-50 text-blue-900 dark:border-blue-900/50 dark:bg-blue-950/20 dark:text-blue-300",
         icon: CircleDashed,
@@ -251,8 +251,7 @@ function getOperationalStage(os: ServiceOrder) {
     case "ASSIGNED":
       return {
         label: "Aguardando execução",
-        description:
-          "A O.S. já foi atribuída e espera o início real do serviço.",
+        description: "Responsável definido e pronto para iniciar.",
         className:
           "border-yellow-200 bg-yellow-50 text-yellow-900 dark:border-yellow-900/50 dark:bg-yellow-950/20 dark:text-yellow-300",
         icon: User,
@@ -260,7 +259,7 @@ function getOperationalStage(os: ServiceOrder) {
     case "IN_PROGRESS":
       return {
         label: "Execução em andamento",
-        description: "O serviço está rodando e ainda não foi concluído.",
+        description: "Serviço em execução.",
         className:
           "border-orange-200 bg-orange-50 text-orange-900 dark:border-orange-900/50 dark:bg-orange-950/20 dark:text-orange-300",
         icon: Clock3,
@@ -268,8 +267,7 @@ function getOperationalStage(os: ServiceOrder) {
     case "DONE":
       return {
         label: "Execução concluída",
-        description:
-          "A operação foi finalizada e já entrou na etapa financeira.",
+        description: "Fluxo operacional encerrado.",
         className:
           "border-green-200 bg-green-50 text-green-900 dark:border-green-900/50 dark:bg-green-950/20 dark:text-green-300",
         icon: CheckCircle2,
@@ -278,7 +276,7 @@ function getOperationalStage(os: ServiceOrder) {
     default:
       return {
         label: "Execução cancelada",
-        description: "A O.S. foi encerrada sem continuidade operacional.",
+        description: "O.S. encerrada sem continuidade.",
         className:
           "border-gray-200 bg-gray-50 text-gray-900 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-300",
         icon: CircleOff,
@@ -293,7 +291,7 @@ function getFinancialStage(os: ServiceOrder) {
   if (financialSummary?.chargeStatus === "PAID") {
     return {
       label: "Fluxo financeiro fechado",
-      description: "Existe cobrança vinculada e o pagamento já foi registrado.",
+      description: "Cobrança vinculada e paga.",
       className:
         "border-green-200 bg-green-50 text-green-900 dark:border-green-900/50 dark:bg-green-950/20 dark:text-green-300",
       icon: BadgeDollarSign,
@@ -303,7 +301,7 @@ function getFinancialStage(os: ServiceOrder) {
   if (financialSummary?.chargeStatus === "OVERDUE") {
     return {
       label: "Cobrança vencida",
-      description: "A cobrança existe, mas está em atraso e exige ação.",
+      description: "Existe cobrança em atraso.",
       className:
         "border-red-200 bg-red-50 text-red-900 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-300",
       icon: AlertCircle,
@@ -313,7 +311,7 @@ function getFinancialStage(os: ServiceOrder) {
   if (financialSummary?.chargeStatus === "PENDING") {
     return {
       label: "Cobrança pendente",
-      description: "A cobrança foi gerada e aguarda pagamento.",
+      description: "Cobrança gerada e aguardando pagamento.",
       className:
         "border-yellow-200 bg-yellow-50 text-yellow-900 dark:border-yellow-900/50 dark:bg-yellow-950/20 dark:text-yellow-300",
       icon: Wallet,
@@ -323,7 +321,7 @@ function getFinancialStage(os: ServiceOrder) {
   if (financialSummary?.chargeStatus === "CANCELED") {
     return {
       label: "Cobrança cancelada",
-      description: "Existe cobrança vinculada, mas ela foi cancelada.",
+      description: "Cobrança vinculada, mas cancelada.",
       className:
         "border-gray-200 bg-gray-50 text-gray-900 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-300",
       icon: Receipt,
@@ -333,8 +331,7 @@ function getFinancialStage(os: ServiceOrder) {
   if (os.status === "DONE" && amountDefined) {
     return {
       label: "Pronta para cobrança",
-      description:
-        "A execução terminou, há valor definido e a cobrança ainda precisa ser vinculada.",
+      description: "Execução finalizada com valor definido.",
       className:
         "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-300",
       icon: ArrowRightLeft,
@@ -344,8 +341,7 @@ function getFinancialStage(os: ServiceOrder) {
   if (os.status === "DONE" && !amountDefined) {
     return {
       label: "Sem valor definido",
-      description:
-        "A O.S. foi concluída, mas ainda não há valor suficiente para preparar a cobrança.",
+      description: "Concluída, mas sem base financeira suficiente.",
       className:
         "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-300",
       icon: AlertCircle,
@@ -354,8 +350,7 @@ function getFinancialStage(os: ServiceOrder) {
 
   return {
     label: "Financeiro ainda não iniciado",
-    description:
-      "A etapa financeira ainda depende do fechamento operacional da O.S.",
+    description: "A etapa financeira depende do fechamento operacional.",
     className:
       "border-gray-200 bg-gray-50 text-gray-900 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-300",
     icon: Wallet,
@@ -447,14 +442,13 @@ export default function ServiceOrdersPage() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedServiceOrderId, setSelectedServiceOrderId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<ServiceOrderStatus | "">("");
-  const [financialFilter, setFinancialFilter] =
-    useState<FinancialFilter>("ALL");
+  const [financialFilter, setFinancialFilter] = useState<FinancialFilter>("ALL");
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [processingId, setProcessingId] = useState<string | null>(null);
-  const [highlightedServiceOrderId, setHighlightedServiceOrderId] = useState<
-    string | null
-  >(() => getServiceOrderIdFromUrl());
+  const [highlightedServiceOrderId, setHighlightedServiceOrderId] = useState<string | null>(
+    () => getServiceOrderIdFromUrl()
+  );
 
   const serviceOrderRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const utils = trpc.useUtils();
@@ -523,10 +517,7 @@ export default function ServiceOrdersPage() {
 
   const highlightedServiceOrder = useMemo(() => {
     if (!highlightedServiceOrderId) return null;
-
-    return (
-      serviceOrders.find((os) => os.id === highlightedServiceOrderId) ?? null
-    );
+    return serviceOrders.find((os) => os.id === highlightedServiceOrderId) ?? null;
   }, [serviceOrders, highlightedServiceOrderId]);
 
   const highlightedExistsOnCurrentPage = useMemo(() => {
@@ -547,15 +538,14 @@ export default function ServiceOrdersPage() {
     },
   });
 
-  const generateChargeMutation =
-    trpc.nexo.serviceOrders.generateCharge.useMutation({
-      onError: (err) => {
-        toast.error(err.message || "Erro ao gerar cobrança");
-      },
-      onSettled: () => {
-        setProcessingId(null);
-      },
-    });
+  const generateChargeMutation = trpc.nexo.serviceOrders.generateCharge.useMutation({
+    onError: (err) => {
+      toast.error(err.message || "Erro ao gerar cobrança");
+    },
+    onSettled: () => {
+      setProcessingId(null);
+    },
+  });
 
   const customers = useMemo(() => {
     const payload = customersQuery.data;
@@ -589,9 +579,7 @@ export default function ServiceOrdersPage() {
 
   useEffect(() => {
     if (listQuery.error) {
-      toast.error(
-        "Erro ao carregar ordens de serviço: " + listQuery.error.message
-      );
+      toast.error("Erro ao carregar ordens de serviço: " + listQuery.error.message);
     }
   }, [listQuery.error]);
 
@@ -713,12 +701,14 @@ export default function ServiceOrdersPage() {
 
   const handleApplySearch = () => {
     setSearchQuery(searchInput.trim());
+    setPage(1);
   };
 
   const handleClearLocalFilters = () => {
     setSearchInput("");
     setSearchQuery("");
     setFinancialFilter("ALL");
+    setPage(1);
   };
 
   const handleOpenDeepLink = (serviceOrderId: string) => {
@@ -736,20 +726,12 @@ export default function ServiceOrdersPage() {
     setShowEditModal(true);
   };
 
-  const total = filteredServiceOrders.length;
-  const totalOpen = filteredServiceOrders.filter((os) => os.status === "OPEN").length;
-  const totalAssigned = filteredServiceOrders.filter(
-    (os) => os.status === "ASSIGNED"
-  ).length;
-  const totalInProgress = filteredServiceOrders.filter(
-    (os) => os.status === "IN_PROGRESS"
-  ).length;
-
+  const totalVisible = filteredServiceOrders.length;
+  const totalInProgress = filteredServiceOrders.filter((os) => os.status === "IN_PROGRESS").length;
   const doneWithCharge = filteredServiceOrders.filter((os) => {
     if (os.status !== "DONE") return false;
     return Boolean(os.financialSummary?.hasCharge);
   }).length;
-
   const doneWithoutCharge = filteredServiceOrders.filter((os) => {
     if (os.status !== "DONE") return false;
     if (!os.amountCents || os.amountCents <= 0) return false;
@@ -767,8 +749,7 @@ export default function ServiceOrdersPage() {
             Ordens de Serviço
           </h1>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Execução, fechamento operacional e transição para cobrança em uma
-            leitura só.
+            Execução operacional com leitura financeira clara e menos barulho visual.
           </p>
         </div>
 
@@ -795,7 +776,7 @@ export default function ServiceOrdersPage() {
         </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-[1fr_260px_auto_auto]">
+      <div className="grid gap-3 lg:grid-cols-[1fr_240px_auto_auto]">
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <input
@@ -812,7 +793,10 @@ export default function ServiceOrdersPage() {
 
         <select
           value={financialFilter}
-          onChange={(e) => setFinancialFilter(e.target.value as FinancialFilter)}
+          onChange={(e) => {
+            setFinancialFilter(e.target.value as FinancialFilter);
+            setPage(1);
+          }}
           className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
         >
           <option value="ALL">Todos os estados financeiros</option>
@@ -839,7 +823,7 @@ export default function ServiceOrdersPage() {
       {highlightedServiceOrderId ? (
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <span className="rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-orange-700 dark:border-orange-900/40 dark:bg-orange-950/20 dark:text-orange-300">
-            Deep-link ativo: {highlightedServiceOrder?.title ?? highlightedServiceOrderId}
+            Foco ativo: {highlightedServiceOrder?.title ?? highlightedServiceOrderId}
           </span>
 
           {!highlightedExistsOnCurrentPage ? (
@@ -863,7 +847,7 @@ export default function ServiceOrdersPage() {
         <div className="flex flex-wrap gap-2 text-sm text-gray-500">
           {searchQuery ? (
             <span className="rounded-full border px-3 py-1">
-              Busca local: {searchQuery}
+              Busca: {searchQuery}
             </span>
           ) : null}
           {financialFilter !== "ALL" ? (
@@ -872,39 +856,21 @@ export default function ServiceOrdersPage() {
             </span>
           ) : null}
           <span className="rounded-full border px-3 py-1">
-            Filtros locais na página {pagination.page}
+            Página {pagination.page}
           </span>
         </div>
       ) : null}
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-6">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
         <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Total na página
-          </p>
+          <p className="text-sm text-gray-600 dark:text-gray-400">Total visível</p>
           <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">
-            {total}
+            {totalVisible}
           </p>
         </div>
 
         <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-          <p className="text-sm text-gray-600 dark:text-gray-400">Abertas</p>
-          <p className="mt-1 text-2xl font-bold text-blue-600 dark:text-blue-400">
-            {totalOpen}
-          </p>
-        </div>
-
-        <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-          <p className="text-sm text-gray-600 dark:text-gray-400">Atribuídas</p>
-          <p className="mt-1 text-2xl font-bold text-yellow-600 dark:text-yellow-400">
-            {totalAssigned}
-          </p>
-        </div>
-
-        <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Em andamento
-          </p>
+          <p className="text-sm text-gray-600 dark:text-gray-400">Em andamento</p>
           <p className="mt-1 text-2xl font-bold text-orange-600 dark:text-orange-400">
             {totalInProgress}
           </p>
@@ -973,7 +939,7 @@ export default function ServiceOrdersPage() {
             <p className="text-gray-500 dark:text-gray-400">
               {serviceOrders.length === 0
                 ? "Nenhuma ordem de serviço encontrada."
-                : "Nenhuma ordem corresponde aos filtros locais."}
+                : "Nenhuma ordem corresponde aos filtros atuais."}
             </p>
             {serviceOrders.length === 0 ? (
               <Button
@@ -1025,7 +991,7 @@ export default function ServiceOrdersPage() {
                 }`}
               >
                 <div className="flex flex-col gap-4">
-                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <h3 className="truncate text-base font-semibold text-gray-900 dark:text-white">
@@ -1072,16 +1038,6 @@ export default function ServiceOrdersPage() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => handleOpenDeepLink(os.id)}
-                        className="gap-2"
-                      >
-                        <Link2 className="h-4 w-4" />
-                        Focar
-                      </Button>
-
-                      <Button
-                        size="sm"
-                        variant="outline"
                         onClick={() => handleOpenEdit(os.id)}
                         className="gap-2"
                       >
@@ -1092,10 +1048,7 @@ export default function ServiceOrdersPage() {
                       <select
                         value={os.status}
                         onChange={(e) =>
-                          handleStatusChange(
-                            os,
-                            e.target.value as ServiceOrderStatus
-                          )
+                          handleStatusChange(os, e.target.value as ServiceOrderStatus)
                         }
                         disabled={updateMutation.isPending || isProcessing}
                         className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300"
@@ -1121,7 +1074,7 @@ export default function ServiceOrdersPage() {
                           isProcessing
                         }
                       >
-                        Iniciar execução
+                        Iniciar
                       </Button>
 
                       <Button
@@ -1134,7 +1087,7 @@ export default function ServiceOrdersPage() {
                           isProcessing
                         }
                       >
-                        Finalizar execução
+                        Finalizar
                       </Button>
 
                       <Button
@@ -1160,19 +1113,29 @@ export default function ServiceOrdersPage() {
                             ? "Ver cobrança"
                             : "Cobrança indisponível"}
                       </Button>
+
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleOpenDeepLink(os.id)}
+                        className="gap-2"
+                      >
+                        <Link2 className="h-4 w-4" />
+                        Focar
+                      </Button>
                     </div>
                   </div>
 
-                  {!hasAssignedPerson && os.status !== "DONE" && os.status !== "CANCELED" ? (
+                  {!hasAssignedPerson &&
+                  os.status !== "DONE" &&
+                  os.status !== "CANCELED" ? (
                     <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300">
                       Defina um responsável antes de atribuir ou iniciar a execução desta O.S.
                     </div>
                   ) : null}
 
                   <div className="grid gap-3 lg:grid-cols-2">
-                    <div
-                      className={`rounded-lg border p-3 ${operationalStage.className}`}
-                    >
+                    <div className={`rounded-lg border p-3 ${operationalStage.className}`}>
                       <div className="flex items-start gap-2">
                         <OperationalIcon className="mt-0.5 h-4 w-4 shrink-0" />
                         <div>
@@ -1206,40 +1169,17 @@ export default function ServiceOrdersPage() {
                       label="Cliente"
                       value={os.customer?.name ?? "Cliente não identificado"}
                     />
-
                     <InfoItem
                       label="Responsável"
                       value={os.assignedTo?.name ?? "Ainda não atribuído"}
                     />
-
                     <InfoItem
                       label="Agendada para"
                       value={formatDateTime(os.scheduledFor)}
                     />
-
-                    <InfoItem
-                      label="Criada em"
-                      value={formatDate(os.createdAt)}
-                    />
-
-                    <InfoItem
-                      label="Início da execução"
-                      value={formatDateTime(os.startedAt)}
-                    />
-
-                    <InfoItem
-                      label="Conclusão"
-                      value={formatDateTime(os.finishedAt)}
-                    />
-
                     <InfoItem
                       label="Valor da O.S."
                       value={formatCurrency(os.amountCents)}
-                    />
-
-                    <InfoItem
-                      label="Vencimento"
-                      value={formatDate(os.dueDate)}
                     />
                   </div>
 
@@ -1261,41 +1201,22 @@ export default function ServiceOrdersPage() {
                       </p>
 
                       <div className="mt-2 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-                        <div>
-                          <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                            Status
-                          </p>
-                          <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
-                            {financialSummary.chargeStatus ?? "—"}
-                          </p>
-                        </div>
-
-                        <div>
-                          <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                            Valor
-                          </p>
-                          <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
-                            {formatCurrency(financialSummary.chargeAmountCents)}
-                          </p>
-                        </div>
-
-                        <div>
-                          <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                            Vencimento
-                          </p>
-                          <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
-                            {formatDate(financialSummary.chargeDueDate)}
-                          </p>
-                        </div>
-
-                        <div>
-                          <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                            Pago em
-                          </p>
-                          <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
-                            {formatDateTime(financialSummary.paidAt)}
-                          </p>
-                        </div>
+                        <InfoItem
+                          label="Status"
+                          value={financialSummary.chargeStatus ?? "—"}
+                        />
+                        <InfoItem
+                          label="Valor"
+                          value={formatCurrency(financialSummary.chargeAmountCents)}
+                        />
+                        <InfoItem
+                          label="Vencimento"
+                          value={formatDate(financialSummary.chargeDueDate)}
+                        />
+                        <InfoItem
+                          label="Pago em"
+                          value={formatDateTime(financialSummary.paidAt)}
+                        />
                       </div>
                     </div>
                   ) : null}
@@ -1306,40 +1227,35 @@ export default function ServiceOrdersPage() {
         </div>
       )}
 
-      {pagination && pagination.pages > 1 && (
-        <div className="flex items-center justify-center gap-2 pt-4">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setPage((current) => Math.max(1, current - 1))}
-            disabled={page <= 1}
-          >
-            Anterior
-          </Button>
+      <div className="flex items-center justify-between">
+        <Button
+          type="button"
+          variant="outline"
+          disabled={page <= 1}
+          onClick={() => setPage((value) => value - 1)}
+        >
+          Anterior
+        </Button>
 
-          <span className="text-sm text-gray-500">
-            {page} / {pagination.pages}
-          </span>
+        <span className="text-sm text-gray-500 dark:text-gray-400">
+          Página {page} de {pagination.pages}
+        </span>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              setPage((current) => Math.min(pagination.pages, current + 1))
-            }
-            disabled={page >= pagination.pages}
-          >
-            Próxima
-          </Button>
-        </div>
-      )}
+        <Button
+          type="button"
+          variant="outline"
+          disabled={page >= pagination.pages}
+          onClick={() => setPage((value) => value + 1)}
+        >
+          Próxima
+        </Button>
+      </div>
 
       <CreateServiceOrderModal
-        open={showCreateModal}
+        isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
-        onCreated={() => {
+        onSuccess={() => {
           void listQuery.refetch();
-          toast.success("OS criada com sucesso!");
         }}
         customers={customers}
         people={people}
@@ -1347,16 +1263,14 @@ export default function ServiceOrdersPage() {
 
       <EditServiceOrderModal
         isOpen={showEditModal}
-        serviceOrderId={selectedServiceOrderId}
         onClose={() => {
           setShowEditModal(false);
           setSelectedServiceOrderId(null);
         }}
         onSuccess={() => {
           void listQuery.refetch();
-          setShowEditModal(false);
-          setSelectedServiceOrderId(null);
         }}
+        serviceOrderId={selectedServiceOrderId}
         people={people}
       />
     </div>

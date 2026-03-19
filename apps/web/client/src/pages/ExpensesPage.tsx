@@ -9,6 +9,8 @@ import {
   Plus,
   Receipt,
   RefreshCw,
+  Search,
+  Tag,
   Trash2,
 } from "lucide-react";
 
@@ -46,6 +48,17 @@ type ExpenseSummary = {
   count: number;
   byCategory: Record<string, number>;
 };
+
+const CATEGORY_OPTIONS: Array<{ value: ExpenseCategory; label: string }> = [
+  { value: "OPERATIONAL", label: "Operacional" },
+  { value: "MARKETING", label: "Marketing" },
+  { value: "INFRASTRUCTURE", label: "Infraestrutura" },
+  { value: "PAYROLL", label: "Folha" },
+  { value: "TAXES", label: "Impostos" },
+  { value: "SUPPLIES", label: "Suprimentos" },
+  { value: "TRAVEL", label: "Viagem" },
+  { value: "OTHER", label: "Outros" },
+];
 
 function formatCurrencyFromCents(value?: number) {
   return new Intl.NumberFormat("pt-BR", {
@@ -208,6 +221,28 @@ function getCategoryLabel(category: ExpenseCategory) {
   }
 }
 
+function getCategoryBadgeClass(category: ExpenseCategory) {
+  switch (category) {
+    case "MARKETING":
+      return "bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-900/30 dark:text-fuchsia-300";
+    case "OPERATIONAL":
+      return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
+    case "INFRASTRUCTURE":
+      return "bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300";
+    case "PAYROLL":
+      return "bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300";
+    case "TAXES":
+      return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300";
+    case "SUPPLIES":
+      return "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300";
+    case "TRAVEL":
+      return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300";
+    case "OTHER":
+    default:
+      return "bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-300";
+  }
+}
+
 export default function ExpensesPage() {
   const { isAuthenticated, isInitializing } = useAuth();
   const canQuery = isAuthenticated && !isInitializing;
@@ -216,6 +251,9 @@ export default function ExpensesPage() {
   const [page, setPage] = useState(1);
   const [openCreate, setOpenCreate] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [searchInput, setSearchInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<ExpenseCategory | "">("");
 
   const limit = 20;
 
@@ -259,8 +297,33 @@ export default function ExpensesPage() {
   const pages = listData.pagination.pages;
 
   const categorySummary = useMemo(() => {
-    return Object.entries(summary.byCategory);
+    return Object.entries(summary.byCategory).sort((a, b) => b[1] - a[1]);
   }, [summary.byCategory]);
+
+  const topCategory = useMemo(() => {
+    if (!categorySummary.length) return null;
+    const [category, value] = categorySummary[0];
+    return {
+      label: getCategoryLabel(normalizeExpenseCategory(category)),
+      value,
+    };
+  }, [categorySummary]);
+
+  const filteredExpenses = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+
+    return expenses.filter((expense) => {
+      const matchesText =
+        !q ||
+        expense.description.toLowerCase().includes(q) ||
+        String(expense.notes ?? "").toLowerCase().includes(q);
+
+      const matchesCategory =
+        !categoryFilter || expense.category === categoryFilter;
+
+      return matchesText && matchesCategory;
+    });
+  }, [expenses, searchQuery, categoryFilter]);
 
   const handleRefresh = async () => {
     await Promise.all([listQuery.refetch(), summaryQuery.refetch()]);
@@ -282,6 +345,20 @@ export default function ExpensesPage() {
     setDeletingId(expense.id);
     await deleteMutation.mutateAsync({ id: expense.id });
   };
+
+  const handleApplySearch = () => {
+    setPage(1);
+    setSearchQuery(searchInput.trim());
+  };
+
+  const handleClearFilters = () => {
+    setPage(1);
+    setSearchInput("");
+    setSearchQuery("");
+    setCategoryFilter("");
+  };
+
+  const hasLocalFilters = Boolean(searchQuery) || Boolean(categoryFilter);
 
   if (isInitializing) {
     return (
@@ -341,7 +418,7 @@ export default function ExpensesPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
           <div className="rounded-xl border p-4 dark:border-zinc-800">
             <div className="text-sm opacity-70">Total de despesas</div>
             <div className="mt-2 text-lg font-semibold">
@@ -358,23 +435,115 @@ export default function ExpensesPage() {
             <div className="text-sm opacity-70">Categorias</div>
             <div className="mt-2 text-lg font-semibold">{categorySummary.length}</div>
           </div>
+
+          <div className="rounded-xl border p-4 dark:border-zinc-800">
+            <div className="text-sm opacity-70">Maior categoria</div>
+            <div className="mt-2 text-lg font-semibold">
+              {topCategory ? topCategory.label : "—"}
+            </div>
+            <div className="mt-1 text-xs opacity-70">
+              {topCategory ? formatCurrencyFromCents(topCategory.value) : "Sem dados"}
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-xl border p-3 space-y-3 dark:border-zinc-800">
+          <div className="flex flex-col gap-2 md:flex-row">
+            <div className="relative w-full">
+              <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 opacity-50" />
+              <input
+                className="w-full rounded border p-2 pl-9 dark:border-zinc-800 dark:bg-zinc-950"
+                placeholder="Buscar por descrição ou observações"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleApplySearch();
+                }}
+              />
+            </div>
+
+            <select
+              className="rounded border p-2 dark:border-zinc-800 dark:bg-zinc-950"
+              value={categoryFilter}
+              onChange={(e) => {
+                setPage(1);
+                setCategoryFilter(e.target.value as ExpenseCategory | "");
+              }}
+            >
+              <option value="">Todas as categorias</option>
+              {CATEGORY_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+
+            <button
+              type="button"
+              className="rounded border px-3 py-2"
+              onClick={handleApplySearch}
+            >
+              Buscar
+            </button>
+
+            <button
+              type="button"
+              className="rounded border px-3 py-2"
+              onClick={handleClearFilters}
+              disabled={!hasLocalFilters && !searchInput}
+            >
+              Limpar
+            </button>
+          </div>
+
+          {hasLocalFilters ? (
+            <div className="flex flex-wrap gap-2 text-xs opacity-70">
+              {searchQuery ? (
+                <span className="rounded-full border px-3 py-1">
+                  Busca: {searchQuery}
+                </span>
+              ) : null}
+              {categoryFilter ? (
+                <span className="rounded-full border px-3 py-1">
+                  Categoria: {getCategoryLabel(categoryFilter)}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
         {categorySummary.length > 0 ? (
           <div className="rounded-xl border p-4 dark:border-zinc-800">
-            <div className="mb-3 font-medium">Resumo por categoria</div>
+            <div className="mb-3 flex items-center gap-2 font-medium">
+              <Tag className="h-4 w-4 text-orange-500" />
+              Resumo por categoria
+            </div>
+
             <div className="space-y-2">
-              {categorySummary.map(([category, value]) => (
-                <div
-                  key={category}
-                  className="flex items-center justify-between text-sm"
-                >
-                  <span>{getCategoryLabel(normalizeExpenseCategory(category))}</span>
-                  <span className="font-medium">
-                    {formatCurrencyFromCents(value)}
-                  </span>
-                </div>
-              ))}
+              {categorySummary.map(([category, value]) => {
+                const normalized = normalizeExpenseCategory(category);
+
+                return (
+                  <div
+                    key={category}
+                    className="flex items-center justify-between rounded-lg border border-transparent bg-zinc-50 px-3 py-2 text-sm dark:bg-zinc-900/50"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${getCategoryBadgeClass(
+                          normalized
+                        )}`}
+                      >
+                        {getCategoryLabel(normalized)}
+                      </span>
+                    </div>
+
+                    <span className="font-medium">
+                      {formatCurrencyFromCents(value)}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           </div>
         ) : null}
@@ -394,15 +563,22 @@ export default function ExpensesPage() {
                 Não foi possível carregar a lista de despesas agora.
               </p>
             </div>
-          ) : expenses.length === 0 ? (
+          ) : filteredExpenses.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-3 py-10 text-center">
               <Receipt className="h-10 w-10 opacity-40" />
               <div>
-                <div className="font-medium">Nenhuma despesa cadastrada</div>
+                <div className="font-medium">
+                  {expenses.length === 0
+                    ? "Nenhuma despesa cadastrada"
+                    : "Nenhuma despesa encontrada"}
+                </div>
                 <p className="mt-1 text-sm opacity-70">
-                  Cadastre a primeira despesa para começar o controle financeiro operacional.
+                  {expenses.length === 0
+                    ? "Cadastre a primeira despesa para começar o controle financeiro operacional."
+                    : "Ajuste os filtros para encontrar as despesas desejadas."}
                 </p>
               </div>
+
               <button
                 type="button"
                 className="inline-flex items-center gap-2 rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600"
@@ -414,25 +590,38 @@ export default function ExpensesPage() {
             </div>
           ) : (
             <div className="space-y-3">
-              {expenses.map((expense) => (
+              {filteredExpenses.map((expense) => (
                 <div
                   key={expense.id}
-                  className="flex flex-col gap-3 rounded-xl border p-3 md:flex-row md:items-center md:justify-between dark:border-zinc-800"
+                  className="flex flex-col gap-3 rounded-xl border p-4 md:flex-row md:items-center md:justify-between dark:border-zinc-800"
                 >
                   <div className="min-w-0">
-                    <div className="font-medium">{expense.description}</div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="font-medium">{expense.description}</div>
+                      <span
+                        className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${getCategoryBadgeClass(
+                          expense.category
+                        )}`}
+                      >
+                        {getCategoryLabel(expense.category)}
+                      </span>
+                    </div>
 
                     <div className="mt-1 text-xs opacity-70">
-                      {getCategoryLabel(expense.category)} • {formatDate(expense.date)}
+                      Data: {formatDate(expense.date)}
                     </div>
 
                     {expense.notes ? (
                       <div className="mt-1 text-xs opacity-70">{expense.notes}</div>
-                    ) : null}
+                    ) : (
+                      <div className="mt-1 text-xs opacity-50">
+                        Sem observações adicionais.
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <div className="min-w-[120px] text-sm font-medium">
+                    <div className="min-w-[120px] text-sm font-semibold">
                       {formatCurrencyFromCents(expense.amountCents)}
                     </div>
 
@@ -469,7 +658,7 @@ export default function ExpensesPage() {
           </button>
 
           <span className="text-sm opacity-70">
-            {page} / {pages}
+            Página {page} de {pages}
           </span>
 
           <button
