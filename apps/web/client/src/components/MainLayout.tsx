@@ -111,7 +111,7 @@ export function MainLayout({ children }: MainLayoutProps) {
     },
     {
       id: "invoices",
-      label: "Notas Fiscais",
+      label: "Faturas",
       icon: FileText,
       route: "/invoices",
       allowedRoles: ["ADMIN", "MANAGER"],
@@ -249,6 +249,7 @@ export function MainLayout({ children }: MainLayoutProps) {
           <button
             onClick={() => setSidebarOpen(false)}
             className="rounded-lg p-1 hover:bg-gray-100 dark:hover:bg-gray-700 md:hidden"
+            type="button"
           >
             <X className="h-5 w-5 text-gray-600 dark:text-gray-400" />
           </button>
@@ -273,6 +274,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                     : "text-gray-600 hover:bg-orange-50 hover:text-orange-600 dark:text-gray-300 dark:hover:bg-orange-900/20 dark:hover:text-orange-400"
                 }`}
                 title={item.label}
+                type="button"
               >
                 <Icon className="h-5 w-5 flex-shrink-0" />
 
@@ -295,6 +297,7 @@ export function MainLayout({ children }: MainLayoutProps) {
             className={`flex w-full items-center rounded-lg text-gray-600 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700 ${
               sidebarCollapsed ? "justify-center p-2" : "px-3 py-2"
             }`}
+            type="button"
           >
             {theme === "dark" ? (
               <Sun className="h-5 w-5 flex-shrink-0" />
@@ -315,6 +318,7 @@ export function MainLayout({ children }: MainLayoutProps) {
             className={`flex w-full items-center rounded-lg text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-900/20 ${
               sidebarCollapsed ? "justify-center p-2" : "px-3 py-2"
             }`}
+            type="button"
           >
             <LogOut className="h-5 w-5 flex-shrink-0" />
 
@@ -339,6 +343,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                 }
               }}
               className="flex-shrink-0 rounded-lg p-2 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700"
+              type="button"
             >
               {isMobile ? (
                 <Menu className="h-5 w-5 text-gray-600 dark:text-gray-400" />

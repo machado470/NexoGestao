@@ -9,6 +9,7 @@ import {
   Loader2,
   Plus,
   RefreshCw,
+  Search,
   Wallet,
 } from "lucide-react";
 import CreateLaunchModal from "@/components/CreateLaunchModal";
@@ -56,7 +57,7 @@ function formatCurrencyFromCents(value: number) {
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL",
-  }).format((Number(value || 0)) / 100);
+  }).format(Number(value || 0) / 100);
 }
 
 function formatDate(value?: string | null) {
@@ -197,6 +198,18 @@ function getTypeBadgeClass(type: ApiType) {
   }
 }
 
+function getBalanceClass(balance: number) {
+  if (balance > 0) {
+    return "text-emerald-600 dark:text-emerald-400";
+  }
+
+  if (balance < 0) {
+    return "text-red-600 dark:text-red-400";
+  }
+
+  return "text-zinc-900 dark:text-white";
+}
+
 export default function LaunchesPage() {
   const { isAuthenticated, isInitializing } = useAuth();
   const canQuery = isAuthenticated && !isInitializing;
@@ -208,6 +221,8 @@ export default function LaunchesPage() {
   const limit = 20;
 
   const [filterType, setFilterType] = useState<UiType>("");
+  const [searchInput, setSearchInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
 
@@ -243,6 +258,23 @@ export default function LaunchesPage() {
   const items = listData.data;
   const pages = listData.pagination.pages;
 
+  const filteredItems = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+
+    return items.filter((launch) => {
+      if (!q) return true;
+
+      return (
+        launch.description.toLowerCase().includes(q) ||
+        String(launch.category ?? "").toLowerCase().includes(q) ||
+        String(launch.account ?? "").toLowerCase().includes(q) ||
+        String(launch.notes ?? "").toLowerCase().includes(q)
+      );
+    });
+  }, [items, searchQuery]);
+
+  const hasFilters = Boolean(filterType) || Boolean(searchQuery) || Boolean(from) || Boolean(to);
+
   const handleRefresh = async () => {
     await Promise.all([listQuery.refetch(), summaryQuery.refetch()]);
   };
@@ -254,6 +286,20 @@ export default function LaunchesPage() {
       utils.launches.list.invalidate(),
       utils.launches.summary.invalidate(),
     ]);
+  };
+
+  const handleApplySearch = () => {
+    setPage(1);
+    setSearchQuery(searchInput.trim());
+  };
+
+  const handleClearFilters = () => {
+    setPage(1);
+    setFilterType("");
+    setSearchInput("");
+    setSearchQuery("");
+    setFrom("");
+    setTo("");
   };
 
   if (isInitializing) {
@@ -348,72 +394,105 @@ export default function LaunchesPage() {
               <Wallet className="h-4 w-4" />
               Saldo
             </div>
-            <div className="mt-2 text-xl font-semibold">
+            <div className={`mt-2 text-xl font-semibold ${getBalanceClass(summaryData.balance)}`}>
               {formatCurrencyFromCents(summaryData.balance)}
             </div>
           </div>
         </div>
 
         <div className="rounded-2xl border p-4 dark:border-zinc-800">
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-            <div>
-              <label className="mb-2 block text-sm font-medium">Tipo</label>
-              <select
-                className="w-full rounded-lg border p-2 dark:border-zinc-800 dark:bg-zinc-950"
-                value={filterType}
-                onChange={(e) => {
-                  setPage(1);
-                  setFilterType(e.target.value as UiType);
-                }}
-              >
-                <option value="">Todos</option>
-                <option value="income">Entrada</option>
-                <option value="expense">Saída</option>
-                <option value="transfer">Transferência</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-medium">De</label>
+          <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.6fr)_220px_180px_180px]">
+            <div className="relative xl:col-span-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 opacity-50" />
               <input
-                type="date"
-                value={from}
-                onChange={(e) => {
-                  setPage(1);
-                  setFrom(e.target.value);
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleApplySearch();
                 }}
-                className="w-full rounded-lg border p-2 dark:border-zinc-800 dark:bg-zinc-950"
+                className="w-full rounded-lg border p-2 pl-9 dark:border-zinc-800 dark:bg-zinc-950"
+                placeholder="Buscar por descrição, categoria, conta ou observações"
               />
             </div>
 
-            <div>
-              <label className="mb-2 block text-sm font-medium">Até</label>
-              <input
-                type="date"
-                value={to}
-                onChange={(e) => {
-                  setPage(1);
-                  setTo(e.target.value);
-                }}
-                className="w-full rounded-lg border p-2 dark:border-zinc-800 dark:bg-zinc-950"
-              />
-            </div>
+            <select
+              className="w-full rounded-lg border p-2 dark:border-zinc-800 dark:bg-zinc-950"
+              value={filterType}
+              onChange={(e) => {
+                setPage(1);
+                setFilterType(e.target.value as UiType);
+              }}
+            >
+              <option value="">Todos os tipos</option>
+              <option value="income">Entrada</option>
+              <option value="expense">Saída</option>
+              <option value="transfer">Transferência</option>
+            </select>
 
-            <div className="flex items-end">
-              <button
-                type="button"
-                onClick={() => {
-                  setPage(1);
-                  setFilterType("");
-                  setFrom("");
-                  setTo("");
-                }}
-                className="w-full rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
-              >
-                Limpar filtros
-              </button>
-            </div>
+            <input
+              type="date"
+              value={from}
+              onChange={(e) => {
+                setPage(1);
+                setFrom(e.target.value);
+              }}
+              className="w-full rounded-lg border p-2 dark:border-zinc-800 dark:bg-zinc-950"
+            />
+
+            <input
+              type="date"
+              value={to}
+              onChange={(e) => {
+                setPage(1);
+                setTo(e.target.value);
+              }}
+              className="w-full rounded-lg border p-2 dark:border-zinc-800 dark:bg-zinc-950"
+            />
           </div>
+
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+            <button
+              type="button"
+              onClick={handleApplySearch}
+              className="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
+            >
+              Buscar
+            </button>
+
+            <button
+              type="button"
+              onClick={handleClearFilters}
+              className="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
+              disabled={!hasFilters && !searchInput}
+            >
+              Limpar
+            </button>
+          </div>
+
+          {hasFilters ? (
+            <div className="mt-3 flex flex-wrap gap-2 text-xs opacity-70">
+              {searchQuery ? (
+                <span className="rounded-full border px-3 py-1">
+                  Busca: {searchQuery}
+                </span>
+              ) : null}
+              {filterType ? (
+                <span className="rounded-full border px-3 py-1">
+                  Tipo: {filterType === "income" ? "Entrada" : filterType === "expense" ? "Saída" : "Transferência"}
+                </span>
+              ) : null}
+              {from ? (
+                <span className="rounded-full border px-3 py-1">
+                  De: {formatDate(from)}
+                </span>
+              ) : null}
+              {to ? (
+                <span className="rounded-full border px-3 py-1">
+                  Até: {formatDate(to)}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
         <div className="rounded-2xl border p-4 dark:border-zinc-800">
@@ -431,13 +510,19 @@ export default function LaunchesPage() {
                 Não foi possível carregar os lançamentos agora.
               </p>
             </div>
-          ) : items.length === 0 ? (
+          ) : filteredItems.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-3 py-10 text-center">
               <Calendar className="h-10 w-10 opacity-40" />
               <div>
-                <div className="font-medium">Nenhum lançamento encontrado</div>
+                <div className="font-medium">
+                  {items.length === 0
+                    ? "Nenhum lançamento cadastrado"
+                    : "Nenhum lançamento encontrado"}
+                </div>
                 <p className="mt-1 text-sm opacity-70">
-                  Ajuste os filtros ou cadastre um novo lançamento manual.
+                  {items.length === 0
+                    ? "Cadastre o primeiro lançamento manual para começar o controle."
+                    : "Ajuste os filtros para encontrar os lançamentos desejados."}
                 </p>
               </div>
               <button
@@ -451,7 +536,7 @@ export default function LaunchesPage() {
             </div>
           ) : (
             <div className="space-y-3">
-              {items.map((launch) => (
+              {filteredItems.map((launch) => (
                 <div
                   key={launch.id}
                   className="flex flex-col gap-4 rounded-xl border p-4 dark:border-zinc-800 lg:flex-row lg:items-center lg:justify-between"
@@ -469,15 +554,24 @@ export default function LaunchesPage() {
                     </div>
 
                     <div className="grid gap-1 text-sm opacity-80">
-                      <div>Categoria: {launch.category || "N/A"}</div>
-                      <div>Conta: {launch.account || "N/A"}</div>
+                      <div>Categoria: {launch.category || "Não informada"}</div>
+                      <div>Conta: {launch.account || "Não informada"}</div>
                       <div>Data: {formatDate(launch.date)}</div>
                       {launch.notes ? <div>Observações: {launch.notes}</div> : null}
                     </div>
                   </div>
 
                   <div className="text-right">
-                    <div className="text-lg font-semibold">
+                    <div
+                      className={`text-lg font-semibold ${
+                        launch.type === "INCOME"
+                          ? "text-emerald-600 dark:text-emerald-400"
+                          : launch.type === "EXPENSE"
+                            ? "text-red-600 dark:text-red-400"
+                            : "text-blue-600 dark:text-blue-400"
+                      }`}
+                    >
+                      {launch.type === "EXPENSE" ? "-" : ""}
                       {formatCurrencyFromCents(launch.amountCents)}
                     </div>
                   </div>

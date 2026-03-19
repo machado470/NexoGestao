@@ -15,9 +15,11 @@ import {
 import { serviceOrderSchema } from "@/lib/validations";
 
 type Props = {
-  open: boolean;
+  open?: boolean;
+  isOpen?: boolean;
   onClose: () => void;
   onCreated?: () => void;
+  onSuccess?: () => void;
   customers: Array<{ id: string; name: string }>;
   people: Array<{ id: string; name: string }>;
 };
@@ -109,18 +111,23 @@ function SectionTitle({
 
 export default function CreateServiceOrderModal({
   open,
+  isOpen,
   onClose,
   onCreated,
+  onSuccess,
   customers,
   people,
 }: Props) {
+  const resolvedOpen = open ?? isOpen ?? false;
   const [formData, setFormData] = useState<FormState>(INITIAL_FORM);
 
   const createMutation = trpc.nexo.serviceOrders.create.useMutation({
     onSuccess: () => {
       setFormData(INITIAL_FORM);
       onCreated?.();
+      onSuccess?.();
       onClose();
+      toast.success("Ordem de serviço criada com sucesso.");
     },
     onError: (error) => {
       toast.error(error.message || "Erro ao criar ordem de serviço");
@@ -203,7 +210,7 @@ export default function CreateServiceOrderModal({
     });
   };
 
-  if (!open) return null;
+  if (!resolvedOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
