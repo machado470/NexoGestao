@@ -617,14 +617,15 @@ export class ServiceOrdersService {
       if (v === null) {
         patch.assignedToPersonId = null
       } else if (typeof v === 'string' && v.trim()) {
+        const normalizedPersonId = v.trim()
         const p = await this.prisma.person.findFirst({
-          where: { id: v.trim(), orgId: params.orgId, active: true },
+          where: { id: normalizedPersonId, orgId: params.orgId, active: true },
           select: { id: true },
         })
         if (!p) {
           throw new BadRequestException('assignedToPersonId inválido para este org')
         }
-        patch.assignedToPersonId = v.trim()
+        patch.assignedToPersonId = normalizedPersonId
       } else {
         throw new BadRequestException('assignedToPersonId inválido')
       }
@@ -642,6 +643,32 @@ export class ServiceOrdersService {
 
     if (patch.assignedToPersonId && !patch.status && existing.status === 'OPEN') {
       patch.status = 'ASSIGNED'
+    }
+
+    const nextAssignedToPersonId =
+      patch.assignedToPersonId !== undefined
+        ? patch.assignedToPersonId
+        : existing.assignedToPersonId
+
+    let nextStatus: ServiceOrderStatus =
+      patch.status !== undefined ? patch.status : existing.status
+
+    if (
+      patch.assignedToPersonId === null &&
+      patch.status === undefined &&
+      (existing.status === 'ASSIGNED' || existing.status === 'OPEN')
+    ) {
+      patch.status = 'OPEN'
+      nextStatus = 'OPEN'
+    }
+
+    if (
+      (nextStatus === 'ASSIGNED' || nextStatus === 'IN_PROGRESS') &&
+      !nextAssignedToPersonId
+    ) {
+      throw new BadRequestException(
+        `Não é permitido manter O.S. em ${nextStatus} sem responsável`,
+      )
     }
 
     if (patch.status === 'IN_PROGRESS' && existing.status !== 'IN_PROGRESS') {

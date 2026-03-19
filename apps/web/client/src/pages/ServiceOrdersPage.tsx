@@ -19,8 +19,10 @@ import {
   Search,
   X,
   Link2,
+  Pencil,
 } from "lucide-react";
 import CreateServiceOrderModal from "@/components/CreateServiceOrderModal";
+import EditServiceOrderModal from "@/components/EditServiceOrderModal";
 import { toast } from "sonner";
 
 type ServiceOrderStatus =
@@ -239,7 +241,9 @@ function getOperationalStage(os: ServiceOrder) {
     case "OPEN":
       return {
         label: "Aguardando início",
-        description: "A O.S. existe, mas ainda não foi colocada em execução.",
+        description: os.assignedToPersonId
+          ? "A O.S. já tem responsável e pode avançar para atribuição formal."
+          : "A O.S. existe, mas ainda não foi colocada em execução.",
         className:
           "border-blue-200 bg-blue-50 text-blue-900 dark:border-blue-900/50 dark:bg-blue-950/20 dark:text-blue-300",
         icon: CircleDashed,
@@ -440,6 +444,8 @@ export default function ServiceOrdersPage() {
   const [page, setPage] = useState(1);
   const limit = 20;
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedServiceOrderId, setSelectedServiceOrderId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<ServiceOrderStatus | "">("");
   const [financialFilter, setFinancialFilter] =
     useState<FinancialFilter>("ALL");
@@ -466,6 +472,11 @@ export default function ServiceOrdersPage() {
   );
 
   const customersQuery = trpc.nexo.customers.list.useQuery(undefined, {
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
+  const peopleQuery = trpc.people.list.useQuery(undefined, {
     retry: false,
     refetchOnWindowFocus: false,
   });
@@ -560,6 +571,22 @@ export default function ServiceOrdersPage() {
     }));
   }, [customersQuery.data]);
 
+  const people = useMemo(() => {
+    const payload = peopleQuery.data;
+    const rows = Array.isArray((payload as any)?.data)
+      ? (payload as any).data
+      : Array.isArray(payload)
+        ? payload
+        : [];
+
+    return rows
+      .filter((person: any) => person?.active !== false)
+      .map((person: any) => ({
+        id: String(person.id),
+        name: String(person.name),
+      }));
+  }, [peopleQuery.data]);
+
   useEffect(() => {
     if (listQuery.error) {
       toast.error(
@@ -604,26 +631,38 @@ export default function ServiceOrdersPage() {
     filteredServiceOrders,
   ]);
 
-  const handleStatusChange = (id: string, newStatus: ServiceOrderStatus) => {
-    setProcessingId(id);
+  const handleStatusChange = (serviceOrder: ServiceOrder, newStatus: ServiceOrderStatus) => {
+    const hasAssignedPerson = Boolean(serviceOrder.assignedToPersonId);
+
+    if (!hasAssignedPerson && (newStatus === "ASSIGNED" || newStatus === "IN_PROGRESS")) {
+      toast.error("Defina um responsável antes de usar esse status.");
+      return;
+    }
+
+    setProcessingId(serviceOrder.id);
     updateMutation.mutate({
-      id,
+      id: serviceOrder.id,
       data: { status: newStatus },
     });
   };
 
-  const handleStartExecution = (id: string) => {
-    setProcessingId(id);
+  const handleStartExecution = (serviceOrder: ServiceOrder) => {
+    if (!serviceOrder.assignedToPersonId) {
+      toast.error("Defina um responsável antes de iniciar a execução.");
+      return;
+    }
+
+    setProcessingId(serviceOrder.id);
     updateMutation.mutate({
-      id,
+      id: serviceOrder.id,
       data: { status: "IN_PROGRESS" },
     });
   };
 
-  const handleFinishExecution = (id: string) => {
-    setProcessingId(id);
+  const handleFinishExecution = (serviceOrder: ServiceOrder) => {
+    setProcessingId(serviceOrder.id);
     updateMutation.mutate({
-      id,
+      id: serviceOrder.id,
       data: { status: "DONE" },
     });
   };
@@ -690,6 +729,11 @@ export default function ServiceOrdersPage() {
   const handleClearDeepLink = () => {
     setHighlightedServiceOrderId(null);
     navigate(buildServiceOrdersUrl(null), { replace: false });
+  };
+
+  const handleOpenEdit = (serviceOrderId: string) => {
+    setSelectedServiceOrderId(serviceOrderId);
+    setShowEditModal(true);
   };
 
   const total = filteredServiceOrders.length;
@@ -954,6 +998,12 @@ export default function ServiceOrdersPage() {
               !!os.amountCents &&
               os.amountCents > 0 &&
               !financialSummary?.hasCharge;
+            const hasAssignedPerson = Boolean(os.assignedToPersonId);
+            const canStartExecution =
+              hasAssignedPerson &&
+              os.status !== "IN_PROGRESS" &&
+              os.status !== "DONE" &&
+              os.status !== "CANCELED";
 
             const operationalStage = getOperationalStage(os);
             const financialStage = getFinancialStage(os);
@@ -1029,32 +1079,44 @@ export default function ServiceOrdersPage() {
                         Focar
                       </Button>
 
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleOpenEdit(os.id)}
+                        className="gap-2"
+                      >
+                        <Pencil className="h-4 w-4" />
+                        Editar
+                      </Button>
+
                       <select
                         value={os.status}
                         onChange={(e) =>
                           handleStatusChange(
-                            os.id,
+                            os,
                             e.target.value as ServiceOrderStatus
                           )
                         }
                         disabled={updateMutation.isPending || isProcessing}
                         className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300"
                       >
-                        {Object.entries(STATUS_LABELS).map(([value, label]) => (
-                          <option key={value} value={value}>
-                            {label}
-                          </option>
-                        ))}
+                        <option value="OPEN">Aberta</option>
+                        <option value="ASSIGNED" disabled={!hasAssignedPerson}>
+                          Atribuída
+                        </option>
+                        <option value="IN_PROGRESS" disabled={!hasAssignedPerson}>
+                          Em andamento
+                        </option>
+                        <option value="DONE">Concluída</option>
+                        <option value="CANCELED">Cancelada</option>
                       </select>
 
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => handleStartExecution(os.id)}
+                        onClick={() => handleStartExecution(os)}
                         disabled={
-                          os.status === "IN_PROGRESS" ||
-                          os.status === "DONE" ||
-                          os.status === "CANCELED" ||
+                          !canStartExecution ||
                           updateMutation.isPending ||
                           isProcessing
                         }
@@ -1065,7 +1127,7 @@ export default function ServiceOrdersPage() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => handleFinishExecution(os.id)}
+                        onClick={() => handleFinishExecution(os)}
                         disabled={
                           os.status !== "IN_PROGRESS" ||
                           updateMutation.isPending ||
@@ -1100,6 +1162,12 @@ export default function ServiceOrdersPage() {
                       </Button>
                     </div>
                   </div>
+
+                  {!hasAssignedPerson && os.status !== "DONE" && os.status !== "CANCELED" ? (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300">
+                      Defina um responsável antes de atribuir ou iniciar a execução desta O.S.
+                    </div>
+                  ) : null}
 
                   <div className="grid gap-3 lg:grid-cols-2">
                     <div
@@ -1274,6 +1342,22 @@ export default function ServiceOrdersPage() {
           toast.success("OS criada com sucesso!");
         }}
         customers={customers}
+        people={people}
+      />
+
+      <EditServiceOrderModal
+        isOpen={showEditModal}
+        serviceOrderId={selectedServiceOrderId}
+        onClose={() => {
+          setShowEditModal(false);
+          setSelectedServiceOrderId(null);
+        }}
+        onSuccess={() => {
+          void listQuery.refetch();
+          setShowEditModal(false);
+          setSelectedServiceOrderId(null);
+        }}
+        people={people}
       />
     </div>
   );

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
-import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import {
   Loader2,
@@ -10,6 +10,7 @@ import {
   Wallet,
   AlertCircle,
   CircleHelp,
+  User,
 } from "lucide-react";
 import { serviceOrderSchema } from "@/lib/validations";
 
@@ -18,10 +19,12 @@ type Props = {
   onClose: () => void;
   onCreated?: () => void;
   customers: Array<{ id: string; name: string }>;
+  people: Array<{ id: string; name: string }>;
 };
 
 type FormState = {
   customerId: string;
+  assignedToPersonId: string;
   title: string;
   description: string;
   priority: string;
@@ -32,6 +35,7 @@ type FormState = {
 
 const INITIAL_FORM: FormState = {
   customerId: "",
+  assignedToPersonId: "",
   title: "",
   description: "",
   priority: "2",
@@ -108,6 +112,7 @@ export default function CreateServiceOrderModal({
   onClose,
   onCreated,
   customers,
+  people,
 }: Props) {
   const [formData, setFormData] = useState<FormState>(INITIAL_FORM);
 
@@ -130,7 +135,6 @@ export default function CreateServiceOrderModal({
   }, [formData.customerId, formData.title]);
 
   const hasAmount = formData.amount.trim().length > 0;
-  const parsedAmount = parseAmountToCents(formData.amount);
   const hasDueDate = formData.dueDate.trim().length > 0;
 
   const selectedCustomerName = useMemo(() => {
@@ -139,6 +143,15 @@ export default function CreateServiceOrderModal({
       "Nenhum cliente selecionado"
     );
   }, [customers, formData.customerId]);
+
+  const selectedPersonName = useMemo(() => {
+    if (!formData.assignedToPersonId) return "Ainda não atribuído";
+
+    return (
+      people.find((person) => person.id === formData.assignedToPersonId)?.name ??
+      "Responsável não encontrado"
+    );
+  }, [people, formData.assignedToPersonId]);
 
   const handleClose = () => {
     if (createMutation.isPending) return;
@@ -162,6 +175,7 @@ export default function CreateServiceOrderModal({
 
     const parsed = serviceOrderSchema.safeParse({
       customerId: formData.customerId.trim(),
+      assignedToPersonId: formData.assignedToPersonId.trim() || "",
       title: formData.title.trim(),
       description: formData.description.trim() || undefined,
       priority,
@@ -179,6 +193,7 @@ export default function CreateServiceOrderModal({
 
     await createMutation.mutateAsync({
       customerId: parsed.data.customerId,
+      assignedToPersonId: parsed.data.assignedToPersonId || undefined,
       title: parsed.data.title,
       description: parsed.data.description || undefined,
       priority: parsed.data.priority,
@@ -220,7 +235,7 @@ export default function CreateServiceOrderModal({
               <SectionTitle
                 icon={ClipboardList}
                 title="Dados operacionais"
-                subtitle="Quem é o cliente, qual serviço será feito e qual a prioridade."
+                subtitle="Quem é o cliente, qual serviço será feito, quem executa e qual a prioridade."
               />
 
               <div className="space-y-4">
@@ -246,6 +261,34 @@ export default function CreateServiceOrderModal({
                       </option>
                     ))}
                   </select>
+                </div>
+
+                <div>
+                  <label className="mb-2 flex items-center gap-2 text-sm font-medium text-gray-900 dark:text-white">
+                    <User className="h-4 w-4 text-gray-500" />
+                    Responsável
+                  </label>
+                  <select
+                    className="w-full rounded-lg border border-gray-300 bg-white p-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-white"
+                    value={formData.assignedToPersonId}
+                    onChange={(e) =>
+                      setFormData((state) => ({
+                        ...state,
+                        assignedToPersonId: e.target.value,
+                      }))
+                    }
+                    disabled={createMutation.isPending}
+                  >
+                    <option value="">Não atribuir agora</option>
+                    {people.map((person) => (
+                      <option key={person.id} value={person.id}>
+                        {person.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Se definir agora, a O.S. já nasce atribuída.
+                  </p>
                 </div>
 
                 <div>
@@ -406,6 +449,15 @@ export default function CreateServiceOrderModal({
                   </p>
                   <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
                     {selectedCustomerName}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                    Responsável
+                  </p>
+                  <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
+                    {selectedPersonName}
                   </p>
                 </div>
 

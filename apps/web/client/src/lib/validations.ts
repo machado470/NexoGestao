@@ -42,6 +42,7 @@ export type AppointmentFormData = z.infer<typeof appointmentSchema>;
 // Service Order validation
 export const serviceOrderSchema = z.object({
   customerId: z.string().trim().min(1, "Selecione um cliente"),
+  assignedToPersonId: z.string().trim().optional().or(z.literal("")),
   title: z.string().trim().min(2, "Título deve ter pelo menos 2 caracteres"),
   description: z.string().trim().optional(),
   priority: z.number().int().min(1).max(5).default(2),
@@ -51,6 +52,20 @@ export const serviceOrderSchema = z.object({
 });
 
 export type ServiceOrderFormData = z.infer<typeof serviceOrderSchema>;
+
+// Service Order edit validation
+export const serviceOrderEditSchema = z.object({
+  title: z.string().trim().min(2, "Título deve ter pelo menos 2 caracteres"),
+  description: z.string().trim().optional(),
+  priority: z.number().int().min(1).max(5).default(2),
+  scheduledFor: z.string().trim().optional().or(z.literal("")),
+  status: z.enum(["OPEN", "ASSIGNED", "IN_PROGRESS", "DONE", "CANCELED"]),
+  assignedToPersonId: z.string().trim().nullable().optional().or(z.literal("")),
+  amountCents: z.number().int().positive("Valor deve ser maior que 0").optional(),
+  dueDate: z.string().trim().optional().or(z.literal("")),
+});
+
+export type ServiceOrderEditFormData = z.infer<typeof serviceOrderEditSchema>;
 
 // Charge validation
 export const chargeSchema = z.object({
