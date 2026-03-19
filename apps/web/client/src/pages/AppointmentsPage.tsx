@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,11 +13,11 @@ import {
   CheckCheck,
   Search,
   X,
-  CalendarDays,
   CircleDashed,
   CircleOff,
   UserCheck,
   AlertTriangle,
+  Link2,
 } from "lucide-react";
 import { CreateAppointmentModal } from "@/components/CreateAppointmentModal";
 import { toast } from "sonner";
@@ -134,7 +135,8 @@ function getStage(appointment: Appointment) {
     case "CONFIRMED":
       return {
         label: "Pronto para execução",
-        description: "O cliente confirmou e o agendamento já pode virar operação.",
+        description:
+          "O cliente confirmou e o agendamento já pode virar operação.",
         className:
           "border-green-200 bg-green-50 text-green-900 dark:border-green-900/40 dark:bg-green-950/20 dark:text-green-300",
         icon: UserCheck,
@@ -150,7 +152,8 @@ function getStage(appointment: Appointment) {
     case "NO_SHOW":
       return {
         label: "Perdido por ausência",
-        description: "O cliente não compareceu e o fluxo precisa de tratamento.",
+        description:
+          "O cliente não compareceu e o fluxo precisa de tratamento.",
         className:
           "border-yellow-200 bg-yellow-50 text-yellow-900 dark:border-yellow-900/40 dark:bg-yellow-950/20 dark:text-yellow-300",
         icon: AlertTriangle,
@@ -186,12 +189,38 @@ function InfoItem({
   );
 }
 
+function getAppointmentIdFromUrl() {
+  if (typeof window === "undefined") return null;
+
+  const params = new URLSearchParams(window.location.search);
+  const appointmentId = params.get("appointmentId")?.trim() ?? "";
+
+  return appointmentId || null;
+}
+
+function buildAppointmentsUrl(appointmentId?: string | null) {
+  const params = new URLSearchParams();
+
+  if (appointmentId) {
+    params.set("appointmentId", appointmentId);
+  }
+
+  const query = params.toString();
+  return query ? `/appointments?${query}` : "/appointments";
+}
+
 export default function AppointmentsPage() {
+  const [, navigate] = useLocation();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [statusFilter, setStatusFilter] = useState<AppointmentStatus | "">("");
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [highlightedAppointmentId, setHighlightedAppointmentId] = useState<
+    string | null
+  >(() => getAppointmentIdFromUrl());
+
+  const appointmentRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const listAppointments = trpc.nexo.appointments.list.useQuery(
     statusFilter ? { status: statusFilter } : undefined,
@@ -251,24 +280,60 @@ export default function AppointmentsPage() {
       if (!q) return true;
 
       return (
-        String(appointment.customer?.name ?? "")
-          .toLowerCase()
-          .includes(q) ||
-        String(appointment.notes ?? "")
-          .toLowerCase()
-          .includes(q) ||
-        String(getStatusLabel(appointment.status))
-          .toLowerCase()
-          .includes(q)
+        String(appointment.customer?.name ?? "").toLowerCase().includes(q) ||
+        String(appointment.notes ?? "").toLowerCase().includes(q) ||
+        String(getStatusLabel(appointment.status)).toLowerCase().includes(q)
       );
     });
   }, [appointments, searchQuery]);
 
+  const highlightedAppointment = useMemo(() => {
+    if (!highlightedAppointmentId) return null;
+
+    return (
+      appointments.find(
+        (appointment) => appointment.id === highlightedAppointmentId
+      ) ?? null
+    );
+  }, [appointments, highlightedAppointmentId]);
+
   useEffect(() => {
     if (listAppointments.error) {
-      toast.error("Erro ao carregar agendamentos: " + listAppointments.error.message);
+      toast.error(
+        "Erro ao carregar agendamentos: " + listAppointments.error.message
+      );
     }
   }, [listAppointments.error]);
+
+  useEffect(() => {
+    const syncFromUrl = () => {
+      const appointmentIdFromUrl = getAppointmentIdFromUrl();
+      setHighlightedAppointmentId((current) => {
+        if (current === appointmentIdFromUrl) return current;
+        return appointmentIdFromUrl;
+      });
+    };
+
+    syncFromUrl();
+    window.addEventListener("popstate", syncFromUrl);
+
+    return () => {
+      window.removeEventListener("popstate", syncFromUrl);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!highlightedAppointmentId) return;
+    if (listAppointments.isLoading) return;
+
+    const element = appointmentRefs.current[highlightedAppointmentId];
+    if (!element) return;
+
+    element.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
+  }, [highlightedAppointmentId, listAppointments.isLoading, filteredAppointments]);
 
   const total = filteredAppointments.length;
   const totalScheduled = filteredAppointments.filter(
@@ -314,6 +379,16 @@ export default function AppointmentsPage() {
     setSearchQuery("");
   };
 
+  const handleOpenDeepLink = (appointmentId: string) => {
+    setHighlightedAppointmentId(appointmentId);
+    navigate(buildAppointmentsUrl(appointmentId), { replace: false });
+  };
+
+  const handleClearDeepLink = () => {
+    setHighlightedAppointmentId(null);
+    navigate(buildAppointmentsUrl(null), { replace: false });
+  };
+
   const hasLocalFilters = Boolean(searchQuery);
 
   return (
@@ -325,7 +400,8 @@ export default function AppointmentsPage() {
             Agendamentos
           </h1>
           <p className="mt-1 text-gray-600 dark:text-gray-400">
-            Leitura operacional dos compromissos, confirmações, conclusões e perdas do dia a dia.
+            Leitura operacional dos compromissos, confirmações, conclusões e
+            perdas do dia a dia.
           </p>
         </div>
 
@@ -377,6 +453,24 @@ export default function AppointmentsPage() {
         </Button>
       </div>
 
+      {highlightedAppointmentId ? (
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-orange-700 dark:border-orange-900/40 dark:bg-orange-950/20 dark:text-orange-300">
+            Deep-link ativo:{" "}
+            {highlightedAppointment?.customer?.name ?? highlightedAppointmentId}
+          </span>
+
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleClearDeepLink}
+          >
+            Limpar foco
+          </Button>
+        </div>
+      ) : null}
+
       {hasLocalFilters ? (
         <div className="flex flex-wrap gap-2 text-sm text-gray-500">
           <span className="rounded-full border px-3 py-1">
@@ -401,7 +495,9 @@ export default function AppointmentsPage() {
         </div>
 
         <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-          <p className="text-sm text-gray-600 dark:text-gray-400">Confirmados</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Confirmados
+          </p>
           <p className="mt-1 text-2xl font-bold text-green-600 dark:text-green-400">
             {totalConfirmed}
           </p>
@@ -422,7 +518,9 @@ export default function AppointmentsPage() {
         </div>
 
         <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-          <p className="text-sm text-gray-600 dark:text-gray-400">Cancelados</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Cancelados
+          </p>
           <p className="mt-1 text-2xl font-bold text-red-600 dark:text-red-400">
             {totalCanceled}
           </p>
@@ -458,11 +556,19 @@ export default function AppointmentsPage() {
             const isProcessing = processingId === appointment.id;
             const stage = getStage(appointment);
             const StageIcon = stage.icon;
+            const isHighlighted = highlightedAppointmentId === appointment.id;
 
             return (
               <div
                 key={appointment.id}
-                className="rounded-xl border border-gray-200 bg-white p-4 transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-800"
+                ref={(element) => {
+                  appointmentRefs.current[appointment.id] = element;
+                }}
+                className={`rounded-xl border bg-white p-4 transition-shadow hover:shadow-md dark:bg-gray-800 ${
+                  isHighlighted
+                    ? "border-orange-400 ring-2 ring-orange-200 dark:border-orange-500 dark:ring-orange-900/40"
+                    : "border-gray-200 dark:border-gray-700"
+                }`}
               >
                 <div className="flex flex-col gap-4">
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -479,6 +585,12 @@ export default function AppointmentsPage() {
                         >
                           {getStatusLabel(appointment.status)}
                         </span>
+
+                        {isHighlighted ? (
+                          <span className="inline-flex items-center rounded-full bg-orange-100 px-2 py-1 text-xs font-medium text-orange-800 dark:bg-orange-900/30 dark:text-orange-300">
+                            Em foco
+                          </span>
+                        ) : null}
                       </div>
 
                       <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
@@ -489,6 +601,17 @@ export default function AppointmentsPage() {
                     </div>
 
                     <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="gap-2"
+                        onClick={() => handleOpenDeepLink(appointment.id)}
+                      >
+                        <Link2 className="h-4 w-4" />
+                        Focar
+                      </Button>
+
                       <Button
                         type="button"
                         size="sm"

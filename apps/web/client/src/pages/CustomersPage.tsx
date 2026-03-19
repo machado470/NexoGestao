@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useState, type ComponentType, type ReactNode } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type ComponentType,
+  type ReactNode,
+} from "react";
+import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import {
@@ -113,6 +120,26 @@ function formatCurrency(value?: number) {
   }).format(value);
 }
 
+function getCustomerIdFromUrl() {
+  if (typeof window === "undefined") return null;
+
+  const params = new URLSearchParams(window.location.search);
+  const customerId = params.get("customerId")?.trim() ?? "";
+
+  return customerId || null;
+}
+
+function buildCustomersUrl(customerId?: string | null) {
+  const params = new URLSearchParams();
+
+  if (customerId) {
+    params.set("customerId", customerId);
+  }
+
+  const query = params.toString();
+  return query ? `/customers?${query}` : "/customers";
+}
+
 function SectionCard({
   title,
   icon: Icon,
@@ -124,13 +151,17 @@ function SectionCard({
   emptyText: string;
   children: ReactNode;
 }) {
-  const hasContent = Array.isArray(children) ? children.length > 0 : Boolean(children);
+  const hasContent = Array.isArray(children)
+    ? children.length > 0
+    : Boolean(children);
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
       <div className="mb-3 flex items-center gap-2">
         <Icon className="h-4 w-4 text-orange-500" />
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{title}</h3>
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+          {title}
+        </h3>
       </div>
 
       {hasContent ? (
@@ -143,9 +174,14 @@ function SectionCard({
 }
 
 export default function CustomersPage() {
+  const [, navigate] = useLocation();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
-  const [workspaceCustomerId, setWorkspaceCustomerId] = useState<string | null>(null);
+  const [editingCustomerId, setEditingCustomerId] = useState<string | null>(
+    null
+  );
+  const [workspaceCustomerId, setWorkspaceCustomerId] = useState<string | null>(
+    () => getCustomerIdFromUrl()
+  );
 
   const listCustomers = trpc.nexo.customers.list.useQuery(undefined, {
     retry: false,
@@ -166,7 +202,9 @@ export default function CustomersPage() {
   }, [listCustomers.data]);
 
   const workspace = useMemo(() => {
-    return (workspaceQuery.data?.data ?? workspaceQuery.data ?? null) as CustomerWorkspace | null;
+    return (workspaceQuery.data?.data ??
+      workspaceQuery.data ??
+      null) as CustomerWorkspace | null;
   }, [workspaceQuery.data]);
 
   useEffect(() => {
@@ -177,13 +215,42 @@ export default function CustomersPage() {
 
   useEffect(() => {
     if (workspaceQuery.error) {
-      toast.error("Erro ao carregar workspace do cliente: " + workspaceQuery.error.message);
+      toast.error(
+        "Erro ao carregar workspace do cliente: " + workspaceQuery.error.message
+      );
     }
   }, [workspaceQuery.error]);
+
+  useEffect(() => {
+    const syncFromUrl = () => {
+      const customerIdFromUrl = getCustomerIdFromUrl();
+      setWorkspaceCustomerId((current) => {
+        if (current === customerIdFromUrl) return current;
+        return customerIdFromUrl;
+      });
+    };
+
+    syncFromUrl();
+    window.addEventListener("popstate", syncFromUrl);
+
+    return () => {
+      window.removeEventListener("popstate", syncFromUrl);
+    };
+  }, []);
 
   const total = customers.length;
   const totalActive = customers.filter((c) => c.active).length;
   const totalInactive = total - totalActive;
+
+  const openWorkspace = (customerId: string) => {
+    setWorkspaceCustomerId(customerId);
+    navigate(buildCustomersUrl(customerId), { replace: false });
+  };
+
+  const closeWorkspace = () => {
+    setWorkspaceCustomerId(null);
+    navigate(buildCustomersUrl(null), { replace: false });
+  };
 
   return (
     <div className="space-y-6 p-6">
@@ -194,7 +261,8 @@ export default function CustomersPage() {
             Clientes
           </h1>
           <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-            Base operacional de clientes vinda do NexoGestão via BFF com sessão em cookie httpOnly.
+            Base operacional de clientes vinda do NexoGestão via BFF com sessão
+            em cookie httpOnly.
           </p>
         </div>
 
@@ -222,28 +290,40 @@ export default function CustomersPage() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-          <p className="text-sm text-gray-600 dark:text-gray-400">Total de Clientes</p>
-          <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">{total}</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Total de Clientes
+          </p>
+          <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">
+            {total}
+          </p>
         </div>
 
         <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
           <p className="text-sm text-gray-600 dark:text-gray-400">Ativos</p>
-          <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">{totalActive}</p>
+          <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">
+            {totalActive}
+          </p>
         </div>
 
         <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
           <p className="text-sm text-gray-600 dark:text-gray-400">Inativos</p>
-          <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">{totalInactive}</p>
+          <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">
+            {totalInactive}
+          </p>
         </div>
       </div>
 
       <div className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
         <div className="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
-          <p className="text-sm font-medium text-gray-900 dark:text-white">Lista</p>
+          <p className="text-sm font-medium text-gray-900 dark:text-white">
+            Lista
+          </p>
         </div>
 
         {listCustomers.isLoading ? (
-          <div className="p-6 text-sm text-gray-600 dark:text-gray-400">Carregando...</div>
+          <div className="p-6 text-sm text-gray-600 dark:text-gray-400">
+            Carregando...
+          </div>
         ) : customers.length === 0 ? (
           <div className="p-6 text-sm text-gray-600 dark:text-gray-400">
             Nenhum cliente ainda. Crie o primeiro.
@@ -253,20 +333,39 @@ export default function CustomersPage() {
             <table className="min-w-full text-sm">
               <thead className="bg-gray-50 dark:bg-gray-900/40">
                 <tr className="text-left">
-                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Nome</th>
-                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Telefone</th>
-                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Email</th>
-                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Observações</th>
-                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Criado em</th>
-                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Status</th>
-                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Ações</th>
+                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
+                    Nome
+                  </th>
+                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
+                    Telefone
+                  </th>
+                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
+                    Email
+                  </th>
+                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
+                    Observações
+                  </th>
+                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
+                    Criado em
+                  </th>
+                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
+                    Status
+                  </th>
+                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
+                    Ações
+                  </th>
                 </tr>
               </thead>
 
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                 {customers.map((customer) => (
-                  <tr key={customer.id} className="hover:bg-gray-50 dark:hover:bg-gray-900/30">
-                    <td className="px-4 py-3 text-gray-900 dark:text-white">{customer.name}</td>
+                  <tr
+                    key={customer.id}
+                    className="hover:bg-gray-50 dark:hover:bg-gray-900/30"
+                  >
+                    <td className="px-4 py-3 text-gray-900 dark:text-white">
+                      {customer.name}
+                    </td>
 
                     <td className="px-4 py-3 text-gray-700 dark:text-gray-300">
                       {customer.phone ?? "—"}
@@ -305,7 +404,7 @@ export default function CustomersPage() {
                           type="button"
                           variant="outline"
                           size="sm"
-                          onClick={() => setWorkspaceCustomerId(customer.id)}
+                          onClick={() => openWorkspace(customer.id)}
                           className="inline-flex items-center gap-2"
                         >
                           <PanelRightOpen className="h-4 w-4" />
@@ -334,10 +433,7 @@ export default function CustomersPage() {
 
       {workspaceCustomerId ? (
         <div className="fixed inset-0 z-50 flex justify-end">
-          <div
-            className="absolute inset-0 bg-black/40"
-            onClick={() => setWorkspaceCustomerId(null)}
-          />
+          <div className="absolute inset-0 bg-black/40" onClick={closeWorkspace} />
 
           <div className="relative h-full w-full max-w-2xl overflow-y-auto border-l border-gray-200 bg-gray-50 shadow-2xl dark:border-gray-700 dark:bg-gray-900">
             <div className="sticky top-0 z-10 border-b border-gray-200 bg-white px-5 py-4 dark:border-gray-700 dark:bg-gray-800">
@@ -356,7 +452,7 @@ export default function CustomersPage() {
 
                 <button
                   type="button"
-                  onClick={() => setWorkspaceCustomerId(null)}
+                  onClick={closeWorkspace}
                   className="rounded-lg p-2 hover:bg-gray-100 dark:hover:bg-gray-700"
                 >
                   <X className="h-5 w-5 text-gray-700 dark:text-gray-300" />
@@ -377,28 +473,36 @@ export default function CustomersPage() {
                 <>
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-                      <p className="text-sm text-gray-500 dark:text-gray-400">Telefone</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        Telefone
+                      </p>
                       <p className="mt-1 font-medium text-gray-900 dark:text-white">
                         {workspace.customer.phone ?? "—"}
                       </p>
                     </div>
 
                     <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-                      <p className="text-sm text-gray-500 dark:text-gray-400">Email</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        Email
+                      </p>
                       <p className="mt-1 font-medium text-gray-900 dark:text-white">
                         {workspace.customer.email ?? "—"}
                       </p>
                     </div>
 
                     <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-                      <p className="text-sm text-gray-500 dark:text-gray-400">Status</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        Status
+                      </p>
                       <p className="mt-1 font-medium text-gray-900 dark:text-white">
                         {workspace.customer.active ? "Ativo" : "Inativo"}
                       </p>
                     </div>
 
                     <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-                      <p className="text-sm text-gray-500 dark:text-gray-400">Criado em</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        Criado em
+                      </p>
                       <p className="mt-1 font-medium text-gray-900 dark:text-white">
                         {formatDate(workspace.customer.createdAt)}
                       </p>
@@ -406,7 +510,9 @@ export default function CustomersPage() {
                   </div>
 
                   <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Observações</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      Observações
+                    </p>
                     <p className="mt-1 text-sm text-gray-900 dark:text-white">
                       {workspace.customer.notes?.trim() || "Sem observações."}
                     </p>

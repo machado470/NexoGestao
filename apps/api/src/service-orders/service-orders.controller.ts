@@ -37,6 +37,8 @@ export class ServiceOrdersController {
     @Query('status') status?: string,
     @Query('customerId') customerId?: string,
     @Query('assignedToPersonId') assignedToPersonId?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
@@ -44,6 +46,8 @@ export class ServiceOrdersController {
       status: status as any,
       customerId,
       assignedToPersonId,
+      from,
+      to,
       page: page ? Number(page) : 1,
       limit: limit ? Number(limit) : 20,
     })

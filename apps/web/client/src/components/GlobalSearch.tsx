@@ -29,6 +29,18 @@ function formatCurrencyFromCharge(charge: any) {
   }).format(cents / 100);
 }
 
+function normalizeArrayPayload(payload: any) {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.data)) return payload.data;
+  if (Array.isArray(payload?.data?.items)) return payload.data.items;
+  if (Array.isArray(payload?.items)) return payload.items;
+  return [];
+}
+
+function includesTerm(value: unknown, searchTerm: string) {
+  return String(value ?? "").toLowerCase().includes(searchTerm);
+}
+
 export function GlobalSearch() {
   const { isAuthenticated, isInitializing } = useAuth();
   const canQuery = isAuthenticated && !isInitializing;
@@ -46,17 +58,14 @@ export function GlobalSearch() {
     refetchOnWindowFocus: false,
   });
 
-  const appointmentsQuery = trpc.nexo.appointments.list.useQuery(
-    { page: 1, limit: 1000 },
-    {
-      enabled: false,
-      retry: false,
-      refetchOnWindowFocus: false,
-    }
-  );
+  const appointmentsQuery = trpc.nexo.appointments.list.useQuery(undefined, {
+    enabled: false,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
 
   const serviceOrdersQuery = trpc.nexo.serviceOrders.list.useQuery(
-    { page: 1, limit: 1000 },
+    { page: 1, limit: 100 },
     {
       enabled: false,
       retry: false,
@@ -65,7 +74,7 @@ export function GlobalSearch() {
   );
 
   const chargesQuery = trpc.finance.charges.list.useQuery(
-    { page: 1, limit: 1000 },
+    { page: 1, limit: 100 },
     {
       enabled: false,
       retry: false,
@@ -80,14 +89,17 @@ export function GlobalSearch() {
       return;
     }
 
-    if (query.trim().length < 2) {
+    const trimmed = query.trim();
+    if (trimmed.length < 2) {
       setResults([]);
       setIsSearching(false);
       return;
     }
 
+    let cancelled = false;
+    const searchTerm = trimmed.toLowerCase();
+
     setIsSearching(true);
-    const searchTerm = query.trim().toLowerCase();
 
     void Promise.all([
       customersQuery.refetch(),
@@ -96,112 +108,133 @@ export function GlobalSearch() {
       chargesQuery.refetch(),
     ])
       .then(([customers, appointments, serviceOrders, charges]) => {
+        if (cancelled) return;
+
         const foundResults: SearchResult[] = [];
+        const seen = new Set<string>();
 
-        const customersList = Array.isArray((customers.data as any)?.data)
-          ? (customers.data as any).data
-          : Array.isArray(customers.data)
-            ? customers.data
-            : [];
-
-        const appointmentsList = Array.isArray((appointments.data as any)?.data)
-          ? (appointments.data as any).data
-          : Array.isArray(appointments.data)
-            ? appointments.data
-            : [];
-
-        const serviceOrdersList = Array.isArray(
-          (serviceOrders.data as any)?.data
-        )
-          ? (serviceOrders.data as any).data
-          : Array.isArray(serviceOrders.data)
-            ? serviceOrders.data
-            : [];
-
-        const chargesList = Array.isArray((charges.data as any)?.data)
-          ? (charges.data as any).data
-          : Array.isArray(charges.data)
-            ? charges.data
-            : [];
+        const customersList = normalizeArrayPayload(customers.data);
+        const appointmentsList = normalizeArrayPayload(appointments.data);
+        const serviceOrdersList = normalizeArrayPayload(serviceOrders.data);
+        const chargesList = normalizeArrayPayload(charges.data);
 
         customersList.forEach((customer: any) => {
-          const name = String(customer?.name ?? "").toLowerCase();
-          const email = String(customer?.email ?? "").toLowerCase();
-          const phone = String(customer?.phone ?? "");
+          const matches =
+            includesTerm(customer?.name, searchTerm) ||
+            includesTerm(customer?.email, searchTerm) ||
+            includesTerm(customer?.phone, searchTerm) ||
+            includesTerm(customer?.notes, searchTerm);
 
-          if (
-            name.includes(searchTerm) ||
-            email.includes(searchTerm) ||
-            phone.includes(searchTerm)
-          ) {
-            foundResults.push({
-              id: customer.id,
-              type: "customer",
-              title: customer.name,
-              subtitle: customer.email || customer.phone || "Cliente",
-              icon: <Users className="h-4 w-4" />,
-              route: "/customers",
-            });
-          }
+          if (!matches) return;
+
+          const key = `customer-${customer.id}`;
+          if (seen.has(key)) return;
+          seen.add(key);
+
+          foundResults.push({
+            id: customer.id,
+            type: "customer",
+            title: customer.name || "Cliente",
+            subtitle: customer.email || customer.phone || "Cliente",
+            icon: <Users className="h-4 w-4" />,
+            route: `/customers?customerId=${customer.id}`,
+          });
         });
 
         appointmentsList.forEach((appointment: any) => {
-          const title = String(appointment?.title ?? "").toLowerCase();
+          const matches =
+            includesTerm(appointment?.customer?.name, searchTerm) ||
+            includesTerm(appointment?.customer?.phone, searchTerm) ||
+            includesTerm(appointment?.notes, searchTerm) ||
+            includesTerm(appointment?.status, searchTerm);
 
-          if (title.includes(searchTerm)) {
-            foundResults.push({
-              id: appointment.id,
-              type: "appointment",
-              title: appointment.title || "Agendamento",
-              subtitle: appointment.startsAt
-                ? new Date(appointment.startsAt).toLocaleDateString("pt-BR")
-                : "Sem data",
-              icon: <Calendar className="h-4 w-4" />,
-              route: "/appointments",
-            });
-          }
+          if (!matches) return;
+
+          const key = `appointment-${appointment.id}`;
+          if (seen.has(key)) return;
+          seen.add(key);
+
+          foundResults.push({
+            id: appointment.id,
+            type: "appointment",
+            title: appointment?.customer?.name || "Agendamento",
+            subtitle: appointment?.startsAt
+              ? new Date(appointment.startsAt).toLocaleDateString("pt-BR")
+              : appointment?.status || "Sem data",
+            icon: <Calendar className="h-4 w-4" />,
+            route: `/appointments?appointmentId=${appointment.id}`,
+          });
         });
 
         serviceOrdersList.forEach((serviceOrder: any) => {
-          const title = String(serviceOrder?.title ?? "").toLowerCase();
+          const matches =
+            includesTerm(serviceOrder?.title, searchTerm) ||
+            includesTerm(serviceOrder?.status, searchTerm) ||
+            includesTerm(serviceOrder?.customer?.name, searchTerm) ||
+            includesTerm(serviceOrder?.notes, searchTerm);
 
-          if (title.includes(searchTerm)) {
-            foundResults.push({
-              id: serviceOrder.id,
-              type: "serviceOrder",
-              title: serviceOrder.title || "Ordem de serviço",
-              subtitle: serviceOrder.status || "Sem status",
-              icon: <Briefcase className="h-4 w-4" />,
-              route: "/service-orders",
-            });
-          }
+          if (!matches) return;
+
+          const key = `serviceOrder-${serviceOrder.id}`;
+          if (seen.has(key)) return;
+          seen.add(key);
+
+          foundResults.push({
+            id: serviceOrder.id,
+            type: "serviceOrder",
+            title: serviceOrder.title || "Ordem de serviço",
+            subtitle:
+              serviceOrder?.customer?.name ||
+              serviceOrder?.status ||
+              "Sem status",
+            icon: <Briefcase className="h-4 w-4" />,
+            route: `/service-orders?serviceOrderId=${serviceOrder.id}`,
+          });
         });
 
         chargesList.forEach((charge: any) => {
-          const description = String(
-            charge?.description ?? charge?.notes ?? ""
-          ).toLowerCase();
+          const matches =
+            includesTerm(charge?.notes, searchTerm) ||
+            includesTerm(charge?.status, searchTerm) ||
+            includesTerm(charge?.customer?.name, searchTerm) ||
+            includesTerm(charge?.customer?.phone, searchTerm) ||
+            includesTerm(charge?.serviceOrder?.title, searchTerm) ||
+            includesTerm(charge?.id, searchTerm);
 
-          if (description.includes(searchTerm)) {
-            foundResults.push({
-              id: charge.id,
-              type: "charge",
-              title: charge.description || charge.notes || "Cobrança",
-              subtitle: formatCurrencyFromCharge(charge),
-              icon: <DollarSign className="h-4 w-4" />,
-              route: "/finances",
-            });
-          }
+          if (!matches) return;
+
+          const key = `charge-${charge.id}`;
+          if (seen.has(key)) return;
+          seen.add(key);
+
+          foundResults.push({
+            id: charge.id,
+            type: "charge",
+            title:
+              charge?.serviceOrder?.title ||
+              charge?.customer?.name ||
+              "Cobrança",
+            subtitle: `${formatCurrencyFromCharge(charge)} • ${
+              charge?.status || "Sem status"
+            }`,
+            icon: <DollarSign className="h-4 w-4" />,
+            route: `/finances?chargeId=${charge.id}`,
+          });
         });
 
         setResults(foundResults.slice(0, 8));
         setIsSearching(false);
       })
       .catch((error) => {
+        if (cancelled) return;
         console.error("Erro ao buscar resultados de pesquisa:", error);
         setResults([]);
         setIsSearching(false);
       });
+
+    return () => {
+      cancelled = true;
+    };
   }, [canQuery, query]);
 
   useEffect(() => {
@@ -234,7 +267,9 @@ export function GlobalSearch() {
         <input
           type="text"
           placeholder={
-            canQuery ? "Buscar clientes, agendamentos..." : "Faça login para buscar"
+            canQuery
+              ? "Buscar clientes, agendamentos..."
+              : "Faça login para buscar"
           }
           value={query}
           disabled={!canQuery}

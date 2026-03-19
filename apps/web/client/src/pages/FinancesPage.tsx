@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -27,9 +27,9 @@ import {
   CreditCard,
   Wallet,
   Receipt,
-  CalendarDays,
   ArrowRightLeft,
   BadgeDollarSign,
+  Link2,
 } from "lucide-react";
 import { CreateChargeModal } from "@/components/CreateChargeModal";
 import { EditChargeModal } from "@/components/EditChargeModal";
@@ -244,10 +244,15 @@ function InfoItem({
   );
 }
 
+function getChargeIdFromParams(params: URLSearchParams) {
+  return params.get("chargeId")?.trim() || "";
+}
+
 export default function FinancesPage() {
   const { isAuthenticated, isInitializing } = useAuth();
   const canLoadFinance = isAuthenticated && !isInitializing;
 
+  const chargeRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const utils = trpc.useUtils();
   const [location, navigate] = useLocation();
 
@@ -257,6 +262,7 @@ export default function FinancesPage() {
   }, [location]);
 
   const serviceOrderIdFromUrl = searchParams.get("serviceOrderId")?.trim() || "";
+  const chargeIdFromUrl = getChargeIdFromParams(searchParams);
   const isServiceOrderScoped = Boolean(serviceOrderIdFromUrl);
 
   const [page, setPage] = useState(1);
@@ -265,6 +271,9 @@ export default function FinancesPage() {
   const [searchInput, setSearchInput] = useState("");
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<ChargeStatusFilter>("ALL");
+  const [highlightedChargeId, setHighlightedChargeId] = useState<string | null>(
+    chargeIdFromUrl || null
+  );
 
   const limit = 20;
 
@@ -295,6 +304,10 @@ export default function FinancesPage() {
   useEffect(() => {
     setPage(1);
   }, [query, statusFilter, serviceOrderIdFromUrl]);
+
+  useEffect(() => {
+    setHighlightedChargeId(chargeIdFromUrl || null);
+  }, [chargeIdFromUrl]);
 
   const refreshQueriesOnly = async () => {
     await Promise.all([
@@ -353,7 +366,25 @@ export default function FinancesPage() {
   };
 
   const handleClearServiceOrderFilter = () => {
-    navigate("/finances");
+    const params = new URLSearchParams(location.includes("?") ? location.split("?")[1] : "");
+    params.delete("serviceOrderId");
+    const next = params.toString();
+    navigate(next ? `/finances?${next}` : "/finances");
+  };
+
+  const handleClearChargeFocus = () => {
+    const params = new URLSearchParams(location.includes("?") ? location.split("?")[1] : "");
+    params.delete("chargeId");
+    const next = params.toString();
+    setHighlightedChargeId(null);
+    navigate(next ? `/finances?${next}` : "/finances");
+  };
+
+  const handleOpenChargeFocus = (chargeId: string) => {
+    const params = new URLSearchParams(location.includes("?") ? location.split("?")[1] : "");
+    params.set("chargeId", chargeId);
+    setHighlightedChargeId(chargeId);
+    navigate(`/finances?${params.toString()}`);
   };
 
   const handleBackToServiceOrders = () => {
@@ -395,8 +426,31 @@ export default function FinancesPage() {
     }
   ) as ChargesMeta;
 
-  const paidCount = charges.filter((charge) => charge.status === "PAID").length;
+  const highlightedCharge = useMemo(() => {
+    if (!highlightedChargeId) return null;
+    return charges.find((charge) => charge.id === highlightedChargeId) ?? null;
+  }, [charges, highlightedChargeId]);
 
+  const highlightedExistsOnCurrentPage = useMemo(() => {
+    if (!highlightedChargeId) return false;
+    return charges.some((charge) => charge.id === highlightedChargeId);
+  }, [charges, highlightedChargeId]);
+
+  useEffect(() => {
+    if (!highlightedChargeId) return;
+    if (chargesQuery.isLoading) return;
+    if (!highlightedExistsOnCurrentPage) return;
+
+    const element = chargeRefs.current[highlightedChargeId];
+    if (!element) return;
+
+    element.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
+  }, [highlightedChargeId, highlightedExistsOnCurrentPage, chargesQuery.isLoading, charges]);
+
+  const paidCount = charges.filter((charge) => charge.status === "PAID").length;
   const pendingCount = charges.filter((charge) => charge.status === "PENDING").length;
   const overdueCount = charges.filter((charge) => charge.status === "OVERDUE").length;
   const pendingAmountOnPage = charges
@@ -406,7 +460,8 @@ export default function FinancesPage() {
   const hasActiveFilters =
     Boolean(query) ||
     statusFilter !== "ALL" ||
-    Boolean(serviceOrderIdFromUrl);
+    Boolean(serviceOrderIdFromUrl) ||
+    Boolean(highlightedChargeId);
 
   const hasError =
     chargesQuery.isError || (!isServiceOrderScoped && statsQuery.isError);
@@ -537,6 +592,31 @@ export default function FinancesPage() {
           </Card>
         ) : null}
 
+        {highlightedChargeId ? (
+          <Card className="border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-900/20">
+            <CardContent className="flex flex-col gap-3 pt-6 md:flex-row md:items-center md:justify-between">
+              <div>
+                <p className="text-sm font-medium text-orange-900 dark:text-orange-300">
+                  Deep-link ativo:{" "}
+                  {highlightedCharge?.notes?.trim() ||
+                    highlightedCharge?.serviceOrder?.title ||
+                    highlightedChargeId.slice(0, 8)}
+                </p>
+                <p className="text-xs text-orange-800 dark:text-orange-400">
+                  {highlightedExistsOnCurrentPage
+                    ? "A cobrança está em foco na página atual."
+                    : "A cobrança não está na página atual."}
+                </p>
+              </div>
+
+              <Button variant="outline" onClick={handleClearChargeFocus}>
+                <X className="mr-2 h-4 w-4" />
+                Limpar foco
+              </Button>
+            </CardContent>
+          </Card>
+        ) : null}
+
         {!isServiceOrderScoped && stats && (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
             <MetricCard
@@ -653,6 +733,11 @@ export default function FinancesPage() {
                     O.S.: {serviceOrderIdFromUrl.slice(0, 8)}
                   </span>
                 )}
+                {highlightedChargeId && (
+                  <span className="rounded-full border px-3 py-1">
+                    Cobrança: {highlightedChargeId.slice(0, 8)}
+                  </span>
+                )}
                 {query && (
                   <span className="rounded-full border px-3 py-1">
                     Busca: {query}
@@ -708,11 +793,19 @@ export default function FinancesPage() {
                 {charges.map((charge) => {
                   const stage = getChargeStage(charge);
                   const StageIcon = stage.icon;
+                  const isHighlighted = highlightedChargeId === charge.id;
 
                   return (
                     <div
                       key={charge.id}
-                      className="rounded-xl border border-gray-200 bg-white p-4 transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-800"
+                      ref={(element) => {
+                        chargeRefs.current[charge.id] = element;
+                      }}
+                      className={`rounded-xl border bg-white p-4 transition-shadow hover:shadow-md dark:bg-gray-800 ${
+                        isHighlighted
+                          ? "border-orange-400 ring-2 ring-orange-200 dark:border-orange-500 dark:ring-orange-900/40"
+                          : "border-gray-200 dark:border-gray-700"
+                      }`}
                     >
                       <div className="flex flex-col gap-4">
                         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -727,6 +820,12 @@ export default function FinancesPage() {
                               <Badge className={getStatusColor(charge.status)}>
                                 {getStatusLabel(charge.status)}
                               </Badge>
+
+                              {isHighlighted ? (
+                                <Badge className="bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300">
+                                  Em foco
+                                </Badge>
+                              ) : null}
                             </div>
 
                             <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
@@ -745,6 +844,15 @@ export default function FinancesPage() {
                           </div>
 
                           <div className="flex flex-wrap gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleOpenChargeFocus(charge.id)}
+                            >
+                              <Link2 className="mr-2 h-4 w-4" />
+                              Focar
+                            </Button>
+
                             {(charge.status === "PENDING" || charge.status === "OVERDUE") && (
                               <>
                                 <Button

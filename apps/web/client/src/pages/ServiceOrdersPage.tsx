@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,6 @@ import {
   RefreshCw,
   ClipboardList,
   User,
-  Calendar,
   AlertCircle,
   Wallet,
   Clock3,
@@ -19,6 +18,7 @@ import {
   ArrowRightLeft,
   Search,
   X,
+  Link2,
 } from "lucide-react";
 import CreateServiceOrderModal from "@/components/CreateServiceOrderModal";
 import { toast } from "sonner";
@@ -264,7 +264,8 @@ function getOperationalStage(os: ServiceOrder) {
     case "DONE":
       return {
         label: "Execução concluída",
-        description: "A operação foi finalizada e já entrou na etapa financeira.",
+        description:
+          "A operação foi finalizada e já entrou na etapa financeira.",
         className:
           "border-green-200 bg-green-50 text-green-900 dark:border-green-900/50 dark:bg-green-950/20 dark:text-green-300",
         icon: CheckCircle2,
@@ -378,10 +379,7 @@ function getFinancialFilterLabel(value: FinancialFilter) {
   }
 }
 
-function matchesFinancialFilter(
-  os: ServiceOrder,
-  filter: FinancialFilter
-) {
+function matchesFinancialFilter(os: ServiceOrder, filter: FinancialFilter) {
   if (filter === "ALL") return true;
 
   const summary = os.financialSummary ?? null;
@@ -417,6 +415,26 @@ function InfoItem({
   );
 }
 
+function getServiceOrderIdFromUrl() {
+  if (typeof window === "undefined") return null;
+
+  const params = new URLSearchParams(window.location.search);
+  const serviceOrderId = params.get("serviceOrderId")?.trim() ?? "";
+
+  return serviceOrderId || null;
+}
+
+function buildServiceOrdersUrl(serviceOrderId?: string | null) {
+  const params = new URLSearchParams();
+
+  if (serviceOrderId) {
+    params.set("serviceOrderId", serviceOrderId);
+  }
+
+  const query = params.toString();
+  return query ? `/service-orders?${query}` : "/service-orders";
+}
+
 export default function ServiceOrdersPage() {
   const [, navigate] = useLocation();
   const [page, setPage] = useState(1);
@@ -428,6 +446,11 @@ export default function ServiceOrdersPage() {
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [highlightedServiceOrderId, setHighlightedServiceOrderId] = useState<
+    string | null
+  >(() => getServiceOrderIdFromUrl());
+
+  const serviceOrderRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const utils = trpc.useUtils();
 
   const listQuery = trpc.nexo.serviceOrders.list.useQuery(
@@ -458,7 +481,9 @@ export default function ServiceOrdersPage() {
   }) as ServiceOrdersListResult;
 
   const serviceOrders = useMemo(() => {
-    return Array.isArray(serviceOrdersResult.data) ? serviceOrdersResult.data : [];
+    return Array.isArray(serviceOrdersResult.data)
+      ? serviceOrdersResult.data
+      : [];
   }, [serviceOrdersResult]);
 
   const filteredServiceOrders = useMemo(() => {
@@ -485,6 +510,19 @@ export default function ServiceOrdersPage() {
     pages: 1,
   };
 
+  const highlightedServiceOrder = useMemo(() => {
+    if (!highlightedServiceOrderId) return null;
+
+    return (
+      serviceOrders.find((os) => os.id === highlightedServiceOrderId) ?? null
+    );
+  }, [serviceOrders, highlightedServiceOrderId]);
+
+  const highlightedExistsOnCurrentPage = useMemo(() => {
+    if (!highlightedServiceOrderId) return false;
+    return filteredServiceOrders.some((os) => os.id === highlightedServiceOrderId);
+  }, [filteredServiceOrders, highlightedServiceOrderId]);
+
   const updateMutation = trpc.nexo.serviceOrders.update.useMutation({
     onSuccess: () => {
       toast.success("OS atualizada com sucesso!");
@@ -498,14 +536,15 @@ export default function ServiceOrdersPage() {
     },
   });
 
-  const generateChargeMutation = trpc.nexo.serviceOrders.generateCharge.useMutation({
-    onError: (err) => {
-      toast.error(err.message || "Erro ao gerar cobrança");
-    },
-    onSettled: () => {
-      setProcessingId(null);
-    },
-  });
+  const generateChargeMutation =
+    trpc.nexo.serviceOrders.generateCharge.useMutation({
+      onError: (err) => {
+        toast.error(err.message || "Erro ao gerar cobrança");
+      },
+      onSettled: () => {
+        setProcessingId(null);
+      },
+    });
 
   const customers = useMemo(() => {
     const payload = customersQuery.data;
@@ -523,9 +562,47 @@ export default function ServiceOrdersPage() {
 
   useEffect(() => {
     if (listQuery.error) {
-      toast.error("Erro ao carregar ordens de serviço: " + listQuery.error.message);
+      toast.error(
+        "Erro ao carregar ordens de serviço: " + listQuery.error.message
+      );
     }
   }, [listQuery.error]);
+
+  useEffect(() => {
+    const syncFromUrl = () => {
+      const serviceOrderIdFromUrl = getServiceOrderIdFromUrl();
+      setHighlightedServiceOrderId((current) => {
+        if (current === serviceOrderIdFromUrl) return current;
+        return serviceOrderIdFromUrl;
+      });
+    };
+
+    syncFromUrl();
+    window.addEventListener("popstate", syncFromUrl);
+
+    return () => {
+      window.removeEventListener("popstate", syncFromUrl);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!highlightedServiceOrderId) return;
+    if (listQuery.isLoading) return;
+    if (!highlightedExistsOnCurrentPage) return;
+
+    const element = serviceOrderRefs.current[highlightedServiceOrderId];
+    if (!element) return;
+
+    element.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
+  }, [
+    highlightedServiceOrderId,
+    highlightedExistsOnCurrentPage,
+    listQuery.isLoading,
+    filteredServiceOrders,
+  ]);
 
   const handleStatusChange = (id: string, newStatus: ServiceOrderStatus) => {
     setProcessingId(id);
@@ -605,9 +682,21 @@ export default function ServiceOrdersPage() {
     setFinancialFilter("ALL");
   };
 
+  const handleOpenDeepLink = (serviceOrderId: string) => {
+    setHighlightedServiceOrderId(serviceOrderId);
+    navigate(buildServiceOrdersUrl(serviceOrderId), { replace: false });
+  };
+
+  const handleClearDeepLink = () => {
+    setHighlightedServiceOrderId(null);
+    navigate(buildServiceOrdersUrl(null), { replace: false });
+  };
+
   const total = filteredServiceOrders.length;
   const totalOpen = filteredServiceOrders.filter((os) => os.status === "OPEN").length;
-  const totalAssigned = filteredServiceOrders.filter((os) => os.status === "ASSIGNED").length;
+  const totalAssigned = filteredServiceOrders.filter(
+    (os) => os.status === "ASSIGNED"
+  ).length;
   const totalInProgress = filteredServiceOrders.filter(
     (os) => os.status === "IN_PROGRESS"
   ).length;
@@ -634,7 +723,8 @@ export default function ServiceOrdersPage() {
             Ordens de Serviço
           </h1>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Execução, fechamento operacional e transição para cobrança em uma leitura só.
+            Execução, fechamento operacional e transição para cobrança em uma
+            leitura só.
           </p>
         </div>
 
@@ -702,6 +792,29 @@ export default function ServiceOrdersPage() {
         </Button>
       </div>
 
+      {highlightedServiceOrderId ? (
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-orange-700 dark:border-orange-900/40 dark:bg-orange-950/20 dark:text-orange-300">
+            Deep-link ativo: {highlightedServiceOrder?.title ?? highlightedServiceOrderId}
+          </span>
+
+          {!highlightedExistsOnCurrentPage ? (
+            <span className="rounded-full border border-yellow-200 bg-yellow-50 px-3 py-1 text-yellow-700 dark:border-yellow-900/40 dark:bg-yellow-950/20 dark:text-yellow-300">
+              Esta O.S. não está na página atual.
+            </span>
+          ) : null}
+
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleClearDeepLink}
+          >
+            Limpar foco
+          </Button>
+        </div>
+      ) : null}
+
       {hasLocalFilters ? (
         <div className="flex flex-wrap gap-2 text-sm text-gray-500">
           {searchQuery ? (
@@ -722,8 +835,12 @@ export default function ServiceOrdersPage() {
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-6">
         <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-          <p className="text-sm text-gray-600 dark:text-gray-400">Total na página</p>
-          <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">{total}</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Total na página
+          </p>
+          <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">
+            {total}
+          </p>
         </div>
 
         <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
@@ -741,21 +858,27 @@ export default function ServiceOrdersPage() {
         </div>
 
         <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-          <p className="text-sm text-gray-600 dark:text-gray-400">Em andamento</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Em andamento
+          </p>
           <p className="mt-1 text-2xl font-bold text-orange-600 dark:text-orange-400">
             {totalInProgress}
           </p>
         </div>
 
         <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-          <p className="text-sm text-gray-600 dark:text-gray-400">Concluídas c/ cobrança</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Concluídas c/ cobrança
+          </p>
           <p className="mt-1 text-2xl font-bold text-green-600 dark:text-green-400">
             {doneWithCharge}
           </p>
         </div>
 
         <div className="rounded-lg border border-red-200 bg-white p-4 dark:border-red-800 dark:bg-gray-800">
-          <p className="text-sm text-gray-600 dark:text-gray-400">Prontas sem cobrança</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Prontas sem cobrança
+          </p>
           <p className="mt-1 text-2xl font-bold text-red-600 dark:text-red-400">
             {doneWithoutCharge}
           </p>
@@ -798,25 +921,27 @@ export default function ServiceOrdersPage() {
         </div>
       )}
 
-      {!listQuery.isLoading && !listQuery.isError && filteredServiceOrders.length === 0 && (
-        <div className="py-12 text-center">
-          <ClipboardList className="mx-auto mb-3 h-12 w-12 text-gray-300 dark:text-gray-600" />
-          <p className="text-gray-500 dark:text-gray-400">
-            {serviceOrders.length === 0
-              ? "Nenhuma ordem de serviço encontrada."
-              : "Nenhuma ordem corresponde aos filtros locais."}
-          </p>
-          {serviceOrders.length === 0 ? (
-            <Button
-              onClick={() => setShowCreateModal(true)}
-              className="mt-4 bg-orange-500 text-white hover:bg-orange-600"
-            >
-              <Plus className="mr-1 h-4 w-4" />
-              Criar primeira OS
-            </Button>
-          ) : null}
-        </div>
-      )}
+      {!listQuery.isLoading &&
+        !listQuery.isError &&
+        filteredServiceOrders.length === 0 && (
+          <div className="py-12 text-center">
+            <ClipboardList className="mx-auto mb-3 h-12 w-12 text-gray-300 dark:text-gray-600" />
+            <p className="text-gray-500 dark:text-gray-400">
+              {serviceOrders.length === 0
+                ? "Nenhuma ordem de serviço encontrada."
+                : "Nenhuma ordem corresponde aos filtros locais."}
+            </p>
+            {serviceOrders.length === 0 ? (
+              <Button
+                onClick={() => setShowCreateModal(true)}
+                className="mt-4 bg-orange-500 text-white hover:bg-orange-600"
+              >
+                <Plus className="mr-1 h-4 w-4" />
+                Criar primeira OS
+              </Button>
+            ) : null}
+          </div>
+        )}
 
       {filteredServiceOrders.length > 0 && (
         <div className="space-y-4">
@@ -835,11 +960,19 @@ export default function ServiceOrdersPage() {
 
             const OperationalIcon = operationalStage.icon;
             const FinancialIcon = financialStage.icon;
+            const isHighlighted = highlightedServiceOrderId === os.id;
 
             return (
               <div
                 key={os.id}
-                className="rounded-xl border border-gray-200 bg-white p-4 transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-800"
+                ref={(element) => {
+                  serviceOrderRefs.current[os.id] = element;
+                }}
+                className={`rounded-xl border bg-white p-4 transition-shadow hover:shadow-md dark:bg-gray-800 ${
+                  isHighlighted
+                    ? "border-orange-400 ring-2 ring-orange-200 dark:border-orange-500 dark:ring-orange-900/40"
+                    : "border-gray-200 dark:border-gray-700"
+                }`}
               >
                 <div className="flex flex-col gap-4">
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -850,9 +983,7 @@ export default function ServiceOrdersPage() {
                         </h3>
 
                         <span
-                          className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                            STATUS_COLORS[os.status]
-                          }`}
+                          className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[os.status]}`}
                         >
                           {STATUS_LABELS[os.status]}
                         </span>
@@ -868,6 +999,12 @@ export default function ServiceOrdersPage() {
                         >
                           {chargeBadge.label}
                         </span>
+
+                        {isHighlighted ? (
+                          <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-800 dark:bg-orange-900/30 dark:text-orange-300">
+                            Em foco
+                          </span>
+                        ) : null}
                       </div>
 
                       {os.description ? (
@@ -882,10 +1019,23 @@ export default function ServiceOrdersPage() {
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleOpenDeepLink(os.id)}
+                        className="gap-2"
+                      >
+                        <Link2 className="h-4 w-4" />
+                        Focar
+                      </Button>
+
                       <select
                         value={os.status}
                         onChange={(e) =>
-                          handleStatusChange(os.id, e.target.value as ServiceOrderStatus)
+                          handleStatusChange(
+                            os.id,
+                            e.target.value as ServiceOrderStatus
+                          )
                         }
                         disabled={updateMutation.isPending || isProcessing}
                         className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300"
@@ -958,7 +1108,9 @@ export default function ServiceOrdersPage() {
                       <div className="flex items-start gap-2">
                         <OperationalIcon className="mt-0.5 h-4 w-4 shrink-0" />
                         <div>
-                          <p className="text-sm font-semibold">{operationalStage.label}</p>
+                          <p className="text-sm font-semibold">
+                            {operationalStage.label}
+                          </p>
                           <p className="mt-1 text-xs opacity-90">
                             {operationalStage.description}
                           </p>
@@ -970,7 +1122,9 @@ export default function ServiceOrdersPage() {
                       <div className="flex items-start gap-2">
                         <FinancialIcon className="mt-0.5 h-4 w-4 shrink-0" />
                         <div>
-                          <p className="text-sm font-semibold">{financialStage.label}</p>
+                          <p className="text-sm font-semibold">
+                            {financialStage.label}
+                          </p>
                           <p className="mt-1 text-xs opacity-90">
                             {financialStage.description}
                           </p>

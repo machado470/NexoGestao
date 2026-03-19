@@ -101,13 +101,6 @@ function formatTime(value?: string | null) {
   });
 }
 
-function isSameDay(value?: string | null, start?: Date, end?: Date) {
-  if (!value || !start || !end) return false;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return false;
-  return date >= start && date <= end;
-}
-
 function getAppointmentStatusTone(status?: string) {
   switch (status) {
     case "CONFIRMED":
@@ -201,6 +194,8 @@ export default function OperationsDashboardPage() {
 
   const serviceOrdersQuery = trpc.nexo.serviceOrders.list.useQuery(
     {
+      from: todayStart.toISOString(),
+      to: todayEnd.toISOString(),
       page: 1,
       limit: 100,
     },
@@ -258,15 +253,15 @@ export default function OperationsDashboardPage() {
     return normalizeArrayPayload<any>(appointmentsQuery.data);
   }, [appointmentsQuery.data]);
 
-  const serviceOrders = useMemo(() => {
-    const payload = serviceOrdersQuery.data as any;
-    const rows = Array.isArray(payload?.data)
-      ? payload.data
-      : Array.isArray(payload)
-        ? payload
+  const serviceOrdersPayload = serviceOrdersQuery.data as any;
+  const todayServiceOrders = useMemo(() => {
+    const rows = Array.isArray(serviceOrdersPayload?.data)
+      ? serviceOrdersPayload.data
+      : Array.isArray(serviceOrdersPayload)
+        ? serviceOrdersPayload
         : [];
     return rows;
-  }, [serviceOrdersQuery.data]);
+  }, [serviceOrdersPayload]);
 
   const allCharges = useMemo(() => {
     return normalizeArrayPayload<any>(chargesQuery.data);
@@ -287,15 +282,6 @@ export default function OperationsDashboardPage() {
   const doneOrdersWithoutCharge = Array.isArray(alerts?.doneOrdersWithoutCharge?.items)
     ? alerts.doneOrdersWithoutCharge.items
     : [];
-
-  const todayServiceOrders = useMemo(() => {
-    return serviceOrders.filter((order: any) => {
-      return (
-        isSameDay(order?.scheduledFor, todayStart, todayEnd) ||
-        isSameDay(order?.appointment?.startsAt, todayStart, todayEnd)
-      );
-    });
-  }, [serviceOrders, todayStart, todayEnd]);
 
   const todayOpenOrders = useMemo(() => {
     return todayServiceOrders.filter((order: any) => order?.status === "OPEN");
@@ -456,7 +442,7 @@ export default function OperationsDashboardPage() {
           subtitle={`${confirmedAppointments.length} confirmados`}
         />
         <MetricCard
-          title="OS do dia"
+          title="O.S. do dia"
           value={todayServiceOrders.length}
           subtitle={`${todayInProgressOrders.length} em execução agora`}
         />
@@ -487,7 +473,7 @@ export default function OperationsDashboardPage() {
 
         <Card className="border-yellow-200">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">OS atribuídas</CardTitle>
+            <CardTitle className="text-base">O.S. atribuídas</CardTitle>
             <CardDescription>Prontas para começar</CardDescription>
           </CardHeader>
           <CardContent>
@@ -499,7 +485,7 @@ export default function OperationsDashboardPage() {
 
         <Card className="border-orange-200">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">OS em execução</CardTitle>
+            <CardTitle className="text-base">O.S. em execução</CardTitle>
             <CardDescription>Serviços rodando agora</CardDescription>
           </CardHeader>
           <CardContent>
@@ -542,10 +528,7 @@ export default function OperationsDashboardPage() {
             )}
 
             {appointments.map((appointment: any) => (
-              <div
-                key={appointment.id}
-                className="rounded-lg border p-3"
-              >
+              <div key={appointment.id} className="rounded-lg border p-3">
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-sm font-medium">
@@ -579,7 +562,7 @@ export default function OperationsDashboardPage() {
               Execução do dia
             </CardTitle>
             <CardDescription>
-              Ordens realmente agendadas para hoje.
+              O.S. do dia vindas direto do backend.
             </CardDescription>
           </CardHeader>
 
@@ -660,10 +643,7 @@ export default function OperationsDashboardPage() {
             )}
 
             {pendingCharges.slice(0, 8).map((charge: any) => (
-              <div
-                key={charge.id}
-                className="rounded-lg border p-3"
-              >
+              <div key={charge.id} className="rounded-lg border p-3">
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-sm font-medium">
@@ -731,11 +711,7 @@ export default function OperationsDashboardPage() {
                     {overdueCharges.length} itens • {formatCurrency(overdueTotalCents)}
                   </p>
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => navigate("/finances")}
-                >
+                <Button size="sm" variant="outline" onClick={() => navigate("/finances")}>
                   Ver financeiro
                 </Button>
               </div>
@@ -751,11 +727,7 @@ export default function OperationsDashboardPage() {
                     {lateServices.length} itens pedindo execução
                   </p>
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => navigate("/service-orders")}
-                >
+                <Button size="sm" variant="outline" onClick={() => navigate("/service-orders")}>
                   Ver O.S.
                 </Button>
               </div>
@@ -771,11 +743,7 @@ export default function OperationsDashboardPage() {
                     {doneOrdersWithoutCharge.length} itens com risco de buraco no fluxo
                   </p>
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => navigate("/service-orders")}
-                >
+                <Button size="sm" variant="outline" onClick={() => navigate("/service-orders")}>
                   Revisar
                 </Button>
               </div>
@@ -791,11 +759,7 @@ export default function OperationsDashboardPage() {
                     {noShowAppointments.length} agendamentos perdidos por ausência
                   </p>
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => navigate("/appointments")}
-                >
+                <Button size="sm" variant="outline" onClick={() => navigate("/appointments")}>
                   Ver agenda
                 </Button>
               </div>

@@ -262,6 +262,8 @@ export class ServiceOrdersService {
       status?: ServiceOrderStatus
       customerId?: string
       assignedToPersonId?: string
+      from?: string
+      to?: string
       page?: number
       limit?: number
     },
@@ -271,6 +273,13 @@ export class ServiceOrdersService {
     const page = filters.page ?? 1
     const limit = Math.min(filters.limit ?? 20, 100)
     const skip = (page - 1) * limit
+
+    const from = parseOptionalDate('from', filters.from)
+    const to = parseOptionalDate('to', filters.to)
+
+    if (from && to && from.getTime() > to.getTime()) {
+      throw new BadRequestException('intervalo inválido: from não pode ser maior que to')
+    }
 
     const where: any = { orgId }
 
@@ -284,6 +293,12 @@ export class ServiceOrdersService {
         throw new BadRequestException('status inválido')
       }
       where.status = filters.status
+    }
+
+    if (from || to) {
+      where.scheduledFor = {}
+      if (from) where.scheduledFor.gte = from
+      if (to) where.scheduledFor.lte = to
     }
 
     const [rows, total] = await Promise.all([
