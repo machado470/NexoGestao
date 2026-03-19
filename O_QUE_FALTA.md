@@ -1,745 +1,1114 @@
-# O QUE FALTA NO NexoGestão
-## Auditoria funcional real para fechamento de produto
+O QUE FALTA NO NexoGestão
+Auditoria funcional real para fechamento de produto
 
-**Atualização:** 18/03/2026  
-**Status:** revisão orientada a execução  
-**Objetivo:** manter visível apenas o que ainda impede o NexoGestão de operar como produto coerente, confiável e vendável
+Atualização: 18/03/2026
+Status: revisão orientada a execução
+Objetivo: manter visível apenas o que ainda impede o NexoGestão de operar como produto coerente, confiável e vendável
 
-## Legenda
+Legenda
 
-- [x] existe e está funcional como base real
-- [~] existe, funciona, mas ainda precisa polimento, exposição melhor ou fechamento mais confortável
-- [ ] ainda falta construir ou fechar de verdade
+ existe e está funcional como base real
 
----
+[~] existe, funciona, mas ainda precisa polimento, exposição melhor ou fechamento mais confortável
 
-# 1. CONTEXTO
+ ainda falta construir ou fechar de verdade
 
-O NexoGestão já tem base arquitetural forte e o fluxo estrutural oficial do sistema continua sendo:
+1. CONTEXTO
 
-cliente  
-→ agendamento  
-→ ordem de serviço  
-→ execução  
-→ cobrança  
-→ pagamento  
-→ timeline  
-→ risco  
+O NexoGestão já tem base arquitetural forte e o fluxo estrutural oficial continua sendo:
+
+cliente
+→ agendamento
+→ ordem de serviço
+→ execução
+→ cobrança
+→ pagamento
+→ timeline
+→ risco
 → governança
 
-Só que agora a leitura correta mudou.
+Só que a leitura correta agora mudou.
 
-O problema atual **não** é mais ausência de módulos principais.  
-O problema atual também **não** é falta de arquitetura.
+O problema atual não é mais falta de módulo principal.
+Também não é mais falta de arquitetura.
 
-O que existe hoje é um produto que já saiu da fase de “promessa técnica” e entrou na fase de:
+O sistema já saiu da fase de promessa técnica.
+Ele entrou na fase em que precisa provar maturidade de produto.
 
-- endurecer fluxo
-- reduzir atrito
-- melhorar rastreabilidade
-- aumentar clareza para o usuário final
-- transformar capacidade real em percepção clara de produto pronto
+Hoje o trabalho real é:
+
+endurecer fluxo
+
+reduzir atrito
+
+aumentar rastreabilidade visível
+
+melhorar leitura por entidade
+
+transformar capacidade real em percepção clara de produto pronto
 
 Em termos práticos:
 
-- o núcleo operacional já conecta agenda, O.S., cobrança e pagamento
-- o frontend já cobre boa parte da operação real
-- várias páginas antes frágeis foram fechadas e limpas
-- o backend já tem mais capacidade do que o frontend ainda comunica
+o núcleo operacional já conecta agenda, O.S., cobrança e pagamento
+
+o frontend já cobre parte importante da operação real
+
+várias páginas antes frágeis já foram fechadas
+
+o backend já faz mais do que o produto ainda comunica
 
 Ou seja:
 
-**o NexoGestão já tem corpo de produto**  
-e agora precisa de **acabamento, leitura clara e consistência de ponta a ponta**
+o NexoGestão já tem motor
+e agora precisa de nitidez, conforto operacional e prova visual de confiabilidade
 
----
-
-# 2. RESUMO EXECUTIVO
-
-## Estado atual
+2. RESUMO EXECUTIVO
+Estado atual
 
 A base técnica está sólida.
 
-O sistema já possui, em operação funcional:
+O sistema já possui, em funcionamento real:
 
-- autenticação
-- RBAC
-- onboarding
-- clientes
-- agendamentos
-- ordens de serviço
-- execução operacional
-- cobrança
-- pagamento
-- timeline
-- governança
-- WhatsApp
-- despesas
-- dashboard operacional
-- workflow operacional
-- páginas administrativas relevantes com base real de uso
+autenticação
 
-O backend já entrega módulos e serviços que sustentam produto real.  
-O frontend já deixou de ser casca e passou a operar fluxos centrais de verdade.  
-Nos módulos administrativos, várias telas antes cruas ou inconsistentes já passaram por endurecimento de UX, normalização de payload e redução de fluxos duplicados.
+RBAC
 
-## Diagnóstico direto
+onboarding
+
+clientes
+
+agendamentos
+
+ordens de serviço
+
+execução operacional
+
+cobrança
+
+pagamento
+
+timeline
+
+governança
+
+WhatsApp
+
+despesas
+
+dashboard operacional
+
+workflow operacional
+
+páginas administrativas relevantes com base real
+
+O backend já sustenta produto real.
+O frontend já deixou de ser casca.
+Os fluxos centrais já existem de verdade.
+
+Diagnóstico direto
 
 O NexoGestão hoje não sofre mais de “não existe”.
 
-Ele sofre, principalmente, de quatro tipos de dívida restantes:
+Ele sofre principalmente de quatro tipos de dívida:
 
-- polimento de UX
-- rastreabilidade mais visível
-- coerência entre módulos administrativos/documentais
-- exposição melhor do que a base já faz
+acabamento de UX
 
-## Tradução mais honesta
+rastreabilidade mais visível
+
+explicação melhor do que o sistema faz
+
+coerência mais clara entre módulos administrativos e operacionais
+
+Tradução honesta
 
 Antes:
-- o risco era parecer só projeto
+
+o risco era parecer só projeto
 
 Agora:
-- o risco é ter produto forte por dentro e parecer menos maduro do que realmente já está
 
-## Conclusão da revisão atual
+o risco é ter produto forte por dentro e ainda parecer menos maduro do que realmente já está
 
-O núcleo principal está fechado estruturalmente.  
-O que falta agora é menos construção de novos módulos e mais:
+Conclusão da revisão atual
 
-- acabamento
-- explicação
-- visibilidade
-- confiabilidade percebida
-- redução de atrito operacional
+O núcleo principal está fechado estruturalmente.
 
----
+O que falta agora é fechar melhor a experiência percebida.
 
-# 3. PLACAR FUNCIONAL ATUAL
+Menos construção de novos blocos.
+Mais:
 
-## VERDE
+acabamento
 
-- [x] Ordens de Serviço
-- [x] Financeiro
-- [x] Agendamentos
-- [x] Timeline
-- [x] Dashboard Operacional
-- [x] Workflow Operacional
-- [x] Referências
-- [x] WhatsApp
-- [x] Governança
-- [x] Despesas
+visibilidade
 
-## VERDE/AMARELO FORTE
+explicação
 
-- [~] Configurações
-- [~] Pessoas
-- [~] Lançamentos
-- [~] Notas Fiscais
+confiabilidade percebida
 
-## AINDA NÃO É FOCO DE EXPANSÃO
+redução de atrito
 
-- [ ] Billing SaaS avançado
-- [ ] Plans / subscriptions expostos de forma comercial forte
-- [ ] Audit UI administrativa completa
-- [ ] Reports executivos profundos
-- [ ] Automações mega configuráveis
-- [ ] Analytics avançado
-- [ ] Inteligência preditiva
-- [ ] Integrações externas demais
+3. PLACAR FUNCIONAL ATUAL
+VERDE
 
----
+ Ordens de Serviço
 
-# 4. O QUE JÁ ESTÁ FECHADO DE VERDADE
+ Financeiro core
 
-## 4.1 Fluxo operacional central
+ Agendamentos
 
-**Status:** [x]
+ Timeline
+
+ Dashboard Operacional
+
+ Workflow Operacional
+
+ Governança base
+
+ Despesas
+
+VERDE / AMARELO FORTE
+
+[~] WhatsApp
+
+[~] Referências
+
+[~] Configurações
+
+[~] Pessoas
+
+[~] Lançamentos
+
+[~] Notas Fiscais / Faturas
+
+FALTAS REAIS AINDA ABERTAS
+
+ Audit UI administrativa
+
+ Evidências / anexos em O.S.
+
+[~] Risco explicado de forma legível
+
+[~] Notificações realmente operacionais
+
+[~] Agenda madura o suficiente para operação sem atrito
+
+AINDA NÃO É FOCO DE EXPANSÃO
+
+ Billing SaaS avançado
+
+ Plans / subscriptions expostos comercialmente
+
+ Reports executivos profundos
+
+ Analytics avançado
+
+ Inteligência preditiva
+
+ Integrações externas demais
+
+ Automações mega configuráveis
+
+4. O QUE JÁ ESTÁ FECHADO DE VERDADE
+4.1 Fluxo operacional central
+
+Status: [x] estruturalmente fechado
+Status percebido: [~] ainda precisa mais clareza e conforto
 
 Hoje já existe base real para sustentar:
 
-cliente  
-→ agendamento  
-→ ordem de serviço  
-→ execução  
-→ cobrança  
-→ pagamento  
-→ timeline  
-→ risco  
+cliente
+→ agendamento
+→ ordem de serviço
+→ execução
+→ cobrança
+→ pagamento
+→ timeline
+→ risco
 → governança
 
-### Já está funcional como fluxo real
-- criação e gestão de cliente
-- criação e gestão de agendamento
-- criação e gestão de ordem de serviço
-- início e conclusão de execução
-- geração de cobrança
-- pagamento e fechamento financeiro principal
-- eventos em timeline
-- leitura operacional via dashboard
-- leitura operacional via workflow
-- governança e alertas visíveis no frontend
+Já está funcional como fluxo real
 
-### O que ainda falta nesse fluxo
-- explicar melhor no produto o que aconteceu entre as etapas
-- reduzir atrito de UX
-- aumentar a rastreabilidade visível
-- melhorar contexto por entidade
+criação e gestão de cliente
 
-O fluxo não está mais quebrado estruturalmente.  
-O que falta é refinamento.
+criação e gestão de agendamento
 
----
+criação e gestão de ordem de serviço
 
-## 4.2 Workflow Operacional
+início e conclusão de execução
 
-**Status:** [x]
+geração de cobrança
 
-A página operacional hoje já:
-- mostra ordens abertas
-- mostra cobranças pendentes
-- mostra cobranças vencidas
-- mostra O.S. concluídas sem cobrança
-- aciona checkout
-- registra pagamento
-- consome alertas reais
+pagamento e fechamento financeiro principal
 
-### Gap restante
-- polimento visual
-- contexto melhor por item
-- possíveis CTAs adicionais por entidade
+eventos em timeline
 
-Mas isso já é acabamento.  
-Não é mais buraco funcional.
+leitura operacional via dashboard
 
----
+leitura operacional via workflow
 
-## 4.3 Dashboard Operacional
+governança e alertas visíveis no frontend
 
-**Status:** [x]
+O que ainda falta nesse fluxo
+
+explicar melhor no produto o que aconteceu entre etapas
+
+reduzir atrito de UX
+
+aumentar rastreabilidade visível
+
+melhorar leitura por entidade
+
+deixar risco e governança menos “caixa preta”
+
+O fluxo não está mais quebrado no motor.
+O que falta é o usuário sentir isso sem precisar interpretar demais.
+
+4.2 Workflow Operacional
+
+Status: [x]
+
+A página já:
+
+mostra ordens abertas
+
+mostra cobranças pendentes
+
+mostra cobranças vencidas
+
+mostra O.S. concluídas sem cobrança
+
+aciona checkout
+
+registra pagamento
+
+consome alertas reais
+
+Gap restante
+
+polimento visual
+
+contexto melhor por item
+
+CTAs adicionais por entidade
+
+navegação cruzada mais forte
+
+Mas isso já é acabamento.
+Não é mais ausência funcional.
+
+4.3 Dashboard Operacional
+
+Status: [x]
 
 Hoje já existe leitura diária real de:
-- agendamentos do dia
-- O.S. do dia
-- ordens aguardando ação
-- ordens em execução
-- ordens concluídas
-- cobranças pendentes
-- alertas operacionais
-- leitura rápida do ciclo
+
+agendamentos do dia
+
+O.S. do dia
+
+ordens aguardando ação
+
+ordens em execução
+
+ordens concluídas
+
+cobranças pendentes
+
+alertas operacionais
+
+leitura rápida do ciclo
 
 Além disso:
-- execução pode ser iniciada
-- execução pode ser concluída
-- cobrança pode abrir checkout
-- pagamento pode ser registrado
+
+execução pode ser iniciada
+
+execução pode ser concluída
+
+cobrança pode abrir checkout
+
+pagamento pode ser registrado
 
 O dashboard já tem função real de operação.
+Não é mais tela enfeitada para demo.
 
----
+4.4 Service Orders
 
-## 4.4 Service Orders
-
-**Status:** [x]
+Status: [x]
 
 Ordem de serviço já é unidade operacional real.
 
-### Já funciona
-- criação
-- listagem
-- atualização
-- início de execução
-- conclusão
-- leitura operacional
-- integração com financeiro
-- integração com timeline
-- integração com alertas
-- `financialSummary` no fluxo
-- limpeza de listagem e redução de N+1 no frontend
+Já funciona
 
-### O que ainda falta
-- anexos / evidências
-- fechamento operacional mais rico
-- checklists/evidências mais fortes
-- explicação melhor no UI
+criação
 
----
+listagem
 
-## 4.5 Financeiro
+atualização
 
-**Status:** [x]
+início de execução
 
-O módulo financeiro já é real.
+conclusão
 
-### Já funciona
-- criação de cobrança
-- listagem
-- integração com O.S.
-- pagamento
-- fechamento pós-pagamento com risco + automação
-- leitura operacional no dashboard
-- leitura no workflow
-- pendências e vencidos aparecendo
-- comunicação com frontend sem ficar só no backend
+leitura operacional
 
-### O que ainda falta
-- visão mais forte por cliente
-- melhor leitura de vencidos
-- mais clareza entre:
-  - cobrança
-  - pagamento
-  - lançamento
-  - fatura
-  - despesa
+integração com financeiro
 
-Hoje o financeiro não está ausente.  
-O que falta é mais clareza e costura fina.
+integração com timeline
 
----
+integração com alertas
 
-## 4.6 Agendamentos
+resumo financeiro no fluxo
 
-**Status:** [x]
+limpeza de listagem e redução de ruído no frontend
 
-### Já funciona
-- criação
-- listagem
-- confirmação
-- cancelamento
-- no-show
-- integração com cliente
-- visão no fluxo operacional
-- integração parcial com timeline e comunicação
+O que ainda falta
 
-### O que ainda falta
-- remarcação mais explícita
-- calendário mais forte
-- disponibilidade real mais refinada
-- lembretes e conflito de agenda mais maduros
+anexos / evidências
 
-Agendamentos já saiu do status de “registro simples”.
+fechamento operacional mais rico
 
----
+checklists mais fortes
 
-## 4.7 WhatsApp
+explicação melhor no UI
 
-**Status:** [x]
+contexto histórico mais robusto por O.S.
 
-### Já funciona
-- envio manual
-- disparos automáticos em partes do fluxo
-- página de operação
-- comunicação visível
-- suporte ao fluxo comercial/operacional
+Aqui está um dos faltantes mais sérios:
+sem evidência, a execução existe; com evidência, ela vira operação auditável de verdade.
 
-### O que ainda falta
-- templates mais padronizados
-- status de entrega mais confiável
-- retry mais visível
-- histórico mais forte por entidade
-- timeline ainda mais completa por mensagem
+4.5 Financeiro core
 
-O canal principal já existe no produto.  
-Agora falta tratá-lo como motor operacional maduro.
+Status: [x]
 
----
+O módulo financeiro principal já é real.
 
-## 4.8 Governança
+Já funciona
 
-**Status:** [x]
+criação de cobrança
 
-### Já funciona
-- base backend real
-- página dedicada
-- execução visível
-- score e leitura institucional
-- ações corretivas / leitura operacional
-- conexão estrutural com risco e alertas
+listagem
 
-### O que ainda falta
-- explicar melhor decisões
-- leitura administrativa mais confortável
-- navegação cruzada com timeline e risco
-- políticas mais visíveis
+integração com O.S.
 
-Governança não é mais capacidade escondida.  
-Já entrou no produto.
+pagamento
 
----
+fechamento pós-pagamento
 
-## 4.9 Timeline
+leitura operacional no dashboard
 
-**Status:** [x]
+leitura no workflow
 
-### Já funciona
-- página dedicada
-- histórico operacional
-- integração com várias entidades
-- filtros básicos
+pendências e vencidos aparecendo
 
-### O que ainda falta
-- visão mais forte por O.S.
-- visão financeira melhor
-- filtros por tipo/severidade
-- garantir cobertura total dos eventos mais críticos
+comunicação com frontend sem ficar escondido no backend
 
-Timeline hoje já é parte funcional do produto, não promessa.
+O que ainda falta
 
----
+visão mais forte por cliente
 
-## 4.10 Despesas
+leitura melhor de vencidos
 
-**Status:** [x]
+costura mais clara entre:
 
-Despesas já tem presença real e deixou de ser buraco primário.
+cobrança
 
-### Já funciona
-- listagem real
-- summary
-- create
-- delete
-- feedback de ação
-- estados de loading/erro
-- leitura administrativa mais consistente
+pagamento
 
-### O que ainda falta
-- costura mais clara com lançamentos e visão financeira consolidada
-- exposição melhor na leitura administrativa consolidada
+lançamento
 
----
+fatura
 
-# 5. MÓDULOS QUE AINDA PEDEM MAIS UMA PASSADA
+despesa
 
-## 5.1 Configurações
+Hoje o financeiro já existe.
+O problema não é falta de motor.
+É clareza e separação mental melhor para o usuário.
 
-**Status:** [~]
+4.6 Agendamentos
+
+Status: [x]
+
+Já funciona
+
+criação
+
+listagem
+
+confirmação
+
+cancelamento
+
+no-show
+
+integração com cliente
+
+visão no fluxo operacional
+
+integração parcial com timeline e comunicação
+
+O que ainda falta
+
+remarcação mais explícita
+
+calendário mais forte
+
+melhor leitura de disponibilidade
+
+conflitos de agenda mais maduros
+
+lembretes mais confiáveis
+
+Agendamento já saiu do status de “registro simples”.
+Agora precisa virar agenda operacional madura.
+
+4.7 WhatsApp
+
+Status: [~]
+
+Já funciona
+
+envio manual
+
+disparos automáticos em partes do fluxo
+
+página dedicada
+
+comunicação visível
+
+suporte ao fluxo comercial e operacional
+
+O que ainda falta
+
+templates mais padronizados
+
+status de entrega mais confiável
+
+retry mais visível
+
+histórico mais forte por entidade
+
+timeline mais completa por mensagem
+
+O canal já existe no produto.
+Mas ainda não está liso o suficiente para ser considerado verde pleno.
+
+WhatsApp mal explicado ou mal rastreado parece bug, não detalhe.
+Então aqui ainda é verde/amarelo forte.
+
+4.8 Governança
+
+Status: [x] base funcional
+Maturidade percebida: [~]
+
+Já funciona
+
+base backend real
+
+página dedicada
+
+execução visível
+
+score e leitura institucional
+
+leitura de ações corretivas
+
+conexão estrutural com risco e alertas
+
+O que ainda falta
+
+explicar melhor decisões
+
+leitura administrativa mais confortável
+
+navegação cruzada com timeline e risco
+
+políticas mais visíveis
+
+histórico mais humano de leitura
+
+Governança já entrou no produto.
+O que falta é ela parar de parecer “módulo técnico sofisticado” e começar a parecer “controle claro da operação”.
+
+4.9 Timeline
+
+Status: [x]
+
+Já funciona
+
+página dedicada
+
+histórico operacional
+
+integração com várias entidades
+
+filtros básicos
+
+O que ainda falta
+
+visão mais forte por O.S.
+
+visão financeira melhor
+
+filtros por tipo
+
+filtros por severidade
+
+garantia de cobertura total dos eventos críticos
+
+Timeline já é parte funcional do produto.
+Agora precisa virar leitura inevitável, não só leitura possível.
+
+4.10 Despesas
+
+Status: [x]
+
+Despesas já deixou de ser buraco primário.
+
+Já funciona
+
+listagem real
+
+summary
+
+create
+
+delete
+
+feedback de ação
+
+estados de loading/erro
+
+leitura administrativa consistente
+
+O que ainda falta
+
+costura mais clara com lançamentos
+
+leitura consolidada com financeiro
+
+explicação melhor dentro do ecossistema financeiro
+
+5. MÓDULOS QUE AINDA PEDEM MAIS UMA PASSADA
+5.1 Configurações
+
+Status: [~]
 
 A página já funciona melhor e já conversa com backend real.
 
-### Já entrega
-- leitura de configurações reais da organização
-- edição básica
-- feedback de save
-- tipagem/normalização melhores
-- membersCount e plano atual visíveis
+Já entrega
 
-### O que falta para ficar verde total
-- expor ação real de segurança, ou
-- simplificar a tela deixando só o que é realmente configurável
+leitura de configurações reais da organização
 
-Hoje não está quebrada.  
-Está só um passo antes do verde pleno.
+edição básica
 
----
+feedback de save
 
-## 5.2 Pessoas
+tipagem/normalização melhores
 
-**Status:** [~]
+membersCount e plano atual visíveis
 
-People saiu do estado cru.
+O que falta para virar verde total
 
-### Já entrega
-- listagem real
-- create
-- edit
-- deactivate
-- visão de estado operacional
-- vínculo com usuário visível
-- leitura de risco
-- feedback melhor de ação e carregamento
-- remoção de ruído técnico no frontend
+expor ação real de segurança
 
-### O que falta para ficar verde total
-- filtro/busca
-- paginação se crescer
-- detalhe mais forte
-- vínculo explícito pessoa ↔ usuário
-- talvez timeline/contexto por pessoa
+ou simplificar a tela para mostrar só o que é realmente configurável
 
-É módulo utilizável e já mais limpo do que antes. Falta maturidade final.
+tratar melhor plano / assinatura / gestão comercial
 
----
+remover qualquer promessa visual que ainda não tenha ação real
 
-## 5.3 Lançamentos
+Hoje não está quebrada.
+Está um passo antes do verde pleno.
 
-**Status:** [~]
+5.2 Pessoas
 
-### Já entrega
-- listagem real
-- resumo
-- criação manual
-- filtro por tipo
-- filtro por período
-- paginação
-- leitura melhor de categoria/conta/data
+Status: [~]
 
-### O que falta para ficar verde total
-- edição
-- exclusão
-- origem do lançamento visível
-- vínculo explícito com financeiro sistêmico
+Já entrega
+
+listagem real
+
+create
+
+edit
+
+deactivate
+
+visão de estado operacional
+
+vínculo com usuário visível
+
+leitura de risco
+
+feedback melhor de ação e carregamento
+
+O que falta para virar verde total
+
+filtro / busca
+
+paginação se crescer
+
+detalhe mais forte por pessoa
+
+vínculo explícito pessoa ↔ usuário
+
+contexto histórico / timeline por pessoa
+
+É utilizável.
+Falta maturidade final.
+
+5.3 Lançamentos
+
+Status: [~]
+
+Já entrega
+
+listagem real
+
+resumo
+
+criação manual
+
+filtro por tipo
+
+filtro por período
+
+paginação
+
+leitura melhor de categoria / conta / data
+
+O que falta para virar verde total
+
+edição
+
+exclusão
+
+origem do lançamento visível
+
+vínculo explícito com financeiro sistêmico
+
+diferença mais clara entre lançamento manual e evento financeiro nativo do sistema
 
 Hoje já deixou de ser vitrine.
+Mas ainda não fecha totalmente a ergonomia esperada.
 
----
+5.4 Notas Fiscais / Faturas
 
-## 5.4 Notas Fiscais / Faturas
+Status: [~]
 
-**Status:** [~]
+Já entrega
 
-### Já entrega
-- listagem
-- summary
-- create
-- update de status controlado
-- delete com regra
-- filtro por texto
-- filtro por status
-- leitura documental explícita
-- feedback visual melhor nas ações
-- loading por item em update/delete
-- fluxo mais coeso após remoção de duplicidade de criação
+listagem
 
-### O que falta para ficar verde total
-- UX mais elegante
-- vínculo mais claro com cliente/cobrança em fases futuras
-- leitura melhor para operação administrativa
-- eventualmente sair do create inline para um fluxo ainda mais refinado
+summary
 
-Já é módulo real e mais consistente do que antes.  
-Só ainda não está “liso”.
+create
 
----
+update de status controlado
 
-# 6. O QUE AINDA FALTA DE VERDADE
+delete com regra
 
-Agora sim, só o que realmente continua faltando.
+filtro por texto
 
-## 6.1 Auditoria administrativa visível
-**Status:** [ ]
+filtro por status
 
-A auditoria já existe no backend em vários fluxos.  
+leitura documental explícita
+
+feedback visual melhor nas ações
+
+loading por item em update/delete
+
+fluxo mais coeso
+
+O que falta para virar verde total
+
+UX mais elegante
+
+vínculo mais claro com cliente e cobrança
+
+leitura melhor para operação administrativa
+
+refinamento do create inline
+
+costura mais clara com financeiro principal
+
+Já é módulo real.
+Só ainda não está liso.
+
+5.5 Referências
+
+Status: [~]
+
+Já entrega
+
+listagem
+
+summary
+
+leitura melhor de estado
+
+UX mais confiável do que antes
+
+O que falta
+
+esclarecer o peso do módulo dentro do produto
+
+acabamento final
+
+decidir se ele é core de operação ou apoio comercial
+
+Hoje não parece quebrado.
+Só ainda não parece central.
+
+6. O QUE AINDA FALTA DE VERDADE
+
+Agora sim: só o que continua faltando de forma honesta.
+
+6.1 Audit UI administrativa
+
+Status: [ ]
+
+A auditoria já existe no backend e em vários fluxos.
 O que falta é uma interface administrativa decente para consulta.
 
-### Falta
-- página de auditoria
-- filtros
-- leitura por entidade
-- leitura por usuário
-- separação clara entre timeline e audit
+Falta
 
----
+página de auditoria
 
-## 6.2 Risco mais visível e explicável
-**Status:** [~]
+filtros
 
-Risco já existe e reage a eventos reais.  
-Mas ainda falta deixá-lo inteligível para o usuário.
+leitura por entidade
 
-### Falta
-- explicar por que o score mudou
-- histórico visual por cliente/pessoa
-- impacto operacional mais explícito
-- transparência do cálculo no produto
+leitura por usuário
 
----
+separação clara entre timeline e audit
 
-## 6.3 Notificações mais maduras
-**Status:** [~]
+navegação útil para investigação real
 
-Existe base, mas ainda falta transformar em centro de operação forte.
+Isso merece prioridade alta.
+Sem isso, o produto perde parte do próprio diferencial de rastreabilidade.
 
-### Falta
-- priorização por severidade
-- leitura/arquivamento melhores
-- agrupamento mais útil
-- ligação mais visível com governança, financeiro e operação
+6.2 Evidências / anexos no fechamento operacional
 
----
-
-## 6.4 Remarcação / disponibilidade / agenda mais madura
-**Status:** [~]
-
-Agendamento já existe.  
-O que falta é elevar a ergonomia operacional.
-
-### Falta
-- remarcação explícita
-- melhor gestão de conflitos
-- disponibilidade real
-- lembretes mais confiáveis
-
----
-
-## 6.5 Evidências / anexos no fechamento operacional
-**Status:** [ ]
+Status: [ ]
 
 O fechamento de execução ainda pode ficar muito mais forte.
 
-### Falta
-- anexos
-- fotos
-- PDFs
-- evidências operacionais
-- fechamento com contexto mais rico
+Falta
 
----
+anexos
 
-## 6.6 Frontend explorar melhor o backend rico
-**Status:** [~]
+fotos
 
-Continua verdadeiro:  
+PDFs
+
+evidências operacionais
+
+fechamento com contexto mais rico
+
+Isso é um dos itens que mais aumentam cara de produto pronto.
+
+6.3 Risco mais visível e explicável
+
+Status: [~]
+
+Risco já existe e reage a eventos reais.
+Mas ainda falta deixá-lo inteligível.
+
+Falta
+
+explicar por que o score mudou
+
+histórico visual por cliente / pessoa
+
+impacto operacional mais explícito
+
+transparência mínima do cálculo no produto
+
+Hoje risco existe mais como motor do que como linguagem de produto.
+
+6.4 Notificações mais maduras
+
+Status: [~]
+
+Existe base, mas ainda falta virar centro operacional de verdade.
+
+Falta
+
+priorização por severidade
+
+leitura / arquivamento melhores
+
+agrupamento mais útil
+
+ligação mais visível com governança, financeiro e operação
+
+6.5 Agenda mais madura
+
+Status: [~]
+
+Agendamento já existe.
+O que falta é elevar a ergonomia.
+
+Falta
+
+remarcação explícita
+
+melhor gestão de conflitos
+
+disponibilidade real
+
+lembretes mais confiáveis
+
+leitura mais confortável do calendário
+
+6.6 Frontend explorar melhor o backend rico
+
+Status: [~]
+
+Continua verdadeiro:
+
 o backend já faz mais do que o frontend comunica.
 
-### Áreas ainda subexpostas
-- audit
-- risk
-- notifications
-- reports
-- automation
-- billing/plans/subscriptions
-- pending / exceptions / corrective actions
+Áreas ainda subexpostas
 
-O risco aqui não é falta de motor.  
+audit
+
+risk
+
+notifications
+
+reports
+
+automation
+
+billing / plans / subscriptions
+
+pending / exceptions / corrective actions
+
+O risco aqui não é falta de motor.
 É percepção baixa de um motor que já existe.
 
----
+7. NOVA ORDEM REAL DE PRIORIDADE
+P0 — endurecimento final do produto vendável
 
-# 7. NOVA ORDEM REAL DE PRIORIDADE
+audit UI administrativa
 
-## P0 — endurecimento final do produto vendável
-- auditoria visível
-- risco explicado
-- agenda mais madura
-- evidências/anexos em O.S.
-- notificação mais operacional
-- coerência final entre módulos administrativos
+evidências / anexos em O.S.
 
-## P1 — polimento de conforto e leitura
-- filtro/busca melhores em módulos administrativos
-- UX mais consistente
-- leitura por entidade
-- navegação cruzada melhor
-- páginas mais explicativas
+risco explicado
 
-## P2 — expansão lateral
+agenda mais madura
+
+notificações mais operacionais
+
+coerência final entre módulos administrativos e operacionais
+
+P1 — polimento de conforto e leitura
+
+filtro / busca melhores
+
+UX mais consistente
+
+leitura por entidade
+
+navegação cruzada melhor
+
+páginas mais explicativas
+
+WhatsApp mais rastreável e confiável
+
+P2 — expansão lateral
+
 Segurar por enquanto:
-- analytics sofisticado
-- automação mega configurável
-- integrações demais
-- múltiplos canais além do WhatsApp
-- inteligência preditiva
-- foguete de Marte, de novo não
 
----
+analytics sofisticado
 
-# 8. CHECKLIST EXECUTÁVEL ATUALIZADO
+automação mega configurável
 
-## Fluxo central
-- [x] cliente sustenta agenda / O.S. / cobrança
-- [x] agendamento cria, confirma e cancela
-- [x] O.S. cria, executa e conclui
-- [x] cobrança nasce e aparece no fluxo
-- [x] pagamento fecha parte central do ciclo
-- [x] timeline já participa do fluxo
-- [~] risco recalcula, mas precisa explicação melhor
-- [x] governança já aparece de forma real
-- [x] workflow operacional fecha leitura do fluxo
-- [x] dashboard operacional fecha leitura diária da operação
+integrações demais
 
-## Auth
-- [x] login
-- [x] registro
-- [x] sessão
-- [x] logout
-- [~] forgot password
-- [~] reset password
-- [x] proteção de rota
-- [x] permissões por role no frontend
+múltiplos canais além do WhatsApp
 
-## Customers
-- [x] listagem
-- [x] criação
-- [x] edição
-- [x] workspace operacional
-- [~] timeline por cliente mais forte
-- [x] histórico de contato com base real melhorada
+inteligência preditiva
 
-## Appointments
-- [x] criação
-- [x] confirmação
-- [~] remarcação
-- [x] cancelamento
-- [~] lembrete
-- [x] vínculo com cliente
+foguete de Marte de novo não
 
-## Service Orders
-- [x] criação
-- [x] atualização de status
-- [x] início de execução
-- [x] conclusão
-- [x] vínculo estrutural com cobrança
-- [x] leitura operacional
-- [ ] anexos / evidências
+8. CHECKLIST EXECUTÁVEL ATUALIZADO
+Fluxo central
 
-## Finance
-- [x] criação de cobrança
-- [x] listagem
-- [x] pagamento
-- [x] leitura operacional no dashboard/workflow
-- [~] vencidos mais maduros
-- [~] comunicação financeira melhor
-- [~] visão consolidada por cliente
+ cliente sustenta agenda / O.S. / cobrança
 
-## WhatsApp
-- [x] envio manual
-- [x] envio automático por eventos
-- [~] templates
-- [~] status de entrega
-- [~] retry
-- [~] rastreabilidade mais forte na timeline
+ agendamento cria, confirma e cancela
 
-## Administrativo
-- [~] settings
-- [~] people
-- [~] launches
-- [~] invoices
-- [ ] audit UI
-- [~] notifications mais maduras
-- [x] referrals com UX endurecida e leitura mais confiável
-- [x] expenses com fluxo administrativo mais consistente
+ O.S. cria, executa e conclui
 
----
+ cobrança nasce e aparece no fluxo
 
-# 9. CRITÉRIO DE PRONTO AGORA
+ pagamento fecha parte central do ciclo
 
-## Produto pronto para operar
+ timeline participa do fluxo
+
+[~] risco recalcula, mas precisa explicação melhor
+
+ governança aparece de forma real
+
+ workflow operacional fecha leitura do fluxo
+
+ dashboard operacional fecha leitura diária da operação
+
+Auth
+
+ login
+
+ registro
+
+ sessão
+
+ logout
+
+[~] forgot password
+
+[~] reset password
+
+ proteção de rota
+
+ permissões por role no frontend
+
+Customers
+
+ listagem
+
+ criação
+
+ edição
+
+ workspace operacional
+
+[~] timeline por cliente mais forte
+
+ histórico de contato com base real melhorada
+
+Appointments
+
+ criação
+
+ confirmação
+
+[~] remarcação
+
+ cancelamento
+
+[~] lembrete
+
+ vínculo com cliente
+
+[~] disponibilidade e conflito de agenda
+
+Service Orders
+
+ criação
+
+ atualização de status
+
+ início de execução
+
+ conclusão
+
+ vínculo estrutural com cobrança
+
+ leitura operacional
+
+ anexos / evidências
+
+Financeiro core
+
+ criação de cobrança
+
+ listagem
+
+ pagamento
+
+ leitura operacional no dashboard / workflow
+
+[~] vencidos mais maduros
+
+[~] comunicação financeira melhor
+
+[~] visão consolidada por cliente
+
+WhatsApp
+
+ envio manual
+
+ envio automático por eventos
+
+[~] templates
+
+[~] status de entrega
+
+[~] retry
+
+[~] rastreabilidade mais forte na timeline
+
+Administrativo
+
+[~] settings
+
+[~] people
+
+[~] launches
+
+[~] invoices / faturas
+
+ audit UI
+
+[~] notifications mais maduras
+
+[~] referrals
+
+ expenses com fluxo administrativo consistente
+
+9. CRITÉRIO DE PRONTO AGORA
+Produto pronto para operar
+
 Quando:
-- o fluxo central fecha sem tropeço
-- o admin entende o que aconteceu
-- o operacional consegue agir sem caça ao tesouro
-- o financeiro não fica descolado da operação
-- a comunicação fica rastreável
-- risco e governança deixam de parecer “caixa preta”
 
-## Produto pronto para vender sem susto
+o fluxo central fecha sem tropeço
+
+o admin entende o que aconteceu
+
+o operacional consegue agir sem caça ao tesouro
+
+o financeiro não fica descolado da operação
+
+a comunicação fica rastreável
+
+risco e governança deixam de parecer caixa preta
+
+Produto pronto para vender sem susto
+
 Quando, além do acima:
-- auditoria administrativa estiver visível
-- agenda estiver mais madura
-- execução tiver evidências/anexos
-- módulos administrativos restantes virarem verde pleno
-- UX estiver menos técnica e mais inevitável
 
----
+auditoria administrativa estiver visível
 
-# 10. FRASE-GUIA NOVA
+agenda estiver mais madura
+
+execução tiver evidências / anexos
+
+módulos administrativos restantes virarem verde pleno
+
+UX estiver menos técnica e mais inevitável
+
+10. FRASE-GUIA NOVA
 
 O NexoGestão já não precisa provar que consegue existir.
 
 Agora ele precisa provar que consegue fechar operação com clareza, confiança e zero cara de remendo.
 
-Menos módulo novo.  
+Menos módulo novo.
 Mais nitidez.
 
-Menos “tem backend pra isso”.  
+Menos “tem backend pra isso”.
 Mais “o usuário viu, entendeu e usou até o fim”.
