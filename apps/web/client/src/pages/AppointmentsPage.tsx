@@ -10,6 +10,13 @@ import {
   Ban,
   Clock3,
   CheckCheck,
+  Search,
+  X,
+  CalendarDays,
+  CircleDashed,
+  CircleOff,
+  UserCheck,
+  AlertTriangle,
 } from "lucide-react";
 import { CreateAppointmentModal } from "@/components/CreateAppointmentModal";
 import { toast } from "sonner";
@@ -20,7 +27,12 @@ type CustomerRef = {
   phone?: string | null;
 };
 
-type AppointmentStatus = "SCHEDULED" | "CONFIRMED" | "DONE" | "CANCELED" | "NO_SHOW";
+type AppointmentStatus =
+  | "SCHEDULED"
+  | "CONFIRMED"
+  | "DONE"
+  | "CANCELED"
+  | "NO_SHOW";
 
 type Appointment = {
   id: string;
@@ -48,7 +60,32 @@ function formatDateTime(value?: string | null) {
   });
 }
 
-function truncateText(value?: string | null, max = 60) {
+function formatDate(value?: string | null) {
+  if (!value) return "—";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+
+  return date.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
+function formatTime(value?: string | null) {
+  if (!value) return "—";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+
+  return date.toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function truncateText(value?: string | null, max = 80) {
   const text = (value ?? "").trim();
   if (!text) return "—";
   if (text.length <= max) return text;
@@ -84,9 +121,76 @@ function getStatusColor(status: AppointmentStatus) {
   return colors[status];
 }
 
+function getStage(appointment: Appointment) {
+  switch (appointment.status) {
+    case "SCHEDULED":
+      return {
+        label: "Aguardando confirmação",
+        description: "O horário foi criado, mas ainda depende de confirmação.",
+        className:
+          "border-blue-200 bg-blue-50 text-blue-900 dark:border-blue-900/40 dark:bg-blue-950/20 dark:text-blue-300",
+        icon: CircleDashed,
+      };
+    case "CONFIRMED":
+      return {
+        label: "Pronto para execução",
+        description: "O cliente confirmou e o agendamento já pode virar operação.",
+        className:
+          "border-green-200 bg-green-50 text-green-900 dark:border-green-900/40 dark:bg-green-950/20 dark:text-green-300",
+        icon: UserCheck,
+      };
+    case "DONE":
+      return {
+        label: "Ciclo do agendamento concluído",
+        description: "O compromisso foi realizado com sucesso.",
+        className:
+          "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-300",
+        icon: CheckCircle2,
+      };
+    case "NO_SHOW":
+      return {
+        label: "Perdido por ausência",
+        description: "O cliente não compareceu e o fluxo precisa de tratamento.",
+        className:
+          "border-yellow-200 bg-yellow-50 text-yellow-900 dark:border-yellow-900/40 dark:bg-yellow-950/20 dark:text-yellow-300",
+        icon: AlertTriangle,
+      };
+    case "CANCELED":
+    default:
+      return {
+        label: "Agendamento cancelado",
+        description: "O compromisso foi encerrado antes da execução.",
+        className:
+          "border-gray-200 bg-gray-50 text-gray-900 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-300",
+        icon: CircleOff,
+      };
+  }
+}
+
+function InfoItem({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/40">
+      <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
+        {label}
+      </p>
+      <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
+        {value}
+      </p>
+    </div>
+  );
+}
+
 export default function AppointmentsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [statusFilter, setStatusFilter] = useState<AppointmentStatus | "">("");
+  const [searchInput, setSearchInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [processingId, setProcessingId] = useState<string | null>(null);
 
   const listAppointments = trpc.nexo.appointments.list.useQuery(
@@ -140,22 +244,55 @@ export default function AppointmentsPage() {
     }));
   }, [listCustomers.data]);
 
+  const filteredAppointments = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+
+    return appointments.filter((appointment) => {
+      if (!q) return true;
+
+      return (
+        String(appointment.customer?.name ?? "")
+          .toLowerCase()
+          .includes(q) ||
+        String(appointment.notes ?? "")
+          .toLowerCase()
+          .includes(q) ||
+        String(getStatusLabel(appointment.status))
+          .toLowerCase()
+          .includes(q)
+      );
+    });
+  }, [appointments, searchQuery]);
+
   useEffect(() => {
     if (listAppointments.error) {
       toast.error("Erro ao carregar agendamentos: " + listAppointments.error.message);
     }
   }, [listAppointments.error]);
 
-  const total = appointments.length;
-  const totalScheduled = appointments.filter((a) => a.status === "SCHEDULED").length;
-  const totalConfirmed = appointments.filter((a) => a.status === "CONFIRMED").length;
-  const totalDone = appointments.filter((a) => a.status === "DONE").length;
+  const total = filteredAppointments.length;
+  const totalScheduled = filteredAppointments.filter(
+    (a) => a.status === "SCHEDULED"
+  ).length;
+  const totalConfirmed = filteredAppointments.filter(
+    (a) => a.status === "CONFIRMED"
+  ).length;
+  const totalDone = filteredAppointments.filter((a) => a.status === "DONE").length;
+  const totalNoShow = filteredAppointments.filter(
+    (a) => a.status === "NO_SHOW"
+  ).length;
+  const totalCanceled = filteredAppointments.filter(
+    (a) => a.status === "CANCELED"
+  ).length;
 
   const handleCreateSuccess = () => {
     void listAppointments.refetch();
   };
 
-  const handleUpdateStatus = async (appointmentId: string, status: AppointmentStatus) => {
+  const handleUpdateStatus = async (
+    appointmentId: string,
+    status: AppointmentStatus
+  ) => {
     setProcessingId(appointmentId);
 
     try {
@@ -168,16 +305,27 @@ export default function AppointmentsPage() {
     }
   };
 
+  const handleApplySearch = () => {
+    setSearchQuery(searchInput.trim());
+  };
+
+  const handleClearLocalFilters = () => {
+    setSearchInput("");
+    setSearchQuery("");
+  };
+
+  const hasLocalFilters = Boolean(searchQuery);
+
   return (
     <div className="space-y-6 p-6">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="flex items-center gap-2 text-3xl font-bold text-gray-900 dark:text-white">
             <Calendar className="h-8 w-8 text-orange-500" />
             Agendamentos
           </h1>
           <p className="mt-1 text-gray-600 dark:text-gray-400">
-            Gerencie os agendamentos operacionais da sua base.
+            Leitura operacional dos compromissos, confirmações, conclusões e perdas do dia a dia.
           </p>
         </div>
 
@@ -202,7 +350,42 @@ export default function AppointmentsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+      <div className="grid gap-3 md:grid-cols-[1fr_auto_auto]">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleApplySearch();
+            }}
+            placeholder="Buscar por cliente, status ou observações"
+            className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-10 pr-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+          />
+        </div>
+
+        <Button onClick={handleApplySearch}>Buscar</Button>
+
+        <Button
+          variant="outline"
+          onClick={handleClearLocalFilters}
+          disabled={!hasLocalFilters && !searchInput}
+        >
+          <X className="mr-2 h-4 w-4" />
+          Limpar
+        </Button>
+      </div>
+
+      {hasLocalFilters ? (
+        <div className="flex flex-wrap gap-2 text-sm text-gray-500">
+          <span className="rounded-full border px-3 py-1">
+            Busca local: {searchQuery}
+          </span>
+        </div>
+      ) : null}
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-6">
         <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
           <p className="text-sm text-gray-600 dark:text-gray-400">Total</p>
           <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">
@@ -230,6 +413,20 @@ export default function AppointmentsPage() {
             {totalDone}
           </p>
         </div>
+
+        <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+          <p className="text-sm text-gray-600 dark:text-gray-400">No-show</p>
+          <p className="mt-1 text-2xl font-bold text-yellow-600 dark:text-yellow-400">
+            {totalNoShow}
+          </p>
+        </div>
+
+        <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+          <p className="text-sm text-gray-600 dark:text-gray-400">Cancelados</p>
+          <p className="mt-1 text-2xl font-bold text-red-600 dark:text-red-400">
+            {totalCanceled}
+          </p>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -251,63 +448,30 @@ export default function AppointmentsPage() {
         )}
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
-        <div className="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
-          <p className="text-sm font-medium text-gray-900 dark:text-white">Lista</p>
+      {listAppointments.isLoading ? (
+        <div className="flex h-64 items-center justify-center">
+          <Loader className="h-8 w-8 animate-spin text-orange-500" />
         </div>
+      ) : filteredAppointments.length > 0 ? (
+        <div className="space-y-4">
+          {filteredAppointments.map((appointment) => {
+            const isProcessing = processingId === appointment.id;
+            const stage = getStage(appointment);
+            const StageIcon = stage.icon;
 
-        {listAppointments.isLoading ? (
-          <div className="flex h-64 items-center justify-center">
-            <Loader className="h-8 w-8 animate-spin text-orange-500" />
-          </div>
-        ) : appointments.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="bg-gray-50 dark:bg-gray-900/40">
-                <tr className="text-left">
-                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
-                    Cliente
-                  </th>
-                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
-                    Início
-                  </th>
-                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
-                    Fim
-                  </th>
-                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
-                    Status
-                  </th>
-                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
-                    Observações
-                  </th>
-                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
-                    Ações
-                  </th>
-                </tr>
-              </thead>
+            return (
+              <div
+                key={appointment.id}
+                className="rounded-xl border border-gray-200 bg-white p-4 transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-800"
+              >
+                <div className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="truncate text-base font-semibold text-gray-900 dark:text-white">
+                          {appointment.customer?.name ?? "Cliente não identificado"}
+                        </h3>
 
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {appointments.map((appointment) => {
-                  const isProcessing = processingId === appointment.id;
-
-                  return (
-                    <tr
-                      key={appointment.id}
-                      className="hover:bg-gray-50 dark:hover:bg-gray-900/30"
-                    >
-                      <td className="px-4 py-3 text-gray-900 dark:text-white">
-                        {appointment.customer?.name ?? "Cliente não identificado"}
-                      </td>
-
-                      <td className="px-4 py-3 text-gray-700 dark:text-gray-300">
-                        {formatDateTime(appointment.startsAt)}
-                      </td>
-
-                      <td className="px-4 py-3 text-gray-700 dark:text-gray-300">
-                        {formatDateTime(appointment.endsAt)}
-                      </td>
-
-                      <td className="px-4 py-3">
                         <span
                           className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${getStatusColor(
                             appointment.status
@@ -315,94 +479,143 @@ export default function AppointmentsPage() {
                         >
                           {getStatusLabel(appointment.status)}
                         </span>
-                      </td>
+                      </div>
 
-                      <td
-                        className="max-w-[280px] px-4 py-3 text-gray-700 dark:text-gray-300"
-                        title={appointment.notes ?? ""}
+                      <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                        {appointment.notes?.trim()
+                          ? truncateText(appointment.notes, 120)
+                          : "Sem observações operacionais para este agendamento."}
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="gap-2"
+                        onClick={() =>
+                          void handleUpdateStatus(appointment.id, "CONFIRMED")
+                        }
+                        disabled={
+                          isProcessing ||
+                          updateAppointment.isPending ||
+                          appointment.status !== "SCHEDULED"
+                        }
                       >
-                        {truncateText(appointment.notes)}
-                      </td>
+                        <CheckCheck className="h-4 w-4" />
+                        Confirmar
+                      </Button>
 
-                      <td className="px-4 py-3">
-                        <div className="flex flex-wrap gap-2">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="gap-2"
-                            onClick={() => void handleUpdateStatus(appointment.id, "CONFIRMED")}
-                            disabled={
-                              isProcessing ||
-                              updateAppointment.isPending ||
-                              appointment.status !== "SCHEDULED"
-                            }
-                          >
-                            <CheckCheck className="h-4 w-4" />
-                            Confirmar
-                          </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="gap-2"
+                        onClick={() =>
+                          void handleUpdateStatus(appointment.id, "DONE")
+                        }
+                        disabled={
+                          isProcessing ||
+                          updateAppointment.isPending ||
+                          !["SCHEDULED", "CONFIRMED"].includes(appointment.status)
+                        }
+                      >
+                        <CheckCircle2 className="h-4 w-4" />
+                        Concluir
+                      </Button>
 
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="gap-2"
-                            onClick={() => void handleUpdateStatus(appointment.id, "DONE")}
-                            disabled={
-                              isProcessing ||
-                              updateAppointment.isPending ||
-                              !["SCHEDULED", "CONFIRMED"].includes(appointment.status)
-                            }
-                          >
-                            <CheckCircle2 className="h-4 w-4" />
-                            Concluir
-                          </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="gap-2"
+                        onClick={() =>
+                          void handleUpdateStatus(appointment.id, "NO_SHOW")
+                        }
+                        disabled={
+                          isProcessing ||
+                          updateAppointment.isPending ||
+                          !["SCHEDULED", "CONFIRMED"].includes(appointment.status)
+                        }
+                      >
+                        <Clock3 className="h-4 w-4" />
+                        No-show
+                      </Button>
 
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="gap-2"
-                            onClick={() => void handleUpdateStatus(appointment.id, "NO_SHOW")}
-                            disabled={
-                              isProcessing ||
-                              updateAppointment.isPending ||
-                              !["SCHEDULED", "CONFIRMED"].includes(appointment.status)
-                            }
-                          >
-                            <Clock3 className="h-4 w-4" />
-                            No-show
-                          </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="gap-2 text-red-600 hover:text-red-700"
+                        onClick={() =>
+                          void handleUpdateStatus(appointment.id, "CANCELED")
+                        }
+                        disabled={
+                          isProcessing ||
+                          updateAppointment.isPending ||
+                          !["SCHEDULED", "CONFIRMED"].includes(appointment.status)
+                        }
+                      >
+                        <Ban className="h-4 w-4" />
+                        Cancelar
+                      </Button>
+                    </div>
+                  </div>
 
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="gap-2 text-red-600 hover:text-red-700"
-                            onClick={() => void handleUpdateStatus(appointment.id, "CANCELED")}
-                            disabled={
-                              isProcessing ||
-                              updateAppointment.isPending ||
-                              !["SCHEDULED", "CONFIRMED"].includes(appointment.status)
-                            }
-                          >
-                            <Ban className="h-4 w-4" />
-                            Cancelar
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="flex h-64 items-center justify-center text-gray-500 dark:text-gray-400">
-            <p>Nenhum agendamento encontrado</p>
-          </div>
-        )}
-      </div>
+                  <div className={`rounded-lg border p-3 ${stage.className}`}>
+                    <div className="flex items-start gap-2">
+                      <StageIcon className="mt-0.5 h-4 w-4 shrink-0" />
+                      <div>
+                        <p className="text-sm font-semibold">{stage.label}</p>
+                        <p className="mt-1 text-xs opacity-90">
+                          {stage.description}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    <InfoItem
+                      label="Data"
+                      value={formatDate(appointment.startsAt)}
+                    />
+                    <InfoItem
+                      label="Início"
+                      value={formatTime(appointment.startsAt)}
+                    />
+                    <InfoItem
+                      label="Fim"
+                      value={formatTime(appointment.endsAt)}
+                    />
+                    <InfoItem
+                      label="Criado em"
+                      value={formatDateTime(appointment.createdAt)}
+                    />
+                  </div>
+
+                  {appointment.notes?.trim() ? (
+                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-400">
+                      <span className="font-medium text-gray-900 dark:text-white">
+                        Observação completa:
+                      </span>{" "}
+                      {appointment.notes}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="flex h-64 items-center justify-center text-gray-500 dark:text-gray-400">
+          <p>
+            {appointments.length === 0
+              ? "Nenhum agendamento encontrado"
+              : "Nenhum agendamento corresponde aos filtros locais"}
+          </p>
+        </div>
+      )}
 
       <CreateAppointmentModal
         isOpen={showCreateModal}

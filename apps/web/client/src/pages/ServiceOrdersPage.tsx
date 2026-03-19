@@ -12,6 +12,13 @@ import {
   Wallet,
   Clock3,
   Receipt,
+  CheckCircle2,
+  CircleDashed,
+  CircleOff,
+  BadgeDollarSign,
+  ArrowRightLeft,
+  Search,
+  X,
 } from "lucide-react";
 import CreateServiceOrderModal from "@/components/CreateServiceOrderModal";
 import { toast } from "sonner";
@@ -25,6 +32,15 @@ type ServiceOrderStatus =
 
 type ChargeStatus = "PENDING" | "PAID" | "OVERDUE" | "CANCELED";
 
+type FinancialFilter =
+  | "ALL"
+  | "NO_CHARGE"
+  | "READY_TO_CHARGE"
+  | "PENDING"
+  | "PAID"
+  | "OVERDUE"
+  | "CANCELED";
+
 type CustomerRef = {
   id: string;
   name: string;
@@ -34,6 +50,13 @@ type CustomerRef = {
 type AssignedPersonRef = {
   id: string;
   name: string;
+};
+
+type AppointmentRef = {
+  id: string;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  status?: string | null;
 };
 
 type FinancialSummary = {
@@ -52,6 +75,7 @@ type ServiceOrder = {
   assignedToPersonId?: string | null;
   assignedTo?: AssignedPersonRef | null;
   appointmentId?: string | null;
+  appointment?: AppointmentRef | null;
   title: string;
   description?: string | null;
   status: ServiceOrderStatus;
@@ -93,7 +117,8 @@ const STATUS_LABELS: Record<ServiceOrderStatus, string> = {
 
 const STATUS_COLORS: Record<ServiceOrderStatus, string> = {
   OPEN: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
-  ASSIGNED: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300",
+  ASSIGNED:
+    "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300",
   IN_PROGRESS:
     "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300",
   DONE: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
@@ -209,12 +234,199 @@ function getChargeBadge(financialSummary?: FinancialSummary | null) {
   }
 }
 
+function getOperationalStage(os: ServiceOrder) {
+  switch (os.status) {
+    case "OPEN":
+      return {
+        label: "Aguardando início",
+        description: "A O.S. existe, mas ainda não foi colocada em execução.",
+        className:
+          "border-blue-200 bg-blue-50 text-blue-900 dark:border-blue-900/50 dark:bg-blue-950/20 dark:text-blue-300",
+        icon: CircleDashed,
+      };
+    case "ASSIGNED":
+      return {
+        label: "Aguardando execução",
+        description:
+          "A O.S. já foi atribuída e espera o início real do serviço.",
+        className:
+          "border-yellow-200 bg-yellow-50 text-yellow-900 dark:border-yellow-900/50 dark:bg-yellow-950/20 dark:text-yellow-300",
+        icon: User,
+      };
+    case "IN_PROGRESS":
+      return {
+        label: "Execução em andamento",
+        description: "O serviço está rodando e ainda não foi concluído.",
+        className:
+          "border-orange-200 bg-orange-50 text-orange-900 dark:border-orange-900/50 dark:bg-orange-950/20 dark:text-orange-300",
+        icon: Clock3,
+      };
+    case "DONE":
+      return {
+        label: "Execução concluída",
+        description: "A operação foi finalizada e já entrou na etapa financeira.",
+        className:
+          "border-green-200 bg-green-50 text-green-900 dark:border-green-900/50 dark:bg-green-950/20 dark:text-green-300",
+        icon: CheckCircle2,
+      };
+    case "CANCELED":
+    default:
+      return {
+        label: "Execução cancelada",
+        description: "A O.S. foi encerrada sem continuidade operacional.",
+        className:
+          "border-gray-200 bg-gray-50 text-gray-900 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-300",
+        icon: CircleOff,
+      };
+  }
+}
+
+function getFinancialStage(os: ServiceOrder) {
+  const financialSummary = os.financialSummary ?? null;
+  const amountDefined = Boolean(os.amountCents && os.amountCents > 0);
+
+  if (financialSummary?.chargeStatus === "PAID") {
+    return {
+      label: "Fluxo financeiro fechado",
+      description: "Existe cobrança vinculada e o pagamento já foi registrado.",
+      className:
+        "border-green-200 bg-green-50 text-green-900 dark:border-green-900/50 dark:bg-green-950/20 dark:text-green-300",
+      icon: BadgeDollarSign,
+    };
+  }
+
+  if (financialSummary?.chargeStatus === "OVERDUE") {
+    return {
+      label: "Cobrança vencida",
+      description: "A cobrança existe, mas está em atraso e exige ação.",
+      className:
+        "border-red-200 bg-red-50 text-red-900 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-300",
+      icon: AlertCircle,
+    };
+  }
+
+  if (financialSummary?.chargeStatus === "PENDING") {
+    return {
+      label: "Cobrança pendente",
+      description: "A cobrança foi gerada e aguarda pagamento.",
+      className:
+        "border-yellow-200 bg-yellow-50 text-yellow-900 dark:border-yellow-900/50 dark:bg-yellow-950/20 dark:text-yellow-300",
+      icon: Wallet,
+    };
+  }
+
+  if (financialSummary?.chargeStatus === "CANCELED") {
+    return {
+      label: "Cobrança cancelada",
+      description: "Existe cobrança vinculada, mas ela foi cancelada.",
+      className:
+        "border-gray-200 bg-gray-50 text-gray-900 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-300",
+      icon: Receipt,
+    };
+  }
+
+  if (os.status === "DONE" && amountDefined) {
+    return {
+      label: "Pronta para cobrança",
+      description:
+        "A execução terminou, há valor definido e a cobrança ainda precisa ser vinculada.",
+      className:
+        "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-300",
+      icon: ArrowRightLeft,
+    };
+  }
+
+  if (os.status === "DONE" && !amountDefined) {
+    return {
+      label: "Sem valor definido",
+      description:
+        "A O.S. foi concluída, mas ainda não há valor suficiente para preparar a cobrança.",
+      className:
+        "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-300",
+      icon: AlertCircle,
+    };
+  }
+
+  return {
+    label: "Financeiro ainda não iniciado",
+    description:
+      "A etapa financeira ainda depende do fechamento operacional da O.S.",
+    className:
+      "border-gray-200 bg-gray-50 text-gray-900 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-300",
+    icon: Wallet,
+  };
+}
+
+function getFinancialFilterLabel(value: FinancialFilter) {
+  switch (value) {
+    case "ALL":
+      return "Todos os estados financeiros";
+    case "NO_CHARGE":
+      return "Sem cobrança";
+    case "READY_TO_CHARGE":
+      return "Prontas para cobrança";
+    case "PENDING":
+      return "Cobrança pendente";
+    case "PAID":
+      return "Cobrança paga";
+    case "OVERDUE":
+      return "Cobrança vencida";
+    case "CANCELED":
+      return "Cobrança cancelada";
+    default:
+      return value;
+  }
+}
+
+function matchesFinancialFilter(
+  os: ServiceOrder,
+  filter: FinancialFilter
+) {
+  if (filter === "ALL") return true;
+
+  const summary = os.financialSummary ?? null;
+  const amountDefined = Boolean(os.amountCents && os.amountCents > 0);
+
+  if (filter === "NO_CHARGE") {
+    return !summary?.hasCharge;
+  }
+
+  if (filter === "READY_TO_CHARGE") {
+    return os.status === "DONE" && amountDefined && !summary?.hasCharge;
+  }
+
+  return summary?.chargeStatus === filter;
+}
+
+function InfoItem({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/40">
+      <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
+        {label}
+      </p>
+      <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
+        {value}
+      </p>
+    </div>
+  );
+}
+
 export default function ServiceOrdersPage() {
   const [, navigate] = useLocation();
   const [page, setPage] = useState(1);
   const limit = 20;
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [statusFilter, setStatusFilter] = useState<ServiceOrderStatus | "">("");
+  const [financialFilter, setFinancialFilter] =
+    useState<FinancialFilter>("ALL");
+  const [searchInput, setSearchInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [processingId, setProcessingId] = useState<string | null>(null);
   const utils = trpc.useUtils();
 
@@ -248,6 +460,23 @@ export default function ServiceOrdersPage() {
   const serviceOrders = useMemo(() => {
     return Array.isArray(serviceOrdersResult.data) ? serviceOrdersResult.data : [];
   }, [serviceOrdersResult]);
+
+  const filteredServiceOrders = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+
+    return serviceOrders.filter((os) => {
+      const matchesText =
+        !q ||
+        String(os.title ?? "").toLowerCase().includes(q) ||
+        String(os.description ?? "").toLowerCase().includes(q) ||
+        String(os.customer?.name ?? "").toLowerCase().includes(q) ||
+        String(os.assignedTo?.name ?? "").toLowerCase().includes(q);
+
+      const matchesFinance = matchesFinancialFilter(os, financialFilter);
+
+      return matchesText && matchesFinance;
+    });
+  }, [financialFilter, searchQuery, serviceOrders]);
 
   const pagination = serviceOrdersResult.pagination ?? {
     page: 1,
@@ -366,22 +595,35 @@ export default function ServiceOrdersPage() {
     navigate(`/finances?serviceOrderId=${encodeURIComponent(serviceOrderId)}`);
   };
 
-  const total = serviceOrders.length;
-  const totalOpen = serviceOrders.filter((os) => os.status === "OPEN").length;
-  const totalInProgress = serviceOrders.filter(
+  const handleApplySearch = () => {
+    setSearchQuery(searchInput.trim());
+  };
+
+  const handleClearLocalFilters = () => {
+    setSearchInput("");
+    setSearchQuery("");
+    setFinancialFilter("ALL");
+  };
+
+  const total = filteredServiceOrders.length;
+  const totalOpen = filteredServiceOrders.filter((os) => os.status === "OPEN").length;
+  const totalAssigned = filteredServiceOrders.filter((os) => os.status === "ASSIGNED").length;
+  const totalInProgress = filteredServiceOrders.filter(
     (os) => os.status === "IN_PROGRESS"
   ).length;
 
-  const doneWithCharge = serviceOrders.filter((os) => {
+  const doneWithCharge = filteredServiceOrders.filter((os) => {
     if (os.status !== "DONE") return false;
     return Boolean(os.financialSummary?.hasCharge);
   }).length;
 
-  const doneWithoutCharge = serviceOrders.filter((os) => {
+  const doneWithoutCharge = filteredServiceOrders.filter((os) => {
     if (os.status !== "DONE") return false;
     if (!os.amountCents || os.amountCents <= 0) return false;
     return !os.financialSummary?.hasCharge;
   }).length;
+
+  const hasLocalFilters = Boolean(searchQuery) || financialFilter !== "ALL";
 
   return (
     <div className="space-y-6 p-6">
@@ -392,7 +634,7 @@ export default function ServiceOrdersPage() {
             Ordens de Serviço
           </h1>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Gerencie execução, fechamento e vínculo financeiro das O.S.
+            Execução, fechamento operacional e transição para cobrança em uma leitura só.
           </p>
         </div>
 
@@ -419,9 +661,68 @@ export default function ServiceOrdersPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
+      <div className="grid gap-3 md:grid-cols-[1fr_260px_auto_auto]">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleApplySearch();
+            }}
+            placeholder="Buscar por título, cliente, descrição ou responsável"
+            className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-10 pr-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+          />
+        </div>
+
+        <select
+          value={financialFilter}
+          onChange={(e) => setFinancialFilter(e.target.value as FinancialFilter)}
+          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+        >
+          <option value="ALL">Todos os estados financeiros</option>
+          <option value="NO_CHARGE">Sem cobrança</option>
+          <option value="READY_TO_CHARGE">Prontas para cobrança</option>
+          <option value="PENDING">Cobrança pendente</option>
+          <option value="PAID">Cobrança paga</option>
+          <option value="OVERDUE">Cobrança vencida</option>
+          <option value="CANCELED">Cobrança cancelada</option>
+        </select>
+
+        <Button onClick={handleApplySearch}>Buscar</Button>
+
+        <Button
+          variant="outline"
+          onClick={handleClearLocalFilters}
+          disabled={!hasLocalFilters && !searchInput}
+        >
+          <X className="mr-2 h-4 w-4" />
+          Limpar
+        </Button>
+      </div>
+
+      {hasLocalFilters ? (
+        <div className="flex flex-wrap gap-2 text-sm text-gray-500">
+          {searchQuery ? (
+            <span className="rounded-full border px-3 py-1">
+              Busca local: {searchQuery}
+            </span>
+          ) : null}
+          {financialFilter !== "ALL" ? (
+            <span className="rounded-full border px-3 py-1">
+              Financeiro: {getFinancialFilterLabel(financialFilter)}
+            </span>
+          ) : null}
+          <span className="rounded-full border px-3 py-1">
+            Filtros locais na página {pagination.page}
+          </span>
+        </div>
+      ) : null}
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-6">
         <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-          <p className="text-sm text-gray-600 dark:text-gray-400">Total</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400">Total na página</p>
           <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">{total}</p>
         </div>
 
@@ -429,6 +730,13 @@ export default function ServiceOrdersPage() {
           <p className="text-sm text-gray-600 dark:text-gray-400">Abertas</p>
           <p className="mt-1 text-2xl font-bold text-blue-600 dark:text-blue-400">
             {totalOpen}
+          </p>
+        </div>
+
+        <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+          <p className="text-sm text-gray-600 dark:text-gray-400">Atribuídas</p>
+          <p className="mt-1 text-2xl font-bold text-yellow-600 dark:text-yellow-400">
+            {totalAssigned}
           </p>
         </div>
 
@@ -447,7 +755,7 @@ export default function ServiceOrdersPage() {
         </div>
 
         <div className="rounded-lg border border-red-200 bg-white p-4 dark:border-red-800 dark:bg-gray-800">
-          <p className="text-sm text-gray-600 dark:text-gray-400">Concluídas sem cobrança</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400">Prontas sem cobrança</p>
           <p className="mt-1 text-2xl font-bold text-red-600 dark:text-red-400">
             {doneWithoutCharge}
           </p>
@@ -490,25 +798,29 @@ export default function ServiceOrdersPage() {
         </div>
       )}
 
-      {!listQuery.isLoading && !listQuery.isError && serviceOrders.length === 0 && (
+      {!listQuery.isLoading && !listQuery.isError && filteredServiceOrders.length === 0 && (
         <div className="py-12 text-center">
           <ClipboardList className="mx-auto mb-3 h-12 w-12 text-gray-300 dark:text-gray-600" />
           <p className="text-gray-500 dark:text-gray-400">
-            Nenhuma ordem de serviço encontrada.
+            {serviceOrders.length === 0
+              ? "Nenhuma ordem de serviço encontrada."
+              : "Nenhuma ordem corresponde aos filtros locais."}
           </p>
-          <Button
-            onClick={() => setShowCreateModal(true)}
-            className="mt-4 bg-orange-500 text-white hover:bg-orange-600"
-          >
-            <Plus className="mr-1 h-4 w-4" />
-            Criar primeira OS
-          </Button>
+          {serviceOrders.length === 0 ? (
+            <Button
+              onClick={() => setShowCreateModal(true)}
+              className="mt-4 bg-orange-500 text-white hover:bg-orange-600"
+            >
+              <Plus className="mr-1 h-4 w-4" />
+              Criar primeira OS
+            </Button>
+          ) : null}
         </div>
       )}
 
-      {serviceOrders.length > 0 && (
-        <div className="space-y-3">
-          {serviceOrders.map((os) => {
+      {filteredServiceOrders.length > 0 && (
+        <div className="space-y-4">
+          {filteredServiceOrders.map((os) => {
             const isProcessing = processingId === os.id;
             const financialSummary = os.financialSummary ?? null;
             const chargeBadge = getChargeBadge(financialSummary);
@@ -518,193 +830,253 @@ export default function ServiceOrdersPage() {
               os.amountCents > 0 &&
               !financialSummary?.hasCharge;
 
+            const operationalStage = getOperationalStage(os);
+            const financialStage = getFinancialStage(os);
+
+            const OperationalIcon = operationalStage.icon;
+            const FinancialIcon = financialStage.icon;
+
             return (
               <div
                 key={os.id}
                 className="rounded-xl border border-gray-200 bg-white p-4 transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-800"
               >
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="min-w-0 flex-1">
+                <div className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="truncate text-base font-semibold text-gray-900 dark:text-white">
+                          {os.title}
+                        </h3>
+
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                            STATUS_COLORS[os.status]
+                          }`}
+                        >
+                          {STATUS_LABELS[os.status]}
+                        </span>
+
+                        <span
+                          className={`text-xs font-medium ${getPriorityColor(os.priority)}`}
+                        >
+                          ● {getPriorityLabel(os.priority)}
+                        </span>
+
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-xs font-medium ${chargeBadge.className}`}
+                        >
+                          {chargeBadge.label}
+                        </span>
+                      </div>
+
+                      {os.description ? (
+                        <p className="mt-2 line-clamp-2 text-sm text-gray-500 dark:text-gray-400">
+                          {os.description}
+                        </p>
+                      ) : (
+                        <p className="mt-2 text-sm text-gray-400 dark:text-gray-500">
+                          Sem descrição operacional.
+                        </p>
+                      )}
+                    </div>
+
                     <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="truncate font-semibold text-gray-900 dark:text-white">
-                        {os.title}
-                      </h3>
-
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                          STATUS_COLORS[os.status]
-                        }`}
+                      <select
+                        value={os.status}
+                        onChange={(e) =>
+                          handleStatusChange(os.id, e.target.value as ServiceOrderStatus)
+                        }
+                        disabled={updateMutation.isPending || isProcessing}
+                        className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300"
                       >
-                        {STATUS_LABELS[os.status]}
-                      </span>
+                        {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                          <option key={value} value={value}>
+                            {label}
+                          </option>
+                        ))}
+                      </select>
 
-                      <span
-                        className={`text-xs font-medium ${getPriorityColor(os.priority)}`}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleStartExecution(os.id)}
+                        disabled={
+                          os.status === "IN_PROGRESS" ||
+                          os.status === "DONE" ||
+                          os.status === "CANCELED" ||
+                          updateMutation.isPending ||
+                          isProcessing
+                        }
                       >
-                        ● {getPriorityLabel(os.priority)}
-                      </span>
+                        Iniciar execução
+                      </Button>
 
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${chargeBadge.className}`}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleFinishExecution(os.id)}
+                        disabled={
+                          os.status !== "IN_PROGRESS" ||
+                          updateMutation.isPending ||
+                          isProcessing
+                        }
                       >
-                        {chargeBadge.label}
-                      </span>
+                        Finalizar execução
+                      </Button>
+
+                      <Button
+                        size="sm"
+                        variant={canGenerateCharge ? "default" : "outline"}
+                        onClick={() => {
+                          if (canGenerateCharge) {
+                            void handleGenerateCharge(os);
+                            return;
+                          }
+
+                          if (financialSummary?.hasCharge) {
+                            handleOpenCharge(os.id);
+                          }
+                        }}
+                        disabled={generateChargeMutation.isPending || isProcessing}
+                        className="gap-2"
+                      >
+                        <Wallet className="h-4 w-4" />
+                        {canGenerateCharge
+                          ? "Gerar cobrança"
+                          : financialSummary?.hasCharge
+                            ? "Ver cobrança"
+                            : "Cobrança indisponível"}
+                      </Button>
                     </div>
+                  </div>
 
-                    {os.description && (
-                      <p className="mt-1 line-clamp-2 text-sm text-gray-500 dark:text-gray-400">
-                        {os.description}
-                      </p>
-                    )}
-
-                    <div className="mt-2 flex flex-wrap items-center gap-4 text-xs text-gray-400 dark:text-gray-500">
-                      <span className="flex items-center gap-1">
-                        <User className="h-3 w-3" />
-                        {os.customer?.name ?? "Cliente não identificado"}
-                      </span>
-
-                      <span className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
-                        Criada em {formatDate(os.createdAt)}
-                      </span>
-
-                      <span className="flex items-center gap-1">
-                        <Clock3 className="h-3 w-3" />
-                        Agendada para {formatDateTime(os.scheduledFor)}
-                      </span>
-
-                      <span>Valor {formatCurrency(os.amountCents)}</span>
-
-                      <span>Vencimento {formatDate(os.dueDate)}</span>
-                    </div>
-
-                    {os.assignedTo?.name ? (
-                      <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                        Responsável: {os.assignedTo.name}
-                      </p>
-                    ) : null}
-
-                    {os.appointmentId ? (
-                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                        Agendamento vinculado: {os.appointmentId}
-                      </p>
-                    ) : null}
-
-                    {os.finishedAt ? (
-                      <p className="mt-1 text-xs text-green-600 dark:text-green-400">
-                        Finalizada em {formatDateTime(os.finishedAt)}
-                      </p>
-                    ) : null}
-
-                    {financialSummary?.hasCharge ? (
-                      <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs dark:border-gray-700 dark:bg-gray-900/40">
-                        <p className="flex items-center gap-1 font-medium text-gray-900 dark:text-white">
-                          <Receipt className="h-3.5 w-3.5" />
-                          Cobrança vinculada
-                        </p>
-                        <p className="mt-1 text-gray-500 dark:text-gray-400">
-                          Status: {financialSummary.chargeStatus ?? "—"} • Valor{" "}
-                          {formatCurrency(financialSummary.chargeAmountCents)} • Vencimento{" "}
-                          {formatDate(financialSummary.chargeDueDate)}
-                        </p>
-                        {financialSummary.paidAt ? (
-                          <p className="mt-1 text-green-600 dark:text-green-400">
-                            Pago em {formatDateTime(financialSummary.paidAt)}
+                  <div className="grid gap-3 lg:grid-cols-2">
+                    <div
+                      className={`rounded-lg border p-3 ${operationalStage.className}`}
+                    >
+                      <div className="flex items-start gap-2">
+                        <OperationalIcon className="mt-0.5 h-4 w-4 shrink-0" />
+                        <div>
+                          <p className="text-sm font-semibold">{operationalStage.label}</p>
+                          <p className="mt-1 text-xs opacity-90">
+                            {operationalStage.description}
                           </p>
-                        ) : null}
+                        </div>
                       </div>
-                    ) : null}
+                    </div>
 
-                    {os.status === "DONE" && (!os.amountCents || os.amountCents <= 0) ? (
-                      <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-300">
-                        O.S. concluída sem valor definido. Sem valor, não há cobrança para gerar.
+                    <div className={`rounded-lg border p-3 ${financialStage.className}`}>
+                      <div className="flex items-start gap-2">
+                        <FinancialIcon className="mt-0.5 h-4 w-4 shrink-0" />
+                        <div>
+                          <p className="text-sm font-semibold">{financialStage.label}</p>
+                          <p className="mt-1 text-xs opacity-90">
+                            {financialStage.description}
+                          </p>
+                        </div>
                       </div>
-                    ) : null}
-
-                    {os.status === "DONE" &&
-                    os.amountCents &&
-                    os.amountCents > 0 &&
-                    !financialSummary?.hasCharge ? (
-                      <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-800 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-300">
-                        O.S. concluída com valor definido, mas ainda sem cobrança vinculada.
-                      </div>
-                    ) : null}
-
-                    {financialSummary?.chargeStatus === "PAID" ? (
-                      <div className="mt-3 rounded-lg border border-green-200 bg-green-50 p-3 text-xs text-green-800 dark:border-green-900/50 dark:bg-green-900/20 dark:text-green-300">
-                        Fluxo financeiro fechado para esta O.S.
-                      </div>
-                    ) : null}
+                    </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2">
-                    <select
-                      value={os.status}
-                      onChange={(e) =>
-                        handleStatusChange(os.id, e.target.value as ServiceOrderStatus)
-                      }
-                      disabled={updateMutation.isPending || isProcessing}
-                      className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300"
-                    >
-                      {Object.entries(STATUS_LABELS).map(([value, label]) => (
-                        <option key={value} value={value}>
-                          {label}
-                        </option>
-                      ))}
-                    </select>
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    <InfoItem
+                      label="Cliente"
+                      value={os.customer?.name ?? "Cliente não identificado"}
+                    />
 
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleStartExecution(os.id)}
-                      disabled={
-                        os.status === "IN_PROGRESS" ||
-                        os.status === "DONE" ||
-                        os.status === "CANCELED" ||
-                        updateMutation.isPending ||
-                        isProcessing
-                      }
-                    >
-                      Iniciar execução
-                    </Button>
+                    <InfoItem
+                      label="Responsável"
+                      value={os.assignedTo?.name ?? "Ainda não atribuído"}
+                    />
 
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleFinishExecution(os.id)}
-                      disabled={
-                        os.status !== "IN_PROGRESS" ||
-                        updateMutation.isPending ||
-                        isProcessing
-                      }
-                    >
-                      Finalizar execução
-                    </Button>
+                    <InfoItem
+                      label="Agendada para"
+                      value={formatDateTime(os.scheduledFor)}
+                    />
 
-                    <Button
-                      size="sm"
-                      variant={canGenerateCharge ? "default" : "outline"}
-                      onClick={() => {
-                        if (canGenerateCharge) {
-                          void handleGenerateCharge(os);
-                          return;
-                        }
+                    <InfoItem
+                      label="Criada em"
+                      value={formatDate(os.createdAt)}
+                    />
 
-                        if (financialSummary?.hasCharge) {
-                          handleOpenCharge(os.id);
-                        }
-                      }}
-                      disabled={generateChargeMutation.isPending || isProcessing}
-                      className="gap-2"
-                    >
-                      <Wallet className="h-4 w-4" />
-                      {canGenerateCharge
-                        ? "Gerar cobrança"
-                        : financialSummary?.hasCharge
-                          ? "Ver cobrança"
-                          : "Cobrança indisponível"}
-                    </Button>
+                    <InfoItem
+                      label="Início da execução"
+                      value={formatDateTime(os.startedAt)}
+                    />
+
+                    <InfoItem
+                      label="Conclusão"
+                      value={formatDateTime(os.finishedAt)}
+                    />
+
+                    <InfoItem
+                      label="Valor da O.S."
+                      value={formatCurrency(os.amountCents)}
+                    />
+
+                    <InfoItem
+                      label="Vencimento"
+                      value={formatDate(os.dueDate)}
+                    />
                   </div>
+
+                  {os.appointment ? (
+                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-400">
+                      <span className="font-medium text-gray-900 dark:text-white">
+                        Agendamento vinculado:
+                      </span>{" "}
+                      {formatDateTime(os.appointment.startsAt)} •{" "}
+                      {os.appointment.status || "Sem status"}
+                    </div>
+                  ) : null}
+
+                  {financialSummary?.hasCharge ? (
+                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs dark:border-gray-700 dark:bg-gray-900/40">
+                      <p className="flex items-center gap-1 font-medium text-gray-900 dark:text-white">
+                        <Receipt className="h-3.5 w-3.5" />
+                        Cobrança vinculada
+                      </p>
+
+                      <div className="mt-2 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                        <div>
+                          <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                            Status
+                          </p>
+                          <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
+                            {financialSummary.chargeStatus ?? "—"}
+                          </p>
+                        </div>
+
+                        <div>
+                          <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                            Valor
+                          </p>
+                          <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
+                            {formatCurrency(financialSummary.chargeAmountCents)}
+                          </p>
+                        </div>
+
+                        <div>
+                          <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                            Vencimento
+                          </p>
+                          <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
+                            {formatDate(financialSummary.chargeDueDate)}
+                          </p>
+                        </div>
+
+                        <div>
+                          <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                            Pago em
+                          </p>
+                          <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
+                            {formatDateTime(financialSummary.paidAt)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               </div>
             );

@@ -25,6 +25,11 @@ import {
   Search,
   X,
   CreditCard,
+  Wallet,
+  Receipt,
+  CalendarDays,
+  ArrowRightLeft,
+  BadgeDollarSign,
 } from "lucide-react";
 import { CreateChargeModal } from "@/components/CreateChargeModal";
 import { EditChargeModal } from "@/components/EditChargeModal";
@@ -80,12 +85,163 @@ function formatMoney(value: number) {
   }).format(value);
 }
 
+function formatCurrencyFromCents(cents?: number | null) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(Number(cents ?? 0) / 100);
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return "—";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+
+  return date.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
 function normalizeChargesPayload(payload: any): Charge[] {
   if (Array.isArray(payload?.data?.items)) return payload.data.items as Charge[];
   if (Array.isArray(payload?.data)) return payload.data as Charge[];
   if (Array.isArray(payload?.items)) return payload.items as Charge[];
   if (Array.isArray(payload)) return payload as Charge[];
   return [];
+}
+
+function getStatusColor(status: string) {
+  switch (status) {
+    case "PAID":
+      return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400";
+    case "PENDING":
+      return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400";
+    case "OVERDUE":
+      return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400";
+    case "CANCELED":
+      return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400";
+    default:
+      return "bg-gray-100 text-gray-800";
+  }
+}
+
+function getStatusLabel(status: string) {
+  switch (status) {
+    case "PAID":
+      return "Pago";
+    case "PENDING":
+      return "Pendente";
+    case "OVERDUE":
+      return "Vencido";
+    case "CANCELED":
+      return "Cancelado";
+    default:
+      return status;
+  }
+}
+
+function getStatusFilterLabel(status: ChargeStatusFilter) {
+  switch (status) {
+    case "ALL":
+      return "Todos";
+    case "PAID":
+      return "Pago";
+    case "PENDING":
+      return "Pendente";
+    case "OVERDUE":
+      return "Vencido";
+    case "CANCELED":
+      return "Cancelado";
+    default:
+      return status;
+  }
+}
+
+function getChargeStage(charge: Charge) {
+  switch (charge.status) {
+    case "PAID":
+      return {
+        label: "Fluxo encerrado",
+        description: "Pagamento confirmado e ciclo financeiro concluído.",
+        className:
+          "border-green-200 bg-green-50 text-green-900 dark:border-green-900/40 dark:bg-green-950/20 dark:text-green-300",
+        icon: BadgeDollarSign,
+      };
+    case "OVERDUE":
+      return {
+        label: "Cobrança em atraso",
+        description: "Existe cobrança emitida, mas o vencimento já passou.",
+        className:
+          "border-red-200 bg-red-50 text-red-900 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300",
+        icon: AlertCircle,
+      };
+    case "PENDING":
+      return {
+        label: "Aguardando pagamento",
+        description: "Cobrança ativa aguardando liquidação.",
+        className:
+          "border-yellow-200 bg-yellow-50 text-yellow-900 dark:border-yellow-900/40 dark:bg-yellow-950/20 dark:text-yellow-300",
+        icon: Wallet,
+      };
+    case "CANCELED":
+    default:
+      return {
+        label: "Cobrança cancelada",
+        description: "Cobrança encerrada sem seguir para pagamento.",
+        className:
+          "border-gray-200 bg-gray-50 text-gray-900 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-300",
+        icon: Receipt,
+      };
+  }
+}
+
+function MetricCard({
+  title,
+  value,
+  subtitle,
+  icon: Icon,
+}: {
+  title: string;
+  value: string | number;
+  subtitle: string;
+  icon: React.ComponentType<{ className?: string }>;
+}) {
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardDescription className="flex items-center gap-2">
+          <Icon className="h-4 w-4" />
+          {title}
+        </CardDescription>
+        <CardTitle className="text-2xl">{value}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className="text-xs text-gray-500 dark:text-gray-400">{subtitle}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function InfoItem({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/40">
+      <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
+        {label}
+      </p>
+      <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
+        {value}
+      </p>
+    </div>
+  );
 }
 
 export default function FinancesPage() {
@@ -221,53 +377,6 @@ export default function FinancesPage() {
     });
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "PAID":
-        return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400";
-      case "PENDING":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400";
-      case "OVERDUE":
-        return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400";
-      case "CANCELED":
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case "PAID":
-        return "Pago";
-      case "PENDING":
-        return "Pendente";
-      case "OVERDUE":
-        return "Vencido";
-      case "CANCELED":
-        return "Cancelado";
-      default:
-        return status;
-    }
-  };
-
-  const getStatusFilterLabel = (status: ChargeStatusFilter) => {
-    switch (status) {
-      case "ALL":
-        return "Todos";
-      case "PAID":
-        return "Pago";
-      case "PENDING":
-        return "Pendente";
-      case "OVERDUE":
-        return "Vencido";
-      case "CANCELED":
-        return "Cancelado";
-      default:
-        return status;
-    }
-  };
-
   const isSubmitting = deleteCharge.isPending || isChargeActionSubmitting;
 
   const statsPayload = statsQuery.data as any;
@@ -288,6 +397,12 @@ export default function FinancesPage() {
 
   const paidCount = charges.filter((charge) => charge.status === "PAID").length;
 
+  const pendingCount = charges.filter((charge) => charge.status === "PENDING").length;
+  const overdueCount = charges.filter((charge) => charge.status === "OVERDUE").length;
+  const pendingAmountOnPage = charges
+    .filter((charge) => charge.status === "PENDING" || charge.status === "OVERDUE")
+    .reduce((acc, charge) => acc + Number(charge.amountCents || 0), 0);
+
   const hasActiveFilters =
     Boolean(query) ||
     statusFilter !== "ALL" ||
@@ -298,9 +413,7 @@ export default function FinancesPage() {
 
   const errorMessage =
     getErrorMessage(chargesQuery.error, "") ||
-    (!isServiceOrderScoped
-      ? getErrorMessage(statsQuery.error, "")
-      : "") ||
+    (!isServiceOrderScoped ? getErrorMessage(statsQuery.error, "") : "") ||
     "Não foi possível carregar o financeiro agora.";
 
   if (isInitializing) {
@@ -362,22 +475,24 @@ export default function FinancesPage() {
         }}
       />
 
-      <div className="space-y-6">
+      <div className="space-y-6 p-6">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-3xl font-bold">
+            <h1 className="flex items-center gap-2 text-3xl font-bold">
+              <Wallet className="h-7 w-7 text-orange-500" />
               {isServiceOrderScoped ? "Cobrança da O.S." : "Financeiro"}
             </h1>
             <p className="text-gray-600 dark:text-gray-400">
               {isServiceOrderScoped
-                ? "Visualização financeira vinculada a uma ordem de serviço."
-                : "Gestão de cobranças e receitas"}
+                ? "Leitura financeira vinculada a uma ordem de serviço específica."
+                : "Gestão de cobranças, atrasos, recebimentos e fechamento financeiro."}
             </p>
           </div>
 
           <div className="flex flex-wrap gap-2">
             {isServiceOrderScoped ? (
               <Button variant="outline" onClick={handleBackToServiceOrders}>
+                <ArrowRightLeft className="mr-2 h-4 w-4" />
                 Voltar para ordens de serviço
               </Button>
             ) : null}
@@ -423,68 +538,34 @@ export default function FinancesPage() {
         ) : null}
 
         {!isServiceOrderScoped && stats && (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Total de Cobranças
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-blue-600">
-                  {stats.totalCharges}
-                </div>
-                <p className="mt-1 text-xs text-gray-500">Todas as cobranças</p>
-              </CardContent>
-            </Card>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <MetricCard
+              title="Total de cobranças"
+              value={stats.totalCharges}
+              subtitle="Base financeira registrada"
+              icon={Receipt}
+            />
 
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Cobranças Pagas
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">
-                  {formatMoney(Number(stats.totalPaidAmount || 0))}
-                </div>
-                <p className="mt-1 text-xs text-gray-500">
-                  {stats.totalPaid} cobranças
-                </p>
-              </CardContent>
-            </Card>
+            <MetricCard
+              title="Recebido"
+              value={formatMoney(Number(stats.totalPaidAmount || 0))}
+              subtitle={`${stats.totalPaid} cobranças pagas`}
+              icon={BadgeDollarSign}
+            />
 
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Cobranças Pendentes
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-yellow-600">
-                  {formatMoney(Number(stats.totalPendingAmount || 0))}
-                </div>
-                <p className="mt-1 text-xs text-gray-500">
-                  {stats.totalPending} cobranças
-                </p>
-              </CardContent>
-            </Card>
+            <MetricCard
+              title="Em aberto"
+              value={formatMoney(Number(stats.totalPendingAmount || 0))}
+              subtitle={`${stats.totalPending} cobranças pendentes`}
+              icon={Wallet}
+            />
 
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Cobranças Vencidas
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-red-600">
-                  {formatMoney(Number(stats.totalOverdueAmount || 0))}
-                </div>
-                <p className="mt-1 text-xs text-gray-500">
-                  {stats.totalOverdue} cobranças
-                </p>
-              </CardContent>
-            </Card>
+            <MetricCard
+              title="Em atraso"
+              value={formatMoney(Number(stats.totalOverdueAmount || 0))}
+              subtitle={`${stats.totalOverdue} cobranças vencidas`}
+              icon={AlertCircle}
+            />
           </div>
         )}
 
@@ -494,15 +575,13 @@ export default function FinancesPage() {
               <div className="flex items-center gap-2">
                 <AlertCircle className="h-5 w-5 text-red-600" />
                 <CardTitle className="text-red-900 dark:text-red-400">
-                  {stats.totalOverdue} Cobranças Vencidas
+                  {stats.totalOverdue} cobranças vencidas exigem ação
                 </CardTitle>
               </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-red-800 dark:text-red-300">
+              <CardDescription className="text-red-800 dark:text-red-300">
                 Total em atraso: {formatMoney(Number(stats.totalOverdueAmount || 0))}
-              </p>
-            </CardContent>
+              </CardDescription>
+            </CardHeader>
           </Card>
         )}
 
@@ -510,14 +589,17 @@ export default function FinancesPage() {
           <CardHeader className="space-y-4">
             <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
               <div>
-                <CardTitle>Cobranças</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <Receipt className="h-5 w-5 text-orange-500" />
+                  Cobranças
+                </CardTitle>
                 <CardDescription>
                   Página {pagination.page} de {pagination.pages}
                 </CardDescription>
               </div>
 
               <div className="text-sm text-gray-500">
-                Exibidas: {charges.length} • Pagas nesta página: {paidCount}
+                Exibidas: {charges.length} • Pagas: {paidCount} • Pendentes: {pendingCount} • Vencidas: {overdueCount}
               </div>
             </div>
 
@@ -585,124 +667,169 @@ export default function FinancesPage() {
             )}
           </CardHeader>
 
-          <CardContent>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/40">
+                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  Valor pendente na página
+                </p>
+                <p className="mt-1 text-xl font-semibold text-gray-900 dark:text-white">
+                  {formatCurrencyFromCents(pendingAmountOnPage)}
+                </p>
+              </div>
+
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/40">
+                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  Recebimentos nesta página
+                </p>
+                <p className="mt-1 text-xl font-semibold text-gray-900 dark:text-white">
+                  {paidCount}
+                </p>
+              </div>
+
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/40">
+                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  Estado predominante
+                </p>
+                <p className="mt-1 text-xl font-semibold text-gray-900 dark:text-white">
+                  {overdueCount > 0
+                    ? "Atrasos visíveis"
+                    : pendingCount > 0
+                      ? "Em cobrança"
+                      : paidCount > 0
+                        ? "Recebimentos fechando"
+                        : "Sem leitura relevante"}
+                </p>
+              </div>
+            </div>
+
             {charges.length > 0 ? (
               <div className="space-y-4">
-                {charges.map((charge) => (
-                  <div
-                    key={charge.id}
-                    className="rounded-lg border p-4 transition hover:bg-gray-50 dark:hover:bg-gray-800/50"
-                  >
-                    <div className="mb-3 flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-gray-900 dark:text-white">
-                          {charge.notes?.trim() ||
-                            charge.serviceOrder?.title ||
-                            `Cobrança #${charge.id.slice(0, 8)}`}
-                        </h3>
-                        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                          Cliente: {charge.customer?.name || "N/A"}
-                        </p>
-                        {charge.serviceOrder?.title ? (
-                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                            O.S.: {charge.serviceOrder.title}
-                          </p>
-                        ) : null}
-                      </div>
+                {charges.map((charge) => {
+                  const stage = getChargeStage(charge);
+                  const StageIcon = stage.icon;
 
-                      <Badge className={getStatusColor(charge.status)}>
-                        {getStatusLabel(charge.status)}
-                      </Badge>
-                    </div>
+                  return (
+                    <div
+                      key={charge.id}
+                      className="rounded-xl border border-gray-200 bg-white p-4 transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-800"
+                    >
+                      <div className="flex flex-col gap-4">
+                        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h3 className="truncate text-base font-semibold text-gray-900 dark:text-white">
+                                {charge.notes?.trim() ||
+                                  charge.serviceOrder?.title ||
+                                  `Cobrança #${charge.id.slice(0, 8)}`}
+                              </h3>
 
-                    <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
-                      <div>
-                        <p className="text-gray-600 dark:text-gray-400">Valor</p>
-                        <p className="font-semibold text-gray-900 dark:text-white">
-                          {formatMoney(Number(charge.amountCents || 0) / 100)}
-                        </p>
-                      </div>
+                              <Badge className={getStatusColor(charge.status)}>
+                                {getStatusLabel(charge.status)}
+                              </Badge>
+                            </div>
 
-                      <div>
-                        <p className="text-gray-600 dark:text-gray-400">Vencimento</p>
-                        <p className="font-semibold text-gray-900 dark:text-white">
-                          {charge.dueDate
-                            ? new Date(charge.dueDate).toLocaleDateString("pt-BR")
-                            : "N/A"}
-                        </p>
-                      </div>
+                            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                              Cliente: {charge.customer?.name || "N/A"}
+                            </p>
 
-                      <div>
-                        <p className="text-gray-600 dark:text-gray-400">Criada em</p>
-                        <p className="font-semibold text-gray-900 dark:text-white">
-                          {charge.createdAt
-                            ? new Date(charge.createdAt).toLocaleDateString("pt-BR")
-                            : "N/A"}
-                        </p>
-                      </div>
+                            {charge.serviceOrder?.title ? (
+                              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                O.S. vinculada: {charge.serviceOrder.title}
+                              </p>
+                            ) : (
+                              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                Cobrança manual sem O.S. vinculada
+                              </p>
+                            )}
+                          </div>
 
-                      {charge.paidAt ? (
-                        <div>
-                          <p className="text-gray-600 dark:text-gray-400">Pagamento</p>
-                          <p className="font-semibold text-green-600">
-                            {new Date(charge.paidAt).toLocaleDateString("pt-BR")}
-                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            {(charge.status === "PENDING" || charge.status === "OVERDUE") && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  onClick={() => void generateCheckout(charge)}
+                                  disabled={isSubmitting}
+                                  variant="outline"
+                                >
+                                  <CreditCard className="mr-2 h-4 w-4" />
+                                  Gerar checkout
+                                </Button>
+
+                                <Button
+                                  size="sm"
+                                  onClick={() => void registerPayment(charge, "PIX")}
+                                  disabled={isSubmitting}
+                                  className="bg-green-600 text-white hover:bg-green-700"
+                                >
+                                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                                  Registrar pagamento
+                                </Button>
+                              </>
+                            )}
+
+                            {charge.status !== "PAID" && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setEditChargeId(String(charge.id))}
+                                disabled={isSubmitting}
+                              >
+                                <Pencil className="mr-2 h-4 w-4" />
+                                Editar
+                              </Button>
+                            )}
+
+                            {charge.status !== "PAID" && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => void handleDeleteCharge(charge)}
+                                disabled={isSubmitting}
+                                className="text-red-600 hover:text-red-700"
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Excluir
+                              </Button>
+                            )}
+                          </div>
                         </div>
-                      ) : null}
+
+                        <div className={`rounded-lg border p-3 ${stage.className}`}>
+                          <div className="flex items-start gap-2">
+                            <StageIcon className="mt-0.5 h-4 w-4 shrink-0" />
+                            <div>
+                              <p className="text-sm font-semibold">{stage.label}</p>
+                              <p className="mt-1 text-xs opacity-90">
+                                {stage.description}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                          <InfoItem
+                            label="Valor"
+                            value={formatCurrencyFromCents(charge.amountCents)}
+                          />
+                          <InfoItem
+                            label="Vencimento"
+                            value={formatDate(charge.dueDate)}
+                          />
+                          <InfoItem
+                            label="Criada em"
+                            value={formatDate(charge.createdAt)}
+                          />
+                          <InfoItem
+                            label="Pagamento"
+                            value={formatDate(charge.paidAt)}
+                          />
+                        </div>
+                      </div>
                     </div>
-
-                    <div className="mt-4 flex flex-wrap gap-2 border-t pt-4">
-                      {(charge.status === "PENDING" || charge.status === "OVERDUE") && (
-                        <>
-                          <Button
-                            size="sm"
-                            onClick={() => void generateCheckout(charge)}
-                            disabled={isSubmitting}
-                            variant="outline"
-                          >
-                            <CreditCard className="mr-2 h-4 w-4" />
-                            Gerar checkout
-                          </Button>
-
-                          <Button
-                            size="sm"
-                            onClick={() => void registerPayment(charge, "PIX")}
-                            disabled={isSubmitting}
-                            className="bg-green-600 text-white hover:bg-green-700"
-                          >
-                            <CheckCircle2 className="mr-2 h-4 w-4" />
-                            Registrar pagamento
-                          </Button>
-                        </>
-                      )}
-
-                      {charge.status !== "PAID" && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setEditChargeId(String(charge.id))}
-                          disabled={isSubmitting}
-                        >
-                          <Pencil className="mr-2 h-4 w-4" />
-                          Editar
-                        </Button>
-                      )}
-
-                      {charge.status !== "PAID" && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => void handleDeleteCharge(charge)}
-                          disabled={isSubmitting}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Excluir
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
 
                 <div className="mt-6 flex items-center justify-between border-t pt-4">
                   <Button
