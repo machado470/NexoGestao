@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import {
   Search,
@@ -17,28 +17,22 @@ interface SearchResult {
   type: "customer" | "appointment" | "serviceOrder" | "charge";
   title: string;
   subtitle?: string;
-  icon: React.ReactNode;
   route: string;
 }
 
-function formatCurrencyFromCharge(charge: any) {
-  const cents = Number(charge?.amountCents ?? 0);
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  }).format(cents / 100);
-}
-
-function normalizeArrayPayload(payload: any) {
-  if (Array.isArray(payload)) return payload;
-  if (Array.isArray(payload?.data)) return payload.data;
-  if (Array.isArray(payload?.data?.items)) return payload.data.items;
-  if (Array.isArray(payload?.items)) return payload.items;
-  return [];
-}
-
-function includesTerm(value: unknown, searchTerm: string) {
-  return String(value ?? "").toLowerCase().includes(searchTerm);
+function getResultIcon(type: SearchResult["type"]) {
+  switch (type) {
+    case "customer":
+      return <Users className="h-4 w-4" />;
+    case "appointment":
+      return <Calendar className="h-4 w-4" />;
+    case "serviceOrder":
+      return <Briefcase className="h-4 w-4" />;
+    case "charge":
+      return <DollarSign className="h-4 w-4" />;
+    default:
+      return <Search className="h-4 w-4" />;
+  }
 }
 
 export function GlobalSearch() {
@@ -47,36 +41,17 @@ export function GlobalSearch() {
 
   const [, navigate] = useLocation();
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
-  const [results, setResults] = useState<SearchResult[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
 
-  const customersQuery = trpc.nexo.customers.list.useQuery(undefined, {
-    enabled: false,
-    retry: false,
-    refetchOnWindowFocus: false,
-  });
-
-  const appointmentsQuery = trpc.nexo.appointments.list.useQuery(undefined, {
-    enabled: false,
-    retry: false,
-    refetchOnWindowFocus: false,
-  });
-
-  const serviceOrdersQuery = trpc.nexo.serviceOrders.list.useQuery(
-    { page: 1, limit: 100 },
+  const globalSearchQuery = trpc.nexo.globalSearch.search.useQuery(
     {
-      enabled: false,
-      retry: false,
-      refetchOnWindowFocus: false,
-    }
-  );
-
-  const chargesQuery = trpc.finance.charges.list.useQuery(
-    { page: 1, limit: 100 },
+      query: debouncedQuery,
+      limit: 8,
+    },
     {
-      enabled: false,
+      enabled: canQuery && debouncedQuery.trim().length >= 2,
       retry: false,
       refetchOnWindowFocus: false,
     }
@@ -84,156 +59,23 @@ export function GlobalSearch() {
 
   useEffect(() => {
     if (!canQuery) {
-      setResults([]);
-      setIsSearching(false);
+      setDebouncedQuery("");
       return;
     }
 
     const trimmed = query.trim();
+
     if (trimmed.length < 2) {
-      setResults([]);
-      setIsSearching(false);
+      setDebouncedQuery("");
       return;
     }
 
-    let cancelled = false;
-    const searchTerm = trimmed.toLowerCase();
-
-    setIsSearching(true);
-
-    void Promise.all([
-      customersQuery.refetch(),
-      appointmentsQuery.refetch(),
-      serviceOrdersQuery.refetch(),
-      chargesQuery.refetch(),
-    ])
-      .then(([customers, appointments, serviceOrders, charges]) => {
-        if (cancelled) return;
-
-        const foundResults: SearchResult[] = [];
-        const seen = new Set<string>();
-
-        const customersList = normalizeArrayPayload(customers.data);
-        const appointmentsList = normalizeArrayPayload(appointments.data);
-        const serviceOrdersList = normalizeArrayPayload(serviceOrders.data);
-        const chargesList = normalizeArrayPayload(charges.data);
-
-        customersList.forEach((customer: any) => {
-          const matches =
-            includesTerm(customer?.name, searchTerm) ||
-            includesTerm(customer?.email, searchTerm) ||
-            includesTerm(customer?.phone, searchTerm) ||
-            includesTerm(customer?.notes, searchTerm);
-
-          if (!matches) return;
-
-          const key = `customer-${customer.id}`;
-          if (seen.has(key)) return;
-          seen.add(key);
-
-          foundResults.push({
-            id: customer.id,
-            type: "customer",
-            title: customer.name || "Cliente",
-            subtitle: customer.email || customer.phone || "Cliente",
-            icon: <Users className="h-4 w-4" />,
-            route: `/customers?customerId=${customer.id}`,
-          });
-        });
-
-        appointmentsList.forEach((appointment: any) => {
-          const matches =
-            includesTerm(appointment?.customer?.name, searchTerm) ||
-            includesTerm(appointment?.customer?.phone, searchTerm) ||
-            includesTerm(appointment?.notes, searchTerm) ||
-            includesTerm(appointment?.status, searchTerm);
-
-          if (!matches) return;
-
-          const key = `appointment-${appointment.id}`;
-          if (seen.has(key)) return;
-          seen.add(key);
-
-          foundResults.push({
-            id: appointment.id,
-            type: "appointment",
-            title: appointment?.customer?.name || "Agendamento",
-            subtitle: appointment?.startsAt
-              ? new Date(appointment.startsAt).toLocaleDateString("pt-BR")
-              : appointment?.status || "Sem data",
-            icon: <Calendar className="h-4 w-4" />,
-            route: `/appointments?appointmentId=${appointment.id}`,
-          });
-        });
-
-        serviceOrdersList.forEach((serviceOrder: any) => {
-          const matches =
-            includesTerm(serviceOrder?.title, searchTerm) ||
-            includesTerm(serviceOrder?.status, searchTerm) ||
-            includesTerm(serviceOrder?.customer?.name, searchTerm) ||
-            includesTerm(serviceOrder?.notes, searchTerm);
-
-          if (!matches) return;
-
-          const key = `serviceOrder-${serviceOrder.id}`;
-          if (seen.has(key)) return;
-          seen.add(key);
-
-          foundResults.push({
-            id: serviceOrder.id,
-            type: "serviceOrder",
-            title: serviceOrder.title || "Ordem de serviço",
-            subtitle:
-              serviceOrder?.customer?.name ||
-              serviceOrder?.status ||
-              "Sem status",
-            icon: <Briefcase className="h-4 w-4" />,
-            route: `/service-orders?serviceOrderId=${serviceOrder.id}`,
-          });
-        });
-
-        chargesList.forEach((charge: any) => {
-          const matches =
-            includesTerm(charge?.notes, searchTerm) ||
-            includesTerm(charge?.status, searchTerm) ||
-            includesTerm(charge?.customer?.name, searchTerm) ||
-            includesTerm(charge?.customer?.phone, searchTerm) ||
-            includesTerm(charge?.serviceOrder?.title, searchTerm) ||
-            includesTerm(charge?.id, searchTerm);
-
-          if (!matches) return;
-
-          const key = `charge-${charge.id}`;
-          if (seen.has(key)) return;
-          seen.add(key);
-
-          foundResults.push({
-            id: charge.id,
-            type: "charge",
-            title:
-              charge?.serviceOrder?.title ||
-              charge?.customer?.name ||
-              "Cobrança",
-            subtitle: `${formatCurrencyFromCharge(charge)} • ${
-              charge?.status || "Sem status"
-            }`,
-            icon: <DollarSign className="h-4 w-4" />,
-            route: `/finances?chargeId=${charge.id}`,
-          });
-        });
-
-        setResults(foundResults.slice(0, 8));
-        setIsSearching(false);
-      })
-      .catch((error) => {
-        if (cancelled) return;
-        console.error("Erro ao buscar resultados de pesquisa:", error);
-        setResults([]);
-        setIsSearching(false);
-      });
+    const timeout = window.setTimeout(() => {
+      setDebouncedQuery(trimmed);
+    }, 250);
 
     return () => {
-      cancelled = true;
+      window.clearTimeout(timeout);
     };
   }, [canQuery, query]);
 
@@ -248,14 +90,25 @@ export function GlobalSearch() {
     }
 
     document.addEventListener("mousedown", handleClickOutside);
-    return () =>
+
+    return () => {
       document.removeEventListener("mousedown", handleClickOutside);
+    };
   }, []);
+
+  const results = Array.isArray(globalSearchQuery.data)
+    ? globalSearchQuery.data
+    : [];
+
+  const isSearching =
+    canQuery &&
+    query.trim().length >= 2 &&
+    (globalSearchQuery.isLoading || globalSearchQuery.isFetching);
 
   const handleSelectResult = (result: SearchResult) => {
     navigate(result.route);
     setQuery("");
-    setResults([]);
+    setDebouncedQuery("");
     setIsOpen(false);
   };
 
@@ -286,7 +139,8 @@ export function GlobalSearch() {
             type="button"
             onClick={() => {
               setQuery("");
-              setResults([]);
+              setDebouncedQuery("");
+              setIsOpen(false);
             }}
             className="absolute right-3 top-1/2 -translate-y-1/2 transform text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
           >
@@ -312,7 +166,7 @@ export function GlobalSearch() {
                   className="flex w-full items-center gap-3 border-b border-gray-100 px-4 py-3 text-left transition-colors hover:bg-gray-50 last:border-b-0 dark:border-gray-700 dark:hover:bg-gray-700"
                 >
                   <div className="flex-shrink-0 text-gray-400 dark:text-gray-600">
-                    {result.icon}
+                    {getResultIcon(result.type)}
                   </div>
 
                   <div className="min-w-0 flex-1">

@@ -26,6 +26,14 @@ type GenerateChargeResponse = {
   chargeId?: string;
 };
 
+type GlobalSearchResult = {
+  id: string;
+  type: "customer" | "appointment" | "serviceOrder" | "charge";
+  title: string;
+  subtitle?: string;
+  route: string;
+};
+
 function getTokenFromCookie(ctx: CtxLike): string | null {
   const raw = ctx?.req?.headers?.cookie;
   if (!raw || typeof raw !== "string") return null;
@@ -151,6 +159,27 @@ function normalizeGenerateChargeResult(payload: any): GenerateChargeResponse {
   };
 }
 
+function normalizeArrayPayload(payload: any) {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.data)) return payload.data;
+  if (Array.isArray(payload?.data?.items)) return payload.data.items;
+  if (Array.isArray(payload?.items)) return payload.items;
+  return [];
+}
+
+function includesTerm(value: unknown, searchTerm: string) {
+  return String(value ?? "").toLowerCase().includes(searchTerm);
+}
+
+function formatCurrencyFromCharge(charge: any) {
+  const cents = Number(charge?.amountCents ?? 0);
+
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(cents / 100);
+}
+
 async function nexoFetch(path: string, options: RequestInit = {}) {
   const url = `${NEXO_API_URL}${path}`;
 
@@ -217,6 +246,178 @@ async function authedDelete(ctx: CtxLike, path: string) {
   return authedFetch(ctx, path, {
     method: "DELETE",
   });
+}
+
+async function searchCustomers(
+  ctx: CtxLike,
+  searchTerm: string,
+  limit: number,
+  seen: Set<string>
+): Promise<GlobalSearchResult[]> {
+  const payload = await authedGet(ctx, "/customers");
+  const list = normalizeArrayPayload(payload);
+  const results: GlobalSearchResult[] = [];
+
+  list.forEach((customer: any) => {
+    const matches =
+      includesTerm(customer?.name, searchTerm) ||
+      includesTerm(customer?.email, searchTerm) ||
+      includesTerm(customer?.phone, searchTerm) ||
+      includesTerm(customer?.notes, searchTerm);
+
+    if (!matches) return;
+
+    const id = String(customer?.id ?? "").trim();
+    if (!id) return;
+
+    const key = `customer-${id}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+
+    results.push({
+      id,
+      type: "customer",
+      title: customer?.name || "Cliente",
+      subtitle: customer?.email || customer?.phone || "Cliente",
+      route: `/customers?customerId=${id}`,
+    });
+  });
+
+  return results.slice(0, limit);
+}
+
+async function searchAppointments(
+  ctx: CtxLike,
+  searchTerm: string,
+  limit: number,
+  seen: Set<string>
+): Promise<GlobalSearchResult[]> {
+  const payload = await authedGet(ctx, "/appointments");
+  const list = normalizeArrayPayload(payload);
+  const results: GlobalSearchResult[] = [];
+
+  list.forEach((appointment: any) => {
+    const matches =
+      includesTerm(appointment?.customer?.name, searchTerm) ||
+      includesTerm(appointment?.customer?.phone, searchTerm) ||
+      includesTerm(appointment?.notes, searchTerm) ||
+      includesTerm(appointment?.status, searchTerm);
+
+    if (!matches) return;
+
+    const id = String(appointment?.id ?? "").trim();
+    if (!id) return;
+
+    const key = `appointment-${id}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+
+    results.push({
+      id,
+      type: "appointment",
+      title: appointment?.customer?.name || "Agendamento",
+      subtitle: appointment?.startsAt
+        ? new Date(appointment.startsAt).toLocaleDateString("pt-BR")
+        : appointment?.status || "Sem data",
+      route: `/appointments?appointmentId=${id}`,
+    });
+  });
+
+  return results.slice(0, limit);
+}
+
+async function searchServiceOrders(
+  ctx: CtxLike,
+  searchTerm: string,
+  limit: number,
+  seen: Set<string>
+): Promise<GlobalSearchResult[]> {
+  const payload = await authedGet(ctx, "/service-orders", {
+    page: 1,
+    limit: 100,
+  });
+
+  const list = normalizeArrayPayload(payload);
+  const results: GlobalSearchResult[] = [];
+
+  list.forEach((serviceOrder: any) => {
+    const matches =
+      includesTerm(serviceOrder?.title, searchTerm) ||
+      includesTerm(serviceOrder?.status, searchTerm) ||
+      includesTerm(serviceOrder?.customer?.name, searchTerm) ||
+      includesTerm(serviceOrder?.notes, searchTerm);
+
+    if (!matches) return;
+
+    const id = String(serviceOrder?.id ?? "").trim();
+    if (!id) return;
+
+    const key = `serviceOrder-${id}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+
+    results.push({
+      id,
+      type: "serviceOrder",
+      title: serviceOrder?.title || "Ordem de serviço",
+      subtitle:
+        serviceOrder?.customer?.name ||
+        serviceOrder?.status ||
+        "Sem status",
+      route: `/service-orders?serviceOrderId=${id}`,
+    });
+  });
+
+  return results.slice(0, limit);
+}
+
+async function searchCharges(
+  ctx: CtxLike,
+  searchTerm: string,
+  limit: number,
+  seen: Set<string>
+): Promise<GlobalSearchResult[]> {
+  const payload = await authedGet(ctx, "/charges", {
+    page: 1,
+    limit: 100,
+  });
+
+  const list = normalizeArrayPayload(payload);
+  const results: GlobalSearchResult[] = [];
+
+  list.forEach((charge: any) => {
+    const matches =
+      includesTerm(charge?.notes, searchTerm) ||
+      includesTerm(charge?.status, searchTerm) ||
+      includesTerm(charge?.customer?.name, searchTerm) ||
+      includesTerm(charge?.customer?.phone, searchTerm) ||
+      includesTerm(charge?.serviceOrder?.title, searchTerm) ||
+      includesTerm(charge?.id, searchTerm);
+
+    if (!matches) return;
+
+    const id = String(charge?.id ?? "").trim();
+    if (!id) return;
+
+    const key = `charge-${id}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+
+    results.push({
+      id,
+      type: "charge",
+      title:
+        charge?.serviceOrder?.title ||
+        charge?.customer?.name ||
+        "Cobrança",
+      subtitle: `${formatCurrencyFromCharge(charge)} • ${
+        charge?.status || "Sem status"
+      }`,
+      route: `/finances?chargeId=${id}`,
+    });
+  });
+
+  return results.slice(0, limit);
 }
 
 const idInput = z.object({ id: z.string().min(1) });
@@ -314,6 +515,34 @@ export const nexoProxyRouter = router({
           method: "POST",
           body: JSON.stringify(input),
         });
+      }),
+  }),
+
+  globalSearch: router({
+    search: protectedProcedure
+      .input(
+        z.object({
+          query: z.string().trim().min(2),
+          limit: z.number().int().min(1).max(20).optional(),
+        })
+      )
+      .query(async ({ input, ctx }) => {
+        const searchTerm = input.query.trim().toLowerCase();
+        const limit = input.limit ?? 8;
+        const seen = new Set<string>();
+
+        const [customers, appointments, serviceOrders, charges] =
+          await Promise.all([
+            searchCustomers(ctx as CtxLike, searchTerm, limit, seen),
+            searchAppointments(ctx as CtxLike, searchTerm, limit, seen),
+            searchServiceOrders(ctx as CtxLike, searchTerm, limit, seen),
+            searchCharges(ctx as CtxLike, searchTerm, limit, seen),
+          ]);
+
+        return [...customers, ...appointments, ...serviceOrders, ...charges].slice(
+          0,
+          limit
+        );
       }),
   }),
 
