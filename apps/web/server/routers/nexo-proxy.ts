@@ -377,7 +377,7 @@ async function searchCharges(
   limit: number,
   seen: Set<string>
 ): Promise<GlobalSearchResult[]> {
-  const payload = await authedGet(ctx, "/charges", {
+  const payload = await authedGet(ctx, "/finance/charges", {
     page: 1,
     limit: 100,
   });
