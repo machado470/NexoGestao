@@ -1,41 +1,42 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
-import { SubscriptionsService } from '../subscriptions/subscriptions.service'
 
 @Injectable()
 export class OrganizationSettingsService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly subscriptionsService: SubscriptionsService,
-  ) {}
+  private readonly logger = new Logger(OrganizationSettingsService.name)
+
+  constructor(private readonly prisma: PrismaService) {}
 
   async getOrganizationSettings(orgId: string) {
-    const organization = await this.prisma.organization.findUnique({
-      where: { id: orgId },
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        timezone: true,
-        currency: true,
-      },
-    })
+    try {
+      const organization = await this.prisma.organization.findUnique({
+        where: { id: orgId },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          timezone: true,
+          currency: true,
+        },
+      })
 
-    if (!organization) {
-      throw new NotFoundException('Organização não encontrada.')
-    }
+      if (!organization) {
+        throw new NotFoundException('Organização não encontrada.')
+      }
 
-    const subscription =
-      await this.subscriptionsService.getOrganizationSubscription(orgId)
-
-    const membersCount = await this.prisma.user.count({
-      where: { orgId },
-    })
-
-    return {
-      ...organization,
-      currentPlan: subscription?.plan?.name || 'Nenhum',
-      membersCount,
+      return {
+        ...organization,
+        currentPlan: 'Nenhum',
+        membersCount: 0,
+      }
+    } catch (error) {
+      this.logger.error(
+        `Erro ao buscar configurações da organização ${orgId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        error instanceof Error ? error.stack : undefined,
+      )
+      throw error
     }
   }
 
@@ -43,33 +44,36 @@ export class OrganizationSettingsService {
     orgId: string,
     data: { name?: string; timezone?: string; currency?: string },
   ) {
-    const organization = await this.prisma.organization.update({
-      where: { id: orgId },
-      data: {
-        ...(data.name ? { name: data.name } : {}),
-        ...(data.timezone ? { timezone: data.timezone } : {}),
-        ...(data.currency ? { currency: data.currency } : {}),
-      },
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        timezone: true,
-        currency: true,
-      },
-    })
+    try {
+      const organization = await this.prisma.organization.update({
+        where: { id: orgId },
+        data: {
+          ...(data.name ? { name: data.name } : {}),
+          ...(data.timezone ? { timezone: data.timezone } : {}),
+          ...(data.currency ? { currency: data.currency } : {}),
+        },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          timezone: true,
+          currency: true,
+        },
+      })
 
-    const subscription =
-      await this.subscriptionsService.getOrganizationSubscription(orgId)
-
-    const membersCount = await this.prisma.user.count({
-      where: { orgId },
-    })
-
-    return {
-      ...organization,
-      currentPlan: subscription?.plan?.name || 'Nenhum',
-      membersCount,
+      return {
+        ...organization,
+        currentPlan: 'Nenhum',
+        membersCount: 0,
+      }
+    } catch (error) {
+      this.logger.error(
+        `Erro ao atualizar configurações da organização ${orgId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        error instanceof Error ? error.stack : undefined,
+      )
+      throw error
     }
   }
 }

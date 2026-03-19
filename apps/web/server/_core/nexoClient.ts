@@ -9,7 +9,7 @@ function getNexoTokenFromReq(req: any): string | null {
 
   const parsed = cookie.parse(raw);
   const token = parsed?.[NEXO_TOKEN_COOKIE];
-  return token || null;
+  return typeof token === "string" && token.trim().length > 0 ? token : null;
 }
 
 function extractErrorMessage(body: any, status: number): string {
@@ -50,11 +50,6 @@ export class NexoHttpError extends Error {
   }
 }
 
-/**
- * Faz fetch pro Nest com Bearer token vindo do cookie httpOnly (nexo_token).
- * - Se não tiver token, retorna null (pra rotas que aceitam anon).
- * - Se tiver token mas API falhar, lança NexoHttpError com a mensagem real.
- */
 export async function nexoFetch<T>(
   req: any,
   path: string,
@@ -64,7 +59,7 @@ export async function nexoFetch<T>(
 
   if (!token) {
     if (init?.allowAnonymous) return null;
-    return null;
+    throw new NexoHttpError(401, { message: "Não autenticado" });
   }
 
   const res = await fetch(`${NEXO_API_URL}${path}`, {

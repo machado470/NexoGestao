@@ -31,10 +31,11 @@ function getTokenFromCookie(ctx: CtxLike): string | null {
   if (!raw || typeof raw !== "string") return null;
 
   const parsed = cookie.parse(raw);
-  return parsed?.[NEXO_TOKEN_COOKIE] || null;
+  const token = parsed?.[NEXO_TOKEN_COOKIE];
+  return typeof token === "string" && token.trim().length > 0 ? token : null;
 }
 
-function getAuthHeader(ctx: CtxLike): string | null {
+function getAuthHeader(ctx: CtxLike): string {
   const header = ctx?.req?.headers?.authorization;
 
   if (typeof header === "string" && header.trim().length > 0) {
@@ -42,7 +43,12 @@ function getAuthHeader(ctx: CtxLike): string | null {
   }
 
   const token = getTokenFromCookie(ctx);
-  return token ? `Bearer ${token}` : null;
+
+  if (!token) {
+    throw new Error("Não autenticado");
+  }
+
+  return `Bearer ${token}`;
 }
 
 function setTokenCookie(ctx: CtxLike, token: string) {
@@ -180,7 +186,7 @@ async function authedFetch(ctx: CtxLike, path: string, options: RequestInit = {}
     ...options,
     headers: {
       ...(options.headers || {}),
-      ...(authHeader ? { Authorization: authHeader } : {}),
+      Authorization: authHeader,
     },
   });
 }
@@ -312,29 +318,29 @@ export const nexoProxyRouter = router({
   }),
 
   customers: router({
-    list: publicProcedure.query(async ({ ctx }) => {
+    list: protectedProcedure.query(async ({ ctx }) => {
       return authedGet(ctx as CtxLike, "/customers");
     }),
 
-    getById: publicProcedure.input(idInput).query(async ({ input, ctx }) => {
+    getById: protectedProcedure.input(idInput).query(async ({ input, ctx }) => {
       return authedGet(ctx as CtxLike, `/customers/${input.id}`);
     }),
 
-    workspace: publicProcedure.input(idInput).query(async ({ input, ctx }) => {
+    workspace: protectedProcedure.input(idInput).query(async ({ input, ctx }) => {
       return authedGet(ctx as CtxLike, `/customers/${input.id}/workspace`);
     }),
 
-    create: publicProcedure.input(z.any()).mutation(async ({ input, ctx }) => {
+    create: protectedProcedure.input(z.any()).mutation(async ({ input, ctx }) => {
       return authedPost(ctx as CtxLike, "/customers", input);
     }),
 
-    update: publicProcedure.input(updateInput).mutation(async ({ input, ctx }) => {
+    update: protectedProcedure.input(updateInput).mutation(async ({ input, ctx }) => {
       return authedPatch(ctx as CtxLike, `/customers/${input.id}`, input.data);
     }),
   }),
 
   timeline: router({
-    listByCustomer: publicProcedure
+    listByCustomer: protectedProcedure
       .input(
         z.object({
           customerId: z.string().min(1),
@@ -349,29 +355,29 @@ export const nexoProxyRouter = router({
   }),
 
   appointments: router({
-    list: publicProcedure.input(z.any().optional()).query(async ({ input, ctx }) => {
+    list: protectedProcedure.input(z.any().optional()).query(async ({ input, ctx }) => {
       return authedGet(ctx as CtxLike, "/appointments", input ?? undefined);
     }),
 
-    getById: publicProcedure.input(idInput).query(async ({ input, ctx }) => {
+    getById: protectedProcedure.input(idInput).query(async ({ input, ctx }) => {
       return authedGet(ctx as CtxLike, `/appointments/${input.id}`);
     }),
 
-    create: publicProcedure.input(z.any()).mutation(async ({ input, ctx }) => {
+    create: protectedProcedure.input(z.any()).mutation(async ({ input, ctx }) => {
       return authedPost(ctx as CtxLike, "/appointments", input);
     }),
 
-    update: publicProcedure.input(updateInput).mutation(async ({ input, ctx }) => {
+    update: protectedProcedure.input(updateInput).mutation(async ({ input, ctx }) => {
       return authedPatch(ctx as CtxLike, `/appointments/${input.id}`, input.data);
     }),
 
-    delete: publicProcedure.input(idInput).mutation(async ({ input, ctx }) => {
+    delete: protectedProcedure.input(idInput).mutation(async ({ input, ctx }) => {
       return authedDelete(ctx as CtxLike, `/appointments/${input.id}`);
     }),
   }),
 
   serviceOrders: router({
-    list: publicProcedure.input(z.any().optional()).query(async ({ input, ctx }) => {
+    list: protectedProcedure.input(z.any().optional()).query(async ({ input, ctx }) => {
       const result = await authedGet(
         ctx as CtxLike,
         "/service-orders",
@@ -381,23 +387,23 @@ export const nexoProxyRouter = router({
       return normalizeServiceOrdersListResult(result);
     }),
 
-    getById: publicProcedure.input(idInput).query(async ({ input, ctx }) => {
+    getById: protectedProcedure.input(idInput).query(async ({ input, ctx }) => {
       return authedGet(ctx as CtxLike, `/service-orders/${input.id}`);
     }),
 
-    create: publicProcedure.input(z.any()).mutation(async ({ input, ctx }) => {
+    create: protectedProcedure.input(z.any()).mutation(async ({ input, ctx }) => {
       return authedPost(ctx as CtxLike, "/service-orders", input);
     }),
 
-    update: publicProcedure.input(updateInput).mutation(async ({ input, ctx }) => {
+    update: protectedProcedure.input(updateInput).mutation(async ({ input, ctx }) => {
       return authedPatch(ctx as CtxLike, `/service-orders/${input.id}`, input.data);
     }),
 
-    delete: publicProcedure.input(idInput).mutation(async ({ input, ctx }) => {
+    delete: protectedProcedure.input(idInput).mutation(async ({ input, ctx }) => {
       return authedDelete(ctx as CtxLike, `/service-orders/${input.id}`);
     }),
 
-    generateCharge: publicProcedure.input(idInput).mutation(async ({ input, ctx }) => {
+    generateCharge: protectedProcedure.input(idInput).mutation(async ({ input, ctx }) => {
       const result = await authedPost(
         ctx as CtxLike,
         `/service-orders/${input.id}/generate-charge`
@@ -408,17 +414,17 @@ export const nexoProxyRouter = router({
   }),
 
   whatsapp: router({
-    messages: publicProcedure
+    messages: protectedProcedure
       .input(z.object({ customerId: z.string().min(1) }))
       .query(async ({ input, ctx }) => {
         return authedGet(ctx as CtxLike, `/whatsapp/messages/${input.customerId}`);
       }),
 
-    send: publicProcedure.input(z.any()).mutation(async ({ input, ctx }) => {
+    send: protectedProcedure.input(z.any()).mutation(async ({ input, ctx }) => {
       return authedPost(ctx as CtxLike, "/whatsapp/messages", input);
     }),
 
-    updateStatus: publicProcedure
+    updateStatus: protectedProcedure
       .input(
         z.object({
           id: z.string().min(1),
@@ -435,7 +441,7 @@ export const nexoProxyRouter = router({
   }),
 
   onboarding: router({
-    complete: publicProcedure.mutation(async ({ ctx }) => {
+    complete: protectedProcedure.mutation(async ({ ctx }) => {
       return authedPost(ctx as CtxLike, "/onboarding/complete");
     }),
   }),

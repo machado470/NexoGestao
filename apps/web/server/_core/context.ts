@@ -18,9 +18,7 @@ export function getNexoTokenFromReq(req: any): string | null {
 
   const parsed = cookie.parse(raw);
   const token = parsed?.[NEXO_TOKEN_COOKIE];
-  if (!token) return null;
-
-  return token;
+  return typeof token === "string" && token.trim().length > 0 ? token : null;
 }
 
 export async function fetchNexoMe(req: any) {
@@ -35,12 +33,35 @@ export async function fetchNexoMe(req: any) {
       },
     });
 
-    if (!response.ok) return null;
+    const text = await response.text();
 
-    return await response.json();
+    let body: any = null;
+    try {
+      body = text ? JSON.parse(text) : null;
+    } catch {
+      body = text;
+    }
+
+    if (!response.ok) {
+      return null;
+    }
+
+    return body;
   } catch {
     return null;
   }
+}
+
+function extractUserFromMePayload(me: any) {
+  return (
+    me?.user ??
+    me?.data?.user ??
+    me?.data?.data?.user ??
+    me?.result?.data?.json?.user ??
+    me?.result?.data?.json?.data?.user ??
+    me?.result?.data?.json?.data?.data?.user ??
+    null
+  );
 }
 
 export async function createContext(
@@ -50,7 +71,7 @@ export async function createContext(
 
   try {
     const me = await fetchNexoMe(opts.req);
-    user = me?.user ?? me?.data?.user ?? null;
+    user = extractUserFromMePayload(me);
   } catch {
     user = null;
   }
