@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common'
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { TimelineService } from '../timeline/timeline.service'
 import { AuditService } from '../audit/audit.service'
@@ -6,6 +11,12 @@ import { AUDIT_ACTIONS } from '../audit/audit.actions'
 import { RequestContextService } from '../common/context/request-context.service'
 import { MetricsService } from '../common/metrics/metrics.service'
 import { FinanceService } from '../finance/finance.service'
+
+function normalizeText(value?: string | null): string | null {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  return trimmed ? trimmed : null
+}
 
 @Injectable()
 export class ExecutionService {
@@ -27,9 +38,11 @@ export class ExecutionService {
         id: true,
         orgId: true,
         customerId: true,
+        assignedToPersonId: true,
         status: true,
         title: true,
         description: true,
+        outcomeSummary: true,
         scheduledFor: true,
         startedAt: true,
         finishedAt: true,
@@ -50,10 +63,13 @@ export class ExecutionService {
         orgId: serviceOrder.orgId,
         serviceOrderId: serviceOrder.id,
         customerId: serviceOrder.customerId,
-        executorPersonId: null,
+        executorPersonId: serviceOrder.assignedToPersonId ?? null,
         startedAt: serviceOrder.startedAt,
         endedAt: serviceOrder.finishedAt,
-        notes: serviceOrder.description ?? null,
+        notes:
+          serviceOrder.outcomeSummary ??
+          serviceOrder.description ??
+          null,
         checklist: [],
         attachments: [],
         status: serviceOrder.status,
@@ -80,9 +96,12 @@ export class ExecutionService {
         id: true,
         orgId: true,
         customerId: true,
+        assignedToPersonId: true,
         status: true,
         startedAt: true,
         finishedAt: true,
+        description: true,
+        outcomeSummary: true,
         amountCents: true,
         dueDate: true,
         createdAt: true,
@@ -92,6 +111,35 @@ export class ExecutionService {
 
     if (!so) {
       throw new NotFoundException('ServiceOrder não encontrada')
+    }
+
+    if (so.status === 'CANCELED') {
+      throw new BadRequestException(
+        'Não é permitido iniciar execução de O.S. cancelada',
+      )
+    }
+
+    if (so.status === 'DONE') {
+      return {
+        id: so.id,
+        orgId: so.orgId,
+        serviceOrderId: so.id,
+        customerId: so.customerId,
+        executorPersonId:
+          input.executorPersonId ?? so.assignedToPersonId ?? null,
+        startedAt: so.startedAt,
+        endedAt: so.finishedAt,
+        notes: so.outcomeSummary ?? so.description ?? null,
+        checklist: input.checklist ?? [],
+        attachments: input.attachments ?? [],
+        status: so.status,
+        amountCents: so.amountCents ?? null,
+        dueDate: so.dueDate ?? null,
+        mode: 'service-order-fallback',
+        createdAt: so.createdAt,
+        updatedAt: so.updatedAt,
+        idempotent: true,
+      }
     }
 
     await this.prisma.serviceOrder.updateMany({
@@ -108,10 +156,12 @@ export class ExecutionService {
         id: true,
         orgId: true,
         customerId: true,
+        assignedToPersonId: true,
         status: true,
         startedAt: true,
         finishedAt: true,
         description: true,
+        outcomeSummary: true,
         amountCents: true,
         dueDate: true,
         createdAt: true,
@@ -123,21 +173,25 @@ export class ExecutionService {
       throw new NotFoundException('ServiceOrder não encontrada')
     }
 
+    const actorPersonId =
+      input.executorPersonId ?? updated.assignedToPersonId ?? null
+
     await this.timeline.log({
       orgId: input.orgId,
-      personId: input.executorPersonId ?? null,
+      personId: actorPersonId,
       action: 'EXECUTION_STARTED',
       description: 'Execução iniciada em modo fallback por ServiceOrder',
       metadata: {
         executionId: updated.id,
         serviceOrderId: updated.id,
         customerId: updated.customerId,
-        executorPersonId: input.executorPersonId ?? null,
-        notes: input.notes ?? null,
+        executorPersonId: actorPersonId,
+        notes: normalizeText(input.notes),
         checklist: input.checklist ?? [],
         attachments: input.attachments ?? [],
         amountCents: updated.amountCents ?? null,
         dueDate: updated.dueDate ?? null,
+        actorPersonId,
         fallbackMode: true,
       },
     })
@@ -145,15 +199,17 @@ export class ExecutionService {
     await this.audit.log({
       orgId: input.orgId,
       action: 'EXECUTION_STARTED',
-      actorPersonId: input.executorPersonId ?? null,
-      personId: input.executorPersonId ?? null,
+      actorPersonId,
+      personId: actorPersonId,
       entityType: 'SERVICE_ORDER',
       entityId: updated.id,
       context: 'Execution started (fallback)',
       metadata: {
         serviceOrderId: updated.id,
         customerId: updated.customerId,
-        notes: input.notes ?? null,
+        notes: normalizeText(input.notes),
+        checklist: input.checklist ?? [],
+        attachments: input.attachments ?? [],
         amountCents: updated.amountCents ?? null,
         dueDate: updated.dueDate ?? null,
         fallbackMode: true,
@@ -166,6 +222,7 @@ export class ExecutionService {
         orgId: input.orgId,
         serviceOrderId: updated.id,
         customerId: updated.customerId,
+        executorPersonId: actorPersonId,
       }),
     )
 
@@ -174,10 +231,10 @@ export class ExecutionService {
       orgId: updated.orgId,
       serviceOrderId: updated.id,
       customerId: updated.customerId,
-      executorPersonId: input.executorPersonId ?? null,
+      executorPersonId: actorPersonId,
       startedAt: updated.startedAt,
       endedAt: updated.finishedAt,
-      notes: input.notes ?? updated.description ?? null,
+      notes: normalizeText(input.notes) ?? updated.description ?? null,
       checklist: input.checklist ?? [],
       attachments: input.attachments ?? [],
       status: updated.status,
@@ -202,10 +259,12 @@ export class ExecutionService {
         id: true,
         orgId: true,
         customerId: true,
+        assignedToPersonId: true,
         status: true,
         startedAt: true,
         finishedAt: true,
         description: true,
+        outcomeSummary: true,
         amountCents: true,
         dueDate: true,
         createdAt: true,
@@ -217,17 +276,23 @@ export class ExecutionService {
       throw new NotFoundException('Execution não encontrada')
     }
 
+    if (existing.status === 'CANCELED') {
+      throw new BadRequestException(
+        'Não é permitido concluir execução de O.S. cancelada',
+      )
+    }
+
     const alreadyDone = existing.status === 'DONE'
+    const normalizedNotes = normalizeText(input.notes)
 
     if (!alreadyDone) {
       await this.prisma.serviceOrder.updateMany({
         where: { id: input.executionId, orgId: input.orgId },
         data: {
           status: 'DONE',
+          startedAt: existing.startedAt ?? new Date(),
           finishedAt: new Date(),
-          ...(typeof input.notes === 'string' && input.notes.trim()
-            ? { description: input.notes.trim() }
-            : {}),
+          ...(normalizedNotes ? { outcomeSummary: normalizedNotes } : {}),
         },
       })
     }
@@ -238,10 +303,12 @@ export class ExecutionService {
         id: true,
         orgId: true,
         customerId: true,
+        assignedToPersonId: true,
         status: true,
         startedAt: true,
         finishedAt: true,
         description: true,
+        outcomeSummary: true,
         amountCents: true,
         dueDate: true,
         createdAt: true,
@@ -256,9 +323,11 @@ export class ExecutionService {
     if (!alreadyDone) {
       const requestId = this.requestContext.requestId
       const userId = this.requestContext.userId
+      const actorPersonId = updated.assignedToPersonId ?? null
 
       await this.timeline.log({
         orgId: input.orgId,
+        personId: actorPersonId,
         action: 'EXECUTION_DONE',
         description: 'Execução concluída em modo fallback por ServiceOrder',
         metadata: {
@@ -266,11 +335,13 @@ export class ExecutionService {
           serviceOrderId: updated.id,
           customerId: updated.customerId,
           requestId,
-          notes: input.notes ?? null,
+          notes: normalizedNotes,
           checklist: input.checklist ?? [],
           attachments: input.attachments ?? [],
           amountCents: updated.amountCents ?? null,
           dueDate: updated.dueDate ?? null,
+          actorUserId: userId ?? null,
+          actorPersonId,
           fallbackMode: true,
         },
       })
@@ -279,6 +350,8 @@ export class ExecutionService {
         orgId: input.orgId,
         action: AUDIT_ACTIONS.EXECUTION_COMPLETED,
         actorUserId: userId,
+        actorPersonId,
+        personId: actorPersonId,
         entityType: 'SERVICE_ORDER',
         entityId: updated.id,
         context: 'Execution completed (fallback)',
@@ -286,6 +359,9 @@ export class ExecutionService {
           requestId,
           serviceOrderId: updated.id,
           customerId: updated.customerId,
+          notes: normalizedNotes,
+          checklist: input.checklist ?? [],
+          attachments: input.attachments ?? [],
           amountCents: updated.amountCents ?? null,
           dueDate: updated.dueDate ?? null,
           fallbackMode: true,
@@ -298,7 +374,7 @@ export class ExecutionService {
           serviceOrderId: updated.id,
           customerId: updated.customerId,
           actorUserId: userId ?? null,
-          actorPersonId: null,
+          actorPersonId,
           amountCents: updated.amountCents ?? undefined,
           dueDate: updated.dueDate ?? null,
         })
@@ -334,10 +410,14 @@ export class ExecutionService {
       orgId: updated.orgId,
       serviceOrderId: updated.id,
       customerId: updated.customerId,
-      executorPersonId: null,
+      executorPersonId: updated.assignedToPersonId ?? null,
       startedAt: updated.startedAt,
       endedAt: updated.finishedAt,
-      notes: input.notes ?? updated.description ?? null,
+      notes:
+        normalizedNotes ??
+        updated.outcomeSummary ??
+        updated.description ??
+        null,
       checklist: input.checklist ?? [],
       attachments: input.attachments ?? [],
       status: updated.status,

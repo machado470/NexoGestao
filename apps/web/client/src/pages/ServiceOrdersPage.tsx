@@ -26,6 +26,11 @@ import {
   CreditCard,
   FileText,
   Ban,
+  ChevronDown,
+  ChevronUp,
+  History,
+  Paperclip,
+  ListChecks,
 } from "lucide-react";
 import CreateServiceOrderModal from "@/components/CreateServiceOrderModal";
 import EditServiceOrderModal from "@/components/EditServiceOrderModal";
@@ -117,6 +122,34 @@ type GenerateChargeResponse = {
   chargeId?: string;
 };
 
+type TimelineEvent = {
+  id: string;
+  action?: string | null;
+  type?: string | null;
+  description?: string | null;
+  createdAt?: string | null;
+  metadata?: Record<string, unknown> | null;
+};
+
+type ExecutionRecord = {
+  id: string;
+  serviceOrderId: string;
+  customerId?: string | null;
+  executorPersonId?: string | null;
+  startedAt?: string | null;
+  endedAt?: string | null;
+  notes?: string | null;
+  checklist?: Array<any>;
+  attachments?: Array<any>;
+  status?: string | null;
+  amountCents?: number | null;
+  dueDate?: string | null;
+  mode?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  idempotent?: boolean;
+};
+
 const STATUS_LABELS: Record<ServiceOrderStatus, string> = {
   OPEN: "Aberta",
   ASSIGNED: "Atribuída",
@@ -134,6 +167,12 @@ const STATUS_COLORS: Record<ServiceOrderStatus, string> = {
   DONE: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
   CANCELED: "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300",
 };
+
+function normalizeText(value?: string | null) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
 
 function getPriorityLabel(priority?: number | null) {
   switch (priority) {
@@ -302,7 +341,7 @@ function getFinancialStage(os: ServiceOrder) {
       description: "Cobrança vinculada e paga.",
       className:
         "border-green-200 bg-green-50 text-green-900 dark:border-green-900/50 dark:bg-green-950/20 dark:text-green-300",
-        icon: BadgeDollarSign,
+      icon: BadgeDollarSign,
     };
   }
 
@@ -403,25 +442,6 @@ function matchesFinancialFilter(os: ServiceOrder, filter: FinancialFilter) {
   return summary?.chargeStatus === filter;
 }
 
-function InfoItem({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/40">
-      <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
-        {label}
-      </p>
-      <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
-        {value}
-      </p>
-    </div>
-  );
-}
-
 function getServiceOrderIdFromUrl() {
   if (typeof window === "undefined") return null;
 
@@ -440,6 +460,138 @@ function buildServiceOrdersUrl(serviceOrderId?: string | null) {
 
   const query = params.toString();
   return query ? `/service-orders?${query}` : "/service-orders";
+}
+
+function getEventKey(event: TimelineEvent) {
+  return String(event.action ?? event.type ?? "EVENT").toUpperCase();
+}
+
+function getEventLabel(event: TimelineEvent) {
+  const key = getEventKey(event);
+
+  const labels: Record<string, string> = {
+    SERVICE_ORDER_CREATED: "O.S. criada",
+    SERVICE_ORDER_UPDATED: "O.S. atualizada",
+    SERVICE_ORDER_ASSIGNED: "O.S. atribuída",
+    SERVICE_ORDER_STARTED: "Execução iniciada",
+    SERVICE_ORDER_DONE: "Execução concluída",
+    SERVICE_ORDER_CANCELED: "O.S. cancelada",
+    EXECUTION_STARTED: "Execução fallback iniciada",
+    EXECUTION_DONE: "Execução fallback concluída",
+    CHARGE_CREATED: "Cobrança criada",
+    CHARGE_UPDATED: "Cobrança atualizada",
+    CHARGE_CANCELED: "Cobrança cancelada",
+    CHARGE_DELETED: "Cobrança excluída",
+    CHARGE_PAID: "Cobrança paga",
+    CHARGE_OVERDUE: "Cobrança vencida",
+  };
+
+  return labels[key] ?? key.split("_").join(" ");
+}
+
+function getEventTone(action?: string | null) {
+  const key = String(action ?? "").toUpperCase();
+
+  if (key.includes("PAID") || key.includes("DONE") || key.includes("CREATED")) {
+    return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300";
+  }
+
+  if (
+    key.includes("OVERDUE") ||
+    key.includes("CANCELED") ||
+    key.includes("CANCELLED")
+  ) {
+    return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300";
+  }
+
+  if (
+    key.includes("UPDATED") ||
+    key.includes("ASSIGNED") ||
+    key.includes("STARTED")
+  ) {
+    return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300";
+  }
+
+  return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
+}
+
+function getEventIcon(event: TimelineEvent) {
+  const key = getEventKey(event);
+
+  if (key.includes("CHARGE") || key.includes("PAYMENT")) {
+    return Receipt;
+  }
+
+  if (key.includes("DONE") || key.includes("PAID")) {
+    return CheckCircle2;
+  }
+
+  if (key.includes("OVERDUE") || key.includes("CANCELED")) {
+    return AlertCircle;
+  }
+
+  if (key.includes("SERVICE_ORDER") || key.includes("EXECUTION")) {
+    return Wrench;
+  }
+
+  return Clock3;
+}
+
+function getEventSummary(event: TimelineEvent) {
+  const metadata = (event.metadata ?? {}) as Record<string, any>;
+  const serviceOrderId = metadata?.serviceOrderId;
+  const chargeId = metadata?.chargeId;
+  const executionId = metadata?.executionId;
+  const amountCents = metadata?.amountCents;
+  const status = metadata?.status;
+  const dueDate = metadata?.dueDate;
+
+  const pieces: string[] = [];
+
+  if (serviceOrderId) {
+    pieces.push(`O.S. #${String(serviceOrderId).slice(0, 8)}`);
+  }
+
+  if (executionId && executionId !== serviceOrderId) {
+    pieces.push(`Exec. #${String(executionId).slice(0, 8)}`);
+  }
+
+  if (chargeId) {
+    pieces.push(`Cobrança #${String(chargeId).slice(0, 8)}`);
+  }
+
+  if (typeof amountCents === "number" && Number.isFinite(amountCents)) {
+    pieces.push(formatCurrency(amountCents));
+  }
+
+  if (typeof status === "string" && status.trim()) {
+    pieces.push(`Status ${status}`);
+  }
+
+  if (typeof dueDate === "string" && dueDate.trim()) {
+    pieces.push(`Venc. ${formatDate(dueDate)}`);
+  }
+
+  return pieces.join(" • ");
+}
+
+function InfoItem({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/40">
+      <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
+        {label}
+      </p>
+      <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
+        {value}
+      </p>
+    </div>
+  );
 }
 
 function SummaryCard({
@@ -525,6 +677,253 @@ function OperationalClosureCard({ os }: { os: ServiceOrder }) {
   return null;
 }
 
+function ServiceOrderExpandedPanel({
+  os,
+}: {
+  os: ServiceOrder;
+}) {
+  const timelineQuery = trpc.nexo.timeline.listByServiceOrder.useQuery(
+    {
+      serviceOrderId: os.id,
+      limit: 20,
+    },
+    {
+      retry: false,
+      refetchOnWindowFocus: false,
+    }
+  );
+
+  const executionQuery = trpc.nexo.executions.listByServiceOrder.useQuery(
+    {
+      serviceOrderId: os.id,
+    },
+    {
+      retry: false,
+      refetchOnWindowFocus: false,
+    }
+  );
+
+  const timelineEvents = useMemo(() => {
+    const payload = timelineQuery.data as any;
+    const rows = Array.isArray(payload?.data)
+      ? payload.data
+      : Array.isArray(payload)
+        ? payload
+        : [];
+    return rows as TimelineEvent[];
+  }, [timelineQuery.data]);
+
+  const executionRows = useMemo(() => {
+    const payload = executionQuery.data as any;
+    const rows = Array.isArray(payload?.data)
+      ? payload.data
+      : Array.isArray(payload)
+        ? payload
+        : [];
+    return rows as ExecutionRecord[];
+  }, [executionQuery.data]);
+
+  const latestExecution = executionRows[0] ?? null;
+  const checklist = Array.isArray(latestExecution?.checklist)
+    ? latestExecution.checklist
+    : [];
+  const attachments = Array.isArray(latestExecution?.attachments)
+    ? latestExecution.attachments
+    : [];
+
+  return (
+    <div className="rounded-xl border border-gray-200 bg-gray-50/60 p-4 dark:border-gray-700 dark:bg-gray-900/30">
+      <div className="grid gap-4 xl:grid-cols-2">
+        <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+          <div className="mb-3 flex items-center gap-2">
+            <Wrench className="h-4 w-4 text-orange-500" />
+            <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
+              Execução vinculada
+            </h4>
+          </div>
+
+          {executionQuery.isLoading ? (
+            <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+              <RefreshCw className="h-4 w-4 animate-spin" />
+              Carregando execução...
+            </div>
+          ) : executionQuery.isError ? (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300">
+              Não foi possível carregar a execução desta O.S.
+            </div>
+          ) : !latestExecution ? (
+            <div className="rounded-lg border border-dashed border-gray-200 p-3 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
+              Nenhuma execução encontrada para esta O.S.
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid gap-3 md:grid-cols-2">
+                <InfoItem
+                  label="Modo"
+                  value={latestExecution.mode || "service-order-fallback"}
+                />
+                <InfoItem
+                  label="Status"
+                  value={String(latestExecution.status || "—")}
+                />
+                <InfoItem
+                  label="Início real"
+                  value={formatDateTime(latestExecution.startedAt)}
+                />
+                <InfoItem
+                  label="Fim real"
+                  value={formatDateTime(latestExecution.endedAt)}
+                />
+              </div>
+
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/40">
+                <div className="mb-2 flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-gray-500" />
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                    Notas da execução
+                  </p>
+                </div>
+                <p className="text-sm text-gray-600 dark:text-gray-300">
+                  {latestExecution.notes?.trim()
+                    ? latestExecution.notes
+                    : "Sem notas registradas na execução."}
+                </p>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/40">
+                  <div className="mb-2 flex items-center gap-2">
+                    <ListChecks className="h-4 w-4 text-gray-500" />
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                      Checklist
+                    </p>
+                  </div>
+
+                  {checklist.length === 0 ? (
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      Nenhum item registrado.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {checklist.map((item, index) => (
+                        <div
+                          key={`checklist-${index}`}
+                          className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800"
+                        >
+                          {typeof item === "string"
+                            ? item
+                            : JSON.stringify(item)}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/40">
+                  <div className="mb-2 flex items-center gap-2">
+                    <Paperclip className="h-4 w-4 text-gray-500" />
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                      Anexos
+                    </p>
+                  </div>
+
+                  {attachments.length === 0 ? (
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      Nenhum anexo registrado.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {attachments.map((item, index) => (
+                        <div
+                          key={`attachment-${index}`}
+                          className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800"
+                        >
+                          {typeof item === "string"
+                            ? item
+                            : JSON.stringify(item)}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+          <div className="mb-3 flex items-center gap-2">
+            <History className="h-4 w-4 text-orange-500" />
+            <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
+              Timeline da O.S.
+            </h4>
+          </div>
+
+          {timelineQuery.isLoading ? (
+            <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+              <RefreshCw className="h-4 w-4 animate-spin" />
+              Carregando histórico...
+            </div>
+          ) : timelineQuery.isError ? (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300">
+              Não foi possível carregar a timeline desta O.S.
+            </div>
+          ) : timelineEvents.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-gray-200 p-3 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
+              Nenhum evento encontrado para esta O.S.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {timelineEvents.map((event) => {
+                const EventIcon = getEventIcon(event);
+                const summary = getEventSummary(event);
+
+                return (
+                  <div
+                    key={event.id}
+                    className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/40"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span
+                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${getEventTone(
+                              event.action
+                            )}`}
+                          >
+                            <EventIcon className="h-3.5 w-3.5" />
+                            {getEventLabel(event)}
+                          </span>
+
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            {formatDateTime(event.createdAt)}
+                          </span>
+                        </div>
+
+                        {event.description ? (
+                          <p className="mt-2 text-sm text-gray-700 dark:text-gray-200">
+                            {event.description}
+                          </p>
+                        ) : null}
+
+                        {summary ? (
+                          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                            {summary}
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ServiceOrdersPage() {
   const [, navigate] = useLocation();
   const [page, setPage] = useState(1);
@@ -540,6 +939,7 @@ export default function ServiceOrdersPage() {
   const [highlightedServiceOrderId, setHighlightedServiceOrderId] = useState<string | null>(
     () => getServiceOrderIdFromUrl()
   );
+  const [expandedServiceOrderId, setExpandedServiceOrderId] = useState<string | null>(null);
 
   const serviceOrderRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const utils = trpc.useUtils();
@@ -564,6 +964,24 @@ export default function ServiceOrdersPage() {
   const peopleQuery = trpc.people.list.useQuery(undefined, {
     retry: false,
     refetchOnWindowFocus: false,
+  });
+
+  const executionStartMutation = trpc.nexo.executions.start.useMutation({
+    onError: (err) => {
+      toast.error(err.message || "Erro ao iniciar execução");
+    },
+    onSettled: () => {
+      setProcessingId(null);
+    },
+  });
+
+  const executionCompleteMutation = trpc.nexo.executions.complete.useMutation({
+    onError: (err) => {
+      toast.error(err.message || "Erro ao concluir execução");
+    },
+    onSettled: () => {
+      setProcessingId(null);
+    },
   });
 
   const serviceOrdersResult = (listQuery.data ?? {
@@ -683,6 +1101,10 @@ export default function ServiceOrdersPage() {
         if (current === serviceOrderIdFromUrl) return current;
         return serviceOrderIdFromUrl;
       });
+
+      if (serviceOrderIdFromUrl) {
+        setExpandedServiceOrderId(serviceOrderIdFromUrl);
+      }
     };
 
     syncFromUrl();
@@ -721,7 +1143,7 @@ export default function ServiceOrdersPage() {
     }
 
     if (newStatus === "DONE") {
-      toast.error("Para concluir a O.S., use Editar e preencha o resumo final.");
+      toast.error("Para concluir a O.S., use Finalizar ou Editar e registre o fechamento.");
       return;
     }
 
@@ -737,33 +1159,82 @@ export default function ServiceOrdersPage() {
     });
   };
 
-  const handleStartExecution = (serviceOrder: ServiceOrder) => {
+  const handleStartExecution = async (serviceOrder: ServiceOrder) => {
     if (!serviceOrder.assignedToPersonId) {
       toast.error("Defina um responsável antes de iniciar a execução.");
       return;
     }
 
     setProcessingId(serviceOrder.id);
-    updateMutation.mutate({
-      id: serviceOrder.id,
-      data: { status: "IN_PROGRESS" },
-    });
+
+    try {
+      const payload = (await executionStartMutation.mutateAsync({
+        serviceOrderId: serviceOrder.id,
+        notes: normalizeText(serviceOrder.description),
+      })) as ExecutionRecord;
+
+      await Promise.all([
+        listQuery.refetch(),
+        utils.nexo.timeline.listByServiceOrder.invalidate({
+          serviceOrderId: serviceOrder.id,
+          limit: 20,
+        }),
+        utils.nexo.executions.listByServiceOrder.invalidate({
+          serviceOrderId: serviceOrder.id,
+        }),
+      ]);
+
+      if (payload?.idempotent) {
+        toast.success("Execução já estava encerrada.");
+        return;
+      }
+
+      toast.success("Execução iniciada com sucesso!");
+      setExpandedServiceOrderId(serviceOrder.id);
+    } catch {
+      // toast já tratado
+    }
   };
 
-  const handleFinishExecution = (serviceOrder: ServiceOrder) => {
-    if (!serviceOrder.outcomeSummary?.trim()) {
+  const handleFinishExecution = async (serviceOrder: ServiceOrder) => {
+    const notes = normalizeText(serviceOrder.outcomeSummary);
+
+    if (!notes) {
       toast.error("Para concluir a O.S., use Editar e preencha o resumo final.");
       return;
     }
 
     setProcessingId(serviceOrder.id);
-    updateMutation.mutate({
-      id: serviceOrder.id,
-      data: {
-        status: "DONE",
-        outcomeSummary: serviceOrder.outcomeSummary,
-      },
-    });
+
+    try {
+      const payload = (await executionCompleteMutation.mutateAsync({
+        id: serviceOrder.id,
+        notes,
+      })) as ExecutionRecord;
+
+      await Promise.all([
+        listQuery.refetch(),
+        utils.finance.charges.list.invalidate(),
+        utils.finance.charges.stats.invalidate(),
+        utils.nexo.timeline.listByServiceOrder.invalidate({
+          serviceOrderId: serviceOrder.id,
+          limit: 20,
+        }),
+        utils.nexo.executions.listByServiceOrder.invalidate({
+          serviceOrderId: serviceOrder.id,
+        }),
+      ]);
+
+      if (payload?.idempotent) {
+        toast.success("Execução já estava concluída.");
+        return;
+      }
+
+      toast.success("Execução finalizada com sucesso!");
+      setExpandedServiceOrderId(serviceOrder.id);
+    } catch {
+      // toast já tratado
+    }
   };
 
   const handleGenerateCharge = async (serviceOrder: ServiceOrder) => {
@@ -788,6 +1259,10 @@ export default function ServiceOrdersPage() {
         listQuery.refetch(),
         utils.finance.charges.list.invalidate(),
         utils.finance.charges.stats.invalidate(),
+        utils.nexo.timeline.listByServiceOrder.invalidate({
+          serviceOrderId: serviceOrder.id,
+          limit: 20,
+        }),
       ]);
 
       if (payload?.created) {
@@ -824,6 +1299,7 @@ export default function ServiceOrdersPage() {
 
   const handleOpenDeepLink = (serviceOrderId: string) => {
     setHighlightedServiceOrderId(serviceOrderId);
+    setExpandedServiceOrderId(serviceOrderId);
     navigate(buildServiceOrdersUrl(serviceOrderId), { replace: false });
   };
 
@@ -835,6 +1311,12 @@ export default function ServiceOrdersPage() {
   const handleOpenEdit = (serviceOrderId: string) => {
     setSelectedServiceOrderId(serviceOrderId);
     setShowEditModal(true);
+  };
+
+  const handleToggleExpanded = (serviceOrderId: string) => {
+    setExpandedServiceOrderId((current) =>
+      current === serviceOrderId ? null : serviceOrderId
+    );
   };
 
   const totalVisible = filteredServiceOrders.length;
@@ -924,6 +1406,7 @@ export default function ServiceOrdersPage() {
           tone="danger"
         />
       </div>
+
       <ServiceOrdersStatusBarChart
         openCount={openCount}
         assignedCount={assignedCount}
@@ -1149,6 +1632,7 @@ export default function ServiceOrdersPage() {
             const OperationalIcon = operationalStage.icon;
             const FinancialIcon = financialStage.icon;
             const isHighlighted = highlightedServiceOrderId === os.id;
+            const isExpanded = expandedServiceOrderId === os.id;
 
             return (
               <div
@@ -1160,7 +1644,7 @@ export default function ServiceOrdersPage() {
                   isHighlighted
                     ? "border-orange-400 ring-2 ring-orange-200 dark:border-orange-500 dark:ring-orange-900/40"
                     : "border-gray-200 dark:border-gray-700"
-                  }`}
+                }`}
               >
                 <div className="flex flex-col gap-4">
                   <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
@@ -1225,6 +1709,8 @@ export default function ServiceOrdersPage() {
                         disabled={
                           updateMutation.isPending ||
                           isProcessing ||
+                          executionStartMutation.isPending ||
+                          executionCompleteMutation.isPending ||
                           os.status === "DONE" ||
                           os.status === "CANCELED"
                         }
@@ -1244,10 +1730,12 @@ export default function ServiceOrdersPage() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => handleStartExecution(os)}
+                        onClick={() => void handleStartExecution(os)}
                         disabled={
                           !canStartExecution ||
                           updateMutation.isPending ||
+                          executionStartMutation.isPending ||
+                          executionCompleteMutation.isPending ||
                           isProcessing
                         }
                       >
@@ -1257,10 +1745,12 @@ export default function ServiceOrdersPage() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => handleFinishExecution(os)}
+                        onClick={() => void handleFinishExecution(os)}
                         disabled={
                           os.status !== "IN_PROGRESS" ||
                           updateMutation.isPending ||
+                          executionStartMutation.isPending ||
+                          executionCompleteMutation.isPending ||
                           isProcessing
                         }
                       >
@@ -1280,7 +1770,11 @@ export default function ServiceOrdersPage() {
                             handleOpenCharge(os.id);
                           }
                         }}
-                        disabled={generateChargeMutation.isPending || isProcessing}
+                        disabled={
+                          generateChargeMutation.isPending ||
+                          executionCompleteMutation.isPending ||
+                          isProcessing
+                        }
                         className="gap-2"
                       >
                         <Wallet className="h-4 w-4" />
@@ -1299,6 +1793,25 @@ export default function ServiceOrdersPage() {
                       >
                         <Link2 className="h-4 w-4" />
                         Focar
+                      </Button>
+
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleToggleExpanded(os.id)}
+                        className="gap-2"
+                      >
+                        {isExpanded ? (
+                          <>
+                            <ChevronUp className="h-4 w-4" />
+                            Recolher
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDown className="h-4 w-4" />
+                            Expandir
+                          </>
+                        )}
                       </Button>
                     </div>
                   </div>
@@ -1384,6 +1897,27 @@ export default function ServiceOrdersPage() {
                       value={formatDateTime(os.finishedAt)}
                     />
                   </div>
+
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    <InfoItem
+                      label="Vencimento"
+                      value={formatDate(os.dueDate)}
+                    />
+                    <InfoItem
+                      label="Cobrança"
+                      value={chargeBadge.label}
+                    />
+                    <InfoItem
+                      label="Pagamento"
+                      value={formatDateTime(os.financialSummary?.paidAt)}
+                    />
+                    <InfoItem
+                      label="Janela"
+                      value={formatDateTime(os.appointment?.endsAt || os.scheduledFor)}
+                    />
+                  </div>
+
+                  {isExpanded ? <ServiceOrderExpandedPanel os={os} /> : null}
                 </div>
               </div>
             );

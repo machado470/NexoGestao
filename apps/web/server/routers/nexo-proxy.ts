@@ -581,6 +581,72 @@ export const nexoProxyRouter = router({
           limit: input.limit,
         });
       }),
+
+    listByServiceOrder: protectedProcedure
+      .input(
+        z.object({
+          serviceOrderId: z.string().min(1),
+          limit: z.number().optional(),
+        })
+      )
+      .query(async ({ input, ctx }) => {
+        return authedGet(
+          ctx as CtxLike,
+          `/timeline/service-orders/${input.serviceOrderId}`,
+          {
+            limit: input.limit,
+          }
+        );
+      }),
+  }),
+
+  executions: router({
+    listByServiceOrder: protectedProcedure
+      .input(
+        z.object({
+          serviceOrderId: z.string().min(1),
+        })
+      )
+      .query(async ({ input, ctx }) => {
+        return authedGet(
+          ctx as CtxLike,
+          `/executions/service-order/${input.serviceOrderId}`
+        );
+      }),
+
+    start: protectedProcedure
+      .input(
+        z.object({
+          serviceOrderId: z.string().min(1),
+          notes: z.string().optional(),
+          checklist: z.any().optional(),
+          attachments: z.any().optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        return authedPost(ctx as CtxLike, "/executions/start", input);
+      }),
+
+    complete: protectedProcedure
+      .input(
+        z.object({
+          id: z.string().min(1),
+          notes: z.string().optional(),
+          checklist: z.any().optional(),
+          attachments: z.any().optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        return authedPost(
+          ctx as CtxLike,
+          `/executions/${input.id}/complete`,
+          {
+            notes: input.notes,
+            checklist: input.checklist,
+            attachments: input.attachments,
+          }
+        );
+      }),
   }),
 
   appointments: router({

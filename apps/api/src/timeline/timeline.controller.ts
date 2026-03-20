@@ -28,4 +28,18 @@ export class TimelineController {
     )
     return { ok: true, data }
   }
+
+  @Get('service-orders/:serviceOrderId')
+  async listByServiceOrder(
+    @Org() orgId: string,
+    @Param('serviceOrderId') serviceOrderId: string,
+    @Query('limit') limit?: string,
+  ) {
+    const data = await this.timeline.listByServiceOrderInOrg(
+      orgId,
+      serviceOrderId,
+      limit ? Number(limit) : 100,
+    )
+    return { ok: true, data }
+  }
 }
