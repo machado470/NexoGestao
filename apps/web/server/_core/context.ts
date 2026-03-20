@@ -1,7 +1,7 @@
 import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
 import cookie from "cookie";
 
-const NEXO_API_URL = process.env.NEXO_API_URL || "http://127.0.0.1:3000";
+const NEXO_API_URL = process.env.NEXO_API_URL || "http://127.0.0.1:3001";
 const NEXO_TOKEN_COOKIE = "nexo_token";
 
 export type TrpcContext = {

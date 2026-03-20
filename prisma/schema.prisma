@@ -330,6 +330,8 @@ model ServiceOrder {
   finishedAt         DateTime?
   amountCents        Int?
   dueDate            DateTime?
+  cancellationReason String?
+  outcomeSummary     String?
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
   charges            Charge[]

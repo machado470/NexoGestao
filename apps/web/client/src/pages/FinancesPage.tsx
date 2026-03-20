@@ -30,6 +30,9 @@ import {
   ArrowRightLeft,
   BadgeDollarSign,
   Link2,
+  Sparkles,
+  Clock3,
+  CircleDollarSign,
 } from "lucide-react";
 import { CreateChargeModal } from "@/components/CreateChargeModal";
 import { EditChargeModal } from "@/components/EditChargeModal";
@@ -222,6 +225,43 @@ function MetricCard({
         <p className="text-xs text-gray-500 dark:text-gray-400">{subtitle}</p>
       </CardContent>
     </Card>
+  );
+}
+
+function SummaryStripCard({
+  title,
+  description,
+  icon: Icon,
+  tone = "default",
+}: {
+  title: string;
+  description: string;
+  icon: React.ComponentType<{ className?: string }>;
+  tone?: "default" | "warning" | "success";
+}) {
+  const toneClass =
+    tone === "warning"
+      ? "border-amber-200 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-950/20"
+      : tone === "success"
+        ? "border-green-200 bg-green-50 dark:border-green-900/40 dark:bg-green-950/20"
+        : "border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800";
+
+  return (
+    <div className={`rounded-xl border p-4 ${toneClass}`}>
+      <div className="flex items-start gap-3">
+        <div className="rounded-lg bg-black/5 p-2 dark:bg-white/5">
+          <Icon className="h-4 w-4" />
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-gray-900 dark:text-white">
+            {title}
+          </p>
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            {description}
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -531,16 +571,22 @@ export default function FinancesPage() {
       />
 
       <div className="space-y-6 p-6">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="flex items-center gap-2 text-3xl font-bold">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div className="max-w-3xl">
+            <div className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs font-medium text-orange-700 dark:border-orange-900/40 dark:bg-orange-950/20 dark:text-orange-300">
+              <Sparkles className="h-3.5 w-3.5" />
+              Centro de fechamento financeiro do ciclo
+            </div>
+
+            <h1 className="mt-3 flex items-center gap-2 text-3xl font-bold">
               <Wallet className="h-7 w-7 text-orange-500" />
               {isServiceOrderScoped ? "Cobrança da O.S." : "Financeiro"}
             </h1>
-            <p className="text-gray-600 dark:text-gray-400">
+
+            <p className="mt-2 text-gray-600 dark:text-gray-400">
               {isServiceOrderScoped
                 ? "Leitura financeira vinculada a uma ordem de serviço específica."
-                : "Gestão de cobranças, atrasos, recebimentos e fechamento financeiro."}
+                : "Cobranças, recebimentos, atrasos e fechamento do fluxo operacional em uma leitura só."}
             </p>
           </div>
 
@@ -571,6 +617,28 @@ export default function FinancesPage() {
             </Button>
           </div>
         </div>
+
+        {!isServiceOrderScoped ? (
+          <div className="grid gap-4 xl:grid-cols-3">
+            <SummaryStripCard
+              title="1. Cobrar"
+              description="Registrar cobranças e garantir que a execução realmente caminhe para o financeiro."
+              icon={Receipt}
+            />
+            <SummaryStripCard
+              title="2. Receber"
+              description="Gerar checkout ou registrar baixa manual para transformar cobrança em entrada real."
+              icon={CircleDollarSign}
+              tone="warning"
+            />
+            <SummaryStripCard
+              title="3. Fechar"
+              description="Encerrar o ciclo com pagamento confirmado, atraso visível ou exceção tratada."
+              icon={BadgeDollarSign}
+              tone="success"
+            />
+          </div>
+        ) : null}
 
         {serviceOrderIdFromUrl ? (
           <Card className="border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-900/20">
@@ -755,7 +823,8 @@ export default function FinancesPage() {
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/40">
-                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                <p className="flex items-center gap-2 text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  <Clock3 className="h-3.5 w-3.5" />
                   Valor pendente na página
                 </p>
                 <p className="mt-1 text-xl font-semibold text-gray-900 dark:text-white">
@@ -764,7 +833,8 @@ export default function FinancesPage() {
               </div>
 
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/40">
-                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                <p className="flex items-center gap-2 text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  <BadgeDollarSign className="h-3.5 w-3.5" />
                   Recebimentos nesta página
                 </p>
                 <p className="mt-1 text-xl font-semibold text-gray-900 dark:text-white">
@@ -773,7 +843,8 @@ export default function FinancesPage() {
               </div>
 
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/40">
-                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                <p className="flex items-center gap-2 text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  <AlertCircle className="h-3.5 w-3.5" />
                   Estado predominante
                 </p>
                 <p className="mt-1 text-xl font-semibold text-gray-900 dark:text-white">

@@ -1,4 +1,11 @@
-import { useEffect, type ComponentType, type ReactNode } from "react";
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  type ComponentType,
+  type LazyExoticComponent,
+  type ReactNode,
+} from "react";
 import { Route, Switch, useLocation } from "wouter";
 import { Loader } from "lucide-react";
 
@@ -12,33 +19,37 @@ import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { canAny, type Permission, type Role } from "./lib/rbac";
 
-import Landing from "./pages/Landing";
-import Login from "./pages/Login";
-import Register from "./pages/Register";
-import Onboarding from "./pages/Onboarding";
-import Dashboard from "./pages/Dashboard";
-import NotFound from "./pages/NotFound";
-import CustomersPage from "./pages/CustomersPage";
-import AppointmentsPage from "./pages/AppointmentsPage";
-import ServiceOrdersPage from "./pages/ServiceOrdersPage";
-import PeoplePage from "./pages/PeoplePage";
-import GovernancePage from "./pages/GovernancePage";
-import FinancesPage from "./pages/FinancesPage";
-import ExecutiveDashboard from "./pages/ExecutiveDashboard";
-import ExecutiveDashboardNew from "./pages/ExecutiveDashboardNew";
-import WhatsAppPage from "./pages/WhatsAppPage";
-import LaunchesPage from "./pages/LaunchesPage";
-import About from "./pages/About";
-import InvoicesPage from "./pages/InvoicesPage";
-import ExpensesPage from "./pages/ExpensesPage";
-import ReferralsPage from "./pages/ReferralsPage";
-import ForgotPasswordPage from "./pages/ForgotPasswordPage";
-import ResetPasswordPage from "./pages/ResetPasswordPage";
-import CalendarPage from "./pages/CalendarPage";
-import SettingsPage from "./pages/SettingsPage";
-import TimelinePage from "./pages/TimelinePage";
-import OperationalWorkflowPage from "./pages/OperationalWorkflowPage";
-import OperationsDashboardPage from "./pages/OperationsDashboardPage";
+const Landing = lazy(() => import("./pages/Landing"));
+const Login = lazy(() => import("./pages/Login"));
+const Register = lazy(() => import("./pages/Register"));
+const Onboarding = lazy(() => import("./pages/Onboarding"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const CustomersPage = lazy(() => import("./pages/CustomersPage"));
+const AppointmentsPage = lazy(() => import("./pages/AppointmentsPage"));
+const ServiceOrdersPage = lazy(() => import("./pages/ServiceOrdersPage"));
+const PeoplePage = lazy(() => import("./pages/PeoplePage"));
+const GovernancePage = lazy(() => import("./pages/GovernancePage"));
+const FinancesPage = lazy(() => import("./pages/FinancesPage"));
+const ExecutiveDashboard = lazy(() => import("./pages/ExecutiveDashboard"));
+const ExecutiveDashboardNew = lazy(() => import("./pages/ExecutiveDashboardNew"));
+const WhatsAppPage = lazy(() => import("./pages/WhatsAppPage"));
+const LaunchesPage = lazy(() => import("./pages/LaunchesPage"));
+const About = lazy(() => import("./pages/About"));
+const InvoicesPage = lazy(() => import("./pages/InvoicesPage"));
+const ExpensesPage = lazy(() => import("./pages/ExpensesPage"));
+const ReferralsPage = lazy(() => import("./pages/ReferralsPage"));
+const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
+const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
+const CalendarPage = lazy(() => import("./pages/CalendarPage"));
+const SettingsPage = lazy(() => import("./pages/SettingsPage"));
+const TimelinePage = lazy(() => import("./pages/TimelinePage"));
+const OperationalWorkflowPage = lazy(
+  () => import("./pages/OperationalWorkflowPage")
+);
+const OperationsDashboardPage = lazy(
+  () => import("./pages/OperationsDashboardPage")
+);
 
 function FullScreenLoader() {
   return (
@@ -76,6 +87,22 @@ function FullScreenMessage({
         ) : null}
       </div>
     </div>
+  );
+}
+
+function RouteFallback() {
+  return <FullScreenLoader />;
+}
+
+function LazyPage({
+  component: Component,
+}: {
+  component: LazyExoticComponent<ComponentType>;
+}) {
+  return (
+    <Suspense fallback={<RouteFallback />}>
+      <Component />
+    </Suspense>
   );
 }
 
@@ -195,7 +222,7 @@ function withMainLayout(Page: ComponentType) {
 }
 
 function protectedPage(
-  Page: ComponentType,
+  Page: LazyExoticComponent<ComponentType>,
   options?: {
     allowedRoles?: Role[];
     permissions?: Permission[];
@@ -203,7 +230,7 @@ function protectedPage(
     onboardingOnly?: boolean;
   }
 ) {
-  const WrappedPage = withMainLayout(Page);
+  const WrappedPage = withMainLayout(() => <LazyPage component={Page} />);
 
   return function ProtectedPageRoute() {
     return (
@@ -218,15 +245,20 @@ function protectedPage(
   };
 }
 
-function publicPage(Page: ComponentType) {
+function publicPage(Page: LazyExoticComponent<ComponentType>) {
   return function PublicPageRoute() {
-    return <PublicRoute component={Page} />;
+    return <PublicRoute component={() => <LazyPage component={Page} />} />;
   };
 }
 
-function onboardingPage(Page: ComponentType) {
+function onboardingPage(Page: LazyExoticComponent<ComponentType>) {
   return function OnboardingPageRoute() {
-    return <ProtectedRoute onboardingOnly component={Page} />;
+    return (
+      <ProtectedRoute
+        onboardingOnly
+        component={() => <LazyPage component={Page} />}
+      />
+    );
   };
 }
 
@@ -378,9 +410,9 @@ function Router() {
       <Route path="/operations" component={OperationsRoute} />
       <Route path="/dashboard/operations" component={OperationsDashboardRoute} />
 
-      <Route path="/about" component={About} />
-      <Route path="/404" component={NotFound} />
-      <Route component={NotFound} />
+      <Route path="/about" component={() => <LazyPage component={About} />} />
+      <Route path="/404" component={() => <LazyPage component={NotFound} />} />
+      <Route component={() => <LazyPage component={NotFound} />} />
     </Switch>
   );
 }

@@ -12,6 +12,8 @@ import {
   Pencil,
   Flag,
   User,
+  FileText,
+  Ban,
 } from "lucide-react";
 import { serviceOrderEditSchema } from "@/lib/validations";
 
@@ -159,6 +161,8 @@ export default function EditServiceOrderModal({
     amount: "",
     dueDate: "",
     status: "OPEN" as ServiceOrderStatus,
+    cancellationReason: "",
+    outcomeSummary: "",
   });
 
   const getServiceOrder = trpc.nexo.serviceOrders.getById.useQuery(
@@ -212,6 +216,8 @@ export default function EditServiceOrderModal({
         serviceOrder?.status === "CANCELED"
           ? serviceOrder.status
           : "OPEN",
+      cancellationReason: serviceOrder?.cancellationReason || "",
+      outcomeSummary: serviceOrder?.outcomeSummary || "",
     });
   }, [getServiceOrder.data]);
 
@@ -225,19 +231,66 @@ export default function EditServiceOrderModal({
   }, [people, formData.assignedToPersonId]);
 
   const canAssignOrStart = Boolean(formData.assignedToPersonId);
+
   const statusOptions = useMemo(() => {
-    const base: Array<{ value: ServiceOrderStatus; label: string; disabled?: boolean }> = [
-      { value: "OPEN", label: "Aberta" },
-      { value: "ASSIGNED", label: "Atribuída", disabled: !canAssignOrStart },
-      { value: "IN_PROGRESS", label: "Em andamento", disabled: !canAssignOrStart },
-      { value: "DONE", label: "Concluída" },
-      { value: "CANCELED", label: "Cancelada" },
-    ];
+    const current = formData.status;
+
+    const base: Array<{ value: ServiceOrderStatus; label: string; disabled?: boolean }> =
+      [{ value: current, label: getStatusLabel(current) }];
+
+    if (current === "OPEN") {
+      base.push(
+        { value: "ASSIGNED", label: "Atribuída", disabled: !canAssignOrStart },
+        { value: "CANCELED", label: "Cancelada" }
+      );
+    }
+
+    if (current === "ASSIGNED") {
+      base.push(
+        { value: "IN_PROGRESS", label: "Em andamento", disabled: !canAssignOrStart },
+        { value: "CANCELED", label: "Cancelada" }
+      );
+    }
+
+    if (current === "IN_PROGRESS") {
+      base.push(
+        { value: "DONE", label: "Concluída" },
+        { value: "CANCELED", label: "Cancelada" }
+      );
+    }
+
+    if (current === "DONE" || current === "CANCELED") {
+      return [{ value: current, label: getStatusLabel(current) }];
+    }
 
     return base;
-  }, [canAssignOrStart]);
+  }, [canAssignOrStart, formData.status]);
 
-  const isCanceled = formData.status === "CANCELED";
+  const isPersistedClosed =
+    formData.status === "DONE" || formData.status === "CANCELED";
+
+  const shouldShowCancellationReason = formData.status === "CANCELED";
+  const shouldShowOutcomeSummary = formData.status === "DONE";
+
+  const transitionHint = useMemo(() => {
+    if (formData.status === "DONE") {
+      return "Ao concluir, a O.S. exige um resumo final e pode seguir para cobrança automaticamente.";
+    }
+
+    if (formData.status === "CANCELED") {
+      return "Ao cancelar, a O.S. exige um motivo claro para manter rastreabilidade operacional.";
+    }
+
+    if (formData.status === "IN_PROGRESS") {
+      return "Esta O.S. está em execução. O próximo passo válido é concluir ou cancelar.";
+    }
+
+    if (formData.status === "ASSIGNED") {
+      return "Esta O.S. já está atribuída. O próximo passo válido é iniciar a execução ou cancelar.";
+    }
+
+    return "O fluxo operacional segue a sequência: aberta → atribuída → em andamento → concluída.";
+  }, [formData.status]);
 
   const submitUpdate = async () => {
     if (!serviceOrderId) return;
@@ -246,13 +299,6 @@ export default function EditServiceOrderModal({
     if (!Number.isFinite(priority)) {
       toast.error("Prioridade inválida.");
       return;
-    }
-
-    if (!formData.assignedToPersonId.trim()) {
-      if (formData.status === "ASSIGNED" || formData.status === "IN_PROGRESS") {
-        toast.error("Defina um responsável antes de usar esse status.");
-        return;
-      }
     }
 
     const amountCents = parseAmountToCents(formData.amount);
@@ -271,6 +317,8 @@ export default function EditServiceOrderModal({
       assignedToPersonId: formData.assignedToPersonId.trim() || "",
       amountCents,
       dueDate: formData.dueDate.trim() || "",
+      cancellationReason: formData.cancellationReason.trim() || "",
+      outcomeSummary: formData.outcomeSummary.trim() || "",
     });
 
     if (!parsed.success) {
@@ -292,6 +340,14 @@ export default function EditServiceOrderModal({
           : null,
         amountCents: parsed.data.amountCents,
         dueDate: parsed.data.dueDate || undefined,
+        cancellationReason:
+          parsed.data.status === "CANCELED"
+            ? parsed.data.cancellationReason || undefined
+            : undefined,
+        outcomeSummary:
+          parsed.data.status === "DONE"
+            ? parsed.data.outcomeSummary || undefined
+            : undefined,
       },
     });
   };
@@ -310,7 +366,9 @@ export default function EditServiceOrderModal({
 
   const payload = getServiceOrder.data as any;
   const serviceOrder = payload?.data ?? payload ?? null;
-  const persistedIsCanceled = serviceOrder?.status === "CANCELED";
+  const persistedStatus = serviceOrder?.status as ServiceOrderStatus | undefined;
+  const isPersistedDone = persistedStatus === "DONE";
+  const isPersistedCanceled = persistedStatus === "CANCELED";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -322,7 +380,7 @@ export default function EditServiceOrderModal({
               Editar Ordem de Serviço
             </h2>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Ajuste dados operacionais, responsável e a base financeira da O.S.
+              Ajuste dados operacionais, responsável, fechamento e base financeira da O.S.
             </p>
           </div>
 
@@ -389,6 +447,24 @@ export default function EditServiceOrderModal({
                       : "Ainda sem cobrança"}
                   </p>
                 </div>
+
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                    Motivo de cancelamento
+                  </p>
+                  <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
+                    {serviceOrder?.cancellationReason || "—"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                    Resumo final
+                  </p>
+                  <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
+                    {serviceOrder?.outcomeSummary || "—"}
+                  </p>
+                </div>
               </div>
             </section>
 
@@ -410,7 +486,7 @@ export default function EditServiceOrderModal({
                     onChange={(e) =>
                       setFormData((state) => ({ ...state, title: e.target.value }))
                     }
-                    disabled={updateServiceOrder.isPending}
+                    disabled={updateServiceOrder.isPending || isPersistedClosed}
                   />
                 </div>
 
@@ -428,7 +504,7 @@ export default function EditServiceOrderModal({
                         description: e.target.value,
                       }))
                     }
-                    disabled={updateServiceOrder.isPending}
+                    disabled={updateServiceOrder.isPending || isPersistedClosed}
                   />
                 </div>
 
@@ -447,7 +523,7 @@ export default function EditServiceOrderModal({
                           priority: e.target.value,
                         }))
                       }
-                      disabled={updateServiceOrder.isPending}
+                      disabled={updateServiceOrder.isPending || isPersistedClosed}
                     >
                       <option value="1">Muito baixa</option>
                       <option value="2">Baixa</option>
@@ -475,7 +551,7 @@ export default function EditServiceOrderModal({
                           scheduledFor: e.target.value,
                         }))
                       }
-                      disabled={updateServiceOrder.isPending}
+                      disabled={updateServiceOrder.isPending || isPersistedClosed}
                     />
                   </div>
                 </div>
@@ -506,7 +582,7 @@ export default function EditServiceOrderModal({
                       });
                     }}
                     className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-                    disabled={updateServiceOrder.isPending}
+                    disabled={updateServiceOrder.isPending || isPersistedClosed}
                   >
                     <option value="">Remover responsável</option>
                     {people.map((person) => (
@@ -520,7 +596,7 @@ export default function EditServiceOrderModal({
                   </p>
                 </div>
 
-                {!canAssignOrStart ? (
+                {!canAssignOrStart && !isPersistedClosed ? (
                   <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300">
                     Defina um responsável antes de usar os status Atribuída ou Em andamento.
                   </div>
@@ -536,10 +612,16 @@ export default function EditServiceOrderModal({
                       setFormData((state) => ({
                         ...state,
                         status: e.target.value as ServiceOrderStatus,
+                        cancellationReason:
+                          e.target.value === "CANCELED" ? state.cancellationReason : "",
+                        outcomeSummary:
+                          e.target.value === "DONE" ? state.outcomeSummary : "",
                       }))
                     }
                     className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-                    disabled={updateServiceOrder.isPending || persistedIsCanceled || isCanceled}
+                    disabled={
+                      updateServiceOrder.isPending || isPersistedDone || isPersistedCanceled
+                    }
                   >
                     {statusOptions.map((option) => (
                       <option
@@ -551,9 +633,66 @@ export default function EditServiceOrderModal({
                       </option>
                     ))}
                   </select>
+                  <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                    {transitionHint}
+                  </p>
                 </div>
               </div>
             </section>
+
+            {shouldShowCancellationReason ? (
+              <section className="rounded-xl border border-gray-200 p-4 dark:border-zinc-800">
+                <SectionTitle
+                  icon={Ban}
+                  title="Motivo do cancelamento"
+                  subtitle="Explique por que a O.S. foi encerrada sem continuidade."
+                />
+
+                <textarea
+                  className="w-full rounded-lg border border-gray-300 bg-white p-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-white"
+                  rows={4}
+                  value={formData.cancellationReason}
+                  onChange={(e) =>
+                    setFormData((state) => ({
+                      ...state,
+                      cancellationReason: e.target.value,
+                    }))
+                  }
+                  disabled={updateServiceOrder.isPending || isPersistedCanceled}
+                  placeholder="Ex: Cliente adiou sem nova data, acesso ao local indisponível, escopo cancelado..."
+                />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Esse motivo fica registrado para auditoria e rastreabilidade.
+                </p>
+              </section>
+            ) : null}
+
+            {shouldShowOutcomeSummary ? (
+              <section className="rounded-xl border border-gray-200 p-4 dark:border-zinc-800">
+                <SectionTitle
+                  icon={FileText}
+                  title="Resumo final da execução"
+                  subtitle="Registre o resultado operacional da O.S. concluída."
+                />
+
+                <textarea
+                  className="w-full rounded-lg border border-gray-300 bg-white p-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-white"
+                  rows={5}
+                  value={formData.outcomeSummary}
+                  onChange={(e) =>
+                    setFormData((state) => ({
+                      ...state,
+                      outcomeSummary: e.target.value,
+                    }))
+                  }
+                  disabled={updateServiceOrder.isPending || isPersistedDone}
+                  placeholder="Ex: Serviço concluído com sucesso, limpeza finalizada, itens revisados, cliente orientado sobre próximos passos..."
+                />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Esse resumo ajuda a fechar a operação com contexto real.
+                </p>
+              </section>
+            ) : null}
 
             <section className="rounded-xl border border-gray-200 p-4 dark:border-zinc-800">
               <SectionTitle
@@ -574,7 +713,7 @@ export default function EditServiceOrderModal({
                     onChange={(e) =>
                       setFormData((state) => ({ ...state, amount: e.target.value }))
                     }
-                    disabled={updateServiceOrder.isPending}
+                    disabled={updateServiceOrder.isPending || isPersistedClosed}
                   />
                   <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                     Valor atual: {formatCurrencyFromInput(formData.amount)}
@@ -593,7 +732,7 @@ export default function EditServiceOrderModal({
                     onChange={(e) =>
                       setFormData((state) => ({ ...state, dueDate: e.target.value }))
                     }
-                    disabled={updateServiceOrder.isPending}
+                    disabled={updateServiceOrder.isPending || isPersistedClosed}
                   />
                 </div>
               </div>
@@ -652,6 +791,19 @@ export default function EditServiceOrderModal({
                     {formData.amount.trim()
                       ? formatCurrencyFromInput(formData.amount)
                       : "Ainda sem valor"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                    Fechamento operacional
+                  </p>
+                  <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
+                    {formData.status === "CANCELED"
+                      ? formData.cancellationReason.trim() || "Motivo pendente"
+                      : formData.status === "DONE"
+                        ? formData.outcomeSummary.trim() || "Resumo pendente"
+                        : "Ainda em fluxo"}
                   </p>
                 </div>
               </div>

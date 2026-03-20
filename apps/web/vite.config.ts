@@ -13,8 +13,8 @@ import { vitePluginManusRuntime } from "vite-plugin-manus-runtime";
 
 const PROJECT_ROOT = import.meta.dirname;
 const LOG_DIR = path.join(PROJECT_ROOT, ".manus-logs");
-const MAX_LOG_SIZE_BYTES = 1 * 1024 * 1024; // 1MB per log file
-const TRIM_TARGET_BYTES = Math.floor(MAX_LOG_SIZE_BYTES * 0.6); // Trim to 60% to avoid constant re-trimming
+const MAX_LOG_SIZE_BYTES = 1 * 1024 * 1024;
+const TRIM_TARGET_BYTES = Math.floor(MAX_LOG_SIZE_BYTES * 0.6);
 
 type LogSource = "browserConsole" | "networkRequests" | "sessionReplay";
 
@@ -34,7 +34,6 @@ function trimLogFile(logPath: string, maxSize: number) {
     const keptLines: string[] = [];
     let keptBytes = 0;
 
-    // Keep newest lines (from end) that fit within 60% of maxSize
     const targetSize = TRIM_TARGET_BYTES;
     for (let i = lines.length - 1; i >= 0; i--) {
       const lineBytes = Buffer.byteLength(`${lines[i]}\n`, "utf-8");
@@ -45,7 +44,7 @@ function trimLogFile(logPath: string, maxSize: number) {
 
     fs.writeFileSync(logPath, keptLines.join("\n"), "utf-8");
   } catch {
-    /* ignore trim errors */
+    // ignora erro de trim
   }
 }
 
@@ -55,25 +54,15 @@ function writeToLogFile(source: LogSource, entries: unknown[]) {
   ensureLogDir();
   const logPath = path.join(LOG_DIR, `${source}.log`);
 
-  // Format entries with timestamps
   const lines = entries.map((entry) => {
     const ts = new Date().toISOString();
     return `[${ts}] ${JSON.stringify(entry)}`;
   });
 
-  // Append to log file
   fs.appendFileSync(logPath, `${lines.join("\n")}\n`, "utf-8");
-
-  // Trim if exceeds max size
   trimLogFile(logPath, MAX_LOG_SIZE_BYTES);
 }
 
-/**
- * Vite plugin to collect browser debug logs
- * - POST /__manus__/logs: Browser sends logs, written directly to files
- * - Files: browserConsole.log, networkRequests.log, sessionReplay.log
- * - Auto-trimmed when exceeding 1MB (keeps newest entries)
- */
 function vitePluginManusDebugCollector(): Plugin {
   return {
     name: "manus-debug-collector",
@@ -82,6 +71,7 @@ function vitePluginManusDebugCollector(): Plugin {
       if (process.env.NODE_ENV === "production") {
         return html;
       }
+
       return {
         html,
         tags: [
@@ -98,14 +88,12 @@ function vitePluginManusDebugCollector(): Plugin {
     },
 
     configureServer(server: ViteDevServer) {
-      // POST /__manus__/logs: Browser sends logs (written directly to files)
       server.middlewares.use("/__manus__/logs", (req, res, next) => {
         if (req.method !== "POST") {
           return next();
         }
 
         const handlePayload = (payload: any) => {
-          // Write logs directly to files
           if (payload.consoleLogs?.length > 0) {
             writeToLogFile("browserConsole", payload.consoleLogs);
           }
@@ -150,7 +138,13 @@ function vitePluginManusDebugCollector(): Plugin {
   };
 }
 
-const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector()];
+const plugins = [
+  react(),
+  tailwindcss(),
+  jsxLocPlugin(),
+  vitePluginManusRuntime(),
+  vitePluginManusDebugCollector(),
+];
 
 export default defineConfig({
   plugins,
@@ -167,6 +161,62 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    chunkSizeWarningLimit: 700,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) {
+            if (id.includes("/pages/")) {
+              if (
+                id.includes("OperationsDashboardPage") ||
+                id.includes("OperationalWorkflowPage") ||
+                id.includes("ServiceOrdersPage") ||
+                id.includes("FinancesPage") ||
+                id.includes("CustomersPage")
+              ) {
+                return "pages-core";
+              }
+
+              if (
+                id.includes("ExecutiveDashboard") ||
+                id.includes("GovernancePage") ||
+                id.includes("TimelinePage") ||
+                id.includes("PeoplePage")
+              ) {
+                return "pages-admin";
+              }
+
+              return "pages-misc";
+            }
+
+            return;
+          }
+
+          if (id.includes("@trpc") || id.includes("@tanstack/react-query")) {
+            return "vendor-data";
+          }
+
+          if (
+            id.includes("lucide-react") ||
+            id.includes("clsx") ||
+            id.includes("tailwind-merge") ||
+            id.includes("class-variance-authority")
+          ) {
+            return "vendor-ui";
+          }
+
+          if (
+            id.includes("zod") ||
+            id.includes("date-fns") ||
+            id.includes("sonner")
+          ) {
+            return "vendor-utils";
+          }
+
+          return "vendor";
+        },
+      },
+    },
   },
   server: {
     host: true,

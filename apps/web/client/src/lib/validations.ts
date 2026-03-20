@@ -54,16 +54,63 @@ export const serviceOrderSchema = z.object({
 export type ServiceOrderFormData = z.infer<typeof serviceOrderSchema>;
 
 // Service Order edit validation
-export const serviceOrderEditSchema = z.object({
-  title: z.string().trim().min(2, "Título deve ter pelo menos 2 caracteres"),
-  description: z.string().trim().optional(),
-  priority: z.number().int().min(1).max(5).default(2),
-  scheduledFor: z.string().trim().optional().or(z.literal("")),
-  status: z.enum(["OPEN", "ASSIGNED", "IN_PROGRESS", "DONE", "CANCELED"]),
-  assignedToPersonId: z.string().trim().nullable().optional().or(z.literal("")),
-  amountCents: z.number().int().positive("Valor deve ser maior que 0").optional(),
-  dueDate: z.string().trim().optional().or(z.literal("")),
-});
+export const serviceOrderEditSchema = z
+  .object({
+    title: z.string().trim().min(2, "Título deve ter pelo menos 2 caracteres"),
+    description: z.string().trim().optional(),
+    priority: z.number().int().min(1).max(5).default(2),
+    scheduledFor: z.string().trim().optional().or(z.literal("")),
+    status: z.enum(["OPEN", "ASSIGNED", "IN_PROGRESS", "DONE", "CANCELED"]),
+    assignedToPersonId: z.string().trim().nullable().optional().or(z.literal("")),
+    amountCents: z.number().int().positive("Valor deve ser maior que 0").optional(),
+    dueDate: z.string().trim().optional().or(z.literal("")),
+    cancellationReason: z.string().trim().max(400, "Motivo deve ter no máximo 400 caracteres").optional().or(z.literal("")),
+    outcomeSummary: z.string().trim().max(4000, "Resumo deve ter no máximo 4000 caracteres").optional().or(z.literal("")),
+  })
+  .superRefine((data, ctx) => {
+    if (data.status === "CANCELED" && !data.cancellationReason?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Informe o motivo do cancelamento",
+        path: ["cancellationReason"],
+      });
+    }
+
+    if (data.status === "DONE" && !data.outcomeSummary?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Informe o resumo da execução concluída",
+        path: ["outcomeSummary"],
+      });
+    }
+
+    if (data.status !== "CANCELED" && data.cancellationReason?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Motivo de cancelamento só pode ser usado em O.S. cancelada",
+        path: ["cancellationReason"],
+      });
+    }
+
+    if (data.status !== "DONE" && data.outcomeSummary?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Resumo final só pode ser usado em O.S. concluída",
+        path: ["outcomeSummary"],
+      });
+    }
+
+    if (
+      (data.status === "ASSIGNED" || data.status === "IN_PROGRESS") &&
+      !data.assignedToPersonId?.trim()
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Defina um responsável antes de usar esse status",
+        path: ["assignedToPersonId"],
+      });
+    }
+  });
 
 export type ServiceOrderEditFormData = z.infer<typeof serviceOrderEditSchema>;
 

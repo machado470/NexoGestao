@@ -110,12 +110,13 @@ export class ServiceOrdersService {
 
   private canTransition(from: ServiceOrderStatus, to: ServiceOrderStatus): boolean {
     const allowed: Record<ServiceOrderStatus, ServiceOrderStatus[]> = {
-      OPEN: ['ASSIGNED', 'IN_PROGRESS', 'CANCELED'],
+      OPEN: ['ASSIGNED', 'CANCELED'],
       ASSIGNED: ['IN_PROGRESS', 'CANCELED'],
       IN_PROGRESS: ['DONE', 'CANCELED'],
       DONE: [],
       CANCELED: [],
     }
+
     return from === to || allowed[from].includes(to)
   }
 
@@ -466,6 +467,8 @@ export class ServiceOrdersService {
         scheduledFor: created.scheduledFor,
         amountCents: created.amountCents ?? null,
         dueDate: created.dueDate ?? null,
+        cancellationReason: created.cancellationReason ?? null,
+        outcomeSummary: created.outcomeSummary ?? null,
         actorUserId: params.createdBy,
         actorPersonId: params.personId,
         createdBy: params.createdBy,
@@ -491,6 +494,8 @@ export class ServiceOrdersService {
         scheduledFor: created.scheduledFor,
         amountCents: created.amountCents ?? null,
         dueDate: created.dueDate ?? null,
+        cancellationReason: created.cancellationReason ?? null,
+        outcomeSummary: created.outcomeSummary ?? null,
       },
     })
 
@@ -538,6 +543,8 @@ export class ServiceOrdersService {
       assignedToPersonId?: string | null
       amountCents?: number
       dueDate?: string
+      cancellationReason?: string
+      outcomeSummary?: string
     }
   }) {
     if (!params.orgId) throw new BadRequestException('orgId é obrigatório')
@@ -547,14 +554,18 @@ export class ServiceOrdersService {
       where: { id: params.id, orgId: params.orgId },
       select: {
         id: true,
+        title: true,
         status: true,
         assignedToPersonId: true,
         customerId: true,
         amountCents: true,
         dueDate: true,
         scheduledFor: true,
+        cancellationReason: true,
+        outcomeSummary: true,
       },
     })
+
     if (!existing) throw new NotFoundException('Ordem de serviço não encontrada')
 
     const patch: any = {}
@@ -614,6 +625,7 @@ export class ServiceOrdersService {
 
     if (params.data.assignedToPersonId !== undefined) {
       const v = params.data.assignedToPersonId
+
       if (v === null) {
         patch.assignedToPersonId = null
       } else if (typeof v === 'string' && v.trim()) {
@@ -671,6 +683,56 @@ export class ServiceOrdersService {
       )
     }
 
+    const normalizedCancellationReason =
+      params.data.cancellationReason !== undefined
+        ? normalizeText(params.data.cancellationReason)
+        : existing.cancellationReason ?? null
+
+    const normalizedOutcomeSummary =
+      params.data.outcomeSummary !== undefined
+        ? normalizeText(params.data.outcomeSummary)
+        : existing.outcomeSummary ?? null
+
+    if (params.data.cancellationReason !== undefined) {
+      if (nextStatus !== 'CANCELED') {
+        throw new BadRequestException(
+          'cancellationReason só pode ser informado para O.S. cancelada',
+        )
+      }
+      patch.cancellationReason = normalizedCancellationReason
+    }
+
+    if (params.data.outcomeSummary !== undefined) {
+      if (nextStatus !== 'DONE') {
+        throw new BadRequestException(
+          'outcomeSummary só pode ser informado para O.S. concluída',
+        )
+      }
+      patch.outcomeSummary = normalizedOutcomeSummary
+    }
+
+    if (nextStatus === 'CANCELED') {
+      if (!normalizedCancellationReason) {
+        throw new BadRequestException(
+          'cancellationReason é obrigatório para cancelar a O.S.',
+        )
+      }
+      if (patch.cancellationReason === undefined) {
+        patch.cancellationReason = normalizedCancellationReason
+      }
+    }
+
+    if (nextStatus === 'DONE') {
+      if (!normalizedOutcomeSummary) {
+        throw new BadRequestException(
+          'outcomeSummary é obrigatório para concluir a O.S.',
+        )
+      }
+      if (patch.outcomeSummary === undefined) {
+        patch.outcomeSummary = normalizedOutcomeSummary
+      }
+    }
+
     if (patch.status === 'IN_PROGRESS' && existing.status !== 'IN_PROGRESS') {
       patch.startedAt = new Date()
     }
@@ -688,6 +750,7 @@ export class ServiceOrdersService {
       where: { id: params.id, orgId: params.orgId },
       data: patch,
     })
+
     if (result.count === 0) {
       throw new NotFoundException('Ordem de serviço não encontrada')
     }
@@ -702,6 +765,7 @@ export class ServiceOrdersService {
         },
       },
     })
+
     if (!updated) throw new NotFoundException('Ordem de serviço não encontrada')
 
     const statusChanged = !!patch.status && patch.status !== existing.status
@@ -724,6 +788,8 @@ export class ServiceOrdersService {
         status: updated.status,
         amountCents: updated.amountCents ?? null,
         dueDate: updated.dueDate ?? null,
+        cancellationReason: updated.cancellationReason ?? null,
+        outcomeSummary: updated.outcomeSummary ?? null,
         actorUserId: params.updatedBy,
         actorPersonId: params.personId,
         updatedBy: params.updatedBy,
@@ -751,12 +817,16 @@ export class ServiceOrdersService {
           assignedToPersonId: existing.assignedToPersonId,
           amountCents: existing.amountCents ?? null,
           dueDate: existing.dueDate ?? null,
+          cancellationReason: existing.cancellationReason ?? null,
+          outcomeSummary: existing.outcomeSummary ?? null,
         },
         after: {
           status: updated.status,
           assignedToPersonId: updated.assignedToPersonId,
           amountCents: updated.amountCents ?? null,
           dueDate: updated.dueDate ?? null,
+          cancellationReason: updated.cancellationReason ?? null,
+          outcomeSummary: updated.outcomeSummary ?? null,
         },
         patch,
       },

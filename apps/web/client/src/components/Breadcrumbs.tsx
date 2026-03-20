@@ -7,23 +7,74 @@ interface Breadcrumb {
 }
 
 const routeBreadcrumbs: Record<string, Breadcrumb[]> = {
-  "/executive-dashboard": [{ label: "Visão Geral", href: "/executive-dashboard" }],
-  "/customers": [{ label: "Clientes", href: "/customers" }],
-  "/appointments": [{ label: "Agendamentos", href: "/appointments" }],
-  "/service-orders": [{ label: "Ordens de Serviço", href: "/service-orders" }],
-  "/finances": [{ label: "Financeiro", href: "/finances" }],
-  "/invoices": [{ label: "Faturas", href: "/invoices" }],
-  "/expenses": [{ label: "Despesas", href: "/expenses" }],
-  "/launches": [{ label: "Lançamentos", href: "/launches" }],
-  "/referrals": [{ label: "Referências", href: "/referrals" }],
-  "/whatsapp": [{ label: "WhatsApp", href: "/whatsapp" }],
-  "/people": [{ label: "Pessoas", href: "/people" }],
-  "/governance": [{ label: "Governança", href: "/governance" }],
-  "/calendar": [{ label: "Calendário", href: "/calendar" }],
-  "/timeline": [{ label: "Timeline", href: "/timeline" }],
-  "/dashboard/operations": [{ label: "Dashboard Operacional", href: "/dashboard/operations" }],
-  "/operations": [{ label: "Workflow Operacional", href: "/operations" }],
-  "/settings": [{ label: "Configurações", href: "/settings" }],
+  "/executive-dashboard": [
+    { label: "Visão", href: "/executive-dashboard" },
+    { label: "Visão Geral" },
+  ],
+  "/dashboard/operations": [
+    { label: "Visão", href: "/executive-dashboard" },
+    { label: "Dashboard Operacional" },
+  ],
+  "/operations": [
+    { label: "Visão", href: "/executive-dashboard" },
+    { label: "Workflow Operacional" },
+  ],
+  "/customers": [
+    { label: "Operação", href: "/customers" },
+    { label: "Clientes" },
+  ],
+  "/appointments": [
+    { label: "Operação", href: "/customers" },
+    { label: "Agendamentos" },
+  ],
+  "/calendar": [
+    { label: "Operação", href: "/customers" },
+    { label: "Calendário" },
+  ],
+  "/service-orders": [
+    { label: "Operação", href: "/customers" },
+    { label: "Ordens de Serviço" },
+  ],
+  "/timeline": [
+    { label: "Operação", href: "/customers" },
+    { label: "Timeline" },
+  ],
+  "/finances": [
+    { label: "Financeiro", href: "/finances" },
+    { label: "Financeiro" },
+  ],
+  "/invoices": [
+    { label: "Financeiro", href: "/finances" },
+    { label: "Faturas" },
+  ],
+  "/expenses": [
+    { label: "Financeiro", href: "/finances" },
+    { label: "Despesas" },
+  ],
+  "/launches": [
+    { label: "Financeiro", href: "/finances" },
+    { label: "Lançamentos" },
+  ],
+  "/governance": [
+    { label: "Governança", href: "/governance" },
+    { label: "Governança" },
+  ],
+  "/people": [
+    { label: "Governança", href: "/governance" },
+    { label: "Pessoas" },
+  ],
+  "/referrals": [
+    { label: "Governança", href: "/governance" },
+    { label: "Referências" },
+  ],
+  "/whatsapp": [
+    { label: "Comunicação", href: "/whatsapp" },
+    { label: "WhatsApp" },
+  ],
+  "/settings": [
+    { label: "Sistema", href: "/settings" },
+    { label: "Configurações" },
+  ],
 };
 
 function humanizeSegment(path: string) {
@@ -40,17 +91,17 @@ function humanizeSegment(path: string) {
     "executive-dashboard": "Visão Geral",
     customers: "Clientes",
     appointments: "Agendamentos",
+    calendar: "Calendário",
     "service-orders": "Ordens de Serviço",
+    timeline: "Timeline",
     finances: "Financeiro",
     invoices: "Faturas",
     expenses: "Despesas",
     launches: "Lançamentos",
+    governance: "Governança",
+    people: "Pessoas",
     referrals: "Referências",
     whatsapp: "WhatsApp",
-    people: "Pessoas",
-    governance: "Governança",
-    calendar: "Calendário",
-    timeline: "Timeline",
     operations: "Workflow Operacional",
     settings: "Configurações",
   };
@@ -64,29 +115,49 @@ function humanizeSegment(path: string) {
   );
 }
 
+function getBreadcrumbs(location: string) {
+  const exact = routeBreadcrumbs[location];
+  if (exact) return exact;
+
+  const matchedEntry = Object.entries(routeBreadcrumbs).find(([route]) => {
+    return route !== "/" && location.startsWith(route);
+  });
+
+  if (matchedEntry) {
+    return matchedEntry[1];
+  }
+
+  return [{ label: humanizeSegment(location) }];
+}
+
 export function Breadcrumbs() {
   const [location, navigate] = useLocation();
 
-  const breadcrumbs = routeBreadcrumbs[location] || [{ label: humanizeSegment(location) }];
+  const breadcrumbs = getBreadcrumbs(location);
   const allBreadcrumbs = [{ label: "Início", href: "/executive-dashboard" }, ...breadcrumbs];
 
   return (
-    <nav className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+    <nav className="flex flex-wrap items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
       {allBreadcrumbs.map((crumb, index) => (
         <div key={`${crumb.label}-${index}`} className="flex items-center gap-2">
           {index > 0 && (
-            <ChevronRight className="h-4 w-4 text-gray-400 dark:text-gray-600" />
+            <ChevronRight className="h-4 w-4 text-zinc-400 dark:text-zinc-600" />
           )}
+
           {crumb.href ? (
             <button
-              onClick={() => navigate(crumb.href!)}
-              className="transition-colors hover:text-orange-600 hover:underline dark:hover:text-orange-400"
               type="button"
+              onClick={() => navigate(crumb.href!)}
+              className={`transition-colors hover:text-orange-600 dark:hover:text-orange-400 ${
+                index === 0
+                  ? "flex items-center"
+                  : "font-medium"
+              }`}
             >
               {index === 0 ? <Home className="h-4 w-4" /> : crumb.label}
             </button>
           ) : (
-            <span className="font-medium text-gray-900 dark:text-white">
+            <span className="font-medium text-zinc-900 dark:text-white">
               {crumb.label}
             </span>
           )}

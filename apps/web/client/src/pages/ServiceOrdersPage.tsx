@@ -20,6 +20,11 @@ import {
   X,
   Link2,
   Pencil,
+  Sparkles,
+  Wrench,
+  CreditCard,
+  FileText,
+  Ban,
 } from "lucide-react";
 import CreateServiceOrderModal from "@/components/CreateServiceOrderModal";
 import EditServiceOrderModal from "@/components/EditServiceOrderModal";
@@ -87,6 +92,8 @@ type ServiceOrder = {
   finishedAt?: string | null;
   amountCents?: number | null;
   dueDate?: string | null;
+  cancellationReason?: string | null;
+  outcomeSummary?: string | null;
   createdAt?: string;
   updatedAt?: string;
   financialSummary?: FinancialSummary | null;
@@ -434,6 +441,89 @@ function buildServiceOrdersUrl(serviceOrderId?: string | null) {
   return query ? `/service-orders?${query}` : "/service-orders";
 }
 
+function SummaryCard({
+  title,
+  value,
+  subtitle,
+  tone = "default",
+}: {
+  title: string;
+  value: string | number;
+  subtitle: string;
+  tone?: "default" | "warning" | "success" | "danger";
+}) {
+  const toneClass =
+    tone === "warning"
+      ? "border-amber-200 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-950/20"
+      : tone === "success"
+        ? "border-green-200 bg-green-50 dark:border-green-900/40 dark:bg-green-950/20"
+        : tone === "danger"
+          ? "border-red-200 bg-red-50 dark:border-red-900/40 dark:bg-red-950/20"
+          : "border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800";
+
+  return (
+    <div className={`rounded-xl border p-4 ${toneClass}`}>
+      <p className="text-sm text-gray-600 dark:text-gray-400">{title}</p>
+      <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">
+        {value}
+      </p>
+      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{subtitle}</p>
+    </div>
+  );
+}
+
+function OperationalClosureCard({ os }: { os: ServiceOrder }) {
+  if (os.status === "DONE") {
+    return (
+      <div
+        className={`rounded-lg border p-3 ${
+          os.outcomeSummary?.trim()
+            ? "border-green-200 bg-green-50 text-green-900 dark:border-green-900/50 dark:bg-green-950/20 dark:text-green-300"
+            : "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-300"
+        }`}
+      >
+        <div className="flex items-start gap-2">
+          <FileText className="mt-0.5 h-4 w-4 shrink-0" />
+          <div>
+            <p className="text-sm font-semibold">Fechamento operacional</p>
+            <p className="mt-1 text-xs opacity-90">
+              {os.outcomeSummary?.trim()
+                ? os.outcomeSummary
+                : "O.S. concluída sem resumo final registrado."}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (os.status === "CANCELED") {
+    return (
+      <div
+        className={`rounded-lg border p-3 ${
+          os.cancellationReason?.trim()
+            ? "border-gray-200 bg-gray-50 text-gray-900 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-300"
+            : "border-red-200 bg-red-50 text-red-900 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-300"
+        }`}
+      >
+        <div className="flex items-start gap-2">
+          <Ban className="mt-0.5 h-4 w-4 shrink-0" />
+          <div>
+            <p className="text-sm font-semibold">Motivo do cancelamento</p>
+            <p className="mt-1 text-xs opacity-90">
+              {os.cancellationReason?.trim()
+                ? os.cancellationReason
+                : "O.S. cancelada sem motivo registrado."}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+}
+
 export default function ServiceOrdersPage() {
   const [, navigate] = useLocation();
   const [page, setPage] = useState(1);
@@ -500,7 +590,9 @@ export default function ServiceOrdersPage() {
         String(os.title ?? "").toLowerCase().includes(q) ||
         String(os.description ?? "").toLowerCase().includes(q) ||
         String(os.customer?.name ?? "").toLowerCase().includes(q) ||
-        String(os.assignedTo?.name ?? "").toLowerCase().includes(q);
+        String(os.assignedTo?.name ?? "").toLowerCase().includes(q) ||
+        String(os.cancellationReason ?? "").toLowerCase().includes(q) ||
+        String(os.outcomeSummary ?? "").toLowerCase().includes(q);
 
       const matchesFinance = matchesFinancialFilter(os, financialFilter);
 
@@ -627,6 +719,16 @@ export default function ServiceOrdersPage() {
       return;
     }
 
+    if (newStatus === "DONE") {
+      toast.error("Para concluir a O.S., use Editar e preencha o resumo final.");
+      return;
+    }
+
+    if (newStatus === "CANCELED") {
+      toast.error("Para cancelar a O.S., use Editar e informe o motivo do cancelamento.");
+      return;
+    }
+
     setProcessingId(serviceOrder.id);
     updateMutation.mutate({
       id: serviceOrder.id,
@@ -648,10 +750,18 @@ export default function ServiceOrdersPage() {
   };
 
   const handleFinishExecution = (serviceOrder: ServiceOrder) => {
+    if (!serviceOrder.outcomeSummary?.trim()) {
+      toast.error("Para concluir a O.S., use Editar e preencha o resumo final.");
+      return;
+    }
+
     setProcessingId(serviceOrder.id);
     updateMutation.mutate({
       id: serviceOrder.id,
-      data: { status: "DONE" },
+      data: {
+        status: "DONE",
+        outcomeSummary: serviceOrder.outcomeSummary,
+      },
     });
   };
 
@@ -737,23 +847,35 @@ export default function ServiceOrdersPage() {
     if (!os.amountCents || os.amountCents <= 0) return false;
     return !os.financialSummary?.hasCharge;
   }).length;
+  const openCount = filteredServiceOrders.filter((os) => os.status === "OPEN").length;
+  const assignedCount = filteredServiceOrders.filter((os) => os.status === "ASSIGNED").length;
+  const paidCount = filteredServiceOrders.filter(
+    (os) => os.financialSummary?.chargeStatus === "PAID"
+  ).length;
 
   const hasLocalFilters = Boolean(searchQuery) || financialFilter !== "ALL";
 
   return (
     <div className="space-y-6 p-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold text-gray-900 dark:text-white">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+        <div className="max-w-3xl">
+          <div className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs font-medium text-orange-700 dark:border-orange-900/40 dark:bg-orange-950/20 dark:text-orange-300">
+            <Sparkles className="h-3.5 w-3.5" />
+            Hub operacional da execução
+          </div>
+
+          <h1 className="mt-3 flex items-center gap-2 text-2xl font-bold text-gray-900 dark:text-white">
             <ClipboardList className="h-6 w-6 text-orange-500" />
             Ordens de Serviço
           </h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Execução operacional com leitura financeira clara e menos barulho visual.
+
+          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+            Aqui a operação ganha contexto real: responsável, execução, cobrança e
+            fechamento financeiro na mesma leitura.
           </p>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button
             variant="outline"
             size="sm"
@@ -776,6 +898,82 @@ export default function ServiceOrdersPage() {
         </div>
       </div>
 
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <SummaryCard
+          title="Ordens visíveis"
+          value={totalVisible}
+          subtitle={`${openCount} abertas e ${assignedCount} atribuídas`}
+        />
+        <SummaryCard
+          title="Em execução"
+          value={totalInProgress}
+          subtitle="Serviços rodando agora"
+          tone="warning"
+        />
+        <SummaryCard
+          title="Concluídas com cobrança"
+          value={doneWithCharge}
+          subtitle={`${paidCount} já fechadas no financeiro`}
+          tone="success"
+        />
+        <SummaryCard
+          title="Prontas sem cobrança"
+          value={doneWithoutCharge}
+          subtitle="Buraco entre execução e financeiro"
+          tone="danger"
+        />
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-3">
+        <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+          <div className="flex items-start gap-3">
+            <div className="rounded-lg bg-blue-100 p-2 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+              <Wrench className="h-4 w-4" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                1. Execução
+              </p>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                A O.S. sai de aberta para atribuída, em andamento e concluída.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+          <div className="flex items-start gap-3">
+            <div className="rounded-lg bg-amber-100 p-2 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+              <CreditCard className="h-4 w-4" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                2. Cobrança
+              </p>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Quando a execução fecha com valor, a cobrança precisa nascer sem atrito.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+          <div className="flex items-start gap-3">
+            <div className="rounded-lg bg-green-100 p-2 text-green-700 dark:bg-green-900/30 dark:text-green-300">
+              <BadgeDollarSign className="h-4 w-4" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                3. Fechamento
+              </p>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Acompanhamento do status financeiro até pagamento ou exceção.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="grid gap-3 lg:grid-cols-[1fr_240px_auto_auto]">
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
@@ -786,7 +984,7 @@ export default function ServiceOrdersPage() {
             onKeyDown={(e) => {
               if (e.key === "Enter") handleApplySearch();
             }}
-            placeholder="Buscar por título, cliente, descrição ou responsável"
+            placeholder="Buscar por título, cliente, descrição, responsável ou fechamento"
             className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-10 pr-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
           />
         </div>
@@ -860,40 +1058,6 @@ export default function ServiceOrdersPage() {
           </span>
         </div>
       ) : null}
-
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-        <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-          <p className="text-sm text-gray-600 dark:text-gray-400">Total visível</p>
-          <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">
-            {totalVisible}
-          </p>
-        </div>
-
-        <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-          <p className="text-sm text-gray-600 dark:text-gray-400">Em andamento</p>
-          <p className="mt-1 text-2xl font-bold text-orange-600 dark:text-orange-400">
-            {totalInProgress}
-          </p>
-        </div>
-
-        <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Concluídas c/ cobrança
-          </p>
-          <p className="mt-1 text-2xl font-bold text-green-600 dark:text-green-400">
-            {doneWithCharge}
-          </p>
-        </div>
-
-        <div className="rounded-lg border border-red-200 bg-white p-4 dark:border-red-800 dark:bg-gray-800">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Prontas sem cobrança
-          </p>
-          <p className="mt-1 text-2xl font-bold text-red-600 dark:text-red-400">
-            {doneWithoutCharge}
-          </p>
-        </div>
-      </div>
 
       <div className="flex flex-wrap gap-2">
         {(["", "OPEN", "ASSIGNED", "IN_PROGRESS", "DONE", "CANCELED"] as const).map(
@@ -1050,7 +1214,12 @@ export default function ServiceOrdersPage() {
                         onChange={(e) =>
                           handleStatusChange(os, e.target.value as ServiceOrderStatus)
                         }
-                        disabled={updateMutation.isPending || isProcessing}
+                        disabled={
+                          updateMutation.isPending ||
+                          isProcessing ||
+                          os.status === "DONE" ||
+                          os.status === "CANCELED"
+                        }
                         className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300"
                       >
                         <option value="OPEN">Aberta</option>
@@ -1183,6 +1352,8 @@ export default function ServiceOrdersPage() {
                     />
                   </div>
 
+                  <OperationalClosureCard os={os} />
+
                   {os.appointment ? (
                     <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-400">
                       <span className="font-medium text-gray-900 dark:text-white">
@@ -1215,7 +1386,7 @@ export default function ServiceOrdersPage() {
                         />
                         <InfoItem
                           label="Pago em"
-                          value={formatDateTime(financialSummary.paidAt)}
+                          value={formatDate(financialSummary.paidAt)}
                         />
                       </div>
                     </div>
@@ -1224,37 +1395,36 @@ export default function ServiceOrdersPage() {
               </div>
             );
           })}
+
+          <div className="mt-6 flex items-center justify-between border-t pt-4">
+            <Button
+              onClick={() => setPage(Math.max(1, page - 1))}
+              disabled={page === 1}
+              variant="outline"
+            >
+              Anterior
+            </Button>
+
+            <span className="text-sm text-gray-600">
+              Página {pagination.page} de {pagination.pages}
+            </span>
+
+            <Button
+              onClick={() => setPage(page + 1)}
+              disabled={page >= pagination.pages}
+              variant="outline"
+            >
+              Próxima
+            </Button>
+          </div>
         </div>
       )}
-
-      <div className="flex items-center justify-between">
-        <Button
-          type="button"
-          variant="outline"
-          disabled={page <= 1}
-          onClick={() => setPage((value) => value - 1)}
-        >
-          Anterior
-        </Button>
-
-        <span className="text-sm text-gray-500 dark:text-gray-400">
-          Página {page} de {pagination.pages}
-        </span>
-
-        <Button
-          type="button"
-          variant="outline"
-          disabled={page >= pagination.pages}
-          onClick={() => setPage((value) => value + 1)}
-        >
-          Próxima
-        </Button>
-      </div>
 
       <CreateServiceOrderModal
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         onSuccess={() => {
+          setPage(1);
           void listQuery.refetch();
         }}
         customers={customers}

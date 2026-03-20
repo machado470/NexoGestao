@@ -7,7 +7,7 @@ import { ApiResponseInterceptor } from './common/http/api-response.interceptor'
 
 function parseCorsOrigins(raw?: string): string[] {
   const v = (raw ?? '').trim()
-  if (!v) return ['http://localhost:5173', 'http://127.0.0.1:5173']
+  if (!v) return ['http://localhost:3001', 'http://127.0.0.1:3001']
 
   return v
     .split(',')
@@ -51,8 +51,8 @@ async function bootstrap() {
       exposedHeaders: ['X-RateLimit-Limit', 'X-RateLimit-Remaining'],
     })
 
-    const portRaw = process.env.API_PORT || process.env.PORT || '3000'
-    const port = Number(portRaw) || 3000
+    const portRaw = process.env.API_PORT || process.env.PORT || '3001'
+    const port = Number(portRaw) || 3001
 
     await app.listen(port, '0.0.0.0')
 

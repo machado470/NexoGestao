@@ -73,11 +73,11 @@ async function startServer() {
     serveStatic(app);
   }
 
-  const port = Number(process.env.PORT || "3001");
+  const port = Number(process.env.PORT || "3000");
 
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);
-    console.log(`NEXO_API_URL=${process.env.NEXO_API_URL || "http://127.0.0.1:3000"}`);
+    console.log(`NEXO_API_URL=${process.env.NEXO_API_URL || "http://127.0.0.1:3001"}`);
   });
 }
 

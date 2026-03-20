@@ -3,7 +3,7 @@ import { protectedProcedure, router } from "../_core/trpc";
 import cookie from "cookie";
 import { emitOperationalNotification } from "../_core/operationalNotifications";
 
-const NEXO_API_URL = process.env.NEXO_API_URL || "http://localhost:3000";
+const NEXO_API_URL = process.env.NEXO_API_URL || "http://127.0.0.1:3001";
 const NEXO_TOKEN_COOKIE = "nexo_token";
 
 /**
@@ -85,9 +85,7 @@ export const dataRouter = router({
         })
       )
       .query(async ({ ctx, input }) => {
-        const out = await nexoFetch(ctx, `/customers?page=${input.page}&limit=${input.limit}`, {
-          method: "GET",
-        });
+        const out = await nexoFetch(ctx, `/customers?page=${input.page}&limit=${input.limit}`);
 
         if (Array.isArray(out)) {
           const total = out.length;
@@ -105,211 +103,11 @@ export const dataRouter = router({
         }
 
         return out;
-      }),
-
-    getById: protectedProcedure
-      .input(z.object({ id: zId }))
-      .query(async ({ input, ctx }) => {
-        return await nexoFetch(ctx, `/customers/${input.id}`, { method: "GET" });
-      }),
-
-    update: protectedProcedure
-      .input(
-        z.object({
-          id: zId,
-          name: z.string().min(1).optional(),
-          email: z.string().email().optional(),
-          phone: z.string().optional(),
-          notes: z.string().optional(),
-          active: z.boolean().optional(),
-        })
-      )
-      .mutation(async ({ input, ctx }) => {
-        const { id, ...data } = input;
-        return await nexoFetch(ctx, `/customers/${id}`, {
-          method: "PATCH",
-          body: JSON.stringify(data),
-        });
-      }),
-
-    delete: protectedProcedure
-      .input(z.object({ id: zId }))
-      .mutation(async ({ input, ctx }) => {
-        return await nexoFetch(ctx, `/customers/${input.id}`, { method: "DELETE" });
-      }),
-  }),
-
-  // ===== Appointments =====
-  appointments: router({
-    create: protectedProcedure
-      .input(
-        z.object({
-          customerId: zId,
-          title: z.string().min(1, "Título é obrigatório"),
-          description: z.string().optional(),
-          startsAt: z.date(),
-          endsAt: z.date().optional(),
-          status: z.enum(["SCHEDULED", "CONFIRMED", "CANCELED", "DONE", "NO_SHOW"]).default("SCHEDULED"),
-          notes: z.string().optional(),
-        })
-      )
-      .mutation(async ({ input, ctx }) => {
-        const result = await nexoFetch(ctx, `/appointments`, {
-          method: "POST",
-          body: JSON.stringify({
-            customerId: input.customerId,
-            title: input.title,
-            description: input.description,
-            startsAt: toISO(input.startsAt),
-            endsAt: toISO(input.endsAt),
-            status: input.status,
-            notes: input.notes,
-          }),
-        });
-
-        if (ctx.user?.organizationId && input.status === "CONFIRMED") {
-          await emitOperationalNotification({
-            orgId: ctx.user.organizationId,
-            type: "APPOINTMENT_CONFIRMED",
-            metadata: { appointmentId: result?.id ?? null },
-          });
-        }
-
-        if (ctx.user?.organizationId && input.status === "NO_SHOW") {
-          await emitOperationalNotification({
-            orgId: ctx.user.organizationId,
-            type: "APPOINTMENT_NO_SHOW",
-            metadata: { appointmentId: result?.id ?? null },
-          });
-        }
-
-        return result;
-      }),
-
-    list: protectedProcedure
-      .input(
-        z.object({
-          page: z.number().int().positive().default(1),
-          limit: z.number().int().positive().default(10),
-        })
-      )
-      .query(async ({ ctx, input }) => {
-        const out = await nexoFetch(ctx, `/appointments?page=${input.page}&limit=${input.limit}`, {
-          method: "GET",
-        });
-
-        if (Array.isArray(out)) {
-          const total = out.length;
-          const offset = (input.page - 1) * input.limit;
-          const data = out.slice(offset, offset + input.limit);
-          return {
-            data,
-            pagination: {
-              page: input.page,
-              limit: input.limit,
-              total,
-              pages: Math.ceil(total / input.limit),
-            },
-          };
-        }
-
-        return out;
-      }),
-
-    getById: protectedProcedure
-      .input(z.object({ id: zId }))
-      .query(async ({ input, ctx }) => {
-        return await nexoFetch(ctx, `/appointments/${input.id}`, { method: "GET" });
-      }),
-
-    update: protectedProcedure
-      .input(
-        z.object({
-          id: zId,
-          title: z.string().min(1).optional(),
-          description: z.string().optional(),
-          startsAt: z.date().optional(),
-          endsAt: z.date().optional(),
-          status: z.enum(["SCHEDULED", "CONFIRMED", "CANCELED", "DONE", "NO_SHOW"]).optional(),
-          notes: z.string().optional(),
-        })
-      )
-      .mutation(async ({ input, ctx }) => {
-        const { id, ...data } = input;
-        const result = await nexoFetch(ctx, `/appointments/${id}`, {
-          method: "PATCH",
-          body: JSON.stringify({
-            ...data,
-            startsAt: data.startsAt ? toISO(data.startsAt) : undefined,
-            endsAt: data.endsAt ? toISO(data.endsAt) : undefined,
-          }),
-        });
-
-        if (ctx.user?.organizationId && input.status === "CONFIRMED") {
-          await emitOperationalNotification({
-            orgId: ctx.user.organizationId,
-            type: "APPOINTMENT_CONFIRMED",
-            metadata: { appointmentId: id },
-          });
-        }
-
-        if (ctx.user?.organizationId && input.status === "NO_SHOW") {
-          await emitOperationalNotification({
-            orgId: ctx.user.organizationId,
-            type: "APPOINTMENT_NO_SHOW",
-            metadata: { appointmentId: id },
-          });
-        }
-
-        return result;
-      }),
-
-    delete: protectedProcedure
-      .input(z.object({ id: zId }))
-      .mutation(async ({ input, ctx }) => {
-        return await nexoFetch(ctx, `/appointments/${input.id}`, { method: "DELETE" });
       }),
   }),
 
   // ===== Service Orders =====
   serviceOrders: router({
-    create: protectedProcedure
-      .input(
-        z.object({
-          customerId: zId,
-          title: z.string().min(1, "Título é obrigatório"),
-          description: z.string().optional(),
-          priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).default("MEDIUM"),
-          status: z.enum(["OPEN", "ASSIGNED", "IN_PROGRESS", "DONE", "CANCELED"]).default("OPEN"),
-          assignedTo: z.string().optional(),
-          notes: z.string().optional(),
-        })
-      )
-      .mutation(async ({ input, ctx }) => {
-        const result = await nexoFetch(ctx, `/service-orders`, {
-          method: "POST",
-          body: JSON.stringify({
-            customerId: input.customerId,
-            title: input.title,
-            description: input.description,
-            priority: input.priority,
-            status: input.status,
-            assignedTo: input.assignedTo,
-            notes: input.notes,
-          }),
-        });
-
-        if (ctx.user?.organizationId && input.status === "DONE") {
-          await emitOperationalNotification({
-            orgId: ctx.user.organizationId,
-            type: "SERVICE_ORDER_COMPLETED",
-            metadata: { serviceOrderId: result?.id ?? null },
-          });
-        }
-
-        return result;
-      }),
-
     list: protectedProcedure
       .input(
         z.object({
@@ -318,80 +116,24 @@ export const dataRouter = router({
         })
       )
       .query(async ({ ctx, input }) => {
-        const out = await nexoFetch(ctx, `/service-orders?page=${input.page}&limit=${input.limit}`, {
-          method: "GET",
-        });
-
-        if (Array.isArray(out)) {
-          const total = out.length;
-          const offset = (input.page - 1) * input.limit;
-          const data = out.slice(offset, offset + input.limit);
-          return {
-            data,
-            pagination: {
-              page: input.page,
-              limit: input.limit,
-              total,
-              pages: Math.ceil(total / input.limit),
-            },
-          };
-        }
-
-        return out;
+        return await nexoFetch(
+          ctx,
+          `/service-orders?page=${input.page}&limit=${input.limit}`
+        );
       }),
 
-    getById: protectedProcedure
-      .input(z.object({ id: zId }))
-      .query(async ({ input, ctx }) => {
-        return await nexoFetch(ctx, `/service-orders/${input.id}`, { method: "GET" });
-      }),
-
-    update: protectedProcedure
+    create: protectedProcedure
       .input(
         z.object({
-          id: zId,
-          title: z.string().min(1).optional(),
+          customerId: zId,
+          title: z.string().min(1),
           description: z.string().optional(),
-          priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).optional(),
-          status: z.enum(["OPEN", "ASSIGNED", "IN_PROGRESS", "DONE", "CANCELED"]).optional(),
-          assignedTo: z.string().optional(),
-          notes: z.string().optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
-        const { id, ...data } = input;
-        const result = await nexoFetch(ctx, `/service-orders/${id}`, {
-          method: "PATCH",
-          body: JSON.stringify(data),
-        });
-
-        if (ctx.user?.organizationId && input.status === "DONE") {
-          await emitOperationalNotification({
-            orgId: ctx.user.organizationId,
-            type: "SERVICE_ORDER_COMPLETED",
-            metadata: { serviceOrderId: id },
-          });
-        }
-
-        return result;
-      }),
-
-    delete: protectedProcedure
-      .input(z.object({ id: zId }))
-      .mutation(async ({ input, ctx }) => {
-        return await nexoFetch(ctx, `/service-orders/${input.id}`, { method: "DELETE" });
-      }),
-
-    /**
-     * Gera cobrança manualmente para uma OS finalizada.
-     * Nest: POST /service-orders/:id/generate-charge
-     * Idempotente: se já existe cobrança, atualiza se necessário.
-     */
-    generateCharge: protectedProcedure
-      .input(z.object({ id: zId }))
-      .mutation(async ({ input, ctx }) => {
-        return await nexoFetch(ctx, `/service-orders/${input.id}/generate-charge`, {
+        return await nexoFetch(ctx, `/service-orders`, {
           method: "POST",
+          body: JSON.stringify(input),
         });
       }),
   }),
