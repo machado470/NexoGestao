@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
+import ServiceOrdersStatusBarChart from "@/components/service-orders/ServiceOrdersStatusBarChart";
 import {
   Plus,
   RefreshCw,
@@ -301,7 +302,7 @@ function getFinancialStage(os: ServiceOrder) {
       description: "Cobrança vinculada e paga.",
       className:
         "border-green-200 bg-green-50 text-green-900 dark:border-green-900/50 dark:bg-green-950/20 dark:text-green-300",
-      icon: BadgeDollarSign,
+        icon: BadgeDollarSign,
     };
   }
 
@@ -923,6 +924,13 @@ export default function ServiceOrdersPage() {
           tone="danger"
         />
       </div>
+      <ServiceOrdersStatusBarChart
+        openCount={openCount}
+        assignedCount={assignedCount}
+        inProgressCount={totalInProgress}
+        doneCount={filteredServiceOrders.filter((os) => os.status === "DONE").length}
+        canceledCount={filteredServiceOrders.filter((os) => os.status === "CANCELED").length}
+      />
 
       <div className="grid gap-4 xl:grid-cols-3">
         <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
@@ -1152,7 +1160,7 @@ export default function ServiceOrdersPage() {
                   isHighlighted
                     ? "border-orange-400 ring-2 ring-orange-200 dark:border-orange-500 dark:ring-orange-900/40"
                     : "border-gray-200 dark:border-gray-700"
-                }`}
+                  }`}
               >
                 <div className="flex flex-col gap-4">
                   <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
@@ -1298,19 +1306,25 @@ export default function ServiceOrdersPage() {
                   {!hasAssignedPerson &&
                   os.status !== "DONE" &&
                   os.status !== "CANCELED" ? (
-                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300">
-                      Defina um responsável antes de atribuir ou iniciar a execução desta O.S.
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-300">
+                      <div className="flex items-start gap-2">
+                        <User className="mt-0.5 h-4 w-4 shrink-0" />
+                        <div>
+                          <p className="text-sm font-semibold">Responsável pendente</p>
+                          <p className="mt-1 text-xs opacity-90">
+                            Defina um responsável antes de atribuir ou iniciar a execução.
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   ) : null}
 
-                  <div className="grid gap-3 lg:grid-cols-2">
+                  <div className="grid gap-3 xl:grid-cols-2">
                     <div className={`rounded-lg border p-3 ${operationalStage.className}`}>
                       <div className="flex items-start gap-2">
                         <OperationalIcon className="mt-0.5 h-4 w-4 shrink-0" />
                         <div>
-                          <p className="text-sm font-semibold">
-                            {operationalStage.label}
-                          </p>
+                          <p className="text-sm font-semibold">{operationalStage.label}</p>
                           <p className="mt-1 text-xs opacity-90">
                             {operationalStage.description}
                           </p>
@@ -1322,9 +1336,7 @@ export default function ServiceOrdersPage() {
                       <div className="flex items-start gap-2">
                         <FinancialIcon className="mt-0.5 h-4 w-4 shrink-0" />
                         <div>
-                          <p className="text-sm font-semibold">
-                            {financialStage.label}
-                          </p>
+                          <p className="text-sm font-semibold">{financialStage.label}</p>
                           <p className="mt-1 text-xs opacity-90">
                             {financialStage.description}
                           </p>
@@ -1333,64 +1345,45 @@ export default function ServiceOrdersPage() {
                     </div>
                   </div>
 
+                  <OperationalClosureCard os={os} />
+
                   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                     <InfoItem
                       label="Cliente"
-                      value={os.customer?.name ?? "Cliente não identificado"}
+                      value={os.customer?.name || "Não vinculado"}
                     />
                     <InfoItem
                       label="Responsável"
-                      value={os.assignedTo?.name ?? "Ainda não atribuído"}
+                      value={os.assignedTo?.name || "Não definido"}
                     />
                     <InfoItem
-                      label="Agendada para"
-                      value={formatDateTime(os.scheduledFor)}
+                      label="Agendado para"
+                      value={formatDateTime(os.scheduledFor || os.appointment?.startsAt)}
                     />
                     <InfoItem
-                      label="Valor da O.S."
+                      label="Valor"
                       value={formatCurrency(os.amountCents)}
                     />
                   </div>
 
-                  <OperationalClosureCard os={os} />
-
-                  {os.appointment ? (
-                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-400">
-                      <span className="font-medium text-gray-900 dark:text-white">
-                        Agendamento vinculado:
-                      </span>{" "}
-                      {formatDateTime(os.appointment.startsAt)} •{" "}
-                      {os.appointment.status || "Sem status"}
-                    </div>
-                  ) : null}
-
-                  {financialSummary?.hasCharge ? (
-                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs dark:border-gray-700 dark:bg-gray-900/40">
-                      <p className="flex items-center gap-1 font-medium text-gray-900 dark:text-white">
-                        <Receipt className="h-3.5 w-3.5" />
-                        Cobrança vinculada
-                      </p>
-
-                      <div className="mt-2 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-                        <InfoItem
-                          label="Status"
-                          value={financialSummary.chargeStatus ?? "—"}
-                        />
-                        <InfoItem
-                          label="Valor"
-                          value={formatCurrency(financialSummary.chargeAmountCents)}
-                        />
-                        <InfoItem
-                          label="Vencimento"
-                          value={formatDate(financialSummary.chargeDueDate)}
-                        />
-                        <InfoItem
-                          label="Pago em"
-                          value={formatDate(financialSummary.paidAt)}
-                        />
-                      </div>
-                    </div>
-                  ) : null}
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    <InfoItem
+                      label="Criada em"
+                      value={formatDate(os.createdAt)}
+                    />
+                    <InfoItem
+                      label="Atualizada em"
+                      value={formatDate(os.updatedAt)}
+                    />
+                    <InfoItem
+                      label="Iniciada em"
+                      value={formatDateTime(os.startedAt)}
+                    />
+                    <InfoItem
+                      label="Finalizada em"
+                      value={formatDateTime(os.finishedAt)}
+                    />
+                  </div>
                 </div>
               </div>
             );
@@ -1424,7 +1417,6 @@ export default function ServiceOrdersPage() {
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         onSuccess={() => {
-          setPage(1);
           void listQuery.refetch();
         }}
         customers={customers}
@@ -1441,6 +1433,7 @@ export default function ServiceOrdersPage() {
           void listQuery.refetch();
         }}
         serviceOrderId={selectedServiceOrderId}
+        customers={customers}
         people={people}
       />
     </div>

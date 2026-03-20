@@ -1,4 +1,7 @@
-import { jsxLocPlugin } from "@builder.io/vite-plugin-jsx-loc";
+cd ~/NexoGestao
+
+rm -f apps/web/vite.config.ts
+nano apps/web/vite.config.tsimport { jsxLocPlugin } from "@builder.io/vite-plugin-jsx-loc";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import fs from "node:fs";
@@ -150,6 +153,14 @@ function getVendorChunk(id: string) {
   if (!id.includes("node_modules")) return undefined;
 
   if (
+    id.includes("/react/") ||
+    id.includes("/react-dom/") ||
+    id.includes("/scheduler/")
+  ) {
+    return "vendor-react";
+  }
+
+  if (
     id.includes("@trpc") ||
     id.includes("@tanstack/react-query") ||
     id.includes("@tanstack/query-core") ||
@@ -254,10 +265,3 @@ export default defineConfig({
       ".manusvm.computer",
       "localhost",
       "127.0.0.1",
-    ],
-    fs: {
-      strict: true,
-      deny: ["**/.*"],
-    },
-  },
-});

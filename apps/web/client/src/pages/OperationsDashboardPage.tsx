@@ -18,6 +18,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import OperationsCompletionRadial from "@/components/operations/OperationsCompletionRadial";
+import OperationsFlowAreaChart from "@/components/operations/OperationsFlowAreaChart";
 import {
   AlertTriangle,
   ArrowRightLeft,
@@ -26,7 +28,6 @@ import {
   Clock3,
   CreditCard,
   PlayCircle,
-  Receipt,
   RefreshCw,
   TimerReset,
   Wallet,
@@ -455,6 +456,22 @@ export default function OperationsDashboardPage() {
           title="Atrasos críticos"
           value={overdueCharges.length + lateServices.length + doneOrdersWithoutCharge.length}
           subtitle="Financeiro e operação pedindo ação"
+        />
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <OperationsCompletionRadial
+          totalOrders={todayServiceOrders.length}
+          completedOrders={todayDoneOrders.length}
+          title="Conclusão operacional do dia"
+          description="Percentual das ordens do dia que já chegaram ao fechamento"
+        />
+
+        <OperationsFlowAreaChart
+          openOrders={todayOpenOrders.length}
+          assignedOrders={todayAssignedOrders.length}
+          inProgressOrders={todayInProgressOrders.length}
+          completedOrders={todayDoneOrders.length}
         />
       </div>
 

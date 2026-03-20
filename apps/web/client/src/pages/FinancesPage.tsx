@@ -14,6 +14,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import FinanceOverviewAreaChart from "@/components/finance/FinanceOverviewAreaChart";
 import {
   Loader2,
   AlertCircle,
@@ -638,6 +639,14 @@ export default function FinancesPage() {
               tone="success"
             />
           </div>
+        ) : null}
+
+        {!isServiceOrderScoped && stats ? (
+          <FinanceOverviewAreaChart
+            paidAmount={Number(stats.totalPaidAmount || 0)}
+            pendingAmount={Number(stats.totalPendingAmount || 0)}
+            overdueAmount={Number(stats.totalOverdueAmount || 0)}
+          />
         ) : null}
 
         {serviceOrderIdFromUrl ? (
