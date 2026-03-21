@@ -45,6 +45,35 @@ export type FinancialSummary = {
   paidAt?: string | null;
 };
 
+export type ExecutionChecklistItem =
+  | string
+  | {
+      label?: string | null;
+      value?: string | null;
+      checked?: boolean | null;
+      note?: string | null;
+    };
+
+export type ExecutionAttachment =
+  | string
+  | {
+      id?: string | null;
+      name?: string | null;
+      url?: string | null;
+      type?: string | null;
+      size?: number | null;
+    };
+
+export type TimelineEventMetadata = {
+  serviceOrderId?: string | null;
+  chargeId?: string | null;
+  executionId?: string | null;
+  amountCents?: number | null;
+  status?: string | null;
+  dueDate?: string | null;
+  [key: string]: unknown;
+};
+
 export type ServiceOrder = {
   id: string;
   customerId: string;
@@ -94,8 +123,8 @@ export type ExecutionRecord = {
   startedAt?: string | null;
   endedAt?: string | null;
   notes?: string | null;
-  checklist?: Array<any>;
-  attachments?: Array<any>;
+  checklist?: ExecutionChecklistItem[];
+  attachments?: ExecutionAttachment[];
   status?: string | null;
   amountCents?: number | null;
   dueDate?: string | null;
@@ -111,7 +140,7 @@ export type TimelineEvent = {
   type?: string | null;
   description?: string | null;
   createdAt?: string | null;
-  metadata?: Record<string, unknown> | null;
+  metadata?: TimelineEventMetadata | null;
 };
 
 export type StageTone = {

@@ -10,162 +10,20 @@ import {
   FileText,
   Ban,
 } from "lucide-react";
-
-type ServiceOrderStatus =
-  | "OPEN"
-  | "ASSIGNED"
-  | "IN_PROGRESS"
-  | "DONE"
-  | "CANCELED";
-
-type ChargeStatus = "PENDING" | "PAID" | "OVERDUE" | "CANCELED";
-
-type CustomerRef = {
-  id: string;
-  name: string;
-  phone?: string | null;
-};
-
-type AssignedPersonRef = {
-  id: string;
-  name: string;
-};
-
-type AppointmentRef = {
-  id: string;
-  startsAt?: string | null;
-  endsAt?: string | null;
-  status?: string | null;
-};
-
-type FinancialSummary = {
-  hasCharge: boolean;
-  chargeId: string | null;
-  chargeStatus: ChargeStatus | null;
-  chargeAmountCents: number | null;
-  chargeDueDate?: string | null;
-  paidAt?: string | null;
-};
-
-type ServiceOrder = {
-  id: string;
-  customerId: string;
-  customer?: CustomerRef | null;
-  assignedToPersonId?: string | null;
-  assignedTo?: AssignedPersonRef | null;
-  appointmentId?: string | null;
-  appointment?: AppointmentRef | null;
-  title: string;
-  description?: string | null;
-  status: ServiceOrderStatus;
-  priority?: number | null;
-  scheduledFor?: string | null;
-  startedAt?: string | null;
-  finishedAt?: string | null;
-  amountCents?: number | null;
-  dueDate?: string | null;
-  cancellationReason?: string | null;
-  outcomeSummary?: string | null;
-  createdAt?: string;
-  updatedAt?: string;
-  financialSummary?: FinancialSummary | null;
-};
-
-type StageTone = {
-  label: string;
-  description: string;
-  className: string;
-  icon: React.ComponentType<{ className?: string }>;
-};
-
-const STATUS_LABELS: Record<ServiceOrderStatus, string> = {
-  OPEN: "Aberta",
-  ASSIGNED: "Atribuída",
-  IN_PROGRESS: "Em andamento",
-  DONE: "Concluída",
-  CANCELED: "Cancelada",
-};
-
-const STATUS_COLORS: Record<ServiceOrderStatus, string> = {
-  OPEN: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
-  ASSIGNED:
-    "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300",
-  IN_PROGRESS:
-    "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300",
-  DONE: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
-  CANCELED: "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300",
-};
-
-function getPriorityLabel(priority?: number | null) {
-  switch (priority) {
-    case 1:
-      return "Muito baixa";
-    case 2:
-      return "Baixa";
-    case 3:
-      return "Média";
-    case 4:
-      return "Alta";
-    case 5:
-      return "Urgente";
-    default:
-      return "Baixa";
-  }
-}
-
-function getPriorityColor(priority?: number | null) {
-  switch (priority) {
-    case 5:
-      return "text-red-500";
-    case 4:
-      return "text-orange-500";
-    case 3:
-      return "text-blue-500";
-    case 2:
-      return "text-gray-500";
-    case 1:
-      return "text-zinc-400";
-    default:
-      return "text-gray-500";
-  }
-}
-
-function formatDate(value?: string | null) {
-  if (!value) return "—";
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
-
-  return date.toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-}
-
-function formatDateTime(value?: string | null) {
-  if (!value) return "—";
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
-
-  return date.toLocaleString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function formatCurrency(cents?: number | null) {
-  const amount = Number(cents ?? 0);
-
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  }).format(amount / 100);
-}
+import type {
+  ServiceOrder,
+  ServiceOrderStatus,
+  StageTone,
+} from "./service-order.types";
+import {
+  STATUS_COLORS,
+  STATUS_LABELS,
+  formatCurrency,
+  formatDate,
+  formatDateTime,
+  getPriorityColor,
+  getPriorityLabel,
+} from "./service-order.utils";
 
 function InfoItem({
   label,
@@ -271,7 +129,10 @@ export default function ServiceOrderCard({
   operationalStage: StageTone;
   financialStage: StageTone;
   onEdit: (serviceOrderId: string) => void;
-  onStatusChange: (serviceOrder: ServiceOrder, newStatus: ServiceOrderStatus) => void;
+  onStatusChange: (
+    serviceOrder: ServiceOrder,
+    newStatus: ServiceOrderStatus
+  ) => void;
   onStartExecution: (serviceOrder: ServiceOrder) => void;
   onFinishExecution: (serviceOrder: ServiceOrder) => void;
   onGenerateCharge: (serviceOrder: ServiceOrder) => void;
@@ -505,10 +366,7 @@ export default function ServiceOrderCard({
         <OperationalClosureCard os={os} />
 
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <InfoItem
-            label="Cliente"
-            value={os.customer?.name || "Não vinculado"}
-          />
+          <InfoItem label="Cliente" value={os.customer?.name || "Não vinculado"} />
           <InfoItem
             label="Responsável"
             value={os.assignedTo?.name || "Não definido"}
@@ -517,25 +375,13 @@ export default function ServiceOrderCard({
             label="Agendado para"
             value={formatDateTime(os.scheduledFor || os.appointment?.startsAt)}
           />
-          <InfoItem
-            label="Valor"
-            value={formatCurrency(os.amountCents)}
-          />
+          <InfoItem label="Valor" value={formatCurrency(os.amountCents)} />
         </div>
 
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <InfoItem
-            label="Criada em"
-            value={formatDate(os.createdAt)}
-          />
-          <InfoItem
-            label="Atualizada em"
-            value={formatDate(os.updatedAt)}
-          />
-          <InfoItem
-            label="Iniciada em"
-            value={formatDateTime(os.startedAt)}
-          />
+          <InfoItem label="Criada em" value={formatDate(os.createdAt)} />
+          <InfoItem label="Atualizada em" value={formatDate(os.updatedAt)} />
+          <InfoItem label="Iniciada em" value={formatDateTime(os.startedAt)} />
           <InfoItem
             label="Finalizada em"
             value={formatDateTime(os.finishedAt)}
@@ -543,14 +389,8 @@ export default function ServiceOrderCard({
         </div>
 
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <InfoItem
-            label="Vencimento"
-            value={formatDate(os.dueDate)}
-          />
-          <InfoItem
-            label="Cobrança"
-            value={chargeBadge.label}
-          />
+          <InfoItem label="Vencimento" value={formatDate(os.dueDate)} />
+          <InfoItem label="Cobrança" value={chargeBadge.label} />
           <InfoItem
             label="Pagamento"
             value={formatDateTime(os.financialSummary?.paidAt)}

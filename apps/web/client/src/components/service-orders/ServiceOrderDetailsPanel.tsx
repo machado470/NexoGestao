@@ -11,11 +11,16 @@ import {
   CheckCircle2,
   AlertCircle,
   Clock3,
+  Check,
+  Link2,
 } from "lucide-react";
 import type {
+  ExecutionAttachment,
+  ExecutionChecklistItem,
   ExecutionRecord,
   ServiceOrder,
   TimelineEvent,
+  TimelineEventMetadata,
 } from "./service-order.types";
 import { formatCurrency, formatDate, formatDateTime } from "./service-order.utils";
 
@@ -95,13 +100,13 @@ function getEventIcon(event: TimelineEvent) {
 }
 
 function getEventSummary(event: TimelineEvent) {
-  const metadata = (event.metadata ?? {}) as Record<string, any>;
-  const serviceOrderId = metadata?.serviceOrderId;
-  const chargeId = metadata?.chargeId;
-  const executionId = metadata?.executionId;
-  const amountCents = metadata?.amountCents;
-  const status = metadata?.status;
-  const dueDate = metadata?.dueDate;
+  const metadata = (event.metadata ?? {}) as TimelineEventMetadata;
+  const serviceOrderId = metadata.serviceOrderId;
+  const chargeId = metadata.chargeId;
+  const executionId = metadata.executionId;
+  const amountCents = metadata.amountCents;
+  const status = metadata.status;
+  const dueDate = metadata.dueDate;
 
   const pieces: string[] = [];
 
@@ -132,6 +137,67 @@ function getEventSummary(event: TimelineEvent) {
   return pieces.join(" • ");
 }
 
+function formatChecklistItem(item: ExecutionChecklistItem) {
+  if (typeof item === "string") {
+    return {
+      title: item,
+      subtitle: "",
+      checked: null as boolean | null,
+    };
+  }
+
+  const title =
+    item.label?.trim() ||
+    item.value?.trim() ||
+    item.note?.trim() ||
+    "Item de checklist";
+
+  const subtitle = [
+    typeof item.value === "string" && item.value.trim() ? item.value.trim() : "",
+    typeof item.note === "string" && item.note.trim() ? item.note.trim() : "",
+  ]
+    .filter(Boolean)
+    .join(" • ");
+
+  return {
+    title,
+    subtitle,
+    checked: typeof item.checked === "boolean" ? item.checked : null,
+  };
+}
+
+function formatAttachmentItem(item: ExecutionAttachment) {
+  if (typeof item === "string") {
+    return {
+      title: item,
+      subtitle: "",
+      url: "",
+    };
+  }
+
+  const title =
+    item.name?.trim() ||
+    item.type?.trim() ||
+    item.url?.trim() ||
+    item.id?.trim() ||
+    "Anexo";
+
+  const subtitle = [
+    typeof item.type === "string" && item.type.trim() ? item.type.trim() : "",
+    typeof item.size === "number" && Number.isFinite(item.size)
+      ? `${item.size} bytes`
+      : "",
+  ]
+    .filter(Boolean)
+    .join(" • ");
+
+  return {
+    title,
+    subtitle,
+    url: typeof item.url === "string" ? item.url : "",
+  };
+}
+
 function InfoItem({
   label,
   value,
@@ -149,6 +215,48 @@ function InfoItem({
       </p>
     </div>
   );
+}
+
+function sortByCreatedAtDesc<T extends { createdAt?: string | null }>(rows: T[]) {
+  return [...rows].sort((a, b) => {
+    const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    return bTime - aTime;
+  });
+}
+
+function normalizeTimelinePayload(payload: unknown): TimelineEvent[] {
+  if (
+    payload &&
+    typeof payload === "object" &&
+    "data" in payload &&
+    Array.isArray((payload as { data?: unknown }).data)
+  ) {
+    return (payload as { data: TimelineEvent[] }).data;
+  }
+
+  if (Array.isArray(payload)) {
+    return payload as TimelineEvent[];
+  }
+
+  return [];
+}
+
+function normalizeExecutionPayload(payload: unknown): ExecutionRecord[] {
+  if (
+    payload &&
+    typeof payload === "object" &&
+    "data" in payload &&
+    Array.isArray((payload as { data?: unknown }).data)
+  ) {
+    return (payload as { data: ExecutionRecord[] }).data;
+  }
+
+  if (Array.isArray(payload)) {
+    return payload as ExecutionRecord[];
+  }
+
+  return [];
 }
 
 export default function ServiceOrderDetailsPanel({
@@ -178,23 +286,11 @@ export default function ServiceOrderDetailsPanel({
   );
 
   const timelineEvents = useMemo(() => {
-    const payload = timelineQuery.data as any;
-    const rows = Array.isArray(payload?.data)
-      ? payload.data
-      : Array.isArray(payload)
-        ? payload
-        : [];
-    return rows as TimelineEvent[];
+    return sortByCreatedAtDesc(normalizeTimelinePayload(timelineQuery.data));
   }, [timelineQuery.data]);
 
   const executionRows = useMemo(() => {
-    const payload = executionQuery.data as any;
-    const rows = Array.isArray(payload?.data)
-      ? payload.data
-      : Array.isArray(payload)
-        ? payload
-        : [];
-    return rows as ExecutionRecord[];
+    return sortByCreatedAtDesc(normalizeExecutionPayload(executionQuery.data));
   }, [executionQuery.data]);
 
   const latestExecution = executionRows[0] ?? null;
@@ -279,16 +375,37 @@ export default function ServiceOrderDetailsPanel({
                     </p>
                   ) : (
                     <div className="space-y-2">
-                      {checklist.map((item, index) => (
-                        <div
-                          key={`checklist-${index}`}
-                          className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800"
-                        >
-                          {typeof item === "string"
-                            ? item
-                            : JSON.stringify(item)}
-                        </div>
-                      ))}
+                      {checklist.map((item, index) => {
+                        const parsed = formatChecklistItem(item);
+
+                        return (
+                          <div
+                            key={`checklist-${index}`}
+                            className="rounded-md border border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-800"
+                          >
+                            <div className="flex items-start gap-2">
+                              {parsed.checked === true ? (
+                                <Check className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
+                              ) : parsed.checked === false ? (
+                                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                              ) : (
+                                <ListChecks className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
+                              )}
+
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                  {parsed.title}
+                                </p>
+                                {parsed.subtitle ? (
+                                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                    {parsed.subtitle}
+                                  </p>
+                                ) : null}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -307,16 +424,36 @@ export default function ServiceOrderDetailsPanel({
                     </p>
                   ) : (
                     <div className="space-y-2">
-                      {attachments.map((item, index) => (
-                        <div
-                          key={`attachment-${index}`}
-                          className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800"
-                        >
-                          {typeof item === "string"
-                            ? item
-                            : JSON.stringify(item)}
-                        </div>
-                      ))}
+                      {attachments.map((item, index) => {
+                        const parsed = formatAttachmentItem(item);
+
+                        return (
+                          <div
+                            key={`attachment-${index}`}
+                            className="rounded-md border border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-800"
+                          >
+                            <div className="flex items-start gap-2">
+                              <Paperclip className="mt-0.5 h-4 w-4 shrink-0 text-gray-500" />
+                              <div className="min-w-0">
+                                <p className="break-all text-sm font-medium text-gray-900 dark:text-white">
+                                  {parsed.title}
+                                </p>
+                                {parsed.subtitle ? (
+                                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                    {parsed.subtitle}
+                                  </p>
+                                ) : null}
+                                {parsed.url ? (
+                                  <p className="mt-1 break-all text-xs text-blue-600 dark:text-blue-400">
+                                    <Link2 className="mr-1 inline h-3.5 w-3.5" />
+                                    {parsed.url}
+                                  </p>
+                                ) : null}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
