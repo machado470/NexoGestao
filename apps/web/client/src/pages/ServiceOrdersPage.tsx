@@ -1,860 +1,196 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useLocation } from "wouter";
+import { useEffect, useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
-import ServiceOrdersStatusBarChart from "@/components/service-orders/ServiceOrdersStatusBarChart";
+import { normalizeList } from "@/lib/utils/normalizeList";
 import ServiceOrderCard from "@/components/service-orders/ServiceOrderCard";
-import {
-  Plus,
-  RefreshCw,
-  ClipboardList,
-  AlertCircle,
-  Sparkles,
-  Wrench,
-  CreditCard,
-  BadgeDollarSign,
-  Search,
-  X,
-} from "lucide-react";
 import CreateServiceOrderModal from "@/components/CreateServiceOrderModal";
 import EditServiceOrderModal from "@/components/EditServiceOrderModal";
-import { toast } from "sonner";
-import type {
-  ExecutionRecord,
-  FinancialFilter,
-  GenerateChargeResponse,
-  ServiceOrder,
-  ServiceOrdersListResult,
-  ServiceOrderStatus,
-} from "@/components/service-orders/service-order.types";
 import {
-  buildServiceOrdersUrl,
   getChargeBadge,
-  getFinancialFilterLabel,
   getFinancialStage,
   getOperationalStage,
-  getServiceOrderIdFromUrl,
+  getPriorityScore,
   matchesFinancialFilter,
-  normalizeText,
-  STATUS_LABELS,
+  getServiceOrderIdFromUrl,
+  buildServiceOrdersUrl,
 } from "@/components/service-orders/service-order.utils";
-
-function SummaryCard({
-  title,
-  value,
-  subtitle,
-  tone = "default",
-}: {
-  title: string;
-  value: string | number;
-  subtitle: string;
-  tone?: "default" | "warning" | "success" | "danger";
-}) {
-  const toneClass =
-    tone === "warning"
-      ? "border-amber-200 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-950/20"
-      : tone === "success"
-        ? "border-green-200 bg-green-50 dark:border-green-900/40 dark:bg-green-950/20"
-        : tone === "danger"
-          ? "border-red-200 bg-red-50 dark:border-red-900/40 dark:bg-red-950/20"
-          : "border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800";
-
-  return (
-    <div className={`rounded-xl border p-4 ${toneClass}`}>
-      <p className="text-sm text-gray-600 dark:text-gray-400">{title}</p>
-      <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">
-        {value}
-      </p>
-      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{subtitle}</p>
-    </div>
-  );
-}
+import type {
+  FinancialFilter,
+  ServiceOrder,
+} from "@/components/service-orders/service-order.types";
 
 export default function ServiceOrdersPage() {
-  const [, navigate] = useLocation();
-  const [page, setPage] = useState(1);
-  const limit = 20;
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [selectedServiceOrderId, setSelectedServiceOrderId] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<ServiceOrderStatus | "">("");
-  const [financialFilter, setFinancialFilter] = useState<FinancialFilter>("ALL");
-  const [searchInput, setSearchInput] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [processingId, setProcessingId] = useState<string | null>(null);
-  const [highlightedServiceOrderId, setHighlightedServiceOrderId] = useState<string | null>(
-    () => getServiceOrderIdFromUrl()
-  );
-  const [expandedServiceOrderId, setExpandedServiceOrderId] = useState<string | null>(null);
-
-  const serviceOrderRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const utils = trpc.useUtils();
 
-  const listQuery = trpc.nexo.serviceOrders.list.useQuery(
-    {
-      page,
-      limit,
-      ...(statusFilter ? { status: statusFilter } : {}),
-    },
-    {
-      retry: false,
-      refetchOnWindowFocus: false,
-    }
-  );
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [processingId, setProcessingId] = useState<string | null>(null);
+  const [filter, setFilter] = useState<FinancialFilter>("ALL");
+
+  const listQuery = trpc.nexo.serviceOrders.list.useQuery({
+    page: 1,
+    limit: 50,
+  });
 
   const customersQuery = trpc.nexo.customers.list.useQuery(undefined, {
     retry: false,
-    refetchOnWindowFocus: false,
-  });
-
-  const peopleQuery = trpc.people.list.useQuery(undefined, {
-    retry: false,
-    refetchOnWindowFocus: false,
-  });
-
-  const executionStartMutation = trpc.nexo.executions.start.useMutation({
-    onError: (err) => {
-      toast.error(err.message || "Erro ao iniciar execução");
-    },
-    onSettled: () => {
-      setProcessingId(null);
-    },
-  });
-
-  const executionCompleteMutation = trpc.nexo.executions.complete.useMutation({
-    onError: (err) => {
-      toast.error(err.message || "Erro ao concluir execução");
-    },
-    onSettled: () => {
-      setProcessingId(null);
-    },
-  });
-
-  const serviceOrdersResult = (listQuery.data ?? {
-    data: [],
-    pagination: {
-      page: 1,
-      limit,
-      total: 0,
-      pages: 1,
-    },
-  }) as ServiceOrdersListResult;
-
-  const serviceOrders = useMemo(() => {
-    return Array.isArray(serviceOrdersResult.data)
-      ? serviceOrdersResult.data
-      : [];
-  }, [serviceOrdersResult]);
-
-  const filteredServiceOrders = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-
-    return serviceOrders.filter((os) => {
-      const matchesText =
-        !q ||
-        String(os.title ?? "").toLowerCase().includes(q) ||
-        String(os.description ?? "").toLowerCase().includes(q) ||
-        String(os.customer?.name ?? "").toLowerCase().includes(q) ||
-        String(os.assignedTo?.name ?? "").toLowerCase().includes(q) ||
-        String(os.cancellationReason ?? "").toLowerCase().includes(q) ||
-        String(os.outcomeSummary ?? "").toLowerCase().includes(q);
-
-      const matchesFinance = matchesFinancialFilter(os, financialFilter);
-
-      return matchesText && matchesFinance;
-    });
-  }, [financialFilter, searchQuery, serviceOrders]);
-
-  const pagination = serviceOrdersResult.pagination ?? {
-    page: 1,
-    limit,
-    total: 0,
-    pages: 1,
-  };
-
-  const highlightedServiceOrder = useMemo(() => {
-    if (!highlightedServiceOrderId) return null;
-    return serviceOrders.find((os) => os.id === highlightedServiceOrderId) ?? null;
-  }, [serviceOrders, highlightedServiceOrderId]);
-
-  const highlightedExistsOnCurrentPage = useMemo(() => {
-    if (!highlightedServiceOrderId) return false;
-    return filteredServiceOrders.some((os) => os.id === highlightedServiceOrderId);
-  }, [filteredServiceOrders, highlightedServiceOrderId]);
-
-  const updateMutation = trpc.nexo.serviceOrders.update.useMutation({
-    onSuccess: () => {
-      toast.success("OS atualizada com sucesso!");
-      void listQuery.refetch();
-    },
-    onError: (err) => {
-      toast.error(err.message || "Erro ao atualizar OS");
-    },
-    onSettled: () => {
-      setProcessingId(null);
-    },
-  });
-
-  const generateChargeMutation = trpc.nexo.serviceOrders.generateCharge.useMutation({
-    onError: (err) => {
-      toast.error(err.message || "Erro ao gerar cobrança");
-    },
-    onSettled: () => {
-      setProcessingId(null);
-    },
   });
 
   const customers = useMemo(() => {
-    const payload = customersQuery.data;
-    const rows = Array.isArray((payload as any)?.data)
-      ? (payload as any).data
-      : Array.isArray(payload)
-        ? payload
-        : [];
-
-    return rows.map((customer: any) => ({
-      id: String(customer.id),
-      name: String(customer.name),
-    }));
+    return normalizeList<{ id: string; name: string }>(customersQuery.data);
   }, [customersQuery.data]);
 
-  const people = useMemo(() => {
-    const payload = peopleQuery.data;
-    const rows = Array.isArray((payload as any)?.data)
-      ? (payload as any).data
-      : Array.isArray(payload)
-        ? payload
-        : [];
+  const people: { id: string; name: string }[] = [];
 
-    return rows
-      .filter((person: any) => person?.active !== false)
-      .map((person: any) => ({
-        id: String(person.id),
-        name: String(person.name),
-      }));
-  }, [peopleQuery.data]);
+  const generateCharge = trpc.nexo.serviceOrders.generateCharge.useMutation({
+    onSuccess: () => utils.nexo.serviceOrders.list.invalidate(),
+  });
+
+  const startExecution = trpc.nexo.executions.start.useMutation({
+    onSuccess: () => utils.nexo.serviceOrders.list.invalidate(),
+  });
+
+  const finishExecution = trpc.nexo.executions.complete.useMutation({
+    onSuccess: () => utils.nexo.serviceOrders.list.invalidate(),
+  });
+
+  const list = useMemo(() => {
+    return normalizeList<ServiceOrder>(listQuery.data);
+  }, [listQuery.data]);
+
+  const sorted = useMemo(() => {
+    return [...list].sort(
+      (a: ServiceOrder, b: ServiceOrder) =>
+        getPriorityScore(b) - getPriorityScore(a),
+    );
+  }, [list]);
+
+  const filtered = useMemo(() => {
+    return sorted.filter((os) => matchesFinancialFilter(os, filter));
+  }, [sorted, filter]);
 
   useEffect(() => {
-    if (listQuery.error) {
-      toast.error("Erro ao carregar ordens de serviço: " + listQuery.error.message);
-    }
-  }, [listQuery.error]);
-
-  useEffect(() => {
-    const syncFromUrl = () => {
-      const serviceOrderIdFromUrl = getServiceOrderIdFromUrl();
-      setHighlightedServiceOrderId((current) => {
-        if (current === serviceOrderIdFromUrl) return current;
-        return serviceOrderIdFromUrl;
-      });
-
-      if (serviceOrderIdFromUrl) {
-        setExpandedServiceOrderId(serviceOrderIdFromUrl);
-      }
-    };
-
-    syncFromUrl();
-    window.addEventListener("popstate", syncFromUrl);
-
-    return () => {
-      window.removeEventListener("popstate", syncFromUrl);
-    };
+    const id = getServiceOrderIdFromUrl();
+    if (id) setExpandedId(id);
   }, []);
 
-  useEffect(() => {
-    if (!highlightedServiceOrderId) return;
-    if (listQuery.isLoading) return;
-    if (!highlightedExistsOnCurrentPage) return;
+  function openDeepLink(id: string) {
+    window.history.pushState({}, "", buildServiceOrdersUrl(id));
+    setExpandedId(id);
+  }
 
-    const element = serviceOrderRefs.current[highlightedServiceOrderId];
-    if (!element) return;
-
-    element.scrollIntoView({
-      behavior: "smooth",
-      block: "center",
-    });
-  }, [
-    highlightedServiceOrderId,
-    highlightedExistsOnCurrentPage,
-    listQuery.isLoading,
-    filteredServiceOrders,
-  ]);
-
-  const handleStatusChange = (serviceOrder: ServiceOrder, newStatus: ServiceOrderStatus) => {
-    const hasAssignedPerson = Boolean(serviceOrder.assignedToPersonId);
-
-    if (!hasAssignedPerson && (newStatus === "ASSIGNED" || newStatus === "IN_PROGRESS")) {
-      toast.error("Defina um responsável antes de usar esse status.");
-      return;
-    }
-
-    if (newStatus === "DONE") {
-      toast.error("Para concluir a O.S., use Finalizar ou Editar e registre o fechamento.");
-      return;
-    }
-
-    if (newStatus === "CANCELED") {
-      toast.error("Para cancelar a O.S., use Editar e informe o motivo do cancelamento.");
-      return;
-    }
-
-    setProcessingId(serviceOrder.id);
-    updateMutation.mutate({
-      id: serviceOrder.id,
-      data: { status: newStatus },
-    });
-  };
-
-  const handleStartExecution = async (serviceOrder: ServiceOrder) => {
-    if (!serviceOrder.assignedToPersonId) {
-      toast.error("Defina um responsável antes de iniciar a execução.");
-      return;
-    }
-
-    setProcessingId(serviceOrder.id);
-
+  async function handleStart(os: ServiceOrder) {
     try {
-      const payload = (await executionStartMutation.mutateAsync({
-        serviceOrderId: serviceOrder.id,
-        notes: normalizeText(serviceOrder.description),
-      })) as ExecutionRecord;
-
-      await Promise.all([
-        listQuery.refetch(),
-        utils.nexo.timeline.listByServiceOrder.invalidate({
-          serviceOrderId: serviceOrder.id,
-          limit: 20,
-        }),
-        utils.nexo.executions.listByServiceOrder.invalidate({
-          serviceOrderId: serviceOrder.id,
-        }),
-      ]);
-
-      if (payload?.idempotent) {
-        toast.success("Execução já estava encerrada.");
-        return;
-      }
-
-      toast.success("Execução iniciada com sucesso!");
-      setExpandedServiceOrderId(serviceOrder.id);
-    } catch {
-      // toast já tratado
+      setProcessingId(os.id);
+      await startExecution.mutateAsync({ serviceOrderId: os.id });
+    } finally {
+      setProcessingId(null);
     }
-  };
+  }
 
-  const handleFinishExecution = async (serviceOrder: ServiceOrder) => {
-    const notes = normalizeText(serviceOrder.outcomeSummary);
-
-    if (!notes) {
-      toast.error("Para concluir a O.S., use Editar e preencha o resumo final.");
-      return;
-    }
-
-    setProcessingId(serviceOrder.id);
-
+  async function handleFinish(os: ServiceOrder) {
     try {
-      const payload = (await executionCompleteMutation.mutateAsync({
-        id: serviceOrder.id,
-        notes,
-      })) as ExecutionRecord;
-
-      await Promise.all([
-        listQuery.refetch(),
-        utils.finance.charges.list.invalidate(),
-        utils.finance.charges.stats.invalidate(),
-        utils.nexo.timeline.listByServiceOrder.invalidate({
-          serviceOrderId: serviceOrder.id,
-          limit: 20,
-        }),
-        utils.nexo.executions.listByServiceOrder.invalidate({
-          serviceOrderId: serviceOrder.id,
-        }),
-      ]);
-
-      if (payload?.idempotent) {
-        toast.success("Execução já estava concluída.");
-        return;
-      }
-
-      toast.success("Execução finalizada com sucesso!");
-      setExpandedServiceOrderId(serviceOrder.id);
-    } catch {
-      // toast já tratado
+      setProcessingId(os.id);
+      await finishExecution.mutateAsync({ id: os.id });
+    } finally {
+      setProcessingId(null);
     }
-  };
+  }
 
-  const handleGenerateCharge = async (serviceOrder: ServiceOrder) => {
-    if (!serviceOrder.customerId) {
-      toast.error("OS sem cliente vinculado.");
-      return;
-    }
-
-    if (!serviceOrder.amountCents || serviceOrder.amountCents <= 0) {
-      toast.error("Defina um valor válido na OS antes de gerar cobrança.");
-      return;
-    }
-
-    setProcessingId(serviceOrder.id);
-
+  async function handleCharge(os: ServiceOrder) {
     try {
-      const payload = (await generateChargeMutation.mutateAsync({
-        id: serviceOrder.id,
-      })) as GenerateChargeResponse;
-
-      await Promise.all([
-        listQuery.refetch(),
-        utils.finance.charges.list.invalidate(),
-        utils.finance.charges.stats.invalidate(),
-        utils.nexo.timeline.listByServiceOrder.invalidate({
-          serviceOrderId: serviceOrder.id,
-          limit: 20,
-        }),
-      ]);
-
-      if (payload?.created) {
-        toast.success("Cobrança gerada com sucesso!");
-        return;
-      }
-
-      if (payload?.chargeId) {
-        toast.success("Cobrança já existia e foi reaproveitada.");
-        return;
-      }
-
-      toast.success("Verificação de cobrança concluída.");
-    } catch {
-      // toast já tratado
+      setProcessingId(os.id);
+      await generateCharge.mutateAsync({ id: os.id });
+    } finally {
+      setProcessingId(null);
     }
-  };
-
-  const handleOpenCharge = (serviceOrderId: string) => {
-    navigate(`/finances?serviceOrderId=${encodeURIComponent(serviceOrderId)}`);
-  };
-
-  const handleApplySearch = () => {
-    setSearchQuery(searchInput.trim());
-    setPage(1);
-  };
-
-  const handleClearLocalFilters = () => {
-    setSearchInput("");
-    setSearchQuery("");
-    setFinancialFilter("ALL");
-    setPage(1);
-  };
-
-  const handleOpenDeepLink = (serviceOrderId: string) => {
-    setHighlightedServiceOrderId(serviceOrderId);
-    setExpandedServiceOrderId(serviceOrderId);
-    navigate(buildServiceOrdersUrl(serviceOrderId), { replace: false });
-  };
-
-  const handleClearDeepLink = () => {
-    setHighlightedServiceOrderId(null);
-    navigate(buildServiceOrdersUrl(null), { replace: false });
-  };
-
-  const handleOpenEdit = (serviceOrderId: string) => {
-    setSelectedServiceOrderId(serviceOrderId);
-    setShowEditModal(true);
-  };
-
-  const handleToggleExpanded = (serviceOrderId: string) => {
-    setExpandedServiceOrderId((current) =>
-      current === serviceOrderId ? null : serviceOrderId
-    );
-  };
-
-  const totalVisible = filteredServiceOrders.length;
-  const totalInProgress = filteredServiceOrders.filter((os) => os.status === "IN_PROGRESS").length;
-  const doneWithCharge = filteredServiceOrders.filter((os) => {
-    if (os.status !== "DONE") return false;
-    return Boolean(os.financialSummary?.hasCharge);
-  }).length;
-  const doneWithoutCharge = filteredServiceOrders.filter((os) => {
-    if (os.status !== "DONE") return false;
-    if (!os.amountCents || os.amountCents <= 0) return false;
-    return !os.financialSummary?.hasCharge;
-  }).length;
-  const openCount = filteredServiceOrders.filter((os) => os.status === "OPEN").length;
-  const assignedCount = filteredServiceOrders.filter((os) => os.status === "ASSIGNED").length;
-  const paidCount = filteredServiceOrders.filter(
-    (os) => os.financialSummary?.chargeStatus === "PAID"
-  ).length;
-
-  const hasLocalFilters = Boolean(searchQuery) || financialFilter !== "ALL";
+  }
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-        <div className="max-w-3xl">
-          <div className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs font-medium text-orange-700 dark:border-orange-900/40 dark:bg-orange-950/20 dark:text-orange-300">
-            <Sparkles className="h-3.5 w-3.5" />
-            Hub operacional da execução
-          </div>
-
-          <h1 className="mt-3 flex items-center gap-2 text-2xl font-bold text-gray-900 dark:text-white">
-            <ClipboardList className="h-6 w-6 text-orange-500" />
-            Ordens de Serviço
-          </h1>
-
-          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-            Aqui a operação ganha contexto real: responsável, execução, cobrança e
-            fechamento financeiro na mesma leitura.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => void listQuery.refetch()}
-            disabled={listQuery.isFetching}
-          >
-            <RefreshCw
-              className={`mr-1 h-4 w-4 ${listQuery.isFetching ? "animate-spin" : ""}`}
-            />
-            Atualizar
-          </Button>
-
-          <Button
-            onClick={() => setShowCreateModal(true)}
-            className="bg-orange-500 text-white hover:bg-orange-600"
-          >
-            <Plus className="mr-1 h-4 w-4" />
-            Nova OS
-          </Button>
-        </div>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-semibold">Ordens de Serviço</h1>
+        <Button onClick={() => setIsCreateOpen(true)}>Nova O.S.</Button>
       </div>
-
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard
-          title="Ordens visíveis"
-          value={totalVisible}
-          subtitle={`${openCount} abertas e ${assignedCount} atribuídas`}
-        />
-        <SummaryCard
-          title="Em execução"
-          value={totalInProgress}
-          subtitle="Serviços rodando agora"
-          tone="warning"
-        />
-        <SummaryCard
-          title="Concluídas com cobrança"
-          value={doneWithCharge}
-          subtitle={`${paidCount} já fechadas no financeiro`}
-          tone="success"
-        />
-        <SummaryCard
-          title="Prontas sem cobrança"
-          value={doneWithoutCharge}
-          subtitle="Buraco entre execução e financeiro"
-          tone="danger"
-        />
-      </div>
-
-      <ServiceOrdersStatusBarChart
-        openCount={openCount}
-        assignedCount={assignedCount}
-        inProgressCount={totalInProgress}
-        doneCount={filteredServiceOrders.filter((os) => os.status === "DONE").length}
-        canceledCount={filteredServiceOrders.filter((os) => os.status === "CANCELED").length}
-      />
-
-      <div className="grid gap-4 xl:grid-cols-3">
-        <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-          <div className="flex items-start gap-3">
-            <div className="rounded-lg bg-blue-100 p-2 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-              <Wrench className="h-4 w-4" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                1. Execução
-              </p>
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                A O.S. sai de aberta para atribuída, em andamento e concluída.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-          <div className="flex items-start gap-3">
-            <div className="rounded-lg bg-amber-100 p-2 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
-              <CreditCard className="h-4 w-4" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                2. Cobrança
-              </p>
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                Quando a execução fecha com valor, a cobrança precisa nascer sem atrito.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-          <div className="flex items-start gap-3">
-            <div className="rounded-lg bg-green-100 p-2 text-green-700 dark:bg-green-900/30 dark:text-green-300">
-              <BadgeDollarSign className="h-4 w-4" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                3. Fechamento
-              </p>
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                Acompanhamento do status financeiro até pagamento ou exceção.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid gap-3 lg:grid-cols-[1fr_240px_auto_auto]">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-          <input
-            type="text"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleApplySearch();
-            }}
-            placeholder="Buscar por título, cliente, descrição, responsável ou fechamento"
-            className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-10 pr-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-          />
-        </div>
-
-        <select
-          value={financialFilter}
-          onChange={(e) => {
-            setFinancialFilter(e.target.value as FinancialFilter);
-            setPage(1);
-          }}
-          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-        >
-          <option value="ALL">Todos os estados financeiros</option>
-          <option value="NO_CHARGE">Sem cobrança</option>
-          <option value="READY_TO_CHARGE">Prontas para cobrança</option>
-          <option value="PENDING">Cobrança pendente</option>
-          <option value="PAID">Cobrança paga</option>
-          <option value="OVERDUE">Cobrança vencida</option>
-          <option value="CANCELED">Cobrança cancelada</option>
-        </select>
-
-        <Button onClick={handleApplySearch}>Buscar</Button>
-
-        <Button
-          variant="outline"
-          onClick={handleClearLocalFilters}
-          disabled={!hasLocalFilters && !searchInput}
-        >
-          <X className="mr-2 h-4 w-4" />
-          Limpar
-        </Button>
-      </div>
-
-      {highlightedServiceOrderId ? (
-        <div className="flex flex-wrap items-center gap-2 text-sm">
-          <span className="rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-orange-700 dark:border-orange-900/40 dark:bg-orange-950/20 dark:text-orange-300">
-            Foco ativo: {highlightedServiceOrder?.title ?? highlightedServiceOrderId}
-          </span>
-
-          {!highlightedExistsOnCurrentPage ? (
-            <span className="rounded-full border border-yellow-200 bg-yellow-50 px-3 py-1 text-yellow-700 dark:border-yellow-900/40 dark:bg-yellow-950/20 dark:text-yellow-300">
-              Esta O.S. não está na página atual.
-            </span>
-          ) : null}
-
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleClearDeepLink}
-          >
-            Limpar foco
-          </Button>
-        </div>
-      ) : null}
-
-      {hasLocalFilters ? (
-        <div className="flex flex-wrap gap-2 text-sm text-gray-500">
-          {searchQuery ? (
-            <span className="rounded-full border px-3 py-1">
-              Busca: {searchQuery}
-            </span>
-          ) : null}
-          {financialFilter !== "ALL" ? (
-            <span className="rounded-full border px-3 py-1">
-              Financeiro: {getFinancialFilterLabel(financialFilter)}
-            </span>
-          ) : null}
-          <span className="rounded-full border px-3 py-1">
-            Página {pagination.page}
-          </span>
-        </div>
-      ) : null}
 
       <div className="flex flex-wrap gap-2">
-        {(["", "OPEN", "ASSIGNED", "IN_PROGRESS", "DONE", "CANCELED"] as const).map(
-          (status) => (
-            <button
-              key={status || "ALL"}
-              type="button"
-              onClick={() => {
-                setStatusFilter(status);
-                setPage(1);
-              }}
-              className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${
-                statusFilter === status
-                  ? "bg-orange-500 text-white"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-              }`}
-            >
-              {status === "" ? "Todos" : STATUS_LABELS[status]}
-            </button>
-          )
-        )}
+        {[
+          "ALL",
+          "NO_CHARGE",
+          "READY_TO_CHARGE",
+          "PENDING",
+          "PAID",
+          "OVERDUE",
+        ].map((f) => (
+          <Button
+            key={f}
+            size="sm"
+            variant={filter === f ? "default" : "outline"}
+            onClick={() => setFilter(f as FinancialFilter)}
+          >
+            {f}
+          </Button>
+        ))}
       </div>
 
-      {listQuery.isLoading && (
-        <div className="flex items-center justify-center py-12">
-          <RefreshCw className="h-6 w-6 animate-spin text-orange-500" />
-          <span className="ml-2 text-gray-500">Carregando...</span>
-        </div>
-      )}
+      <div className="space-y-3">
+        {filtered.map((os: ServiceOrder) => {
+          const chargeBadge = getChargeBadge(os.financialSummary);
+          const operationalStage = getOperationalStage(os);
+          const financialStage = getFinancialStage(os);
 
-      {listQuery.isError && (
-        <div className="flex items-center gap-2 rounded-lg bg-red-50 p-4 text-red-600 dark:bg-red-900/20 dark:text-red-400">
-          <AlertCircle className="h-5 w-5" />
-          <span>Erro ao carregar ordens de serviço. Tente novamente.</span>
-        </div>
-      )}
-
-      {!listQuery.isLoading &&
-        !listQuery.isError &&
-        filteredServiceOrders.length === 0 && (
-          <div className="py-12 text-center">
-            <ClipboardList className="mx-auto mb-3 h-12 w-12 text-gray-300 dark:text-gray-600" />
-            <p className="text-gray-500 dark:text-gray-400">
-              {serviceOrders.length === 0
-                ? "Nenhuma ordem de serviço encontrada."
-                : "Nenhuma ordem corresponde aos filtros atuais."}
-            </p>
-            {serviceOrders.length === 0 ? (
-              <Button
-                onClick={() => setShowCreateModal(true)}
-                className="mt-4 bg-orange-500 text-white hover:bg-orange-600"
-              >
-                <Plus className="mr-1 h-4 w-4" />
-                Criar primeira OS
-              </Button>
-            ) : null}
-          </div>
-        )}
-
-      {filteredServiceOrders.length > 0 && (
-        <div className="space-y-4">
-          {filteredServiceOrders.map((os) => {
-            const isProcessing = processingId === os.id;
-            const financialSummary = os.financialSummary ?? null;
-            const chargeBadge = getChargeBadge(financialSummary);
-            const canGenerateCharge =
-              os.status === "DONE" &&
-              !!os.amountCents &&
-              os.amountCents > 0 &&
-              !financialSummary?.hasCharge;
-            const hasAssignedPerson = Boolean(os.assignedToPersonId);
-            const canStartExecution =
-              hasAssignedPerson &&
-              os.status !== "IN_PROGRESS" &&
-              os.status !== "DONE" &&
-              os.status !== "CANCELED";
-
-            const operationalStage = getOperationalStage(os);
-            const financialStage = getFinancialStage(os);
-            const isHighlighted = highlightedServiceOrderId === os.id;
-            const isExpanded = expandedServiceOrderId === os.id;
-
-            return (
-              <div
-                key={os.id}
-                ref={(element) => {
-                  serviceOrderRefs.current[os.id] = element;
-                }}
-              >
-                <ServiceOrderCard
-                  os={os}
-                  isHighlighted={isHighlighted}
-                  isExpanded={isExpanded}
-                  isProcessing={isProcessing}
-                  chargeBadge={chargeBadge}
-                  canGenerateCharge={canGenerateCharge}
-                  canStartExecution={canStartExecution}
-                  operationalStage={operationalStage}
-                  financialStage={financialStage}
-                  onEdit={handleOpenEdit}
-                  onStatusChange={handleStatusChange}
-                  onStartExecution={handleStartExecution}
-                  onFinishExecution={handleFinishExecution}
-                  onGenerateCharge={handleGenerateCharge}
-                  onOpenCharge={handleOpenCharge}
-                  onOpenDeepLink={handleOpenDeepLink}
-                  onToggleExpanded={handleToggleExpanded}
-                  isUpdating={updateMutation.isPending}
-                  isStartingExecution={executionStartMutation.isPending}
-                  isFinishingExecution={executionCompleteMutation.isPending}
-                  isGeneratingCharge={generateChargeMutation.isPending}
-                />
-              </div>
-            );
-          })}
-
-          <div className="mt-6 flex items-center justify-between border-t pt-4">
-            <Button
-              onClick={() => setPage(Math.max(1, page - 1))}
-              disabled={page === 1}
-              variant="outline"
-            >
-              Anterior
-            </Button>
-
-            <span className="text-sm text-gray-600">
-              Página {pagination.page} de {pagination.pages}
-            </span>
-
-            <Button
-              onClick={() => setPage(page + 1)}
-              disabled={page >= pagination.pages}
-              variant="outline"
-            >
-              Próxima
-            </Button>
-          </div>
-        </div>
-      )}
+          return (
+            <ServiceOrderCard
+              key={os.id}
+              os={os}
+              isExpanded={expandedId === os.id}
+              isProcessing={processingId === os.id}
+              chargeBadge={chargeBadge}
+              canGenerateCharge={
+                financialStage.label === "Pronta para cobrança"
+              }
+              canStartExecution={
+                os.status !== "IN_PROGRESS" && os.status !== "DONE"
+              }
+              operationalStage={operationalStage}
+              financialStage={financialStage}
+              onEdit={(id) => setEditId(id)}
+              onStartExecution={handleStart}
+              onFinishExecution={handleFinish}
+              onGenerateCharge={handleCharge}
+              onOpenDeepLink={openDeepLink}
+              onToggleExpanded={(id) =>
+                setExpandedId((prev) => (prev === id ? null : id))
+              }
+              isUpdating={false}
+              isStartingExecution={startExecution.isPending}
+              isFinishingExecution={finishExecution.isPending}
+              isGeneratingCharge={generateCharge.isPending}
+            />
+          );
+        })}
+      </div>
 
       <CreateServiceOrderModal
-        isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
+        isOpen={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
         onSuccess={() => {
-          void listQuery.refetch();
+          setIsCreateOpen(false);
+          utils.nexo.serviceOrders.list.invalidate();
         }}
         customers={customers}
         people={people}
       />
 
       <EditServiceOrderModal
-        isOpen={showEditModal}
-        onClose={() => {
-          setShowEditModal(false);
-          setSelectedServiceOrderId(null);
-        }}
+        isOpen={Boolean(editId)}
+        serviceOrderId={editId}
+        onClose={() => setEditId(null)}
         onSuccess={() => {
-          void listQuery.refetch();
+          setEditId(null);
+          utils.nexo.serviceOrders.list.invalidate();
         }}
-        serviceOrderId={selectedServiceOrderId}
         people={people}
       />
     </div>

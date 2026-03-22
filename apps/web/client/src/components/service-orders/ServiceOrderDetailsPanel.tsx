@@ -301,8 +301,76 @@ export default function ServiceOrderDetailsPanel({
     ? latestExecution.attachments
     : [];
 
+  const chargeStatusLabel = os.financialSummary?.chargeStatus ?? "Sem cobrança";
+  const chargeAmountLabel = os.financialSummary?.hasCharge
+    ? formatCurrency(os.financialSummary.chargeAmountCents ?? 0)
+    : "—";
+  const chargeDueDateLabel = os.financialSummary?.hasCharge
+    ? formatDate(os.financialSummary.chargeDueDate)
+    : "—";
+  const paidAtLabel = os.financialSummary?.hasCharge
+    ? formatDateTime(os.financialSummary.paidAt)
+    : "—";
+
   return (
     <div className="rounded-xl border border-gray-200 bg-gray-50/60 p-4 dark:border-gray-700 dark:bg-gray-900/30">
+      <div className="mb-4 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+        <div className="mb-3 flex items-center gap-2">
+          <Wrench className="h-4 w-4 text-orange-500" />
+          <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
+            Resumo da O.S.
+          </h4>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <InfoItem label="Cliente" value={os.customer?.name || "—"} />
+          <InfoItem
+            label="Responsável"
+            value={os.assignedTo?.name || "Não atribuído"}
+          />
+          <InfoItem label="Status" value={os.status} />
+          <InfoItem label="Agendado" value={formatDateTime(os.scheduledFor)} />
+          <InfoItem label="Início" value={formatDateTime(os.startedAt)} />
+          <InfoItem label="Fim" value={formatDateTime(os.finishedAt)} />
+        </div>
+
+        {os.description?.trim() ? (
+          <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/40">
+            <div className="mb-2 flex items-center gap-2">
+              <FileText className="h-4 w-4 text-gray-500" />
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                Descrição da O.S.
+              </p>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-300">
+              {os.description}
+            </p>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="mb-4 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+        <div className="mb-3 flex items-center gap-2">
+          <Receipt className="h-4 w-4 text-green-500" />
+          <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
+            Financeiro
+          </h4>
+        </div>
+
+        {!os.financialSummary?.hasCharge ? (
+          <div className="rounded-lg border border-dashed border-gray-200 p-3 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
+            Nenhuma cobrança vinculada a esta O.S.
+          </div>
+        ) : (
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <InfoItem label="Status" value={chargeStatusLabel} />
+            <InfoItem label="Valor" value={chargeAmountLabel} />
+            <InfoItem label="Vencimento" value={chargeDueDateLabel} />
+            <InfoItem label="Pago em" value={paidAtLabel} />
+          </div>
+        )}
+      </div>
+
       <div className="grid gap-4 xl:grid-cols-2">
         <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
           <div className="mb-3 flex items-center gap-2">
