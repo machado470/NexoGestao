@@ -34,11 +34,7 @@ services:
       NODE_ENV: production
       REDIS_HOST: redis
       REDIS_PORT: "6379"
-
-      # Auto apply migrations when db is empty
       AUTO_MIGRATE: "1"
-
-      # Optional: wait for postgres (seconds)
       DB_WAIT_SECONDS: "40"
     depends_on:
       postgres:
@@ -48,11 +44,7 @@ services:
     ports:
       - "3000:3000"
     restart: unless-stopped
-
-    # PROD: usa o entrypoint dentro da imagem (ele já faz migrate/seed/check dist)
     entrypoint: ["/app/apps/api/docker-entrypoint.sh"]
-    volumes:
-      - ./apps/api:/app/apps/api
 
 volumes:
   pgdata:

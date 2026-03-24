@@ -36,6 +36,10 @@ export class GovernanceReadService {
         evaluated: true,
         warnings: true,
         correctives: true,
+        restrictedCount: true,
+        suspendedCount: true,
+        openCorrectivesCount: true,
+        durationMs: true,
       },
     })
 
@@ -59,14 +63,91 @@ export class GovernanceReadService {
       evaluated: last.evaluated,
       warnings: last.warnings,
       correctives: last.correctives,
-
       institutionalRiskScore: last.institutionalRiskScore,
       restrictedCount: last.restrictedCount,
       suspendedCount: last.suspendedCount,
       openCorrectivesCount: last.openCorrectivesCount,
       durationMs: last.durationMs,
-
       trend: trend.reverse(),
+    }
+  }
+
+  async getAutoScore(orgId: string) {
+    const [lastRun, peopleAgg] = await Promise.all([
+      this.getLatestRun(orgId),
+      this.prisma.person.aggregate({
+        where: { orgId },
+        _count: { id: true },
+        _avg: { riskScore: true },
+      }),
+    ])
+
+    const peopleCount = peopleAgg._count.id ?? 0
+    const avgRiskScore = Math.round(peopleAgg._avg.riskScore ?? 0)
+
+    const restrictedCount = await this.prisma.person.count({
+      where: { orgId, operationalState: 'RESTRICTED' },
+    })
+
+    const suspendedCount = await this.prisma.person.count({
+      where: { orgId, operationalState: 'SUSPENDED' },
+    })
+
+    const openCorrectivesCount = await this.prisma.correctiveAction.count({
+      where: {
+        orgId,
+        status: 'OPEN',
+      },
+    })
+
+    const governanceScore =
+      lastRun?.institutionalRiskScore != null
+        ? Math.max(0, 100 - lastRun.institutionalRiskScore)
+        : Math.max(0, 100 - avgRiskScore)
+
+    const level =
+      governanceScore >= 90
+        ? 'A'
+        : governanceScore >= 75
+          ? 'B'
+          : governanceScore >= 60
+            ? 'C'
+            : governanceScore >= 40
+              ? 'D'
+              : 'E'
+
+    return {
+      score: governanceScore,
+      level,
+      lastUpdated: lastRun?.createdAt ?? null,
+      source: lastRun ? 'GOVERNANCE_RUN' : 'LIVE_FALLBACK',
+      factors: [
+        {
+          name: 'Risco institucional',
+          value: lastRun?.institutionalRiskScore ?? avgRiskScore,
+          reference: 'Quanto menor, melhor.',
+        },
+        {
+          name: 'Pessoas avaliadas',
+          value: lastRun?.evaluated ?? peopleCount,
+          reference: 'Base considerada na leitura atual.',
+        },
+        {
+          name: 'Restritos',
+          value: lastRun?.restrictedCount ?? restrictedCount,
+          reference: 'Pessoas em estado RESTRICTED.',
+        },
+        {
+          name: 'Suspensos',
+          value: lastRun?.suspendedCount ?? suspendedCount,
+          reference: 'Pessoas em estado SUSPENDED.',
+        },
+        {
+          name: 'Corretivas abertas',
+          value: lastRun?.openCorrectivesCount ?? openCorrectivesCount,
+          reference: 'Carga corretiva operacional ativa.',
+        },
+      ],
     }
   }
 }

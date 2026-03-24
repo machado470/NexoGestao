@@ -12,32 +12,64 @@ export class RiskService {
   ) {}
 
   /**
-   * ✅ Calculate-only (sem persistência, sem snapshot)
-   * Use em jobs que só precisam do número para derivar estado/snapshot operacional.
+   * 🔹 Apenas cálculo simples (compatível com o que já existia)
    */
   async calculatePersonRisk(personId: string) {
     return this.temporalRisk.calculate(personId)
   }
 
   /**
-   * ✅ Recalcula + persiste (riskScore + RiskSnapshot + timeline)
-   * Use quando o risco mudou por evento real (pagamento, no-show, atraso, etc).
+   * 🔥 NOVO: cálculo completo com explicação (base do frontend inteligente)
+   */
+  async getPersonRiskExplanation(personId: string) {
+    const detailed = await this.temporalRisk.calculateDetailed(personId)
+
+    const person = await this.prisma.person.findUnique({
+      where: { id: personId },
+      select: {
+        id: true,
+        name: true,
+        riskScore: true,
+        operationalState: true,
+      },
+    })
+
+    if (!person) {
+      throw new Error('Pessoa não encontrada')
+    }
+
+    return {
+      person,
+      risk: detailed,
+    }
+  }
+
+  /**
+   * 🔹 Recalcula + persiste
    */
   async recalculatePersonRisk(personId: string, reason?: string) {
-    const score = await this.temporalRisk.calculate(personId)
+    const detailed = await this.temporalRisk.calculateDetailed(personId)
 
     await this.prisma.person.update({
       where: { id: personId },
-      data: { riskScore: score },
+      data: {
+        riskScore: detailed.score,
+        operationalState: detailed.state,
+      },
     })
 
-    await this.snapshot(personId, score, reason)
+    await this.snapshot(personId, detailed.score, reason)
 
-    return score
+    return detailed
   }
 
+  /**
+   * 🔹 Snapshot + timeline
+   */
   async snapshot(personId: string, score: number, reason?: string) {
-    const finalReason = reason?.trim() ? reason.trim() : 'Reavaliação automática'
+    const finalReason = reason?.trim()
+      ? reason.trim()
+      : 'Reavaliação automática'
 
     const person = await this.prisma.person.findUnique({
       where: { id: personId },
@@ -64,11 +96,10 @@ export class RiskService {
     })
   }
 
-  async recalculateCustomerOperationalRisk(
-    orgId: string,
-    customerId: string,
-    reason?: string,
-  ) {
+  /**
+   * 🔥 MELHORADO: risco operacional do cliente com explicação
+   */
+  async getCustomerOperationalRisk(orgId: string, customerId: string) {
     const [noShowCount, overdueCount, canceledCount] = await Promise.all([
       this.prisma.appointment.count({
         where: { orgId, customerId, status: 'NO_SHOW' },
@@ -81,20 +112,50 @@ export class RiskService {
       }),
     ])
 
-    const score = Math.min(100, noShowCount * 25 + overdueCount * 20 + Math.max(0, canceledCount - 1) * 10)
+    const score = Math.min(
+      100,
+      noShowCount * 25 +
+        overdueCount * 20 +
+        Math.max(0, canceledCount - 1) * 10,
+    )
+
+    const explanation = [
+      `Score calculado: ${score}`,
+      `Faltas (no-show): ${noShowCount} → impacto ${noShowCount * 25}`,
+      `Cobranças vencidas: ${overdueCount} → impacto ${overdueCount * 20}`,
+      `Cancelamentos: ${canceledCount} → impacto ${
+        Math.max(0, canceledCount - 1) * 10
+      }`,
+    ]
+
+    return {
+      score,
+      factors: { noShowCount, overdueCount, canceledCount },
+      explanation,
+    }
+  }
+
+  /**
+   * 🔹 Mantido (compatibilidade com fluxo atual)
+   */
+  async recalculateCustomerOperationalRisk(
+    orgId: string,
+    customerId: string,
+    reason?: string,
+  ) {
+    const result = await this.getCustomerOperationalRisk(orgId, customerId)
 
     await this.timeline.log({
       orgId,
       action: 'CUSTOMER_OPERATIONAL_RISK_UPDATED',
-      description: `Risco operacional do cliente recalculado (${score})`,
+      description: `Risco operacional do cliente recalculado (${result.score})`,
       metadata: {
         customerId,
         reason: reason ?? 'OPERATIONAL_EVENT',
-        score,
-        factors: { noShowCount, overdueCount, canceledCount },
+        ...result,
       },
     })
 
-    return { score, factors: { noShowCount, overdueCount, canceledCount } }
+    return result
   }
 }

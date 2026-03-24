@@ -7,8 +7,19 @@ import { useChargeActions } from "@/hooks/useChargeActions";
 import {
   getErrorMessage,
   normalizeAlertsPayload,
-  normalizeArrayPayload,
 } from "@/lib/query-helpers";
+import {
+  normalizeAppointments,
+  normalizeCharges,
+  normalizeOrders,
+} from "@/lib/operations/operations.utils";
+import {
+  getDoneWithoutCharge,
+  getOrdersByStatus,
+  getPendingCharges,
+  getOverdueCharges,
+  sumAmountCents,
+} from "@/lib/operations/operations.selectors";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,6 +46,56 @@ import {
   CircleDashed,
   UserCheck,
 } from "lucide-react";
+
+type AppointmentRow = {
+  id: string;
+  status?: string | null;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  notes?: string | null;
+  customer?: {
+    name?: string | null;
+  } | null;
+};
+
+type ServiceOrderRow = {
+  id: string;
+  title?: string | null;
+  status?: string | null;
+  scheduledFor?: string | null;
+  appointment?: {
+    startsAt?: string | null;
+  } | null;
+  customer?: {
+    name?: string | null;
+  } | null;
+  financialSummary?: {
+    hasCharge?: boolean | null;
+  } | null;
+};
+
+type ChargeRow = {
+  id: string;
+  status?: string | null;
+  amountCents?: number | null;
+  dueDate?: string | null;
+  customer?: {
+    name?: string | null;
+  } | null;
+  serviceOrder?: {
+    title?: string | null;
+  } | null;
+};
+
+type AlertItems<T> = {
+  items?: T[];
+};
+
+type DashboardAlerts = {
+  overdueCharges?: AlertItems<ChargeRow>;
+  overdueOrders?: AlertItems<ServiceOrderRow>;
+  doneOrdersWithoutCharge?: AlertItems<ServiceOrderRow>;
+};
 
 const SERVICE_STATUS_LABELS: Record<string, string> = {
   OPEN: "Aberta",
@@ -102,7 +163,7 @@ function formatTime(value?: string | null) {
   });
 }
 
-function getAppointmentStatusTone(status?: string) {
+function getAppointmentStatusTone(status?: string | null) {
   switch (status) {
     case "CONFIRMED":
       return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300";
@@ -119,7 +180,7 @@ function getAppointmentStatusTone(status?: string) {
   }
 }
 
-function getServiceOrderStatusTone(status?: string) {
+function getServiceOrderStatusTone(status?: string | null) {
   switch (status) {
     case "DONE":
       return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300";
@@ -136,7 +197,7 @@ function getServiceOrderStatusTone(status?: string) {
   }
 }
 
-function getChargeStatusTone(status?: string) {
+function getChargeStatusTone(status?: string | null) {
   switch (status) {
     case "PAID":
       return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300";
@@ -251,25 +312,19 @@ export default function OperationsDashboardPage() {
   });
 
   const appointments = useMemo(() => {
-    return normalizeArrayPayload<any>(appointmentsQuery.data);
+    return normalizeAppointments<AppointmentRow>(appointmentsQuery.data);
   }, [appointmentsQuery.data]);
 
-  const serviceOrdersPayload = serviceOrdersQuery.data as any;
   const todayServiceOrders = useMemo(() => {
-    const rows = Array.isArray(serviceOrdersPayload?.data)
-      ? serviceOrdersPayload.data
-      : Array.isArray(serviceOrdersPayload)
-        ? serviceOrdersPayload
-        : [];
-    return rows;
-  }, [serviceOrdersPayload]);
+    return normalizeOrders<ServiceOrderRow>(serviceOrdersQuery.data);
+  }, [serviceOrdersQuery.data]);
 
   const allCharges = useMemo(() => {
-    return normalizeArrayPayload<any>(chargesQuery.data);
+    return normalizeCharges<ChargeRow>(chargesQuery.data);
   }, [chargesQuery.data]);
 
   const alerts = useMemo(() => {
-    return normalizeAlertsPayload<any>(alertsQuery.data);
+    return normalizeAlertsPayload<DashboardAlerts>(alertsQuery.data);
   }, [alertsQuery.data]);
 
   const overdueCharges = Array.isArray(alerts?.overdueCharges?.items)
@@ -280,52 +335,49 @@ export default function OperationsDashboardPage() {
     ? alerts.overdueOrders.items
     : [];
 
-  const doneOrdersWithoutCharge = Array.isArray(alerts?.doneOrdersWithoutCharge?.items)
-    ? alerts.doneOrdersWithoutCharge.items
-    : [];
+  const doneOrdersWithoutCharge =
+    Array.isArray(alerts?.doneOrdersWithoutCharge?.items)
+      ? alerts.doneOrdersWithoutCharge.items
+      : getDoneWithoutCharge(todayServiceOrders);
 
   const todayOpenOrders = useMemo(() => {
-    return todayServiceOrders.filter((order: any) => order?.status === "OPEN");
+    return getOrdersByStatus(todayServiceOrders, "OPEN");
   }, [todayServiceOrders]);
 
   const todayAssignedOrders = useMemo(() => {
-    return todayServiceOrders.filter((order: any) => order?.status === "ASSIGNED");
+    return getOrdersByStatus(todayServiceOrders, "ASSIGNED");
   }, [todayServiceOrders]);
 
   const todayInProgressOrders = useMemo(() => {
-    return todayServiceOrders.filter((order: any) => order?.status === "IN_PROGRESS");
+    return getOrdersByStatus(todayServiceOrders, "IN_PROGRESS");
   }, [todayServiceOrders]);
 
   const todayDoneOrders = useMemo(() => {
-    return todayServiceOrders.filter((order: any) => order?.status === "DONE");
+    return getOrdersByStatus(todayServiceOrders, "DONE");
   }, [todayServiceOrders]);
 
   const scheduledAppointments = useMemo(() => {
-    return appointments.filter((item: any) => item?.status === "SCHEDULED");
+    return appointments.filter((item) => item?.status === "SCHEDULED");
   }, [appointments]);
 
   const confirmedAppointments = useMemo(() => {
-    return appointments.filter((item: any) => item?.status === "CONFIRMED");
+    return appointments.filter((item) => item?.status === "CONFIRMED");
   }, [appointments]);
 
   const noShowAppointments = useMemo(() => {
-    return appointments.filter((item: any) => item?.status === "NO_SHOW");
+    return appointments.filter((item) => item?.status === "NO_SHOW");
   }, [appointments]);
 
   const pendingCharges = useMemo(() => {
-    return allCharges.filter((charge: any) => charge?.status === "PENDING");
+    return getPendingCharges(allCharges);
   }, [allCharges]);
 
   const pendingTotalCents = useMemo(() => {
-    return pendingCharges.reduce((acc: number, charge: any) => {
-      return acc + Number(charge?.amountCents || 0);
-    }, 0);
+    return sumAmountCents(pendingCharges);
   }, [pendingCharges]);
 
   const overdueTotalCents = useMemo(() => {
-    return overdueCharges.reduce((acc: number, charge: any) => {
-      return acc + Number(charge?.amountCents || 0);
-    }, 0);
+    return sumAmountCents(overdueCharges);
   }, [overdueCharges]);
 
   const handleStartExecution = (id: string) => {
@@ -348,6 +400,13 @@ export default function OperationsDashboardPage() {
         },
       }
     );
+  };
+
+  const refreshAll = () => {
+    void appointmentsQuery.refetch();
+    void serviceOrdersQuery.refetch();
+    void chargesQuery.refetch();
+    void alertsQuery.refetch();
   };
 
   const isLoading =
@@ -422,15 +481,7 @@ export default function OperationsDashboardPage() {
           </p>
         </div>
 
-        <Button
-          variant="outline"
-          onClick={() => {
-            void appointmentsQuery.refetch();
-            void serviceOrdersQuery.refetch();
-            void chargesQuery.refetch();
-            void alertsQuery.refetch();
-          }}
-        >
+        <Button variant="outline" onClick={refreshAll}>
           <RefreshCw className="mr-2 h-4 w-4" />
           Atualizar
         </Button>
@@ -454,7 +505,11 @@ export default function OperationsDashboardPage() {
         />
         <MetricCard
           title="Atrasos críticos"
-          value={overdueCharges.length + lateServices.length + doneOrdersWithoutCharge.length}
+          value={
+            overdueCharges.length +
+            lateServices.length +
+            doneOrdersWithoutCharge.length
+          }
           subtitle="Financeiro e operação pedindo ação"
         />
       </div>
@@ -478,7 +533,9 @@ export default function OperationsDashboardPage() {
       <div className="grid gap-4 md:grid-cols-4">
         <Card className="border-blue-200">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Agenda aguardando confirmação</CardTitle>
+            <CardTitle className="text-base">
+              Agenda aguardando confirmação
+            </CardTitle>
             <CardDescription>Agendados ainda não confirmados</CardDescription>
           </CardHeader>
           <CardContent>
@@ -514,7 +571,9 @@ export default function OperationsDashboardPage() {
 
         <Card className="border-red-200">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Concluídas sem cobrança</CardTitle>
+            <CardTitle className="text-base">
+              Concluídas sem cobrança
+            </CardTitle>
             <CardDescription>Buraco entre operação e financeiro</CardDescription>
           </CardHeader>
           <CardContent>
@@ -544,7 +603,7 @@ export default function OperationsDashboardPage() {
               </p>
             )}
 
-            {appointments.map((appointment: any) => (
+            {appointments.map((appointment) => (
               <div key={appointment.id} className="rounded-lg border p-3">
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
@@ -553,12 +612,18 @@ export default function OperationsDashboardPage() {
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {formatTime(appointment.startsAt)}
-                      {appointment.endsAt ? ` → ${formatTime(appointment.endsAt)}` : ""}
+                      {appointment.endsAt
+                        ? ` → ${formatTime(appointment.endsAt)}`
+                        : ""}
                     </p>
                   </div>
 
-                  <Badge className={getAppointmentStatusTone(appointment.status)}>
-                    {APPOINTMENT_STATUS_LABELS[appointment.status] ?? appointment.status}
+                  <Badge
+                    className={getAppointmentStatusTone(appointment.status)}
+                  >
+                    {APPOINTMENT_STATUS_LABELS[
+                      String(appointment.status ?? "")
+                    ] ?? appointment.status}
                   </Badge>
                 </div>
 
@@ -590,19 +655,22 @@ export default function OperationsDashboardPage() {
               </p>
             )}
 
-            {todayServiceOrders.map((order: any) => (
+            {todayServiceOrders.map((order) => (
               <div key={order.id} className="space-y-3 rounded-lg border p-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0">
                     <p className="text-sm font-medium">{order.title}</p>
                     <p className="text-xs text-muted-foreground">
                       {order.customer?.name || "Sem cliente"} •{" "}
-                      {formatTime(order?.scheduledFor || order?.appointment?.startsAt)}
+                      {formatTime(
+                        order?.scheduledFor || order?.appointment?.startsAt
+                      )}
                     </p>
                   </div>
 
                   <Badge className={getServiceOrderStatusTone(order.status)}>
-                    {SERVICE_STATUS_LABELS[order.status] ?? order.status}
+                    {SERVICE_STATUS_LABELS[String(order.status ?? "")] ??
+                      order.status}
                   </Badge>
                 </div>
 
@@ -659,7 +727,7 @@ export default function OperationsDashboardPage() {
               </p>
             )}
 
-            {pendingCharges.slice(0, 8).map((charge: any) => (
+            {pendingCharges.slice(0, 8).map((charge) => (
               <div key={charge.id} className="rounded-lg border p-3">
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
@@ -725,10 +793,15 @@ export default function OperationsDashboardPage() {
                     Cobranças vencidas
                   </p>
                   <p className="text-xs text-red-800 dark:text-red-400">
-                    {overdueCharges.length} itens • {formatCurrency(overdueTotalCents)}
+                    {overdueCharges.length} itens •{" "}
+                    {formatCurrency(overdueTotalCents)}
                   </p>
                 </div>
-                <Button size="sm" variant="outline" onClick={() => navigate("/finances")}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => navigate("/finances")}
+                >
                   Ver financeiro
                 </Button>
               </div>
@@ -744,7 +817,11 @@ export default function OperationsDashboardPage() {
                     {lateServices.length} itens pedindo execução
                   </p>
                 </div>
-                <Button size="sm" variant="outline" onClick={() => navigate("/service-orders")}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => navigate("/service-orders")}
+                >
                   Ver O.S.
                 </Button>
               </div>
@@ -757,10 +834,15 @@ export default function OperationsDashboardPage() {
                     O.S. concluídas sem cobrança
                   </p>
                   <p className="text-xs text-orange-800 dark:text-orange-400">
-                    {doneOrdersWithoutCharge.length} itens com risco de buraco no fluxo
+                    {doneOrdersWithoutCharge.length} itens com risco de buraco no
+                    fluxo
                   </p>
                 </div>
-                <Button size="sm" variant="outline" onClick={() => navigate("/service-orders")}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => navigate("/service-orders")}
+                >
                   Revisar
                 </Button>
               </div>
@@ -773,10 +855,15 @@ export default function OperationsDashboardPage() {
                     No-show no dia
                   </p>
                   <p className="text-xs text-yellow-800 dark:text-yellow-400">
-                    {noShowAppointments.length} agendamentos perdidos por ausência
+                    {noShowAppointments.length} agendamentos perdidos por
+                    ausência
                   </p>
                 </div>
-                <Button size="sm" variant="outline" onClick={() => navigate("/appointments")}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => navigate("/appointments")}
+                >
                   Ver agenda
                 </Button>
               </div>
@@ -802,7 +889,9 @@ export default function OperationsDashboardPage() {
               <CircleDashed className="h-3.5 w-3.5" />
               A confirmar
             </p>
-            <p className="mt-1 text-lg font-semibold">{scheduledAppointments.length}</p>
+            <p className="mt-1 text-lg font-semibold">
+              {scheduledAppointments.length}
+            </p>
             <p className="text-xs text-muted-foreground">
               Compromissos ainda não confirmados.
             </p>
@@ -813,7 +902,9 @@ export default function OperationsDashboardPage() {
               <UserCheck className="h-3.5 w-3.5" />
               Confirmado
             </p>
-            <p className="mt-1 text-lg font-semibold">{confirmedAppointments.length}</p>
+            <p className="mt-1 text-lg font-semibold">
+              {confirmedAppointments.length}
+            </p>
             <p className="text-xs text-muted-foreground">
               Agenda pronta para virar operação.
             </p>
@@ -835,7 +926,9 @@ export default function OperationsDashboardPage() {
               <ArrowRightLeft className="h-3.5 w-3.5" />
               Travado entre operação e financeiro
             </p>
-            <p className="mt-1 text-lg font-semibold">{doneOrdersWithoutCharge.length}</p>
+            <p className="mt-1 text-lg font-semibold">
+              {doneOrdersWithoutCharge.length}
+            </p>
             <p className="text-xs text-muted-foreground">
               Concluídas que ainda precisam caminhar para cobrança.
             </p>

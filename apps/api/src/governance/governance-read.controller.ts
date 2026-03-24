@@ -38,16 +38,6 @@ export class GovernanceReadController {
 
   @Get('auto-score')
   async autoScore(@Req() req: any) {
-    // Implementação mockada para integração
-    return {
-      score: 85,
-      level: 'A',
-      lastUpdated: new Date(),
-      factors: [
-        { name: 'Financeiro', score: 90 },
-        { name: 'Operacional', score: 80 },
-        { name: 'Legal', score: 85 },
-      ]
-    }
+    return this.read.getAutoScore(req.user.orgId)
   }
 }

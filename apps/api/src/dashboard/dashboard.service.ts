@@ -1,26 +1,28 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { MemoryCacheService } from '../common/cache/memory-cache.service'
+import { GovernanceReadService } from '../governance/governance-read.service'
 
-const CACHE_TTL_METRICS = 60_000 // 1 minuto
-const CACHE_TTL_CHARTS = 300_000 // 5 minutos
+const CACHE_TTL_METRICS = 60_000
+const CACHE_TTL_CHARTS = 300_000
 
 @Injectable()
 export class DashboardService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cache: MemoryCacheService,
+    private readonly governanceRead: GovernanceReadService,
   ) {}
 
   async getMetrics(orgId: string) {
     return this.cache.getOrSet(
       `dashboard:metrics:${orgId}`,
-      () => this._fetchMetrics(orgId),
+      () => this.fetchMetrics(orgId),
       CACHE_TTL_METRICS,
     )
   }
 
-  private async _fetchMetrics(orgId: string) {
+  private async fetchMetrics(orgId: string) {
     const now = new Date()
     const startOfWeek = new Date(now)
     startOfWeek.setDate(now.getDate() - now.getDay())
@@ -40,6 +42,7 @@ export class DashboardService {
       totalRevenue,
       paidRevenue,
       pendingRevenue,
+      autoScore,
     ] = await Promise.all([
       this.prisma.customer.count({ where: { orgId, active: true } }),
       this.prisma.serviceOrder.count({ where: { orgId } }),
@@ -89,15 +92,16 @@ export class DashboardService {
         where: { orgId, status: { in: ['PENDING', 'OVERDUE'] } },
         _sum: { amountCents: true },
       }),
+      this.governanceRead.getAutoScore(orgId),
     ])
 
     return {
       totalCustomers,
+      totalServiceOrders,
       openServiceOrders,
       overdueServiceOrders,
       weeklyRevenueInCents: weeklyRevenueAgg._sum.amountCents ?? 0,
       pendingPaymentsInCents: pendingPaymentsAgg._sum.amountCents ?? 0,
-      totalServiceOrders,
       inProgressOrders,
       completedOrders,
       delayedOrders,
@@ -105,18 +109,19 @@ export class DashboardService {
       totalRevenueInCents: totalRevenue._sum.amountCents ?? 0,
       paidRevenueInCents: paidRevenue._sum.amountCents ?? 0,
       pendingRevenueInCents: pendingRevenue._sum.amountCents ?? 0,
+      governance: autoScore,
     }
   }
 
   async getAlerts(orgId: string) {
     return this.cache.getOrSet(
       `dashboard:alerts:${orgId}`,
-      () => this._fetchAlerts(orgId),
+      () => this.fetchAlerts(orgId),
       CACHE_TTL_METRICS,
     )
   }
 
-  private async _fetchAlerts(orgId: string) {
+  private async fetchAlerts(orgId: string) {
     const now = new Date()
     const todayStart = new Date(now)
     todayStart.setHours(0, 0, 0, 0)
@@ -146,7 +151,6 @@ export class DashboardService {
         orderBy: { dueDate: 'asc' },
         take: 10,
       }),
-
       this.prisma.charge.findMany({
         where: {
           orgId,
@@ -164,7 +168,6 @@ export class DashboardService {
         orderBy: { dueDate: 'asc' },
         take: 10,
       }),
-
       this.prisma.appointment.findMany({
         where: {
           orgId,
@@ -182,7 +185,6 @@ export class DashboardService {
         orderBy: { startsAt: 'asc' },
         take: 10,
       }),
-
       this.prisma.customer.findMany({
         where: {
           orgId,
@@ -204,7 +206,6 @@ export class DashboardService {
         },
         take: 10,
       }),
-
       this.prisma.serviceOrder.findMany({
         where: {
           orgId,
@@ -220,10 +221,7 @@ export class DashboardService {
           createdAt: true,
           customer: { select: { id: true, name: true } },
         },
-        orderBy: [
-          { finishedAt: 'desc' },
-          { createdAt: 'desc' },
-        ],
+        orderBy: [{ finishedAt: 'desc' }, { createdAt: 'desc' }],
         take: 10,
       }),
     ])
@@ -235,10 +233,7 @@ export class DashboardService {
       },
       overdueCharges: {
         count: overdueCharges.length,
-        totalAmountCents: overdueCharges.reduce(
-          (sum, c) => sum + c.amountCents,
-          0,
-        ),
+        totalAmountCents: overdueCharges.reduce((sum, c) => sum + c.amountCents, 0),
         items: overdueCharges,
       },
       todayServices: {
@@ -257,13 +252,13 @@ export class DashboardService {
       },
       customersWithPending: {
         count: customersWithPending.length,
-        items: customersWithPending.map((c) => ({
-          id: c.id,
-          name: c.name,
-          phone: c.phone,
-          pendingCharges: c.charges.length,
-          totalPendingCents: c.charges.reduce(
-            (sum, ch) => sum + ch.amountCents,
+        items: customersWithPending.map((customer) => ({
+          id: customer.id,
+          name: customer.name,
+          phone: customer.phone,
+          pendingCharges: customer.charges.length,
+          totalPendingCents: customer.charges.reduce(
+            (sum, charge) => sum + charge.amountCents,
             0,
           ),
         })),
@@ -284,22 +279,22 @@ export class DashboardService {
   async getRevenueData(orgId: string) {
     return this.cache.getOrSet(
       `dashboard:revenue:${orgId}`,
-      () => this._fetchRevenueData(orgId),
+      () => this.fetchRevenueData(orgId),
       CACHE_TTL_CHARTS,
     )
   }
 
-  private async _fetchRevenueData(orgId: string) {
+  private async fetchRevenueData(orgId: string) {
     const now = new Date()
     const months: Array<{ month: string; date: Date; revenue: number }> = []
 
     for (let i = 11; i >= 0; i--) {
       const date = new Date(now.getFullYear(), now.getMonth() - i, 1)
-      const monthName = date.toLocaleDateString('pt-BR', {
+      const month = date.toLocaleDateString('pt-BR', {
         month: 'short',
         year: '2-digit',
       })
-      months.push({ month: monthName, date, revenue: 0 })
+      months.push({ month, date, revenue: 0 })
     }
 
     const payments = await this.prisma.payment.findMany({
@@ -310,32 +305,39 @@ export class DashboardService {
       select: { amountCents: true, createdAt: true },
     })
 
-    payments.forEach((payment) => {
+    for (const payment of payments) {
       const paymentMonth = new Date(
         payment.createdAt.getFullYear(),
         payment.createdAt.getMonth(),
         1,
       )
-      const monthIndex = months.findIndex(
-        (m) =>
-          m.date.getFullYear() === paymentMonth.getFullYear() &&
-          m.date.getMonth() === paymentMonth.getMonth(),
-      )
-      if (monthIndex !== -1) months[monthIndex].revenue += payment.amountCents
-    })
 
-    return months.map((m) => ({ month: m.month, revenue: m.revenue / 100 }))
+      const monthIndex = months.findIndex(
+        entry =>
+          entry.date.getFullYear() === paymentMonth.getFullYear() &&
+          entry.date.getMonth() === paymentMonth.getMonth(),
+      )
+
+      if (monthIndex !== -1) {
+        months[monthIndex].revenue += payment.amountCents
+      }
+    }
+
+    return months.map(entry => ({
+      month: entry.month,
+      revenue: entry.revenue / 100,
+    }))
   }
 
   async getCustomerGrowth(orgId: string) {
     return this.cache.getOrSet(
       `dashboard:growth:${orgId}`,
-      () => this._fetchCustomerGrowth(orgId),
+      () => this.fetchCustomerGrowth(orgId),
       CACHE_TTL_CHARTS,
     )
   }
 
-  private async _fetchCustomerGrowth(orgId: string) {
+  private async fetchCustomerGrowth(orgId: string) {
     const now = new Date()
     const months: Array<{
       month: string
@@ -346,11 +348,11 @@ export class DashboardService {
 
     for (let i = 11; i >= 0; i--) {
       const date = new Date(now.getFullYear(), now.getMonth() - i, 1)
-      const monthName = date.toLocaleDateString('pt-BR', {
+      const month = date.toLocaleDateString('pt-BR', {
         month: 'short',
         year: '2-digit',
       })
-      months.push({ month: monthName, date, newCustomers: 0, totalCustomers: 0 })
+      months.push({ month, date, newCustomers: 0, totalCustomers: 0 })
     }
 
     const customers = await this.prisma.customer.findMany({
@@ -362,86 +364,85 @@ export class DashboardService {
       orderBy: { createdAt: 'asc' },
     })
 
-    customers.forEach((customer) => {
+    for (const customer of customers) {
       const customerMonth = new Date(
         customer.createdAt.getFullYear(),
         customer.createdAt.getMonth(),
         1,
       )
+
       const monthIndex = months.findIndex(
-        (m) =>
-          m.date.getFullYear() === customerMonth.getFullYear() &&
-          m.date.getMonth() === customerMonth.getMonth(),
+        entry =>
+          entry.date.getFullYear() === customerMonth.getFullYear() &&
+          entry.date.getMonth() === customerMonth.getMonth(),
       )
-      if (monthIndex !== -1) months[monthIndex].newCustomers += 1
-    })
+
+      if (monthIndex !== -1) {
+        months[monthIndex].newCustomers += 1
+      }
+    }
 
     let cumulative = 0
-    months.forEach((m) => {
-      cumulative += m.newCustomers
-      m.totalCustomers = cumulative
-    })
 
-    return months.map((m) => ({
-      month: m.month,
-      newCustomers: m.newCustomers,
-      totalCustomers: m.totalCustomers,
+    for (const month of months) {
+      cumulative += month.newCustomers
+      month.totalCustomers = cumulative
+    }
+
+    return months.map(month => ({
+      month: month.month,
+      newCustomers: month.newCustomers,
+      totalCustomers: month.totalCustomers,
     }))
   }
 
   async getServiceOrdersStatus(orgId: string) {
     return this.cache.getOrSet(
       `dashboard:so-status:${orgId}`,
-      () => this._fetchServiceOrdersStatus(orgId),
+      () => this.fetchServiceOrdersStatus(orgId),
       CACHE_TTL_METRICS,
     )
   }
 
-  private async _fetchServiceOrdersStatus(orgId: string) {
-    const [openCount, assignedCount, inProgressCount, doneCount, canceledCount] =
-      await Promise.all([
-        this.prisma.serviceOrder.count({ where: { orgId, status: 'OPEN' } }),
-        this.prisma.serviceOrder.count({ where: { orgId, status: 'ASSIGNED' } }),
-        this.prisma.serviceOrder.count({
-          where: { orgId, status: 'IN_PROGRESS' },
-        }),
-        this.prisma.serviceOrder.count({ where: { orgId, status: 'DONE' } }),
-        this.prisma.serviceOrder.count({
-          where: { orgId, status: 'CANCELED' },
-        }),
-      ])
+  private async fetchServiceOrdersStatus(orgId: string) {
+    const [open, assigned, inProgress, completed, cancelled] = await Promise.all([
+      this.prisma.serviceOrder.count({ where: { orgId, status: 'OPEN' } }),
+      this.prisma.serviceOrder.count({ where: { orgId, status: 'ASSIGNED' } }),
+      this.prisma.serviceOrder.count({ where: { orgId, status: 'IN_PROGRESS' } }),
+      this.prisma.serviceOrder.count({ where: { orgId, status: 'DONE' } }),
+      this.prisma.serviceOrder.count({ where: { orgId, status: 'CANCELED' } }),
+    ])
 
     return {
-      open: openCount,
-      assigned: assignedCount,
-      inProgress: inProgressCount,
-      completed: doneCount,
-      cancelled: canceledCount,
+      open,
+      assigned,
+      inProgress,
+      completed,
+      cancelled,
     }
   }
 
   async getChargesStatus(orgId: string) {
     return this.cache.getOrSet(
       `dashboard:charges-status:${orgId}`,
-      () => this._fetchChargesStatus(orgId),
+      () => this.fetchChargesStatus(orgId),
       CACHE_TTL_METRICS,
     )
   }
 
-  private async _fetchChargesStatus(orgId: string) {
-    const [pendingCount, paidCount, overdueCount, canceledCount] =
-      await Promise.all([
-        this.prisma.charge.count({ where: { orgId, status: 'PENDING' } }),
-        this.prisma.charge.count({ where: { orgId, status: 'PAID' } }),
-        this.prisma.charge.count({ where: { orgId, status: 'OVERDUE' } }),
-        this.prisma.charge.count({ where: { orgId, status: 'CANCELED' } }),
-      ])
+  private async fetchChargesStatus(orgId: string) {
+    const [pending, paid, overdue, cancelled] = await Promise.all([
+      this.prisma.charge.count({ where: { orgId, status: 'PENDING' } }),
+      this.prisma.charge.count({ where: { orgId, status: 'PAID' } }),
+      this.prisma.charge.count({ where: { orgId, status: 'OVERDUE' } }),
+      this.prisma.charge.count({ where: { orgId, status: 'CANCELED' } }),
+    ])
 
     return {
-      pending: pendingCount,
-      paid: paidCount,
-      overdue: overdueCount,
-      cancelled: canceledCount,
+      pending,
+      paid,
+      overdue,
+      cancelled,
     }
   }
 

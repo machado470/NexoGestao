@@ -18,6 +18,10 @@ import type {
   StageTone,
 } from "./service-order.types";
 
+/* =========================
+   STATUS
+========================= */
+
 export const STATUS_LABELS: Record<ServiceOrderStatus, string> = {
   OPEN: "Aberta",
   ASSIGNED: "Atribuída",
@@ -35,6 +39,10 @@ export const STATUS_COLORS: Record<ServiceOrderStatus, string> = {
   DONE: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
   CANCELED: "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300",
 };
+
+/* =========================
+   TEXTO / FORMATOS
+========================= */
 
 export function normalizeText(value?: string | null) {
   if (typeof value !== "string") return null;
@@ -63,6 +71,10 @@ export function formatCurrency(cents?: number | null) {
     currency: "BRL",
   }).format(amount / 100);
 }
+
+/* =========================
+   PRIORIDADE
+========================= */
 
 export function getPriorityLabel(priority?: number | null) {
   switch (priority) {
@@ -93,6 +105,10 @@ export function getPriorityColor(priority?: number | null) {
       return "text-gray-500";
   }
 }
+
+/* =========================
+   ATIVIDADE / INTELIGÊNCIA
+========================= */
 
 export function getLastActivityAt(os: ServiceOrder) {
   return (
@@ -130,6 +146,10 @@ export function getPriorityScore(os: ServiceOrder) {
 
   return 100;
 }
+
+/* =========================
+   FINANCEIRO
+========================= */
 
 export function isReadyToCharge(os: ServiceOrder) {
   const summary = os.financialSummary ?? null;
@@ -212,6 +232,10 @@ export function matchesFinancialFilter(
 
   return summary?.chargeStatus === filter;
 }
+
+/* =========================
+   STAGES / HUB OPERACIONAL
+========================= */
 
 export function getOperationalStage(os: ServiceOrder): StageTone {
   const hasAssignedPerson = Boolean(os.assignedToPersonId);
@@ -347,6 +371,10 @@ export function getFinancialStage(os: ServiceOrder): StageTone {
   };
 }
 
+/* =========================
+   URL
+========================= */
+
 export function getServiceOrderIdFromUrl() {
   if (typeof window === "undefined") return null;
   const params = new URLSearchParams(window.location.search);
@@ -359,3 +387,4 @@ export function buildServiceOrdersUrl(serviceOrderId?: string | null) {
 
   return params.toString() ? `/service-orders?${params}` : "/service-orders";
 }
+

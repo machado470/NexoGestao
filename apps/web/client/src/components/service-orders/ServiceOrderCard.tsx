@@ -1,7 +1,4 @@
-import { useMemo } from "react";
-import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
-import { normalizeList } from "@/lib/utils/normalizeList";
 import ServiceOrderDetailsPanel from "@/components/service-orders/ServiceOrderDetailsPanel";
 import {
   Wallet,
@@ -24,7 +21,7 @@ import {
   getPriorityLabel,
   getLastActivityAt,
   isAbandoned,
-  getPriorityScore,
+  isReadyToCharge,
 } from "./service-order.utils";
 
 interface Props {
@@ -60,10 +57,6 @@ function formatTimeAgo(date?: string | Date | null) {
   return `${Math.floor(h / 24)}d`;
 }
 
-function normalizeTimelineRows(data: unknown) {
-  return normalizeList<any>(data);
-}
-
 export default function ServiceOrderCard({
   os,
   isExpanded,
@@ -84,23 +77,12 @@ export default function ServiceOrderCard({
   isFinishingExecution,
   isGeneratingCharge,
 }: Props) {
-  const timelineQuery = trpc.nexo.timeline.listByServiceOrder.useQuery(
-    { serviceOrderId: os.id, limit: 1 },
-    { retry: false },
-  );
-
-  const lastEvent = useMemo(() => {
-    const events = normalizeTimelineRows(timelineQuery.data);
-    return events[0] ?? null;
-  }, [timelineQuery.data]);
-
-  const lastActivityAt = lastEvent?.createdAt || getLastActivityAt(os);
+  const lastActivityAt = getLastActivityAt(os);
   const timeAgo = formatTimeAgo(lastActivityAt);
 
   const abandoned = isAbandoned(os);
-  const score = getPriorityScore(os);
 
-  const isMoneyBlocked = financialStage.label === "Pronta para cobrança";
+  const isMoneyBlocked = isReadyToCharge(os);
 
   const disabled =
     isProcessing ||
@@ -121,9 +103,7 @@ export default function ServiceOrderCard({
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="font-semibold">{os.title}</h3>
 
-              <span
-                className={`px-2 py-0.5 text-xs rounded ${STATUS_COLORS[os.status]}`}
-              >
+              <span className={`px-2 py-0.5 text-xs rounded ${STATUS_COLORS[os.status]}`}>
                 {STATUS_LABELS[os.status]}
               </span>
 
@@ -131,9 +111,7 @@ export default function ServiceOrderCard({
                 ● {getPriorityLabel(os.priority)}
               </span>
 
-              <span
-                className={`px-2 py-0.5 text-xs rounded ${chargeBadge.className}`}
-              >
+              <span className={`px-2 py-0.5 text-xs rounded ${chargeBadge.className}`}>
                 {chargeBadge.label}
               </span>
 
@@ -145,21 +123,15 @@ export default function ServiceOrderCard({
                   Abandonada
                 </span>
               )}
-
-              <span className="text-xs text-gray-400">score {score}</span>
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <span
-                className={`px-2 py-1 text-xs rounded border ${operationalStage.className}`}
-              >
+              <span className={`px-2 py-1 text-xs rounded border ${operationalStage.className}`}>
                 <operationalStage.icon className="inline h-3 w-3 mr-1" />
                 {operationalStage.label}
               </span>
 
-              <span
-                className={`px-2 py-1 text-xs rounded border ${financialStage.className}`}
-              >
+              <span className={`px-2 py-1 text-xs rounded border ${financialStage.className}`}>
                 <financialStage.icon className="inline h-3 w-3 mr-1" />
                 {financialStage.label}
               </span>

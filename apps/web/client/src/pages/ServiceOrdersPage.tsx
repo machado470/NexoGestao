@@ -13,6 +13,8 @@ import {
   matchesFinancialFilter,
   getServiceOrderIdFromUrl,
   buildServiceOrdersUrl,
+  getFinancialFilterLabel,
+  isReadyToCharge,
 } from "@/components/service-orders/service-order.utils";
 import type {
   FinancialFilter,
@@ -41,7 +43,9 @@ export default function ServiceOrdersPage() {
     return normalizeList<{ id: string; name: string }>(customersQuery.data);
   }, [customersQuery.data]);
 
-  const people: { id: string; name: string }[] = [];
+  const people = useMemo(() => {
+    return [] as { id: string; name: string }[];
+  }, []);
 
   const generateCharge = trpc.nexo.serviceOrders.generateCharge.useMutation({
     onSuccess: () => utils.nexo.serviceOrders.list.invalidate(),
@@ -61,8 +65,7 @@ export default function ServiceOrdersPage() {
 
   const sorted = useMemo(() => {
     return [...list].sort(
-      (a: ServiceOrder, b: ServiceOrder) =>
-        getPriorityScore(b) - getPriorityScore(a),
+      (a, b) => getPriorityScore(b) - getPriorityScore(a)
     );
   }, [list]);
 
@@ -107,6 +110,15 @@ export default function ServiceOrdersPage() {
     }
   }
 
+  const filters: FinancialFilter[] = [
+    "ALL",
+    "NO_CHARGE",
+    "READY_TO_CHARGE",
+    "PENDING",
+    "PAID",
+    "OVERDUE",
+  ];
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -115,27 +127,20 @@ export default function ServiceOrdersPage() {
       </div>
 
       <div className="flex flex-wrap gap-2">
-        {[
-          "ALL",
-          "NO_CHARGE",
-          "READY_TO_CHARGE",
-          "PENDING",
-          "PAID",
-          "OVERDUE",
-        ].map((f) => (
+        {filters.map((f) => (
           <Button
             key={f}
             size="sm"
             variant={filter === f ? "default" : "outline"}
-            onClick={() => setFilter(f as FinancialFilter)}
+            onClick={() => setFilter(f)}
           >
-            {f}
+            {getFinancialFilterLabel(f)}
           </Button>
         ))}
       </div>
 
       <div className="space-y-3">
-        {filtered.map((os: ServiceOrder) => {
+        {filtered.map((os) => {
           const chargeBadge = getChargeBadge(os.financialSummary);
           const operationalStage = getOperationalStage(os);
           const financialStage = getFinancialStage(os);
@@ -147,9 +152,7 @@ export default function ServiceOrdersPage() {
               isExpanded={expandedId === os.id}
               isProcessing={processingId === os.id}
               chargeBadge={chargeBadge}
-              canGenerateCharge={
-                financialStage.label === "Pronta para cobrança"
-              }
+              canGenerateCharge={isReadyToCharge(os)}
               canStartExecution={
                 os.status !== "IN_PROGRESS" && os.status !== "DONE"
               }
@@ -164,9 +167,15 @@ export default function ServiceOrdersPage() {
                 setExpandedId((prev) => (prev === id ? null : id))
               }
               isUpdating={false}
-              isStartingExecution={startExecution.isPending}
-              isFinishingExecution={finishExecution.isPending}
-              isGeneratingCharge={generateCharge.isPending}
+              isStartingExecution={
+                startExecution.isPending && processingId === os.id
+              }
+              isFinishingExecution={
+                finishExecution.isPending && processingId === os.id
+              }
+              isGeneratingCharge={
+                generateCharge.isPending && processingId === os.id
+              }
             />
           );
         })}
