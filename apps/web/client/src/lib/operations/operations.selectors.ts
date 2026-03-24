@@ -1,27 +1,33 @@
+import { normalizeStatus } from "./operations.utils";
+
 export function getOrdersByStatus<T extends { status?: string | null }>(
   list: T[],
   status: string
 ) {
-  return list.filter((o) => String(o?.status ?? "") === status);
+  const targetStatus = normalizeStatus(status);
+  return list.filter((o) => normalizeStatus(o?.status) === targetStatus);
 }
 
 export function getOrdersInStatuses<T extends { status?: string | null }>(
   list: T[],
   statuses: string[]
 ) {
-  return list.filter((o) => statuses.includes(String(o?.status ?? "")));
+  const targetStatuses = statuses.map((status) => normalizeStatus(status));
+  return list.filter((o) =>
+    targetStatuses.includes(normalizeStatus(o?.status))
+  );
 }
 
 export function getPendingCharges<
   T extends { status?: string | null; amountCents?: number | null }
 >(list: T[]) {
-  return list.filter((c) => String(c?.status ?? "") === "PENDING");
+  return list.filter((c) => normalizeStatus(c?.status) === "PENDING");
 }
 
 export function getOverdueCharges<
   T extends { status?: string | null; amountCents?: number | null }
 >(list: T[]) {
-  return list.filter((c) => String(c?.status ?? "") === "OVERDUE");
+  return list.filter((c) => normalizeStatus(c?.status) === "OVERDUE");
 }
 
 export function getDoneWithoutCharge<
@@ -32,7 +38,7 @@ export function getDoneWithoutCharge<
 >(list: T[]) {
   return list.filter(
     (o) =>
-      String(o?.status ?? "") === "DONE" &&
+      normalizeStatus(o?.status) === "DONE" &&
       !o?.financialSummary?.hasCharge
   );
 }

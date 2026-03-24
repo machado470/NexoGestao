@@ -217,6 +217,8 @@ export class DashboardService {
         select: {
           id: true,
           title: true,
+          amountCents: true,
+          scheduledFor: true,
           finishedAt: true,
           createdAt: true,
           customer: { select: { id: true, name: true } },
@@ -233,7 +235,10 @@ export class DashboardService {
       },
       overdueCharges: {
         count: overdueCharges.length,
-        totalAmountCents: overdueCharges.reduce((sum, c) => sum + c.amountCents, 0),
+        totalAmountCents: overdueCharges.reduce(
+          (sum, c) => sum + (c.amountCents ?? 0),
+          0,
+        ),
         items: overdueCharges,
       },
       todayServices: {
@@ -258,20 +263,36 @@ export class DashboardService {
           phone: customer.phone,
           pendingCharges: customer.charges.length,
           totalPendingCents: customer.charges.reduce(
-            (sum, charge) => sum + charge.amountCents,
+            (sum, charge) => sum + (charge.amountCents ?? 0),
             0,
           ),
         })),
       },
       doneOrdersWithoutCharge: {
         count: doneOrdersWithoutCharge.length,
-        items: doneOrdersWithoutCharge.map((order) => ({
-          id: order.id,
-          title: order.title,
-          finishedAt: order.finishedAt,
-          createdAt: order.createdAt,
-          customer: order.customer,
-        })),
+        totalAmountCents: doneOrdersWithoutCharge.reduce(
+          (sum, order) => sum + (order.amountCents ?? 0),
+          0,
+        ),
+        items: doneOrdersWithoutCharge.map((order) => {
+          const referenceDate = order.finishedAt ?? order.createdAt
+          const diffMs = now.getTime() - referenceDate.getTime()
+          const daysWithoutCharge = Math.max(
+            0,
+            Math.floor(diffMs / (1000 * 60 * 60 * 24)),
+          )
+
+          return {
+            id: order.id,
+            title: order.title,
+            amountCents: order.amountCents ?? 0,
+            scheduledFor: order.scheduledFor,
+            finishedAt: order.finishedAt,
+            createdAt: order.createdAt,
+            daysWithoutCharge,
+            customer: order.customer,
+          }
+        }),
       },
     }
   }

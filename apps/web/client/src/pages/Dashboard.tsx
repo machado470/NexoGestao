@@ -10,60 +10,31 @@ function formatCurrency(cents: number): string {
 }
 
 function formatDate(dateStr: string | Date): string {
-  return new Date(dateStr).toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
+  return new Date(dateStr).toLocaleDateString("pt-BR");
 }
-
-type DashboardNotification = {
-  id: string;
-  title: string;
-  message: string;
-  createdAt: string | Date;
-};
 
 function AlertCard({
   title,
   count,
-  colorClass,
   children,
 }: {
   title: string;
   count: number;
-  colorClass: string;
   children?: React.ReactNode;
 }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div
-      className={`rounded-2xl border p-4 dark:border-zinc-800 ${
-        count > 0 ? colorClass : ""
-      }`}
-    >
+    <div className="rounded-2xl border p-4">
       <div
-        className="flex cursor-pointer items-center justify-between"
+        className="flex cursor-pointer justify-between"
         onClick={() => count > 0 && setExpanded(!expanded)}
       >
         <span className="font-medium">{title}</span>
-        <span
-          className={`rounded-full px-2 py-0.5 text-sm font-semibold ${
-            count > 0
-              ? "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300"
-              : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800"
-          }`}
-        >
-          {count}
-        </span>
+        <span className="font-bold">{count}</span>
       </div>
 
-      {expanded && count > 0 && (
-        <div className="mt-3 space-y-2 border-t pt-3 dark:border-zinc-800">
-          {children}
-        </div>
-      )}
+      {expanded && <div className="mt-3 space-y-2">{children}</div>}
     </div>
   );
 }
@@ -71,258 +42,86 @@ function AlertCard({
 export default function Dashboard() {
   const { isAuthenticated, isInitializing } = useAuth();
 
-  const canLoadDashboard = isAuthenticated && !isInitializing;
-
   const alertsQuery = trpc.dashboard.alerts.useQuery(undefined, {
-    enabled: canLoadDashboard,
-    refetchInterval: canLoadDashboard ? 60_000 : false,
+    enabled: isAuthenticated && !isInitializing,
     retry: false,
-    refetchOnWindowFocus: false,
   });
-
-  const metricsQuery = trpc.dashboard.kpis.useQuery(undefined, {
-    enabled: canLoadDashboard,
-    refetchInterval: canLoadDashboard ? 60_000 : false,
-    retry: false,
-    refetchOnWindowFocus: false,
-  });
-
-  const notificationsQuery = trpc.dashboard.notifications.useQuery(
-    { limit: 8 },
-    {
-      enabled: canLoadDashboard,
-      refetchInterval: canLoadDashboard ? 30_000 : false,
-      retry: false,
-      refetchOnWindowFocus: false,
-    }
-  );
 
   const alerts = (alertsQuery.data as any)?.data ?? alertsQuery.data;
-  const metrics = (metricsQuery.data as any)?.data ?? metricsQuery.data;
 
-  const notifications = Array.isArray(notificationsQuery.data)
-    ? notificationsQuery.data
-    : [];
-
-  if (isInitializing) {
-    return (
-      <div className="p-6 space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">Dashboard</h1>
-          <span className="text-sm text-zinc-500">Carregando sessão...</span>
-        </div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <div className="p-6 space-y-6">
-        <div className="rounded-2xl border p-4 text-sm text-zinc-500 dark:border-zinc-800">
-          Faça login para visualizar o dashboard.
-        </div>
-      </div>
-    );
-  }
+  if (!isAuthenticated) return <div className="p-6">Login</div>;
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Dashboard</h1>
-        {(alertsQuery.isLoading || metricsQuery.isLoading) && (
-          <span className="text-sm text-zinc-500">Carregando...</span>
-        )}
-      </div>
+      <h1 className="text-2xl font-bold">Central de decisão</h1>
 
-      {metrics && (
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          <div className="rounded-2xl border p-4 dark:border-zinc-800">
-            <div className="text-sm text-zinc-500">Clientes ativos</div>
-            <div className="mt-1 text-2xl font-bold">
-              {metrics.totalCustomers ?? 0}
-            </div>
-          </div>
+      {alerts && (
+        <div className="grid gap-4 md:grid-cols-2">
 
-          <div className="rounded-2xl border p-4 dark:border-zinc-800">
-            <div className="text-sm text-zinc-500">O.S. abertas</div>
-            <div className="mt-1 text-2xl font-bold">
-              {metrics.openServiceOrders ?? 0}
-            </div>
-          </div>
+          {/* ORDENS ATRASADAS */}
+          <AlertCard
+            title="Ordens atrasadas"
+            count={alerts.overdueOrders?.count ?? 0}
+          >
+            {alerts.overdueOrders?.items?.map((o: any) => (
+              <div
+                key={o.id}
+                className="border p-2 rounded cursor-pointer hover:bg-gray-50"
+                onClick={() =>
+                  window.location.href = `/service-orders?id=${o.id}`
+                }
+              >
+                <div className="font-medium">{o.title}</div>
+                <div className="text-xs text-gray-500">
+                  {o.customer?.name}
+                </div>
+              </div>
+            ))}
+          </AlertCard>
 
-          <div className="rounded-2xl border p-4 dark:border-zinc-800">
-            <div className="text-sm text-zinc-500">Receita semanal</div>
-            <div className="mt-1 text-2xl font-bold">
-              {formatCurrency(metrics.weeklyRevenueInCents ?? 0)}
-            </div>
-          </div>
+          {/* COBRANÇAS VENCIDAS */}
+          <AlertCard
+            title="Cobranças vencidas"
+            count={alerts.overdueCharges?.count ?? 0}
+          >
+            {alerts.overdueCharges?.items?.map((c: any) => (
+              <div
+                key={c.id}
+                className="border p-2 rounded cursor-pointer hover:bg-gray-50"
+                onClick={() =>
+                  window.location.href = `/service-orders?id=${c.serviceOrderId}`
+                }
+              >
+                <div className="font-medium">
+                  {c.customer?.name}
+                </div>
+                <div className="text-sm text-red-600">
+                  {formatCurrency(c.amountCents)}
+                </div>
+              </div>
+            ))}
+          </AlertCard>
 
-          <div className="rounded-2xl border p-4 dark:border-zinc-800">
-            <div className="text-sm text-zinc-500">Pendente</div>
-            <div className="mt-1 text-2xl font-bold text-yellow-600">
-              {formatCurrency(metrics.pendingPaymentsInCents ?? 0)}
-            </div>
-          </div>
+          {/* SEM COBRANÇA */}
+          <AlertCard
+            title="Execução sem cobrança"
+            count={alerts.doneOrdersWithoutCharge?.count ?? 0}
+          >
+            {alerts.doneOrdersWithoutCharge?.items?.map((o: any) => (
+              <div
+                key={o.id}
+                className="border p-2 rounded cursor-pointer hover:bg-gray-50"
+                onClick={() =>
+                  window.location.href = `/service-orders?id=${o.id}`
+                }
+              >
+                <div className="font-medium">{o.title}</div>
+              </div>
+            ))}
+          </AlertCard>
+
         </div>
       )}
-
-      <div>
-        <h2 className="mb-3 text-lg font-semibold">
-          Notificações Operacionais
-        </h2>
-
-        {notificationsQuery.isLoading ? (
-          <div className="rounded-2xl border p-4 text-sm text-zinc-500 dark:border-zinc-800">
-            Carregando notificações...
-          </div>
-        ) : notifications.length > 0 ? (
-          <div className="space-y-2">
-            {notifications.map((notification: DashboardNotification) => (
-              <div
-                key={notification.id}
-                className="rounded-2xl border p-3 dark:border-zinc-800"
-              >
-                <div className="text-sm font-semibold">
-                  {notification.title}
-                </div>
-                <div className="text-sm text-zinc-600 dark:text-zinc-300">
-                  {notification.message}
-                </div>
-                <div className="mt-1 text-xs text-zinc-500">
-                  {new Date(notification.createdAt).toLocaleString("pt-BR")}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="rounded-2xl border p-4 text-sm text-zinc-500 dark:border-zinc-800">
-            Sem notificações operacionais no momento.
-          </div>
-        )}
-      </div>
-
-      <div>
-        <h2 className="mb-3 text-lg font-semibold">Alertas Operacionais</h2>
-
-        {alertsQuery.isLoading ? (
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            {[1, 2, 3, 4].map((i) => (
-              <div
-                key={i}
-                className="h-16 animate-pulse rounded-2xl bg-zinc-100 dark:bg-zinc-800"
-              />
-            ))}
-          </div>
-        ) : alertsQuery.isError ? (
-          <div className="rounded-2xl border border-red-200 p-4 text-red-600 dark:border-red-900">
-            Erro ao carregar alertas.
-          </div>
-        ) : alerts ? (
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <AlertCard
-              title="Ordens Atrasadas"
-              count={alerts.overdueOrders?.count ?? 0}
-              colorClass="border-red-200 dark:border-red-900"
-            >
-              {alerts.overdueOrders?.items?.map((order: any) => (
-                <div
-                  key={order.id}
-                  className="flex items-center justify-between text-sm"
-                >
-                  <div>
-                    <div className="font-medium">{order.title}</div>
-                    <div className="text-xs text-zinc-500">
-                      {order.customer?.name}
-                    </div>
-                  </div>
-                  <div className="text-xs text-red-500">
-                    {order.dueDate ? formatDate(order.dueDate) : "—"}
-                  </div>
-                </div>
-              ))}
-            </AlertCard>
-
-            <AlertCard
-              title="Cobranças Vencidas"
-              count={alerts.overdueCharges?.count ?? 0}
-              colorClass="border-orange-200 dark:border-orange-900"
-            >
-              <div className="mb-2 text-sm font-medium text-orange-600">
-                Total:{" "}
-                {formatCurrency(alerts.overdueCharges?.totalAmountCents ?? 0)}
-              </div>
-
-              {alerts.overdueCharges?.items?.map((charge: any) => (
-                <div
-                  key={charge.id}
-                  className="flex items-center justify-between text-sm"
-                >
-                  <div>
-                    <div className="font-medium">{charge.customer?.name}</div>
-                    <div className="text-xs text-zinc-500">
-                      Venceu em {formatDate(charge.dueDate)}
-                    </div>
-                  </div>
-                  <div className="font-semibold text-orange-600">
-                    {formatCurrency(charge.amountCents)}
-                  </div>
-                </div>
-              ))}
-            </AlertCard>
-
-            <AlertCard
-              title="Serviços de Hoje"
-              count={alerts.todayServices?.count ?? 0}
-              colorClass="border-blue-200 dark:border-blue-900"
-            >
-              {alerts.todayServices?.items?.map((apt: any) => (
-                <div
-                  key={apt.id}
-                  className="flex items-center justify-between text-sm"
-                >
-                  <div>
-                    <div className="font-medium">
-                      {apt.title || "Agendamento"}
-                    </div>
-                    <div className="text-xs text-zinc-500">
-                      {apt.customer?.name}
-                    </div>
-                  </div>
-                  <div className="text-xs text-blue-500">
-                    {new Date(apt.startsAt).toLocaleTimeString("pt-BR", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </div>
-                </div>
-              ))}
-            </AlertCard>
-
-            <AlertCard
-              title="Clientes com Pendência"
-              count={alerts.customersWithPending?.count ?? 0}
-              colorClass="border-yellow-200 dark:border-yellow-900"
-            >
-              {alerts.customersWithPending?.items?.map((customer: any) => (
-                <div
-                  key={customer.id}
-                  className="flex items-center justify-between text-sm"
-                >
-                  <div>
-                    <div className="font-medium">{customer.name}</div>
-                    <div className="text-xs text-zinc-500">
-                      {customer.pendingCharges} cobrança(s)
-                    </div>
-                  </div>
-                  <div className="font-semibold text-yellow-600">
-                    {formatCurrency(customer.totalPendingCents)}
-                  </div>
-                </div>
-              ))}
-            </AlertCard>
-          </div>
-        ) : null}
-      </div>
     </div>
   );
 }

@@ -17,33 +17,39 @@ import { MainLayout } from "./components/MainLayout";
 import { NotificationCenter } from "./components/NotificationCenter";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import { canAny, type Permission, type Role } from "./lib/rbac";
+import { canAny, type Permission } from "./lib/rbac";
 
+// pages
 const Landing = lazy(() => import("./pages/Landing"));
 const Login = lazy(() => import("./pages/Login"));
 const Register = lazy(() => import("./pages/Register"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const About = lazy(() => import("./pages/About"));
+const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
+const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
+
 const CustomersPage = lazy(() => import("./pages/CustomersPage"));
 const AppointmentsPage = lazy(() => import("./pages/AppointmentsPage"));
 const ServiceOrdersPage = lazy(() => import("./pages/ServiceOrdersPage"));
 const PeoplePage = lazy(() => import("./pages/PeoplePage"));
 const GovernancePage = lazy(() => import("./pages/GovernancePage"));
 const FinancesPage = lazy(() => import("./pages/FinancesPage"));
+
 const ExecutiveDashboard = lazy(() => import("./pages/ExecutiveDashboard"));
 const ExecutiveDashboardNew = lazy(() => import("./pages/ExecutiveDashboardNew"));
+
 const WhatsAppPage = lazy(() => import("./pages/WhatsAppPage"));
 const LaunchesPage = lazy(() => import("./pages/LaunchesPage"));
-const About = lazy(() => import("./pages/About"));
 const InvoicesPage = lazy(() => import("./pages/InvoicesPage"));
 const ExpensesPage = lazy(() => import("./pages/ExpensesPage"));
 const ReferralsPage = lazy(() => import("./pages/ReferralsPage"));
-const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
-const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
+
 const CalendarPage = lazy(() => import("./pages/CalendarPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const TimelinePage = lazy(() => import("./pages/TimelinePage"));
+
 const OperationalWorkflowPage = lazy(
   () => import("./pages/OperationalWorkflowPage")
 );
@@ -73,14 +79,18 @@ function FullScreenMessage({
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-6 dark:bg-gray-900">
       <div className="w-full max-w-md rounded-2xl border bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
-        <h1 className="text-xl font-semibold">{title}</h1>
-        <p className="mt-2 text-sm text-muted-foreground">{description}</p>
+        <h1 className="text-xl font-semibold text-zinc-950 dark:text-white">
+          {title}
+        </h1>
+        <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+          {description}
+        </p>
 
         {actionLabel && onAction ? (
           <button
             type="button"
             onClick={onAction}
-            className="mt-4 inline-flex rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+            className="mt-4 inline-flex rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600"
           >
             {actionLabel}
           </button>
@@ -90,17 +100,13 @@ function FullScreenMessage({
   );
 }
 
-function RouteFallback() {
-  return <FullScreenLoader />;
-}
-
 function LazyPage({
   component: Component,
 }: {
   component: LazyExoticComponent<ComponentType>;
 }) {
   return (
-    <Suspense fallback={<RouteFallback />}>
+    <Suspense fallback={<FullScreenLoader />}>
       <Component />
     </Suspense>
   );
@@ -108,13 +114,11 @@ function LazyPage({
 
 function ProtectedRoute({
   component: Component,
-  allowedRoles,
   permissions,
   requireCompletedOnboarding = false,
   onboardingOnly = false,
 }: {
   component: ComponentType;
-  allowedRoles?: Role[];
   permissions?: Permission[];
   requireCompletedOnboarding?: boolean;
   onboardingOnly?: boolean;
@@ -149,32 +153,11 @@ function ProtectedRoute({
     requiresOnboarding,
   ]);
 
-  if (isInitializing) {
-    return <FullScreenLoader />;
-  }
+  if (isInitializing) return <FullScreenLoader />;
+  if (!isAuthenticated) return null;
 
-  if (!isAuthenticated) {
-    return null;
-  }
-
-  if (requireCompletedOnboarding && requiresOnboarding) {
-    return null;
-  }
-
-  if (onboardingOnly && !requiresOnboarding) {
-    return null;
-  }
-
-  if (allowedRoles?.length && (!role || !allowedRoles.includes(role))) {
-    return (
-      <FullScreenMessage
-        title="Acesso restrito"
-        description="Seu perfil não tem permissão para acessar esta área."
-        actionLabel="Voltar ao dashboard"
-        onAction={() => navigate("/dashboard")}
-      />
-    );
-  }
+  if (requireCompletedOnboarding && requiresOnboarding) return null;
+  if (onboardingOnly && !requiresOnboarding) return null;
 
   if (permissions?.length && (!role || !canAny(role, permissions))) {
     return (
@@ -200,13 +183,8 @@ function PublicRoute({ component: Component }: { component: ComponentType }) {
     }
   }, [isAuthenticated, isInitializing, navigate, redirectTo]);
 
-  if (isInitializing) {
-    return <FullScreenLoader />;
-  }
-
-  if (isAuthenticated) {
-    return null;
-  }
+  if (isInitializing) return <FullScreenLoader />;
+  if (isAuthenticated) return null;
 
   return <Component />;
 }
@@ -224,19 +202,17 @@ function withMainLayout(Page: ComponentType) {
 function protectedPage(
   Page: LazyExoticComponent<ComponentType>,
   options?: {
-    allowedRoles?: Role[];
     permissions?: Permission[];
     requireCompletedOnboarding?: boolean;
     onboardingOnly?: boolean;
   }
 ) {
-  const WrappedPage = withMainLayout(() => <LazyPage component={Page} />);
+  const Wrapped = withMainLayout(() => <LazyPage component={Page} />);
 
   return function ProtectedPageRoute() {
     return (
       <ProtectedRoute
-        component={WrappedPage}
-        allowedRoles={options?.allowedRoles}
+        component={Wrapped}
         permissions={options?.permissions}
         requireCompletedOnboarding={options?.requireCompletedOnboarding}
         onboardingOnly={options?.onboardingOnly}
@@ -266,98 +242,94 @@ function RouteShell({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+// ROUTES
+
 const DashboardRoute = protectedPage(Dashboard, {
   requireCompletedOnboarding: true,
 });
 
 const CustomersRoute = protectedPage(CustomersPage, {
-  requireCompletedOnboarding: true,
   permissions: ["customers:read"],
+  requireCompletedOnboarding: true,
 });
 
 const AppointmentsRoute = protectedPage(AppointmentsPage, {
-  requireCompletedOnboarding: true,
   permissions: ["appointments:read"],
+  requireCompletedOnboarding: true,
 });
 
 const ServiceOrdersRoute = protectedPage(ServiceOrdersPage, {
-  requireCompletedOnboarding: true,
   permissions: ["orders:read"],
+  requireCompletedOnboarding: true,
 });
 
 const FinancesRoute = protectedPage(FinancesPage, {
-  requireCompletedOnboarding: true,
   permissions: ["finance:read"],
+  requireCompletedOnboarding: true,
 });
 
 const PeopleRoute = protectedPage(PeoplePage, {
+  permissions: ["people:manage"],
   requireCompletedOnboarding: true,
-  allowedRoles: ["ADMIN"],
 });
 
 const GovernanceRoute = protectedPage(GovernancePage, {
+  permissions: ["governance:read"],
   requireCompletedOnboarding: true,
-  allowedRoles: ["ADMIN", "MANAGER", "VIEWER"],
 });
 
 const ExecutiveDashboardRoute = protectedPage(ExecutiveDashboard, {
   requireCompletedOnboarding: true,
-  allowedRoles: ["ADMIN", "MANAGER", "VIEWER"],
 });
 
 const ExecutiveDashboardNewRoute = protectedPage(ExecutiveDashboardNew, {
   requireCompletedOnboarding: true,
-  allowedRoles: ["ADMIN", "MANAGER", "VIEWER"],
 });
 
 const WhatsAppRoute = protectedPage(WhatsAppPage, {
   requireCompletedOnboarding: true,
-  allowedRoles: ["ADMIN", "MANAGER", "STAFF"],
 });
 
 const LaunchesRoute = protectedPage(LaunchesPage, {
+  permissions: ["finance:read"],
   requireCompletedOnboarding: true,
-  allowedRoles: ["ADMIN", "MANAGER"],
 });
 
 const InvoicesRoute = protectedPage(InvoicesPage, {
+  permissions: ["finance:read"],
   requireCompletedOnboarding: true,
-  allowedRoles: ["ADMIN", "MANAGER"],
 });
 
 const ExpensesRoute = protectedPage(ExpensesPage, {
+  permissions: ["finance:read"],
   requireCompletedOnboarding: true,
-  allowedRoles: ["ADMIN", "MANAGER"],
 });
 
 const ReferralsRoute = protectedPage(ReferralsPage, {
   requireCompletedOnboarding: true,
-  allowedRoles: ["ADMIN", "MANAGER"],
 });
 
 const CalendarRoute = protectedPage(CalendarPage, {
-  requireCompletedOnboarding: true,
   permissions: ["appointments:read"],
+  requireCompletedOnboarding: true,
 });
 
 const SettingsRoute = protectedPage(SettingsPage, {
+  permissions: ["settings:manage"],
   requireCompletedOnboarding: true,
-  allowedRoles: ["ADMIN"],
 });
 
 const TimelineRoute = protectedPage(TimelinePage, {
+  permissions: ["reports:read"],
   requireCompletedOnboarding: true,
-  allowedRoles: ["ADMIN", "MANAGER", "VIEWER"],
 });
 
 const OperationsRoute = protectedPage(OperationalWorkflowPage, {
   requireCompletedOnboarding: true,
-  allowedRoles: ["ADMIN", "MANAGER", "STAFF"],
 });
 
 const OperationsDashboardRoute = protectedPage(OperationsDashboardPage, {
   requireCompletedOnboarding: true,
-  allowedRoles: ["ADMIN", "MANAGER", "STAFF"],
 });
 
 function Router() {

@@ -11,3 +11,7 @@ export function normalizeCharges<T = any>(data: unknown): T[] {
 export function normalizeAppointments<T = any>(data: unknown): T[] {
   return normalizeList<T>(data);
 }
+
+export function normalizeStatus(value?: string | null) {
+  return String(value ?? "").trim().toUpperCase();
+}

@@ -118,13 +118,22 @@ function buildQuery(input?: Record<string, unknown> | null): string {
 }
 
 function normalizeServiceOrdersListResult(payload: any): ServiceOrderListResponse {
+  const nested = payload?.data && typeof payload.data === "object" ? payload.data : null;
+
   const rawData = Array.isArray(payload?.data)
     ? payload.data
-    : Array.isArray(payload)
-      ? payload
-      : [];
+    : Array.isArray(nested?.data)
+      ? nested.data
+      : Array.isArray(payload)
+        ? payload
+        : [];
 
-  const rawPagination = payload?.pagination;
+  const rawPagination =
+    nested?.pagination && typeof nested.pagination === "object"
+      ? nested.pagination
+      : payload?.pagination && typeof payload.pagination === "object"
+        ? payload.pagination
+        : null;
 
   return {
     data: rawData,

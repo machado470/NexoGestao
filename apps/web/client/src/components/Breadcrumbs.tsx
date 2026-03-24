@@ -7,7 +7,15 @@ interface Breadcrumb {
 }
 
 const routeBreadcrumbs: Record<string, Breadcrumb[]> = {
+  "/dashboard": [
+    { label: "Visão", href: "/executive-dashboard" },
+    { label: "Dashboard" },
+  ],
   "/executive-dashboard": [
+    { label: "Visão", href: "/executive-dashboard" },
+    { label: "Visão Geral" },
+  ],
+  "/executive-dashboard-new": [
     { label: "Visão", href: "/executive-dashboard" },
     { label: "Visão Geral" },
   ],
@@ -16,33 +24,30 @@ const routeBreadcrumbs: Record<string, Breadcrumb[]> = {
     { label: "Dashboard Operacional" },
   ],
   "/operations": [
-    { label: "Visão", href: "/executive-dashboard" },
+    { label: "Operação", href: "/operations" },
     { label: "Workflow Operacional" },
   ],
   "/customers": [
-    { label: "Operação", href: "/customers" },
+    { label: "Operação", href: "/operations" },
     { label: "Clientes" },
   ],
   "/appointments": [
-    { label: "Operação", href: "/customers" },
+    { label: "Operação", href: "/operations" },
     { label: "Agendamentos" },
   ],
   "/calendar": [
-    { label: "Operação", href: "/customers" },
+    { label: "Operação", href: "/operations" },
     { label: "Calendário" },
   ],
   "/service-orders": [
-    { label: "Operação", href: "/customers" },
+    { label: "Operação", href: "/operations" },
     { label: "Ordens de Serviço" },
   ],
   "/timeline": [
-    { label: "Operação", href: "/customers" },
+    { label: "Operação", href: "/operations" },
     { label: "Timeline" },
   ],
-  "/finances": [
-    { label: "Financeiro", href: "/finances" },
-    { label: "Financeiro" },
-  ],
+  "/finances": [{ label: "Financeiro" }],
   "/invoices": [
     { label: "Financeiro", href: "/finances" },
     { label: "Faturas" },
@@ -55,10 +60,7 @@ const routeBreadcrumbs: Record<string, Breadcrumb[]> = {
     { label: "Financeiro", href: "/finances" },
     { label: "Lançamentos" },
   ],
-  "/governance": [
-    { label: "Governança", href: "/governance" },
-    { label: "Governança" },
-  ],
+  "/governance": [{ label: "Governança" }],
   "/people": [
     { label: "Governança", href: "/governance" },
     { label: "Pessoas" },
@@ -67,14 +69,8 @@ const routeBreadcrumbs: Record<string, Breadcrumb[]> = {
     { label: "Governança", href: "/governance" },
     { label: "Referências" },
   ],
-  "/whatsapp": [
-    { label: "Comunicação", href: "/whatsapp" },
-    { label: "WhatsApp" },
-  ],
-  "/settings": [
-    { label: "Sistema", href: "/settings" },
-    { label: "Configurações" },
-  ],
+  "/whatsapp": [{ label: "Comunicação" }, { label: "WhatsApp" }],
+  "/settings": [{ label: "Sistema" }, { label: "Configurações" }],
 };
 
 function humanizeSegment(path: string) {
@@ -88,7 +84,9 @@ function humanizeSegment(path: string) {
   if (!clean) return "Início";
 
   const mapped: Record<string, string> = {
+    dashboard: "Dashboard",
     "executive-dashboard": "Visão Geral",
+    "executive-dashboard-new": "Visão Geral",
     customers: "Clientes",
     appointments: "Agendamentos",
     calendar: "Calendário",
@@ -115,12 +113,16 @@ function humanizeSegment(path: string) {
   );
 }
 
+function startsWithSegment(location: string, route: string) {
+  return location === route || location.startsWith(`${route}/`);
+}
+
 function getBreadcrumbs(location: string) {
   const exact = routeBreadcrumbs[location];
   if (exact) return exact;
 
   const matchedEntry = Object.entries(routeBreadcrumbs).find(([route]) => {
-    return route !== "/" && location.startsWith(route);
+    return route !== "/" && startsWithSegment(location, route);
   });
 
   if (matchedEntry) {
@@ -134,7 +136,10 @@ export function Breadcrumbs() {
   const [location, navigate] = useLocation();
 
   const breadcrumbs = getBreadcrumbs(location);
-  const allBreadcrumbs = [{ label: "Início", href: "/executive-dashboard" }, ...breadcrumbs];
+  const allBreadcrumbs = [
+    { label: "Início", href: "/executive-dashboard" },
+    ...breadcrumbs,
+  ];
 
   return (
     <nav className="flex flex-wrap items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
@@ -149,9 +154,7 @@ export function Breadcrumbs() {
               type="button"
               onClick={() => navigate(crumb.href!)}
               className={`transition-colors hover:text-orange-600 dark:hover:text-orange-400 ${
-                index === 0
-                  ? "flex items-center"
-                  : "font-medium"
+                index === 0 ? "flex items-center" : "font-medium"
               }`}
             >
               {index === 0 ? <Home className="h-4 w-4" /> : crumb.label}
