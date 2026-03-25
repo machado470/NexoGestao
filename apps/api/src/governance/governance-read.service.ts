@@ -95,8 +95,10 @@ export class GovernanceReadService {
 
     const openCorrectivesCount = await this.prisma.correctiveAction.count({
       where: {
-        orgId,
         status: 'OPEN',
+        person: {
+          orgId,
+        },
       },
     })
 

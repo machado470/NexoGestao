@@ -1,6 +1,6 @@
 import cookie from "cookie";
 
-const NEXO_API_URL = process.env.NEXO_API_URL || "http://127.0.0.1:3001";
+const NEXO_API_URL = process.env.NEXO_API_URL || "http://127.0.0.1:3000";
 const NEXO_TOKEN_COOKIE = "nexo_token";
 
 function getNexoTokenFromReq(req: any): string | null {
@@ -15,25 +15,15 @@ function getNexoTokenFromReq(req: any): string | null {
 function extractErrorMessage(body: any, status: number): string {
   if (!body) return `Nexo API error ${status}`;
 
-  if (typeof body === "string" && body.trim()) {
-    return body;
-  }
+  if (typeof body === "string" && body.trim()) return body;
 
-  if (Array.isArray(body?.message)) {
-    return body.message.join(", ");
-  }
+  if (Array.isArray(body?.message)) return body.message.join(", ");
 
-  if (typeof body?.message === "string" && body.message.trim()) {
-    return body.message;
-  }
+  if (typeof body?.message === "string") return body.message;
 
-  if (typeof body?.error === "string" && body.error.trim()) {
-    return body.error;
-  }
+  if (typeof body?.error === "string") return body.error;
 
-  if (typeof body?.data?.message === "string" && body.data.message.trim()) {
-    return body.data.message;
-  }
+  if (typeof body?.data?.message === "string") return body.data.message;
 
   return `Nexo API error ${status}`;
 }

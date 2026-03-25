@@ -1,24 +1,15 @@
 import { Button } from "@/components/ui/button";
-import {
-  Wallet,
-  Pencil,
-  AlertCircle,
-  History,
-  ReceiptText,
-} from "lucide-react";
+import { Pencil, AlertCircle } from "lucide-react";
+
 import type { ServiceOrder, StageTone } from "./service-order.types";
+
 import {
-  STATUS_COLORS,
-  STATUS_LABELS,
   formatCurrency,
   formatDateTime,
-  getPriorityColor,
-  getPriorityLabel,
-  getLastActivityAt,
-  isAbandoned,
-  isReadyToCharge,
-} from "./service-order.utils";
-import { normalizeStatus } from "@/lib/operations/operations.utils";
+  normalizeStatus,
+} from "@/lib/operations/operations.utils";
+
+import { getServiceOrderNextAction } from "@/lib/operations/operations.selectors";
 
 interface Props {
   os: ServiceOrder;
@@ -36,11 +27,30 @@ interface Props {
 
 function formatTimeAgo(date?: string | Date | null) {
   if (!date) return "sem atividade";
+
   const diff = Date.now() - new Date(date).getTime();
   const h = Math.floor(diff / 3600000);
+
   if (h < 1) return "agora";
   if (h < 24) return `há ${h}h`;
+
   return `${Math.floor(h / 24)}d`;
+}
+
+function getStatusLabel(status: string) {
+  if (status === "DONE") return "Concluído";
+  if (status === "IN_PROGRESS") return "Em execução";
+  if (status === "OPEN") return "Aberto";
+  if (status === "ASSIGNED") return "Atribuído";
+  return status;
+}
+
+function getCardToneClass(tone: string) {
+  if (tone === "red") return "border-red-500 ring-2 ring-red-200";
+  if (tone === "amber") return "border-amber-400";
+  if (tone === "blue") return "border-blue-400";
+  if (tone === "green") return "border-green-400";
+  return "";
 }
 
 export default function ServiceOrderCard({
@@ -53,22 +63,23 @@ export default function ServiceOrderCard({
   onOpenDeepLink,
   isUpdating,
 }: Props) {
-  const lastActivityAt = getLastActivityAt(os);
-  const timeAgo = formatTimeAgo(lastActivityAt);
-
   const status = normalizeStatus(os.status);
 
-  const abandoned = isAbandoned(os);
-  const isChargeMissingAfterDone = isReadyToCharge(os);
+  const lastActivityAt =
+    os.updatedAt || os.finishedAt || os.startedAt || os.createdAt;
+
+  const timeAgo = formatTimeAgo(lastActivityAt);
+
+  const nextAction = getServiceOrderNextAction(os);
 
   const disabled = isProcessing || isUpdating;
 
   return (
     <div
       onClick={() => onOpenDeepLink(os.id)}
-      className={`rounded-xl border p-4 transition cursor-pointer hover:bg-gray-50 ${
-        isChargeMissingAfterDone ? "border-red-500 ring-2 ring-red-200" : ""
-      }`}
+      className={`rounded-xl border p-4 transition cursor-pointer hover:bg-gray-50 ${getCardToneClass(
+        nextAction.tone
+      )}`}
     >
       <div className="flex flex-col gap-3">
 
@@ -76,12 +87,8 @@ export default function ServiceOrderCard({
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="font-semibold">{os.title}</h3>
 
-          <span className={`px-2 py-0.5 text-xs rounded ${STATUS_COLORS[status]}`}>
-            {STATUS_LABELS[status]}
-          </span>
-
-          <span className={`text-xs ${getPriorityColor(os.priority)}`}>
-            ● {getPriorityLabel(os.priority)}
+          <span className="px-2 py-0.5 text-xs rounded bg-gray-100 text-gray-700">
+            {getStatusLabel(status)}
           </span>
 
           <span className={`px-2 py-0.5 text-xs rounded ${chargeBadge.className}`}>
@@ -90,10 +97,10 @@ export default function ServiceOrderCard({
 
           <span className="text-xs text-gray-400">{timeAgo}</span>
 
-          {abandoned && (
-            <span className="inline-flex items-center gap-1 rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-700">
+          {nextAction.tone === "red" && (
+            <span className="inline-flex items-center gap-1 rounded bg-red-100 px-2 py-0.5 text-xs text-red-700">
               <AlertCircle className="h-3 w-3" />
-              Abandonada
+              Ação urgente
             </span>
           )}
         </div>
@@ -109,36 +116,33 @@ export default function ServiceOrderCard({
           </span>
         </div>
 
-        {/* ALERTA */}
-        {isChargeMissingAfterDone && (
-          <div className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded">
-            💰 Execução concluída sem cobrança
-          </div>
-        )}
+        {/* NEXT ACTION */}
+        <div className="text-xs text-gray-600">
+          {nextAction.title}
+        </div>
 
         {/* INFO */}
         <div className="flex flex-wrap gap-3 text-xs text-gray-500">
-          <span className="inline-flex items-center gap-1">
-            <Wallet className="h-3.5 w-3.5" />
+          <span>
             {typeof os.amountCents === "number" && os.amountCents > 0
               ? formatCurrency(os.amountCents)
               : "Sem valor"}
           </span>
 
-          <span className="inline-flex items-center gap-1">
-            <History className="h-3.5 w-3.5" />
+          <span>
             {os.scheduledFor
               ? formatDateTime(os.scheduledFor)
               : "Sem agendamento"}
           </span>
 
-          <span className="inline-flex items-center gap-1">
-            <ReceiptText className="h-3.5 w-3.5" />
-            {os.dueDate ? formatDateTime(os.dueDate) : "Sem vencimento"}
+          <span>
+            {os.dueDate
+              ? formatDateTime(os.dueDate)
+              : "Sem vencimento"}
           </span>
         </div>
 
-        {/* ACTIONS */}
+        {/* ACTION */}
         <div className="flex justify-end">
           <Button
             size="sm"

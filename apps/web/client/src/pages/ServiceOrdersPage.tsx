@@ -2,24 +2,46 @@ import { useEffect, useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { normalizeOrders } from "@/lib/operations/operations.utils";
-import ServiceOrderCard from "@/components/service-orders/ServiceOrderCard";
-import ServiceOrderDetailsPanel from "@/components/service-orders/ServiceOrderDetailsPanel";
-import CreateServiceOrderModal from "@/components/CreateServiceOrderModal";
-import EditServiceOrderModal from "@/components/EditServiceOrderModal";
 import {
-  buildServiceOrdersUrl,
   getChargeBadge,
-  getFinancialFilterLabel,
   getFinancialStage,
   getOperationalStage,
   getPriorityScore,
-  getServiceOrderIdFromUrl,
   matchesFinancialFilter,
-} from "@/components/service-orders/service-order.utils";
+} from "@/lib/operations/operations.selectors";
+
+import ServiceOrderCard from "@/components/service-orders/ServiceOrderCard";
+import ServiceOrderDetailsPanel from "@/components/service-orders/ServiceOrderDetailsPanel";
+
+import CreateServiceOrderModal from "@/components/CreateServiceOrderModal";
+import EditServiceOrderModal from "@/components/EditServiceOrderModal";
+
 import type {
   FinancialFilter,
   ServiceOrder,
 } from "@/components/service-orders/service-order.types";
+
+function buildServiceOrdersUrl(id: string) {
+  const url = new URL(window.location.href);
+  url.searchParams.set("os", id);
+  return `${url.pathname}${url.search}`;
+}
+
+function getServiceOrderIdFromUrl() {
+  const url = new URL(window.location.href);
+  return url.searchParams.get("os");
+}
+
+function getFinancialFilterLabel(filter: FinancialFilter) {
+  if (filter === "ALL") return "Todas";
+  if (filter === "NO_CHARGE") return "Sem cobrança";
+  if (filter === "READY_TO_CHARGE") return "Prontas para cobrar";
+  if (filter === "PENDING") return "Pendentes";
+  if (filter === "PAID") return "Pagas";
+  if (filter === "OVERDUE") return "Vencidas";
+  if (filter === "CANCELED") return "Canceladas";
+  return filter;
+}
 
 export default function ServiceOrdersPage() {
   const utils = trpc.useUtils();
@@ -27,18 +49,11 @@ export default function ServiceOrdersPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [processingId, setProcessingId] = useState<string | null>(null);
   const [filter, setFilter] = useState<FinancialFilter>("ALL");
 
   const listQuery = trpc.nexo.serviceOrders.list.useQuery(
-    {
-      page: 1,
-      limit: 50,
-    },
-    {
-      retry: false,
-      refetchOnWindowFocus: false,
-    }
+    { page: 1, limit: 50 },
+    { retry: false, refetchOnWindowFocus: false }
   );
 
   const customersQuery = trpc.nexo.customers.list.useQuery(undefined, {
@@ -53,37 +68,38 @@ export default function ServiceOrdersPage() {
 
   const activeQuery = trpc.nexo.serviceOrders.getById.useQuery(
     { id: activeId as string },
-    {
-      enabled: Boolean(activeId),
-      retry: false,
-      refetchOnWindowFocus: false,
-    }
+    { enabled: Boolean(activeId), retry: false, refetchOnWindowFocus: false }
   );
 
-  const customers = useMemo(() => {
-    return normalizeOrders<{ id: string; name: string }>(customersQuery.data);
-  }, [customersQuery.data]);
+  const customers = useMemo(
+    () => normalizeOrders<{ id: string; name: string }>(customersQuery.data),
+    [customersQuery.data]
+  );
 
-  const people = useMemo(() => {
-    return normalizeOrders<{ id: string; name: string }>(peopleQuery.data);
-  }, [peopleQuery.data]);
+  const people = useMemo(
+    () => normalizeOrders<{ id: string; name: string }>(peopleQuery.data),
+    [peopleQuery.data]
+  );
 
-  const list = useMemo(() => {
-    return normalizeOrders<ServiceOrder>(listQuery.data);
-  }, [listQuery.data]);
+  const list = useMemo(
+    () => normalizeOrders<ServiceOrder>(listQuery.data),
+    [listQuery.data]
+  );
 
-  const sorted = useMemo(() => {
-    return [...list].sort((a, b) => getPriorityScore(b) - getPriorityScore(a));
-  }, [list]);
+  const sorted = useMemo(
+    () => [...list].sort((a, b) => getPriorityScore(b) - getPriorityScore(a)),
+    [list]
+  );
 
-  const filtered = useMemo(() => {
-    return sorted.filter((os) => matchesFinancialFilter(os, filter));
-  }, [sorted, filter]);
+  const operationalQueue = useMemo(
+    () => sorted.filter((os) => matchesFinancialFilter(os, filter)),
+    [sorted, filter]
+  );
 
   const activeFromList = useMemo(() => {
     if (!activeId) return null;
-    return filtered.find((item) => item.id === activeId) ?? null;
-  }, [filtered, activeId]);
+    return operationalQueue.find((item) => item.id === activeId) ?? null;
+  }, [operationalQueue, activeId]);
 
   const activeOs = useMemo(() => {
     if (activeQuery.data && typeof activeQuery.data === "object") {
@@ -94,25 +110,23 @@ export default function ServiceOrdersPage() {
 
   useEffect(() => {
     const deepLinkedId = getServiceOrderIdFromUrl();
-    if (deepLinkedId) {
-      setActiveId(deepLinkedId);
-    }
+    if (deepLinkedId) setActiveId(deepLinkedId);
   }, []);
 
   useEffect(() => {
     if (activeId) return;
-    if (filtered.length === 0) return;
-    setActiveId(filtered[0].id);
-  }, [filtered, activeId]);
+    if (operationalQueue.length === 0) return;
+    setActiveId(operationalQueue[0].id);
+  }, [operationalQueue, activeId]);
 
   useEffect(() => {
-    if (filtered.length === 0) return;
+    if (operationalQueue.length === 0) return;
 
-    const stillExists = filtered.some((item) => item.id === activeId);
+    const stillExists = operationalQueue.some((item) => item.id === activeId);
     if (!stillExists) {
-      setActiveId(filtered[0].id);
+      setActiveId(operationalQueue[0].id);
     }
-  }, [filtered, activeId]);
+  }, [operationalQueue, activeId]);
 
   function openAsActive(id: string) {
     window.history.pushState({}, "", buildServiceOrdersUrl(id));
@@ -134,7 +148,7 @@ export default function ServiceOrdersPage() {
         <div>
           <h1 className="text-xl font-semibold">Ordens de Serviço</h1>
           <p className="text-sm text-muted-foreground">
-            Centro da execução, status operacional e ponte com financeiro.
+            Centro da operação: execução, cobrança e status em tempo real.
           </p>
         </div>
 
@@ -156,30 +170,26 @@ export default function ServiceOrdersPage() {
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
         <div className="xl:col-span-5 2xl:col-span-4">
-          <div className="rounded-xl border border-border bg-card">
-            <div className="border-b border-border px-4 py-3">
+          <div className="rounded-xl border bg-card">
+            <div className="border-b px-4 py-3">
               <h2 className="font-semibold">Fila operacional</h2>
               <p className="text-xs text-muted-foreground">
-                {filtered.length} ordem(ns) no filtro atual
+                {operationalQueue.length} ordem(ns) no fluxo atual
               </p>
             </div>
 
             <div className="max-h-[72vh] overflow-y-auto p-3">
               {listQuery.isLoading ? (
-                <div className="rounded-lg border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
-                  Carregando ordens de serviço...
+                <div className="py-8 text-center text-sm text-muted-foreground">
+                  Carregando...
                 </div>
-              ) : listQuery.isError ? (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-8 text-center text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300">
-                  Não foi possível carregar as ordens de serviço.
-                </div>
-              ) : filtered.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
-                  Nenhuma ordem encontrada para o filtro selecionado.
+              ) : operationalQueue.length === 0 ? (
+                <div className="py-8 text-center text-sm text-muted-foreground">
+                  Nenhuma ordem neste fluxo.
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {filtered.map((os) => {
+                  {operationalQueue.map((os) => {
                     const chargeBadge = getChargeBadge(os.financialSummary);
                     const operationalStage = getOperationalStage(os);
                     const financialStage = getFinancialStage(os);
@@ -187,13 +197,13 @@ export default function ServiceOrdersPage() {
                     return (
                       <div
                         key={os.id}
-                        className={`rounded-2xl transition ${
+                        className={`rounded-2xl ${
                           activeId === os.id ? "ring-2 ring-blue-500" : ""
                         }`}
                       >
                         <ServiceOrderCard
                           os={os}
-                          isProcessing={processingId === os.id}
+                          isProcessing={false}
                           chargeBadge={chargeBadge}
                           operationalStage={operationalStage}
                           financialStage={financialStage}
@@ -211,24 +221,16 @@ export default function ServiceOrdersPage() {
         </div>
 
         <div className="xl:col-span-7 2xl:col-span-8">
-          <div className="rounded-xl border border-border bg-card p-4">
+          <div className="rounded-xl border bg-card p-4">
             {!activeId ? (
-              <div className="rounded-lg border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">
-                Selecione uma ordem de serviço.
-              </div>
-            ) : activeQuery.isLoading && !activeOs ? (
-              <div className="rounded-lg border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">
-                Carregando hub da ordem de serviço...
-              </div>
-            ) : activeQuery.isError && !activeOs ? (
-              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-10 text-center text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300">
-                Não foi possível carregar a ordem selecionada.
+              <div className="py-10 text-center text-sm text-muted-foreground">
+                Selecione uma ordem.
               </div>
             ) : activeOs ? (
               <ServiceOrderDetailsPanel os={activeOs} />
             ) : (
-              <div className="rounded-lg border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">
-                Nenhuma ordem disponível.
+              <div className="py-10 text-center text-sm text-muted-foreground">
+                Carregando...
               </div>
             )}
           </div>
@@ -251,15 +253,13 @@ export default function ServiceOrdersPage() {
         serviceOrderId={editId}
         onClose={() => setEditId(null)}
         onSuccess={() => {
-          const currentEditId = editId;
+          const id = editId;
           setEditId(null);
 
           void utils.nexo.serviceOrders.list.invalidate();
 
-          if (currentEditId) {
-            void utils.nexo.serviceOrders.getById.invalidate({
-              id: currentEditId,
-            });
+          if (id) {
+            void utils.nexo.serviceOrders.getById.invalidate({ id });
           }
         }}
         people={people}
