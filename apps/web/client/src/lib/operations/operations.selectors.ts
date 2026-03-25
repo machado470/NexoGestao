@@ -108,7 +108,7 @@ export function getChargeBadge(summary?: ServiceOrder["financialSummary"]) {
 
   return {
     label: "Pendente",
-      className: "bg-amber-100 text-amber-700",
+    className: "bg-amber-100 text-amber-700",
   };
 }
 
@@ -228,60 +228,66 @@ export function getServiceOrderFlowSteps(os: ServiceOrder) {
 }
 
 export function getServiceOrderNextAction(os: ServiceOrder) {
+  // PRIORIDADE MÁXIMA: cobrança vencida
+  if (os.financialSummary?.chargeStatus === "OVERDUE") {
+    return {
+      tone: "red",
+      title: "Cobrar cliente imediatamente",
+      description: "Existe cobrança vencida exigindo ação urgente.",
+    };
+  }
+
+  // execução parada
   if (["OPEN", "ASSIGNED"].includes(os.status)) {
     return {
       tone: "amber",
-      title: "Próxima ação: iniciar execução",
-      description: "A ordem está parada antes do início do serviço.",
+      title: "Iniciar execução",
+      description: "A ordem ainda não foi iniciada.",
     };
   }
 
+  // execução em andamento
   if (os.status === "IN_PROGRESS") {
     return {
       tone: "blue",
-      title: "Próxima ação: finalizar execução",
-      description: "A execução está em andamento e precisa ser concluída.",
+      title: "Finalizar execução",
+      description: "A execução precisa ser concluída.",
     };
   }
 
+  // serviço feito sem cobrança
   if (os.status === "DONE" && !os.financialSummary?.hasCharge) {
     return {
       tone: "red",
-      title: "Próxima ação: gerar cobrança",
+      title: "Gerar cobrança",
       description: "Serviço concluído sem cobrança vinculada.",
     };
   }
 
-  if (os.financialSummary?.chargeStatus === "OVERDUE") {
-    return {
-      tone: "red",
-      title: "Próxima ação: cobrar cliente",
-      description: "Existe cobrança vencida exigindo ação financeira.",
-    };
-  }
-
+  // cobrança criada
   if (
     os.financialSummary?.hasCharge &&
     os.financialSummary?.chargeStatus === "PENDING"
   ) {
     return {
       tone: "amber",
-      title: "Próxima ação: acompanhar pagamento",
-      description: "Cobrança criada e aguardando recebimento.",
+      title: "Acompanhar pagamento",
+      description: "Cobrança criada aguardando pagamento.",
     };
   }
 
+  // finalizado
   if (os.financialSummary?.chargeStatus === "PAID") {
     return {
       tone: "green",
       title: "Fluxo concluído",
-      description: "Execução e financeiro finalizados com sucesso.",
+      description: "Execução e financeiro finalizados.",
     };
   }
 
   return {
     tone: "gray",
     title: "Sem ação imediata",
-    description: "A ordem não exige ação operacional neste momento.",
+    description: "Nenhuma ação necessária no momento.",
   };
 }

@@ -7,6 +7,9 @@ import { toast } from "sonner";
 import { useChargeActions } from "@/hooks/useChargeActions";
 import { useLocation } from "wouter";
 import {
+  buildWhatsAppConversationUrl,
+  buildWhatsAppUrlFromCharge,
+  buildWhatsAppUrlFromServiceOrder,
   normalizeCharges,
   normalizeOrders,
   normalizeStatus,
@@ -55,6 +58,8 @@ export default function OperationsDashboardPage() {
     onSuccess: () => {
       toast.success("Execução concluída");
       utils.nexo.serviceOrders.list.invalidate();
+      utils.finance.charges.list.invalidate();
+      alertsQuery.refetch();
     },
     onError: (error) => {
       toast.error(error.message || "Erro ao concluir execução");
@@ -93,12 +98,12 @@ export default function OperationsDashboardPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>🚨 Ação imediata</CardTitle>
+          <CardTitle>Ação imediata</CardTitle>
         </CardHeader>
 
         <CardContent className="space-y-3">
           {alerts?.overdueCharges?.count > 0 && (
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-3">
               <span>
                 {alerts.overdueCharges.count} cobranças vencidas •{" "}
                 {formatCurrency(alerts.overdueCharges.totalAmountCents)}
@@ -110,53 +115,58 @@ export default function OperationsDashboardPage() {
                   const items = alerts?.overdueCharges?.items || [];
                   const first = items[0];
 
-                  if (!first?.customerId) {
+                  const whatsappUrl = buildWhatsAppConversationUrl({
+                    customerId: first?.customerId ? String(first.customerId) : null,
+                    context: "overdue_charge",
+                    chargeId: first?.id ? String(first.id) : null,
+                    serviceOrderId: first?.serviceOrderId
+                      ? String(first.serviceOrderId)
+                      : null,
+                    amountCents:
+                      typeof first?.amountCents === "number"
+                        ? first.amountCents
+                        : null,
+                    dueDate: first?.dueDate ? String(first.dueDate) : null,
+                  });
+
+                  if (!whatsappUrl) {
                     toast.error("Cobrança sem cliente vinculado");
                     return;
                   }
 
-                  navigate(`/whatsapp?customerId=${String(first.customerId)}`);
+                  navigate(whatsappUrl);
                 }}
               >
-                Cobrar
+                Cobrar no WhatsApp
               </Button>
             </div>
           )}
 
           {alerts?.overdueOrders?.count > 0 && (
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-3">
               <span>{alerts.overdueOrders.count} serviços atrasados</span>
 
-              <Button
-                size="sm"
-                onClick={() => navigate("/service-orders")}
-              >
+              <Button size="sm" onClick={() => navigate("/service-orders")}>
                 Resolver
               </Button>
             </div>
           )}
 
           {alerts?.doneOrdersWithoutCharge?.count > 0 && (
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-3">
               <span>{alerts.doneOrdersWithoutCharge.count} serviços sem cobrança</span>
 
-              <Button
-                size="sm"
-                onClick={() => navigate("/service-orders")}
-              >
+              <Button size="sm" onClick={() => navigate("/service-orders")}>
                 Gerar cobrança
               </Button>
             </div>
           )}
 
           {alerts?.customersWithPending?.count > 0 && (
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-3">
               <span>{alerts.customersWithPending.count} clientes com pendência</span>
 
-              <Button
-                size="sm"
-                onClick={() => navigate("/customers")}
-              >
+              <Button size="sm" onClick={() => navigate("/customers")}>
                 Ver clientes
               </Button>
             </div>
@@ -170,37 +180,65 @@ export default function OperationsDashboardPage() {
         </CardHeader>
 
         <CardContent className="space-y-3">
-          {serviceOrders.map((order: any) => {
-            const status = normalizeStatus(order.status);
+          {serviceOrders.length === 0 ? (
+            <div className="text-sm text-muted-foreground">
+              Nenhuma ordem de serviço encontrada.
+            </div>
+          ) : (
+            serviceOrders.map((order: any) => {
+              const status = normalizeStatus(order.status);
+              const hasCharge = Boolean(order?.financialSummary?.hasCharge);
+              const canSendChargeMessage =
+                Boolean(order?.customerId) && status === "DONE";
 
-            return (
-              <div key={order.id} className="rounded border p-3">
-                <div className="font-medium">{order.title}</div>
+              const whatsappUrl = buildWhatsAppUrlFromServiceOrder(order);
 
-                <div className="mt-2 flex gap-2">
-                  <Button
-                    size="sm"
-                    disabled={!["OPEN", "ASSIGNED"].includes(status) || startExecution.isPending}
-                    onClick={() =>
-                      startExecution.mutate({ serviceOrderId: order.id })
-                    }
-                  >
-                    Iniciar
-                  </Button>
+              return (
+                <div key={order.id} className="rounded border p-3">
+                  <div className="font-medium">{order.title}</div>
 
-                  <Button
-                    size="sm"
-                    disabled={status !== "IN_PROGRESS" || finishExecution.isPending}
-                    onClick={() =>
-                      finishExecution.mutate({ id: order.id })
-                    }
-                  >
-                    Concluir
-                  </Button>
+                  <div className="mt-1 text-sm text-muted-foreground">
+                    Status: {status}
+                  </div>
+
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      disabled={
+                        !["OPEN", "ASSIGNED"].includes(status) || startExecution.isPending
+                      }
+                      onClick={() =>
+                        startExecution.mutate({ serviceOrderId: order.id })
+                      }
+                    >
+                      Iniciar
+                    </Button>
+
+                    <Button
+                      size="sm"
+                      disabled={status !== "IN_PROGRESS" || finishExecution.isPending}
+                      onClick={() => finishExecution.mutate({ id: order.id })}
+                    >
+                      Concluir
+                    </Button>
+
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={!canSendChargeMessage || !whatsappUrl}
+                      onClick={() => {
+                        if (whatsappUrl) {
+                          navigate(whatsappUrl);
+                        }
+                      }}
+                    >
+                      {hasCharge ? "Cobrar cliente" : "Falar com cliente"}
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </CardContent>
       </Card>
 
@@ -210,30 +248,53 @@ export default function OperationsDashboardPage() {
         </CardHeader>
 
         <CardContent className="space-y-3">
-          {charges.map((charge: any) => (
-            <div key={charge.id} className="rounded border p-3">
-              <div className="font-medium">{charge.customer?.name}</div>
-              <div>{formatCurrency(charge.amountCents)}</div>
-
-              <div className="mt-2 flex gap-2">
-                <Button
-                  size="sm"
-                  onClick={() => void generateCheckout(charge)}
-                  disabled={isSubmitting}
-                >
-                  Checkout
-                </Button>
-
-                <Button
-                  size="sm"
-                  onClick={() => void registerPayment(charge, "CASH")}
-                  disabled={isSubmitting}
-                >
-                  Pagar
-                </Button>
-              </div>
+          {charges.length === 0 ? (
+            <div className="text-sm text-muted-foreground">
+              Nenhuma cobrança pendente encontrada.
             </div>
-          ))}
+          ) : (
+            charges.map((charge: any) => {
+              const whatsappUrl = buildWhatsAppUrlFromCharge(charge);
+
+              return (
+                <div key={charge.id} className="rounded border p-3">
+                  <div className="font-medium">{charge.customer?.name || "Cliente"}</div>
+                  <div>{formatCurrency(charge.amountCents)}</div>
+
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => void generateCheckout(charge)}
+                      disabled={isSubmitting}
+                    >
+                      Checkout
+                    </Button>
+
+                    <Button
+                      size="sm"
+                      onClick={() => void registerPayment(charge, "CASH")}
+                      disabled={isSubmitting}
+                    >
+                      Pagar
+                    </Button>
+
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={!whatsappUrl}
+                      onClick={() => {
+                        if (whatsappUrl) {
+                          navigate(whatsappUrl);
+                        }
+                      }}
+                    >
+                      Cobrar no WhatsApp
+                    </Button>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </CardContent>
       </Card>
     </div>

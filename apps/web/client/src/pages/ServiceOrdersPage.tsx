@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
+import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
-import { normalizeOrders } from "@/lib/operations/operations.utils";
+import {
+  buildWhatsAppUrlFromServiceOrder,
+  normalizeOrders,
+} from "@/lib/operations/operations.utils";
 import {
   getChargeBadge,
   getFinancialStage,
@@ -44,6 +48,7 @@ function getFinancialFilterLabel(filter: FinancialFilter) {
 }
 
 export default function ServiceOrdersPage() {
+  const [, navigate] = useLocation();
   const utils = trpc.useUtils();
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -53,31 +58,24 @@ export default function ServiceOrdersPage() {
 
   const listQuery = trpc.nexo.serviceOrders.list.useQuery(
     { page: 1, limit: 50 },
-    { retry: false, refetchOnWindowFocus: false }
+    { retry: false }
   );
 
-  const customersQuery = trpc.nexo.customers.list.useQuery(undefined, {
-    retry: false,
-    refetchOnWindowFocus: false,
-  });
-
-  const peopleQuery = trpc.nexo.people.list.useQuery(undefined, {
-    retry: false,
-    refetchOnWindowFocus: false,
-  });
+  const customersQuery = trpc.nexo.customers.list.useQuery();
+  const peopleQuery = trpc.nexo.people.list.useQuery();
 
   const activeQuery = trpc.nexo.serviceOrders.getById.useQuery(
     { id: activeId as string },
-    { enabled: Boolean(activeId), retry: false, refetchOnWindowFocus: false }
+    { enabled: Boolean(activeId) }
   );
 
   const customers = useMemo(
-    () => normalizeOrders<{ id: string; name: string }>(customersQuery.data),
+    () => normalizeOrders(customersQuery.data),
     [customersQuery.data]
   );
 
   const people = useMemo(
-    () => normalizeOrders<{ id: string; name: string }>(peopleQuery.data),
+    () => normalizeOrders(peopleQuery.data),
     [peopleQuery.data]
   );
 
@@ -119,15 +117,6 @@ export default function ServiceOrdersPage() {
     setActiveId(operationalQueue[0].id);
   }, [operationalQueue, activeId]);
 
-  useEffect(() => {
-    if (operationalQueue.length === 0) return;
-
-    const stillExists = operationalQueue.some((item) => item.id === activeId);
-    if (!stillExists) {
-      setActiveId(operationalQueue[0].id);
-    }
-  }, [operationalQueue, activeId]);
-
   function openAsActive(id: string) {
     window.history.pushState({}, "", buildServiceOrdersUrl(id));
     setActiveId(id);
@@ -144,96 +133,76 @@ export default function ServiceOrdersPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-xl font-semibold">Ordens de Serviço</h1>
-          <p className="text-sm text-muted-foreground">
-            Centro da operação: execução, cobrança e status em tempo real.
-          </p>
-        </div>
-
+      <div className="flex justify-between">
+        <h1 className="text-xl font-semibold">Ordens de Serviço</h1>
         <Button onClick={() => setIsCreateOpen(true)}>Nova O.S.</Button>
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        {filters.map((currentFilter) => (
+      <div className="flex gap-2 flex-wrap">
+        {filters.map((f) => (
           <Button
-            key={currentFilter}
+            key={f}
             size="sm"
-            variant={filter === currentFilter ? "default" : "outline"}
-            onClick={() => setFilter(currentFilter)}
+            variant={filter === f ? "default" : "outline"}
+            onClick={() => setFilter(f)}
           >
-            {getFinancialFilterLabel(currentFilter)}
+            {getFinancialFilterLabel(f)}
           </Button>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-        <div className="xl:col-span-5 2xl:col-span-4">
-          <div className="rounded-xl border bg-card">
-            <div className="border-b px-4 py-3">
-              <h2 className="font-semibold">Fila operacional</h2>
-              <p className="text-xs text-muted-foreground">
-                {operationalQueue.length} ordem(ns) no fluxo atual
-              </p>
-            </div>
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
+        <div className="xl:col-span-5">
+          <div className="space-y-3">
+            {operationalQueue.map((os) => {
+              const whatsappUrl = buildWhatsAppUrlFromServiceOrder(os);
 
-            <div className="max-h-[72vh] overflow-y-auto p-3">
-              {listQuery.isLoading ? (
-                <div className="py-8 text-center text-sm text-muted-foreground">
-                  Carregando...
-                </div>
-              ) : operationalQueue.length === 0 ? (
-                <div className="py-8 text-center text-sm text-muted-foreground">
-                  Nenhuma ordem neste fluxo.
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {operationalQueue.map((os) => {
-                    const chargeBadge = getChargeBadge(os.financialSummary);
-                    const operationalStage = getOperationalStage(os);
-                    const financialStage = getFinancialStage(os);
+              return (
+                <div key={os.id} className="space-y-2">
+                  <ServiceOrderCard
+                    os={os}
+                    isProcessing={false}
+                    chargeBadge={getChargeBadge(os.financialSummary)}
+                    operationalStage={getOperationalStage(os)}
+                    financialStage={getFinancialStage(os)}
+                    onEdit={(id) => setEditId(id)}
+                    onOpenDeepLink={openAsActive}
+                    isUpdating={false}
+                  />
 
-                    return (
-                      <div
-                        key={os.id}
-                        className={`rounded-2xl ${
-                          activeId === os.id ? "ring-2 ring-blue-500" : ""
-                        }`}
-                      >
-                        <ServiceOrderCard
-                          os={os}
-                          isProcessing={false}
-                          chargeBadge={chargeBadge}
-                          operationalStage={operationalStage}
-                          financialStage={financialStage}
-                          onEdit={(id) => setEditId(id)}
-                          onOpenDeepLink={openAsActive}
-                          isUpdating={false}
-                        />
-                      </div>
-                    );
-                  })}
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        if (whatsappUrl) navigate(whatsappUrl);
+                      }}
+                      disabled={!whatsappUrl}
+                    >
+                      WhatsApp
+                    </Button>
+
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => openAsActive(os.id)}
+                    >
+                      Abrir
+                    </Button>
+                  </div>
                 </div>
-              )}
-            </div>
+              );
+            })}
           </div>
         </div>
 
-        <div className="xl:col-span-7 2xl:col-span-8">
-          <div className="rounded-xl border bg-card p-4">
-            {!activeId ? (
-              <div className="py-10 text-center text-sm text-muted-foreground">
-                Selecione uma ordem.
-              </div>
-            ) : activeOs ? (
-              <ServiceOrderDetailsPanel os={activeOs} />
-            ) : (
-              <div className="py-10 text-center text-sm text-muted-foreground">
-                Carregando...
-              </div>
-            )}
-          </div>
+        <div className="xl:col-span-7">
+          {activeOs ? (
+            <ServiceOrderDetailsPanel os={activeOs} />
+          ) : (
+            <div className="text-sm text-muted-foreground">
+              Selecione uma ordem.
+            </div>
+          )}
         </div>
       </div>
 
@@ -242,7 +211,7 @@ export default function ServiceOrdersPage() {
         onClose={() => setIsCreateOpen(false)}
         onSuccess={() => {
           setIsCreateOpen(false);
-          void utils.nexo.serviceOrders.list.invalidate();
+          utils.nexo.serviceOrders.list.invalidate();
         }}
         customers={customers}
         people={people}
@@ -253,14 +222,8 @@ export default function ServiceOrdersPage() {
         serviceOrderId={editId}
         onClose={() => setEditId(null)}
         onSuccess={() => {
-          const id = editId;
           setEditId(null);
-
-          void utils.nexo.serviceOrders.list.invalidate();
-
-          if (id) {
-            void utils.nexo.serviceOrders.getById.invalidate({ id });
-          }
+          utils.nexo.serviceOrders.list.invalidate();
         }}
         people={people}
       />

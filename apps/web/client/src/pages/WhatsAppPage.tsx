@@ -5,6 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { MessageCircle } from "lucide-react";
 import { toast } from "sonner";
+import {
+  buildWhatsAppConversationUrl,
+  formatCurrency,
+  formatDate,
+} from "@/lib/operations/operations.utils";
 
 type Message = {
   id: string;
@@ -21,6 +26,15 @@ type Conversation = {
   lastMessage?: string;
   lastMessageTime?: string;
   unreadCount: number;
+};
+
+type WhatsAppContextParams = {
+  customerId: string | null;
+  context: string | null;
+  chargeId: string | null;
+  serviceOrderId: string | null;
+  amountCents: number | null;
+  dueDate: string | null;
 };
 
 function normalizeCustomerList(payload: any): any[] {
@@ -55,40 +69,86 @@ function normalizeMessages(payload: any): Message[] {
     createdAt: String(message.createdAt ?? ""),
     fromMe: Boolean(
       message.fromMe ??
-      message.isFromMe ??
-      (message.direction === "OUTBOUND")
+        message.isFromMe ??
+        (message.direction === "OUTBOUND")
     ),
   }));
 }
 
-function getCustomerIdFromLocation(location: string): string | null {
+function parseLocationParams(location: string): WhatsAppContextParams {
   const params = new URLSearchParams(location.split("?")[1] || "");
-  const id = params.get("customerId")?.trim() || "";
-  return id || null;
+
+  const customerId = params.get("customerId")?.trim() || null;
+  const context = params.get("context")?.trim() || null;
+  const chargeId = params.get("chargeId")?.trim() || null;
+  const serviceOrderId = params.get("serviceOrderId")?.trim() || null;
+  const dueDate = params.get("dueDate")?.trim() || null;
+
+  const rawAmountCents = params.get("amountCents")?.trim() || "";
+  const amountCents =
+    rawAmountCents && !Number.isNaN(Number(rawAmountCents))
+      ? Number(rawAmountCents)
+      : null;
+
+  return {
+    customerId,
+    context,
+    chargeId,
+    serviceOrderId,
+    amountCents,
+    dueDate,
+  };
+}
+
+function buildContextMessage(args: {
+  customerName: string;
+  context: string | null;
+  amountCents: number | null;
+  dueDate: string | null;
+}) {
+  const firstName = args.customerName?.trim()?.split(" ")[0] || "cliente";
+  const amountLabel =
+    args.amountCents != null ? formatCurrency(args.amountCents) : null;
+  const dueDateLabel = args.dueDate ? formatDate(args.dueDate) : null;
+
+  if (args.context === "overdue_charge") {
+    if (amountLabel && dueDateLabel) {
+      return `Olá ${firstName}, tudo bem? Identificamos uma cobrança pendente no valor de ${amountLabel}, com vencimento em ${dueDateLabel}. Posso te enviar o link para regularização?`;
+    }
+
+    if (amountLabel) {
+      return `Olá ${firstName}, tudo bem? Identificamos uma cobrança pendente no valor de ${amountLabel}. Posso te enviar o link para regularização?`;
+    }
+
+    return `Olá ${firstName}, tudo bem? Identificamos uma cobrança pendente. Posso te enviar o link para regularização?`;
+  }
+
+  if (args.context === "service_order_followup") {
+    return `Olá ${firstName}, tudo bem? Estou entrando em contato sobre o seu atendimento para alinhar os próximos passos.`;
+  }
+
+  return `Olá ${firstName}, tudo bem? Posso te ajudar com seu atendimento?`;
 }
 
 export default function WhatsAppPage() {
   const [location, navigate] = useLocation();
 
-  const customerIdFromLocation = useMemo(
-    () => getCustomerIdFromLocation(location),
-    [location]
-  );
+  const routeParams = useMemo(() => parseLocationParams(location), [location]);
 
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(
-    customerIdFromLocation
+    routeParams.customerId
   );
   const [messageInput, setMessageInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [conversations, setConversations] = useState<Conversation[]>([]);
 
   useEffect(() => {
-    if (!customerIdFromLocation) return;
+    if (!routeParams.customerId) return;
 
     setSelectedCustomerId((current) =>
-      current === customerIdFromLocation ? current : customerIdFromLocation
+      current === routeParams.customerId ? current : routeParams.customerId
     );
-  }, [customerIdFromLocation]);
+  }, [routeParams.customerId]);
 
   const customersQuery = trpc.nexo.customers.list.useQuery();
 
@@ -105,6 +165,7 @@ export default function WhatsAppPage() {
   const sendMessageMutation = trpc.nexo.whatsapp.send.useMutation({
     onSuccess: async () => {
       await whatsappMessagesQuery.refetch();
+      toast.success("Mensagem enviada");
     },
     onError: (error) => {
       toast.error(error.message || "Não foi possível enviar a mensagem.");
@@ -128,7 +189,8 @@ export default function WhatsAppPage() {
       );
 
       let updated: Conversation[] = convos.map((conversation) => {
-        const existingMessages = messagesByCustomer.get(conversation.customerId) ?? [];
+        const existingMessages =
+          messagesByCustomer.get(conversation.customerId) ?? [];
         const lastMessage = existingMessages[existingMessages.length - 1];
 
         return {
@@ -169,14 +231,14 @@ export default function WhatsAppPage() {
       return updated;
     });
 
-    if (!selectedCustomerId && !customerIdFromLocation && convos.length > 0) {
+    if (!selectedCustomerId && !routeParams.customerId && convos.length > 0) {
       setSelectedCustomerId(convos[0].customerId);
     }
   }, [
     customersQuery.data,
     selectedCustomerId,
     customerByIdQuery.data,
-    customerIdFromLocation,
+    routeParams.customerId,
   ]);
 
   useEffect(() => {
@@ -218,19 +280,75 @@ export default function WhatsAppPage() {
     );
   }, [conversations, searchQuery]);
 
+  const contextSummary = useMemo(() => {
+    if (!selectedConversation) {
+      return null;
+    }
+
+    if (routeParams.context === "overdue_charge") {
+      const parts: string[] = ["Cobrança pendente em aberto"];
+
+      if (routeParams.amountCents != null) {
+        parts.push(formatCurrency(routeParams.amountCents));
+      }
+
+      if (routeParams.dueDate) {
+        parts.push(`vencimento ${formatDate(routeParams.dueDate)}`);
+      }
+
+      return parts.join(" • ");
+    }
+
+    if (routeParams.context === "service_order_followup") {
+      const parts: string[] = ["Acompanhamento da ordem de serviço"];
+
+      if (routeParams.serviceOrderId) {
+        parts.push(`O.S. ${routeParams.serviceOrderId.slice(0, 8)}`);
+      }
+
+      return parts.join(" • ");
+    }
+
+    return null;
+  }, [
+    selectedConversation,
+    routeParams.context,
+    routeParams.amountCents,
+    routeParams.dueDate,
+    routeParams.serviceOrderId,
+  ]);
+
   useEffect(() => {
     if (!selectedConversation) return;
 
     setMessageInput((prev) => {
       if (prev.trim()) return prev;
 
-      return `Olá ${selectedConversation.customerName}, temos um pagamento em aberto. Posso te enviar o link?`;
+      return buildContextMessage({
+        customerName: selectedConversation.customerName,
+        context: routeParams.context,
+        amountCents: routeParams.amountCents,
+        dueDate: routeParams.dueDate,
+      });
     });
-  }, [selectedConversation]);
+  }, [
+    selectedConversation,
+    routeParams.context,
+    routeParams.amountCents,
+    routeParams.dueDate,
+  ]);
 
   const handleSelectConversation = (customerId: string) => {
     setSelectedCustomerId(customerId);
-    navigate(`/whatsapp?customerId=${customerId}`, { replace: true });
+    setMessageInput("");
+
+    const conversationUrl = buildWhatsAppConversationUrl({
+      customerId,
+    });
+
+    if (conversationUrl) {
+      navigate(conversationUrl, { replace: true });
+    }
   };
 
   const handleSendMessage = async () => {
@@ -308,13 +426,17 @@ export default function WhatsAppPage() {
               <p className="truncate text-sm text-gray-500">
                 {selectedConversation.whatsappNumber || "Sem número"}
               </p>
+
+              {contextSummary ? (
+                <div className="mt-3 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-sm text-orange-800">
+                  {contextSummary}
+                </div>
+              ) : null}
             </div>
 
             <div className="flex-1 overflow-auto p-4">
               {whatsappMessagesQuery.isLoading ? (
-                <div className="text-sm text-gray-500">
-                  Carregando mensagens...
-                </div>
+                <div className="text-sm text-gray-500">Carregando mensagens...</div>
               ) : selectedConversation.messages.length === 0 ? (
                 <div className="flex h-full flex-col items-center justify-center text-center text-gray-500">
                   <MessageCircle className="mb-2 h-12 w-12 opacity-50" />

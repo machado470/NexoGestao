@@ -1,6 +1,12 @@
 import { useMemo } from "react";
+import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
-import { formatCurrency, formatDate, formatDateTime } from "@/lib/operations/operations.utils";
+import {
+  buildWhatsAppUrlFromServiceOrder,
+  formatCurrency,
+  formatDate,
+  formatDateTime,
+} from "@/lib/operations/operations.utils";
 import {
   getFinancialStage,
   getOperationalStage,
@@ -15,6 +21,7 @@ import {
   Receipt,
   Wrench,
 } from "lucide-react";
+import { toast } from "sonner";
 import type { ServiceOrder } from "./service-order.types";
 
 function getActionToneClass(tone: string) {
@@ -55,6 +62,7 @@ function getFlowStepClasses(done: boolean, active: boolean) {
 }
 
 export default function ServiceOrderDetailsPanel({ os }: { os: ServiceOrder }) {
+  const [, navigate] = useLocation();
   const utils = trpc.useUtils();
 
   const timelineQuery = trpc.nexo.timeline.listByServiceOrder.useQuery(
@@ -69,6 +77,7 @@ export default function ServiceOrderDetailsPanel({ os }: { os: ServiceOrder }) {
 
   const startExecution = trpc.nexo.executions.start.useMutation({
     onSuccess: async () => {
+      toast.success("Execução iniciada");
       await Promise.all([
         utils.nexo.serviceOrders.list.invalidate(),
         utils.nexo.serviceOrders.getById.invalidate({ id: os.id }),
@@ -79,11 +88,15 @@ export default function ServiceOrderDetailsPanel({ os }: { os: ServiceOrder }) {
           serviceOrderId: os.id,
         }),
       ]);
+    },
+    onError: (error) => {
+      toast.error(error.message || "Erro ao iniciar execução");
     },
   });
 
   const finishExecution = trpc.nexo.executions.complete.useMutation({
     onSuccess: async () => {
+      toast.success("Execução finalizada");
       await Promise.all([
         utils.nexo.serviceOrders.list.invalidate(),
         utils.nexo.serviceOrders.getById.invalidate({ id: os.id }),
@@ -93,19 +106,28 @@ export default function ServiceOrderDetailsPanel({ os }: { os: ServiceOrder }) {
         utils.nexo.executions.listByServiceOrder.invalidate({
           serviceOrderId: os.id,
         }),
+        utils.finance.charges.list.invalidate(),
       ]);
+    },
+    onError: (error) => {
+      toast.error(error.message || "Erro ao finalizar execução");
     },
   });
 
   const generateCharge = trpc.nexo.serviceOrders.generateCharge.useMutation({
     onSuccess: async () => {
+      toast.success("Cobrança gerada");
       await Promise.all([
         utils.nexo.serviceOrders.list.invalidate(),
         utils.nexo.serviceOrders.getById.invalidate({ id: os.id }),
         utils.nexo.timeline.listByServiceOrder.invalidate({
           serviceOrderId: os.id,
         }),
+        utils.finance.charges.list.invalidate(),
       ]);
+    },
+    onError: (error) => {
+      toast.error(error.message || "Erro ao gerar cobrança");
     },
   });
 
@@ -143,6 +165,14 @@ export default function ServiceOrderDetailsPanel({ os }: { os: ServiceOrder }) {
   const OperationalIcon = operationalStage.icon;
   const FinancialIcon = financialStage.icon;
 
+  const hasCustomer = Boolean(os.customer?.name || os.customerId);
+  const hasWhatsappContact = Boolean(
+    os.customer?.whatsappNumber || os.customer?.phone || os.customerId
+  );
+  const chargeIsPaid = String(os.financialSummary?.chargeStatus ?? "") === "PAID";
+
+  const whatsappUrl = buildWhatsAppUrlFromServiceOrder(os);
+
   return (
     <div className="space-y-4">
       <div className="rounded-xl border p-4">
@@ -155,19 +185,25 @@ export default function ServiceOrderDetailsPanel({ os }: { os: ServiceOrder }) {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs ${operationalStage.className}`}>
+            <div
+              className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs ${operationalStage.className}`}
+            >
               <OperationalIcon className="h-3.5 w-3.5" />
               {operationalStage.label}
             </div>
 
-            <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs ${financialStage.className}`}>
+            <div
+              className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs ${financialStage.className}`}
+            >
               <FinancialIcon className="h-3.5 w-3.5" />
               {financialStage.label}
             </div>
           </div>
         </div>
 
-        <div className={`mb-4 rounded-xl border p-4 ${getActionToneClass(nextAction.tone)}`}>
+        <div
+          className={`mb-4 rounded-xl border p-4 ${getActionToneClass(nextAction.tone)}`}
+        >
           <div className="flex items-start gap-3">
             <AlertCircle className="mt-0.5 h-4 w-4" />
             <div>
@@ -231,6 +267,23 @@ export default function ServiceOrderDetailsPanel({ os }: { os: ServiceOrder }) {
           >
             {isGeneratingCharge ? "Gerando..." : "Gerar cobrança"}
           </button>
+
+          <button
+            className="rounded border border-orange-300 bg-orange-50 px-3 py-1 text-xs text-orange-700 disabled:opacity-50"
+            onClick={() => {
+              if (whatsappUrl) navigate(whatsappUrl);
+            }}
+            disabled={!hasCustomer || !hasWhatsappContact || !whatsappUrl}
+          >
+            Abrir WhatsApp
+          </button>
+
+          <button
+            className="rounded border border-gray-300 bg-white px-3 py-1 text-xs text-gray-700 disabled:opacity-50"
+            onClick={() => navigate("/service-orders")}
+          >
+            Voltar para lista
+          </button>
         </div>
 
         <div className="grid gap-2 text-sm md:grid-cols-2">
@@ -262,20 +315,53 @@ export default function ServiceOrderDetailsPanel({ os }: { os: ServiceOrder }) {
         </div>
 
         {!os.financialSummary?.hasCharge ? (
-          <p className="text-sm text-gray-500">Sem cobrança vinculada.</p>
+          <div className="space-y-3">
+            <p className="text-sm text-gray-500">Sem cobrança vinculada.</p>
+
+            <div className="flex flex-wrap gap-2">
+              <button
+                className="rounded bg-red-600 px-3 py-1 text-xs text-white disabled:opacity-50"
+                onClick={() => generateCharge.mutate({ id: os.id })}
+                disabled={!canGenerateCharge || isBusy}
+              >
+                {isGeneratingCharge ? "Gerando..." : "Gerar cobrança agora"}
+              </button>
+            </div>
+          </div>
         ) : (
-          <div className="grid gap-2 text-sm md:grid-cols-2">
-            <div>
-              <b>Status:</b> {os.financialSummary.chargeStatus || "—"}
+          <div className="space-y-3">
+            <div className="grid gap-2 text-sm md:grid-cols-2">
+              <div>
+                <b>Status:</b> {os.financialSummary.chargeStatus || "—"}
+              </div>
+              <div>
+                <b>Valor:</b> {formatCurrency(os.financialSummary.chargeAmountCents)}
+              </div>
+              <div>
+                <b>Vencimento:</b> {formatDate(os.financialSummary.chargeDueDate)}
+              </div>
+              <div>
+                <b>Pago em:</b> {formatDateTime(os.financialSummary.paidAt)}
+              </div>
             </div>
-            <div>
-              <b>Valor:</b> {formatCurrency(os.financialSummary.chargeAmountCents)}
-            </div>
-            <div>
-              <b>Vencimento:</b> {formatDate(os.financialSummary.chargeDueDate)}
-            </div>
-            <div>
-              <b>Pago em:</b> {formatDateTime(os.financialSummary.paidAt)}
+
+            <div className="flex flex-wrap gap-2">
+              <button
+                className="rounded border border-orange-300 bg-orange-50 px-3 py-1 text-xs text-orange-700 disabled:opacity-50"
+                onClick={() => {
+                  if (whatsappUrl) navigate(whatsappUrl);
+                }}
+                disabled={!hasCustomer || !hasWhatsappContact || !whatsappUrl}
+              >
+                {chargeIsPaid ? "Falar com cliente" : "Cobrar no WhatsApp"}
+              </button>
+
+              <button
+                className="rounded border border-gray-300 bg-white px-3 py-1 text-xs text-gray-700"
+                onClick={() => navigate("/finances")}
+              >
+                Abrir financeiro
+              </button>
             </div>
           </div>
         )}

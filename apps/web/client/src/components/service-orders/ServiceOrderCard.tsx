@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Pencil, AlertCircle } from "lucide-react";
+import { Pencil, AlertCircle, MessageCircle, Eye } from "lucide-react";
 
 import type { ServiceOrder, StageTone } from "./service-order.types";
 
@@ -7,6 +7,7 @@ import {
   formatCurrency,
   formatDateTime,
   normalizeStatus,
+  buildWhatsAppUrlFromServiceOrder,
 } from "@/lib/operations/operations.utils";
 
 import { getServiceOrderNextAction } from "@/lib/operations/operations.selectors";
@@ -69,29 +70,27 @@ export default function ServiceOrderCard({
     os.updatedAt || os.finishedAt || os.startedAt || os.createdAt;
 
   const timeAgo = formatTimeAgo(lastActivityAt);
-
   const nextAction = getServiceOrderNextAction(os);
-
   const disabled = isProcessing || isUpdating;
+
+  const whatsappUrl = buildWhatsAppUrlFromServiceOrder(os);
 
   return (
     <div
       onClick={() => onOpenDeepLink(os.id)}
-      className={`rounded-xl border p-4 transition cursor-pointer hover:bg-gray-50 ${getCardToneClass(
+      className={`cursor-pointer rounded-xl border p-4 transition hover:bg-gray-50 ${getCardToneClass(
         nextAction.tone
       )}`}
     >
       <div className="flex flex-col gap-3">
-
-        {/* HEADER */}
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="font-semibold">{os.title}</h3>
 
-          <span className="px-2 py-0.5 text-xs rounded bg-gray-100 text-gray-700">
+          <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-700">
             {getStatusLabel(status)}
           </span>
 
-          <span className={`px-2 py-0.5 text-xs rounded ${chargeBadge.className}`}>
+          <span className={`rounded px-2 py-0.5 text-xs ${chargeBadge.className}`}>
             {chargeBadge.label}
           </span>
 
@@ -105,45 +104,53 @@ export default function ServiceOrderCard({
           )}
         </div>
 
-        {/* STAGES */}
         <div className="flex flex-wrap gap-2">
-          <span className={`px-2 py-1 text-xs rounded border ${operationalStage.className}`}>
+          <span
+            className={`rounded border px-2 py-1 text-xs ${operationalStage.className}`}
+          >
             {operationalStage.label}
           </span>
 
-          <span className={`px-2 py-1 text-xs rounded border ${financialStage.className}`}>
+          <span
+            className={`rounded border px-2 py-1 text-xs ${financialStage.className}`}
+          >
             {financialStage.label}
           </span>
         </div>
 
-        {/* NEXT ACTION */}
-        <div className="text-xs text-gray-600">
-          {nextAction.title}
+        <div className="rounded-lg border bg-gray-50 px-3 py-2">
+          <div className="text-[11px] uppercase tracking-wide text-gray-500">
+            Próxima ação
+          </div>
+          <div className="text-sm font-medium text-gray-800">{nextAction.title}</div>
+          <div className="text-xs text-gray-600">{nextAction.description}</div>
         </div>
 
-        {/* INFO */}
-        <div className="flex flex-wrap gap-3 text-xs text-gray-500">
-          <span>
-            {typeof os.amountCents === "number" && os.amountCents > 0
-              ? formatCurrency(os.amountCents)
-              : "Sem valor"}
-          </span>
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenDeepLink(os.id);
+            }}
+            disabled={disabled}
+          >
+            <Eye className="h-4 w-4" />
+          </Button>
 
-          <span>
-            {os.scheduledFor
-              ? formatDateTime(os.scheduledFor)
-              : "Sem agendamento"}
-          </span>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (whatsappUrl) window.location.href = whatsappUrl;
+            }}
+            disabled={disabled || !whatsappUrl}
+          >
+            <MessageCircle className="h-4 w-4" />
+          </Button>
 
-          <span>
-            {os.dueDate
-              ? formatDateTime(os.dueDate)
-              : "Sem vencimento"}
-          </span>
-        </div>
-
-        {/* ACTION */}
-        <div className="flex justify-end">
           <Button
             size="sm"
             onClick={(e) => {
@@ -155,7 +162,6 @@ export default function ServiceOrderCard({
             <Pencil className="h-4 w-4" />
           </Button>
         </div>
-
       </div>
     </div>
   );
