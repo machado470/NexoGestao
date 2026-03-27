@@ -228,7 +228,6 @@ export function getServiceOrderFlowSteps(os: ServiceOrder) {
 }
 
 export function getServiceOrderNextAction(os: ServiceOrder) {
-  // PRIORIDADE MÁXIMA: cobrança vencida
   if (os.financialSummary?.chargeStatus === "OVERDUE") {
     return {
       tone: "red",
@@ -237,7 +236,6 @@ export function getServiceOrderNextAction(os: ServiceOrder) {
     };
   }
 
-  // execução parada
   if (["OPEN", "ASSIGNED"].includes(os.status)) {
     return {
       tone: "amber",
@@ -246,7 +244,6 @@ export function getServiceOrderNextAction(os: ServiceOrder) {
     };
   }
 
-  // execução em andamento
   if (os.status === "IN_PROGRESS") {
     return {
       tone: "blue",
@@ -255,7 +252,6 @@ export function getServiceOrderNextAction(os: ServiceOrder) {
     };
   }
 
-  // serviço feito sem cobrança
   if (os.status === "DONE" && !os.financialSummary?.hasCharge) {
     return {
       tone: "red",
@@ -264,19 +260,18 @@ export function getServiceOrderNextAction(os: ServiceOrder) {
     };
   }
 
-  // cobrança criada
   if (
     os.financialSummary?.hasCharge &&
     os.financialSummary?.chargeStatus === "PENDING"
   ) {
     return {
       tone: "amber",
-      title: "Acompanhar pagamento",
-      description: "Cobrança criada aguardando pagamento.",
+      title: "Receber pagamento",
+      description:
+        "Cobrança pendente. Gere checkout, registre pagamento ou cobre via WhatsApp.",
     };
   }
 
-  // finalizado
   if (os.financialSummary?.chargeStatus === "PAID") {
     return {
       tone: "green",

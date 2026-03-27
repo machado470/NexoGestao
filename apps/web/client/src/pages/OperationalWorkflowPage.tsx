@@ -1,182 +1,128 @@
-import { useMemo } from "react";
-import { useLocation } from "wouter";
-import { useAuth } from "@/contexts/AuthContext";
-import { useChargeActions } from "@/hooks/useChargeActions";
+import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { trpc } from "@/lib/trpc";
-import { toast } from "sonner";
-import { normalizeAlertsPayload } from "@/lib/query-helpers";
-import {
-  normalizeCharges,
-  normalizeOrders,
-} from "@/lib/operations/operations.utils";
-import {
-  getOrdersInStatuses,
-  getPendingCharges,
-  getOverdueCharges,
-  getDoneWithoutCharge,
-  sumAmountCents,
-} from "@/lib/operations/operations.selectors";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
   RefreshCw,
+  Wrench,
+  PlayCircle,
   CheckCircle2,
   CreditCard,
-  PlayCircle,
-  ArrowRightLeft,
-  Wallet,
-  Wrench,
-  Receipt,
+  AlertTriangle,
+  Send,
 } from "lucide-react";
+import { toast } from "sonner";
 
-type ServiceOrderRow = {
-  id: string;
-  title?: string | null;
-  status?: string | null;
-  customer?: { name?: string | null } | null;
-  assignedTo?: { name?: string | null } | null;
-  financialSummary?: { hasCharge?: boolean | null } | null;
-};
-
-type ChargeRow = {
-  id: string;
-  status?: string | null;
-  amountCents?: number | null;
-  dueDate?: string | null;
-  customer?: { name?: string | null } | null;
-  serviceOrder?: { title?: string | null } | null;
-};
-
-function formatCurrency(cents?: number | null) {
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  }).format(Number(cents ?? 0) / 100);
-}
-
-function formatDate(value?: string | null) {
-  if (!value) return "—";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString("pt-BR");
-}
+import { useChargeActions } from "@/hooks/useChargeActions";
+import { formatCurrency } from "@/lib/utils";
 
 export default function OperationalWorkflowPage() {
-  const { isAuthenticated, isInitializing } = useAuth();
-  const canQuery = isAuthenticated && !isInitializing;
-  const [location, navigate] = useLocation();
+  const navigate = useNavigate();
+  const utils = trpc.useUtils();
 
-  const chargesQuery = trpc.finance.charges.list.useQuery(
-    { page: 1, limit: 100 },
-    { enabled: canQuery, retry: false }
-  );
+  //  controle por chargeId
+  const [sendingIds, setSendingIds] = useState<string[]>([]);
 
-  const serviceOrdersQuery = trpc.nexo.serviceOrders.list.useQuery(
-    { page: 1, limit: 100 },
-    { enabled: canQuery, retry: false }
-  );
-
-  const alertsQuery = trpc.dashboard.alerts.useQuery(undefined, {
-    enabled: canQuery,
-    retry: false,
+  const serviceOrdersQuery = trpc.nexo.serviceOrders.list.useQuery({
+    page: 1,
+    limit: 50,
   });
+
+  const chargesQuery = trpc.nexo.finance.charges.list.useQuery({
+    page: 1,
+    limit: 50,
+  });
+
+  const sendWhatsApp = trpc.nexo.whatsapp.send.useMutation({
+    onSuccess: (_data, variables: any) => {
+      utils.nexo.whatsapp.messages.invalidate();
+      toast.success("Mensagem enviada via WhatsApp");
+
+      setSendingIds((prev) =>
+        prev.filter((id) => id !== variables.meta?.chargeId)
+      );
+    },
+    onError: (err, variables: any) => {
+      toast.error(err.message || "Erro ao enviar mensagem");
+
+      setSendingIds((prev) =>
+        prev.filter((id) => id !== variables.meta?.chargeId)
+      );
+    },
+  });
+
+  const serviceOrders = serviceOrdersQuery.data?.data ?? [];
+  const charges = chargesQuery.data?.data ?? [];
+
+  const actionableOrders = useMemo(
+    () =>
+      serviceOrders.filter(
+        (o) => o.status === "OPEN" || o.status === "ASSIGNED"
+      ),
+    [serviceOrders]
+  );
+
+  const doneWithoutCharge = useMemo(
+    () =>
+      serviceOrders.filter(
+        (o) => o.status === "DONE" && !o.chargeId
+      ),
+    [serviceOrders]
+  );
+
+  const overdueCharges = useMemo(
+    () => charges.filter((c) => c.status === "OVERDUE"),
+    [charges]
+  );
+
+  const pendingCharges = useMemo(
+    () => charges.filter((c) => c.status === "PENDING"),
+    [charges]
+  );
 
   const { registerPayment, generateCheckout, isSubmitting } =
     useChargeActions({
-      location,
       navigate,
-      returnPath: "/operations",
-      refreshActions: [
-        () => chargesQuery.refetch(),
-        () => alertsQuery.refetch(),
-        () => serviceOrdersQuery.refetch(),
-      ],
+      returnPath: "/dashboard/operations",
     });
 
-  const updateServiceOrder = trpc.nexo.serviceOrders.update.useMutation({
-    onSuccess: () => {
-      serviceOrdersQuery.refetch();
-    },
-    onError: (e) => toast.error(e.message),
-  });
+  const handleStart = (id: string) => {
+    trpc.nexo.serviceOrders.update.mutate({
+      id,
+      data: { status: "IN_PROGRESS" },
+    });
+  };
 
-  // =========================
-  // NORMALIZAÇÃO
-  // =========================
+  const handleFinish = (id: string) => {
+    trpc.nexo.serviceOrders.update.mutate({
+      id,
+      data: { status: "DONE" },
+    });
+  };
 
-  const serviceOrders = useMemo(() => {
-    return normalizeOrders<ServiceOrderRow>(serviceOrdersQuery.data);
-  }, [serviceOrdersQuery.data]);
+  //  envio por chargeId
+  const handleSendWhatsApp = (c: any) => {
+    if (sendingIds.includes(c.id)) return;
 
-  const charges = useMemo(() => {
-    return normalizeCharges<ChargeRow>(chargesQuery.data);
-  }, [chargesQuery.data]);
+    const firstName = c.customer?.name?.split(" ")[0] || "cliente";
 
-  const alerts = useMemo(() => {
-    return normalizeAlertsPayload<any>(alertsQuery.data);
-  }, [alertsQuery.data]);
+    const message = `Olá ${firstName}, tudo bem? Identificamos uma cobrança vencida no valor de ${formatCurrency(
+      c.amountCents
+    )}. Posso te enviar o link de pagamento?`;
 
-  // =========================
-  // DERIVAÇÕES
-  // =========================
+    setSendingIds((prev) => [...prev, c.id]);
 
-  const actionableOrders = useMemo(() => {
-    return getOrdersInStatuses(serviceOrders, [
-      "OPEN",
-      "ASSIGNED",
-      "IN_PROGRESS",
-    ]);
-  }, [serviceOrders]);
-
-  const doneWithoutCharge = useMemo(() => {
-    return getDoneWithoutCharge(serviceOrders);
-  }, [serviceOrders]);
-
-  const pendingCharges = useMemo(() => {
-    return getPendingCharges(charges);
-  }, [charges]);
-
-  const overdueCharges = useMemo(() => {
-    return getOverdueCharges(charges);
-  }, [charges]);
-
-  const receivableTotal = useMemo(() => {
-    return sumAmountCents([...pendingCharges, ...overdueCharges]);
-  }, [pendingCharges, overdueCharges]);
-
-  // =========================
-  // ACTIONS
-  // =========================
-
-  function handleStart(id: string) {
-    updateServiceOrder.mutate({ id, data: { status: "IN_PROGRESS" } });
-  }
-
-  function handleFinish(id: string) {
-    updateServiceOrder.mutate({ id, data: { status: "DONE" } });
-  }
-
-  // =========================
-  // UI STATES
-  // =========================
-
-  if (isInitializing) return <div className="p-6">Carregando...</div>;
-  if (!isAuthenticated) return <div className="p-6">Faça login</div>;
-
-  // =========================
-  // UI
-  // =========================
+    sendWhatsApp.mutate({
+      customerId: c.customerId,
+      content: message,
+      meta: { chargeId: c.id }, //  chave
+    });
+  };
 
   return (
     <div className="space-y-6 p-6">
-      <div className="flex justify-between">
+      <div className="flex justify-between items-center">
         <h1 className="flex items-center gap-2 text-2xl font-bold">
           <Wrench className="h-6 w-6 text-orange-500" />
           Workflow Operacional
@@ -187,7 +133,6 @@ export default function OperationalWorkflowPage() {
           onClick={() => {
             chargesQuery.refetch();
             serviceOrdersQuery.refetch();
-            alertsQuery.refetch();
           }}
         >
           <RefreshCw className="mr-2 h-4 w-4" />
@@ -235,24 +180,69 @@ export default function OperationalWorkflowPage() {
 
               <Button
                 size="sm"
-                onClick={() => navigate(`/finances?serviceOrderId=${o.id}`)}
+                onClick={() =>
+                  navigate(`/finances?serviceOrderId=${o.id}`)
+                }
               >
                 <CreditCard className="h-4 w-4 mr-1" />
-                Cobrar
+                Gerar cobrança
               </Button>
             </div>
           ))}
         </CardContent>
       </Card>
 
-      {/* RECEBER */}
-      <Card>
+      {/* VENCIDAS */}
+      <Card className="border-red-500">
         <CardHeader>
-          <CardTitle>Receber agora</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-red-500">
+            <AlertTriangle className="h-5 w-5" />
+            Cobranças vencidas
+          </CardTitle>
         </CardHeader>
 
         <CardContent className="space-y-3">
-          {[...overdueCharges, ...pendingCharges].map((c) => (
+          {overdueCharges.map((c) => {
+            const isSending = sendingIds.includes(c.id);
+
+            return (
+              <div key={c.id} className="border rounded-lg p-3">
+                <p>{c.customer?.name}</p>
+                <p>{formatCurrency(c.amountCents)}</p>
+
+                <div className="flex gap-2 mt-2">
+                  <Button
+                    size="sm"
+                    onClick={() => generateCheckout(c)}
+                    disabled={isSubmitting}
+                  >
+                    Cobrar
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleSendWhatsApp(c)}
+                    disabled={isSending}
+                  >
+                    <Send className="h-4 w-4 mr-1" />
+                    {isSending ? "Enviando..." : "WhatsApp"}
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+        </CardContent>
+      </Card>
+
+      {/* PENDENTES */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Cobranças pendentes</CardTitle>
+        </CardHeader>
+
+        <CardContent className="space-y-3">
+          {pendingCharges.map((c) => (
             <div key={c.id} className="border rounded-lg p-3">
               <p>{c.customer?.name}</p>
               <p>{formatCurrency(c.amountCents)}</p>
@@ -276,19 +266,6 @@ export default function OperationalWorkflowPage() {
               </div>
             </div>
           ))}
-        </CardContent>
-      </Card>
-
-      {/* RESUMO */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Resumo financeiro</CardTitle>
-        </CardHeader>
-
-        <CardContent>
-          <p className="text-xl font-bold">
-            {formatCurrency(receivableTotal)}
-          </p>
         </CardContent>
       </Card>
     </div>

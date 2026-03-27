@@ -82,11 +82,22 @@ export function buildWhatsAppConversationUrl(input: WhatsAppUrlInput) {
 }
 
 export function buildWhatsAppUrlFromServiceOrder(os: any) {
+  const hasCharge = Boolean(os?.financialSummary?.hasCharge);
+  const status = String(os?.financialSummary?.chargeStatus ?? "").toUpperCase();
+
+  let context: string | null = null;
+
+  if (hasCharge && status === "OVERDUE") {
+    context = "overdue_charge";
+  } else if (hasCharge && status === "PENDING") {
+    context = "charge_pending";
+  } else {
+    context = "service_order_followup";
+  }
+
   return buildWhatsAppConversationUrl({
     customerId: os?.customerId ? String(os.customerId) : null,
-    context: os?.financialSummary?.hasCharge
-      ? "overdue_charge"
-      : "service_order_followup",
+    context,
     chargeId: os?.financialSummary?.chargeId
       ? String(os.financialSummary.chargeId)
       : null,
@@ -104,7 +115,10 @@ export function buildWhatsAppUrlFromServiceOrder(os: any) {
 export function buildWhatsAppUrlFromCharge(charge: any) {
   return buildWhatsAppConversationUrl({
     customerId: charge?.customerId ? String(charge.customerId) : null,
-    context: "overdue_charge",
+    context:
+      String(charge?.status ?? "").toUpperCase() === "OVERDUE"
+        ? "overdue_charge"
+        : "charge_pending",
     chargeId: charge?.id ? String(charge.id) : null,
     serviceOrderId: charge?.serviceOrderId ? String(charge.serviceOrderId) : null,
     amountCents:

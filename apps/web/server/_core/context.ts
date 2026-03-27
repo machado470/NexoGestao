@@ -1,7 +1,7 @@
 import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
 import cookie from "cookie";
 
-const NEXO_API_URL = process.env.NEXO_API_URL || "http://127.0.0.1:3001";
+const NEXO_API_URL = process.env.NEXO_API_URL || "http://127.0.0.1:3000";
 const NEXO_TOKEN_COOKIE = "nexo_token";
 
 export type TrpcContext = {
@@ -18,6 +18,7 @@ export function getNexoTokenFromReq(req: any): string | null {
 
   const parsed = cookie.parse(raw);
   const token = parsed?.[NEXO_TOKEN_COOKIE];
+
   return typeof token === "string" && token.trim().length > 0 ? token : null;
 }
 
@@ -43,11 +44,24 @@ export async function fetchNexoMe(req: any) {
     }
 
     if (!response.ok) {
+      if (process.env.NODE_ENV !== "production") {
+        console.error("[trpc/context] fetchNexoMe failed", {
+          url: `${NEXO_API_URL}/me`,
+          status: response.status,
+          body,
+        });
+      }
       return null;
     }
 
     return body;
-  } catch {
+  } catch (error) {
+    if (process.env.NODE_ENV !== "production") {
+      console.error("[trpc/context] fetchNexoMe exception", {
+        url: `${NEXO_API_URL}/me`,
+        error,
+      });
+    }
     return null;
   }
 }
@@ -72,7 +86,10 @@ export async function createContext(
   try {
     const me = await fetchNexoMe(opts.req);
     user = extractUserFromMePayload(me);
-  } catch {
+  } catch (error) {
+    if (process.env.NODE_ENV !== "production") {
+      console.error("[trpc/context] createContext failed", error);
+    }
     user = null;
   }
 
