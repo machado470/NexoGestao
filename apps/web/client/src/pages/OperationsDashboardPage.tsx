@@ -9,9 +9,11 @@ import { useLocation } from "wouter";
 import {
   buildWhatsAppConversationUrl,
   buildWhatsAppUrlFromCharge,
+  buildServiceOrdersDeepLink,
   normalizeCharges,
   normalizeOrders,
   normalizeStatus,
+  formatCurrency,
 } from "@/lib/operations/operations.utils";
 import { normalizeAlertsPayload } from "@/lib/query-helpers";
 import {
@@ -28,18 +30,6 @@ import {
   Receipt,
   Wrench,
 } from "lucide-react";
-
-function formatCurrency(cents?: number | null) {
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  }).format(Number(cents ?? 0) / 100);
-}
-
-function buildServiceOrdersDeepLink(id?: string | null) {
-  if (!id) return "/service-orders";
-  return `/service-orders?os=${id}`;
-}
 
 export default function OperationsDashboardPage() {
   const { isAuthenticated, isInitializing } = useAuth();

@@ -28,21 +28,9 @@ import type {
   ServiceOrder,
 } from "@/components/service-orders/service-order.types";
 
-function buildServiceOrdersUrl(id: string) {
-  const url = new URL(window.location.href);
-  url.searchParams.set("os", id);
-  return `${url.pathname}${url.search}`;
-}
-
-function getServiceOrderIdFromUrl() {
-  const url = new URL(window.location.href);
-  return url.searchParams.get("os");
-}
-
-function clearServiceOrderIdFromUrl() {
-  const url = new URL(window.location.href);
-  url.searchParams.delete("os");
-  return `${url.pathname}${url.search}`;
+function getOsFromLocation(location: string) {
+  const params = new URLSearchParams(location.split("?")[1] || "");
+  return params.get("os");
 }
 
 function getFinancialFilterLabel(filter: FinancialFilter) {
@@ -68,7 +56,7 @@ function getQueueSummaryLabel(filter: FinancialFilter) {
 }
 
 export default function ServiceOrdersPage() {
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
   const utils = trpc.useUtils();
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -158,26 +146,25 @@ export default function ServiceOrdersPage() {
   }, [activeQuery.data, activeFromList]);
 
   useEffect(() => {
-    const deepLinkedId = getServiceOrderIdFromUrl();
-    if (deepLinkedId) setActiveId(deepLinkedId);
-  }, []);
+    const id = getOsFromLocation(location);
+    if (id) setActiveId(id);
+  }, [location]);
 
   useEffect(() => {
     if (activeId && sorted.some((item) => item.id === activeId)) return;
 
     if (operationalQueue.length === 0) {
       setActiveId(null);
-      window.history.replaceState({}, "", clearServiceOrderIdFromUrl());
       return;
     }
 
     const nextId = operationalQueue[0].id;
     setActiveId(nextId);
-    window.history.replaceState({}, "", buildServiceOrdersUrl(nextId));
-  }, [operationalQueue, sorted, activeId]);
+    navigate(`/service-orders?os=${nextId}`);
+  }, [operationalQueue, sorted, activeId, navigate]);
 
   function openAsActive(id: string) {
-    window.history.pushState({}, "", buildServiceOrdersUrl(id));
+    navigate(`/service-orders?os=${id}`);
     setActiveId(id);
   }
 
@@ -245,9 +232,6 @@ export default function ServiceOrdersPage() {
               Urgentes
             </div>
             <div className="mt-1 text-2xl font-semibold">{urgentCount}</div>
-            <div className="text-sm text-muted-foreground">
-              Próxima ação em vermelho
-            </div>
           </CardContent>
         </Card>
 
@@ -257,9 +241,6 @@ export default function ServiceOrdersPage() {
               Prontas para cobrar
             </div>
             <div className="mt-1 text-2xl font-semibold">{readyToChargeCount}</div>
-            <div className="text-sm text-muted-foreground">
-              Execução concluída sem cobrança
-            </div>
           </CardContent>
         </Card>
 
@@ -270,9 +251,6 @@ export default function ServiceOrdersPage() {
             </div>
             <div className="mt-1 text-2xl font-semibold">
               {pendingFinancialCount}
-            </div>
-            <div className="text-sm text-muted-foreground">
-              Pendentes ou vencidas
             </div>
           </CardContent>
         </Card>
@@ -292,70 +270,41 @@ export default function ServiceOrdersPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-        <div className="xl:col-span-5">
-          <div className="space-y-3">
-            {listQuery.isLoading ? (
-              <Card>
-                <CardContent className="p-4 text-sm text-muted-foreground">
-                  Carregando ordens de serviço...
-                </CardContent>
-              </Card>
-            ) : operationalQueue.length === 0 ? (
-              <Card>
-                <CardContent className="p-4 text-sm text-muted-foreground">
-                  Nenhuma ordem encontrada para este filtro.
-                </CardContent>
-              </Card>
-            ) : (
-              operationalQueue.map((os) => {
-                const whatsappUrl = buildWhatsAppUrlFromServiceOrder(os);
-                const isActive = activeId === os.id;
-                const nextAction = getServiceOrderNextAction(os);
+        <div className="xl:col-span-5 space-y-3">
+          {operationalQueue.map((os) => {
+            const whatsappUrl = buildWhatsAppUrlFromServiceOrder(os);
+            const isActive = activeId === os.id;
 
-                return (
-                  <div
-                    key={os.id}
-                    className={isActive ? "rounded-2xl ring-2 ring-primary/20" : ""}
+            return (
+              <div key={os.id} className={isActive ? "ring-2 ring-primary/20 rounded-xl" : ""}>
+                <ServiceOrderCard
+                  os={os}
+                  isProcessing={false}
+                  chargeBadge={getChargeBadge(os.financialSummary)}
+                  operationalStage={getOperationalStage(os)}
+                  financialStage={getFinancialStage(os)}
+                  onEdit={(id) => setEditId(id)}
+                  onOpenDeepLink={openAsActive}
+                  isUpdating={false}
+                />
+
+                <div className="mt-2 flex justify-between px-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => whatsappUrl && navigate(whatsappUrl)}
                   >
-                    <ServiceOrderCard
-                      os={os}
-                      isProcessing={false}
-                      chargeBadge={getChargeBadge(os.financialSummary)}
-                      operationalStage={getOperationalStage(os)}
-                      financialStage={getFinancialStage(os)}
-                      onEdit={(id) => setEditId(id)}
-                      onOpenDeepLink={openAsActive}
-                      isUpdating={false}
-                    />
+                    <MessageCircle className="mr-2 h-4 w-4" />
+                    WhatsApp
+                  </Button>
 
-                    <div className="mt-2 flex flex-wrap items-center justify-between gap-2 px-2">
-                      <div className="text-xs text-muted-foreground">
-                        {nextAction.title}
-                      </div>
-
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            if (whatsappUrl) navigate(whatsappUrl);
-                          }}
-                          disabled={!whatsappUrl}
-                        >
-                          <MessageCircle className="mr-2 h-4 w-4" />
-                          WhatsApp
-                        </Button>
-
-                        <Button size="sm" onClick={() => openAsActive(os.id)}>
-                          Abrir
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
+                  <Button size="sm" onClick={() => openAsActive(os.id)}>
+                    Abrir
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         <div className="xl:col-span-7">
@@ -374,10 +323,7 @@ export default function ServiceOrdersPage() {
       <CreateServiceOrderModal
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
-        onSuccess={async () => {
-          setIsCreateOpen(false);
-          await refreshAll();
-        }}
+        onSuccess={refreshAll}
         customers={customers}
         people={people}
       />
@@ -386,10 +332,7 @@ export default function ServiceOrdersPage() {
         isOpen={Boolean(editId)}
         serviceOrderId={editId}
         onClose={() => setEditId(null)}
-        onSuccess={async () => {
-          setEditId(null);
-          await refreshAll();
-        }}
+        onSuccess={refreshAll}
         people={people}
       />
     </div>

@@ -5,26 +5,21 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { MessageCircle } from "lucide-react";
 import { toast } from "sonner";
-import { formatCurrency } from "@/lib/operations/operations.utils";
 
-function parseLocationParams(location: string) {
-  const params = new URLSearchParams(location.split("?")[1] || "");
-
-  return {
-    customerId: params.get("customerId"),
-    context: params.get("context"),
-    amountCents: params.get("amountCents")
-      ? Number(params.get("amountCents"))
-      : null,
-    dueDate: params.get("dueDate"),
-    chargeId: params.get("chargeId"),
-    serviceOrderId: params.get("serviceOrderId"),
-  };
-}
+import {
+  parseWhatsAppRoute,
+  getWhatsAppPrefilledMessage,
+  getWhatsAppContextLabel,
+  getWhatsAppContextDescription,
+  formatCurrency,
+  buildFinanceChargeUrl,
+  buildServiceOrdersDeepLink,
+} from "@/lib/operations/operations.utils";
 
 export default function WhatsAppPage() {
   const [location, navigate] = useLocation();
-  const route = useMemo(() => parseLocationParams(location), [location]);
+
+  const route = useMemo(() => parseWhatsAppRoute(location), [location]);
 
   const [messageInput, setMessageInput] = useState("");
 
@@ -51,27 +46,8 @@ export default function WhatsAppPage() {
   useEffect(() => {
     if (!customer || messageInput) return;
 
-    const firstName = customer.name?.split(" ")[0] || "cliente";
-    const amount =
-      route.amountCents !== null
-        ? formatCurrency(route.amountCents)
-        : "";
-
-    if (route.context === "overdue_charge") {
-      setMessageInput(
-        `Olá ${firstName}, identificamos um pagamento vencido de ${amount}. Posso te enviar o link?`
-      );
-      return;
-    }
-
-    if (route.context === "charge_pending") {
-      setMessageInput(
-        `Olá ${firstName}, lembrando do pagamento de ${amount}. Posso te enviar o link?`
-      );
-      return;
-    }
-
-    setMessageInput(`Olá ${firstName}, tudo bem?`);
+    const msg = getWhatsAppPrefilledMessage(customer, route);
+    setMessageInput(msg);
   }, [customer, route, messageInput]);
 
   const messages = useMemo(() => {
@@ -88,14 +64,16 @@ export default function WhatsAppPage() {
 
       {/* CONTEXTO */}
       {customer && (
-        <div className="border p-3 rounded bg-gray-900 space-y-1">
-          <p className="font-semibold">{customer.name}</p>
+        <div className="border p-4 rounded bg-gray-900 space-y-2">
+          <p className="font-semibold text-lg">{customer.name}</p>
 
-          {route.context && (
-            <p className="text-sm text-gray-400">
-              Contexto: {route.context}
-            </p>
-          )}
+          <p className="text-sm text-gray-400">
+            {getWhatsAppContextLabel(route.context)}
+          </p>
+
+          <p className="text-sm text-gray-500">
+            {getWhatsAppContextDescription(route)}
+          </p>
 
           {route.amountCents && (
             <p className="text-sm text-green-400">
@@ -108,13 +86,17 @@ export default function WhatsAppPage() {
       {/* AÇÕES RÁPIDAS */}
       <div className="flex gap-2">
         {route.chargeId && (
-          <Button onClick={() => navigate(`/finances?chargeId=${route.chargeId}`)}>
+          <Button onClick={() => navigate(buildFinanceChargeUrl(route.chargeId))}>
             Ver cobrança
           </Button>
         )}
 
         {route.serviceOrderId && (
-          <Button onClick={() => navigate(`/service-orders?os=${route.serviceOrderId}`)}>
+          <Button
+            onClick={() =>
+              navigate(buildServiceOrdersDeepLink(route.serviceOrderId))
+            }
+          >
             Ver ordem
           </Button>
         )}

@@ -1,74 +1,58 @@
+import { useMemo } from "react";
+import { useLocation } from "wouter";
+import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
-import { normalizeOrders } from "@/lib/operations/operations.utils";
+import {
+  normalizeOrders,
+  buildWhatsAppUrlFromServiceOrder,
+  buildFinanceChargeUrl,
+  buildServiceOrdersDeepLink,
+} from "@/lib/operations/operations.utils";
 import {
   getServiceOrderNextAction,
   getOperationalStage,
   getFinancialStage,
 } from "@/lib/operations/operations.selectors";
-import { buildWhatsAppUrlFromServiceOrder } from "@/lib/operations/operations.utils";
-import { useLocation } from "wouter";
 
 export default function OperationalWorkflowPage() {
   const [, navigate] = useLocation();
-  const utils = trpc.useUtils();
 
   const ordersQuery = trpc.nexo.serviceOrders.list.useQuery({
     page: 1,
     limit: 50,
   });
 
-  const updateMutation = trpc.nexo.serviceOrders.update.useMutation({
-    onSuccess: () => {
-      utils.nexo.serviceOrders.list.invalidate();
-    },
-  });
-
-  const orders = normalizeOrders(ordersQuery.data);
-
-  const handleStart = async (os: any) => {
-    await updateMutation.mutateAsync({
-      id: os.id,
-      status: "IN_PROGRESS",
-    });
-  };
-
-  const handleFinish = async (os: any) => {
-    await updateMutation.mutateAsync({
-      id: os.id,
-      status: "DONE",
-    });
-  };
-
-  const handleCharge = (os: any) => {
-    navigate(`/service-orders?os=${os.id}`);
-  };
-
-  const handlePayment = (os: any) => {
-    if (!os.financialSummary?.chargeId) return;
-    navigate(`/finances?chargeId=${os.financialSummary.chargeId}`);
-  };
-
-  const handleWhatsApp = (os: any) => {
-    const url = buildWhatsAppUrlFromServiceOrder(os);
-    if (url) navigate(url);
-  };
+  const orders = useMemo(() => normalizeOrders(ordersQuery.data), [ordersQuery.data]);
 
   return (
     <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-semibold">Workflow Operacional</h1>
+      <div className="space-y-1">
+        <h1 className="text-2xl font-semibold">Workflow Operacional</h1>
+        <p className="text-sm text-gray-400">
+          Triagem rápida das ordens com próximo passo definido.
+        </p>
+      </div>
 
       {orders.map((os: any) => {
         const next = getServiceOrderNextAction(os);
         const op = getOperationalStage(os);
         const fin = getFinancialStage(os);
 
+        const chargeId = os?.financialSummary?.chargeId
+          ? String(os.financialSummary.chargeId)
+          : null;
+
+        const whatsappUrl = buildWhatsAppUrlFromServiceOrder(os);
+        const serviceOrderUrl = buildServiceOrdersDeepLink(os?.id ? String(os.id) : null);
+        const financeUrl = buildFinanceChargeUrl(chargeId);
+
         return (
           <div
             key={os.id}
-            className="border rounded p-4 space-y-3 bg-gray-900"
+            className="border rounded p-4 space-y-4 bg-gray-900"
           >
-            <div className="flex justify-between">
-              <div>
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-1">
                 <p className="font-semibold">
                   {os.customer?.name ?? "Cliente"}
                 </p>
@@ -82,61 +66,38 @@ export default function OperationalWorkflowPage() {
               </div>
             </div>
 
-            <div className="flex gap-4 text-sm">
+            <div className="flex gap-4 text-sm flex-wrap">
               <span>{op.label}</span>
               <span>{fin.label}</span>
             </div>
 
-            <div className="text-sm">
+            <div className="text-sm space-y-1">
               <p className="font-medium">{next.title}</p>
               <p className="text-gray-400">{next.description}</p>
             </div>
 
             <div className="flex gap-2 flex-wrap">
-              {["OPEN", "ASSIGNED"].includes(os.status) && (
-                <button
-                  onClick={() => handleStart(os)}
-                  className="bg-blue-600 px-3 py-1 rounded text-sm"
+              <Button onClick={() => navigate(serviceOrderUrl)}>
+                Abrir ordem
+              </Button>
+
+              {chargeId && (
+                <Button
+                  variant="secondary"
+                  onClick={() => navigate(financeUrl)}
                 >
-                  Iniciar
-                </button>
+                  Ver cobrança
+                </Button>
               )}
 
-              {os.status === "IN_PROGRESS" && (
-                <button
-                  onClick={() => handleFinish(os)}
-                  className="bg-green-600 px-3 py-1 rounded text-sm"
+              {whatsappUrl && (
+                <Button
+                  variant="secondary"
+                  onClick={() => navigate(whatsappUrl)}
                 >
-                  Finalizar
-                </button>
+                  WhatsApp
+                </Button>
               )}
-
-              {os.status === "DONE" &&
-                !os.financialSummary?.hasCharge && (
-                  <button
-                    onClick={() => handleCharge(os)}
-                    className="bg-yellow-600 px-3 py-1 rounded text-sm"
-                  >
-                    Gerar cobrança
-                  </button>
-                )}
-
-              {os.financialSummary?.hasCharge &&
-                os.financialSummary?.chargeStatus !== "PAID" && (
-                  <button
-                    onClick={() => handlePayment(os)}
-                    className="bg-green-700 px-3 py-1 rounded text-sm"
-                  >
-                    Receber
-                  </button>
-                )}
-
-              <button
-                onClick={() => handleWhatsApp(os)}
-                className="bg-purple-600 px-3 py-1 rounded text-sm"
-              >
-                WhatsApp
-              </button>
             </div>
           </div>
         );
