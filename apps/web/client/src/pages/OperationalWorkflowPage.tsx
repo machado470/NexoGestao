@@ -1,273 +1,110 @@
-import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { trpc } from "@/lib/trpc";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import {
-  RefreshCw,
-  Wrench,
-  PlayCircle,
-  CheckCircle2,
-  CreditCard,
-  AlertTriangle,
-  Send,
-} from "lucide-react";
-import { toast } from "sonner";
-
-import { useChargeActions } from "@/hooks/useChargeActions";
-import { formatCurrency } from "@/lib/utils";
 
 export default function OperationalWorkflowPage() {
-  const navigate = useNavigate();
   const utils = trpc.useUtils();
-
-  //  controle por chargeId
-  const [sendingIds, setSendingIds] = useState<string[]>([]);
-
-  const serviceOrdersQuery = trpc.nexo.serviceOrders.list.useQuery({
-    page: 1,
-    limit: 50,
-  });
 
   const chargesQuery = trpc.nexo.finance.charges.list.useQuery({
     page: 1,
     limit: 50,
   });
 
-  const sendWhatsApp = trpc.nexo.whatsapp.send.useMutation({
-    onSuccess: (_data, variables: any) => {
-      utils.nexo.whatsapp.messages.invalidate();
-      toast.success("Mensagem enviada via WhatsApp");
-
-      setSendingIds((prev) =>
-        prev.filter((id) => id !== variables.meta?.chargeId)
-      );
-    },
-    onError: (err, variables: any) => {
-      toast.error(err.message || "Erro ao enviar mensagem");
-
-      setSendingIds((prev) =>
-        prev.filter((id) => id !== variables.meta?.chargeId)
-      );
+  const payMutation = trpc.finance.charges.pay.useMutation({
+    onSuccess: () => {
+      utils.finance.charges.list.invalidate();
+      utils.finance.charges.stats.invalidate();
     },
   });
 
-  const serviceOrders = serviceOrdersQuery.data?.data ?? [];
-  const charges = chargesQuery.data?.data ?? [];
+  const charges = chargesQuery.data?.items ?? [];
 
-  const actionableOrders = useMemo(
-    () =>
-      serviceOrders.filter(
-        (o) => o.status === "OPEN" || o.status === "ASSIGNED"
-      ),
-    [serviceOrders]
-  );
+  const overdue = charges.filter((c) => c.status === "OVERDUE");
+  const pending = charges.filter((c) => c.status === "PENDING");
 
-  const doneWithoutCharge = useMemo(
-    () =>
-      serviceOrders.filter(
-        (o) => o.status === "DONE" && !o.chargeId
-      ),
-    [serviceOrders]
-  );
-
-  const overdueCharges = useMemo(
-    () => charges.filter((c) => c.status === "OVERDUE"),
-    [charges]
-  );
-
-  const pendingCharges = useMemo(
-    () => charges.filter((c) => c.status === "PENDING"),
-    [charges]
-  );
-
-  const { registerPayment, generateCheckout, isSubmitting } =
-    useChargeActions({
-      navigate,
-      returnPath: "/dashboard/operations",
-    });
-
-  const handleStart = (id: string) => {
-    trpc.nexo.serviceOrders.update.mutate({
-      id,
-      data: { status: "IN_PROGRESS" },
-    });
-  };
-
-  const handleFinish = (id: string) => {
-    trpc.nexo.serviceOrders.update.mutate({
-      id,
-      data: { status: "DONE" },
-    });
-  };
-
-  //  envio por chargeId
-  const handleSendWhatsApp = (c: any) => {
-    if (sendingIds.includes(c.id)) return;
-
-    const firstName = c.customer?.name?.split(" ")[0] || "cliente";
-
-    const message = `Olá ${firstName}, tudo bem? Identificamos uma cobrança vencida no valor de ${formatCurrency(
-      c.amountCents
-    )}. Posso te enviar o link de pagamento?`;
-
-    setSendingIds((prev) => [...prev, c.id]);
-
-    sendWhatsApp.mutate({
-      customerId: c.customerId,
-      content: message,
-      meta: { chargeId: c.id }, //  chave
+  const handlePay = async (charge: any) => {
+    await payMutation.mutateAsync({
+      chargeId: charge.id,
+      amountCents: charge.amountCents,
+      method: "CASH",
     });
   };
 
   return (
     <div className="space-y-6 p-6">
-      <div className="flex justify-between items-center">
-        <h1 className="flex items-center gap-2 text-2xl font-bold">
-          <Wrench className="h-6 w-6 text-orange-500" />
-          Workflow Operacional
-        </h1>
+      <h1 className="text-2xl font-semibold">Workflow Operacional</h1>
 
-        <Button
-          variant="outline"
-          onClick={() => {
-            chargesQuery.refetch();
-            serviceOrdersQuery.refetch();
-          }}
-        >
-          <RefreshCw className="mr-2 h-4 w-4" />
-          Atualizar
-        </Button>
-      </div>
+      {/* PRIORIDADE */}
+      {overdue.length > 0 && (
+        <div className="bg-red-900 p-4 rounded border border-red-500">
+          <h2 className="font-semibold mb-3 text-red-400">
+            🔴 AÇÃO URGENTE — Cobranças vencidas
+          </h2>
 
-      {/* EXECUTAR */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Executar agora</CardTitle>
-        </CardHeader>
-
-        <CardContent className="space-y-3">
-          {actionableOrders.map((o) => (
-            <div key={o.id} className="border rounded-lg p-3">
-              <p className="font-semibold">{o.title}</p>
-
-              <div className="flex gap-2 mt-2">
-                <Button size="sm" onClick={() => handleStart(o.id)}>
-                  <PlayCircle className="h-4 w-4 mr-1" />
-                  Iniciar
-                </Button>
-
-                <Button size="sm" onClick={() => handleFinish(o.id)}>
-                  <CheckCircle2 className="h-4 w-4 mr-1" />
-                  Concluir
-                </Button>
-              </div>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-
-      {/* COBRAR */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Cobrar agora</CardTitle>
-        </CardHeader>
-
-        <CardContent className="space-y-3">
-          {doneWithoutCharge.map((o) => (
-            <div key={o.id} className="border rounded-lg p-3">
-              <p className="font-semibold">{o.title}</p>
-
-              <Button
-                size="sm"
-                onClick={() =>
-                  navigate(`/finances?serviceOrderId=${o.id}`)
-                }
-              >
-                <CreditCard className="h-4 w-4 mr-1" />
-                Gerar cobrança
-              </Button>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-
-      {/* VENCIDAS */}
-      <Card className="border-red-500">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-red-500">
-            <AlertTriangle className="h-5 w-5" />
-            Cobranças vencidas
-          </CardTitle>
-        </CardHeader>
-
-        <CardContent className="space-y-3">
-          {overdueCharges.map((c) => {
-            const isSending = sendingIds.includes(c.id);
-
-            return (
-              <div key={c.id} className="border rounded-lg p-3">
+          {overdue.map((c) => (
+            <div
+              key={c.id}
+              className="flex justify-between items-center p-2 border-b border-red-700"
+            >
+              <div>
                 <p>{c.customer?.name}</p>
-                <p>{formatCurrency(c.amountCents)}</p>
-
-                <div className="flex gap-2 mt-2">
-                  <Button
-                    size="sm"
-                    onClick={() => generateCheckout(c)}
-                    disabled={isSubmitting}
-                  >
-                    Cobrar
-                  </Button>
-
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleSendWhatsApp(c)}
-                    disabled={isSending}
-                  >
-                    <Send className="h-4 w-4 mr-1" />
-                    {isSending ? "Enviando..." : "WhatsApp"}
-                  </Button>
-                </div>
+                <p className="text-sm">
+                  R$ {(c.amountCents / 100).toFixed(2)}
+                </p>
               </div>
-            );
-          })}
-        </CardContent>
-      </Card>
+
+              <button
+                onClick={() => handlePay(c)}
+                className="bg-green-600 px-3 py-1 rounded text-sm"
+              >
+                Marcar como pago
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* PENDENTES */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Cobranças pendentes</CardTitle>
-        </CardHeader>
+      <div className="bg-gray-800 p-4 rounded">
+        <h2 className="font-semibold mb-3">
+          🟡 Cobranças pendentes ({pending.length})
+        </h2>
 
-        <CardContent className="space-y-3">
-          {pendingCharges.map((c) => (
-            <div key={c.id} className="border rounded-lg p-3">
+        {pending.map((c) => (
+          <div
+            key={c.id}
+            className="flex justify-between items-center p-2 border-b border-gray-700"
+          >
+            <div>
               <p>{c.customer?.name}</p>
-              <p>{formatCurrency(c.amountCents)}</p>
-
-              <div className="flex gap-2 mt-2">
-                <Button
-                  size="sm"
-                  onClick={() => generateCheckout(c)}
-                  disabled={isSubmitting}
-                >
-                  Checkout
-                </Button>
-
-                <Button
-                  size="sm"
-                  onClick={() => registerPayment(c, "PIX")}
-                  disabled={isSubmitting}
-                >
-                  Baixar
-                </Button>
-              </div>
+              <p className="text-sm">
+                R$ {(c.amountCents / 100).toFixed(2)}
+              </p>
             </div>
-          ))}
-        </CardContent>
-      </Card>
+
+            <button
+              onClick={() => handlePay(c)}
+              className="bg-blue-600 px-3 py-1 rounded text-sm"
+            >
+              Receber agora
+            </button>
+          </div>
+        ))}
+
+        {pending.length === 0 && (
+          <p className="text-gray-400">Nada pendente.</p>
+        )}
+      </div>
+
+      {/* ESTADO LIMPO */}
+      {pending.length === 0 && overdue.length === 0 && (
+        <div className="bg-green-900 p-4 rounded border border-green-500">
+          <h2 className="text-green-400 font-semibold">
+            ✅ Tudo em dia
+          </h2>
+          <p className="text-sm text-gray-300">
+            Nenhuma cobrança pendente ou vencida.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
