@@ -34,9 +34,11 @@ import {
   Sparkles,
   Clock3,
   CircleDollarSign,
+  MessageCircle,
 } from "lucide-react";
 import { CreateChargeModal } from "@/components/CreateChargeModal";
 import { EditChargeModal } from "@/components/EditChargeModal";
+import { buildWhatsAppUrlFromCharge } from "@/lib/operations/operations.utils";
 
 type ChargeStatusFilter = "ALL" | "PENDING" | "PAID" | "OVERDUE" | "CANCELED";
 type ChargeStatus = "PENDING" | "PAID" | "OVERDUE" | "CANCELED";
@@ -373,10 +375,8 @@ export default function FinancesPage() {
     generateCheckout,
     isSubmitting: isChargeActionSubmitting,
   } = useChargeActions({
-    location,
     navigate,
     returnPath: "/finances",
-    refreshActions: [refreshQueriesOnly],
   });
 
   const deleteCharge = trpc.finance.charges.delete.useMutation({
@@ -407,14 +407,18 @@ export default function FinancesPage() {
   };
 
   const handleClearServiceOrderFilter = () => {
-    const params = new URLSearchParams(location.includes("?") ? location.split("?")[1] : "");
+    const params = new URLSearchParams(
+      location.includes("?") ? location.split("?")[1] : ""
+    );
     params.delete("serviceOrderId");
     const next = params.toString();
     navigate(next ? `/finances?${next}` : "/finances");
   };
 
   const handleClearChargeFocus = () => {
-    const params = new URLSearchParams(location.includes("?") ? location.split("?")[1] : "");
+    const params = new URLSearchParams(
+      location.includes("?") ? location.split("?")[1] : ""
+    );
     params.delete("chargeId");
     const next = params.toString();
     setHighlightedChargeId(null);
@@ -422,7 +426,9 @@ export default function FinancesPage() {
   };
 
   const handleOpenChargeFocus = (chargeId: string) => {
-    const params = new URLSearchParams(location.includes("?") ? location.split("?")[1] : "");
+    const params = new URLSearchParams(
+      location.includes("?") ? location.split("?")[1] : ""
+    );
     params.set("chargeId", chargeId);
     setHighlightedChargeId(chargeId);
     navigate(`/finances?${params.toString()}`);
@@ -447,6 +453,12 @@ export default function FinancesPage() {
     await deleteCharge.mutateAsync({
       id: String(charge.id),
     });
+  };
+
+  const handleOpenWhatsApp = (charge: Charge) => {
+    const url = buildWhatsAppUrlFromCharge(charge);
+    if (!url) return;
+    navigate(url);
   };
 
   const isSubmitting = deleteCharge.isPending || isChargeActionSubmitting;
@@ -935,6 +947,16 @@ export default function FinancesPage() {
 
                             {(charge.status === "PENDING" || charge.status === "OVERDUE") && (
                               <>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleOpenWhatsApp(charge)}
+                                  disabled={isSubmitting}
+                                >
+                                  <MessageCircle className="mr-2 h-4 w-4" />
+                                  WhatsApp
+                                </Button>
+
                                 <Button
                                   size="sm"
                                   onClick={() => void generateCheckout(charge)}
