@@ -17,6 +17,23 @@ import {
   buildServiceOrdersDeepLink,
 } from "@/lib/operations/operations.utils";
 
+function getMessageTypeFromContext(context: string) {
+  if (context === "overdue_charge") return "PAYMENT_REMINDER";
+  if (context === "charge_pending") return "PAYMENT_REMINDER";
+  if (context === "service_order_followup") return "SERVICE_UPDATE";
+  return "CUSTOMER_NOTIFICATION";
+}
+
+function getEntityType(route: ReturnType<typeof parseWhatsAppRoute>) {
+  if (route.chargeId) return "CHARGE";
+  if (route.serviceOrderId) return "SERVICE_ORDER";
+  return "CUSTOMER";
+}
+
+function getEntityId(route: ReturnType<typeof parseWhatsAppRoute>) {
+  return route.chargeId || route.serviceOrderId || route.customerId;
+}
+
 export default function WhatsAppPage() {
   const [location, navigate] = useLocation();
   const route = useMemo(() => parseWhatsAppRoute(location), [location]);
@@ -232,6 +249,11 @@ export default function WhatsAppPage() {
               sendMutation.mutate({
                 customerId: route.customerId!,
                 content: messageInput.trim(),
+                entityType: getEntityType(route),
+                entityId: getEntityId(route),
+                messageType: getMessageTypeFromContext(route.context),
+                chargeId: route.chargeId,
+                serviceOrderId: route.serviceOrderId,
               })
             }
             disabled={!canSend}

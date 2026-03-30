@@ -1,5 +1,6 @@
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
+import { buildFinanceChargeUrl } from "@/lib/operations/operations.utils";
 
 type NavigateFn = (path: string) => void;
 
@@ -11,13 +12,15 @@ type UseChargeActionsOptions = {
 };
 
 function buildChargeFinancePath(chargeId: string, returnPath?: string) {
-  const params = new URLSearchParams();
+  const base = buildFinanceChargeUrl(chargeId);
 
-  params.set("chargeId", chargeId);
-
-  if (returnPath) {
-    params.set("returnTo", returnPath);
+  if (!returnPath) {
+    return base;
   }
+
+  const params = new URLSearchParams();
+  params.set("chargeId", chargeId);
+  params.set("returnTo", returnPath);
 
   return `/finances?${params.toString()}`;
 }

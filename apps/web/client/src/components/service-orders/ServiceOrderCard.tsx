@@ -4,8 +4,6 @@ import { Pencil, AlertCircle, MessageCircle, Eye } from "lucide-react";
 import type { ServiceOrder, StageTone } from "./service-order.types";
 
 import {
-  formatCurrency,
-  formatDateTime,
   normalizeStatus,
   buildWhatsAppUrlFromServiceOrder,
 } from "@/lib/operations/operations.utils";
@@ -22,6 +20,7 @@ interface Props {
 
   onEdit: (id: string) => void;
   onOpenDeepLink: (id: string) => void;
+  onOpenWhatsApp?: (url: string) => void;
 
   isUpdating: boolean;
 }
@@ -62,6 +61,7 @@ export default function ServiceOrderCard({
   financialStage,
   onEdit,
   onOpenDeepLink,
+  onOpenWhatsApp,
   isUpdating,
 }: Props) {
   const status = normalizeStatus(os.status);
@@ -144,9 +144,11 @@ export default function ServiceOrderCard({
             variant="outline"
             onClick={(e) => {
               e.stopPropagation();
-              if (whatsappUrl) window.location.href = whatsappUrl;
+              if (whatsappUrl && onOpenWhatsApp) {
+                onOpenWhatsApp(whatsappUrl);
+              }
             }}
-            disabled={disabled || !whatsappUrl}
+            disabled={disabled || !whatsappUrl || !onOpenWhatsApp}
           >
             <MessageCircle className="h-4 w-4" />
           </Button>

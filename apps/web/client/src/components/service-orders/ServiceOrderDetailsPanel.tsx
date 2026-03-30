@@ -69,12 +69,16 @@ function getTimelineLabel(event: TimelineEvent) {
   const action = String(event.action ?? event.type ?? "").trim().toUpperCase();
 
   if (action === "CHARGE_CREATED") return "Cobrança gerada";
-  if (action === "CHARGE_PAID") return "Pagamento recebido";
+  if (action === "CHARGE_PAID" || action === "PAYMENT_RECEIVED") {
+    return "Pagamento recebido";
+  }
   if (action === "CHARGE_OVERDUE") return "Cobrança vencida";
   if (action === "SERVICE_ORDER_CREATED") return "O.S. criada";
   if (action === "SERVICE_ORDER_UPDATED") return "O.S. atualizada";
   if (action === "EXECUTION_STARTED") return "Execução iniciada";
-  if (action === "EXECUTION_COMPLETED") return "Execução concluída";
+  if (action === "EXECUTION_COMPLETED" || action === "EXECUTION_DONE") {
+    return "Execução concluída";
+  }
 
   return event.description || event.action || event.type || "Evento";
 }
@@ -181,7 +185,8 @@ export default function ServiceOrderDetailsPanel({ os }: { os: ServiceOrder }) {
   );
 
   const latestExecution = executions[0] ?? null;
-  const chargeIsPaid = os.financialSummary?.chargeStatus === "PAID";
+  const chargeIsPaid =
+    normalizeStatus(os.financialSummary?.chargeStatus) === "PAID";
 
   const charge =
     os.financialSummary?.hasCharge && isValidId(os.financialSummary.chargeId)

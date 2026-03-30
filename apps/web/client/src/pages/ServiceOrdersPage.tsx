@@ -4,6 +4,7 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
+  buildServiceOrdersDeepLink,
   buildWhatsAppUrlFromServiceOrder,
   normalizeOrders,
 } from "@/lib/operations/operations.utils";
@@ -160,11 +161,11 @@ export default function ServiceOrdersPage() {
 
     const nextId = operationalQueue[0].id;
     setActiveId(nextId);
-    navigate(`/service-orders?os=${nextId}`);
+    navigate(buildServiceOrdersDeepLink(nextId));
   }, [operationalQueue, sorted, activeId, navigate]);
 
   function openAsActive(id: string) {
-    navigate(`/service-orders?os=${id}`);
+    navigate(buildServiceOrdersDeepLink(id));
     setActiveId(id);
   }
 
@@ -276,7 +277,10 @@ export default function ServiceOrdersPage() {
             const isActive = activeId === os.id;
 
             return (
-              <div key={os.id} className={isActive ? "ring-2 ring-primary/20 rounded-xl" : ""}>
+              <div
+                key={os.id}
+                className={isActive ? "rounded-xl ring-2 ring-primary/20" : ""}
+              >
                 <ServiceOrderCard
                   os={os}
                   isProcessing={false}
@@ -285,6 +289,7 @@ export default function ServiceOrdersPage() {
                   financialStage={getFinancialStage(os)}
                   onEdit={(id) => setEditId(id)}
                   onOpenDeepLink={openAsActive}
+                  onOpenWhatsApp={(url) => navigate(url)}
                   isUpdating={false}
                 />
 

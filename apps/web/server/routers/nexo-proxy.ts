@@ -373,7 +373,7 @@ async function searchServiceOrders(
         serviceOrder?.customer?.name ||
         serviceOrder?.status ||
         "Sem status",
-      route: `/service-orders?serviceOrderId=${id}`,
+      route: `/service-orders?os=${id}`,
     });
   });
 
@@ -760,3 +760,4 @@ export const nexoProxyRouter = router({
     }),
   }),
 });
+

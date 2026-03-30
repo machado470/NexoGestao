@@ -28,6 +28,10 @@ import {
 import CreateCustomerModal from "@/components/CreateCustomerModal";
 import EditCustomerModal from "@/components/EditCustomerModal";
 import { Button } from "@/components/ui/button";
+import {
+  buildFinanceChargeUrl,
+  buildServiceOrdersDeepLink,
+} from "@/lib/operations/operations.utils";
 
 type Customer = {
   id: string;
@@ -523,7 +527,10 @@ export default function CustomersPage() {
 
       {workspaceCustomerId ? (
         <div className="fixed inset-0 z-50 flex justify-end">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-[1px]" onClick={closeWorkspace} />
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-[1px]"
+            onClick={closeWorkspace}
+          />
 
           <div className="relative h-full w-full max-w-2xl overflow-y-auto border-l border-gray-200 bg-gray-50 shadow-2xl dark:border-gray-700 dark:bg-gray-900">
             <div className="sticky top-0 z-10 border-b border-gray-200 bg-white/95 px-5 py-4 backdrop-blur dark:border-gray-700 dark:bg-gray-800/95">
@@ -738,9 +745,7 @@ export default function CustomersPage() {
                             type="button"
                             size="sm"
                             variant="outline"
-                            onClick={() =>
-                              navigate(`/service-orders?serviceOrderId=${item.id}`)
-                            }
+                            onClick={() => navigate(buildServiceOrdersDeepLink(item.id))}
                           >
                             <ArrowRightLeft className="mr-1 h-4 w-4" />
                             Abrir
@@ -781,7 +786,7 @@ export default function CustomersPage() {
                             type="button"
                             size="sm"
                             variant="outline"
-                            onClick={() => navigate("/finances")}
+                            onClick={() => navigate(buildFinanceChargeUrl(item.id))}
                           >
                             <ArrowRightLeft className="mr-1 h-4 w-4" />
                             Abrir
