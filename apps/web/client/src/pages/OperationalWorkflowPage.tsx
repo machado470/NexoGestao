@@ -2,12 +2,15 @@ import { useMemo } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
+
 import {
   normalizeOrders,
-  buildWhatsAppUrlFromServiceOrder,
-  buildFinanceChargeUrl,
   buildServiceOrdersDeepLink,
+  buildFinanceChargeUrl,
+  buildOperationalContextFromServiceOrder,
+  buildWhatsAppUrlFromContext,
 } from "@/lib/operations/operations.utils";
+
 import {
   getServiceOrderNextAction,
   getOperationalStage,
@@ -22,14 +25,17 @@ export default function OperationalWorkflowPage() {
     limit: 50,
   });
 
-  const orders = useMemo(() => normalizeOrders(ordersQuery.data), [ordersQuery.data]);
+  const orders = useMemo(
+    () => normalizeOrders(ordersQuery.data),
+    [ordersQuery.data]
+  );
 
   return (
     <div className="p-6 space-y-6">
       <div className="space-y-1">
         <h1 className="text-2xl font-semibold">Workflow Operacional</h1>
         <p className="text-sm text-gray-400">
-          Triagem rápida das ordens com próximo passo definido.
+          Fila de execução com próxima ação clara.
         </p>
       </div>
 
@@ -38,13 +44,11 @@ export default function OperationalWorkflowPage() {
         const op = getOperationalStage(os);
         const fin = getFinancialStage(os);
 
-        const chargeId = os?.financialSummary?.chargeId
-          ? String(os.financialSummary.chargeId)
-          : null;
+        const ctx = buildOperationalContextFromServiceOrder(os);
 
-        const whatsappUrl = buildWhatsAppUrlFromServiceOrder(os);
-        const serviceOrderUrl = buildServiceOrdersDeepLink(os?.id ? String(os.id) : null);
-        const financeUrl = buildFinanceChargeUrl(chargeId);
+        const serviceOrderUrl = buildServiceOrdersDeepLink(os?.id);
+        const financeUrl = buildFinanceChargeUrl(ctx.chargeId);
+        const whatsappUrl = buildWhatsAppUrlFromContext(ctx);
 
         return (
           <div
@@ -81,7 +85,7 @@ export default function OperationalWorkflowPage() {
                 Abrir ordem
               </Button>
 
-              {chargeId && (
+              {ctx.chargeId && (
                 <Button
                   variant="secondary"
                   onClick={() => navigate(financeUrl)}

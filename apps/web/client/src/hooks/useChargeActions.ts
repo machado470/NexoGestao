@@ -1,18 +1,51 @@
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 
-export function useChargeActions(options?: {
-  navigate?: (path: string) => void;
-}) {
-  const [, navigateWouter] = useLocation();
+type NavigateFn = (path: string) => void;
+
+type UseChargeActionsOptions = {
+  navigate?: NavigateFn;
+  location?: string;
+  returnPath?: string;
+  refreshActions?: Array<() => void | Promise<void>>;
+};
+
+function buildChargeFinancePath(chargeId: string, returnPath?: string) {
+  const params = new URLSearchParams();
+
+  params.set("chargeId", chargeId);
+
+  if (returnPath) {
+    params.set("returnTo", returnPath);
+  }
+
+  return `/finances?${params.toString()}`;
+}
+
+export function useChargeActions(options?: UseChargeActionsOptions) {
+  const [locationWouter, navigateWouter] = useLocation();
+
   const navigate = options?.navigate ?? navigateWouter;
+  const location = options?.location ?? locationWouter;
+  const returnPath = options?.returnPath ?? location ?? "/finances";
+  const refreshActions = options?.refreshActions ?? [];
 
   const utils = trpc.useUtils();
 
+  const runRefreshActions = async () => {
+    for (const action of refreshActions) {
+      await action();
+    }
+  };
+
   const payCharge = trpc.finance.charges.pay.useMutation({
-    onSuccess: () => {
-      utils.finance.charges.list.invalidate();
-      utils.finance.charges.stats.invalidate();
+    onSuccess: async () => {
+      await Promise.all([
+        utils.finance.charges.list.invalidate(),
+        utils.finance.charges.stats.invalidate(),
+      ]);
+
+      await runRefreshActions();
     },
   });
 
@@ -25,7 +58,9 @@ export function useChargeActions(options?: {
   };
 
   const generateCheckout = async (charge: any) => {
-    navigate(`/finances?chargeId=${charge.id}`);
+    if (!charge?.id) return;
+
+    navigate(buildChargeFinancePath(String(charge.id), returnPath));
   };
 
   return {

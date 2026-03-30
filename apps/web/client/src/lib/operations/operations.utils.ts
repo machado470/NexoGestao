@@ -15,6 +15,15 @@ export type ParsedWhatsAppRoute = {
   serviceOrderId: string | null;
 };
 
+export type OperationalContext = {
+  customerId: string | null;
+  chargeId: string | null;
+  serviceOrderId: string | null;
+  amountCents: number | null;
+  dueDate: string | null;
+  context: WhatsAppContext;
+};
+
 type WhatsAppUrlInput = {
   customerId?: string | null;
   context?: string | null;
@@ -236,7 +245,9 @@ export function buildWhatsAppConversationUrl(input: WhatsAppUrlInput) {
   return `/whatsapp?${params.toString()}`;
 }
 
-export function buildWhatsAppUrlFromServiceOrder(os: any) {
+export function buildOperationalContextFromServiceOrder(
+  os: any
+): OperationalContext {
   const hasCharge = Boolean(os?.financialSummary?.hasCharge);
   const status = normalizeStatus(os?.financialSummary?.chargeStatus);
 
@@ -248,9 +259,8 @@ export function buildWhatsAppUrlFromServiceOrder(os: any) {
     context = "charge_pending";
   }
 
-  return buildWhatsAppConversationUrl({
+  return {
     customerId: os?.customerId ? String(os.customerId) : null,
-    context,
     chargeId: os?.financialSummary?.chargeId
       ? String(os.financialSummary.chargeId)
       : null,
@@ -262,20 +272,46 @@ export function buildWhatsAppUrlFromServiceOrder(os: any) {
     dueDate: os?.financialSummary?.chargeDueDate
       ? String(os.financialSummary.chargeDueDate)
       : null,
-  });
+    context,
+  };
 }
 
-export function buildWhatsAppUrlFromCharge(charge: any) {
-  return buildWhatsAppConversationUrl({
+export function buildOperationalContextFromCharge(
+  charge: any
+): OperationalContext {
+  return {
     customerId: charge?.customerId ? String(charge.customerId) : null,
+    chargeId: charge?.id ? String(charge.id) : null,
+    serviceOrderId: charge?.serviceOrderId
+      ? String(charge.serviceOrderId)
+      : null,
+    amountCents:
+      typeof charge?.amountCents === "number" ? charge.amountCents : null,
+    dueDate: charge?.dueDate ? String(charge.dueDate) : null,
     context:
       normalizeStatus(charge?.status) === "OVERDUE"
         ? "overdue_charge"
         : "charge_pending",
-    chargeId: charge?.id ? String(charge.id) : null,
-    serviceOrderId: charge?.serviceOrderId ? String(charge.serviceOrderId) : null,
-    amountCents:
-      typeof charge?.amountCents === "number" ? charge.amountCents : null,
-    dueDate: charge?.dueDate ? String(charge.dueDate) : null,
+  };
+}
+
+export function buildWhatsAppUrlFromContext(ctx: OperationalContext) {
+  return buildWhatsAppConversationUrl({
+    customerId: ctx.customerId,
+    context: ctx.context,
+    chargeId: ctx.chargeId,
+    serviceOrderId: ctx.serviceOrderId,
+    amountCents: ctx.amountCents,
+    dueDate: ctx.dueDate,
   });
+}
+
+export function buildWhatsAppUrlFromServiceOrder(os: any) {
+  return buildWhatsAppUrlFromContext(
+    buildOperationalContextFromServiceOrder(os)
+  );
+}
+
+export function buildWhatsAppUrlFromCharge(charge: any) {
+  return buildWhatsAppUrlFromContext(buildOperationalContextFromCharge(charge));
 }
