@@ -69,8 +69,8 @@ function getPageTitle(location: string) {
   const exact = titles[location];
   if (exact) return exact;
 
-  const matched = Object.entries(titles).find(([route]) =>
-    location === route || location.startsWith(`${route}/`)
+  const matched = Object.entries(titles).find(
+    ([route]) => location === route || location.startsWith(`${route}/`)
   );
 
   return matched?.[1] ?? "NexoGestão";
@@ -80,7 +80,8 @@ function getPageDescription(location: string) {
   const descriptions: Record<string, string> = {
     "/dashboard": "Visão geral da operação.",
     "/executive-dashboard": "Visão consolidada de métricas, crescimento e operação.",
-    "/executive-dashboard-new": "Visão consolidada de métricas, crescimento e operação.",
+    "/executive-dashboard-new":
+      "Visão consolidada de métricas, crescimento e operação.",
     "/dashboard/operations": "Leitura diária do ciclo operacional e dos gargalos.",
     "/operations": "Fila prática do que precisa avançar agora.",
     "/customers": "Base operacional de clientes e relacionamento.",
@@ -98,8 +99,8 @@ function getPageDescription(location: string) {
   const exact = descriptions[location];
   if (exact) return exact;
 
-  const matched = Object.entries(descriptions).find(([route]) =>
-    location === route || location.startsWith(`${route}/`)
+  const matched = Object.entries(descriptions).find(
+    ([route]) => location === route || location.startsWith(`${route}/`)
   );
 
   return matched?.[1] ?? "Operação, financeiro e governança no mesmo fluxo.";
@@ -247,6 +248,7 @@ export function MainLayout({ children }: MainLayoutProps) {
           if (item.permissions?.length) {
             return canAny(role, item.permissions);
           }
+
           return true;
         }),
       }))
@@ -254,136 +256,147 @@ export function MainLayout({ children }: MainLayoutProps) {
   }, [role]);
 
   const pageTitle = useMemo(() => getPageTitle(location), [location]);
-  const pageDescription = useMemo(() => getPageDescription(location), [location]);
+  const pageDescription = useMemo(
+    () => getPageDescription(location),
+    [location]
+  );
 
   return (
-    <div className="flex h-screen bg-zinc-50 text-zinc-900 dark:bg-[#09090b] dark:text-zinc-100">
-      <aside
-        className={`flex shrink-0 flex-col border-r border-zinc-200 bg-white transition-all dark:border-zinc-800 dark:bg-[#111113] ${
-          sidebarCollapsed ? "w-20" : "w-64"
-        }`}
-      >
-        <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-4 dark:border-zinc-800">
-          <div className="min-w-0">
-            {!sidebarCollapsed ? (
-              <>
-                <p className="truncate text-base font-semibold text-zinc-950 dark:text-white">
-                  NexoGestão
-                </p>
-                <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
-                  Operação com contexto
-                </p>
-              </>
-            ) : (
-              <p className="text-base font-semibold text-zinc-950 dark:text-white">N</p>
-            )}
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setSidebarCollapsed((prev) => !prev)}
-            className="rounded-lg p-2 text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white"
-          >
-            {sidebarCollapsed ? (
-              <ChevronRight className="h-4 w-4" />
-            ) : (
-              <ChevronLeft className="h-4 w-4" />
-            )}
-          </button>
-        </div>
-
-        <nav className="flex-1 overflow-y-auto px-3 py-4">
-          <div className="space-y-5">
-            {visibleSections.map((section) => (
-              <div key={section.id}>
-                {!sidebarCollapsed && (
-                  <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-400 dark:text-zinc-500">
-                    {section.label}
+    <div className="nexo-app-shell flex min-h-screen w-full overflow-hidden text-zinc-900 dark:text-zinc-100">
+      <div className="flex w-full gap-3 md:gap-4">
+        <aside
+          className={`nexo-app-panel-strong flex shrink-0 flex-col overflow-hidden transition-all ${
+            sidebarCollapsed ? "w-20" : "w-64"
+          }`}
+        >
+          <div className="border-b border-slate-200/70 px-4 py-4 dark:border-slate-800/80">
+            <div className="flex items-center justify-between">
+              <div className="min-w-0">
+                {!sidebarCollapsed ? (
+                  <>
+                    <p className="truncate text-base font-semibold text-zinc-950 dark:text-white">
+                      NexoGestão
+                    </p>
+                    <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
+                      Operação com contexto
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-base font-semibold text-zinc-950 dark:text-white">
+                    N
                   </p>
                 )}
-
-                <div className="space-y-1">
-                  {section.items.map((item) => {
-                    const Icon = item.icon;
-                    const active = isRouteActive(location, item.route);
-
-                    return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => navigate(item.route)}
-                        title={item.label}
-                        className={`flex w-full items-center rounded-xl px-3 py-2.5 text-sm transition-colors ${
-                          sidebarCollapsed ? "justify-center" : "gap-3"
-                        } ${
-                          active
-                            ? "bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300"
-                            : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white"
-                        }`}
-                      >
-                        <Icon className="h-4 w-4 shrink-0" />
-                        {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
-                      </button>
-                    );
-                  })}
-                </div>
               </div>
-            ))}
-          </div>
-        </nav>
 
-        <div className="border-t border-zinc-200 p-3 dark:border-zinc-800">
-          <div className="space-y-1">
-            <button
-              type="button"
-              onClick={toggleTheme}
-              className={`flex w-full items-center rounded-xl px-3 py-2.5 text-sm text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white ${
-                sidebarCollapsed ? "justify-center" : "gap-3"
-              }`}
-            >
-              {theme === "dark" ? (
-                <Sun className="h-4 w-4 shrink-0" />
-              ) : (
-                <Moon className="h-4 w-4 shrink-0" />
-              )}
-              {!sidebarCollapsed && (
-                <span>{theme === "dark" ? "Tema claro" : "Tema escuro"}</span>
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => void logout()}
-              className={`flex w-full items-center rounded-xl px-3 py-2.5 text-sm text-red-600 transition-colors hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-500/10 dark:hover:text-red-300 ${
-                sidebarCollapsed ? "justify-center" : "gap-3"
-              }`}
-            >
-              <LogOut className="h-4 w-4 shrink-0" />
-              {!sidebarCollapsed && <span>Sair</span>}
-            </button>
-          </div>
-        </div>
-      </aside>
-
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="border-b border-zinc-200 bg-white/90 px-4 py-4 backdrop-blur dark:border-zinc-800 dark:bg-[#09090b]/85 md:px-6">
-          <div className="flex flex-col gap-3">
-            <Breadcrumbs />
-
-            <div>
-              <h1 className="text-2xl font-semibold tracking-tight text-zinc-950 dark:text-white">
-                {pageTitle}
-              </h1>
-              <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-                {pageDescription}
-              </p>
+              <button
+                type="button"
+                onClick={() => setSidebarCollapsed((prev) => !prev)}
+                className="rounded-xl p-2 text-zinc-500 transition-colors hover:bg-zinc-100/80 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/70 dark:hover:text-white"
+              >
+                {sidebarCollapsed ? (
+                  <ChevronRight className="h-4 w-4" />
+                ) : (
+                  <ChevronLeft className="h-4 w-4" />
+                )}
+              </button>
             </div>
           </div>
-        </header>
 
-        <main className="min-w-0 flex-1 overflow-auto bg-zinc-50 p-4 dark:bg-[#09090b] md:p-6">
-          {children}
-        </main>
+          <nav className="flex-1 overflow-y-auto px-3 py-4">
+            <div className="space-y-5">
+              {visibleSections.map((section) => (
+                <div key={section.id}>
+                  {!sidebarCollapsed && (
+                    <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-400 dark:text-zinc-500">
+                      {section.label}
+                    </p>
+                  )}
+
+                  <div className="space-y-1">
+                    {section.items.map((item) => {
+                      const Icon = item.icon;
+                      const active = isRouteActive(location, item.route);
+
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => navigate(item.route)}
+                          title={item.label}
+                          className={`flex w-full items-center rounded-xl px-3 py-2.5 text-sm transition-colors ${
+                            sidebarCollapsed ? "justify-center" : "gap-3"
+                          } ${
+                            active
+                              ? "border border-orange-200/80 bg-orange-100/80 text-orange-700 dark:border-orange-500/20 dark:bg-orange-500/15 dark:text-orange-300"
+                              : "text-zinc-600 hover:bg-white/70 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-slate-900/60 dark:hover:text-white"
+                          }`}
+                        >
+                          <Icon className="h-4 w-4 shrink-0" />
+                          {!sidebarCollapsed && (
+                            <span className="truncate">{item.label}</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </nav>
+
+          <div className="border-t border-slate-200/70 p-3 dark:border-slate-800/80">
+            <div className="space-y-1">
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className={`flex w-full items-center rounded-xl px-3 py-2.5 text-sm text-zinc-600 transition-colors hover:bg-white/70 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-slate-900/60 dark:hover:text-white ${
+                  sidebarCollapsed ? "justify-center" : "gap-3"
+                }`}
+              >
+                {theme === "dark" ? (
+                  <Sun className="h-4 w-4 shrink-0" />
+                ) : (
+                  <Moon className="h-4 w-4 shrink-0" />
+                )}
+                {!sidebarCollapsed && (
+                  <span>{theme === "dark" ? "Tema claro" : "Tema escuro"}</span>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => void logout()}
+                className={`flex w-full items-center rounded-xl px-3 py-2.5 text-sm text-red-600 transition-colors hover:bg-red-50/90 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-500/10 dark:hover:text-red-300 ${
+                  sidebarCollapsed ? "justify-center" : "gap-3"
+                }`}
+              >
+                <LogOut className="h-4 w-4 shrink-0" />
+                {!sidebarCollapsed && <span>Sair</span>}
+              </button>
+            </div>
+          </div>
+        </aside>
+
+        <div className="flex min-w-0 flex-1 flex-col gap-3 md:gap-4">
+          <header className="nexo-app-panel-strong px-4 py-4 md:px-6">
+            <div className="flex flex-col gap-3">
+              <Breadcrumbs />
+
+              <div>
+                <h1 className="text-2xl font-semibold tracking-tight text-zinc-950 dark:text-white">
+                  {pageTitle}
+                </h1>
+                <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                  {pageDescription}
+                </p>
+              </div>
+            </div>
+          </header>
+
+          <main className="nexo-app-content min-w-0 flex-1 overflow-auto p-4 md:p-6">
+            {children}
+          </main>
+        </div>
       </div>
     </div>
   );

@@ -59,8 +59,10 @@ const OperationsDashboardPage = lazy(
 
 function FullScreenLoader() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-900">
-      <Loader className="h-8 w-8 animate-spin text-orange-500" />
+    <div className="nexo-app-shell flex min-h-screen items-center justify-center px-6">
+      <div className="nexo-app-panel-strong flex w-full max-w-md items-center justify-center p-10">
+        <Loader className="h-8 w-8 animate-spin text-orange-500" />
+      </div>
     </div>
   );
 }
@@ -77,8 +79,8 @@ function FullScreenMessage({
   onAction?: () => void;
 }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-6 dark:bg-gray-900">
-      <div className="w-full max-w-md rounded-2xl border bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+    <div className="nexo-app-shell flex min-h-screen items-center justify-center px-6">
+      <div className="nexo-app-panel-strong w-full max-w-md p-6">
         <h1 className="text-xl font-semibold text-zinc-950 dark:text-white">
           {title}
         </h1>
@@ -380,7 +382,10 @@ function Router() {
       <Route path="/settings" component={SettingsRoute} />
       <Route path="/timeline" component={TimelineRoute} />
       <Route path="/operations" component={OperationsRoute} />
-      <Route path="/dashboard/operations" component={OperationsDashboardRoute} />
+      <Route
+        path="/dashboard/operations"
+        component={OperationsDashboardRoute}
+      />
 
       <Route path="/about" component={() => <LazyPage component={About} />} />
       <Route path="/404" component={() => <LazyPage component={NotFound} />} />
