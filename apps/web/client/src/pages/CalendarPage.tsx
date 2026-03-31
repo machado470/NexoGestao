@@ -4,10 +4,11 @@ import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin, { type DateClickArg } from "@fullcalendar/interaction";
 import type { EventClickArg, EventDropArg, EventInput } from "@fullcalendar/core";
+import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { CalendarDays, Plus, X, Loader2 } from "lucide-react";
+import { CalendarDays, Plus, X, Loader2, MessageCircle, Briefcase } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -185,7 +186,9 @@ function CreateAppointmentModal({
             </label>
             <select
               value={form.customerId}
-              onChange={(e) => setForm((prev) => ({ ...prev, customerId: e.target.value }))}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, customerId: e.target.value }))
+              }
               className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
             >
               <option value="">Selecione um cliente</option>
@@ -204,7 +207,9 @@ function CreateAppointmentModal({
             <input
               type="datetime-local"
               value={form.startsAt}
-              onChange={(e) => setForm((prev) => ({ ...prev, startsAt: e.target.value }))}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, startsAt: e.target.value }))
+              }
               className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
             />
           </div>
@@ -216,7 +221,9 @@ function CreateAppointmentModal({
             <input
               type="datetime-local"
               value={form.endsAt}
-              onChange={(e) => setForm((prev) => ({ ...prev, endsAt: e.target.value }))}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, endsAt: e.target.value }))
+              }
               className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
             />
           </div>
@@ -249,7 +256,9 @@ function CreateAppointmentModal({
             </label>
             <textarea
               value={form.notes}
-              onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, notes: e.target.value }))
+              }
               rows={3}
               placeholder="Observações do agendamento"
               className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
@@ -257,7 +266,12 @@ function CreateAppointmentModal({
           </div>
 
           <div className="flex gap-3 pt-2">
-            <Button type="button" variant="outline" onClick={onClose} className="flex-1">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              className="flex-1"
+            >
               Cancelar
             </Button>
             <Button
@@ -285,10 +299,14 @@ function EventDetailModal({
   state,
   onClose,
   onUpdate,
+  onOpenExecution,
+  onOpenWhatsApp,
 }: {
   state: DetailModalState;
   onClose: () => void;
   onUpdate: () => void;
+  onOpenExecution: (customerId: string) => void;
+  onOpenWhatsApp: (customerId: string) => void;
 }) {
   const updateMutation = trpc.nexo.appointments.update.useMutation({
     onSuccess: () => {
@@ -388,7 +406,26 @@ function EventDetailModal({
           </div>
         </div>
 
-        <div className="px-5 pb-5">
+        <div className="space-y-2 px-5 pb-5">
+          <Button
+            type="button"
+            className="w-full"
+            onClick={() => onOpenExecution(event.customerId)}
+          >
+            <Briefcase className="mr-2 h-4 w-4" />
+            Abrir execução
+          </Button>
+
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            onClick={() => onOpenWhatsApp(event.customerId)}
+          >
+            <MessageCircle className="mr-2 h-4 w-4" />
+            Falar com cliente
+          </Button>
+
           <Button variant="outline" onClick={onClose} className="w-full">
             Fechar
           </Button>
@@ -400,6 +437,7 @@ function EventDetailModal({
 
 export default function CalendarPage() {
   const calendarRef = useRef<FullCalendar>(null);
+  const [, navigate] = useLocation();
   const [createModal, setCreateModal] = useState<CreateModalState>({
     open: false,
     startStr: "",
@@ -445,7 +483,9 @@ export default function CalendarPage() {
   const events: EventInput[] = useMemo(() => {
     return rawAppointments.map((appointment) => ({
       id: String(appointment.id),
-      title: appointment.customer?.name ?? "Agendamento",
+      title: `${appointment.customer?.name ?? "Agendamento"} • ${getStatusLabel(
+        appointment.status
+      )}`,
       start: appointment.startsAt,
       end: appointment.endsAt ?? undefined,
       backgroundColor: STATUS_COLORS[appointment.status] ?? "#6b7280",
@@ -510,6 +550,22 @@ export default function CalendarPage() {
     void appointmentsQuery.refetch();
   }, [appointmentsQuery]);
 
+  const handleOpenExecution = useCallback(
+    (customerId: string) => {
+      navigate(`/customers?customerId=${customerId}`);
+      setDetailModal({ open: false, event: null });
+    },
+    [navigate]
+  );
+
+  const handleOpenWhatsApp = useCallback(
+    (customerId: string) => {
+      navigate(`/whatsapp?customerId=${customerId}`);
+      setDetailModal({ open: false, event: null });
+    },
+    [navigate]
+  );
+
   return (
     <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
@@ -519,7 +575,7 @@ export default function CalendarPage() {
             Calendário
           </h1>
           <p className="mt-1 text-gray-600 dark:text-gray-400">
-            Visualize e gerencie os agendamentos da operação.
+            Agenda operacional conectada com atendimento, execução e contato com o cliente.
           </p>
         </div>
 
@@ -617,6 +673,8 @@ export default function CalendarPage() {
         state={detailModal}
         onClose={() => setDetailModal({ open: false, event: null })}
         onUpdate={() => void appointmentsQuery.refetch()}
+        onOpenExecution={handleOpenExecution}
+        onOpenWhatsApp={handleOpenWhatsApp}
       />
     </div>
   );

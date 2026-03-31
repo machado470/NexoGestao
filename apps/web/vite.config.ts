@@ -8,7 +8,6 @@ import { vitePluginManusRuntime } from "vite-plugin-manus-runtime";
 
 // =============================================================================
 // Manus Debug Collector - Vite Plugin
-// Writes browser logs directly to files, trimmed when exceeding size limit
 // =============================================================================
 
 const PROJECT_ROOT = import.meta.dirname;
@@ -43,9 +42,7 @@ function trimLogFile(logPath: string, maxSize: number) {
     }
 
     fs.writeFileSync(logPath, keptLines.join("\n"), "utf-8");
-  } catch {
-    // ignora erro de trim
-  }
+  } catch {}
 }
 
 function writeToLogFile(source: LogSource, entries: unknown[]) {
@@ -108,17 +105,6 @@ function vitePluginManusDebugCollector(): Plugin {
           res.end(JSON.stringify({ success: true }));
         };
 
-        const reqBody = (req as { body?: unknown }).body;
-        if (reqBody && typeof reqBody === "object") {
-          try {
-            handlePayload(reqBody);
-          } catch (e) {
-            res.writeHead(400, { "Content-Type": "application/json" });
-            res.end(JSON.stringify({ success: false, error: String(e) }));
-          }
-          return;
-        }
-
         let body = "";
         req.on("data", (chunk) => {
           body += chunk.toString();
@@ -147,7 +133,7 @@ const plugins = [
 ];
 
 function getVendorChunk(id: string) {
-  if (!id.includes("node_modules")) return undefined;
+  if (!id.includes("node_modules")) return;
 
   if (
     id.includes("@trpc") ||
@@ -167,6 +153,25 @@ function getVendorChunk(id: string) {
   }
 
   if (
+    id.includes("@fullcalendar/")
+  ) {
+    return "vendor-calendar";
+  }
+
+  if (
+    id.includes("framer-motion")
+  ) {
+    return "vendor-motion";
+  }
+
+  if (
+    id.includes("streamdown") ||
+    id.includes("shepherd")
+  ) {
+    return "vendor-extras";
+  }
+
+  if (
     id.includes("lucide-react") ||
     id.includes("@radix-ui") ||
     id.includes("embla-carousel") ||
@@ -176,18 +181,38 @@ function getVendorChunk(id: string) {
     id.includes("react-day-picker") ||
     id.includes("class-variance-authority") ||
     id.includes("clsx") ||
-    id.includes("tailwind-merge")
+    id.includes("tailwind-merge") ||
+    id.includes("react-resizable-panels")
   ) {
     return "vendor-ui";
   }
 
   if (
+    id.includes("react-hook-form") ||
+    id.includes("@hookform/resolvers") ||
     id.includes("/zod/") ||
     id.includes("/date-fns/") ||
     id.includes("/sonner/") ||
     id.includes("/nanoid/")
   ) {
     return "vendor-utils";
+  }
+
+  if (
+    id.includes("@aws-sdk/") ||
+    id.includes("@sentry/") ||
+    id.includes("axios")
+  ) {
+    return "vendor-integrations";
+  }
+
+  if (
+    id.includes("wouter") ||
+    id.includes("zustand") ||
+    id.includes("next-themes") ||
+    id.includes("jose")
+  ) {
+    return "vendor-core";
   }
 
   return "vendor-misc";
@@ -205,6 +230,7 @@ export default defineConfig({
   envDir: path.resolve(import.meta.dirname),
   root: path.resolve(import.meta.dirname, "client"),
   publicDir: path.resolve(import.meta.dirname, "client", "public"),
+
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
@@ -213,29 +239,6 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (!id.includes("node_modules")) {
-            if (id.includes("/pages/")) {
-              if (
-                id.includes("OperationsDashboardPage") ||
-                id.includes("OperationalWorkflowPage") ||
-                id.includes("ServiceOrdersPage") ||
-                id.includes("FinancesPage") ||
-                id.includes("CustomersPage")
-              ) {
-                return "pages-core";
-              }
-
-              if (
-                id.includes("ExecutiveDashboard") ||
-                id.includes("GovernancePage") ||
-                id.includes("TimelinePage") ||
-                id.includes("PeoplePage")
-              ) {
-                return "pages-admin";
-              }
-
-              return "pages-misc";
-            }
-
             return;
           }
 
@@ -244,6 +247,7 @@ export default defineConfig({
       },
     },
   },
+
   server: {
     host: true,
     allowedHosts: [

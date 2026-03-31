@@ -18,9 +18,19 @@ import {
   UserCheck,
   AlertTriangle,
   Link2,
+  MessageCircle,
+  Briefcase,
+  Users,
+  ArrowRight,
+  Wallet,
 } from "lucide-react";
 import { CreateAppointmentModal } from "@/components/CreateAppointmentModal";
 import { toast } from "sonner";
+import {
+  buildServiceOrdersDeepLink,
+  buildWhatsAppConversationUrl,
+  normalizeOrders,
+} from "@/lib/operations/operations.utils";
 
 type CustomerRef = {
   id: string;
@@ -44,6 +54,18 @@ type Appointment = {
   status: AppointmentStatus;
   notes: string | null;
   createdAt?: string;
+};
+
+type ServiceOrder = {
+  id: string;
+  customerId?: string | null;
+  title?: string | null;
+  status?: string | null;
+  createdAt?: string | null;
+  financialSummary?: {
+    hasCharge?: boolean;
+    chargeStatus?: string | null;
+  } | null;
 };
 
 function formatDateTime(value?: string | null) {
@@ -189,6 +211,34 @@ function InfoItem({
   );
 }
 
+function SummaryCard({
+  title,
+  value,
+  subtitle,
+  valueClassName,
+}: {
+  title: string;
+  value: string | number;
+  subtitle: string;
+  valueClassName?: string;
+}) {
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+      <p className="text-sm text-gray-600 dark:text-gray-400">{title}</p>
+      <p
+        className={`mt-1 text-2xl font-bold text-gray-900 dark:text-white ${
+          valueClassName ?? ""
+        }`}
+      >
+        {value}
+      </p>
+      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+        {subtitle}
+      </p>
+    </div>
+  );
+}
+
 function getAppointmentIdFromUrl() {
   if (typeof window === "undefined") return null;
 
@@ -207,6 +257,109 @@ function buildAppointmentsUrl(appointmentId?: string | null) {
 
   const query = params.toString();
   return query ? `/appointments?${query}` : "/appointments";
+}
+
+function buildCustomersUrl(customerId?: string | null) {
+  if (!customerId) return "/customers";
+  return `/customers?customerId=${customerId}`;
+}
+
+function normalizeServiceOrdersPayload(data: unknown) {
+  return normalizeOrders<ServiceOrder>(data);
+}
+
+function getAppointmentNextAction(params: {
+  appointment: Appointment;
+  serviceOrders: ServiceOrder[];
+}) {
+  const { appointment, serviceOrders } = params;
+  const customerOrders = serviceOrders.filter(
+    (item) => String(item.customerId ?? "") === appointment.customerId
+  );
+
+  const latestOrder = customerOrders[0] ?? null;
+  const hasOrder = customerOrders.length > 0;
+  const hasPendingCharge = customerOrders.some((order) => {
+    const status = String(order.financialSummary?.chargeStatus ?? "").toUpperCase();
+    return status === "PENDING" || status === "OVERDUE";
+  });
+
+  if (appointment.status === "CANCELED") {
+    return {
+      tone:
+        "border-gray-200 bg-gray-50 text-gray-900 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-300",
+      title: "Fluxo encerrado",
+      description: "Agendamento cancelado. Nenhuma ação operacional imediata.",
+    };
+  }
+
+  if (appointment.status === "NO_SHOW") {
+    return {
+      tone:
+        "border-yellow-200 bg-yellow-50 text-yellow-900 dark:border-yellow-900/40 dark:bg-yellow-950/20 dark:text-yellow-300",
+      title: "Retomar contato",
+      description:
+        "Cliente não compareceu. Vale reabrir conversa e tentar remarcar.",
+    };
+  }
+
+  if (appointment.status === "SCHEDULED") {
+    return {
+      tone:
+        "border-blue-200 bg-blue-50 text-blue-900 dark:border-blue-900/40 dark:bg-blue-950/20 dark:text-blue-300",
+      title: "Confirmar o horário",
+      description:
+        "O próximo passo é validar presença e reduzir risco de ausência.",
+    };
+  }
+
+  if (appointment.status === "CONFIRMED" && !hasOrder) {
+    return {
+      tone:
+        "border-orange-200 bg-orange-50 text-orange-900 dark:border-orange-900/40 dark:bg-orange-950/20 dark:text-orange-300",
+      title: "Abrir execução",
+      description:
+        "Cliente confirmado sem O.S. vinculada visível. Hora de puxar a operação.",
+    };
+  }
+
+  if (appointment.status === "CONFIRMED" && hasOrder) {
+    return {
+      tone:
+        "border-green-200 bg-green-50 text-green-900 dark:border-green-900/40 dark:bg-green-950/20 dark:text-green-300",
+      title: "Acompanhar O.S.",
+      description: latestOrder
+        ? `Já existe operação em andamento para este cliente. Use a ordem como hub.`
+        : "Cliente confirmado com operação em andamento.",
+    };
+  }
+
+  if (appointment.status === "DONE" && hasPendingCharge) {
+    return {
+      tone:
+        "border-red-200 bg-red-50 text-red-900 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300",
+      title: "Fechar financeiro",
+      description:
+        "Atendimento concluído, mas ainda existem pendências financeiras pedindo ação.",
+    };
+  }
+
+  if (appointment.status === "DONE" && hasOrder) {
+    return {
+      tone:
+        "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-300",
+      title: "Fluxo em acompanhamento",
+      description:
+        "Agendamento concluído. Agora a leitura correta é acompanhar operação e financeiro.",
+    };
+  }
+
+  return {
+    tone:
+      "border-gray-200 bg-gray-50 text-gray-900 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-300",
+    title: "Sem ação imediata",
+    description: "Nenhum próximo passo crítico identificado no momento.",
+  };
 }
 
 export default function AppointmentsPage() {
@@ -235,10 +388,19 @@ export default function AppointmentsPage() {
     refetchOnWindowFocus: false,
   });
 
+  const listServiceOrders = trpc.nexo.serviceOrders.list.useQuery(
+    { page: 1, limit: 100 },
+    {
+      retry: false,
+      refetchOnWindowFocus: false,
+    }
+  );
+
   const updateAppointment = trpc.nexo.appointments.update.useMutation({
     onSuccess: () => {
       toast.success("Agendamento atualizado com sucesso!");
       void listAppointments.refetch();
+      void listServiceOrders.refetch();
     },
     onError: (error) => {
       toast.error(error.message || "Erro ao atualizar agendamento");
@@ -273,6 +435,14 @@ export default function AppointmentsPage() {
     }));
   }, [listCustomers.data]);
 
+  const serviceOrders = useMemo(() => {
+    return normalizeServiceOrdersPayload(listServiceOrders.data).sort((a, b) => {
+      const dateA = new Date(a.createdAt ?? 0).getTime();
+      const dateB = new Date(b.createdAt ?? 0).getTime();
+      return dateB - dateA;
+    });
+  }, [listServiceOrders.data]);
+
   const filteredAppointments = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
 
@@ -304,6 +474,14 @@ export default function AppointmentsPage() {
       );
     }
   }, [listAppointments.error]);
+
+  useEffect(() => {
+    if (listServiceOrders.error) {
+      toast.error(
+        "Erro ao carregar ordens de serviço: " + listServiceOrders.error.message
+      );
+    }
+  }, [listServiceOrders.error]);
 
   useEffect(() => {
     const syncFromUrl = () => {
@@ -350,6 +528,15 @@ export default function AppointmentsPage() {
     (a) => a.status === "CANCELED"
   ).length;
 
+  const appointmentsWithOperations = filteredAppointments.filter((appointment) =>
+    serviceOrders.some(
+      (order) => String(order.customerId ?? "") === appointment.customerId
+    )
+  ).length;
+
+  const appointmentsWithoutOperations =
+    filteredAppointments.length - appointmentsWithOperations;
+
   const handleCreateSuccess = () => {
     void listAppointments.refetch();
   };
@@ -393,15 +580,21 @@ export default function AppointmentsPage() {
 
   return (
     <div className="space-y-6 p-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="flex items-center gap-2 text-3xl font-bold text-gray-900 dark:text-white">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+        <div className="max-w-3xl">
+          <div className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs font-medium text-orange-700 dark:border-orange-900/40 dark:bg-orange-950/20 dark:text-orange-300">
+            <ArrowRight className="h-3.5 w-3.5" />
+            Porta de entrada da operação
+          </div>
+
+          <h1 className="mt-3 flex items-center gap-2 text-3xl font-bold text-gray-900 dark:text-white">
             <Calendar className="h-8 w-8 text-orange-500" />
             Agendamentos
           </h1>
-          <p className="mt-1 text-gray-600 dark:text-gray-400">
-            Leitura operacional dos compromissos, confirmações, conclusões e
-            perdas do dia a dia.
+
+          <p className="mt-2 text-gray-600 dark:text-gray-400">
+            O agendamento não é agenda solta. Ele é o ponto onde o cliente entra
+            no fluxo, confirma presença, vira execução e puxa o resto da operação.
           </p>
         </div>
 
@@ -409,7 +602,13 @@ export default function AppointmentsPage() {
           <Button
             type="button"
             variant="outline"
-            onClick={() => void listAppointments.refetch()}
+            onClick={() =>
+              Promise.all([
+                listAppointments.refetch(),
+                listServiceOrders.refetch(),
+                listCustomers.refetch(),
+              ])
+            }
             className="gap-2"
           >
             <RefreshCcw className="h-4 w-4" />
@@ -479,52 +678,53 @@ export default function AppointmentsPage() {
         </div>
       ) : null}
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-6">
-        <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-          <p className="text-sm text-gray-600 dark:text-gray-400">Total</p>
-          <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">
-            {total}
-          </p>
-        </div>
-
-        <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-          <p className="text-sm text-gray-600 dark:text-gray-400">Agendados</p>
-          <p className="mt-1 text-2xl font-bold text-blue-600 dark:text-blue-400">
-            {totalScheduled}
-          </p>
-        </div>
-
-        <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Confirmados
-          </p>
-          <p className="mt-1 text-2xl font-bold text-green-600 dark:text-green-400">
-            {totalConfirmed}
-          </p>
-        </div>
-
-        <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-          <p className="text-sm text-gray-600 dark:text-gray-400">Concluídos</p>
-          <p className="mt-1 text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-            {totalDone}
-          </p>
-        </div>
-
-        <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-          <p className="text-sm text-gray-600 dark:text-gray-400">No-show</p>
-          <p className="mt-1 text-2xl font-bold text-yellow-600 dark:text-yellow-400">
-            {totalNoShow}
-          </p>
-        </div>
-
-        <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Cancelados
-          </p>
-          <p className="mt-1 text-2xl font-bold text-red-600 dark:text-red-400">
-            {totalCanceled}
-          </p>
-        </div>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-4 xl:grid-cols-8">
+        <SummaryCard
+          title="Total"
+          value={total}
+          subtitle="Agendamentos visíveis"
+        />
+        <SummaryCard
+          title="Agendados"
+          value={totalScheduled}
+          subtitle="Ainda sem confirmação"
+          valueClassName="text-blue-600 dark:text-blue-400"
+        />
+        <SummaryCard
+          title="Confirmados"
+          value={totalConfirmed}
+          subtitle="Prontos para operar"
+          valueClassName="text-green-600 dark:text-green-400"
+        />
+        <SummaryCard
+          title="Concluídos"
+          value={totalDone}
+          subtitle="Ciclo de agenda encerrado"
+          valueClassName="text-emerald-600 dark:text-emerald-400"
+        />
+        <SummaryCard
+          title="No-show"
+          value={totalNoShow}
+          subtitle="Pedem retomada"
+          valueClassName="text-yellow-600 dark:text-yellow-400"
+        />
+        <SummaryCard
+          title="Cancelados"
+          value={totalCanceled}
+          subtitle="Fluxo interrompido"
+          valueClassName="text-red-600 dark:text-red-400"
+        />
+        <SummaryCard
+          title="Com operação"
+          value={appointmentsWithOperations}
+          subtitle="Já puxaram O.S."
+          valueClassName="text-orange-600 dark:text-orange-400"
+        />
+        <SummaryCard
+          title="Sem operação"
+          value={appointmentsWithoutOperations}
+          subtitle="Ainda não viraram execução"
+        />
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -557,6 +757,34 @@ export default function AppointmentsPage() {
             const stage = getStage(appointment);
             const StageIcon = stage.icon;
             const isHighlighted = highlightedAppointmentId === appointment.id;
+
+            const relatedOrders = serviceOrders.filter(
+              (order) => String(order.customerId ?? "") === appointment.customerId
+            );
+            const latestOrder = relatedOrders[0] ?? null;
+            const hasOperation = relatedOrders.length > 0;
+            const hasPendingFinancial = relatedOrders.some((order) => {
+              const chargeStatus = String(
+                order.financialSummary?.chargeStatus ?? ""
+              ).toUpperCase();
+              return chargeStatus === "PENDING" || chargeStatus === "OVERDUE";
+            });
+
+            const nextAction = getAppointmentNextAction({
+              appointment,
+              serviceOrders,
+            });
+
+            const whatsappUrl = buildWhatsAppConversationUrl({
+              customerId: appointment.customerId,
+              context:
+                appointment.status === "NO_SHOW"
+                  ? "general"
+                  : appointment.status === "DONE" && hasPendingFinancial
+                    ? "charge_pending"
+                    : "general",
+              serviceOrderId: latestOrder?.id ?? null,
+            });
 
             return (
               <div
@@ -591,6 +819,22 @@ export default function AppointmentsPage() {
                             Em foco
                           </span>
                         ) : null}
+
+                        {hasOperation ? (
+                          <span className="inline-flex items-center rounded-full bg-orange-100 px-2 py-1 text-xs font-medium text-orange-800 dark:bg-orange-900/30 dark:text-orange-300">
+                            Já puxou operação
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-300">
+                            Ainda sem O.S.
+                          </span>
+                        )}
+
+                        {hasPendingFinancial ? (
+                          <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-1 text-xs font-medium text-red-800 dark:bg-red-900/30 dark:text-red-300">
+                            Pendência financeira
+                          </span>
+                        ) : null}
                       </div>
 
                       <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
@@ -610,6 +854,48 @@ export default function AppointmentsPage() {
                       >
                         <Link2 className="h-4 w-4" />
                         Focar
+                      </Button>
+
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="gap-2"
+                        onClick={() =>
+                          navigate(buildCustomersUrl(appointment.customerId))
+                        }
+                      >
+                        <Users className="h-4 w-4" />
+                        Cliente
+                      </Button>
+
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="gap-2"
+                        onClick={() =>
+                          navigate(
+                            latestOrder
+                              ? buildServiceOrdersDeepLink(latestOrder.id)
+                              : "/service-orders"
+                          )
+                        }
+                      >
+                        <Briefcase className="h-4 w-4" />
+                        {latestOrder ? "Abrir O.S." : "Ir para O.S."}
+                      </Button>
+
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="gap-2"
+                        onClick={() => whatsappUrl && navigate(whatsappUrl)}
+                        disabled={!whatsappUrl}
+                      >
+                        <MessageCircle className="h-4 w-4" />
+                        WhatsApp
                       </Button>
 
                       <Button
@@ -698,6 +984,21 @@ export default function AppointmentsPage() {
                     </div>
                   </div>
 
+                  <div className={`rounded-lg border p-3 ${nextAction.tone}`}>
+                    <div className="flex items-start gap-2">
+                      <ArrowRight className="mt-0.5 h-4 w-4 shrink-0" />
+                      <div>
+                        <p className="text-sm font-semibold">
+                          Próxima ação recomendada
+                        </p>
+                        <p className="mt-1 text-sm">{nextAction.title}</p>
+                        <p className="mt-1 text-xs opacity-90">
+                          {nextAction.description}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                     <InfoItem
                       label="Data"
@@ -715,6 +1016,63 @@ export default function AppointmentsPage() {
                       label="Criado em"
                       value={formatDateTime(appointment.createdAt)}
                     />
+                  </div>
+
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/40">
+                      <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        <Briefcase className="h-3.5 w-3.5" />
+                        Execução
+                      </div>
+                      <p className="mt-2 text-sm font-medium text-gray-900 dark:text-white">
+                        {hasOperation
+                          ? latestOrder?.title?.trim() || "Operação vinculada"
+                          : "Nenhuma O.S. visível"}
+                      </p>
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        {hasOperation
+                          ? `Status: ${latestOrder?.status ?? "—"}`
+                          : "Este agendamento ainda não virou hub de execução."}
+                      </p>
+                    </div>
+
+                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/40">
+                      <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        <Wallet className="h-3.5 w-3.5" />
+                        Financeiro
+                      </div>
+                      <p className="mt-2 text-sm font-medium text-gray-900 dark:text-white">
+                        {hasPendingFinancial
+                          ? "Existe pendência"
+                          : hasOperation
+                            ? "Sem alerta crítico"
+                            : "Ainda não puxado"}
+                      </p>
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        {hasPendingFinancial
+                          ? "Há cobrança pendente ou vencida na operação deste cliente."
+                          : hasOperation
+                            ? "Nenhuma pressão financeira crítica detectada agora."
+                            : "O financeiro nasce depois da execução."}
+                      </p>
+                    </div>
+
+                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/40">
+                      <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        <MessageCircle className="h-3.5 w-3.5" />
+                        Comunicação
+                      </div>
+                      <p className="mt-2 text-sm font-medium text-gray-900 dark:text-white">
+                        {appointment.customer?.phone
+                          ? "Contato possível"
+                          : "Telefone ausente"}
+                      </p>
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        {appointment.customer?.phone
+                          ? "Use o WhatsApp como alavanca para confirmar, remarcar ou cobrar."
+                          : "Sem telefone visível no payload atual para contato direto."}
+                      </p>
+                    </div>
                   </div>
 
                   {appointment.notes?.trim() ? (

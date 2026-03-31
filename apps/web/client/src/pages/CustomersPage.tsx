@@ -24,6 +24,7 @@ import {
   Mail,
   ArrowRightLeft,
   Link2,
+  MessageCircle,
 } from "lucide-react";
 import CreateCustomerModal from "@/components/CreateCustomerModal";
 import EditCustomerModal from "@/components/EditCustomerModal";
@@ -325,6 +326,16 @@ export default function CustomersPage() {
     (item) => item.status === "PENDING" || item.status === "OVERDUE"
   ).length;
 
+  const nextActionLabel = !workspace
+    ? "Selecione um cliente para abrir o workspace."
+    : workspacePendingCharges > 0
+      ? "Cobrar cliente imediatamente"
+      : workspaceServiceOrdersCount > 0
+        ? "Acompanhar execução das ordens"
+        : workspaceAppointmentsCount > 0
+          ? "Preparar atendimento agendado"
+          : "Iniciar relacionamento com este cliente";
+
   return (
     <div className="space-y-6 p-6">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
@@ -340,8 +351,8 @@ export default function CustomersPage() {
           </h1>
 
           <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-            Aqui o relacionamento deixa de ser cadastro simples e vira contexto:
-            agenda, execução, cobrança e histórico do cliente no mesmo lugar.
+            O cliente deixa de ser cadastro simples e vira contexto: agenda,
+            execução, cobrança e histórico no mesmo lugar.
           </p>
         </div>
 
@@ -395,7 +406,7 @@ export default function CustomersPage() {
                 Lista de clientes
               </p>
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                Abra o workspace para enxergar o histórico operacional consolidado.
+                Abra o workspace para enxergar contexto consolidado e próxima ação.
               </p>
             </div>
           </div>
@@ -568,6 +579,16 @@ export default function CustomersPage() {
                 </div>
               ) : (
                 <>
+                  <div className="rounded-xl border border-orange-300 bg-orange-100 p-4 dark:border-orange-900 dark:bg-orange-950/20">
+                    <p className="text-sm font-semibold text-orange-800 dark:text-orange-300">
+                      Próxima ação recomendada
+                    </p>
+
+                    <p className="mt-1 text-sm text-orange-700 dark:text-orange-400">
+                      {nextActionLabel}
+                    </p>
+                  </div>
+
                   <div className="rounded-xl border border-orange-200 bg-orange-50 p-4 dark:border-orange-900/40 dark:bg-orange-950/20">
                     <div className="flex flex-col gap-3">
                       <div className="flex flex-wrap gap-2">
@@ -579,7 +600,7 @@ export default function CustomersPage() {
                           className="gap-2"
                         >
                           <CalendarDays className="h-4 w-4" />
-                          Ver agenda
+                          Abrir agenda do cliente
                         </Button>
 
                         <Button
@@ -590,7 +611,7 @@ export default function CustomersPage() {
                           className="gap-2"
                         >
                           <Briefcase className="h-4 w-4" />
-                          Ver O.S.
+                          Ver execuções
                         </Button>
 
                         <Button
@@ -601,7 +622,20 @@ export default function CustomersPage() {
                           className="gap-2"
                         >
                           <Wallet className="h-4 w-4" />
-                          Ver financeiro
+                          Ver cobranças
+                        </Button>
+
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            navigate(`/whatsapp?customerId=${workspace.customer.id}`)
+                          }
+                          className="gap-2"
+                        >
+                          <MessageCircle className="h-4 w-4" />
+                          Falar com cliente
                         </Button>
 
                         <Button
@@ -682,7 +716,7 @@ export default function CustomersPage() {
                       title="Pendências"
                       value={workspacePendingCharges}
                       subtitle="Cobranças que ainda pedem ação"
-                      tone={workspacePendingCharges > 0 ? "success" : "muted"}
+                      tone={workspacePendingCharges > 0 ? "default" : "muted"}
                     />
                   </div>
 
@@ -748,7 +782,7 @@ export default function CustomersPage() {
                             onClick={() => navigate(buildServiceOrdersDeepLink(item.id))}
                           >
                             <ArrowRightLeft className="mr-1 h-4 w-4" />
-                            Abrir
+                            Abrir ordem
                           </Button>
                         </div>
                       </div>
@@ -789,7 +823,7 @@ export default function CustomersPage() {
                             onClick={() => navigate(buildFinanceChargeUrl(item.id))}
                           >
                             <ArrowRightLeft className="mr-1 h-4 w-4" />
-                            Abrir
+                            Abrir cobrança
                           </Button>
                         </div>
                       </div>

@@ -15,9 +15,8 @@ import {
   DollarSign,
   BarChart3,
   Shield,
-  ChevronRight,
-  MessageCircle,
   ChevronLeft,
+  ChevronRight,
   Settings,
   Workflow,
   Sparkles,
@@ -79,10 +78,12 @@ function getPageTitle(location: string) {
 function getPageDescription(location: string) {
   const descriptions: Record<string, string> = {
     "/dashboard": "Visão geral da operação.",
-    "/executive-dashboard": "Visão consolidada de métricas, crescimento e operação.",
+    "/executive-dashboard":
+      "Visão consolidada de métricas, crescimento e operação.",
     "/executive-dashboard-new":
       "Visão consolidada de métricas, crescimento e operação.",
-    "/dashboard/operations": "Leitura diária do ciclo operacional e dos gargalos.",
+    "/dashboard/operations":
+      "Leitura diária do ciclo operacional e dos gargalos.",
     "/operations": "Fila prática do que precisa avançar agora.",
     "/customers": "Base operacional de clientes e relacionamento.",
     "/appointments": "Agenda operacional e preparação da execução.",
@@ -92,7 +93,7 @@ function getPageDescription(location: string) {
     "/finances": "Cobranças, recebimentos e fluxo financeiro.",
     "/governance": "Regras, risco e leitura institucional.",
     "/people": "Gestão da equipe e dos vínculos.",
-    "/whatsapp": "Comunicação operacional com contexto.",
+    "/whatsapp": "Conversa contextual vinculada à operação.",
     "/settings": "Parâmetros e ajustes do sistema.",
   };
 
@@ -212,18 +213,6 @@ export function MainLayout({ children }: MainLayoutProps) {
       ],
     },
     {
-      id: "communication",
-      label: "Comunicação",
-      items: [
-        {
-          id: "whatsapp",
-          label: "WhatsApp",
-          icon: MessageCircle,
-          route: "/whatsapp",
-        },
-      ],
-    },
-    {
       id: "system",
       label: "Sistema",
       items: [
@@ -262,27 +251,27 @@ export function MainLayout({ children }: MainLayoutProps) {
   );
 
   return (
-    <div className="nexo-app-shell flex min-h-screen w-full overflow-hidden text-zinc-900 dark:text-zinc-100">
-      <div className="flex w-full gap-3 md:gap-4">
+    <div className="nexo-app-shell min-h-screen text-zinc-900 dark:text-zinc-100">
+      <div className="flex min-h-screen w-full gap-3 p-2 md:gap-4 md:p-3">
         <aside
-          className={`nexo-app-panel-strong flex shrink-0 flex-col overflow-hidden transition-all ${
-            sidebarCollapsed ? "w-20" : "w-64"
+          className={`nexo-app-panel-strong sticky top-2 flex h-[calc(100vh-1rem)] shrink-0 flex-col overflow-hidden transition-all duration-300 md:top-3 md:h-[calc(100vh-1.5rem)] ${
+            sidebarCollapsed ? "w-[76px]" : "w-[248px]"
           }`}
         >
-          <div className="border-b border-slate-200/70 px-4 py-4 dark:border-slate-800/80">
-            <div className="flex items-center justify-between">
+          <div className="border-b border-slate-200/70 px-3 py-3 dark:border-white/6">
+            <div className="flex items-center justify-between gap-2">
               <div className="min-w-0">
                 {!sidebarCollapsed ? (
                   <>
-                    <p className="truncate text-base font-semibold text-zinc-950 dark:text-white">
+                    <p className="truncate text-sm font-semibold tracking-tight text-zinc-950 dark:text-white">
                       NexoGestão
                     </p>
-                    <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
+                    <p className="truncate text-[11px] text-zinc-500 dark:text-zinc-400">
                       Operação com contexto
                     </p>
                   </>
                 ) : (
-                  <p className="text-base font-semibold text-zinc-950 dark:text-white">
+                  <p className="text-sm font-semibold text-zinc-950 dark:text-white">
                     N
                   </p>
                 )}
@@ -291,7 +280,7 @@ export function MainLayout({ children }: MainLayoutProps) {
               <button
                 type="button"
                 onClick={() => setSidebarCollapsed((prev) => !prev)}
-                className="rounded-xl p-2 text-zinc-500 transition-colors hover:bg-zinc-100/80 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/70 dark:hover:text-white"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-zinc-500 transition-colors hover:bg-zinc-100/80 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-white/[0.05] dark:hover:text-white"
               >
                 {sidebarCollapsed ? (
                   <ChevronRight className="h-4 w-4" />
@@ -302,12 +291,12 @@ export function MainLayout({ children }: MainLayoutProps) {
             </div>
           </div>
 
-          <nav className="flex-1 overflow-y-auto px-3 py-4">
-            <div className="space-y-5">
+          <nav className="min-h-0 flex-1 overflow-y-auto px-2 py-3">
+            <div className="space-y-4">
               {visibleSections.map((section) => (
                 <div key={section.id}>
                   {!sidebarCollapsed && (
-                    <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-400 dark:text-zinc-500">
+                    <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-400 dark:text-zinc-500">
                       {section.label}
                     </p>
                   )}
@@ -323,17 +312,19 @@ export function MainLayout({ children }: MainLayoutProps) {
                           type="button"
                           onClick={() => navigate(item.route)}
                           title={item.label}
-                          className={`flex w-full items-center rounded-xl px-3 py-2.5 text-sm transition-colors ${
-                            sidebarCollapsed ? "justify-center" : "gap-3"
+                          className={`flex w-full items-center rounded-xl px-2.5 py-2 text-[13px] transition-colors ${
+                            sidebarCollapsed ? "justify-center" : "gap-2.5"
                           } ${
                             active
-                              ? "border border-orange-200/80 bg-orange-100/80 text-orange-700 dark:border-orange-500/20 dark:bg-orange-500/15 dark:text-orange-300"
-                              : "text-zinc-600 hover:bg-white/70 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-slate-900/60 dark:hover:text-white"
+                              ? "border border-orange-200/80 bg-orange-100/80 text-orange-700 dark:border-orange-500/20 dark:bg-orange-500/12 dark:text-orange-300"
+                              : "text-zinc-600 hover:bg-zinc-100/80 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-white/[0.05] dark:hover:text-white"
                           }`}
                         >
                           <Icon className="h-4 w-4 shrink-0" />
                           {!sidebarCollapsed && (
-                            <span className="truncate">{item.label}</span>
+                            <span className="truncate font-medium">
+                              {item.label}
+                            </span>
                           )}
                         </button>
                       );
@@ -344,13 +335,13 @@ export function MainLayout({ children }: MainLayoutProps) {
             </div>
           </nav>
 
-          <div className="border-t border-slate-200/70 p-3 dark:border-slate-800/80">
+          <div className="border-t border-slate-200/70 p-2 dark:border-white/6">
             <div className="space-y-1">
               <button
                 type="button"
                 onClick={toggleTheme}
-                className={`flex w-full items-center rounded-xl px-3 py-2.5 text-sm text-zinc-600 transition-colors hover:bg-white/70 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-slate-900/60 dark:hover:text-white ${
-                  sidebarCollapsed ? "justify-center" : "gap-3"
+                className={`flex w-full items-center rounded-xl px-2.5 py-2 text-[13px] text-zinc-600 transition-colors hover:bg-zinc-100/80 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-white/[0.05] dark:hover:text-white ${
+                  sidebarCollapsed ? "justify-center" : "gap-2.5"
                 }`}
               >
                 {theme === "dark" ? (
@@ -358,32 +349,37 @@ export function MainLayout({ children }: MainLayoutProps) {
                 ) : (
                   <Moon className="h-4 w-4 shrink-0" />
                 )}
+
                 {!sidebarCollapsed && (
-                  <span>{theme === "dark" ? "Tema claro" : "Tema escuro"}</span>
+                  <span className="truncate font-medium">
+                    {theme === "dark" ? "Tema claro" : "Tema escuro"}
+                  </span>
                 )}
               </button>
 
               <button
                 type="button"
                 onClick={() => void logout()}
-                className={`flex w-full items-center rounded-xl px-3 py-2.5 text-sm text-red-600 transition-colors hover:bg-red-50/90 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-500/10 dark:hover:text-red-300 ${
-                  sidebarCollapsed ? "justify-center" : "gap-3"
+                className={`flex w-full items-center rounded-xl px-2.5 py-2 text-[13px] text-red-600 transition-colors hover:bg-red-50/90 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-500/10 dark:hover:text-red-300 ${
+                  sidebarCollapsed ? "justify-center" : "gap-2.5"
                 }`}
               >
                 <LogOut className="h-4 w-4 shrink-0" />
-                {!sidebarCollapsed && <span>Sair</span>}
+                {!sidebarCollapsed && (
+                  <span className="truncate font-medium">Sair</span>
+                )}
               </button>
             </div>
           </div>
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col gap-3 md:gap-4">
-          <header className="nexo-app-panel-strong px-4 py-4 md:px-6">
-            <div className="flex flex-col gap-3">
+          <header className="nexo-app-panel-strong px-4 py-3 md:px-5 md:py-4">
+            <div className="flex flex-col gap-2.5">
               <Breadcrumbs />
 
               <div>
-                <h1 className="text-2xl font-semibold tracking-tight text-zinc-950 dark:text-white">
+                <h1 className="text-[1.65rem] font-semibold tracking-tight text-zinc-950 dark:text-white">
                   {pageTitle}
                 </h1>
                 <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
@@ -393,7 +389,7 @@ export function MainLayout({ children }: MainLayoutProps) {
             </div>
           </header>
 
-          <main className="nexo-app-content min-w-0 flex-1 overflow-auto p-4 md:p-6">
+          <main className="nexo-app-content min-h-0 flex-1 overflow-auto p-4 md:p-5">
             {children}
           </main>
         </div>

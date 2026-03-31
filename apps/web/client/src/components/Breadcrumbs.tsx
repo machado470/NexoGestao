@@ -69,7 +69,10 @@ const routeBreadcrumbs: Record<string, Breadcrumb[]> = {
     { label: "Governança", href: "/governance" },
     { label: "Referências" },
   ],
-  "/whatsapp": [{ label: "Comunicação" }, { label: "WhatsApp" }],
+  "/whatsapp": [
+    { label: "Operação", href: "/service-orders" },
+    { label: "Conversa contextual" },
+  ],
   "/settings": [{ label: "Sistema" }, { label: "Configurações" }],
 };
 
@@ -99,7 +102,7 @@ function humanizeSegment(path: string) {
     governance: "Governança",
     people: "Pessoas",
     referrals: "Referências",
-    whatsapp: "WhatsApp",
+    whatsapp: "Conversa contextual",
     operations: "Workflow Operacional",
     settings: "Configurações",
   };
@@ -142,25 +145,30 @@ export function Breadcrumbs() {
   ];
 
   return (
-    <nav className="flex flex-wrap items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
+    <nav className="flex flex-wrap items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400">
       {allBreadcrumbs.map((crumb, index) => (
-        <div key={`${crumb.label}-${index}`} className="flex items-center gap-2">
+        <div
+          key={`${crumb.label}-${index}`}
+          className="flex items-center gap-1.5"
+        >
           {index > 0 && (
-            <ChevronRight className="h-4 w-4 text-zinc-400 dark:text-zinc-600" />
+            <ChevronRight className="h-3.5 w-3.5 text-zinc-400 dark:text-zinc-600" />
           )}
 
           {crumb.href ? (
             <button
               type="button"
               onClick={() => navigate(crumb.href!)}
-              className={`transition-colors hover:text-orange-600 dark:hover:text-orange-400 ${
-                index === 0 ? "flex items-center" : "font-medium"
+              className={`rounded-md px-1.5 py-0.5 transition-colors hover:text-orange-600 dark:hover:text-orange-400 ${
+                index === 0
+                  ? "flex items-center text-zinc-500 dark:text-zinc-400"
+                  : "font-medium text-zinc-500 dark:text-zinc-400"
               }`}
             >
-              {index === 0 ? <Home className="h-4 w-4" /> : crumb.label}
+              {index === 0 ? <Home className="h-3.5 w-3.5" /> : crumb.label}
             </button>
           ) : (
-            <span className="font-medium text-zinc-900 dark:text-white">
+            <span className="rounded-md px-1.5 py-0.5 font-medium text-zinc-900 dark:text-white">
               {crumb.label}
             </span>
           )}

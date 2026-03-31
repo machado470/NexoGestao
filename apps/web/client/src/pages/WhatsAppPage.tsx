@@ -3,7 +3,12 @@ import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { MessageCircle, RefreshCw, ArrowRight } from "lucide-react";
+import {
+  MessageCircle,
+  RefreshCw,
+  ArrowRight,
+  ArrowLeft,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -42,12 +47,12 @@ export default function WhatsAppPage() {
 
   const customerQuery = trpc.nexo.customers.getById.useQuery(
     { id: route.customerId || "" },
-    { enabled: !!route.customerId }
+    { enabled: !!route.customerId, retry: false, refetchOnWindowFocus: false }
   );
 
   const messagesQuery = trpc.nexo.whatsapp.messages.useQuery(
     { customerId: route.customerId || "" },
-    { enabled: !!route.customerId }
+    { enabled: !!route.customerId, retry: false, refetchOnWindowFocus: false }
   );
 
   const sendMutation = trpc.nexo.whatsapp.send.useMutation({
@@ -76,7 +81,10 @@ export default function WhatsAppPage() {
   }, [messagesQuery.data]);
 
   const isLoading =
-    customerQuery.isLoading || messagesQuery.isLoading || sendMutation.isPending;
+    !!route.customerId &&
+    (customerQuery.isLoading ||
+      messagesQuery.isLoading ||
+      sendMutation.isPending);
 
   const canSend =
     Boolean(route.customerId) &&
@@ -88,11 +96,40 @@ export default function WhatsAppPage() {
 
   const dueDateLabel = route.dueDate ? formatDate(route.dueDate) : null;
 
+  if (!route.customerId) {
+    return (
+      <div className="space-y-6 p-6">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h1 className="flex items-center gap-2 text-xl font-bold">
+              <MessageCircle className="h-5 w-5" />
+              WhatsApp
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Esta conversa só pode ser aberta a partir de uma ordem de serviço
+              ou cobrança.
+            </p>
+          </div>
+
+          <Button variant="outline" onClick={() => navigate("/service-orders")}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Voltar para ordens
+          </Button>
+        </div>
+
+        <div className="rounded-xl border p-6 text-sm text-muted-foreground">
+          Selecione um cliente a partir de uma ordem de serviço ou cobrança para
+          abrir uma conversa contextual.
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6 p-6">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-xl font-bold flex items-center gap-2">
+          <h1 className="flex items-center gap-2 text-xl font-bold">
             <MessageCircle className="h-5 w-5" />
             WhatsApp
           </h1>
@@ -105,7 +142,7 @@ export default function WhatsAppPage() {
           <Button
             variant="outline"
             onClick={() => void messagesQuery.refetch()}
-            disabled={!route.customerId || messagesQuery.isLoading}
+            disabled={messagesQuery.isLoading}
           >
             <RefreshCw className="mr-2 h-4 w-4" />
             Atualizar conversa
@@ -133,14 +170,8 @@ export default function WhatsAppPage() {
         </div>
       </div>
 
-      {!route.customerId ? (
-        <div className="rounded-xl border p-4 text-sm text-muted-foreground">
-          Nenhum cliente foi informado para abrir esta conversa.
-        </div>
-      ) : null}
-
       {customer && (
-        <div className="rounded-xl border bg-gray-900 p-4 space-y-3">
+        <div className="space-y-3 rounded-xl border bg-gray-900 p-4">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-lg font-semibold">{customer.name}</p>
@@ -193,7 +224,7 @@ export default function WhatsAppPage() {
         </div>
       )}
 
-      <div className="rounded-xl border p-4 space-y-3 min-h-[280px] max-h-[420px] overflow-y-auto">
+      <div className="max-h-[420px] min-h-[280px] space-y-3 overflow-y-auto rounded-xl border p-4">
         {messagesQuery.isLoading ? (
           <p className="text-sm text-muted-foreground">Carregando conversa...</p>
         ) : messages.length === 0 ? (
@@ -228,7 +259,7 @@ export default function WhatsAppPage() {
         )}
       </div>
 
-      <div className="rounded-xl border p-4 space-y-3">
+      <div className="space-y-3 rounded-xl border p-4">
         <div>
           <p className="font-medium">Mensagem</p>
           <p className="text-sm text-muted-foreground">
@@ -240,7 +271,7 @@ export default function WhatsAppPage() {
           value={messageInput}
           onChange={(e) => setMessageInput(e.target.value)}
           placeholder="Digite a mensagem para o cliente"
-          disabled={!route.customerId || isLoading}
+          disabled={isLoading}
         />
 
         <div className="flex flex-wrap gap-2">
