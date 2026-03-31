@@ -208,7 +208,6 @@ export class PaymentsService {
         orgId,
         chargeId,
         actorUserId: null,
-        actorPersonId: null,
         method: 'CARD',
         amountCents: internalCharge.amountCents,
       })
@@ -259,7 +258,6 @@ export class PaymentsService {
       dueDate,
       notes: description,
       actorUserId: null,
-      actorPersonId: null,
     })
 
     return { id: created.id, status: created.status }
@@ -296,7 +294,6 @@ export class PaymentsService {
         orgId: charge.orgId,
         chargeId,
         actorUserId: null,
-        actorPersonId: null,
         method: 'OTHER',
         amountCents: charge.amountCents,
       })

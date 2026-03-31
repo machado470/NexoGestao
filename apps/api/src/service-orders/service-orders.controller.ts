@@ -122,7 +122,6 @@ export class ServiceOrdersController {
     @Param('id') id: string,
   ) {
     const actorUserId = user?.userId ?? null
-    const actorPersonId = user?.personId ?? null
 
     const os = await this.serviceOrders.get(orgId, id)
 
@@ -133,7 +132,6 @@ export class ServiceOrdersController {
       amountCents: os?.amountCents ?? 0,
       dueDate: os?.dueDate ?? null,
       actorUserId,
-      actorPersonId,
     })
   }
 }

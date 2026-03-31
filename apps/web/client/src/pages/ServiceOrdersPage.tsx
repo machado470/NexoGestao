@@ -74,7 +74,7 @@ export default function ServiceOrdersPage() {
     retry: false,
   });
 
-  const peopleQuery = trpc.nexo.people.list.useQuery(undefined, {
+  const peopleQuery = trpc.people.list.useQuery(undefined, {
     retry: false,
   });
 

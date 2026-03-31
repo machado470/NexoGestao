@@ -1,14 +1,15 @@
 import {
-  Controller,
-  Get,
-  Post,
-  Param,
+  BadRequestException,
   Body,
-  UseGuards,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
   Query,
   Res,
-  Patch,
-  Delete,
+  UseGuards,
 } from '@nestjs/common'
 import { Throttle } from '@nestjs/throttler'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
@@ -22,6 +23,18 @@ import { CreatePaymentDto } from './dto/create-payment.dto'
 import { ChargesQueryDto } from './dto/charges-query.dto'
 import { CreateChargeDto } from './dto/create-charge.dto'
 import { UpdateChargeDto } from './dto/update-charge.dto'
+
+function parseDueDate(value?: string | Date | null): Date | undefined {
+  if (value == null) return undefined
+  if (value instanceof Date) return value
+
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) {
+    throw new BadRequestException('dueDate inválido')
+  }
+
+  return parsed
+}
 
 @UseGuards(JwtAuthGuard, RolesGuard, OperationalStateGuard)
 @Controller('finance')
@@ -87,13 +100,14 @@ export class FinanceController {
     @Body() body: CreateChargeDto,
   ) {
     const actorUserId = user?.userId ?? user?.sub ?? null
-    const actorPersonId = user?.personId ?? null
 
     const data = await this.finance.createCharge({
-      ...body,
       orgId,
+      customerId: body.customerId,
+      amountCents: body.amountCents,
+      dueDate: parseDueDate(body.dueDate) as Date,
+      notes: body.notes,
       actorUserId,
-      actorPersonId,
     })
 
     return { ok: true, data }
@@ -108,14 +122,14 @@ export class FinanceController {
     @Body() body: UpdateChargeDto,
   ) {
     const actorUserId = user?.userId ?? user?.sub ?? null
-    const actorPersonId = user?.personId ?? null
 
     const data = await this.finance.updateCharge({
-      ...body,
       id,
       orgId,
       actorUserId,
-      actorPersonId,
+      amountCents: body.amountCents,
+      dueDate: parseDueDate(body.dueDate),
+      status: body.status,
     })
 
     return { ok: true, data }
@@ -129,13 +143,11 @@ export class FinanceController {
     @Param('id') id: string,
   ) {
     const actorUserId = user?.userId ?? user?.sub ?? null
-    const actorPersonId = user?.personId ?? null
 
     await this.finance.deleteCharge({
       orgId,
       id,
       actorUserId,
-      actorPersonId,
     })
 
     return { ok: true }
@@ -151,13 +163,11 @@ export class FinanceController {
     @Body() body: CreatePaymentDto,
   ) {
     const actorUserId = user?.userId ?? user?.sub ?? null
-    const actorPersonId = user?.personId ?? null
 
     const data = await this.finance.payCharge({
       orgId,
       chargeId,
       actorUserId,
-      actorPersonId,
       method: body.method,
       amountCents: body.amountCents,
     })

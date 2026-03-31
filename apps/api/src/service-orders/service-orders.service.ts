@@ -851,7 +851,6 @@ export class ServiceOrdersService {
           serviceOrderId: updated.id,
           customerId: updated.customerId,
           actorUserId: params.updatedBy,
-          actorPersonId: params.personId,
           amountCents: updated.amountCents ?? null,
           dueDate: updated.dueDate ?? null,
         })

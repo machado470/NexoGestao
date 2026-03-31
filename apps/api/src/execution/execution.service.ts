@@ -374,7 +374,6 @@ export class ExecutionService {
           serviceOrderId: updated.id,
           customerId: updated.customerId,
           actorUserId: userId ?? null,
-          actorPersonId,
           amountCents: updated.amountCents ?? undefined,
           dueDate: updated.dueDate ?? null,
         })

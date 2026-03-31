@@ -4,11 +4,13 @@ import { buildFinanceChargeUrl } from "@/lib/operations/operations.utils";
 
 type NavigateFn = (path: string) => void;
 
+type PaymentMethod = "PIX" | "CASH" | "CARD" | "TRANSFER" | "OTHER";
+
 type UseChargeActionsOptions = {
   navigate?: NavigateFn;
   location?: string;
   returnPath?: string;
-  refreshActions?: Array<() => void | Promise<void>>;
+  refreshActions?: Array<() => void | Promise<unknown>>;
 };
 
 function buildChargeFinancePath(chargeId: string, returnPath?: string) {
@@ -52,7 +54,7 @@ export function useChargeActions(options?: UseChargeActionsOptions) {
     },
   });
 
-  const registerPayment = async (charge: any, method: string) => {
+  const registerPayment = async (charge: any, method: PaymentMethod) => {
     await payCharge.mutateAsync({
       chargeId: charge.id,
       method,
@@ -69,6 +71,6 @@ export function useChargeActions(options?: UseChargeActionsOptions) {
   return {
     registerPayment,
     generateCheckout,
-    isSubmitting: payCharge.isLoading,
+    isSubmitting: payCharge.isPending,
   };
 }

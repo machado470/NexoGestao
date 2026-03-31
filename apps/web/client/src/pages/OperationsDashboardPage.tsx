@@ -112,9 +112,15 @@ export default function OperationsDashboardPage() {
     navigate,
     returnPath: "/dashboard/operations",
     refreshActions: [
-      () => serviceOrdersQuery.refetch(),
-      () => chargesQuery.refetch(),
-      () => alertsQuery.refetch(),
+      async () => {
+        await serviceOrdersQuery.refetch();
+      },
+      async () => {
+        await chargesQuery.refetch();
+      },
+      async () => {
+        await alertsQuery.refetch();
+      },
     ],
   });
 
