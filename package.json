@@ -41,6 +41,6 @@
   },
   "dependencies": {
     "@prisma/client": "5.22.0",
-    "@trpc/server": "10.45.2"
+    "@trpc/server": "11.15.0"
   }
 }

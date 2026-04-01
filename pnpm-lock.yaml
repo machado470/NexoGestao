@@ -15,8 +15,8 @@ importers:
         specifier: 5.22.0
         version: 5.22.0(prisma@5.22.0)
       '@trpc/server':
-        specifier: 10.45.2
-        version: 10.45.2
+        specifier: 11.15.0
+        version: 11.15.0(typescript@5.9.3)
     devDependencies:
       prisma:
         specifier: 5.22.0
@@ -3353,9 +3353,6 @@ packages:
       '@trpc/server': 11.15.0
       react: '>=18.2.0'
       typescript: '>=5.7.2'
-
-  '@trpc/server@10.45.2':
-    resolution: {integrity: sha512-wOrSThNNE4HUnuhJG6PfDRp4L2009KDVxsd+2VYH8ro6o/7/jwYZ8Uu5j+VaW+mOmc8EHerHzGcdbGNQSAUPgg==}
 
   '@trpc/server@11.15.0':
     resolution: {integrity: sha512-qLcodARy05fzMSrNG6VYtynsAmUCRaQ7SDm3Ynvryhylp2Zq4KN28qJeMlMqLeJKwZ05KukkcIsVTKzscWX1pQ==}
@@ -10731,8 +10728,6 @@ snapshots:
       '@trpc/server': 11.15.0(typescript@5.9.3)
       react: 19.2.4
       typescript: 5.9.3
-
-  '@trpc/server@10.45.2': {}
 
   '@trpc/server@11.15.0(typescript@5.9.3)':
     dependencies:

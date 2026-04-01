@@ -45,7 +45,6 @@ function setTokenCookie(ctx: CtxLike, token: string) {
   });
 }
 
-// 🔥 CORREÇÃO AQUI
 function extractToken(result: any): string | null {
   return (
     result?.data?.data?.token ||
@@ -57,6 +56,37 @@ function extractToken(result: any): string | null {
   );
 }
 
+function toQueryString(input?: Record<string, unknown> | null): string {
+  if (!input || typeof input !== "object") return "";
+
+  const params = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(input)) {
+    if (
+      value === undefined ||
+      value === null ||
+      value === "" ||
+      Number.isNaN(value)
+    ) {
+      continue;
+    }
+
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        if (item !== undefined && item !== null) {
+          params.append(key, String(item));
+        }
+      }
+      continue;
+    }
+
+    params.append(key, String(value));
+  }
+
+  const query = params.toString();
+  return query ? `?${query}` : "";
+}
+
 async function nexoFetch(path: string, options: RequestInit = {}) {
   const url = `${NEXO_API_URL}${path}`;
 
@@ -64,7 +94,7 @@ async function nexoFetch(path: string, options: RequestInit = {}) {
     ...options,
     headers: {
       "Content-Type": "application/json",
-      ...options.headers,
+      ...(options.headers || {}),
     },
   });
 
@@ -91,7 +121,11 @@ async function nexoFetch(path: string, options: RequestInit = {}) {
   return body;
 }
 
-async function authedFetch(ctx: CtxLike, path: string, options: RequestInit = {}) {
+async function authedFetch(
+  ctx: CtxLike,
+  path: string,
+  options: RequestInit = {}
+) {
   const authHeader = getAuthHeader(ctx);
 
   return nexoFetch(path, {
@@ -103,8 +137,12 @@ async function authedFetch(ctx: CtxLike, path: string, options: RequestInit = {}
   });
 }
 
-async function authedGet(ctx: CtxLike, path: string) {
-  return authedFetch(ctx, path);
+async function authedGet(
+  ctx: CtxLike,
+  path: string,
+  query?: Record<string, unknown>
+) {
+  return authedFetch(ctx, `${path}${toQueryString(query)}`);
 }
 
 async function authedPost(ctx: CtxLike, path: string, body?: unknown) {
@@ -113,6 +151,15 @@ async function authedPost(ctx: CtxLike, path: string, body?: unknown) {
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
 }
+
+async function authedPatch(ctx: CtxLike, path: string, body?: unknown) {
+  return authedFetch(ctx, path, {
+    method: "PATCH",
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+}
+
+const anyInput = z.any().optional();
 
 export const nexoProxyRouter = router({
   auth: router({
@@ -165,9 +212,235 @@ export const nexoProxyRouter = router({
 
         return result;
       }),
+
+    forgotPassword: publicProcedure
+      .input(
+        z.object({
+          email: z.string().email(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        return nexoFetch("/auth/forgot-password", {
+          method: "POST",
+          body: JSON.stringify(input),
+        });
+      }),
+
+    resetPassword: publicProcedure
+      .input(
+        z.object({
+          token: z.string(),
+          password: z.string().min(8),
+        })
+      )
+      .mutation(async ({ input }) => {
+        return nexoFetch("/auth/reset-password", {
+          method: "POST",
+          body: JSON.stringify(input),
+        });
+      }),
   }),
 
   me: protectedProcedure.query(async ({ ctx }) => {
     return authedGet(ctx as CtxLike, "/me");
+  }),
+
+  customers: router({
+    list: protectedProcedure.input(anyInput).query(async ({ ctx, input }) => {
+      return authedGet(ctx as CtxLike, "/customers", input);
+    }),
+
+    getById: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .query(async ({ ctx, input }) => {
+        return authedGet(ctx as CtxLike, `/customers/${input.id}`);
+      }),
+
+    workspace: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .query(async ({ ctx, input }) => {
+        return authedGet(ctx as CtxLike, `/customers/${input.id}/workspace`);
+      }),
+
+    create: protectedProcedure.input(z.any()).mutation(async ({ ctx, input }) => {
+      return authedPost(ctx as CtxLike, "/customers", input);
+    }),
+
+    update: protectedProcedure.input(z.any()).mutation(async ({ ctx, input }) => {
+      const id = input?.id;
+      if (!id || typeof id !== "string") {
+        throw new Error("ID do cliente é obrigatório.");
+      }
+
+      const { id: _id, ...payload } = input ?? {};
+      return authedPatch(ctx as CtxLike, `/customers/${id}`, payload);
+    }),
+  }),
+
+  appointments: router({
+    list: protectedProcedure.input(anyInput).query(async ({ ctx, input }) => {
+      return authedGet(ctx as CtxLike, "/appointments", input);
+    }),
+
+    getById: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .query(async ({ ctx, input }) => {
+        return authedGet(ctx as CtxLike, `/appointments/${input.id}`);
+      }),
+
+    create: protectedProcedure.input(z.any()).mutation(async ({ ctx, input }) => {
+      return authedPost(ctx as CtxLike, "/appointments", input);
+    }),
+
+    update: protectedProcedure.input(z.any()).mutation(async ({ ctx, input }) => {
+      const id = input?.id;
+      if (!id || typeof id !== "string") {
+        throw new Error("ID do agendamento é obrigatório.");
+      }
+
+      const { id: _id, ...payload } = input ?? {};
+      return authedPatch(ctx as CtxLike, `/appointments/${id}`, payload);
+    }),
+  }),
+
+  serviceOrders: router({
+    list: protectedProcedure.input(anyInput).query(async ({ ctx, input }) => {
+      return authedGet(ctx as CtxLike, "/service-orders", input);
+    }),
+
+    getById: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .query(async ({ ctx, input }) => {
+        return authedGet(ctx as CtxLike, `/service-orders/${input.id}`);
+      }),
+
+    create: protectedProcedure.input(z.any()).mutation(async ({ ctx, input }) => {
+      return authedPost(ctx as CtxLike, "/service-orders", input);
+    }),
+
+    update: protectedProcedure.input(z.any()).mutation(async ({ ctx, input }) => {
+      const id = input?.id;
+      if (!id || typeof id !== "string") {
+        throw new Error("ID da ordem de serviço é obrigatório.");
+      }
+
+      const { id: _id, ...payload } = input ?? {};
+      return authedPatch(ctx as CtxLike, `/service-orders/${id}`, payload);
+    }),
+
+    generateCharge: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        return authedPost(
+          ctx as CtxLike,
+          `/service-orders/${input.id}/generate-charge`
+        );
+      }),
+  }),
+
+  timeline: router({
+    listByCustomer: protectedProcedure
+      .input(z.object({ customerId: z.string() }))
+      .query(async ({ ctx, input }) => {
+        return authedGet(
+          ctx as CtxLike,
+          `/timeline/customers/${input.customerId}`
+        );
+      }),
+
+    listByServiceOrder: protectedProcedure
+      .input(z.object({ serviceOrderId: z.string() }))
+      .query(async ({ ctx, input }) => {
+        return authedGet(
+          ctx as CtxLike,
+          `/timeline/service-orders/${input.serviceOrderId}`
+        );
+      }),
+  }),
+
+  executions: router({
+    listByServiceOrder: protectedProcedure
+      .input(z.object({ serviceOrderId: z.string() }))
+      .query(async ({ ctx, input }) => {
+        return authedGet(
+          ctx as CtxLike,
+          `/executions/service-order/${input.serviceOrderId}`
+        );
+      }),
+
+    start: protectedProcedure.input(z.any()).mutation(async ({ ctx, input }) => {
+      return authedPost(ctx as CtxLike, "/executions/start", input);
+    }),
+
+    complete: protectedProcedure.input(z.any()).mutation(async ({ ctx, input }) => {
+      const id = input?.id;
+      if (!id || typeof id !== "string") {
+        throw new Error("ID da execução é obrigatório.");
+      }
+
+      const { id: _id, ...payload } = input ?? {};
+      return authedPost(ctx as CtxLike, `/executions/${id}/complete`, payload);
+    }),
+  }),
+
+  whatsapp: router({
+    messages: protectedProcedure
+      .input(z.object({ customerId: z.string() }))
+      .query(async ({ ctx, input }) => {
+        return authedGet(
+          ctx as CtxLike,
+          `/whatsapp/messages/${input.customerId}`
+        );
+      }),
+
+    send: protectedProcedure.input(z.any()).mutation(async ({ ctx, input }) => {
+      return authedPost(ctx as CtxLike, "/whatsapp/messages", input);
+    }),
+  }),
+
+  settings: router({
+    get: protectedProcedure.query(async ({ ctx }) => {
+      return authedGet(ctx as CtxLike, "/organization-settings");
+    }),
+
+    update: protectedProcedure.input(z.any()).mutation(async ({ ctx, input }) => {
+      return authedPatch(ctx as CtxLike, "/organization-settings", input);
+    }),
+  }),
+
+  onboarding: router({
+    complete: protectedProcedure.input(z.any()).mutation(async ({ ctx, input }) => {
+      return authedPost(ctx as CtxLike, "/onboarding/complete", input);
+    }),
+  }),
+
+  globalSearch: router({
+    search: protectedProcedure
+      .input(
+        z.object({
+          query: z.string().optional(),
+        })
+      )
+      .query(async ({ ctx, input }) => {
+        const query = String(input?.query ?? "").trim();
+
+        const [customers, serviceOrders] = await Promise.all([
+          authedGet(ctx as CtxLike, "/customers", query ? { search: query } : {}),
+          authedGet(
+            ctx as CtxLike,
+            "/service-orders",
+            query ? { search: query } : {}
+          ),
+        ]);
+
+        return {
+          ok: true,
+          data: {
+            query,
+            customers,
+            serviceOrders,
+          },
+        };
+      }),
   }),
 });
