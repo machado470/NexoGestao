@@ -42,6 +42,11 @@ function getSessionData(payload: SessionMeOutput) {
   return payload?.data?.data ?? null;
 }
 
+function redirectToLogin() {
+  if (typeof window === "undefined") return;
+  window.location.assign("/login");
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const utils = trpc.useUtils();
 
@@ -59,10 +64,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logoutMutation = trpc.session.logout.useMutation();
 
   useEffect(() => {
-    if (meQuery.isFetched || meQuery.error) {
+    if (meQuery.isFetched || meQuery.isError) {
       setHasResolvedSession(true);
     }
-  }, [meQuery.isFetched, meQuery.error]);
+  }, [meQuery.isFetched, meQuery.isError]);
 
   const loadSessionAfterAuth = useCallback(async () => {
     const attempts = 4;
@@ -152,7 +157,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await logoutMutation.mutateAsync();
       utils.session.me.setData(undefined, null);
+      await utils.session.me.cancel();
       await utils.session.me.invalidate();
+      redirectToLogin();
     } catch (err) {
       setLocalError(err);
       throw err;

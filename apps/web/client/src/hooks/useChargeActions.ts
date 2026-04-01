@@ -6,11 +6,18 @@ type NavigateFn = (path: string) => void;
 
 type PaymentMethod = "PIX" | "CASH" | "CARD" | "TRANSFER" | "OTHER";
 
+type RefreshAction = () => void | Promise<unknown>;
+
+type ChargeLike = {
+  id: string;
+  amountCents: number;
+};
+
 type UseChargeActionsOptions = {
   navigate?: NavigateFn;
   location?: string;
   returnPath?: string;
-  refreshActions?: Array<() => void | Promise<unknown>>;
+  refreshActions?: RefreshAction[];
 };
 
 function buildChargeFinancePath(chargeId: string, returnPath?: string) {
@@ -39,7 +46,11 @@ export function useChargeActions(options?: UseChargeActionsOptions) {
 
   const runRefreshActions = async () => {
     for (const action of refreshActions) {
-      await action();
+      try {
+        await action();
+      } catch (error) {
+        console.error("[useChargeActions] refresh action failed", error);
+      }
     }
   };
 
@@ -54,7 +65,7 @@ export function useChargeActions(options?: UseChargeActionsOptions) {
     },
   });
 
-  const registerPayment = async (charge: any, method: PaymentMethod) => {
+  const registerPayment = async (charge: ChargeLike, method: PaymentMethod) => {
     await payCharge.mutateAsync({
       chargeId: charge.id,
       method,
@@ -62,8 +73,10 @@ export function useChargeActions(options?: UseChargeActionsOptions) {
     });
   };
 
-  const generateCheckout = async (charge: any) => {
-    if (!charge?.id) return;
+  const generateCheckout = async (charge: Pick<ChargeLike, "id"> | null | undefined) => {
+    if (!charge?.id) {
+      return;
+    }
 
     navigate(buildChargeFinancePath(String(charge.id), returnPath));
   };

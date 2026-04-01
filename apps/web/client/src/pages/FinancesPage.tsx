@@ -84,6 +84,21 @@ type ChargeStats = {
   totalOverdueAmount: number;
 };
 
+type ChargesResponseShape = {
+  data?: {
+    items?: Charge[];
+    pagination?: ChargesMeta;
+    meta?: ChargesMeta;
+  };
+  items?: Charge[];
+  pagination?: ChargesMeta;
+  meta?: ChargesMeta;
+};
+
+type StatsResponseShape = {
+  data?: ChargeStats;
+};
+
 function formatMoney(value: number) {
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
@@ -111,12 +126,50 @@ function formatDate(value?: string | null) {
   });
 }
 
-function normalizeChargesPayload(payload: any): Charge[] {
-  if (Array.isArray(payload?.data?.items)) return payload.data.items as Charge[];
-  if (Array.isArray(payload?.data)) return payload.data as Charge[];
-  if (Array.isArray(payload?.items)) return payload.items as Charge[];
-  if (Array.isArray(payload)) return payload as Charge[];
+function safeExtractCharges(payload: unknown): Charge[] {
+  if (Array.isArray(payload)) {
+    return payload as Charge[];
+  }
+
+  const data = payload as ChargesResponseShape | null | undefined;
+
+  if (Array.isArray(data?.data?.items)) {
+    return data.data.items;
+  }
+
+  if (Array.isArray(data?.items)) {
+    return data.items;
+  }
+
   return [];
+}
+
+function safeExtractStats(payload: unknown): ChargeStats | null {
+  if (!payload) return null;
+
+  const data = payload as StatsResponseShape | ChargeStats;
+
+  if ("data" in data && data.data) {
+    return data.data;
+  }
+
+  return data as ChargeStats;
+}
+
+function safeExtractPagination(payload: unknown): ChargesMeta {
+  const data = payload as ChargesResponseShape | null | undefined;
+
+  return (
+    data?.pagination ??
+    data?.meta ??
+    data?.data?.pagination ??
+    data?.data?.meta ?? {
+      page: 1,
+      limit: 20,
+      total: 0,
+      pages: 1,
+    }
+  );
 }
 
 function getStatusColor(status: string) {
@@ -352,13 +405,6 @@ export default function FinancesPage() {
     setHighlightedChargeId(chargeIdFromUrl || null);
   }, [chargeIdFromUrl]);
 
-  const refreshQueriesOnly = async () => {
-    await Promise.all([
-      chargesQuery.refetch(),
-      ...(isServiceOrderScoped ? [] : [statsQuery.refetch()]),
-    ]);
-  };
-
   const refreshAll = async () => {
     if (!canLoadFinance) return;
 
@@ -445,7 +491,7 @@ export default function FinancesPage() {
 
   const handleDeleteCharge = async (charge: Charge) => {
     const confirmed = window.confirm(
-      `Excluir a cobrança de ${charge?.customer?.name || "cliente"}?`
+      `Excluir a cobrança de ${charge.customer?.name || "cliente"}?`
     );
 
     if (!confirmed) return;
@@ -463,21 +509,9 @@ export default function FinancesPage() {
 
   const isSubmitting = deleteCharge.isPending || isChargeActionSubmitting;
 
-  const statsPayload = statsQuery.data as any;
-  const stats = (statsPayload?.data ?? statsPayload ?? null) as ChargeStats | null;
-
-  const chargesPayload = chargesQuery.data as any;
-  const charges = normalizeChargesPayload(chargesPayload);
-
-  const pagination = (
-    chargesPayload?.pagination ??
-    chargesPayload?.meta ?? {
-      page: 1,
-      limit: 20,
-      total: 0,
-      pages: 1,
-    }
-  ) as ChargesMeta;
+  const stats = safeExtractStats(statsQuery.data);
+  const charges = safeExtractCharges(chargesQuery.data);
+  const pagination = safeExtractPagination(chargesQuery.data);
 
   const highlightedCharge = useMemo(() => {
     if (!highlightedChargeId) return null;

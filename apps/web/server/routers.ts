@@ -1,4 +1,3 @@
-import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
@@ -47,14 +46,8 @@ export const appRouter = router({
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
 
-      ctx.res.cookie(NEXO_TOKEN_COOKIE, "", {
+      ctx.res.clearCookie(NEXO_TOKEN_COOKIE, {
         ...cookieOptions,
-        maxAge: 0,
-      });
-
-      ctx.res.clearCookie(COOKIE_NAME, {
-        ...cookieOptions,
-        maxAge: -1,
       });
 
       return {

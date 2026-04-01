@@ -42,6 +42,29 @@ import {
   Wrench,
 } from "lucide-react";
 
+type ServiceOrder = {
+  id: string;
+  title: string;
+  status: string;
+};
+
+type Charge = {
+  id: string;
+  amountCents: number;
+  status: string;
+  customer?: {
+    name?: string | null;
+  } | null;
+};
+
+type AlertsPayload = {
+  overdueCharges?: {
+    count?: number;
+    totalAmountCents?: number;
+    items?: Charge[];
+  };
+};
+
 function EmptyState({ text }: { text: string }) {
   return (
     <div className="rounded-2xl border border-dashed border-slate-200/80 px-4 py-8 text-sm text-zinc-500 dark:border-white/8 dark:text-zinc-400">
@@ -124,30 +147,30 @@ export default function OperationsDashboardPage() {
     ],
   });
 
-  const serviceOrders = useMemo(
-    () => normalizeOrders(serviceOrdersQuery.data),
+  const serviceOrders = useMemo<ServiceOrder[]>(
+    () => (normalizeOrders(serviceOrdersQuery.data) ?? []) as ServiceOrder[],
     [serviceOrdersQuery.data]
   );
 
-  const charges = useMemo(
-    () => normalizeCharges(chargesQuery.data),
+  const charges = useMemo<Charge[]>(
+    () => (normalizeCharges(chargesQuery.data) ?? []) as Charge[],
     [chargesQuery.data]
   );
 
-  const alerts = useMemo(
-    () => normalizeAlertsPayload<any>(alertsQuery.data),
+  const alerts = useMemo<AlertsPayload>(
+    () => normalizeAlertsPayload<AlertsPayload>(alertsQuery.data) ?? {},
     [alertsQuery.data]
   );
 
   const urgentOrders = useMemo(() => {
     return serviceOrders
-      .filter((order: any) => getServiceOrderNextAction(order).tone === "red")
+      .filter((order: ServiceOrder) => getServiceOrderNextAction(order).tone === "red")
       .slice(0, 5);
   }, [serviceOrders]);
 
   const readyToChargeOrders = useMemo(() => {
     return serviceOrders
-      .filter((order: any) => matchesFinancialFilter(order, "READY_TO_CHARGE"))
+      .filter((order: ServiceOrder) => matchesFinancialFilter(order, "READY_TO_CHARGE"))
       .slice(0, 5);
   }, [serviceOrders]);
 
@@ -155,9 +178,9 @@ export default function OperationsDashboardPage() {
     return charges.slice(0, 5);
   }, [charges]);
 
-  const topOverdueCharge = alerts?.overdueCharges?.items?.[0] ?? null;
-  const overdueCount = Number(alerts?.overdueCharges?.count ?? 0);
-  const overdueAmount = Number(alerts?.overdueCharges?.totalAmountCents ?? 0);
+  const topOverdueCharge = alerts.overdueCharges?.items?.[0] ?? null;
+  const overdueCount = Number(alerts.overdueCharges?.count ?? 0);
+  const overdueAmount = Number(alerts.overdueCharges?.totalAmountCents ?? 0);
 
   async function refreshAll() {
     await Promise.all([
@@ -333,7 +356,7 @@ export default function OperationsDashboardPage() {
             {urgentOrders.length === 0 ? (
               <EmptyState text="Nenhuma ordem urgente neste momento." />
             ) : (
-              urgentOrders.map((order: any) => {
+              urgentOrders.map((order: ServiceOrder) => {
                 const next = getServiceOrderNextAction(order);
 
                 return (
@@ -400,7 +423,7 @@ export default function OperationsDashboardPage() {
             {readyToChargeOrders.length === 0 ? (
               <EmptyState text="Nenhuma ordem pronta para cobrar agora." />
             ) : (
-              readyToChargeOrders.map((order: any) => {
+              readyToChargeOrders.map((order: ServiceOrder) => {
                 const ctx = buildOperationalContextFromServiceOrder(order);
                 const whatsappUrl = buildWhatsAppUrlFromContext(ctx);
 
@@ -451,7 +474,7 @@ export default function OperationsDashboardPage() {
             {pendingCharges.length === 0 ? (
               <EmptyState text="Nenhuma cobrança pendente neste momento." />
             ) : (
-              pendingCharges.map((charge: any) => {
+              pendingCharges.map((charge: Charge) => {
                 const whatsappUrl = buildWhatsAppUrlFromCharge(charge);
 
                 return (
@@ -469,7 +492,7 @@ export default function OperationsDashboardPage() {
                     <div className="mt-3 flex flex-wrap gap-2">
                       <Button
                         size="sm"
-                        onClick={() => generateCheckout(charge)}
+                        onClick={() => void generateCheckout(charge)}
                         className="rounded-xl"
                       >
                         Gerar cobrança
@@ -478,7 +501,7 @@ export default function OperationsDashboardPage() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => registerPayment(charge, "CASH")}
+                        onClick={() => void registerPayment(charge, "CASH")}
                         className="rounded-xl"
                       >
                         Marcar como pago

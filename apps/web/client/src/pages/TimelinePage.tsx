@@ -42,7 +42,13 @@ type TimelineEvent = {
   metadata?: Record<string, unknown> | null;
 };
 
-type EventScope = "ALL" | "APPOINTMENTS" | "SERVICE_ORDERS" | "FINANCIAL" | "RISK" | "GOVERNANCE";
+type EventScope =
+  | "ALL"
+  | "APPOINTMENTS"
+  | "SERVICE_ORDERS"
+  | "FINANCIAL"
+  | "RISK"
+  | "GOVERNANCE";
 
 function formatDateTime(value?: string | null) {
   if (!value) return "—";
@@ -370,10 +376,17 @@ function SummaryCard({
   );
 }
 
-export default function TimelinePage() {
-  const [, navigate] = useLocation();
+function getCustomerIdFromLocation(location: string) {
+  const queryString = location.includes("?") ? location.split("?")[1] : "";
+  const params = new URLSearchParams(queryString);
+  return params.get("customerId")?.trim() || "";
+}
 
-  const [customerId, setCustomerId] = useState<string>("");
+export default function TimelinePage() {
+  const [location, navigate] = useLocation();
+  const customerIdFromUrl = useMemo(() => getCustomerIdFromLocation(location), [location]);
+
+  const [customerId, setCustomerId] = useState<string>(customerIdFromUrl);
   const [search, setSearch] = useState("");
   const [scopeFilter, setScopeFilter] = useState<EventScope>("ALL");
   const [showMetadata, setShowMetadata] = useState(false);
@@ -462,10 +475,26 @@ export default function TimelinePage() {
   }, [filteredEvents]);
 
   useEffect(() => {
+    if (customerIdFromUrl && customerIdFromUrl !== customerId) {
+      setCustomerId(customerIdFromUrl);
+    }
+  }, [customerIdFromUrl, customerId]);
+
+  useEffect(() => {
+    if (customerIdFromUrl) return;
     if (!customerId && customers.length > 0) {
       setCustomerId(customers[0].id);
     }
-  }, [customerId, customers]);
+  }, [customerId, customerIdFromUrl, customers]);
+
+  useEffect(() => {
+    if (!customerId) return;
+
+    const current = getCustomerIdFromLocation(location);
+    if (current === customerId) return;
+
+    navigate(`/timeline?customerId=${customerId}`, { replace: true });
+  }, [customerId, location, navigate]);
 
   useEffect(() => {
     if (customersQuery.error) {
@@ -490,6 +519,12 @@ export default function TimelinePage() {
     { value: "RISK", label: "Risco" },
     { value: "GOVERNANCE", label: "Governança" },
   ];
+
+  const hasFatalError = customersQuery.isError || (Boolean(customerId) && timelineQuery.isError);
+  const fatalErrorMessage =
+    customersQuery.error?.message ||
+    timelineQuery.error?.message ||
+    "Não foi possível carregar a timeline agora.";
 
   return (
     <div className="space-y-6 p-6">
@@ -538,6 +573,12 @@ export default function TimelinePage() {
           </Button>
         </div>
       </div>
+
+      {hasFatalError ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300">
+          {fatalErrorMessage}
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
         <SummaryCard

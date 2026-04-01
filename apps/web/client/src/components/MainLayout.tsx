@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
+import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { canAny, type Permission } from "@/lib/rbac";
@@ -22,6 +23,7 @@ import {
   Sparkles,
   History,
   Building2,
+  Loader2,
 } from "lucide-react";
 
 interface MainLayoutProps {
@@ -109,7 +111,7 @@ function getPageDescription(location: string) {
 
 export function MainLayout({ children }: MainLayoutProps) {
   const [location, navigate] = useLocation();
-  const { role, logout } = useAuth();
+  const { role, logout, isSubmitting } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
@@ -250,6 +252,16 @@ export function MainLayout({ children }: MainLayoutProps) {
     [location]
   );
 
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Não foi possível sair agora.";
+      toast.error(message);
+    }
+  };
+
   return (
     <div className="nexo-app-shell min-h-screen text-zinc-900 dark:text-zinc-100">
       <div className="flex min-h-screen w-full gap-3 p-2 md:gap-4 md:p-3">
@@ -359,14 +371,22 @@ export function MainLayout({ children }: MainLayoutProps) {
 
               <button
                 type="button"
-                onClick={() => void logout()}
-                className={`flex w-full items-center rounded-xl px-2.5 py-2 text-[13px] text-red-600 transition-colors hover:bg-red-50/90 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-500/10 dark:hover:text-red-300 ${
+                onClick={() => void handleLogout()}
+                disabled={isSubmitting}
+                className={`flex w-full items-center rounded-xl px-2.5 py-2 text-[13px] text-red-600 transition-colors hover:bg-red-50/90 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-60 dark:text-red-400 dark:hover:bg-red-500/10 dark:hover:text-red-300 ${
                   sidebarCollapsed ? "justify-center" : "gap-2.5"
                 }`}
               >
-                <LogOut className="h-4 w-4 shrink-0" />
+                {isSubmitting ? (
+                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                ) : (
+                  <LogOut className="h-4 w-4 shrink-0" />
+                )}
+
                 {!sidebarCollapsed && (
-                  <span className="truncate font-medium">Sair</span>
+                  <span className="truncate font-medium">
+                    {isSubmitting ? "Saindo..." : "Sair"}
+                  </span>
                 )}
               </button>
             </div>

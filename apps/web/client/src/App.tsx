@@ -114,6 +114,15 @@ function LazyPage({
   );
 }
 
+function RedirectingScreen({ message }: { message: string }) {
+  return (
+    <FullScreenMessage
+      title="Redirecionando..."
+      description={message}
+    />
+  );
+}
+
 function ProtectedRoute({
   component: Component,
   permissions,
@@ -155,11 +164,27 @@ function ProtectedRoute({
     requiresOnboarding,
   ]);
 
-  if (isInitializing) return <FullScreenLoader />;
-  if (!isAuthenticated) return null;
+  if (isInitializing) {
+    return <FullScreenLoader />;
+  }
 
-  if (requireCompletedOnboarding && requiresOnboarding) return null;
-  if (onboardingOnly && !requiresOnboarding) return null;
+  if (!isAuthenticated) {
+    return (
+      <RedirectingScreen message="Sua sessão não está ativa. Você será enviado para o login." />
+    );
+  }
+
+  if (requireCompletedOnboarding && requiresOnboarding) {
+    return (
+      <RedirectingScreen message="Seu acesso precisa passar pelo onboarding antes de continuar." />
+    );
+  }
+
+  if (onboardingOnly && !requiresOnboarding) {
+    return (
+      <RedirectingScreen message="Seu onboarding já foi concluído. Voltando para o dashboard." />
+    );
+  }
 
   if (permissions?.length && (!role || !canAny(role, permissions))) {
     return (
@@ -186,7 +211,12 @@ function PublicRoute({ component: Component }: { component: ComponentType }) {
   }, [isAuthenticated, isInitializing, navigate, redirectTo]);
 
   if (isInitializing) return <FullScreenLoader />;
-  if (isAuthenticated) return null;
+
+  if (isAuthenticated) {
+    return (
+      <RedirectingScreen message="Sua sessão já está ativa. Redirecionando para a área interna." />
+    );
+  }
 
   return <Component />;
 }
