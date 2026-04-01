@@ -339,6 +339,12 @@ export const nexoProxyRouter = router({
   }),
 
   timeline: router({
+    listByOrg: protectedProcedure
+      .input(z.object({ limit: z.number().optional(), action: z.string().optional() }).optional())
+      .query(async ({ ctx, input }) => {
+        return authedGet(ctx as CtxLike, `/timeline`, input ?? {});
+      }),
+
     listByCustomer: protectedProcedure
       .input(z.object({ customerId: z.string(), limit: z.number().optional() }))
       .query(async ({ ctx, input }) => {

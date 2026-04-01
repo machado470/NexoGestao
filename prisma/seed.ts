@@ -2,7 +2,7 @@ import { PrismaClient } from '@prisma/client'
 import { createRequire } from 'node:module'
 
 const require = createRequire(import.meta.url)
-const bcrypt = require('/app/node_modules/.pnpm/bcryptjs@3.0.3/node_modules/bcryptjs/umd/index.js')
+const bcrypt = require('bcryptjs')
 
 const prisma = new PrismaClient()
 

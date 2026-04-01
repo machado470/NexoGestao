@@ -67,15 +67,20 @@ export async function fetchNexoMe(req: any) {
 }
 
 function extractUserFromMePayload(me: any) {
-  return (
+  const raw =
     me?.user ??
     me?.data?.user ??
     me?.data?.data?.user ??
     me?.result?.data?.json?.user ??
     me?.result?.data?.json?.data?.user ??
     me?.result?.data?.json?.data?.data?.user ??
-    null
-  );
+    null;
+  if (!raw) return null;
+  // Normaliza orgId -> organizationId para compatibilidade com os routers do BFF
+  return {
+    ...raw,
+    organizationId: raw.organizationId ?? raw.orgId ?? null,
+  };
 }
 
 export async function createContext(

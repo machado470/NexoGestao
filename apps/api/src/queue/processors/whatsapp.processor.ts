@@ -2,14 +2,15 @@ import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nest
 import { Job, Worker } from 'bullmq'
 import IORedis from 'ioredis'
 import { WhatsAppService } from '../../whatsapp/whatsapp.service'
-import { MockWhatsAppProvider } from '../../whatsapp/providers/mock.provider'
+import { createWhatsAppProvider } from '../../whatsapp/providers/provider.factory'
+import type { WhatsAppProvider } from '../../whatsapp/providers/whatsapp.provider'
 import { QUEUE_CONNECTION, QUEUE_NAMES } from '../queue.constants'
 import { QueueService } from '../queue.service'
 
 @Injectable()
 export class WhatsAppProcessor implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(WhatsAppProcessor.name)
-  private readonly provider = new MockWhatsAppProvider()
+  private readonly provider: WhatsAppProvider = createWhatsAppProvider()
   private worker?: Worker
 
   constructor(

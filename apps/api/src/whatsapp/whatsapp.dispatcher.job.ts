@@ -3,12 +3,13 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
 import { WhatsAppService } from './whatsapp.service'
-import { MockWhatsAppProvider } from './providers/mock.provider'
+import { createWhatsAppProvider } from './providers/provider.factory'
+import type { WhatsAppProvider } from './providers/whatsapp.provider'
 
 @Injectable()
 export class WhatsAppDispatcherJob {
   private readonly logger = new Logger(WhatsAppDispatcherJob.name)
-  private readonly provider = new MockWhatsAppProvider()
+  private readonly provider: WhatsAppProvider = createWhatsAppProvider()
 
   constructor(private readonly whatsApp: WhatsAppService) {}
 
