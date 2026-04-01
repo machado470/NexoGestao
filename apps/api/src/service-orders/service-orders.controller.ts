@@ -32,25 +32,8 @@ export class ServiceOrdersController {
 
   @Get()
   @Roles('ADMIN', 'MANAGER', 'STAFF', 'VIEWER')
-  list(
-    @Org() orgId: string,
-    @Query('status') status?: string,
-    @Query('customerId') customerId?: string,
-    @Query('assignedToPersonId') assignedToPersonId?: string,
-    @Query('from') from?: string,
-    @Query('to') to?: string,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-  ) {
-    return this.serviceOrders.list(orgId, {
-      status: status as any,
-      customerId,
-      assignedToPersonId,
-      from,
-      to,
-      page: page ? Number(page) : 1,
-      limit: limit ? Number(limit) : 20,
-    })
+  list(@Org() orgId: string, @Query() query: any) {
+    return this.serviceOrders.list(orgId, query)
   }
 
   @Get(':id')

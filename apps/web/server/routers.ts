@@ -3,7 +3,6 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
 import { fetchNexoMe } from "./_core/context";
 import { nexoProxyRouter } from "./routers/nexo-proxy";
-import { dataRouter } from "./routers/data";
 import { financeRouter } from "./routers/finance";
 import { peopleRouter } from "./routers/people";
 import { governanceRouter } from "./routers/governance";
@@ -24,7 +23,6 @@ export const appRouter = router({
 
   nexo: nexoProxyRouter,
 
-  data: dataRouter,
   finance: financeRouter,
   people: peopleRouter,
   governance: governanceRouter,

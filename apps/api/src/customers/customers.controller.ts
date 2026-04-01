@@ -5,6 +5,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
   Res,
 } from '@nestjs/common'
@@ -29,8 +30,8 @@ export class CustomersController {
 
   @Get()
   @Roles('ADMIN', 'MANAGER', 'STAFF', 'VIEWER')
-  list(@Org() orgId: string) {
-    return this.customers.list(orgId)
+  list(@Org() orgId: string, @Query() query: any) {
+    return this.customers.list(orgId, query)
   }
 
   @Get('export')

@@ -7,7 +7,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { TimelineService } from '../timeline/timeline.service'
 import { AuditService } from '../audit/audit.service'
 import { AUDIT_ACTIONS } from '../audit/audit.actions'
-import { ServiceOrderStatus } from '@prisma/client'
+import { ServiceOrderStatus, Prisma } from '@prisma/client'
 import { OperationalStateService } from '../people/operational-state.service'
 import { FinanceService } from '../finance/finance.service'
 import { AutomationService } from '../automation/automation.service'
@@ -230,7 +230,7 @@ export class ServiceOrdersService {
       if (!current) {
         chargeByServiceOrderId.set(charge.serviceOrderId, {
           id: charge.id,
-          status: charge.status,
+          status: charge.status as any,
           amountCents: charge.amountCents,
           dueDate: charge.dueDate,
           paidAt: charge.paidAt ?? null,
@@ -238,10 +238,10 @@ export class ServiceOrdersService {
         continue
       }
 
-      if (priority[charge.status] > priority[current.status]) {
+      if (priority[charge.status as keyof typeof priority] > priority[current.status as keyof typeof priority]) {
         chargeByServiceOrderId.set(charge.serviceOrderId, {
           id: charge.id,
-          status: charge.status,
+          status: charge.status as any,
           amountCents: charge.amountCents,
           dueDate: charge.dueDate,
           paidAt: charge.paidAt ?? null,
@@ -267,12 +267,13 @@ export class ServiceOrdersService {
       to?: string
       page?: number
       limit?: number
+      search?: string
     },
   ) {
     if (!orgId) throw new BadRequestException('orgId é obrigatório')
 
-    const page = filters.page ?? 1
-    const limit = Math.min(filters.limit ?? 20, 100)
+    const page = Number(filters.page) || 1
+    const limit = Math.min(Number(filters.limit) || 20, 100)
     const skip = (page - 1) * limit
 
     const from = parseOptionalDate('from', filters.from)
@@ -282,7 +283,7 @@ export class ServiceOrdersService {
       throw new BadRequestException('intervalo inválido: from não pode ser maior que to')
     }
 
-    const where: any = { orgId }
+    const where: Prisma.ServiceOrderWhereInput = { orgId }
 
     if (filters.customerId) where.customerId = filters.customerId
     if (filters.assignedToPersonId) {
@@ -300,6 +301,23 @@ export class ServiceOrdersService {
       where.scheduledFor = {}
       if (from) where.scheduledFor.gte = from
       if (to) where.scheduledFor.lte = to
+    }
+
+    if (filters.search) {
+      const s = String(filters.search)
+      where.OR = [
+        { title: { contains: s, mode: 'insensitive' } },
+        { description: { contains: s, mode: 'insensitive' } },
+        {
+          customer: {
+            OR: [
+              { name: { contains: s, mode: 'insensitive' } },
+              { email: { contains: s, mode: 'insensitive' } },
+              { phone: { contains: s, mode: 'insensitive' } },
+            ],
+          },
+        },
+      ]
     }
 
     const [rows, total] = await Promise.all([
@@ -360,97 +378,64 @@ export class ServiceOrdersService {
     customerId: string
     title: string
     description?: string
-    priority?: number
-    scheduledFor?: string
-    appointmentId?: string
     assignedToPersonId?: string
+    appointmentId?: string
+    scheduledFor?: string
     amountCents?: number
     dueDate?: string
   }) {
     if (!params.orgId) throw new BadRequestException('orgId é obrigatório')
-    if (!params.customerId) {
-      throw new BadRequestException('customerId é obrigatório')
-    }
+    if (!params.customerId) throw new BadRequestException('customerId é obrigatório')
 
-    const title = normalizeText(params.title)
-    if (!title) throw new BadRequestException('title é obrigatório')
+    const title = (params.title ?? '').trim()
+    if (!title) throw new BadRequestException('Título é obrigatório')
 
     const description = normalizeText(params.description)
-
-    const priority =
-      typeof params.priority === 'number' && Number.isFinite(params.priority)
-        ? Math.min(5, Math.max(1, Math.floor(params.priority)))
-        : 2
-
     const scheduledFor = parseOptionalDate('scheduledFor', params.scheduledFor)
-    const rawDueDate = parseOptionalDate('dueDate', params.dueDate)
     const amountCents = normalizeAmount(params.amountCents)
-
-    const dueDateValue = resolveDueDateForServiceOrder({
-      amountCents,
-      dueDate: rawDueDate,
-      referenceDate: scheduledFor,
-    })
+    const dueDate = parseOptionalDate('dueDate', params.dueDate)
 
     const customer = await this.prisma.customer.findFirst({
       where: { id: params.customerId, orgId: params.orgId },
       select: { id: true, name: true },
     })
-    if (!customer) throw new BadRequestException('Cliente inválido para este org')
+    if (!customer) throw new BadRequestException('Cliente inválido')
+
+    if (params.assignedToPersonId) {
+      const person = await this.prisma.person.findFirst({
+        where: { id: params.assignedToPersonId, orgId: params.orgId },
+        select: { id: true },
+      })
+      if (!person) throw new BadRequestException('Responsável inválido')
+    }
 
     if (params.appointmentId) {
       const appt = await this.prisma.appointment.findFirst({
         where: { id: params.appointmentId, orgId: params.orgId },
-        select: { id: true, customerId: true },
-      })
-      if (!appt) {
-        throw new BadRequestException('appointmentId inválido para este org')
-      }
-      if (appt.customerId !== params.customerId) {
-        throw new BadRequestException(
-          'appointmentId não pertence ao mesmo customerId',
-        )
-      }
-    }
-
-    if (params.assignedToPersonId) {
-      const p = await this.prisma.person.findFirst({
-        where: {
-          id: params.assignedToPersonId,
-          orgId: params.orgId,
-          active: true,
-        },
         select: { id: true },
       })
-      if (!p) {
-        throw new BadRequestException('assignedToPersonId inválido para este org')
-      }
+      if (!appt) throw new BadRequestException('Agendamento inválido')
     }
 
     const created = await this.prisma.serviceOrder.create({
       data: {
         orgId: params.orgId,
         customerId: params.customerId,
-        appointmentId: params.appointmentId ?? null,
-        assignedToPersonId: params.assignedToPersonId ?? null,
         title,
         description,
-        priority,
+        assignedToPersonId: params.assignedToPersonId ?? null,
+        appointmentId: params.appointmentId ?? null,
         scheduledFor,
         amountCents,
-        dueDate: dueDateValue,
-        status: params.assignedToPersonId ? 'ASSIGNED' : 'OPEN',
+        status: 'OPEN',
       },
       include: {
         customer: { select: { id: true, name: true, phone: true } },
         assignedTo: { select: { id: true, name: true } },
-        appointment: {
-          select: { id: true, startsAt: true, endsAt: true, status: true },
-        },
       },
     })
 
-    const context = `O.S. criada: ${created.title} (${created.customer.name})`
+    const context = `Ordem de serviço criada: ${created.title} (cliente: ${created.customer.name})`
 
     await this.timeline.log({
       orgId: params.orgId,
@@ -460,18 +445,11 @@ export class ServiceOrdersService {
       metadata: {
         serviceOrderId: created.id,
         customerId: created.customerId,
-        appointmentId: created.appointmentId,
-        assignedToPersonId: created.assignedToPersonId,
-        status: created.status,
-        priority: created.priority,
-        scheduledFor: created.scheduledFor,
-        amountCents: created.amountCents ?? null,
-        dueDate: created.dueDate ?? null,
-        cancellationReason: created.cancellationReason ?? null,
-        outcomeSummary: created.outcomeSummary ?? null,
         actorUserId: params.createdBy,
         actorPersonId: params.personId,
         createdBy: params.createdBy,
+        title: created.title,
+        status: created.status,
       },
     })
 
@@ -487,46 +465,30 @@ export class ServiceOrdersService {
       metadata: {
         serviceOrderId: created.id,
         customerId: created.customerId,
-        appointmentId: created.appointmentId,
-        assignedToPersonId: created.assignedToPersonId,
+        title: created.title,
         status: created.status,
-        priority: created.priority,
-        scheduledFor: created.scheduledFor,
-        amountCents: created.amountCents ?? null,
-        dueDate: created.dueDate ?? null,
-        cancellationReason: created.cancellationReason ?? null,
-        outcomeSummary: created.outcomeSummary ?? null,
       },
     })
 
-    await this.syncOperationalForPeople(params.orgId, [created.assignedToPersonId])
-    await this.onboardingService.completeOnboardingStep(params.orgId, 'createService')
+    await this.notificationsService.createNotification(
+      created.orgId,
+      'SERVICE_ORDER_CREATED',
+      `Nova O.S. "${created.title}" criada para ${created.customer.name}.`,
+      params.createdBy,
+      { serviceOrderId: created.id },
+    )
 
-    const [enriched] = await this.attachFinancialSummary(params.orgId, [created])
-    return enriched ?? { ...created, financialSummary: this.buildFinancialSummary(null) }
-  }
+    await this.onboardingService.completeOnboardingStep(
+      params.orgId,
+      'createServiceOrder',
+    )
 
-  async checkAndNotifyOverdueServiceOrders() {
-    const now = new Date()
+    await this.syncOperationalForPeople(params.orgId, [
+      params.personId,
+      params.assignedToPersonId,
+    ])
 
-    const overdueServiceOrders = await this.prisma.serviceOrder.findMany({
-      where: {
-        scheduledFor: { lt: now },
-        status: { notIn: [ServiceOrderStatus.DONE, ServiceOrderStatus.CANCELED] },
-      },
-      include: { customer: true, assignedTo: true },
-    })
-
-    for (const so of overdueServiceOrders) {
-      const message = `Serviço #${so.id} (${so.title}) para ${so.customer.name} está atrasado.`
-      await this.notificationsService.createNotification(
-        so.orgId,
-        'SERVICE_OVERDUE',
-        message,
-        so.assignedToPersonId ? (so.assignedTo as any)?.userId : null,
-        { serviceOrderId: so.id, customerId: so.customerId },
-      )
-    }
+    return created
   }
 
   async update(params: {
@@ -537,345 +499,186 @@ export class ServiceOrdersService {
     data: {
       title?: string
       description?: string
-      priority?: number
-      scheduledFor?: string
+      assignedToPersonId?: string
       status?: ServiceOrderStatus
-      assignedToPersonId?: string | null
+      scheduledFor?: string
       amountCents?: number
-      dueDate?: string
-      cancellationReason?: string
-      outcomeSummary?: string
     }
   }) {
     if (!params.orgId) throw new BadRequestException('orgId é obrigatório')
     if (!params.id) throw new BadRequestException('id é obrigatório')
 
-    const existing = await this.prisma.serviceOrder.findFirst({
+    const before = await this.prisma.serviceOrder.findFirst({
       where: { id: params.id, orgId: params.orgId },
-      select: {
-        id: true,
-        title: true,
-        status: true,
-        assignedToPersonId: true,
-        customerId: true,
-        amountCents: true,
-        dueDate: true,
-        scheduledFor: true,
-        cancellationReason: true,
-        outcomeSummary: true,
-      },
     })
+    if (!before) throw new NotFoundException('Ordem de serviço não encontrada')
 
-    if (!existing) throw new NotFoundException('Ordem de serviço não encontrada')
+    const data: any = {}
 
-    const patch: any = {}
-
-    if (typeof params.data.title === 'string') {
-      const v = normalizeText(params.data.title)
-      if (!v) throw new BadRequestException('title inválido')
-      patch.title = v
+    if (params.data.title !== undefined) {
+      const v = (params.data.title ?? '').trim()
+      if (!v) throw new BadRequestException('Título inválido')
+      data.title = v
     }
 
-    if (typeof params.data.description === 'string') {
-      patch.description = normalizeText(params.data.description)
-    }
-
-    if (typeof params.data.priority === 'number') {
-      if (!Number.isFinite(params.data.priority)) {
-        throw new BadRequestException('priority inválida')
-      }
-      patch.priority = Math.min(5, Math.max(1, Math.floor(params.data.priority)))
-    }
-
-    let nextScheduledFor = existing.scheduledFor ?? null
-    if (typeof params.data.scheduledFor === 'string') {
-      const parsed = parseOptionalDate('scheduledFor', params.data.scheduledFor)
-      patch.scheduledFor = parsed
-      nextScheduledFor = parsed
-    }
-
-    let nextAmountCents = existing.amountCents ?? null
-    if (params.data.amountCents !== undefined) {
-      const normalizedAmount = normalizeAmount(params.data.amountCents)
-      patch.amountCents = normalizedAmount
-      nextAmountCents = normalizedAmount
-    }
-
-    let dueDateTouched = false
-    let nextDueDate = existing.dueDate ?? null
-
-    if (params.data.dueDate !== undefined) {
-      dueDateTouched = true
-      const parsed = parseOptionalDate('dueDate', params.data.dueDate)
-      patch.dueDate = parsed
-      nextDueDate = parsed
-    }
-
-    if (typeof params.data.status === 'string') {
-      if (!isStatus(params.data.status)) {
-        throw new BadRequestException('status inválido')
-      }
-      if (!this.canTransition(existing.status, params.data.status)) {
-        throw new BadRequestException(
-          `Transição inválida de ${existing.status} para ${params.data.status}`,
-        )
-      }
-      patch.status = params.data.status
+    if (params.data.description !== undefined) {
+      data.description = normalizeText(params.data.description)
     }
 
     if (params.data.assignedToPersonId !== undefined) {
-      const v = params.data.assignedToPersonId
-
-      if (v === null) {
-        patch.assignedToPersonId = null
-      } else if (typeof v === 'string' && v.trim()) {
-        const normalizedPersonId = v.trim()
-        const p = await this.prisma.person.findFirst({
-          where: { id: normalizedPersonId, orgId: params.orgId, active: true },
+      if (params.data.assignedToPersonId) {
+        const person = await this.prisma.person.findFirst({
+          where: { id: params.data.assignedToPersonId, orgId: params.orgId },
           select: { id: true },
         })
-        if (!p) {
-          throw new BadRequestException('assignedToPersonId inválido para este org')
-        }
-        patch.assignedToPersonId = normalizedPersonId
+        if (!person) throw new BadRequestException('Responsável inválido')
+        data.assignedToPersonId = params.data.assignedToPersonId
       } else {
-        throw new BadRequestException('assignedToPersonId inválido')
+        data.assignedToPersonId = null
       }
     }
 
-    if (!dueDateTouched && nextAmountCents && !nextDueDate) {
-      const autoDueDate = resolveDueDateForServiceOrder({
-        amountCents: nextAmountCents,
-        dueDate: null,
-        referenceDate: nextScheduledFor,
-      })
-      patch.dueDate = autoDueDate
-      nextDueDate = autoDueDate
-    }
-
-    if (patch.assignedToPersonId && !patch.status && existing.status === 'OPEN') {
-      patch.status = 'ASSIGNED'
-    }
-
-    const nextAssignedToPersonId =
-      patch.assignedToPersonId !== undefined
-        ? patch.assignedToPersonId
-        : existing.assignedToPersonId
-
-    let nextStatus: ServiceOrderStatus =
-      patch.status !== undefined ? patch.status : existing.status
-
-    if (
-      patch.assignedToPersonId === null &&
-      patch.status === undefined &&
-      (existing.status === 'ASSIGNED' || existing.status === 'OPEN')
-    ) {
-      patch.status = 'OPEN'
-      nextStatus = 'OPEN'
-    }
-
-    if (
-      (nextStatus === 'ASSIGNED' || nextStatus === 'IN_PROGRESS') &&
-      !nextAssignedToPersonId
-    ) {
-      throw new BadRequestException(
-        `Não é permitido manter O.S. em ${nextStatus} sem responsável`,
-      )
-    }
-
-    const normalizedCancellationReason =
-      params.data.cancellationReason !== undefined
-        ? normalizeText(params.data.cancellationReason)
-        : existing.cancellationReason ?? null
-
-    const normalizedOutcomeSummary =
-      params.data.outcomeSummary !== undefined
-        ? normalizeText(params.data.outcomeSummary)
-        : existing.outcomeSummary ?? null
-
-    if (params.data.cancellationReason !== undefined) {
-      if (nextStatus !== 'CANCELED') {
+    if (params.data.status !== undefined) {
+      if (!isStatus(params.data.status)) {
+        throw new BadRequestException('status inválido')
+      }
+      if (!this.canTransition(before.status, params.data.status)) {
         throw new BadRequestException(
-          'cancellationReason só pode ser informado para O.S. cancelada',
+          `Transição de status inválida: ${before.status} -> ${params.data.status}`,
         )
       }
-      patch.cancellationReason = normalizedCancellationReason
+      data.status = params.data.status
     }
 
-    if (params.data.outcomeSummary !== undefined) {
-      if (nextStatus !== 'DONE') {
-        throw new BadRequestException(
-          'outcomeSummary só pode ser informado para O.S. concluída',
-        )
-      }
-      patch.outcomeSummary = normalizedOutcomeSummary
+    if (params.data.scheduledFor !== undefined) {
+      data.scheduledFor = parseOptionalDate('scheduledFor', params.data.scheduledFor)
     }
 
-    if (nextStatus === 'CANCELED') {
-      if (!normalizedCancellationReason) {
-        throw new BadRequestException(
-          'cancellationReason é obrigatório para cancelar a O.S.',
-        )
-      }
-      if (patch.cancellationReason === undefined) {
-        patch.cancellationReason = normalizedCancellationReason
-      }
+    if (params.data.amountCents !== undefined) {
+      data.amountCents = normalizeAmount(params.data.amountCents)
     }
 
-    if (nextStatus === 'DONE') {
-      if (!normalizedOutcomeSummary) {
-        throw new BadRequestException(
-          'outcomeSummary é obrigatório para concluir a O.S.',
-        )
-      }
-      if (patch.outcomeSummary === undefined) {
-        patch.outcomeSummary = normalizedOutcomeSummary
-      }
-    }
-
-    if (patch.status === 'IN_PROGRESS' && existing.status !== 'IN_PROGRESS') {
-      patch.startedAt = new Date()
-    }
-
-    if (patch.status === 'DONE' && existing.status !== 'DONE') {
-      patch.finishedAt = new Date()
-      patch.startedAt = patch.startedAt ?? new Date()
-    }
-
-    if (Object.keys(patch).length === 0) {
+    if (Object.keys(data).length === 0) {
       throw new BadRequestException('Nenhum campo para atualizar')
     }
 
-    const result = await this.prisma.serviceOrder.updateMany({
-      where: { id: params.id, orgId: params.orgId },
-      data: patch,
-    })
-
-    if (result.count === 0) {
-      throw new NotFoundException('Ordem de serviço não encontrada')
-    }
-
-    const updated = await this.prisma.serviceOrder.findFirst({
-      where: { id: params.id, orgId: params.orgId },
+    const updated = await this.prisma.serviceOrder.update({
+      where: { id: params.id },
+      data,
       include: {
         customer: { select: { id: true, name: true, phone: true } },
         assignedTo: { select: { id: true, name: true } },
-        appointment: {
-          select: { id: true, startsAt: true, endsAt: true, status: true },
-        },
       },
     })
 
-    if (!updated) throw new NotFoundException('Ordem de serviço não encontrada')
-
-    const statusChanged = !!patch.status && patch.status !== existing.status
-    const assignedChanged =
-      patch.assignedToPersonId !== undefined &&
-      patch.assignedToPersonId !== existing.assignedToPersonId
+    const context = `Ordem de serviço atualizada: ${updated.title}`
 
     await this.timeline.log({
       orgId: params.orgId,
       personId: params.personId,
-      action: statusChanged
-        ? statusToAction(updated.status)
-        : 'SERVICE_ORDER_UPDATED',
-      description: `O.S. atualizada: ${updated.title} (${updated.customer.name})`,
+      action: statusToAction(updated.status),
+      description: context,
       metadata: {
         serviceOrderId: updated.id,
         customerId: updated.customerId,
-        appointmentId: updated.appointmentId,
-        assignedToPersonId: updated.assignedToPersonId,
-        status: updated.status,
-        amountCents: updated.amountCents ?? null,
-        dueDate: updated.dueDate ?? null,
-        cancellationReason: updated.cancellationReason ?? null,
-        outcomeSummary: updated.outcomeSummary ?? null,
         actorUserId: params.updatedBy,
         actorPersonId: params.personId,
         updatedBy: params.updatedBy,
-        patch,
+        patch: data,
       },
     })
 
-    let auditAction: string = AUDIT_ACTIONS.SERVICE_ORDER_UPDATED
-    if (statusChanged) auditAction = AUDIT_ACTIONS.SERVICE_ORDER_STATUS_CHANGED
-    else if (assignedChanged) auditAction = AUDIT_ACTIONS.SERVICE_ORDER_ASSIGNED_CHANGED
+    if (data.status === 'DONE' && before.status !== 'DONE') {
+      if (updated.amountCents && updated.amountCents > 0) {
+        await this.finance.ensureChargeForServiceOrderDone({
+          orgId: params.orgId,
+          serviceOrderId: updated.id,
+          customerId: updated.customerId,
+          amountCents: updated.amountCents,
+          actorUserId: params.updatedBy,
+        })
+      }
+
+      await this.automation.executeTrigger({
+        orgId: params.orgId,
+        trigger: 'SERVICE_ORDER_DONE',
+        payload: {
+          serviceOrderId: updated.id,
+          customerId: updated.customerId,
+          customerPhone: updated.customer?.phone ?? null,
+          title: updated.title,
+          status: updated.status,
+          entityId: updated.id,
+        },
+      })
+    }
 
     await this.audit.log({
       orgId: params.orgId,
-      action: auditAction,
+      action: AUDIT_ACTIONS.SERVICE_ORDER_UPDATED,
       actorUserId: params.updatedBy,
       actorPersonId: params.personId,
       personId: params.personId,
       entityType: 'SERVICE_ORDER',
       entityId: updated.id,
-      context: `O.S. atualizada: ${updated.title} (${updated.customer.name})`,
+      context,
       metadata: {
         serviceOrderId: updated.id,
         before: {
-          status: existing.status,
-          assignedToPersonId: existing.assignedToPersonId,
-          amountCents: existing.amountCents ?? null,
-          dueDate: existing.dueDate ?? null,
-          cancellationReason: existing.cancellationReason ?? null,
-          outcomeSummary: existing.outcomeSummary ?? null,
+          title: before.title,
+          status: before.status,
+          assignedToPersonId: before.assignedToPersonId,
         },
         after: {
+          title: updated.title,
           status: updated.status,
           assignedToPersonId: updated.assignedToPersonId,
-          amountCents: updated.amountCents ?? null,
-          dueDate: updated.dueDate ?? null,
-          cancellationReason: updated.cancellationReason ?? null,
-          outcomeSummary: updated.outcomeSummary ?? null,
         },
-        patch,
+        patch: data,
       },
     })
 
-    if (statusChanged && updated.status === 'DONE') {
-      await this.automation.executeTrigger({
-        orgId: params.orgId,
-        trigger: 'SERVICE_ORDER_COMPLETED',
-        payload: {
-          serviceOrderId: updated.id,
-          customerId: updated.customerId,
-          customerPhone: updated.customer?.phone ?? null,
-          amountCents: updated.amountCents ?? null,
-          entityId: updated.id,
-        },
-      })
+    await this.syncOperationalForPeople(params.orgId, [
+      params.personId,
+      before.assignedToPersonId,
+      updated.assignedToPersonId,
+    ])
 
-      try {
-        await this.finance.ensureChargeForServiceOrderDone({
-          orgId: params.orgId,
-          serviceOrderId: updated.id,
-          customerId: updated.customerId,
-          actorUserId: params.updatedBy,
-          amountCents: updated.amountCents ?? null,
-          dueDate: updated.dueDate ?? null,
-        })
-      } catch (err) {
-        console.warn(
-          '[ServiceOrders] Falha ao criar cobrança ao concluir O.S. orgId=%s soId=%s err=%s',
-          params.orgId,
-          updated.id,
-          err instanceof Error ? err.message : String(err),
-        )
-      }
+    return updated
+  }
+
+  async generateCharge(params: {
+    orgId: string
+    actorUserId: string | null
+    serviceOrderId: string
+    amountCents?: number
+    dueDate?: string
+  }) {
+    const os = await this.prisma.serviceOrder.findFirst({
+      where: { id: params.serviceOrderId, orgId: params.orgId },
+    })
+
+    if (!os) throw new NotFoundException('Ordem de serviço não encontrada')
+
+    const amountCents = normalizeAmount(params.amountCents) ?? os.amountCents
+    if (!amountCents || amountCents <= 0) {
+      throw new BadRequestException('Valor da O.S. não definido ou inválido')
     }
 
-    const impacted: Array<string | null> = []
+    const dueDate = resolveDueDateForServiceOrder({
+      amountCents,
+      dueDate: parseOptionalDate('dueDate', params.dueDate),
+    })
 
-    if (assignedChanged) {
-      impacted.push(existing.assignedToPersonId ?? null)
-      impacted.push(updated.assignedToPersonId ?? null)
-    } else if (statusChanged) {
-      impacted.push(updated.assignedToPersonId ?? null)
-    }
+    const result = await this.finance.ensureChargeForServiceOrderDone({
+      orgId: params.orgId,
+      serviceOrderId: os.id,
+      customerId: os.customerId,
+      amountCents,
+      dueDate,
+      actorUserId: params.actorUserId,
+    })
 
-    await this.syncOperationalForPeople(params.orgId, impacted)
-
-    const [enriched] = await this.attachFinancialSummary(params.orgId, [updated])
-    return enriched ?? { ...updated, financialSummary: this.buildFinancialSummary(null) }
+    return result
   }
 }

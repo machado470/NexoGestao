@@ -10,6 +10,7 @@ import { NotificationsService } from '../notifications/notifications.service'
 import { OnboardingService } from '../onboarding/onboarding.service'
 import { AUDIT_ACTIONS } from '../audit/audit.actions'
 import { AnalyticsService, UsageMetricEvent } from '../analytics/analytics.service'
+import { Prisma } from '@prisma/client'
 
 function normalizeEmail(v?: string): string | null {
   const s = (v ?? '').trim().toLowerCase()
@@ -32,14 +33,43 @@ export class CustomersService {
     private readonly analytics: AnalyticsService,
   ) {}
 
-  async list(orgId: string) {
+  async list(orgId: string, query?: any) {
     if (!orgId) throw new BadRequestException('orgId é obrigatório')
 
-    return this.prisma.customer.findMany({
-      where: { orgId },
-      orderBy: { createdAt: 'desc' },
-      take: 200,
-    })
+    const page = Number(query?.page) || 1
+    const limit = Number(query?.limit) || 20
+    const skip = (page - 1) * limit
+
+    const where: Prisma.CustomerWhereInput = { orgId }
+
+    if (query?.search) {
+      const s = String(query.search)
+      where.OR = [
+        { name: { contains: s, mode: 'insensitive' } },
+        { email: { contains: s, mode: 'insensitive' } },
+        { phone: { contains: s, mode: 'insensitive' } },
+      ]
+    }
+
+    const [items, total] = await Promise.all([
+      this.prisma.customer.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        skip,
+      }),
+      this.prisma.customer.count({ where }),
+    ])
+
+    return {
+      data: items,
+      meta: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+      },
+    }
   }
 
   async exportCsv(orgId: string) {

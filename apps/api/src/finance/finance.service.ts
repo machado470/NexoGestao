@@ -3,7 +3,7 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
-import { $Enums } from '@prisma/client'
+import { $Enums, Prisma } from '@prisma/client'
 
 @Injectable()
 export class FinanceService {
@@ -45,21 +45,58 @@ export class FinanceService {
   // LIST
   // =========================
   async listCharges(orgId: string, query?: any) {
-    const where: any = { orgId }
+    const page = Number(query?.page) || 1
+    const limit = Number(query?.limit) || 20
+    const skip = (page - 1) * limit
+
+    const where: Prisma.ChargeWhereInput = { orgId }
 
     if (query?.status) {
       where.status = query.status
     }
 
-    const items = await this.prisma.charge.findMany({
-      where,
-      include: {
-        customer: true,
-      },
-      orderBy: { createdAt: 'desc' },
-    })
+    if (query?.serviceOrderId) {
+      where.serviceOrderId = query.serviceOrderId
+    }
 
-    return { items }
+    if (query?.q) {
+      const q = String(query.q)
+      where.OR = [
+        { notes: { contains: q, mode: 'insensitive' } },
+        {
+          customer: {
+            OR: [
+              { name: { contains: q, mode: 'insensitive' } },
+              { email: { contains: q, mode: 'insensitive' } },
+              { phone: { contains: q, mode: 'insensitive' } },
+            ],
+          },
+        },
+      ]
+    }
+
+    const [items, total] = await Promise.all([
+      this.prisma.charge.findMany({
+        where,
+        include: {
+          customer: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        skip,
+      }),
+      this.prisma.charge.count({ where }),
+    ])
+
+    return {
+      items,
+      meta: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+      },
+    }
   }
 
   async getCharge(orgId: string, id: string) {
@@ -82,6 +119,7 @@ export class FinanceService {
     dueDate: Date
     actorUserId?: string | null
     notes?: string | null
+    serviceOrderId?: string | null
   }) {
     return this.prisma.charge.create({
       data: {
@@ -91,6 +129,7 @@ export class FinanceService {
         dueDate: input.dueDate,
         status: 'PENDING',
         notes: input.notes ?? null,
+        serviceOrderId: input.serviceOrderId ?? null,
       },
     })
   }
@@ -108,7 +147,7 @@ export class FinanceService {
       data: {
         amountCents: input.amountCents,
         dueDate: input.dueDate,
-        status: input.status,
+        status: input.status as any,
       },
     })
   }
@@ -217,25 +256,81 @@ export class FinanceService {
   }
 
   // =========================
-  // STUBS
+  // STATS & REPORTS
   // =========================
   async exportChargesCsv(orgId: string) {
-    return 'csv'
+    const charges = await this.prisma.charge.findMany({
+      where: { orgId },
+      include: { customer: true },
+      orderBy: { createdAt: 'desc' },
+    })
+
+    let csv = 'ID,Cliente,Valor,Vencimento,Status,Criado Em\n'
+    for (const c of charges) {
+      csv += `${c.id},"${c.customer?.name ?? ''}",${c.amountCents / 100},${c.dueDate.toISOString()},${c.status},${c.createdAt.toISOString()}\n`
+    }
+    return csv
   }
 
   async getChargeStats(orgId: string) {
-    return {}
+    const [pending, overdue, paid] = await Promise.all([
+      this.prisma.charge.aggregate({
+        where: { orgId, status: 'PENDING' },
+        _count: { _all: true },
+        _sum: { amountCents: true },
+      }),
+      this.prisma.charge.aggregate({
+        where: { orgId, status: 'OVERDUE' },
+        _count: { _all: true },
+        _sum: { amountCents: true },
+      }),
+      this.prisma.charge.aggregate({
+        where: { orgId, status: 'PAID' },
+        _count: { _all: true },
+        _sum: { amountCents: true },
+      }),
+    ])
+
+    return {
+      pending: {
+        count: pending._count._all ?? 0,
+        amountCents: pending._sum.amountCents ?? 0,
+      },
+      overdue: {
+        count: overdue._count._all ?? 0,
+        amountCents: overdue._sum.amountCents ?? 0,
+      },
+      paid: {
+        count: paid._count._all ?? 0,
+        amountCents: paid._sum.amountCents ?? 0,
+      },
+    }
   }
 
   async getRevenueByMonth(orgId: string) {
-    return []
+    const payments = await this.prisma.payment.findMany({
+      where: { orgId },
+      select: { amountCents: true, paidAt: true },
+    })
+
+    const months: Record<string, number> = {}
+    for (const p of payments) {
+      const month = p.paidAt.toISOString().slice(0, 7) // YYYY-MM
+      months[month] = (months[month] || 0) + p.amountCents
+    }
+
+    return Object.entries(months)
+      .map(([month, amountCents]) => ({ month, amountCents }))
+      .sort((a, b) => a.month.localeCompare(b.month))
   }
 
   async createAutomationCharge(data: any) {
-    return {}
+    // Placeholder for future automation logic
+    return { ok: true }
   }
 
   async sendPaymentReminder(data: any) {
-    return {}
+    // Placeholder for future notification logic
+    return { ok: true }
   }
 }

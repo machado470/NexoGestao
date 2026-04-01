@@ -29,19 +29,8 @@ export class AppointmentsController {
 
   @Get()
   @Roles('ADMIN', 'MANAGER', 'STAFF', 'VIEWER')
-  list(
-    @Org() orgId: string,
-    @Query('from') from?: string,
-    @Query('to') to?: string,
-    @Query('status') status?: string,
-    @Query('customerId') customerId?: string,
-  ) {
-    return this.appointments.list(orgId, {
-      from,
-      to,
-      status: status as any,
-      customerId,
-    })
+  list(@Org() orgId: string, @Query() query: any) {
+    return this.appointments.list(orgId, query)
   }
 
   @Get(':id')

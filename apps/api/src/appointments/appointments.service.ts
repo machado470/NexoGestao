@@ -8,7 +8,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { TimelineService } from '../timeline/timeline.service'
 import { AuditService } from '../audit/audit.service'
 import { AUDIT_ACTIONS } from '../audit/audit.actions'
-import { AppointmentStatus } from '@prisma/client'
+import { AppointmentStatus, Prisma } from '@prisma/client'
 import { WhatsAppService } from '../whatsapp/whatsapp.service'
 import { RiskService } from '../risk/risk.service'
 import { AutomationService } from '../automation/automation.service'
@@ -140,13 +140,20 @@ export class AppointmentsService {
       to?: string
       status?: AppointmentStatus
       customerId?: string
+      page?: number
+      limit?: number
+      search?: string
     },
   ) {
     if (!orgId) throw new BadRequestException('orgId é obrigatório')
     const from = parseISODate('from', filters.from)
     const to = parseISODate('to', filters.to)
 
-    const where: any = { orgId }
+    const page = Number(filters.page) || 1
+    const limit = Number(filters.limit) || 20
+    const skip = (page - 1) * limit
+
+    const where: Prisma.AppointmentWhereInput = { orgId }
 
     if (filters.customerId) where.customerId = filters.customerId
 
@@ -161,14 +168,44 @@ export class AppointmentsService {
       if (to) where.startsAt.lte = to
     }
 
-    return this.prisma.appointment.findMany({
-      where,
-      orderBy: { startsAt: 'asc' },
-      take: 500,
-      include: {
-        customer: { select: { id: true, name: true, phone: true } },
+    if (filters.search) {
+      const s = String(filters.search)
+      where.OR = [
+        { notes: { contains: s, mode: 'insensitive' } },
+        {
+          customer: {
+            OR: [
+              { name: { contains: s, mode: 'insensitive' } },
+              { email: { contains: s, mode: 'insensitive' } },
+              { phone: { contains: s, mode: 'insensitive' } },
+            ],
+          },
+        },
+      ]
+    }
+
+    const [items, total] = await Promise.all([
+      this.prisma.appointment.findMany({
+        where,
+        orderBy: { startsAt: 'asc' },
+        take: limit,
+        skip,
+        include: {
+          customer: { select: { id: true, name: true, phone: true } },
+        },
+      }),
+      this.prisma.appointment.count({ where }),
+    ])
+
+    return {
+      data: items,
+      meta: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
       },
-    })
+    }
   }
 
   async get(orgId: string, id: string) {
@@ -343,94 +380,54 @@ export class AppointmentsService {
     if (!params.orgId) throw new BadRequestException('orgId é obrigatório')
     if (!params.id) throw new BadRequestException('id é obrigatório')
 
-    const existing = await this.prisma.appointment.findFirst({
+    const before = await this.prisma.appointment.findFirst({
       where: { id: params.id, orgId: params.orgId },
-      select: {
-        id: true,
-        status: true,
-        startsAt: true,
-        endsAt: true,
-        customerId: true,
-        notes: true,
+      include: {
+        customer: { select: { id: true, name: true } },
       },
     })
-    if (!existing) throw new NotFoundException('Agendamento não encontrado')
+    if (!before) throw new NotFoundException('Agendamento não encontrado')
 
-    const patch: any = {}
+    const data: any = {}
 
-    const patchStartsAt =
-      typeof params.data.startsAt === 'string'
-        ? parseISODate('startsAt', params.data.startsAt)
-        : undefined
-
-    const patchEndsAt =
-      typeof params.data.endsAt === 'string'
-        ? parseISODate('endsAt', params.data.endsAt)
-        : undefined
-
-    if (patchStartsAt === null) throw new BadRequestException('startsAt inválido')
-    if (patchEndsAt === null) throw new BadRequestException('endsAt inválido')
-
-    if (typeof params.data.notes === 'string') {
-      patch.notes = normalizeNotes(params.data.notes)
+    if (params.data.startsAt) {
+      data.startsAt = parseISODate('startsAt', params.data.startsAt)
     }
-
-    if (typeof params.data.status === 'string') {
+    if (params.data.endsAt) {
+      data.endsAt = parseISODate('endsAt', params.data.endsAt)
+    }
+    if (params.data.status) {
       if (!isStatus(params.data.status)) throw new BadRequestException('status inválido')
-      if (!this.canTransition(existing.status, params.data.status)) {
+      if (!this.canTransition(before.status, params.data.status)) {
         throw new BadRequestException(
-          `Transição inválida de ${existing.status} para ${params.data.status}`,
+          `Transição de status inválida: ${before.status} -> ${params.data.status}`,
         )
       }
-      patch.status = params.data.status
+      data.status = params.data.status
+    }
+    if (params.data.notes !== undefined) {
+      data.notes = normalizeNotes(params.data.notes)
     }
 
-    const finalStartsAt = (patchStartsAt ?? existing.startsAt) as Date
-
-    const existingEndsAt = existing.endsAt as Date
-    const existingDuration = durationMinutes(existing.startsAt, existingEndsAt)
-
-    const finalEndsAt =
-      patchEndsAt !== undefined
-        ? (patchEndsAt ?? addMinutes(finalStartsAt, DEFAULT_DURATION_MIN))
-        : patchStartsAt
-          ? addMinutes(finalStartsAt, existingDuration)
-          : existingEndsAt
-
-    if (finalEndsAt.getTime() <= finalStartsAt.getTime()) {
-      throw new BadRequestException('endsAt não pode ser antes/igual a startsAt')
-    }
-
-    patch.startsAt = finalStartsAt
-    patch.endsAt = finalEndsAt
-
-    if (Object.keys(patch).length === 0) {
+    if (Object.keys(data).length === 0) {
       throw new BadRequestException('Nenhum campo para atualizar')
     }
 
     try {
-      const result = await this.prisma.appointment.updateMany({
-        where: { id: params.id, orgId: params.orgId },
-        data: patch,
-      })
-      if (result.count === 0) throw new NotFoundException('Agendamento não encontrado')
-
-      const updated = await this.prisma.appointment.findFirst({
-        where: { id: params.id, orgId: params.orgId },
+      const updated = await this.prisma.appointment.update({
+        where: { id: params.id },
+        data,
         include: {
           customer: { select: { id: true, name: true, phone: true } },
         },
       })
-      if (!updated) throw new NotFoundException('Agendamento não encontrado')
-
-      const statusChanged = !!patch.status && patch.status !== existing.status
 
       const context = `Agendamento atualizado: ${updated.customer.name}`
 
       await this.timeline.log({
         orgId: params.orgId,
         personId: params.personId,
-        action: statusChanged ? statusToAction(updated.status) : 'APPOINTMENT_UPDATED',
+        action: statusToAction(updated.status),
         description: context,
         metadata: {
           appointmentId: updated.id,
@@ -438,15 +435,36 @@ export class AppointmentsService {
           actorUserId: params.updatedBy,
           actorPersonId: params.personId,
           updatedBy: params.updatedBy,
-          patch,
+          patch: data,
         },
       })
 
+      if (data.status && data.status !== before.status) {
+        await this.enqueueAppointmentWorkflow({
+          orgId: params.orgId,
+          customerId: updated.customerId,
+          appointmentId: updated.id,
+          status: updated.status,
+        })
+
+        await this.automation.executeTrigger({
+          orgId: params.orgId,
+          trigger: 'APPOINTMENT_STATUS_CHANGED',
+          payload: {
+            appointmentId: updated.id,
+            customerId: updated.customerId,
+            customerPhone: updated.customer?.phone ?? null,
+            startsAt: updated.startsAt,
+            status: updated.status,
+            entityId: updated.id,
+            beforeStatus: before.status,
+          },
+        })
+      }
+
       await this.audit.log({
         orgId: params.orgId,
-        action: statusChanged
-          ? AUDIT_ACTIONS.APPOINTMENT_STATUS_CHANGED
-          : AUDIT_ACTIONS.APPOINTMENT_UPDATED,
+        action: AUDIT_ACTIONS.APPOINTMENT_UPDATED,
         actorUserId: params.updatedBy,
         actorPersonId: params.personId,
         personId: params.personId,
@@ -455,78 +473,25 @@ export class AppointmentsService {
         context,
         metadata: {
           appointmentId: updated.id,
-          customerId: updated.customerId,
-          before: existing,
+          before: {
+            startsAt: before.startsAt,
+            endsAt: before.endsAt,
+            status: before.status,
+            notes: before.notes,
+          },
           after: {
-            id: updated.id,
-            status: updated.status,
             startsAt: updated.startsAt,
             endsAt: updated.endsAt,
-            customerId: updated.customerId,
+            status: updated.status,
             notes: updated.notes,
           },
-          patch,
+          patch: data,
         },
       })
-
-      if (statusChanged) {
-        await this.enqueueAppointmentWorkflow({
-          orgId: params.orgId,
-          customerId: updated.customerId,
-          appointmentId: updated.id,
-          status: updated.status,
-        })
-        if (updated.status === 'NO_SHOW') {
-          await this.risk.recalculateCustomerOperationalRisk(
-            params.orgId,
-            updated.customerId,
-            'APPOINTMENT_NO_SHOW',
-          )
-        }
-      }
 
       return updated
     } catch (e: any) {
       if (isOverlapDbViolation(e)) {
-        const context = `Conflito de horário bloqueado (DB) (update)`
-
-        await this.timeline.log({
-          orgId: params.orgId,
-          personId: params.personId,
-          action: 'APPOINTMENT_CONFLICT_BLOCKED',
-          description: context,
-          metadata: {
-            appointmentId: params.id,
-            actorUserId: params.updatedBy,
-            actorPersonId: params.personId,
-            updatedBy: params.updatedBy,
-            attempted: {
-              startsAt: finalStartsAt,
-              endsAt: finalEndsAt,
-              status: patch.status,
-            },
-          },
-        })
-
-        await this.audit.log({
-          orgId: params.orgId,
-          action: AUDIT_ACTIONS.APPOINTMENT_CONFLICT_BLOCKED,
-          actorUserId: params.updatedBy,
-          actorPersonId: params.personId,
-          personId: params.personId,
-          entityType: 'APPOINTMENT',
-          entityId: params.id,
-          context,
-          metadata: {
-            appointmentId: params.id,
-            attempted: {
-              startsAt: finalStartsAt,
-              endsAt: finalEndsAt,
-              status: patch.status,
-            },
-          },
-        })
-
         throw new ConflictException('Conflito de horário: já existe um agendamento nesse intervalo')
       }
       throw e
