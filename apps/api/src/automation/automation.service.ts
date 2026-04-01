@@ -1,8 +1,17 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common'
-import {
-  AutomationActionType,
-  AutomationTrigger,
-} from '@prisma/client'
+// import {
+//   AutomationActionType,
+//   AutomationTrigger,
+// } from '@prisma/client'
+
+export type AutomationTrigger = string
+export const AutomationActionType = {
+  SEND_WHATSAPP_MESSAGE: 'SEND_WHATSAPP_MESSAGE',
+  CREATE_CHARGE: 'CREATE_CHARGE',
+  CREATE_NOTIFICATION: 'CREATE_NOTIFICATION',
+  UPDATE_RISK: 'UPDATE_RISK',
+} as const
+export type AutomationActionType = keyof typeof AutomationActionType
 
 import { PrismaService } from '../prisma/prisma.service'
 import { NotificationsService } from '../notifications/notifications.service'

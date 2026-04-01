@@ -56,17 +56,13 @@ export class QuotasService {
 
       if (!subscription) return 'FREE'
 
-      if (
-        subscription.status === SubscriptionStatus.CANCELED ||
-        subscription.status === SubscriptionStatus.INACTIVE
-      ) {
+      if (subscription.status === SubscriptionStatus.CANCELED) {
         return 'FREE'
       }
 
       if (
         subscription.status === SubscriptionStatus.TRIALING &&
-        subscription.trialEndsAt &&
-        subscription.trialEndsAt < new Date()
+        subscription.currentPeriodEnd < new Date()
       ) {
         return 'FREE'
       }

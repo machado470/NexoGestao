@@ -27,6 +27,7 @@ model Organization {
   persons            Person[]
   referrals          Referral[]
   serviceOrders      ServiceOrder[]
+  serviceOrderAttachments ServiceOrderAttachment[]
   timelineEvents     TimelineEvent[]
   tracks             Track[]
   users              User[]
@@ -335,6 +336,7 @@ model ServiceOrder {
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
   charges            Charge[]
+  attachments        ServiceOrderAttachment[]
   appointment        Appointment?       @relation(fields: [appointmentId], references: [id])
   assignedTo         Person?            @relation("ServiceOrderAssignedTo", fields: [assignedToPersonId], references: [id])
   customer           Customer           @relation(fields: [customerId], references: [id])
@@ -345,6 +347,23 @@ model ServiceOrder {
   @@index([assignedToPersonId, createdAt])
   @@index([orgId, customerId, createdAt])
   @@index([orgId, scheduledFor])
+}
+
+model ServiceOrderAttachment {
+  id             String       @id @default(uuid())
+  orgId          String
+  serviceOrderId String
+  name           String
+  url            String
+  type           String       @default("image/jpeg")
+  size           Int?
+  uploadedByPersonId String?
+  createdAt      DateTime     @default(now())
+  serviceOrder   ServiceOrder @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
+  org            Organization @relation(fields: [orgId], references: [id])
+
+  @@index([orgId, serviceOrderId, createdAt])
+  @@index([serviceOrderId, createdAt])
 }
 
 model Charge {

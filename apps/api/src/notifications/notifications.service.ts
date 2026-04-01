@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
-import { NotificationType } from '@prisma/client'
+// import { NotificationType } from '@prisma/client'
+export type NotificationType = string
 import { QueueService } from '../queue/queue.service'
 import { QUEUE_NAMES } from '../queue/queue.constants'
 

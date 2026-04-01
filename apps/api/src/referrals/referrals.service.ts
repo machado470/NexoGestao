@@ -123,10 +123,8 @@ export class ReferralsService {
         orgId,
         referrerName: dto.referrerName,
         referrerEmail: dto.referrerEmail,
-        referrerPhone: dto.referrerPhone,
         referredName: dto.referredName,
         referredEmail: dto.referredEmail,
-        referredPhone: dto.referredPhone,
         creditAmountCents: dto.creditAmount ? Math.round(dto.creditAmount * 100) : 0,
         status: dto.status ?? 'PENDING',
         code,
@@ -141,12 +139,6 @@ export class ReferralsService {
     const updateData: any = {}
     if (dto.status) {
       updateData.status = dto.status
-      if (dto.status === 'CONFIRMED' && !referral.confirmedAt) {
-        updateData.confirmedAt = new Date()
-      }
-      if (dto.status === 'PAID' && !referral.paidAt) {
-        updateData.paidAt = new Date()
-      }
     }
     if (dto.creditAmount !== undefined) {
       updateData.creditAmountCents = Math.round(dto.creditAmount * 100)

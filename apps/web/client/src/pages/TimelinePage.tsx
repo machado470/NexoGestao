@@ -397,7 +397,7 @@ export default function TimelinePage() {
   });
 
   const timelineQuery = trpc.nexo.timeline.listByCustomer.useQuery(
-    { customerId, limit: 100 },
+    { customerId },
     {
       enabled: Boolean(customerId),
       retry: false,

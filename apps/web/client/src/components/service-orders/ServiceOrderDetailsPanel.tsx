@@ -109,7 +109,7 @@ export default function ServiceOrderDetailsPanel({ os }: { os: ServiceOrder }) {
   );
 
   const executionQuery = trpc.nexo.executions.listByServiceOrder.useQuery(
-    { serviceOrderId: os.id },
+    { serviceOrderId: os.id, limit: 20 },
     { retry: false }
   );
 
@@ -193,7 +193,7 @@ export default function ServiceOrderDetailsPanel({ os }: { os: ServiceOrder }) {
       ? {
           id: os.financialSummary.chargeId,
           customerId: os.customerId,
-          amountCents: os.financialSummary.chargeAmountCents,
+          amountCents: os.financialSummary.chargeAmountCents ?? 0,
           serviceOrderId: os.id,
           serviceOrder: { title: os.title },
         }

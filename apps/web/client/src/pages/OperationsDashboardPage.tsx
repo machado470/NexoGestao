@@ -42,11 +42,7 @@ import {
   Wrench,
 } from "lucide-react";
 
-type ServiceOrder = {
-  id: string;
-  title: string;
-  status: string;
-};
+import type { ServiceOrder } from "@/components/service-orders/service-order.types";
 
 type Charge = {
   id: string;

@@ -3,11 +3,11 @@ import { PrismaService } from '../prisma/prisma.service'
 import { PlansService } from '../plans/plans.service'
 import {
   PlanName,
-  PrismaClient,
+  // PrismaClient,
   SubscriptionStatus,
 } from '@prisma/client'
 
-type DbClient = PrismaService | PrismaClient
+type DbClient = any
 
 @Injectable()
 export class SubscriptionsService {

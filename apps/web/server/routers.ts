@@ -35,6 +35,8 @@ export const appRouter = router({
   ai: aiRouter,
   financeAdvanced: financeAdvancedRouter,
   payments: paymentsRouter,
+  audit: nexoProxyRouter.audit,
+  risk: nexoProxyRouter.risk,
 
   session: router({
     me: publicProcedure.query(async ({ ctx }) => {

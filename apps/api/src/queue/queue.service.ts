@@ -50,14 +50,14 @@ export class QueueService implements OnModuleDestroy {
       ...options,
     })
 
-    await this.prisma.queueJob.create({
-      data: {
-        queue: queueName,
-        jobId: job.id?.toString() ?? '',
-        status: 'QUEUED',
-        payload: payload as any,
-      },
-    })
+    // await this.prisma.queueJob.create({
+    //   data: {
+    //     queue: queueName,
+    //     jobId: job.id?.toString() ?? '',
+    //     status: 'QUEUED',
+    //     payload: payload as any,
+    //   },
+    // })
 
     return job
   }
@@ -69,14 +69,14 @@ export class QueueService implements OnModuleDestroy {
     error?: string | null
     completed?: boolean
   }) {
-    await this.prisma.queueJob.updateMany({
-      where: { queue: input.queue, jobId: input.jobId },
-      data: {
-        status: input.status,
-        error: input.error ?? null,
-        completedAt: input.completed ? new Date() : null,
-      },
-    })
+    // await this.prisma.queueJob.updateMany({
+    //   where: { queue: input.queue, jobId: input.jobId },
+    //   data: {
+    //     status: input.status,
+    //     error: input.error ?? null,
+    //     completedAt: input.completed ? new Date() : null,
+    //   },
+    // })
   }
 
   async getQueueStatus() {

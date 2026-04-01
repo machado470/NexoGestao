@@ -340,31 +340,37 @@ export const nexoProxyRouter = router({
 
   timeline: router({
     listByCustomer: protectedProcedure
-      .input(z.object({ customerId: z.string() }))
+      .input(z.object({ customerId: z.string(), limit: z.number().optional() }))
       .query(async ({ ctx, input }) => {
+        const { customerId, ...query } = input;
         return authedGet(
           ctx as CtxLike,
-          `/timeline/customers/${input.customerId}`
+          `/timeline/customers/${customerId}`,
+          query
         );
       }),
 
     listByServiceOrder: protectedProcedure
-      .input(z.object({ serviceOrderId: z.string() }))
+      .input(z.object({ serviceOrderId: z.string(), limit: z.number().optional() }))
       .query(async ({ ctx, input }) => {
+        const { serviceOrderId, ...query } = input;
         return authedGet(
           ctx as CtxLike,
-          `/timeline/service-orders/${input.serviceOrderId}`
+          `/timeline/service-orders/${serviceOrderId}`,
+          query
         );
       }),
   }),
 
   executions: router({
     listByServiceOrder: protectedProcedure
-      .input(z.object({ serviceOrderId: z.string() }))
+      .input(z.object({ serviceOrderId: z.string(), limit: z.number().optional() }))
       .query(async ({ ctx, input }) => {
+        const { serviceOrderId, ...query } = input;
         return authedGet(
           ctx as CtxLike,
-          `/executions/service-order/${input.serviceOrderId}`
+          `/executions/service-order/${serviceOrderId}`,
+          query
         );
       }),
 
@@ -419,6 +425,7 @@ export const nexoProxyRouter = router({
       .input(
         z.object({
           query: z.string().optional(),
+          limit: z.number().optional(),
         })
       )
       .query(async ({ ctx, input }) => {
@@ -441,6 +448,44 @@ export const nexoProxyRouter = router({
             serviceOrders,
           },
         };
+      }),
+  }),
+
+  audit: router({
+    listEvents: protectedProcedure
+      .input(
+        z.object({
+          page: z.number().optional(),
+          limit: z.number().optional(),
+          entityType: z.string().optional(),
+          entityId: z.string().optional(),
+          action: z.string().optional(),
+          actorPersonId: z.string().optional(),
+          from: z.string().optional(),
+          to: z.string().optional(),
+        })
+      )
+      .query(async ({ ctx, input }) => {
+        return authedGet(ctx as CtxLike, "/audit/events", input);
+      }),
+
+    getSummary: protectedProcedure
+      .input(
+        z.object({
+          from: z.string().optional(),
+          to: z.string().optional(),
+        })
+      )
+      .query(async ({ ctx, input }) => {
+        return authedGet(ctx as CtxLike, "/audit/summary", input);
+      }),
+  }),
+
+  risk: router({
+    explainPerson: protectedProcedure
+      .input(z.object({ personId: z.string() }))
+      .query(async ({ ctx, input }) => {
+        return authedGet(ctx as CtxLike, `/risk/explain/person/${input.personId}`);
       }),
   }),
 });

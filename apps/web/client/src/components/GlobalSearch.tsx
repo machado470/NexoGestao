@@ -48,7 +48,6 @@ export function GlobalSearch() {
   const globalSearchQuery = trpc.nexo.globalSearch.search.useQuery(
     {
       query: debouncedQuery,
-      limit: 8,
     },
     {
       enabled: canQuery && debouncedQuery.trim().length >= 2,

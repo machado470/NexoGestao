@@ -18,7 +18,7 @@
     "baseUrl": ".",
     "paths": {
       "@prisma/client": [
-        "src/types/prisma-client-fallback.ts"
+        "../../node_modules/.prisma/client"
       ]
     }
   },

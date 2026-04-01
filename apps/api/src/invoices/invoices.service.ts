@@ -152,10 +152,6 @@ export class InvoicesService {
         description: dto.description,
         amountCents: dto.amountCents,
         status: dto.status ?? InvoiceStatus.DRAFT,
-        dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
-        issuedAt: dto.issuedAt ? new Date(dto.issuedAt) : undefined,
-        paidAt: undefined,
-        notes: dto.notes,
       },
     })
   }
@@ -199,12 +195,6 @@ export class InvoicesService {
       description: dto.description,
       amountCents: dto.amountCents,
       status: dto.status,
-      dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
-      notes: dto.notes,
-    }
-
-    if (dto.status === InvoiceStatus.ISSUED && !invoice.issuedAt) {
-      updateData.issuedAt = dto.issuedAt ? new Date(dto.issuedAt) : new Date()
     }
 
     return this.prisma.invoice.update({

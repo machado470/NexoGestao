@@ -31,8 +31,8 @@ export class AnalyticsService {
         data: {
           orgId: params.orgId,
           userId: params.userId ?? null,
-          event: params.event,
-          metadata: params.metadata ?? {},
+          event: params.event as any,
+          metadata: (params.metadata ?? {}) as any,
         },
       })
     } catch (err: unknown) {

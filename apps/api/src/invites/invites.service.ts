@@ -25,8 +25,8 @@ export class InvitesService {
       throw new BadRequestException('Já existe um usuário com este e-mail nesta organização.');
     }
 
-    const existingInvite = await this.prisma.inviteToken.findFirst({
-      where: { orgId, email: invitedEmail, expiresAt: { gt: new Date() } },
+    const existingInvite = await this.prisma.user.findFirst({
+      where: { orgId, email: invitedEmail, inviteExpiresAt: { gt: new Date() } },
     });
     if (existingInvite) {
       throw new BadRequestException('Já existe um convite pendente para este e-mail nesta organização.');
@@ -37,13 +37,21 @@ export class InvitesService {
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7);
 
-    const invite = await this.prisma.inviteToken.create({
-      data: {
+    const invite = await this.prisma.user.upsert({
+      where: { email: invitedEmail },
+      create: {
         email: invitedEmail,
-        token: hashedToken,
+        inviteToken: hashedToken,
         orgId,
-        expiresAt,
+        inviteExpiresAt: expiresAt,
         role: prismaRole,
+        active: false,
+      },
+      update: {
+        inviteToken: hashedToken,
+        inviteExpiresAt: expiresAt,
+        role: prismaRole,
+        orgId,
       },
     });
 
@@ -59,43 +67,40 @@ export class InvitesService {
   }
 
   async acceptInvite(email: string, rawToken: string, name: string, password?: string) {
-    const invite = await this.prisma.inviteToken.findFirst({
-      where: { email, expiresAt: { gt: new Date() } },
-      include: { org: true },
+    const user = await this.prisma.user.findFirst({
+      where: { email, inviteExpiresAt: { gt: new Date() } },
     });
 
-    if (!invite) {
+    if (!user || !user.inviteToken) {
       throw new NotFoundException('Convite inválido ou expirado.');
     }
 
-    const isTokenValid = await bcrypt.compare(rawToken, invite.token);
+    const isTokenValid = await bcrypt.compare(rawToken, user.inviteToken);
     if (!isTokenValid) {
       throw new UnauthorizedException('Token de convite inválido.');
     }
 
     const hashedPassword = password ? await bcrypt.hash(password, 10) : null;
 
-    const user = await this.prisma.user.create({
+    const updatedUser = await this.prisma.user.update({
+      where: { id: user.id },
       data: {
-        email: invite.email,
         password: hashedPassword,
-        orgId: invite.orgId,
-        role: invite.role,
         active: true,
+        inviteToken: null,
+        inviteExpiresAt: null,
         person: {
           create: {
             name,
-            email: invite.email,
-            role: invite.role,
-            orgId: invite.orgId,
+            email: user.email,
+            role: user.role,
+            orgId: user.orgId,
           },
         },
       },
     });
 
-    await this.prisma.inviteToken.delete({ where: { id: invite.id } });
-
-    return user;
+    return updatedUser;
   }
 
   async getOrganizationMembers(orgId: string) {
@@ -104,9 +109,9 @@ export class InvitesService {
       select: { id: true, email: true, role: true, active: true, createdAt: true, person: { select: { name: true } } },
     });
 
-    const pendingInvites = await this.prisma.inviteToken.findMany({
-      where: { orgId, expiresAt: { gt: new Date() } },
-      select: { id: true, email: true, expiresAt: true, role: true, createdAt: true },
+    const pendingInvites = await this.prisma.user.findMany({
+      where: { orgId, active: false, inviteExpiresAt: { gt: new Date() } },
+      select: { id: true, email: true, inviteExpiresAt: true, role: true, createdAt: true },
     });
 
     return { users, pendingInvites };

@@ -76,21 +76,33 @@ export class GovernanceRunService {
       },
     })
 
-    await this.prisma.governanceRun.create({
-      data: {
-        orgId: resolvedOrgId,
+    const bucket = `run-${resolvedOrgId}-${finishedAt.toISOString().slice(0, 10)}`
 
+    await this.prisma.governanceRun.upsert({
+      where: { orgId_bucket: { orgId: resolvedOrgId, bucket } },
+      create: {
+        orgId: resolvedOrgId,
+        bucket,
         evaluated: this.evaluated,
         warnings: this.warnings,
         correctives: this.correctives,
-
         institutionalRiskScore,
         restrictedCount: this.restrictedCount,
         suspendedCount: this.suspendedCount,
         openCorrectivesCount,
-
         durationMs,
         startedAt: this.startedAt,
+        finishedAt,
+      },
+      update: {
+        evaluated: this.evaluated,
+        warnings: this.warnings,
+        correctives: this.correctives,
+        institutionalRiskScore,
+        restrictedCount: this.restrictedCount,
+        suspendedCount: this.suspendedCount,
+        openCorrectivesCount,
+        durationMs,
         finishedAt,
       },
     })
@@ -151,21 +163,33 @@ export class GovernanceRunService {
     const finishedAt = new Date()
     const durationMs = Math.max(0, finishedAt.getTime() - startedAt.getTime())
 
-    await this.prisma.governanceRun.create({
-      data: {
-        orgId: params.orgId,
+    const bucket = `run-${params.orgId}-${finishedAt.toISOString().slice(0, 10)}`
 
+    await this.prisma.governanceRun.upsert({
+      where: { orgId_bucket: { orgId: params.orgId, bucket } },
+      create: {
+        orgId: params.orgId,
+        bucket,
         evaluated: params.evaluated,
         warnings: params.warnings,
         correctives: params.correctives,
-
         institutionalRiskScore: params.institutionalRiskScore,
         restrictedCount: params.restrictedCount,
         suspendedCount: params.suspendedCount,
         openCorrectivesCount: params.openCorrectivesCount,
-
         durationMs,
         startedAt,
+        finishedAt,
+      },
+      update: {
+        evaluated: params.evaluated,
+        warnings: params.warnings,
+        correctives: params.correctives,
+        institutionalRiskScore: params.institutionalRiskScore,
+        restrictedCount: params.restrictedCount,
+        suspendedCount: params.suspendedCount,
+        openCorrectivesCount: params.openCorrectivesCount,
+        durationMs,
         finishedAt,
       },
     })

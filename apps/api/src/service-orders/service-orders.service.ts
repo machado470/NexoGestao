@@ -378,6 +378,7 @@ export class ServiceOrdersService {
     customerId: string
     title: string
     description?: string
+    priority?: number
     assignedToPersonId?: string
     appointmentId?: string
     scheduledFor?: string
@@ -394,6 +395,7 @@ export class ServiceOrdersService {
     const scheduledFor = parseOptionalDate('scheduledFor', params.scheduledFor)
     const amountCents = normalizeAmount(params.amountCents)
     const dueDate = parseOptionalDate('dueDate', params.dueDate)
+    const priority = typeof params.priority === 'number' ? params.priority : 2
 
     const customer = await this.prisma.customer.findFirst({
       where: { id: params.customerId, orgId: params.orgId },
@@ -423,10 +425,12 @@ export class ServiceOrdersService {
         customerId: params.customerId,
         title,
         description,
+        priority,
         assignedToPersonId: params.assignedToPersonId ?? null,
         appointmentId: params.appointmentId ?? null,
         scheduledFor,
         amountCents,
+        dueDate,
         status: 'OPEN',
       },
       include: {
@@ -472,7 +476,7 @@ export class ServiceOrdersService {
 
     await this.notificationsService.createNotification(
       created.orgId,
-      'SERVICE_ORDER_CREATED',
+      'CUSTOMER_CREATED' as any,
       `Nova O.S. "${created.title}" criada para ${created.customer.name}.`,
       params.createdBy,
       { serviceOrderId: created.id },
@@ -480,7 +484,7 @@ export class ServiceOrdersService {
 
     await this.onboardingService.completeOnboardingStep(
       params.orgId,
-      'createServiceOrder',
+      'createService' as any,
     )
 
     await this.syncOperationalForPeople(params.orgId, [

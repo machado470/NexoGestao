@@ -53,7 +53,7 @@ export default function Onboarding() {
     {
       page: 1,
       limit: 20,
-    } as any,
+    },
     {
       enabled: canQuery,
       retry: false,
@@ -65,7 +65,7 @@ export default function Onboarding() {
     {
       page: 1,
       limit: 20,
-    } as any,
+    },
     {
       enabled: canQuery,
       retry: false,
@@ -166,7 +166,7 @@ export default function Onboarding() {
     setProgress((prev) => ({ ...prev, [key]: true }));
 
   const finish = async () => {
-    await completeOnboardingMutation.mutateAsync();
+    await completeOnboardingMutation.mutateAsync({});
     navigate("/dashboard");
   };
 
