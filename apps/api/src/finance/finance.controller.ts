@@ -174,4 +174,14 @@ export class FinanceController {
 
     return { ok: true, data }
   }
+
+  @Post('charges/:chargeId/remind')
+  @Roles('ADMIN', 'MANAGER')
+  async remindCharge(
+    @Org() orgId: string,
+    @Param('chargeId') chargeId: string,
+  ) {
+    await this.finance.sendPaymentReminderWhatsApp(chargeId)
+    return { ok: true }
+  }
 }

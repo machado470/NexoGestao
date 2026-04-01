@@ -1,13 +1,20 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
-import { $Enums, Prisma } from '@prisma/client'
+import { $Enums, Prisma, WhatsAppEntityType, WhatsAppMessageType } from '@prisma/client'
+import { WhatsAppService } from '../whatsapp/whatsapp.service'
 
 @Injectable()
 export class FinanceService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(FinanceService.name)
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly whatsapp: WhatsAppService,
+  ) {}
 
   // =========================
   // OVERVIEW
@@ -121,7 +128,7 @@ export class FinanceService {
     notes?: string | null
     serviceOrderId?: string | null
   }) {
-    return this.prisma.charge.create({
+    const charge = await this.prisma.charge.create({
       data: {
         orgId: input.orgId,
         customerId: input.customerId,
@@ -131,7 +138,17 @@ export class FinanceService {
         notes: input.notes ?? null,
         serviceOrderId: input.serviceOrderId ?? null,
       },
+      include: { customer: true },
     })
+
+    // Enviar cobrança automática via WhatsApp
+    if (charge.customer?.phone) {
+      await this.sendChargeWhatsApp(charge.id).catch((err) =>
+        this.logger.error(`Erro ao enviar cobrança WhatsApp: ${err.message}`),
+      )
+    }
+
+    return charge
   }
 
   async updateCharge(input: {
@@ -193,6 +210,11 @@ export class FinanceService {
       data: { status: 'PAID', paidAt: new Date() },
     })
 
+    // Enviar confirmação de pagamento via WhatsApp
+    await this.sendPaymentConfirmationWhatsApp(charge.id).catch((err) =>
+      this.logger.error(`Erro ao enviar confirmação WhatsApp: ${err.message}`),
+    )
+
     return { ok: true }
   }
 
@@ -243,14 +265,44 @@ export class FinanceService {
   async automateOverdueLifecycle(orgId: string) {
     const now = new Date()
 
+    // Buscar cobranças que estão prestes a vencer para enviar lembrete (ex: hoje)
+    const todayStart = new Date(now.setHours(0, 0, 0, 0))
+    const todayEnd = new Date(now.setHours(23, 59, 59, 999))
+
+    const dueToday = await this.prisma.charge.findMany({
+      where: {
+        orgId,
+        status: 'PENDING',
+        dueDate: { gte: todayStart, lte: todayEnd },
+      },
+    })
+
+    for (const charge of dueToday) {
+      await this.sendPaymentReminderWhatsApp(charge.id).catch((err) =>
+        this.logger.error(`Erro ao enviar lembrete WhatsApp: ${err.message}`),
+      )
+    }
+
+    // Atualizar status para OVERDUE
     const result = await this.prisma.charge.updateMany({
       where: {
         orgId,
         status: 'PENDING',
-        dueDate: { lt: now },
+        dueDate: { lt: todayStart },
       },
       data: { status: 'OVERDUE' },
     })
+
+    // Enviar lembrete para cobranças que acabaram de vencer
+    const overdue = await this.prisma.charge.findMany({
+      where: {
+        orgId,
+        status: 'OVERDUE',
+        updatedAt: { gte: now }, // Simplificação para este exemplo
+      },
+    })
+
+    // (Opcional: enviar lembrete para overdue também)
 
     return { ok: true, updated: result.count }
   }
@@ -332,5 +384,90 @@ export class FinanceService {
   async sendPaymentReminder(data: any) {
     // Placeholder for future notification logic
     return { ok: true }
+  }
+
+  // =========================
+  // WHATSAPP INTEGRATION
+  // =========================
+  private formatCurrency(cents: number) {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(cents / 100)
+  }
+
+  private formatDate(date: Date) {
+    return new Intl.DateTimeFormat('pt-BR').format(date)
+  }
+
+  async sendChargeWhatsApp(chargeId: string) {
+    const charge = await this.prisma.charge.findUnique({
+      where: { id: chargeId },
+      include: { customer: true },
+    })
+
+    if (!charge || !charge.customer?.phone) return
+
+    const amount = this.formatCurrency(charge.amountCents)
+    const dueDate = this.formatDate(charge.dueDate)
+    const text = `Olá, ${charge.customer.name}! Segue a sua cobrança no valor de ${amount}, com vencimento em ${dueDate}.`
+
+    await this.whatsapp.enqueueMessage({
+      orgId: charge.orgId,
+      customerId: charge.customerId,
+      toPhone: charge.customer.phone,
+      entityType: WhatsAppEntityType.CHARGE,
+      entityId: charge.id,
+      messageType: WhatsAppMessageType.PAYMENT_LINK,
+      messageKey: `charge_${charge.id}`,
+      renderedText: text,
+    })
+  }
+
+  async sendPaymentConfirmationWhatsApp(chargeId: string) {
+    const charge = await this.prisma.charge.findUnique({
+      where: { id: chargeId },
+      include: { customer: true },
+    })
+
+    if (!charge || !charge.customer?.phone) return
+
+    const amount = this.formatCurrency(charge.amountCents)
+    const text = `Olá, ${charge.customer.name}! Recebemos o seu pagamento no valor de ${amount}. Obrigado!`
+
+    await this.whatsapp.enqueueMessage({
+      orgId: charge.orgId,
+      customerId: charge.customerId,
+      toPhone: charge.customer.phone,
+      entityType: WhatsAppEntityType.CHARGE,
+      entityId: charge.id,
+      messageType: WhatsAppMessageType.RECEIPT,
+      messageKey: `receipt_${charge.id}`,
+      renderedText: text,
+    })
+  }
+
+  async sendPaymentReminderWhatsApp(chargeId: string) {
+    const charge = await this.prisma.charge.findUnique({
+      where: { id: chargeId },
+      include: { customer: true },
+    })
+
+    if (!charge || !charge.customer?.phone) return
+
+    const amount = this.formatCurrency(charge.amountCents)
+    const dueDate = this.formatDate(charge.dueDate)
+    const text = `Olá, ${charge.customer.name}! Lembramos que sua cobrança de ${amount} vence em ${dueDate}.`
+
+    await this.whatsapp.enqueueMessage({
+      orgId: charge.orgId,
+      customerId: charge.customerId,
+      toPhone: charge.customer.phone,
+      entityType: WhatsAppEntityType.CHARGE,
+      entityId: charge.id,
+      messageType: WhatsAppMessageType.PAYMENT_REMINDER,
+      messageKey: `reminder_${charge.id}_${new Date().toISOString().split('T')[0]}`,
+      renderedText: text,
+    })
   }
 }
