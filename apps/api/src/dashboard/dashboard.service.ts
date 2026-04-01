@@ -3,8 +3,8 @@ import { PrismaService } from '../prisma/prisma.service'
 import { MemoryCacheService } from '../common/cache/memory-cache.service'
 import { GovernanceReadService } from '../governance/governance-read.service'
 
-const CACHE_TTL_METRICS = 60_000
-const CACHE_TTL_CHARTS = 300_000
+const CACHE_TTL_METRICS = 300_000 // 5 minutos
+const CACHE_TTL_CHARTS = 900_000 // 15 minutos
 
 @Injectable()
 export class DashboardService {
@@ -28,22 +28,8 @@ export class DashboardService {
     startOfWeek.setDate(now.getDate() - now.getDay())
     startOfWeek.setHours(0, 0, 0, 0)
 
-    const [
-      totalCustomers,
-      totalServiceOrders,
-      openServiceOrders,
-      overdueServiceOrders,
-      weeklyRevenueAgg,
-      pendingPaymentsAgg,
-      inProgressOrders,
-      completedOrders,
-      delayedOrders,
-      riskTickets,
-      totalRevenue,
-      paidRevenue,
-      pendingRevenue,
-      autoScore,
-    ] = await Promise.all([
+    // Executa as consultas em lotes menores para não sobrecarregar a conexão com o banco
+    const batch1 = await Promise.all([
       this.prisma.customer.count({ where: { orgId, active: true } }),
       this.prisma.serviceOrder.count({ where: { orgId } }),
       this.prisma.serviceOrder.count({
@@ -60,6 +46,9 @@ export class DashboardService {
         where: { orgId, createdAt: { gte: startOfWeek } },
         _sum: { amountCents: true },
       }),
+    ])
+
+    const batch2 = await Promise.all([
       this.prisma.charge.aggregate({
         where: { orgId, status: { in: ['PENDING', 'OVERDUE'] } },
         _sum: { amountCents: true },
@@ -70,16 +59,12 @@ export class DashboardService {
       this.prisma.serviceOrder.count({
         where: { orgId, status: 'DONE' },
       }),
-      this.prisma.serviceOrder.count({
-        where: {
-          orgId,
-          status: { in: ['OPEN', 'ASSIGNED', 'IN_PROGRESS'] },
-          dueDate: { lt: now },
-        },
-      }),
       this.prisma.correctiveAction.count({
         where: { person: { orgId }, status: 'OPEN' },
       }),
+    ])
+
+    const batch3 = await Promise.all([
       this.prisma.charge.aggregate({
         where: { orgId },
         _sum: { amountCents: true },
@@ -88,12 +73,16 @@ export class DashboardService {
         where: { orgId, status: 'PAID' },
         _sum: { amountCents: true },
       }),
-      this.prisma.charge.aggregate({
-        where: { orgId, status: { in: ['PENDING', 'OVERDUE'] } },
-        _sum: { amountCents: true },
-      }),
       this.governanceRead.getAutoScore(orgId),
     ])
+
+    const [totalCustomers, totalServiceOrders, openServiceOrders, overdueServiceOrders, weeklyRevenueAgg] = batch1
+    const [pendingPaymentsAgg, inProgressOrders, completedOrders, riskTickets] = batch2
+    const [totalRevenue, paidRevenue, autoScore] = batch3
+
+    // Reutiliza valores já calculados para evitar redundância
+    const delayedOrders = overdueServiceOrders
+    const pendingRevenue = pendingPaymentsAgg
 
     return {
       totalCustomers,

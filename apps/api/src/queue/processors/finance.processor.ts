@@ -33,6 +33,9 @@ export class FinanceProcessor implements OnModuleInit, OnModuleDestroy {
 
           if (job.name === 'payment-reminder') {
             await this.financeService.sendPaymentReminder(job.data)
+            if (job.data.chargeId) {
+              await this.financeService.sendPaymentReminderWhatsApp(job.data.chargeId)
+            }
           }
 
           await this.queueService.updateJobStatus({
