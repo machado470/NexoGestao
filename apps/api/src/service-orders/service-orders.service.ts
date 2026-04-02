@@ -7,12 +7,18 @@ import { PrismaService } from '../prisma/prisma.service'
 import { TimelineService } from '../timeline/timeline.service'
 import { AuditService } from '../audit/audit.service'
 import { AUDIT_ACTIONS } from '../audit/audit.actions'
-import { ServiceOrderStatus, Prisma } from '@prisma/client'
+import {
+  ServiceOrderStatus,
+  Prisma,
+  WhatsAppEntityType,
+  WhatsAppMessageType,
+} from '@prisma/client'
 import { OperationalStateService } from '../people/operational-state.service'
 import { FinanceService } from '../finance/finance.service'
 import { AutomationService } from '../automation/automation.service'
 import { NotificationsService } from '../notifications/notifications.service'
 import { OnboardingService } from '../onboarding/onboarding.service'
+import { WhatsAppService } from '../whatsapp/whatsapp.service'
 
 function normalizeText(v?: string): string | null {
   const s = (v ?? '').trim()
@@ -106,7 +112,52 @@ export class ServiceOrdersService {
     private readonly automation: AutomationService,
     private readonly notificationsService: NotificationsService,
     private readonly onboardingService: OnboardingService,
+    private readonly whatsApp: WhatsAppService,
   ) {}
+
+  private async enqueueServiceOrderCreatedMessage(params: {
+    orgId: string
+    customerId: string
+    serviceOrderId: string
+    customerName: string
+    customerPhone: string | null | undefined
+    title: string
+  }) {
+    if (!params.customerPhone) return
+
+    await this.whatsApp.enqueueMessage({
+      orgId: params.orgId,
+      customerId: params.customerId,
+      toPhone: params.customerPhone,
+      entityType: WhatsAppEntityType.SERVICE_ORDER,
+      entityId: params.serviceOrderId,
+      messageType: WhatsAppMessageType.EXECUTION_CONFIRMATION,
+      messageKey: `service_order_created:${params.serviceOrderId}`,
+      renderedText: `Olá, ${params.customerName}! Sua ordem de serviço "${params.title}" foi criada com sucesso.`,
+    })
+  }
+
+  private async enqueueServiceOrderDoneMessage(params: {
+    orgId: string
+    customerId: string
+    serviceOrderId: string
+    customerName: string
+    customerPhone: string | null | undefined
+    title: string
+  }) {
+    if (!params.customerPhone) return
+
+    await this.whatsApp.enqueueMessage({
+      orgId: params.orgId,
+      customerId: params.customerId,
+      toPhone: params.customerPhone,
+      entityType: WhatsAppEntityType.SERVICE_ORDER,
+      entityId: params.serviceOrderId,
+      messageType: WhatsAppMessageType.EXECUTION_CONFIRMATION,
+      messageKey: `service_order_done:${params.serviceOrderId}`,
+      renderedText: `Olá, ${params.customerName}! Sua ordem de serviço "${params.title}" foi concluída.`,
+    })
+  }
 
   private canTransition(from: ServiceOrderStatus, to: ServiceOrderStatus): boolean {
     const allowed: Record<ServiceOrderStatus, ServiceOrderStatus[]> = {
@@ -238,7 +289,10 @@ export class ServiceOrdersService {
         continue
       }
 
-      if (priority[charge.status as keyof typeof priority] > priority[current.status as keyof typeof priority]) {
+      if (
+        priority[charge.status as keyof typeof priority] >
+        priority[current.status as keyof typeof priority]
+      ) {
         chargeByServiceOrderId.set(charge.serviceOrderId, {
           id: charge.id,
           status: charge.status as any,
@@ -482,6 +536,15 @@ export class ServiceOrdersService {
       { serviceOrderId: created.id },
     )
 
+    await this.enqueueServiceOrderCreatedMessage({
+      orgId: created.orgId,
+      customerId: created.customerId,
+      serviceOrderId: created.id,
+      customerName: created.customer.name,
+      customerPhone: created.customer.phone,
+      title: created.title,
+    })
+
     await this.onboardingService.completeOnboardingStep(
       params.orgId,
       'createService' as any,
@@ -614,6 +677,15 @@ export class ServiceOrdersService {
           status: updated.status,
           entityId: updated.id,
         },
+      })
+
+      await this.enqueueServiceOrderDoneMessage({
+        orgId: updated.orgId,
+        customerId: updated.customerId,
+        serviceOrderId: updated.id,
+        customerName: updated.customer?.name ?? 'cliente',
+        customerPhone: updated.customer?.phone,
+        title: updated.title,
       })
     }
 

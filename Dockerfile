@@ -7,6 +7,9 @@ RUN apt-get update && apt-get install -y \
   ca-certificates \
   postgresql-client \
   curl \
+  python3 \
+  make \
+  g++ \
   && rm -rf /var/lib/apt/lists/*
 
 RUN npm install -g pnpm @nestjs/cli
@@ -15,7 +18,7 @@ RUN npm install -g pnpm @nestjs/cli
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/api/package.json apps/api/package.json
 
-# ✅ patches precisam existir antes do install (pnpm patchedDependencies)
+# patches precisam existir antes do install (pnpm patchedDependencies)
 COPY patches ./patches
 
 RUN pnpm install --frozen-lockfile
@@ -23,7 +26,7 @@ RUN pnpm install --frozen-lockfile
 # resto do repo
 COPY . .
 
-# 🔒 GARANTIA ABSOLUTA que o entrypoint é executável e sem CRLF
+# garantia que o entrypoint é executável e sem CRLF
 RUN chmod +x /app/apps/api/docker-entrypoint.sh \
   && sed -i 's/\r$//' /app/apps/api/docker-entrypoint.sh
 
