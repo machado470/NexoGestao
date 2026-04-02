@@ -1,6 +1,9 @@
 import {
   AppointmentStatus,
   ChargeStatus,
+  ExpenseCategory,
+  InvoiceStatus,
+  LaunchType,
   PaymentMethod,
   PrismaClient,
   ServiceOrderStatus,
@@ -82,10 +85,7 @@ async function upsertUser(orgId: string, user: PilotUser) {
 
 async function upsertCustomer(orgId: string, customer: CustomerSeed) {
   const existing = await prisma.customer.findFirst({
-    where: {
-      orgId,
-      email: customer.email.toLowerCase(),
-    },
+    where: { orgId, email: customer.email.toLowerCase() },
   })
 
   if (existing) {
@@ -117,6 +117,8 @@ async function upsertAppointment(params: {
   customerId: string
   startsAt: Date
   endsAt: Date
+  title: string
+  description: string
   status: AppointmentStatus
   notes: string
 }) {
@@ -133,6 +135,8 @@ async function upsertAppointment(params: {
       where: { id: found.id },
       data: {
         endsAt: params.endsAt,
+        title: params.title,
+        description: params.description,
         status: params.status,
         notes: params.notes,
       },
@@ -154,10 +158,7 @@ async function upsertServiceOrder(params: {
   amountCents: number
   dueDate: Date
   status: ServiceOrderStatus
-  priority?: number
-  scheduledFor?: Date
   outcomeSummary?: string
-  cancellationReason?: string
 }) {
   const found = await prisma.serviceOrder.findFirst({
     where: {
@@ -166,15 +167,6 @@ async function upsertServiceOrder(params: {
       title: params.title,
     },
   })
-
-  const startedAt =
-    params.status === ServiceOrderStatus.IN_PROGRESS ||
-    params.status === ServiceOrderStatus.DONE
-      ? atHour(new Date(), -1, 9)
-      : null
-
-  const finishedAt =
-    params.status === ServiceOrderStatus.DONE ? atHour(new Date(), -1, 17) : null
 
   if (found) {
     return prisma.serviceOrder.update({
@@ -186,12 +178,12 @@ async function upsertServiceOrder(params: {
         amountCents: params.amountCents,
         dueDate: params.dueDate,
         status: params.status,
-        priority: params.priority ?? 2,
-        scheduledFor: params.scheduledFor,
         outcomeSummary: params.outcomeSummary,
-        cancellationReason: params.cancellationReason,
-        startedAt,
-        finishedAt,
+        executionStartedAt:
+          params.status === ServiceOrderStatus.IN_PROGRESS || params.status === ServiceOrderStatus.DONE
+            ? atHour(new Date(), -1, 9)
+            : null,
+        executionEndedAt: params.status === ServiceOrderStatus.DONE ? atHour(new Date(), -1, 11) : null,
       },
     })
   }
@@ -199,136 +191,11 @@ async function upsertServiceOrder(params: {
   return prisma.serviceOrder.create({
     data: {
       ...params,
-      priority: params.priority ?? 2,
-      startedAt: startedAt ?? undefined,
-      finishedAt: finishedAt ?? undefined,
-    },
-  })
-}
-
-async function upsertChargeByServiceOrder(params: {
-  orgId: string
-  customerId: string
-  serviceOrderId: string
-  amountCents: number
-  dueDate: Date
-  status: ChargeStatus
-  paidAt?: Date | null
-  notes?: string | null
-}) {
-  const existing = await prisma.charge.findFirst({
-    where: {
-      orgId: params.orgId,
-      serviceOrderId: params.serviceOrderId,
-    },
-  })
-
-  if (existing) {
-    return prisma.charge.update({
-      where: { id: existing.id },
-      data: {
-        customerId: params.customerId,
-        amountCents: params.amountCents,
-        dueDate: params.dueDate,
-        status: params.status,
-        paidAt: params.paidAt ?? null,
-        notes: params.notes ?? null,
-      },
-    })
-  }
-
-  return prisma.charge.create({
-    data: {
-      orgId: params.orgId,
-      customerId: params.customerId,
-      serviceOrderId: params.serviceOrderId,
-      amountCents: params.amountCents,
-      dueDate: params.dueDate,
-      status: params.status,
-      paidAt: params.paidAt ?? null,
-      notes: params.notes ?? null,
-    },
-  })
-}
-
-async function upsertStandaloneCharge(params: {
-  orgId: string
-  customerId: string
-  amountCents: number
-  dueDate: Date
-  status: ChargeStatus
-  notes?: string | null
-}) {
-  const existing = await prisma.charge.findFirst({
-    where: {
-      orgId: params.orgId,
-      customerId: params.customerId,
-      serviceOrderId: null,
-      amountCents: params.amountCents,
-    },
-  })
-
-  if (existing) {
-    return prisma.charge.update({
-      where: { id: existing.id },
-      data: {
-        dueDate: params.dueDate,
-        status: params.status,
-        notes: params.notes ?? null,
-      },
-    })
-  }
-
-  return prisma.charge.create({
-    data: {
-      orgId: params.orgId,
-      customerId: params.customerId,
-      amountCents: params.amountCents,
-      dueDate: params.dueDate,
-      status: params.status,
-      notes: params.notes ?? null,
-    },
-  })
-}
-
-async function upsertPayment(params: {
-  orgId: string
-  chargeId: string
-  amountCents: number
-  method: PaymentMethod
-  paidAt: Date
-  notes?: string | null
-  externalRef?: string | null
-}) {
-  const existing = await prisma.payment.findFirst({
-    where: {
-      orgId: params.orgId,
-      chargeId: params.chargeId,
-    },
-  })
-
-  if (existing) {
-    return prisma.payment.update({
-      where: { id: existing.id },
-      data: {
-        amountCents: params.amountCents,
-        method: params.method,
-        paidAt: params.paidAt,
-        notes: params.notes ?? null,
-        externalRef: params.externalRef ?? null,
-      },
-    })
-  }
-
-  return prisma.payment.create({
-    data: {
-      orgId: params.orgId,
-      chargeId: params.chargeId,
-      amountCents: params.amountCents,
-      method: params.method,
-      paidAt: params.paidAt,
-      notes: params.notes ?? null,
-      externalRef: params.externalRef ?? null,
+      executionStartedAt:
+        params.status === ServiceOrderStatus.IN_PROGRESS || params.status === ServiceOrderStatus.DONE
+          ? atHour(new Date(), -1, 9)
+          : undefined,
+      executionEndedAt: params.status === ServiceOrderStatus.DONE ? atHour(new Date(), -1, 11) : undefined,
     },
   })
 }
@@ -337,7 +204,7 @@ async function upsertExpense(params: {
   orgId: string
   description: string
   amountCents: number
-  category: string
+  category: ExpenseCategory
   date: Date
   notes?: string
   createdByUserId?: string
@@ -364,11 +231,10 @@ async function upsertLaunch(params: {
   orgId: string
   description: string
   amountCents: number
-  type: string
+  type: LaunchType
   category: string
   account?: string
   date: Date
-  notes?: string
   createdByUserId?: string
 }) {
   const existing = await prisma.launch.findFirst({
@@ -389,117 +255,6 @@ async function upsertLaunch(params: {
   return prisma.launch.create({ data: params })
 }
 
-async function upsertInvoice(params: {
-  orgId: string
-  number: string
-  customerId?: string
-  description: string
-  amountCents: number
-  status: string
-}) {
-  const existing = await prisma.invoice.findFirst({
-    where: {
-      orgId: params.orgId,
-      number: params.number,
-    },
-  })
-
-  if (existing) {
-    return prisma.invoice.update({
-      where: { id: existing.id },
-      data: {
-        customerId: params.customerId,
-        description: params.description,
-        amountCents: params.amountCents,
-        status: params.status,
-      },
-    })
-  }
-
-  return prisma.invoice.create({
-    data: params,
-  })
-}
-
-async function createTimelineIfMissing(params: {
-  orgId: string
-  action: string
-  description: string
-  personId?: string
-  metadata?: Record<string, unknown>
-}) {
-  const existing = await prisma.timelineEvent.findFirst({
-    where: {
-      orgId: params.orgId,
-      action: params.action,
-      description: params.description,
-    },
-  })
-
-  if (existing) {
-    return prisma.timelineEvent.update({
-      where: { id: existing.id },
-      data: {
-        personId: params.personId,
-        metadata: params.metadata,
-      },
-    })
-  }
-
-  return prisma.timelineEvent.create({
-    data: {
-      orgId: params.orgId,
-      action: params.action,
-      description: params.description,
-      personId: params.personId,
-      metadata: params.metadata,
-    },
-  })
-}
-
-async function ensureBusinessSubscription(orgId: string) {
-  const plan = await prisma.plan.upsert({
-    where: { name: 'BUSINESS' },
-    update: {
-      priceCents: 19900,
-    },
-    create: {
-      name: 'BUSINESS',
-      priceCents: 19900,
-    },
-  })
-
-  const currentPeriodStart = atHour(new Date(), -2, 0, 0)
-  const currentPeriodEnd = atHour(new Date(), 28, 23, 59)
-
-  const existing = await prisma.subscription.findUnique({
-    where: { orgId },
-  })
-
-  if (existing) {
-    return prisma.subscription.update({
-      where: { orgId },
-      data: {
-        planId: plan.id,
-        status: 'ACTIVE',
-        currentPeriodStart,
-        currentPeriodEnd,
-        canceledAt: null,
-      },
-    })
-  }
-
-  return prisma.subscription.create({
-    data: {
-      orgId,
-      planId: plan.id,
-      status: 'ACTIVE',
-      currentPeriodStart,
-      currentPeriodEnd,
-    },
-  })
-}
-
 async function main() {
   const now = new Date()
   const pilotOrgSlug = env('PILOT_ORG_SLUG', 'pilot-servicos-viva')
@@ -510,6 +265,7 @@ async function main() {
     update: {
       name: pilotOrgName,
       requiresOnboarding: false,
+      onboardingStep: 4,
       timezone: 'America/Sao_Paulo',
       currency: 'BRL',
     },
@@ -517,12 +273,11 @@ async function main() {
       slug: pilotOrgSlug,
       name: pilotOrgName,
       requiresOnboarding: false,
+      onboardingStep: 4,
       timezone: 'America/Sao_Paulo',
       currency: 'BRL',
     },
   })
-
-  await ensureBusinessSubscription(org.id)
 
   const users: PilotUser[] = [
     {
@@ -551,19 +306,10 @@ async function main() {
     },
   ]
 
-  const savedUsers = await Promise.all(
-    users.map((user) => upsertUser(org.id, user)),
-  )
-
+  const savedUsers = await Promise.all(users.map((user) => upsertUser(org.id, user)))
   const [adminUser, operatorUser, financeUser] = savedUsers
 
-  const operatorPerson = await prisma.person.findUnique({
-    where: { userId: operatorUser.id },
-  })
-
-  const financePerson = await prisma.person.findUnique({
-    where: { userId: financeUser.id },
-  })
+  const operatorPerson = await prisma.person.findUnique({ where: { userId: operatorUser.id } })
 
   const customerSeeds: CustomerSeed[] = [
     {
@@ -598,55 +344,58 @@ async function main() {
     },
   ]
 
-  const customers = await Promise.all(
-    customerSeeds.map((customer) => upsertCustomer(org.id, customer)),
-  )
+  const customers = await Promise.all(customerSeeds.map((customer) => upsertCustomer(org.id, customer)))
 
   const appointments = await Promise.all([
     upsertAppointment({
       orgId: org.id,
       customerId: customers[0].id,
+      title: 'Visita técnica mensal - elétrica áreas comuns',
+      description: 'Checklist de painéis e iluminação do condomínio.',
       startsAt: atHour(now, 1, 8, 30),
       endsAt: atHour(now, 1, 10, 30),
       status: AppointmentStatus.CONFIRMED,
-      notes:
-        'Visita técnica mensal elétrica nas áreas comuns. Validar acesso na portaria.',
+      notes: 'Levar EPI completo e validar acesso na portaria.',
     }),
     upsertAppointment({
       orgId: org.id,
       customerId: customers[1].id,
+      title: 'Inspeção de ar-condicionado - recepção',
+      description: 'Verificar ruído e eficiência térmica.',
       startsAt: atHour(now, 2, 14, 0),
       endsAt: atHour(now, 2, 15, 30),
       status: AppointmentStatus.SCHEDULED,
-      notes:
-        'Inspeção de ar-condicionado na recepção. Equipamento split 36.000 BTUs.',
+      notes: 'Equipamento modelo split 36.000 BTUs.',
     }),
     upsertAppointment({
       orgId: org.id,
       customerId: customers[2].id,
+      title: 'Manutenção corretiva - coifa industrial',
+      description: 'Troca de contatores e limpeza de dutos.',
       startsAt: atHour(now, -2, 21, 0),
       endsAt: atHour(now, -2, 23, 0),
       status: AppointmentStatus.DONE,
-      notes:
-        'Manutenção corretiva da coifa industrial concluída dentro do prazo.',
+      notes: 'Serviço concluído dentro do prazo.',
     }),
     upsertAppointment({
       orgId: org.id,
       customerId: customers[3].id,
+      title: 'Revisão preventiva hidráulica',
+      description: 'Inspeção de banheiros e caixas de descarga.',
       startsAt: atHour(now, 3, 9, 0),
       endsAt: atHour(now, 3, 10, 0),
       status: AppointmentStatus.CONFIRMED,
-      notes:
-        'Revisão preventiva hidráulica com acompanhamento da coordenação escolar.',
+      notes: 'Acompanhamento da coordenação escolar.',
     }),
     upsertAppointment({
       orgId: org.id,
       customerId: customers[4].id,
+      title: 'Diagnóstico de rede interna',
+      description: 'Pontos sem conectividade no estoque.',
       startsAt: atHour(now, 0, 16, 0),
       endsAt: atHour(now, 0, 17, 30),
       status: AppointmentStatus.NO_SHOW,
-      notes:
-        'Diagnóstico de rede interna. Responsável da loja não estava presente.',
+      notes: 'Responsável da loja não estava presente para liberar acesso.',
     }),
   ])
 
@@ -657,13 +406,10 @@ async function main() {
       appointmentId: appointments[0].id,
       assignedToPersonId: operatorPerson?.id,
       title: 'OS-001 - Manutenção elétrica condomínio',
-      description:
-        'Reaperto em barramentos, revisão de quadro e substituição de 12 lâmpadas LED.',
+      description: 'Reaperto em barramentos e substituição de 12 lâmpadas LED.',
       amountCents: 185000,
       dueDate: atHour(now, 7, 18, 0),
       status: ServiceOrderStatus.IN_PROGRESS,
-      priority: 3,
-      scheduledFor: atHour(now, 1, 8, 30),
     }),
     upsertServiceOrder({
       orgId: org.id,
@@ -671,12 +417,10 @@ async function main() {
       appointmentId: appointments[1].id,
       assignedToPersonId: operatorPerson?.id,
       title: 'OS-002 - Revisão climatização clínica',
-      description: 'Limpeza completa, teste de pressão e troca de filtro HEPA.',
+      description: 'Limpeza completa e troca de filtro HEPA.',
       amountCents: 124000,
       dueDate: atHour(now, 10, 18, 0),
       status: ServiceOrderStatus.ASSIGNED,
-      priority: 2,
-      scheduledFor: atHour(now, 2, 14, 0),
     }),
     upsertServiceOrder({
       orgId: org.id,
@@ -684,15 +428,11 @@ async function main() {
       appointmentId: appointments[2].id,
       assignedToPersonId: operatorPerson?.id,
       title: 'OS-003 - Cozinha industrial corretiva',
-      description:
-        'Troca de contatores, testes elétricos e emissão de relatório técnico.',
+      description: 'Troca de contatores, testes e emissão de relatório técnico.',
       amountCents: 98000,
       dueDate: atHour(now, -1, 18, 0),
       status: ServiceOrderStatus.DONE,
-      priority: 3,
-      scheduledFor: atHour(now, -2, 21, 0),
-      outcomeSummary:
-        'Equipamento liberado para uso com recomendação de monitoramento semanal.',
+      outcomeSummary: 'Equipamento liberado para uso e monitoramento semanal.',
     }),
     upsertServiceOrder({
       orgId: org.id,
@@ -700,123 +440,203 @@ async function main() {
       appointmentId: appointments[3].id,
       assignedToPersonId: operatorPerson?.id,
       title: 'OS-004 - Preventiva hidráulica escolar',
-      description:
-        'Substituição de válvulas, vedação de 4 pontos de vazamento e teste de pressão.',
+      description: 'Substituição de válvulas e vedação de 4 pontos de vazamento.',
       amountCents: 76000,
       dueDate: atHour(now, 12, 18, 0),
       status: ServiceOrderStatus.OPEN,
-      priority: 2,
-      scheduledFor: atHour(now, 3, 9, 0),
     }),
     upsertServiceOrder({
       orgId: org.id,
       customerId: customers[4].id,
       assignedToPersonId: operatorPerson?.id,
       title: 'OS-005 - Reestruturação de rede loja',
-      description:
-        'Passagem de novo cabeamento CAT6, organização de rack e troca do switch principal.',
+      description: 'Passagem de novo cabeamento CAT6 e troca de switch principal.',
       amountCents: 212000,
       dueDate: atHour(now, 15, 18, 0),
       status: ServiceOrderStatus.OPEN,
-      priority: 3,
-      scheduledFor: atHour(now, 4, 13, 0),
-      cancellationReason: null,
     }),
   ])
 
-  const charge1 = await upsertChargeByServiceOrder({
-    orgId: org.id,
-    customerId: customers[0].id,
-    serviceOrderId: serviceOrders[0].id,
-    amountCents: 185000,
-    dueDate: atHour(now, 10, 12, 0),
-    status: ChargeStatus.PENDING,
-    notes: 'Pagamento via PIX em até 10 dias.',
+  const chargeDueFuture = atHour(now, 10, 12, 0)
+  const chargeDueOverdue = atHour(now, -5, 12, 0)
+
+  const charge1 = await prisma.charge.upsert({
+    where: { orgId_serviceOrderId: { orgId: org.id, serviceOrderId: serviceOrders[0].id } },
+    update: {
+      customerId: customers[0].id,
+      amountCents: 185000,
+      dueDate: chargeDueFuture,
+      status: ChargeStatus.PENDING,
+      title: 'Cobrança OS-001',
+      notes: 'Pagamento via PIX em até 10 dias.',
+    },
+    create: {
+      orgId: org.id,
+      customerId: customers[0].id,
+      serviceOrderId: serviceOrders[0].id,
+      amountCents: 185000,
+      dueDate: chargeDueFuture,
+      status: ChargeStatus.PENDING,
+      title: 'Cobrança OS-001',
+      notes: 'Pagamento via PIX em até 10 dias.',
+    },
   })
 
-  const charge2 = await upsertChargeByServiceOrder({
-    orgId: org.id,
-    customerId: customers[2].id,
-    serviceOrderId: serviceOrders[2].id,
-    amountCents: 98000,
-    dueDate: atHour(now, -4, 12, 0),
-    paidAt: atHour(now, -3, 10, 0),
-    status: ChargeStatus.PAID,
-    notes: 'Pago no cartão corporativo.',
+  const charge2 = await prisma.charge.upsert({
+    where: { orgId_serviceOrderId: { orgId: org.id, serviceOrderId: serviceOrders[2].id } },
+    update: {
+      customerId: customers[2].id,
+      amountCents: 98000,
+      dueDate: atHour(now, -4, 12, 0),
+      paidAt: atHour(now, -3, 10, 0),
+      status: ChargeStatus.PAID,
+      title: 'Cobrança OS-003',
+      notes: 'Pago no cartão corporativo.',
+    },
+    create: {
+      orgId: org.id,
+      customerId: customers[2].id,
+      serviceOrderId: serviceOrders[2].id,
+      amountCents: 98000,
+      dueDate: atHour(now, -4, 12, 0),
+      paidAt: atHour(now, -3, 10, 0),
+      status: ChargeStatus.PAID,
+      title: 'Cobrança OS-003',
+      notes: 'Pago no cartão corporativo.',
+    },
   })
 
-  await upsertPayment({
-    orgId: org.id,
-    chargeId: charge2.id,
-    amountCents: 98000,
-    method: PaymentMethod.CARD,
-    paidAt: atHour(now, -3, 10, 0),
-    notes: 'Conciliação automática finalizada pelo financeiro.',
-    externalRef: 'PILOT-PAYMENT-OS003',
+  await prisma.payment.upsert({
+    where: { orgId_chargeId: { orgId: org.id, chargeId: charge2.id } },
+    update: {
+      amountCents: 98000,
+      method: PaymentMethod.CARD,
+      paidAt: atHour(now, -3, 10, 0),
+      notes: 'Conciliação automática finalizada pelo financeiro.',
+    },
+    create: {
+      orgId: org.id,
+      chargeId: charge2.id,
+      amountCents: 98000,
+      method: PaymentMethod.CARD,
+      paidAt: atHour(now, -3, 10, 0),
+      notes: 'Conciliação automática finalizada pelo financeiro.',
+    },
   })
 
-  await upsertStandaloneCharge({
-    orgId: org.id,
-    customerId: customers[1].id,
-    amountCents: 124000,
-    dueDate: atHour(now, -5, 12, 0),
-    status: ChargeStatus.OVERDUE,
-    notes: 'Fatura vencida há 5 dias.',
-  })
+  const standaloneCharges = [
+    {
+      customerId: customers[1].id,
+      amountCents: 124000,
+      dueDate: chargeDueOverdue,
+      status: ChargeStatus.OVERDUE,
+      title: 'Cobrança avulsa clínica',
+      notes: 'Fatura vencida há 5 dias.',
+    },
+    {
+      customerId: customers[4].id,
+      amountCents: 212000,
+      dueDate: atHour(now, 18, 12, 0),
+      status: ChargeStatus.PENDING,
+      title: 'Cobrança sinal reestruturação de rede',
+      notes: null,
+    },
+  ]
 
-  await upsertStandaloneCharge({
-    orgId: org.id,
-    customerId: customers[4].id,
-    amountCents: 212000,
-    dueDate: atHour(now, 18, 12, 0),
-    status: ChargeStatus.PENDING,
-    notes: 'Cobrança inicial para início da reestruturação de rede.',
-  })
+  for (const seed of standaloneCharges) {
+    const existing = await prisma.charge.findFirst({
+      where: {
+        orgId: org.id,
+        customerId: seed.customerId,
+        title: seed.title,
+      },
+    })
 
-  const year = now.getFullYear()
+    if (existing) {
+      await prisma.charge.update({
+        where: { id: existing.id },
+        data: {
+          amountCents: seed.amountCents,
+          dueDate: seed.dueDate,
+          status: seed.status,
+          notes: seed.notes,
+        },
+      })
+    } else {
+      await prisma.charge.create({
+        data: {
+          orgId: org.id,
+          customerId: seed.customerId,
+          amountCents: seed.amountCents,
+          dueDate: seed.dueDate,
+          status: seed.status,
+          title: seed.title,
+          notes: seed.notes,
+        },
+      })
+    }
+  }
 
-  await upsertInvoice({
-    orgId: org.id,
-    number: `FV-${year}-1001`,
-    customerId: customers[0].id,
-    description: 'Mensalidade manutenção predial - Condomínio Parque das Flores',
-    amountCents: 185000,
-    status: 'ISSUED',
-  })
+  const invoiceSeeds = [
+    {
+      number: `FV-${now.getFullYear()}-1001`,
+      customerId: customers[0].id,
+      description: 'Mensalidade manutenção predial - Condomínio Parque das Flores',
+      amountCents: 185000,
+      status: InvoiceStatus.ISSUED,
+      dueDate: chargeDueFuture,
+      issuedAt: atHour(now, 0, 8, 0),
+      paidAt: null,
+    },
+    {
+      number: `FV-${now.getFullYear()}-1002`,
+      customerId: customers[2].id,
+      description: 'Serviço corretivo cozinha industrial',
+      amountCents: 98000,
+      status: InvoiceStatus.PAID,
+      dueDate: atHour(now, -3, 12, 0),
+      issuedAt: atHour(now, -4, 8, 0),
+      paidAt: atHour(now, -3, 11, 0),
+    },
+    {
+      number: `FV-${now.getFullYear()}-1003`,
+      customerId: customers[1].id,
+      description: 'Manutenção de climatização trimestral',
+      amountCents: 124000,
+      status: InvoiceStatus.ISSUED,
+      dueDate: chargeDueOverdue,
+      issuedAt: atHour(now, -8, 8, 0),
+      paidAt: null,
+    },
+    {
+      number: `FV-${now.getFullYear()}-1004`,
+      customerId: customers[3].id,
+      description: 'Pacote preventivo hidráulico semestral',
+      amountCents: 76000,
+      status: InvoiceStatus.DRAFT,
+      dueDate: atHour(now, 14, 12, 0),
+      issuedAt: null,
+      paidAt: null,
+    },
+  ]
 
-  await upsertInvoice({
-    orgId: org.id,
-    number: `FV-${year}-1002`,
-    customerId: customers[2].id,
-    description: 'Serviço corretivo cozinha industrial',
-    amountCents: 98000,
-    status: 'PAID',
-  })
-
-  await upsertInvoice({
-    orgId: org.id,
-    number: `FV-${year}-1003`,
-    customerId: customers[1].id,
-    description: 'Manutenção de climatização trimestral',
-    amountCents: 124000,
-    status: 'ISSUED',
-  })
-
-  await upsertInvoice({
-    orgId: org.id,
-    number: `FV-${year}-1004`,
-    customerId: customers[3].id,
-    description: 'Pacote preventivo hidráulico semestral',
-    amountCents: 76000,
-    status: 'DRAFT',
-  })
+  for (const invoice of invoiceSeeds) {
+    await prisma.invoice.upsert({
+      where: { orgId_number: { orgId: org.id, number: invoice.number } },
+      update: invoice,
+      create: {
+        orgId: org.id,
+        ...invoice,
+      },
+    })
+  }
 
   const expenseSeeds = [
     {
       orgId: org.id,
       description: 'Combustível equipe técnica - semana 1',
       amountCents: 18750,
-      category: 'OPERATIONAL',
+      category: ExpenseCategory.OPERATIONAL,
       date: atHour(now, -7, 18, 0),
       notes: 'Abastecimento para 3 veículos utilitários.',
       createdByUserId: financeUser.id,
@@ -825,7 +645,7 @@ async function main() {
       orgId: org.id,
       description: 'Compra de filtros e peças de reposição',
       amountCents: 25490,
-      category: 'SUPPLIES',
+      category: ExpenseCategory.SUPPLIES,
       date: atHour(now, -6, 15, 0),
       createdByUserId: operatorUser.id,
     },
@@ -833,7 +653,7 @@ async function main() {
       orgId: org.id,
       description: 'Assinatura plataforma de chamados',
       amountCents: 6990,
-      category: 'INFRASTRUCTURE',
+      category: ExpenseCategory.INFRASTRUCTURE,
       date: atHour(now, -5, 10, 0),
       notes: 'Plano profissional mensal.',
       createdByUserId: adminUser.id,
@@ -842,7 +662,7 @@ async function main() {
       orgId: org.id,
       description: 'Campanha local Google Ads',
       amountCents: 18000,
-      category: 'MARKETING',
+      category: ExpenseCategory.MARKETING,
       date: atHour(now, -4, 12, 0),
       createdByUserId: financeUser.id,
     },
@@ -850,7 +670,7 @@ async function main() {
       orgId: org.id,
       description: 'Vale-transporte equipe operacional',
       amountCents: 22500,
-      category: 'PAYROLL',
+      category: ExpenseCategory.PAYROLL,
       date: atHour(now, -3, 9, 0),
       createdByUserId: financeUser.id,
     },
@@ -865,7 +685,7 @@ async function main() {
       orgId: org.id,
       description: 'Receita prevista - OS-001',
       amountCents: 185000,
-      type: 'INCOME',
+      type: LaunchType.INCOME,
       category: 'Serviços Prediais',
       account: 'Conta Corrente Principal',
       date: atHour(now, 10, 8, 0),
@@ -875,7 +695,7 @@ async function main() {
       orgId: org.id,
       description: 'Receita realizada - OS-003',
       amountCents: 98000,
-      type: 'INCOME',
+      type: LaunchType.INCOME,
       category: 'Manutenção Corretiva',
       account: 'Conta Corrente Principal',
       date: atHour(now, -3, 11, 0),
@@ -885,7 +705,7 @@ async function main() {
       orgId: org.id,
       description: 'Despesa com combustível',
       amountCents: 18750,
-      type: 'EXPENSE',
+      type: LaunchType.EXPENSE,
       category: 'Logística',
       account: 'Cartão Empresa',
       date: atHour(now, -7, 18, 30),
@@ -895,7 +715,7 @@ async function main() {
       orgId: org.id,
       description: 'Despesa com peças de reposição',
       amountCents: 25490,
-      type: 'EXPENSE',
+      type: LaunchType.EXPENSE,
       category: 'Suprimentos Técnicos',
       account: 'Conta Corrente Principal',
       date: atHour(now, -6, 16, 0),
@@ -907,68 +727,19 @@ async function main() {
     await upsertLaunch(launch)
   }
 
-  await createTimelineIfMissing({
-    orgId: org.id,
-    action: 'PILOT_ENVIRONMENT_SEEDED',
-    description: 'Ambiente piloto populado com base operacional realista.',
-    personId: financePerson?.id,
-    metadata: {
-      orgSlug: org.slug,
-      users: users.map((user) => ({ email: user.email, role: user.role })),
-      customers: customerSeeds.length,
-      appointments: appointments.length,
-      serviceOrders: serviceOrders.length,
-      chargesSeeded: 4,
-      invoicesSeeded: 4,
-    },
-  })
-
-  await createTimelineIfMissing({
-    orgId: org.id,
-    action: 'SERVICE_ORDER_IN_PROGRESS',
-    description: 'OS-001 em execução com equipe técnica em campo.',
-    personId: operatorPerson?.id,
-    metadata: {
-      serviceOrderId: serviceOrders[0].id,
-      customerId: customers[0].id,
-      status: 'IN_PROGRESS',
-    },
-  })
-
-  await createTimelineIfMissing({
-    orgId: org.id,
-    action: 'PAYMENT_RECEIVED',
-    description: 'Pagamento recebido e conciliado para a OS-003.',
-    personId: financePerson?.id,
-    metadata: {
-      serviceOrderId: serviceOrders[2].id,
-      chargeId: charge2.id,
-      amountCents: 98000,
-      method: 'CARD',
-    },
-  })
-
-  await createTimelineIfMissing({
-    orgId: org.id,
-    action: 'CHARGE_OVERDUE',
-    description: 'Cobrança em atraso detectada para a Clínica Vida Leve.',
-    personId: financePerson?.id,
-    metadata: {
-      customerId: customers[1].id,
-      amountCents: 124000,
-      status: 'OVERDUE',
-    },
-  })
-
-  await createTimelineIfMissing({
-    orgId: org.id,
-    action: 'APPOINTMENT_NO_SHOW',
-    description: 'Atendimento não realizado por ausência do responsável da loja.',
-    personId: operatorPerson?.id,
-    metadata: {
-      appointmentId: appointments[4].id,
-      customerId: customers[4].id,
-      status: 'NO_SHOW',
+  await prisma.timelineEvent.create({
+    data: {
+      orgId: org.id,
+      action: 'PILOT_ENVIRONMENT_SEEDED',
+      description: 'Ambiente piloto populado com base operacional realista.',
+      metadata: {
+        orgSlug: org.slug,
+        users: users.map((user) => ({ email: user.email, role: user.role })),
+        customers: customerSeeds.length,
+        appointments: appointments.length,
+        serviceOrders: serviceOrders.length,
+        invoices: invoiceSeeds.length,
+      },
     },
   })
 
@@ -978,8 +749,6 @@ async function main() {
   for (const user of users) {
     console.log(`- ${user.key}: ${user.email} / ${user.password}`)
   }
-  console.log(`Cobrança pendente principal: ${charge1.id}`)
-  console.log(`Cobrança paga principal: ${charge2.id}`)
 }
 
 main()

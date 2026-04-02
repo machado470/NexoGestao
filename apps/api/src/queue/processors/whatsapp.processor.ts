@@ -1,16 +1,24 @@
-import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common'
+import {
+  Inject,
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common'
 import { Job, Worker } from 'bullmq'
 import IORedis from 'ioredis'
 import { WhatsAppService } from '../../whatsapp/whatsapp.service'
-import { createWhatsAppProvider } from '../../whatsapp/providers/provider.factory'
-import type { WhatsAppProvider } from '../../whatsapp/providers/whatsapp.provider'
+import {
+  createWhatsAppProvider,
+  isWhatsAppSendError,
+} from '../../whatsapp/providers/whatsapp.provider'
 import { QUEUE_CONNECTION, QUEUE_NAMES } from '../queue.constants'
 import { QueueService } from '../queue.service'
 
 @Injectable()
 export class WhatsAppProcessor implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(WhatsAppProcessor.name)
-  private readonly provider: WhatsAppProvider = createWhatsAppProvider()
+  private readonly provider = createWhatsAppProvider()
   private worker?: Worker
 
   constructor(
@@ -38,46 +46,48 @@ export class WhatsAppProcessor implements OnModuleInit, OnModuleDestroy {
             text: message.renderedText,
           })
 
-          if (result.ok) {
+          if (!isWhatsAppSendError(result)) {
             await this.whatsApp.markSent({
               id: message.id,
               provider: result.provider,
               providerMessageId: result.providerMessageId,
             })
-          } else {
-            const error = result as any
-            await this.whatsApp.markFailed({
-              id: message.id,
-              provider: error.provider,
-              errorCode: error.errorCode,
-              errorMessage: error.errorMessage,
+
+            await this.queueService.updateJobStatus({
+              queue: QUEUE_NAMES.WHATSAPP,
+              jobId: job.id?.toString() ?? '',
+              status: 'COMPLETED',
+              completed: true,
             })
-            throw new Error(error.errorMessage)
+
+            return
           }
 
-          await this.queueService.updateJobStatus({
-            queue: QUEUE_NAMES.WHATSAPP,
-            jobId: job.id?.toString() ?? '',
-            status: 'COMPLETED',
-            completed: true,
+          await this.whatsApp.markFailed({
+            id: message.id,
+            provider: result.provider,
+            errorCode: result.errorCode,
+            errorMessage: result.errorMessage,
           })
+
+          throw new Error(result.errorMessage)
         },
         { connection: this.connection },
       )
 
       this.logger.log('WhatsApp worker iniciado')
-    } catch (err) {
-      const error = err as Error
-      this.logger.error(`Falha ao iniciar whatsapp worker: ${error.message}`)
+    } catch (error) {
+      const err = error as Error
+      this.logger.error(`Falha ao iniciar whatsapp worker: ${err.message}`)
     }
   }
 
   async onModuleDestroy() {
     try {
       await this.worker?.close()
-    } catch (err) {
-      const error = err as Error
-      this.logger.error(`Erro ao fechar whatsapp worker: ${error.message}`)
+    } catch (error) {
+      const err = error as Error
+      this.logger.error(`Erro ao fechar whatsapp worker: ${err.message}`)
     }
   }
 }

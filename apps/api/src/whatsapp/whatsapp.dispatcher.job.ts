@@ -3,20 +3,20 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
 import { WhatsAppService } from './whatsapp.service'
-import { createWhatsAppProvider } from './providers/provider.factory'
-import type { WhatsAppProvider } from './providers/whatsapp.provider'
+import {
+  createWhatsAppProvider,
+  isWhatsAppSendError,
+} from './providers/whatsapp.provider'
 
 @Injectable()
 export class WhatsAppDispatcherJob {
   private readonly logger = new Logger(WhatsAppDispatcherJob.name)
-  private readonly provider: WhatsAppProvider = createWhatsAppProvider()
+  private readonly provider = createWhatsAppProvider()
 
   constructor(private readonly whatsApp: WhatsAppService) {}
 
-  // roda a cada 10 segundos (dev-friendly)
   @Cron(CronExpression.EVERY_10_SECONDS)
   async dispatchQueued() {
-    // kill-switch pra dev/ambiente
     if (process.env.DISABLE_WHATSAPP_SCHEDULE === '1') return
 
     const workerId = `api-${process.pid}`
@@ -29,41 +29,40 @@ export class WhatsAppDispatcherJob {
         `dispatching ${claimed.length} claimed whatsapp message(s) worker=${workerId}`,
       )
 
-      for (const m of claimed) {
+      for (const message of claimed) {
         try {
-          const res = await this.provider.send({
-            toPhone: m.toPhone,
-            text: m.renderedText,
+          const result = await this.provider.send({
+            toPhone: message.toPhone,
+            text: message.renderedText,
           })
 
-          if (res.ok) {
+          if (!isWhatsAppSendError(result)) {
             await this.whatsApp.markSent({
-              id: m.id,
-              provider: res.provider,
-              providerMessageId: res.providerMessageId,
+              id: message.id,
+              provider: result.provider,
+              providerMessageId: result.providerMessageId,
             })
-          } else {
-            const errorRes = res as any
-            await this.whatsApp.markFailed({
-              id: m.id,
-              provider: errorRes.provider,
-              errorCode: errorRes.errorCode,
-              errorMessage: errorRes.errorMessage,
-            })
+            continue
           }
-        } catch (err: any) {
+
           await this.whatsApp.markFailed({
-            id: m.id,
+            id: message.id,
+            provider: result.provider,
+            errorCode: result.errorCode,
+            errorMessage: result.errorMessage,
+          })
+        } catch (error: any) {
+          await this.whatsApp.markFailed({
+            id: message.id,
             provider: 'internal',
             errorCode: 'UNEXPECTED',
-            errorMessage: err?.message ?? 'unexpected error',
+            errorMessage: error?.message ?? 'unexpected error',
           })
         }
       }
-    } catch (err: any) {
-      // Importante: cron não deve “gritar” e nem derrubar fluxo do app
+    } catch (error: any) {
       this.logger.warn(
-        `dispatchQueued failed worker=${workerId} err=${err?.code ?? ''} msg=${err?.message ?? err}`,
+        `dispatchQueued failed worker=${workerId} err=${error?.code ?? ''} msg=${error?.message ?? error}`,
       )
     }
   }
