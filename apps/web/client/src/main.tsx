@@ -13,51 +13,56 @@ initSentry();
 
 const queryClient = new QueryClient();
 
+let isRedirectingToLogin = false;
+
+const isPublicPath = (pathname: string): boolean => {
+  return (
+    pathname === "/login" ||
+    pathname === "/register" ||
+    pathname === "/forgot-password" ||
+    pathname === "/reset-password"
+  );
+};
+
 const shouldRedirectToLogin = (error: unknown): boolean => {
   if (!(error instanceof TRPCClientError)) return false;
 
-  const message = String(error.message ?? "").toLowerCase();
+  const message = String(error.message ?? "").toLowerCase().trim();
 
   return (
+    message === "unauthorized" ||
+    message === "unauthenticated" ||
     message.includes("não autenticado") ||
-    message.includes("unauthorized") ||
-    message.includes("unauthenticated") ||
-    message.includes("jwt") ||
-    message.includes("token inválido") ||
-    message.includes("token invalido")
+    message.includes("nao autenticado")
   );
 };
 
 const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (typeof window === "undefined") return;
+  if (isRedirectingToLogin) return;
   if (!shouldRedirectToLogin(error)) return;
+  if (isPublicPath(window.location.pathname)) return;
 
-  const currentPath = window.location.pathname;
-  const isAlreadyPublic =
-    currentPath === "/login" ||
-    currentPath === "/register" ||
-    currentPath === "/forgot-password" ||
-    currentPath === "/reset-password";
-
-  if (isAlreadyPublic) return;
-
-  window.location.href = getLoginUrl();
+  isRedirectingToLogin = true;
+  window.location.assign(getLoginUrl());
 };
 
 queryClient.getQueryCache().subscribe((event) => {
-  if (event.type === "updated" && event.action.type === "error") {
-    const error = event.query.state.error;
-    redirectToLoginIfUnauthorized(error);
-    console.error("[API Query Error]", error);
-  }
+  if (event.type !== "updated") return;
+  if (event.action.type !== "error") return;
+
+  const error = event.query.state.error;
+  redirectToLoginIfUnauthorized(error);
+  console.error("[API Query Error]", error);
 });
 
 queryClient.getMutationCache().subscribe((event) => {
-  if (event.type === "updated" && event.action.type === "error") {
-    const error = event.mutation.state.error;
-    redirectToLoginIfUnauthorized(error);
-    console.error("[API Mutation Error]", error);
-  }
+  if (event.type !== "updated") return;
+  if (event.action.type !== "error") return;
+
+  const error = event.mutation.state.error;
+  redirectToLoginIfUnauthorized(error);
+  console.error("[API Mutation Error]", error);
 });
 
 const trpcClient = trpc.createClient({

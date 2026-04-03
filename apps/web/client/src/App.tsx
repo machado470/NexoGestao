@@ -115,12 +115,7 @@ function LazyPage({
 }
 
 function RedirectingScreen({ message }: { message: string }) {
-  return (
-    <FullScreenMessage
-      title="Redirecionando..."
-      description={message}
-    />
-  );
+  return <FullScreenMessage title="Redirecionando..." description={message} />;
 }
 
 function ProtectedRoute({
@@ -137,7 +132,7 @@ function ProtectedRoute({
   const { isAuthenticated, isInitializing, payload, role } = useAuth();
   const [, navigate] = useLocation();
 
-  const requiresOnboarding = Boolean(payload?.data?.requiresOnboarding);
+  const requiresOnboarding = Boolean(payload?.data?.data?.requiresOnboarding);
 
   useEffect(() => {
     if (isInitializing) return;
@@ -356,7 +351,9 @@ const TimelineRoute = protectedPage(TimelinePage, {
   requireCompletedOnboarding: true,
 });
 
-const OperationsRoute = protectedPage(OperationalWorkflowPage, {
+// TESTE A/B TEMPORARIO:
+// /operations vai usar a mesma tela de /service-orders
+const OperationsRoute = protectedPage(ServiceOrdersPage, {
   requireCompletedOnboarding: true,
 });
 

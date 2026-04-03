@@ -33,6 +33,10 @@ import {
   buildFinanceChargeUrl,
   buildServiceOrdersDeepLink,
 } from "@/lib/operations/operations.utils";
+import {
+  normalizeArrayPayload,
+  normalizeObjectPayload,
+} from "@/lib/query-helpers";
 
 type Customer = {
   id: string;
@@ -150,6 +154,28 @@ function buildCustomersUrl(customerId?: string | null) {
   return query ? `/customers?${query}` : "/customers";
 }
 
+function normalizeWorkspacePayload(payload: unknown): CustomerWorkspace | null {
+  const raw = normalizeObjectPayload<any>(payload);
+
+  if (!raw || typeof raw !== "object") {
+    return null;
+  }
+
+  const customer = raw.customer;
+
+  if (!customer || typeof customer !== "object") {
+    return null;
+  }
+
+  return {
+    customer: customer as Customer,
+    appointments: Array.isArray(raw.appointments) ? raw.appointments : [],
+    serviceOrders: Array.isArray(raw.serviceOrders) ? raw.serviceOrders : [],
+    charges: Array.isArray(raw.charges) ? raw.charges : [],
+    timeline: Array.isArray(raw.timeline) ? raw.timeline : [],
+  };
+}
+
 function SectionCard({
   title,
   icon: Icon,
@@ -264,14 +290,12 @@ export default function CustomersPage() {
     }
   );
 
-  const customers: Customer[] = useMemo(() => {
-    return (listCustomers.data?.data ?? []) as Customer[];
+  const customers = useMemo(() => {
+    return normalizeArrayPayload<Customer>(listCustomers.data);
   }, [listCustomers.data]);
 
   const workspace = useMemo(() => {
-    return (workspaceQuery.data?.data ??
-      workspaceQuery.data ??
-      null) as CustomerWorkspace | null;
+    return normalizeWorkspacePayload(workspaceQuery.data);
   }, [workspaceQuery.data]);
 
   useEffect(() => {

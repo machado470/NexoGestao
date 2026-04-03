@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
 
 import {
@@ -17,29 +18,81 @@ import {
   getFinancialStage,
 } from "@/lib/operations/operations.selectors";
 
+import type { ServiceOrder } from "@/components/service-orders/service-order.types";
+
 export default function OperationalWorkflowPage() {
   const [, navigate] = useLocation();
 
-  const ordersQuery = trpc.nexo.serviceOrders.list.useQuery({
-    page: 1,
-    limit: 50,
-  });
+  const ordersQuery = trpc.nexo.serviceOrders.list.useQuery(
+    {
+      page: 1,
+      limit: 50,
+    },
+    {
+      retry: false,
+      refetchOnWindowFocus: false,
+    }
+  );
 
   const orders = useMemo(
-    () => normalizeOrders(ordersQuery.data),
+    () => normalizeOrders<ServiceOrder>(ordersQuery.data),
     [ordersQuery.data]
   );
 
+  if (ordersQuery.isLoading) {
+    return (
+      <div className="space-y-4 p-6">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold">Workflow Operacional</h1>
+          <p className="text-sm text-muted-foreground">
+            Carregando fila operacional...
+          </p>
+        </div>
+
+        <Card>
+          <CardContent className="p-6 text-sm text-muted-foreground">
+            Buscando ordens de serviço.
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (ordersQuery.error) {
+    return (
+      <div className="space-y-4 p-6">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold">Workflow Operacional</h1>
+          <p className="text-sm text-muted-foreground">
+            Não foi possível carregar a fila operacional.
+          </p>
+        </div>
+
+        <Card>
+          <CardContent className="space-y-3 p-6">
+            <p className="text-sm text-red-400">
+              {ordersQuery.error.message || "Erro ao carregar ordens de serviço."}
+            </p>
+
+            <Button onClick={() => void ordersQuery.refetch()}>
+              Tentar novamente
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6 p-6">
       <div className="space-y-1">
         <h1 className="text-2xl font-semibold">Workflow Operacional</h1>
-        <p className="text-sm text-gray-400">
+        <p className="text-sm text-muted-foreground">
           Fila de execução com próxima ação clara.
         </p>
       </div>
 
-      {orders.map((os: any) => {
+      {orders.map((os) => {
         const next = getServiceOrderNextAction(os);
         const op = getOperationalStage(os);
         const fin = getFinancialStage(os);
@@ -53,7 +106,7 @@ export default function OperationalWorkflowPage() {
         return (
           <div
             key={os.id}
-            className="border rounded p-4 space-y-4 bg-gray-900"
+            className="space-y-4 rounded border bg-gray-900 p-4"
           >
             <div className="flex items-start justify-between gap-4">
               <div className="space-y-1">
@@ -70,17 +123,17 @@ export default function OperationalWorkflowPage() {
               </div>
             </div>
 
-            <div className="flex gap-4 text-sm flex-wrap">
+            <div className="flex flex-wrap gap-4 text-sm">
               <span>{op.label}</span>
               <span>{fin.label}</span>
             </div>
 
-            <div className="text-sm space-y-1">
+            <div className="space-y-1 text-sm">
               <p className="font-medium">{next.title}</p>
               <p className="text-gray-400">{next.description}</p>
             </div>
 
-            <div className="flex gap-2 flex-wrap">
+            <div className="flex flex-wrap gap-2">
               <Button onClick={() => navigate(serviceOrderUrl)}>
                 Abrir ordem
               </Button>
@@ -108,7 +161,11 @@ export default function OperationalWorkflowPage() {
       })}
 
       {orders.length === 0 && (
-        <p className="text-gray-400">Nenhuma ordem encontrada.</p>
+        <Card>
+          <CardContent className="p-6 text-sm text-muted-foreground">
+            Nenhuma ordem encontrada.
+          </CardContent>
+        </Card>
       )}
     </div>
   );

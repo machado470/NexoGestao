@@ -1,0 +1,91 @@
+import { useMemo, useState } from "react";
+import { useLocation } from "wouter";
+import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
+import { useTheme } from "@/contexts/ThemeContext";
+import { canAny, type Permission } from "@/lib/rbac";
+import { Breadcrumbs } from "./Breadcrumbs";
+import {
+  LogOut,
+  Moon,
+  Sun,
+  Users,
+  Calendar,
+  CalendarDays,
+  Briefcase,
+  DollarSign,
+  BarChart3,
+  Shield,
+  ChevronLeft,
+  ChevronRight,
+  Settings,
+  Workflow,
+  Sparkles,
+  History,
+  Building2,
+  Loader2,
+} from "lucide-react";
+
+interface MainLayoutProps {
+  children: React.ReactNode;
+}
+
+type MenuItem = {
+  id: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  route: string;
+  permissions?: Permission[];
+};
+
+type MenuSection = {
+  id: string;
+  label: string;
+  items: MenuItem[];
+};
+
+function isRouteActive(location: string, route: string) {
+  return location === route || location.startsWith(`${route}/`);
+}
+
+function getPageTitle(location: string) {
+  const titles: Record<string, string> = {
+    "/dashboard": "Dashboard",
+    "/executive-dashboard": "Dashboard Executivo",
+    "/executive-dashboard-new": "Dashboard Executivo",
+    "/dashboard/operations": "Dashboard Operacional",
+    "/operations": "Workflow Operacional",
+    "/customers": "Clientes",
+    "/appointments": "Agendamentos",
+    "/calendar": "Calendário",
+    "/service-orders": "Ordens de Serviço",
+    "/timeline": "Timeline",
+    "/finances": "Financeiro",
+    "/governance": "Governança",
+    "/people": "Pessoas",
+    "/whatsapp": "WhatsApp",
+    "/settings": "Configurações",
+  };
+
+  const exact = titles[location];
+  if (exact) return exact;
+
+  const matched = Object.entries(titles).find(
+    ([route]) => location === route || location.startsWith(`${route}/`)
+  );
+
+  return matched?.[1] ?? "NexoGestão";
+}
+
+function getPageDescription(location: string) {
+  const descriptions: Record<string, string> = {
+    "/dashboard": "Visão geral da operação.",
+    "/executive-dashboard":
+      "Visão consolidada de métricas, crescimento e operação.",
+    "/executive-dashboard-new":
+      "Visão consolidada de métricas, crescimento e operação.",
+    "/dashboard/operations":
+      "Leitura diária do ciclo operacional e dos gargalos.",
+    "/operations": "Fila prática do que precisa avançar agora.",
+    "/customers": "Base operacional de clientes e relacionamento.",
+    "/appointments": "Agenda

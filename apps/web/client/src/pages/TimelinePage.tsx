@@ -21,6 +21,7 @@ import {
   ShieldAlert,
   Users,
   Sparkles,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -350,6 +351,57 @@ function getMetadataId(
   return null;
 }
 
+function normalizeCustomersPayload(payload: unknown): CustomerOption[] {
+  const raw = (payload as any)?.data?.data ?? (payload as any)?.data ?? payload;
+
+  if (Array.isArray(raw)) {
+    return raw
+      .map((customer: any) => ({
+        id: String(customer?.id ?? ""),
+        name: String(customer?.name ?? ""),
+      }))
+      .filter((customer) => customer.id && customer.name);
+  }
+
+  if (Array.isArray(raw?.items)) {
+    return raw.items
+      .map((customer: any) => ({
+        id: String(customer?.id ?? ""),
+        name: String(customer?.name ?? ""),
+      }))
+      .filter((customer: CustomerOption) => customer.id && customer.name);
+  }
+
+  if (Array.isArray(raw?.data)) {
+    return raw.data
+      .map((customer: any) => ({
+        id: String(customer?.id ?? ""),
+        name: String(customer?.name ?? ""),
+      }))
+      .filter((customer: CustomerOption) => customer.id && customer.name);
+  }
+
+  return [];
+}
+
+function normalizeTimelinePayload(payload: unknown): TimelineEvent[] {
+  const raw = (payload as any)?.data?.data ?? (payload as any)?.data ?? payload;
+
+  if (Array.isArray(raw)) {
+    return raw as TimelineEvent[];
+  }
+
+  if (Array.isArray(raw?.items)) {
+    return raw.items as TimelineEvent[];
+  }
+
+  if (Array.isArray(raw?.data)) {
+    return raw.data as TimelineEvent[];
+  }
+
+  return [];
+}
+
 function SummaryCard({
   title,
   value,
@@ -384,7 +436,10 @@ function getCustomerIdFromLocation(location: string) {
 
 export default function TimelinePage() {
   const [location, navigate] = useLocation();
-  const customerIdFromUrl = useMemo(() => getCustomerIdFromLocation(location), [location]);
+  const customerIdFromUrl = useMemo(
+    () => getCustomerIdFromLocation(location),
+    [location]
+  );
 
   const [customerId, setCustomerId] = useState<string>(customerIdFromUrl);
   const [search, setSearch] = useState("");
@@ -406,28 +461,11 @@ export default function TimelinePage() {
   );
 
   const customers = useMemo(() => {
-    const payload = customersQuery.data;
-    const rows = Array.isArray((payload as any)?.data)
-      ? (payload as any).data
-      : Array.isArray(payload)
-        ? payload
-        : [];
-
-    return rows.map((customer: any) => ({
-      id: String(customer.id),
-      name: String(customer.name),
-    })) as CustomerOption[];
+    return normalizeCustomersPayload(customersQuery.data);
   }, [customersQuery.data]);
 
   const events = useMemo(() => {
-    const payload = timelineQuery.data;
-    const rows = Array.isArray((payload as any)?.data)
-      ? (payload as any).data
-      : Array.isArray(payload)
-        ? payload
-        : [];
-
-    return rows as TimelineEvent[];
+    return normalizeTimelinePayload(timelineQuery.data);
   }, [timelineQuery.data]);
 
   const filteredEvents = useMemo(() => {
@@ -520,11 +558,16 @@ export default function TimelinePage() {
     { value: "GOVERNANCE", label: "Governança" },
   ];
 
-  const hasFatalError = customersQuery.isError || (Boolean(customerId) && timelineQuery.isError);
+  const hasFatalError =
+    customersQuery.isError || (Boolean(customerId) && timelineQuery.isError);
+
   const fatalErrorMessage =
     customersQuery.error?.message ||
     timelineQuery.error?.message ||
     "Não foi possível carregar a timeline agora.";
+
+  const isInitialLoading =
+    customersQuery.isLoading || (Boolean(customerId) && timelineQuery.isLoading);
 
   return (
     <div className="space-y-6 p-6">
@@ -629,7 +672,8 @@ export default function TimelinePage() {
                 </label>
 
                 {customersQuery.isLoading ? (
-                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                  <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                    <Loader2 className="h-4 w-4 animate-spin" />
                     Carregando clientes...
                   </div>
                 ) : customers.length === 0 ? (
@@ -700,7 +744,9 @@ export default function TimelinePage() {
                 <p className="mt-2 text-xs text-orange-700 dark:text-orange-300">
                   {scopeFilter === "ALL"
                     ? "Leitura completa do histórico do cliente."
-                    : `Filtro ativo: ${filters.find((item) => item.value === scopeFilter)?.label ?? "Tudo"}.`}
+                    : `Filtro ativo: ${
+                        filters.find((item) => item.value === scopeFilter)?.label ?? "Tudo"
+                      }.`}
                 </p>
               </div>
             </div>
@@ -760,8 +806,9 @@ export default function TimelinePage() {
             <div className="py-10 text-center text-sm text-gray-500 dark:text-gray-400">
               Selecione um cliente para ver a timeline.
             </div>
-          ) : timelineQuery.isLoading ? (
-            <div className="py-10 text-center text-sm text-gray-500 dark:text-gray-400">
+          ) : isInitialLoading ? (
+            <div className="flex items-center justify-center gap-2 py-10 text-sm text-gray-500 dark:text-gray-400">
+              <Loader2 className="h-4 w-4 animate-spin" />
               Carregando eventos...
             </div>
           ) : filteredEvents.length === 0 ? (

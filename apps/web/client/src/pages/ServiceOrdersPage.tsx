@@ -29,6 +29,21 @@ import type {
   ServiceOrder,
 } from "@/components/service-orders/service-order.types";
 
+type CustomerOption = {
+  id: string;
+  name: string;
+  phone?: string | null;
+  email?: string | null;
+};
+
+type PersonOption = {
+  id: string;
+  name: string;
+  role?: string | null;
+  email?: string | null;
+  active?: boolean;
+};
+
 function getOsFromLocation(location: string) {
   const params = new URLSearchParams(location.split("?")[1] || "");
   return params.get("os");
@@ -56,6 +71,71 @@ function getQueueSummaryLabel(filter: FinancialFilter) {
   return "Fila operacional";
 }
 
+function normalizeCustomers(payload: unknown): CustomerOption[] {
+  const raw = payload as
+    | { data?: unknown; items?: unknown[] }
+    | unknown[]
+    | null
+    | undefined;
+
+  const candidate =
+    Array.isArray(raw)
+      ? raw
+      : Array.isArray(raw?.items)
+        ? raw.items
+        : Array.isArray((raw as any)?.data?.items)
+          ? (raw as any).data.items
+          : Array.isArray((raw as any)?.data)
+            ? (raw as any).data
+            : [];
+
+  return candidate
+    .map((item) => {
+      const customer = (item ?? {}) as Partial<CustomerOption>;
+
+      return {
+        id: typeof customer.id === "string" ? customer.id : "",
+        name: typeof customer.name === "string" ? customer.name : "",
+        phone: typeof customer.phone === "string" ? customer.phone : null,
+        email: typeof customer.email === "string" ? customer.email : null,
+      };
+    })
+    .filter((customer) => customer.id && customer.name);
+}
+
+function normalizePeople(payload: unknown): PersonOption[] {
+  const raw = payload as
+    | { data?: unknown; items?: unknown[] }
+    | unknown[]
+    | null
+    | undefined;
+
+  const candidate =
+    Array.isArray(raw)
+      ? raw
+      : Array.isArray(raw?.items)
+        ? raw.items
+        : Array.isArray((raw as any)?.data?.items)
+          ? (raw as any).data.items
+          : Array.isArray((raw as any)?.data)
+            ? (raw as any).data
+            : [];
+
+  return candidate
+    .map((item) => {
+      const person = (item ?? {}) as Partial<PersonOption>;
+
+      return {
+        id: typeof person.id === "string" ? person.id : "",
+        name: typeof person.name === "string" ? person.name : "",
+        role: typeof person.role === "string" ? person.role : null,
+        email: typeof person.email === "string" ? person.email : null,
+        active: typeof person.active === "boolean" ? person.active : true,
+      };
+    })
+    .filter((person) => person.id && person.name);
+}
+
 export default function ServiceOrdersPage() {
   const [location, navigate] = useLocation();
   const utils = trpc.useUtils();
@@ -67,15 +147,20 @@ export default function ServiceOrdersPage() {
 
   const listQuery = trpc.nexo.serviceOrders.list.useQuery(
     { page: 1, limit: 50 },
-    { retry: false }
+    {
+      retry: false,
+      refetchOnWindowFocus: false,
+    }
   );
 
   const customersQuery = trpc.nexo.customers.list.useQuery(undefined, {
     retry: false,
+    refetchOnWindowFocus: false,
   });
 
   const peopleQuery = trpc.people.list.useQuery(undefined, {
     retry: false,
+    refetchOnWindowFocus: false,
   });
 
   const activeQuery = trpc.nexo.serviceOrders.getById.useQuery(
@@ -83,16 +168,17 @@ export default function ServiceOrdersPage() {
     {
       enabled: Boolean(activeId),
       retry: false,
+      refetchOnWindowFocus: false,
     }
   );
 
   const customers = useMemo(
-    () => normalizeOrders(customersQuery.data),
+    () => normalizeCustomers(customersQuery.data),
     [customersQuery.data]
   );
 
   const people = useMemo(
-    () => normalizeOrders(peopleQuery.data),
+    () => normalizePeople(peopleQuery.data),
     [peopleQuery.data]
   );
 
@@ -148,7 +234,9 @@ export default function ServiceOrdersPage() {
 
   useEffect(() => {
     const id = getOsFromLocation(location);
-    if (id) setActiveId(id);
+    if (id) {
+      setActiveId(id);
+    }
   }, [location]);
 
   useEffect(() => {
@@ -188,6 +276,63 @@ export default function ServiceOrdersPage() {
     "PAID",
     "OVERDUE",
   ];
+
+  const isLoading =
+    listQuery.isLoading || customersQuery.isLoading || peopleQuery.isLoading;
+
+  const hasError =
+    listQuery.isError || customersQuery.isError || peopleQuery.isError;
+
+  const errorMessage =
+    listQuery.error?.message ||
+    customersQuery.error?.message ||
+    peopleQuery.error?.message ||
+    "Não foi possível carregar a fila operacional.";
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4 p-6">
+        <div>
+          <h1 className="text-2xl font-semibold">Ordens de Serviço</h1>
+          <p className="text-sm text-muted-foreground">
+            Carregando fila operacional...
+          </p>
+        </div>
+
+        <Card>
+          <CardContent className="p-6 text-sm text-muted-foreground">
+            Buscando ordens, clientes e responsáveis.
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (hasError) {
+    return (
+      <div className="space-y-4 p-6">
+        <div>
+          <h1 className="text-2xl font-semibold">Ordens de Serviço</h1>
+          <p className="text-sm text-muted-foreground">
+            Não foi possível carregar a fila operacional.
+          </p>
+        </div>
+
+        <Card>
+          <CardContent className="space-y-3 p-6">
+            <p className="text-sm text-red-500">
+              {errorMessage}
+            </p>
+
+            <Button variant="outline" onClick={() => void refreshAll()}>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Tentar novamente
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -241,7 +386,9 @@ export default function ServiceOrdersPage() {
             <div className="text-xs uppercase tracking-wide text-muted-foreground">
               Prontas para cobrar
             </div>
-            <div className="mt-1 text-2xl font-semibold">{readyToChargeCount}</div>
+            <div className="mt-1 text-2xl font-semibold">
+              {readyToChargeCount}
+            </div>
           </CardContent>
         </Card>
 
@@ -271,7 +418,7 @@ export default function ServiceOrdersPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-        <div className="xl:col-span-5 space-y-3">
+        <div className="space-y-3 xl:col-span-5">
           {operationalQueue.map((os) => {
             const whatsappUrl = buildWhatsAppUrlFromServiceOrder(os);
             const isActive = activeId === os.id;

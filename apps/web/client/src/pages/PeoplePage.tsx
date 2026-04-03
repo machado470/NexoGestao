@@ -64,60 +64,60 @@ type ServiceOrder = {
 };
 
 function normalizePeoplePayload(payload: unknown): PersonItem[] {
-  const raw = (payload as { data?: unknown } | null | undefined)?.data ?? payload;
+  const raw = (payload as any)?.data?.data ?? (payload as any)?.data ?? payload;
 
   if (!Array.isArray(raw)) {
     return [];
   }
 
-  return raw.map((item) => {
-    const candidate = (item ?? {}) as Partial<PersonItem>;
+  return raw
+    .map((item) => {
+      const candidate = (item ?? {}) as Partial<PersonItem>;
 
-    return {
-      id: typeof candidate.id === "string" ? candidate.id : "",
-      name: typeof candidate.name === "string" ? candidate.name : "Sem nome",
-      role: typeof candidate.role === "string" ? candidate.role : null,
-      email: typeof candidate.email === "string" ? candidate.email : null,
-      active: candidate.active === false ? false : true,
-      riskScore:
-        typeof candidate.riskScore === "number" && Number.isFinite(candidate.riskScore)
-          ? candidate.riskScore
-          : 0,
-      operationalState:
-        typeof candidate.operationalState === "string"
-          ? candidate.operationalState
-          : null,
-      userId: typeof candidate.userId === "string" ? candidate.userId : null,
-    };
-  });
+      return {
+        id: typeof candidate.id === "string" ? candidate.id : "",
+        name: typeof candidate.name === "string" ? candidate.name : "Sem nome",
+        role: typeof candidate.role === "string" ? candidate.role : null,
+        email: typeof candidate.email === "string" ? candidate.email : null,
+        active: candidate.active === false ? false : true,
+        riskScore:
+          typeof candidate.riskScore === "number" && Number.isFinite(candidate.riskScore)
+            ? candidate.riskScore
+            : 0,
+        operationalState:
+          typeof candidate.operationalState === "string"
+            ? candidate.operationalState
+            : null,
+        userId: typeof candidate.userId === "string" ? candidate.userId : null,
+      };
+    })
+    .filter((person) => person.id);
 }
 
 function normalizeLinkedStats(payload: unknown): LinkedStatsResponse {
-  const raw = (payload as { data?: unknown } | null | undefined)?.data ?? payload;
+  const raw = (payload as any)?.data?.data ?? (payload as any)?.data ?? payload;
 
   if (!raw || typeof raw !== "object") {
     return { count: 0 };
   }
 
-  const candidate = raw as Partial<LinkedStatsResponse>;
-
   return {
     count:
-      typeof candidate.count === "number" && Number.isFinite(candidate.count)
-        ? candidate.count
+      typeof (raw as any).count === "number" && Number.isFinite((raw as any).count)
+        ? (raw as any).count
         : 0,
   };
 }
 
 function normalizeServiceOrders(payload: unknown): ServiceOrder[] {
-  const raw = (payload as { data?: unknown } | null | undefined)?.data ?? payload;
-
-  if (Array.isArray((raw as any)?.items)) {
-    return (raw as any).items as ServiceOrder[];
-  }
+  const raw = (payload as any)?.data?.data ?? (payload as any)?.data ?? payload;
 
   if (Array.isArray(raw)) {
     return raw as ServiceOrder[];
+  }
+
+  if (Array.isArray((raw as any)?.items)) {
+    return (raw as any).items as ServiceOrder[];
   }
 
   if (Array.isArray((payload as any)?.items)) {
@@ -253,9 +253,7 @@ function SummaryCard({
         <Icon className="h-4 w-4 text-orange-500" />
         {title}
       </div>
-      <div
-        className={`mt-2 text-2xl font-semibold ${valueClassName ?? ""}`}
-      >
+      <div className={`mt-2 text-2xl font-semibold ${valueClassName ?? ""}`}>
         {value}
       </div>
       <div className="mt-1 text-xs opacity-70">{subtitle}</div>
@@ -302,6 +300,7 @@ export default function PeoplePage() {
       await Promise.all([
         utils.people.list.invalidate(),
         utils.people.statsLinked.invalidate(),
+        utils.nexo.serviceOrders.list.invalidate(),
       ]);
     },
     onError: (error) => {
@@ -345,11 +344,12 @@ export default function PeoplePage() {
         return status === "DONE";
       });
 
-      const recentOrder = [...linkedOrders].sort((a, b) => {
-        const dateA = new Date(a.createdAt ?? 0).getTime();
-        const dateB = new Date(b.createdAt ?? 0).getTime();
-        return dateB - dateA;
-      })[0] ?? null;
+      const recentOrder =
+        [...linkedOrders].sort((a, b) => {
+          const dateA = new Date(a.createdAt ?? 0).getTime();
+          const dateB = new Date(b.createdAt ?? 0).getTime();
+          return dateB - dateA;
+        })[0] ?? null;
 
       return {
         ...person,
@@ -386,6 +386,18 @@ export default function PeoplePage() {
     );
   }, [peopleWithOperationalData]);
 
+  const isLoading =
+    listPeople.isLoading || statsLinked.isLoading || serviceOrdersQuery.isLoading;
+
+  const hasError =
+    listPeople.isError || statsLinked.isError || serviceOrdersQuery.isError;
+
+  const errorMessage =
+    listPeople.error?.message ||
+    statsLinked.error?.message ||
+    serviceOrdersQuery.error?.message ||
+    "Não foi possível carregar a equipe da organização agora.";
+
   const handleRefresh = async () => {
     await Promise.all([
       listPeople.refetch(),
@@ -400,6 +412,7 @@ export default function PeoplePage() {
     await Promise.all([
       utils.people.list.invalidate(),
       utils.people.statsLinked.invalidate(),
+      utils.nexo.serviceOrders.list.invalidate(),
     ]);
   };
 
@@ -434,7 +447,7 @@ export default function PeoplePage() {
     );
   }
 
-  if (listPeople.isLoading) {
+  if (isLoading) {
     return (
       <div className="flex h-[80vh] items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
@@ -442,7 +455,7 @@ export default function PeoplePage() {
     );
   }
 
-  if (listPeople.isError) {
+  if (hasError) {
     return (
       <div className="space-y-6 p-6">
         <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
@@ -451,9 +464,7 @@ export default function PeoplePage() {
             Erro ao carregar pessoas
           </div>
 
-          <p className="mt-2 text-sm">
-            Não foi possível carregar a equipe da organização agora.
-          </p>
+          <p className="mt-2 text-sm">{errorMessage}</p>
 
           <button
             type="button"
@@ -533,7 +544,7 @@ export default function PeoplePage() {
           />
           <SummaryCard
             title="Usuários vinculados"
-            value={statsLinked.isLoading ? "..." : linkedStats.count}
+            value={linkedStats.count}
             subtitle="Acesso conectado à conta"
             icon={UserCheck}
           />
@@ -675,7 +686,7 @@ export default function PeoplePage() {
                                 <Mail className="h-3.5 w-3.5" />
                                 Email
                               </div>
-                              <div className="mt-2 text-sm font-medium text-zinc-950 dark:text-white break-all">
+                              <div className="mt-2 break-all text-sm font-medium text-zinc-950 dark:text-white">
                                 {person.email || "N/A"}
                               </div>
                             </div>

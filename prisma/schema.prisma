@@ -8,34 +8,34 @@ datasource db {
 }
 
 model Organization {
-  id                 String             @id @default(uuid())
-  name               String
-  slug               String             @unique
-  requiresOnboarding Boolean            @default(true)
-  timezone           String             @default("America/Sao_Paulo")
-  currency           String             @default("BRL")
-  createdAt          DateTime           @default(now())
-  appointments       Appointment[]
-  auditEvents        AuditEvent[]
-  charges            Charge[]
-  customers          Customer[]
-  expenses           Expense[]
-  runs               GovernanceRun[]
-  invoices           Invoice[]
-  launches           Launch[]
-  payments           Payment[]
-  persons            Person[]
-  referrals          Referral[]
-  serviceOrders      ServiceOrder[]
+  id                      String                   @id @default(uuid())
+  name                    String
+  slug                    String                   @unique
+  requiresOnboarding      Boolean                  @default(true)
+  timezone                String                   @default("America/Sao_Paulo")
+  currency                String                   @default("BRL")
+  createdAt               DateTime                 @default(now())
+  appointments            Appointment[]
+  auditEvents             AuditEvent[]
+  charges                 Charge[]
+  customers               Customer[]
+  expenses                Expense[]
+  runs                    GovernanceRun[]
+  invoices                Invoice[]
+  launches                Launch[]
+  payments                Payment[]
+  persons                 Person[]
+  referrals               Referral[]
+  serviceOrders           ServiceOrder[]
   serviceOrderAttachments ServiceOrderAttachment[]
-  timelineEvents     TimelineEvent[]
-  tracks             Track[]
-  users              User[]
-  usageMetrics       UsageMetric[]
-  whatsAppMessages   WhatsAppMessage[]
-  whatsAppTemplates  WhatsAppTemplate[]
+  timelineEvents          TimelineEvent[]
+  tracks                  Track[]
+  users                   User[]
+  usageMetrics            UsageMetric[]
+  whatsAppMessages        WhatsAppMessage[]
+  whatsAppTemplates       WhatsAppTemplate[]
 
-  subscription       Subscription?
+  subscription            Subscription?
 }
 
 model User {
@@ -350,17 +350,17 @@ model ServiceOrder {
 }
 
 model ServiceOrderAttachment {
-  id             String       @id @default(uuid())
-  orgId          String
-  serviceOrderId String
-  name           String
-  url            String
-  type           String       @default("image/jpeg")
-  size           Int?
+  id                 String       @id @default(uuid())
+  orgId              String
+  serviceOrderId     String
+  name               String
+  url                String
+  type               String       @default("image/jpeg")
+  size               Int?
   uploadedByPersonId String?
-  createdAt      DateTime     @default(now())
-  serviceOrder   ServiceOrder @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
-  org            Organization @relation(fields: [orgId], references: [id])
+  createdAt          DateTime     @default(now())
+  serviceOrder       ServiceOrder @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
+  org                Organization @relation(fields: [orgId], references: [id])
 
   @@index([orgId, serviceOrderId, createdAt])
   @@index([serviceOrderId, createdAt])
@@ -490,21 +490,25 @@ model WhatsAppTemplate {
 }
 
 model WhatsAppMessage {
-  id           String                @id @default(uuid())
-  orgId        String
-  customerId   String
-  channel      MessageChannel        @default(WHATSAPP)
-  entityType   WhatsAppEntityType
-  entityId     String
-  messageType  WhatsAppMessageType
-  messageKey   String                @unique
-  status       WhatsAppMessageStatus @default(QUEUED)
-  toPhone      String
-  renderedText String
-  createdAt    DateTime              @default(now())
+  id                String                @id @default(uuid())
+  orgId             String
+  customerId        String
+  channel           MessageChannel        @default(WHATSAPP)
+  entityType        WhatsAppEntityType
+  entityId          String
+  messageType       WhatsAppMessageType
+  messageKey        String                @unique
+  status            WhatsAppMessageStatus @default(QUEUED)
+  toPhone           String
+  renderedText      String
+  provider          String?
+  providerMessageId String?
+  errorCode         String?
+  errorMessage      String?
+  createdAt         DateTime              @default(now())
 
-  customer     Customer              @relation(fields: [customerId], references: [id])
-  org          Organization          @relation(fields: [orgId], references: [id])
+  customer          Customer              @relation(fields: [customerId], references: [id])
+  org               Organization          @relation(fields: [orgId], references: [id])
 }
 
 model Plan {

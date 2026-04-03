@@ -77,7 +77,7 @@ export class WhatsAppController {
       )
     }
 
-    return this.whatsapp.queueMessage({
+    return this.whatsapp.enqueueMessage({
       orgId,
       customerId: body.customerId,
       toPhone,

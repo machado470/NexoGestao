@@ -141,7 +141,6 @@ export class FinanceService {
       include: { customer: true },
     })
 
-    // Enviar cobrança automática via WhatsApp
     if (charge.customer?.phone) {
       await this.sendChargeWhatsApp(charge.id).catch((err) =>
         this.logger.error(`Erro ao enviar cobrança WhatsApp: ${err.message}`),
@@ -210,7 +209,6 @@ export class FinanceService {
       data: { status: 'PAID', paidAt: new Date() },
     })
 
-    // Enviar confirmação de pagamento via WhatsApp
     await this.sendPaymentConfirmationWhatsApp(charge.id).catch((err) =>
       this.logger.error(`Erro ao enviar confirmação WhatsApp: ${err.message}`),
     )
@@ -265,9 +263,11 @@ export class FinanceService {
   async automateOverdueLifecycle(orgId: string) {
     const now = new Date()
 
-    // Buscar cobranças que estão prestes a vencer para enviar lembrete (ex: hoje)
-    const todayStart = new Date(now.setHours(0, 0, 0, 0))
-    const todayEnd = new Date(now.setHours(23, 59, 59, 999))
+    const todayStart = new Date(now)
+    todayStart.setHours(0, 0, 0, 0)
+
+    const todayEnd = new Date(now)
+    todayEnd.setHours(23, 59, 59, 999)
 
     const dueToday = await this.prisma.charge.findMany({
       where: {
@@ -283,7 +283,6 @@ export class FinanceService {
       )
     }
 
-    // Atualizar status para OVERDUE
     const result = await this.prisma.charge.updateMany({
       where: {
         orgId,
@@ -293,16 +292,18 @@ export class FinanceService {
       data: { status: 'OVERDUE' },
     })
 
-    // Enviar lembrete para cobranças que acabaram de vencer
     const overdue = await this.prisma.charge.findMany({
       where: {
         orgId,
         status: 'OVERDUE',
-        updatedAt: { gte: now }, // Simplificação para este exemplo
       },
     })
 
-    // (Opcional: enviar lembrete para overdue também)
+    for (const charge of overdue) {
+      await this.sendPaymentReminderWhatsApp(charge.id).catch((err) =>
+        this.logger.error(`Erro overdue WhatsApp: ${err.message}`),
+      )
+    }
 
     return { ok: true, updated: result.count }
   }
@@ -367,7 +368,7 @@ export class FinanceService {
 
     const months: Record<string, number> = {}
     for (const p of payments) {
-      const month = p.paidAt.toISOString().slice(0, 7) // YYYY-MM
+      const month = p.paidAt.toISOString().slice(0, 7)
       months[month] = (months[month] || 0) + p.amountCents
     }
 
@@ -377,12 +378,10 @@ export class FinanceService {
   }
 
   async createAutomationCharge(data: any) {
-    // Placeholder for future automation logic
     return { ok: true }
   }
 
   async sendPaymentReminder(data: any) {
-    // Placeholder for future notification logic
     return { ok: true }
   }
 

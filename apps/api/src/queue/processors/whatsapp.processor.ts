@@ -8,10 +8,8 @@ import {
 import { Job, Worker } from 'bullmq'
 import IORedis from 'ioredis'
 import { WhatsAppService } from '../../whatsapp/whatsapp.service'
-import {
-  createWhatsAppProvider,
-  isWhatsAppSendError,
-} from '../../whatsapp/providers/whatsapp.provider'
+import { isWhatsAppSendError } from '../../whatsapp/providers/whatsapp.provider'
+import { createWhatsAppProvider } from '../../whatsapp/providers/provider.factory'
 import { QUEUE_CONNECTION, QUEUE_NAMES } from '../queue.constants'
 import { QueueService } from '../queue.service'
 

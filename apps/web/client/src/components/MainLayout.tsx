@@ -50,10 +50,10 @@ function isRouteActive(location: string, route: string) {
 
 function getPageTitle(location: string) {
   const titles: Record<string, string> = {
-    "/dashboard": "Dashboard",
+    "/dashboard": "Central de decisão",
     "/executive-dashboard": "Dashboard Executivo",
     "/executive-dashboard-new": "Dashboard Executivo",
-    "/dashboard/operations": "Dashboard Operacional",
+    "/dashboard/operations": "Operação diária",
     "/operations": "Workflow Operacional",
     "/customers": "Clientes",
     "/appointments": "Agendamentos",
@@ -79,18 +79,21 @@ function getPageTitle(location: string) {
 
 function getPageDescription(location: string) {
   const descriptions: Record<string, string> = {
-    "/dashboard": "Visão geral da operação.",
+    "/dashboard":
+      "Leitura direta do que está travando execução, cobrança e fechamento.",
     "/executive-dashboard":
       "Visão consolidada de métricas, crescimento e operação.",
     "/executive-dashboard-new":
       "Visão consolidada de métricas, crescimento e operação.",
     "/dashboard/operations":
-      "Leitura diária do ciclo operacional e dos gargalos.",
-    "/operations": "Fila prática do que precisa avançar agora.",
+      "Fila prática do que precisa avançar agora.",
+    "/operations":
+      "Execução guiada sem perda de contexto entre etapas.",
     "/customers": "Base operacional de clientes e relacionamento.",
     "/appointments": "Agenda operacional e preparação da execução.",
     "/calendar": "Visão temporal da agenda e da disponibilidade.",
-    "/service-orders": "Centro da execução operacional.",
+    "/service-orders":
+      "Centro da execução e origem de todo o fluxo financeiro.",
     "/timeline": "Rastreabilidade transversal dos eventos.",
     "/finances": "Cobranças, recebimentos e fluxo financeiro.",
     "/governance": "Regras, risco e leitura institucional.",
@@ -111,7 +114,7 @@ function getPageDescription(location: string) {
 
 export function MainLayout({ children }: MainLayoutProps) {
   const [location, navigate] = useLocation();
-  const { role, logout, isSubmitting } = useAuth();
+  const { role, logout, isLoggingOut } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
@@ -128,13 +131,13 @@ export function MainLayout({ children }: MainLayoutProps) {
         },
         {
           id: "operations-dashboard",
-          label: "Dashboard Operacional",
+          label: "Operação diária",
           icon: Sparkles,
           route: "/dashboard/operations",
         },
         {
           id: "operations",
-          label: "Workflow Operacional",
+          label: "Workflow",
           icon: Workflow,
           route: "/operations",
         },
@@ -372,12 +375,12 @@ export function MainLayout({ children }: MainLayoutProps) {
               <button
                 type="button"
                 onClick={() => void handleLogout()}
-                disabled={isSubmitting}
+                disabled={isLoggingOut}
                 className={`flex w-full items-center rounded-xl px-2.5 py-2 text-[13px] text-red-600 transition-colors hover:bg-red-50/90 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-60 dark:text-red-400 dark:hover:bg-red-500/10 dark:hover:text-red-300 ${
                   sidebarCollapsed ? "justify-center" : "gap-2.5"
                 }`}
               >
-                {isSubmitting ? (
+                {isLoggingOut ? (
                   <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
                 ) : (
                   <LogOut className="h-4 w-4 shrink-0" />
@@ -385,7 +388,7 @@ export function MainLayout({ children }: MainLayoutProps) {
 
                 {!sidebarCollapsed && (
                   <span className="truncate font-medium">
-                    {isSubmitting ? "Saindo..." : "Sair"}
+                    {isLoggingOut ? "Saindo..." : "Sair"}
                   </span>
                 )}
               </button>
@@ -395,14 +398,14 @@ export function MainLayout({ children }: MainLayoutProps) {
 
         <div className="flex min-w-0 flex-1 flex-col gap-3 md:gap-4">
           <header className="nexo-app-panel-strong px-4 py-3 md:px-5 md:py-4">
-            <div className="flex flex-col gap-2.5">
+            <div className="flex flex-col gap-3">
               <Breadcrumbs />
 
-              <div>
-                <h1 className="text-[1.65rem] font-semibold tracking-tight text-zinc-950 dark:text-white">
+              <div className="flex flex-col gap-1">
+                <h1 className="text-[1.8rem] font-semibold tracking-tight text-zinc-950 dark:text-white">
                   {pageTitle}
                 </h1>
-                <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                <p className="max-w-2xl text-sm leading-6 text-zinc-500 dark:text-zinc-400">
                   {pageDescription}
                 </p>
               </div>

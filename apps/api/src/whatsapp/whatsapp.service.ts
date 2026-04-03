@@ -116,9 +116,6 @@ export class WhatsAppService {
     }
   }
 
-  /**
-   * Claim concorrente seguro usando apenas campos existentes no schema atual.
-   */
   async claimQueued(params: { limit?: number; workerId: string }) {
     const limit = params.limit ?? 50
     const workerId = params.workerId
@@ -190,12 +187,20 @@ export class WhatsAppService {
     provider: string
     providerMessageId: string
   }) {
-    const { id } = params
+    const { id, provider, providerMessageId } = params
+
+    this.logger.log(
+      `whatsapp sent id=${id} provider=${provider} providerMessageId=${providerMessageId}`,
+    )
 
     return this.prisma.whatsAppMessage.update({
       where: { id },
       data: {
         status: WhatsAppMessageStatus.SENT,
+        provider,
+        providerMessageId,
+        errorCode: null,
+        errorMessage: null,
       },
     })
   }
@@ -206,12 +211,19 @@ export class WhatsAppService {
     errorCode: string
     errorMessage: string
   }) {
-    const { id } = params
+    const { id, provider, errorCode, errorMessage } = params
+
+    this.logger.warn(
+      `whatsapp failed id=${id} provider=${provider} errorCode=${errorCode} errorMessage=${errorMessage}`,
+    )
 
     return this.prisma.whatsAppMessage.update({
       where: { id },
       data: {
         status: WhatsAppMessageStatus.FAILED,
+        provider,
+        errorCode,
+        errorMessage,
       },
     })
   }

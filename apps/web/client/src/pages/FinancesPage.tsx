@@ -84,20 +84,28 @@ type ChargeStats = {
   totalOverdueAmount: number;
 };
 
+type ChargeBucket = {
+  count?: number;
+  amountCents?: number;
+};
+
 type ChargesResponseShape = {
-  data?: {
-    items?: Charge[];
-    pagination?: ChargesMeta;
-    meta?: ChargesMeta;
-  };
+  data?: Charge[] | { items?: Charge[]; pagination?: ChargesMeta; meta?: ChargesMeta };
   items?: Charge[];
   pagination?: ChargesMeta;
   meta?: ChargesMeta;
 };
 
-type StatsResponseShape = {
-  data?: ChargeStats;
-};
+type StatsResponseShape =
+  | {
+      data?: ChargeStats | Record<string, unknown>;
+    }
+  | ChargeStats
+  | {
+      pending?: ChargeBucket;
+      overdue?: ChargeBucket;
+      paid?: ChargeBucket;
+    };
 
 function formatMoney(value: number) {
   return new Intl.NumberFormat("pt-BR", {
@@ -132,9 +140,14 @@ function safeExtractCharges(payload: unknown): Charge[] {
   }
 
   const data = payload as ChargesResponseShape | null | undefined;
+  const raw = data?.data;
 
-  if (Array.isArray(data?.data?.items)) {
-    return data.data.items;
+  if (Array.isArray(raw)) {
+    return raw as Charge[];
+  }
+
+  if (raw && typeof raw === "object" && Array.isArray((raw as any).items)) {
+    return (raw as any).items as Charge[];
   }
 
   if (Array.isArray(data?.items)) {
@@ -147,23 +160,69 @@ function safeExtractCharges(payload: unknown): Charge[] {
 function safeExtractStats(payload: unknown): ChargeStats | null {
   if (!payload) return null;
 
-  const data = payload as StatsResponseShape | ChargeStats;
+  const raw = ((payload as { data?: unknown } | null | undefined)?.data ??
+    payload) as any;
 
-  if ("data" in data && data.data) {
-    return data.data;
+  if (!raw || typeof raw !== "object") {
+    return null;
   }
 
-  return data as ChargeStats;
+  const hasLegacyShape =
+    typeof raw.totalCharges === "number" ||
+    typeof raw.totalPaid === "number" ||
+    typeof raw.totalPending === "number" ||
+    typeof raw.totalOverdue === "number";
+
+  if (hasLegacyShape) {
+    return {
+      totalCharges: Number(raw.totalCharges ?? 0),
+      totalPaid: Number(raw.totalPaid ?? 0),
+      totalPaidAmount: Number(raw.totalPaidAmount ?? 0),
+      totalPending: Number(raw.totalPending ?? 0),
+      totalPendingAmount: Number(raw.totalPendingAmount ?? 0),
+      totalOverdue: Number(raw.totalOverdue ?? 0),
+      totalOverdueAmount: Number(raw.totalOverdueAmount ?? 0),
+    };
+  }
+
+  const pendingCount = Number(raw.pending?.count ?? 0);
+  const overdueCount = Number(raw.overdue?.count ?? 0);
+  const paidCount = Number(raw.paid?.count ?? 0);
+
+  const pendingAmount = Number(raw.pending?.amountCents ?? 0) / 100;
+  const overdueAmount = Number(raw.overdue?.amountCents ?? 0) / 100;
+  const paidAmount = Number(raw.paid?.amountCents ?? 0) / 100;
+
+  return {
+    totalCharges: pendingCount + overdueCount + paidCount,
+    totalPaid: paidCount,
+    totalPaidAmount: paidAmount,
+    totalPending: pendingCount,
+    totalPendingAmount: pendingAmount,
+    totalOverdue: overdueCount,
+    totalOverdueAmount: overdueAmount,
+  };
 }
 
 function safeExtractPagination(payload: unknown): ChargesMeta {
   const data = payload as ChargesResponseShape | null | undefined;
+  const raw = data?.data;
+
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    return (
+      (raw as any).pagination ??
+      (raw as any).meta ?? {
+        page: 1,
+        limit: 20,
+        total: 0,
+        pages: 1,
+      }
+    );
+  }
 
   return (
     data?.pagination ??
-    data?.meta ??
-    data?.data?.pagination ??
-    data?.data?.meta ?? {
+    data?.meta ?? {
       page: 1,
       limit: 20,
       total: 0,
@@ -535,7 +594,12 @@ export default function FinancesPage() {
       behavior: "smooth",
       block: "center",
     });
-  }, [highlightedChargeId, highlightedExistsOnCurrentPage, chargesQuery.isLoading, charges]);
+  }, [
+    highlightedChargeId,
+    highlightedExistsOnCurrentPage,
+    chargesQuery.isLoading,
+    charges,
+  ]);
 
   const paidCount = charges.filter((charge) => charge.status === "PAID").length;
   const pendingCount = charges.filter((charge) => charge.status === "PENDING").length;

@@ -3,10 +3,8 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
 import { WhatsAppService } from './whatsapp.service'
-import {
-  createWhatsAppProvider,
-  isWhatsAppSendError,
-} from './providers/whatsapp.provider'
+import { isWhatsAppSendError } from './providers/whatsapp.provider'
+import { createWhatsAppProvider } from './providers/provider.factory'
 
 @Injectable()
 export class WhatsAppDispatcherJob {
@@ -26,7 +24,7 @@ export class WhatsAppDispatcherJob {
       if (claimed.length === 0) return
 
       this.logger.log(
-        `dispatching ${claimed.length} claimed whatsapp message(s) worker=${workerId}`,
+        `dispatching ${claimed.length} whatsapp message(s) worker=${workerId}`,
       )
 
       for (const message of claimed) {
