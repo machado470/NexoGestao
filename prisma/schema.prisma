@@ -92,20 +92,33 @@ model Person {
 }
 
 model TimelineEvent {
-  id          String       @id @default(uuid())
-  action      String
-  personId    String?
-  description String?
-  metadata    Json?
-  createdAt   DateTime     @default(now())
-  orgId       String
-  org         Organization @relation(fields: [orgId], references: [id])
-  person      Person?      @relation(fields: [personId], references: [id])
+  id             String        @id @default(uuid())
+  action         String
+  personId       String?
+  description    String?
+  customerId     String?
+  serviceOrderId String?
+  appointmentId  String?
+  chargeId       String?
+  metadata       Json?
+  createdAt      DateTime      @default(now())
+  orgId          String
+
+  org            Organization  @relation(fields: [orgId], references: [id])
+  person         Person?       @relation(fields: [personId], references: [id])
+  customer       Customer?     @relation(fields: [customerId], references: [id])
+  serviceOrder   ServiceOrder? @relation(fields: [serviceOrderId], references: [id])
+  appointment    Appointment?  @relation(fields: [appointmentId], references: [id])
+  charge         Charge?       @relation(fields: [chargeId], references: [id])
 
   @@index([orgId, createdAt])
   @@index([orgId, action, createdAt])
   @@index([personId, createdAt])
   @@index([action, createdAt])
+  @@index([orgId, customerId, createdAt])
+  @@index([orgId, serviceOrderId, createdAt])
+  @@index([orgId, appointmentId, createdAt])
+  @@index([orgId, chargeId, createdAt])
 }
 
 model Track {
@@ -290,6 +303,7 @@ model Customer {
   invoices         Invoice[]
   serviceOrders    ServiceOrder[]
   whatsAppMessages WhatsAppMessage[]
+  timelineEvents   TimelineEvent[]
 
   @@index([orgId, createdAt])
   @@index([orgId, active, createdAt])
@@ -297,18 +311,19 @@ model Customer {
 }
 
 model Appointment {
-  id           String            @id @default(uuid())
-  orgId        String
-  customerId   String
-  startsAt     DateTime
-  endsAt       DateTime
-  status       AppointmentStatus @default(SCHEDULED)
-  notes        String?
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
-  customer     Customer          @relation(fields: [customerId], references: [id])
-  org          Organization      @relation(fields: [orgId], references: [id])
-  serviceOrder ServiceOrder?
+  id             String            @id @default(uuid())
+  orgId          String
+  customerId     String
+  startsAt       DateTime
+  endsAt         DateTime
+  status         AppointmentStatus @default(SCHEDULED)
+  notes          String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  customer       Customer          @relation(fields: [customerId], references: [id])
+  org            Organization      @relation(fields: [orgId], references: [id])
+  serviceOrder   ServiceOrder?
+  timelineEvents TimelineEvent[]
 
   @@index([orgId, startsAt])
   @@index([orgId, startsAt, endsAt])
@@ -341,6 +356,7 @@ model ServiceOrder {
   assignedTo         Person?            @relation("ServiceOrderAssignedTo", fields: [assignedToPersonId], references: [id])
   customer           Customer           @relation(fields: [customerId], references: [id])
   org                Organization       @relation(fields: [orgId], references: [id])
+  timelineEvents     TimelineEvent[]
 
   @@index([orgId, createdAt])
   @@index([orgId, status, createdAt])
@@ -367,22 +383,23 @@ model ServiceOrderAttachment {
 }
 
 model Charge {
-  id             String        @id @default(uuid())
+  id             String         @id @default(uuid())
   orgId          String
   customerId     String
   serviceOrderId String?
   amountCents    Int
-  currency       String        @default("BRL")
-  status         ChargeStatus  @default(PENDING)
+  currency       String         @default("BRL")
+  status         ChargeStatus   @default(PENDING)
   dueDate        DateTime
   paidAt         DateTime?
   notes          String?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-  customer       Customer      @relation(fields: [customerId], references: [id])
-  org            Organization  @relation(fields: [orgId], references: [id])
-  serviceOrder   ServiceOrder? @relation(fields: [serviceOrderId], references: [id])
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  customer       Customer       @relation(fields: [customerId], references: [id])
+  org            Organization   @relation(fields: [orgId], references: [id])
+  serviceOrder   ServiceOrder?  @relation(fields: [serviceOrderId], references: [id])
   payments       Payment[]
+  timelineEvents TimelineEvent[]
 
   @@index([orgId, createdAt])
   @@index([customerId, createdAt])

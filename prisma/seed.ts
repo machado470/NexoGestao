@@ -1,8 +1,9 @@
 import { PrismaClient } from '@prisma/client'
 import { createRequire } from 'node:module'
+import { seedDemoOrg } from './seed-demo-org'
 
 const require = createRequire(import.meta.url)
-const bcrypt = require('bcryptjs')
+const bcrypt = require('../apps/api/node_modules/bcryptjs')
 
 const prisma = new PrismaClient()
 
@@ -11,7 +12,7 @@ function env(name: string, fallback = ''): string {
   return v || fallback
 }
 
-async function main() {
+async function ensureDefaultAdmin() {
   const org = await prisma.organization.upsert({
     where: { slug: 'default' },
     update: {
@@ -66,7 +67,35 @@ async function main() {
     },
   })
 
-  console.log('Seed finalizado')
+  return org
+}
+
+async function runDemoOrgSeed() {
+  const org = await ensureDefaultAdmin()
+
+  const user = await prisma.user.findFirst({
+    where: { orgId: org.id, role: 'ADMIN' },
+    select: { id: true },
+  })
+
+  await seedDemoOrg(org.id, user?.id ?? null)
+  console.log('Seed demo-org finalizado')
+}
+
+async function runBasicSeed() {
+  await ensureDefaultAdmin()
+  console.log('Seed básico finalizado')
+}
+
+async function main() {
+  const seedMode = env('SEED_MODE', 'basic').toLowerCase()
+
+  if (seedMode === 'demo' || seedMode === 'demo-org') {
+    await runDemoOrgSeed()
+    return
+  }
+
+  await runBasicSeed()
 }
 
 main()

@@ -61,10 +61,7 @@ export const invoicesRouter = router({
         customerId: z.union([z.number().int().positive(), z.string().min(1)]).optional(),
         number: z.string().min(1, "Número da fatura é obrigatório"),
         amount: z.number().min(0.01, "Valor deve ser maior que 0"),
-        issueDate: z.coerce.date().optional(),
-        dueDate: z.coerce.date().optional(),
         status: z.enum(["DRAFT", "ISSUED", "PAID", "CANCELLED"]).default("DRAFT"),
-        notes: z.string().optional(),
         description: z.string().optional(),
       })
     )
@@ -75,10 +72,7 @@ export const invoicesRouter = router({
           customerId: input.customerId ? String(input.customerId) : undefined,
           number: input.number,
           amountCents: Math.round(input.amount * 100),
-          issuedAt: input.issueDate ? input.issueDate.toISOString() : undefined,
-          dueDate: input.dueDate ? input.dueDate.toISOString() : undefined,
           status: input.status,
-          notes: input.notes,
           description: input.description,
         }),
       });
@@ -93,22 +87,17 @@ export const invoicesRouter = router({
         id: z.union([z.number().int().positive(), z.string().min(1)]),
         status: z.enum(["DRAFT", "ISSUED", "PAID", "CANCELLED"]).optional(),
         amount: z.number().optional(),
-        dueDate: z.coerce.date().optional(),
-        issueDate: z.coerce.date().optional(),
-        notes: z.string().optional(),
         description: z.string().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const { id, amount, dueDate, issueDate, ...rest } = input;
+      const { id, amount, ...rest } = input;
 
       const raw = await nexoFetch<any>(ctx.req, `/invoices/${id}`, {
         method: "PATCH",
         body: JSON.stringify({
           ...rest,
           ...(amount !== undefined ? { amountCents: Math.round(amount * 100) } : {}),
-          ...(dueDate ? { dueDate: dueDate.toISOString() } : {}),
-          ...(issueDate ? { issuedAt: issueDate.toISOString() } : {}),
         }),
       });
 

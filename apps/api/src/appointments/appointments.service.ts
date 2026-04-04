@@ -60,12 +60,6 @@ function addMinutes(d: Date, minutes: number): Date {
   return new Date(d.getTime() + minutes * 60 * 1000)
 }
 
-function durationMinutes(start: Date, end: Date): number {
-  const ms = end.getTime() - start.getTime()
-  if (ms <= 0) return DEFAULT_DURATION_MIN
-  return Math.max(1, Math.round(ms / 60000))
-}
-
 function isOverlapDbViolation(err: any): boolean {
   const msg = String(err?.message ?? '')
   const code = String(err?.code ?? '')
@@ -281,9 +275,9 @@ export class AppointmentsService {
         personId: params.personId,
         action: 'APPOINTMENT_CREATED',
         description: context,
+        customerId: created.customerId,
+        appointmentId: created.id,
         metadata: {
-          appointmentId: created.id,
-          customerId: created.customerId,
           actorUserId: params.createdBy,
           actorPersonId: params.personId,
           createdBy: params.createdBy,
@@ -335,8 +329,8 @@ export class AppointmentsService {
           personId: params.personId,
           action: 'APPOINTMENT_CONFLICT_BLOCKED',
           description: context,
+          customerId: params.customerId,
           metadata: {
-            customerId: params.customerId,
             actorUserId: params.createdBy,
             actorPersonId: params.personId,
             createdBy: params.createdBy,
@@ -429,9 +423,9 @@ export class AppointmentsService {
         personId: params.personId,
         action: statusToAction(updated.status),
         description: context,
+        customerId: updated.customerId,
+        appointmentId: updated.id,
         metadata: {
-          appointmentId: updated.id,
-          customerId: updated.customerId,
           actorUserId: params.updatedBy,
           actorPersonId: params.personId,
           updatedBy: params.updatedBy,

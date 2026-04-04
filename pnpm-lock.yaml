@@ -21,6 +21,9 @@ importers:
       prisma:
         specifier: 5.22.0
         version: 5.22.0
+      tsx:
+        specifier: ^4.19.2
+        version: 4.21.0
       turbo:
         specifier: ^2.0.0
         version: 2.9.3

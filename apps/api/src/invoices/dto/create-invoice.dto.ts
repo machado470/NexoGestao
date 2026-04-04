@@ -3,7 +3,6 @@ import {
   IsNumber,
   IsOptional,
   IsString,
-  IsDateString,
   IsEnum,
   IsUUID,
   Min,
@@ -39,21 +38,4 @@ export class CreateInvoiceDto {
   @IsEnum(InvoiceStatus)
   @IsOptional()
   status?: InvoiceStatus
-
-  @IsDateString()
-  @IsOptional()
-  dueDate?: string
-
-  @IsDateString()
-  @IsOptional()
-  issuedAt?: string
-
-  @IsDateString()
-  @IsOptional()
-  paidAt?: string
-
-  @IsString()
-  @IsOptional()
-  @MaxLength(1000)
-  notes?: string
 }

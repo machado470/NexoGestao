@@ -9,8 +9,8 @@ done
 
 echo "✅ Postgres disponível"
 
-echo "🧱 Aplicando schema Prisma (db push com accept-data-loss)..."
-npx prisma db push --accept-data-loss
+echo "🧱 Aplicando migrations Prisma..."
+npx prisma migrate deploy
 
 echo "🌱 Rodando seed..."
 npx prisma db seed

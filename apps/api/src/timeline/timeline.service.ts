@@ -9,6 +9,10 @@ type TimelineLogInput = {
   action: string
   personId?: string | null
   description?: string | null
+  customerId?: string | null
+  serviceOrderId?: string | null
+  appointmentId?: string | null
+  chargeId?: string | null
   metadata?: Record<string, any> | null
 }
 
@@ -30,6 +34,14 @@ function pickActorPersonId(metadata?: Record<string, any> | null): string | null
   if (typeof v !== 'string') return null
   const s = v.trim()
   return s ? s : null
+}
+
+function pickString(metadata: Record<string, any> | null | undefined, key: string): string | null {
+  if (!metadata) return null
+  const value = metadata[key]
+  if (typeof value !== 'string') return null
+  const normalized = value.trim()
+  return normalized ? normalized : null
 }
 
 @Injectable()
@@ -69,7 +81,9 @@ export class TimelineService {
           select: { id: true },
         })
 
-        if (person?.id) personId = person.id
+        if (person?.id) {
+          personId = person.id
+        }
       }
     }
 
@@ -82,6 +96,24 @@ export class TimelineService {
       )
     }
 
+    const customerId =
+      input.customerId ??
+      pickString(input.metadata ?? null, 'customerId') ??
+      pickString(input.metadata ?? null, 'entityId')
+
+    const serviceOrderId =
+      input.serviceOrderId ??
+      pickString(input.metadata ?? null, 'serviceOrderId') ??
+      pickString(input.metadata ?? null, 'executionId')
+
+    const appointmentId =
+      input.appointmentId ??
+      pickString(input.metadata ?? null, 'appointmentId')
+
+    const chargeId =
+      input.chargeId ??
+      pickString(input.metadata ?? null, 'chargeId')
+
     const requestId = this.requestContext.requestId
 
     const event = await this.prisma.timelineEvent.create({
@@ -90,6 +122,10 @@ export class TimelineService {
         action: input.action,
         personId,
         description: input.description ?? null,
+        customerId,
+        serviceOrderId,
+        appointmentId,
+        chargeId,
         metadata: {
           ...(input.metadata ?? {}),
           ...(requestId ? { requestId } : {}),
@@ -153,6 +189,7 @@ export class TimelineService {
       where: {
         orgId,
         OR: [
+          { customerId },
           { metadata: { path: ['customerId'], equals: customerId } },
           { metadata: { path: ['entityId'], equals: customerId } },
         ],
@@ -167,6 +204,7 @@ export class TimelineService {
       where: {
         orgId,
         OR: [
+          { serviceOrderId },
           { metadata: { path: ['serviceOrderId'], equals: serviceOrderId } },
           { metadata: { path: ['entityId'], equals: serviceOrderId } },
           { metadata: { path: ['executionId'], equals: serviceOrderId } },

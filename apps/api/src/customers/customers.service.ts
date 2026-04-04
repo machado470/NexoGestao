@@ -128,6 +128,7 @@ export class CustomersService {
         where: {
           orgId,
           OR: [
+            { customerId: id },
             { metadata: { path: ['customerId'], equals: id } },
             { metadata: { path: ['entityId'], equals: id } },
           ],
@@ -189,8 +190,8 @@ export class CustomersService {
       action: 'CUSTOMER_CREATED',
       description: context,
       personId: params.personId,
+      customerId: created.id,
       metadata: {
-        customerId: created.id,
         actorUserId: params.createdBy,
         actorPersonId: params.personId,
         createdBy: params.createdBy,
@@ -343,8 +344,8 @@ export class CustomersService {
       action: 'CUSTOMER_UPDATED',
       description: context,
       personId: params.personId,
+      customerId: updated.id,
       metadata: {
-        customerId: updated.id,
         actorUserId: params.updatedBy,
         actorPersonId: params.personId,
         updatedBy: params.updatedBy,

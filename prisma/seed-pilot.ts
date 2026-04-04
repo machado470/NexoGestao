@@ -426,6 +426,10 @@ async function createTimelineIfMissing(params: {
   action: string
   description: string
   personId?: string
+  customerId?: string
+  serviceOrderId?: string
+  appointmentId?: string
+  chargeId?: string
   metadata?: Record<string, unknown>
 }) {
   const existing = await prisma.timelineEvent.findFirst({
@@ -441,6 +445,10 @@ async function createTimelineIfMissing(params: {
       where: { id: existing.id },
       data: {
         personId: params.personId,
+        customerId: params.customerId,
+        serviceOrderId: params.serviceOrderId,
+        appointmentId: params.appointmentId,
+        chargeId: params.chargeId,
         metadata: params.metadata,
       },
     })
@@ -452,6 +460,10 @@ async function createTimelineIfMissing(params: {
       action: params.action,
       description: params.description,
       personId: params.personId,
+      customerId: params.customerId,
+      serviceOrderId: params.serviceOrderId,
+      appointmentId: params.appointmentId,
+      chargeId: params.chargeId,
       metadata: params.metadata,
     },
   })
@@ -556,6 +568,10 @@ async function main() {
   )
 
   const [adminUser, operatorUser, financeUser] = savedUsers
+
+  const adminPerson = await prisma.person.findUnique({
+    where: { userId: adminUser.id },
+  })
 
   const operatorPerson = await prisma.person.findUnique({
     where: { userId: operatorUser.id },
@@ -745,7 +761,7 @@ async function main() {
     notes: 'Pago no cartão corporativo.',
   })
 
-  await upsertPayment({
+  const payment2 = await upsertPayment({
     orgId: org.id,
     chargeId: charge2.id,
     amountCents: 98000,
@@ -755,7 +771,7 @@ async function main() {
     externalRef: 'PILOT-PAYMENT-OS003',
   })
 
-  await upsertStandaloneCharge({
+  const overdueCharge = await upsertStandaloneCharge({
     orgId: org.id,
     customerId: customers[1].id,
     amountCents: 124000,
@@ -764,7 +780,7 @@ async function main() {
     notes: 'Fatura vencida há 5 dias.',
   })
 
-  await upsertStandaloneCharge({
+  const pendingStandaloneCharge = await upsertStandaloneCharge({
     orgId: org.id,
     customerId: customers[4].id,
     amountCents: 212000,
@@ -925,13 +941,97 @@ async function main() {
 
   await createTimelineIfMissing({
     orgId: org.id,
+    action: 'CUSTOMER_CREATED',
+    description: `Cliente ${customers[0].name} inserido no ambiente piloto.`,
+    personId: adminPerson?.id,
+    customerId: customers[0].id,
+    metadata: {
+      source: 'seed-pilot',
+    },
+  })
+
+  await createTimelineIfMissing({
+    orgId: org.id,
+    action: 'APPOINTMENT_CREATED',
+    description: `Agendamento criado para ${customers[0].name}.`,
+    personId: adminPerson?.id,
+    customerId: customers[0].id,
+    appointmentId: appointments[0].id,
+    metadata: {
+      startsAt: appointments[0].startsAt.toISOString(),
+      endsAt: appointments[0].endsAt.toISOString(),
+      status: appointments[0].status,
+    },
+  })
+
+  await createTimelineIfMissing({
+    orgId: org.id,
+    action: 'SERVICE_ORDER_CREATED',
+    description: 'OS-001 criada para atendimento do condomínio.',
+    personId: adminPerson?.id,
+    customerId: customers[0].id,
+    serviceOrderId: serviceOrders[0].id,
+    appointmentId: appointments[0].id,
+    metadata: {
+      title: serviceOrders[0].title,
+      status: serviceOrders[0].status,
+    },
+  })
+
+  await createTimelineIfMissing({
+    orgId: org.id,
     action: 'SERVICE_ORDER_IN_PROGRESS',
     description: 'OS-001 em execução com equipe técnica em campo.',
     personId: operatorPerson?.id,
+    customerId: customers[0].id,
+    serviceOrderId: serviceOrders[0].id,
+    appointmentId: appointments[0].id,
     metadata: {
-      serviceOrderId: serviceOrders[0].id,
-      customerId: customers[0].id,
       status: 'IN_PROGRESS',
+    },
+  })
+
+  await createTimelineIfMissing({
+    orgId: org.id,
+    action: 'CHARGE_CREATED',
+    description: 'Cobrança gerada para a OS-001.',
+    personId: financePerson?.id,
+    customerId: customers[0].id,
+    serviceOrderId: serviceOrders[0].id,
+    chargeId: charge1.id,
+    metadata: {
+      amountCents: charge1.amountCents,
+      dueDate: charge1.dueDate.toISOString(),
+      status: charge1.status,
+    },
+  })
+
+  await createTimelineIfMissing({
+    orgId: org.id,
+    action: 'SERVICE_ORDER_DONE',
+    description: 'OS-003 concluída com emissão de relatório técnico.',
+    personId: operatorPerson?.id,
+    customerId: customers[2].id,
+    serviceOrderId: serviceOrders[2].id,
+    appointmentId: appointments[2].id,
+    metadata: {
+      status: serviceOrders[2].status,
+      outcomeSummary: serviceOrders[2].outcomeSummary,
+    },
+  })
+
+  await createTimelineIfMissing({
+    orgId: org.id,
+    action: 'CHARGE_CREATED',
+    description: 'Cobrança gerada para a OS-003.',
+    personId: financePerson?.id,
+    customerId: customers[2].id,
+    serviceOrderId: serviceOrders[2].id,
+    chargeId: charge2.id,
+    metadata: {
+      amountCents: charge2.amountCents,
+      dueDate: charge2.dueDate.toISOString(),
+      status: charge2.status,
     },
   })
 
@@ -940,11 +1040,14 @@ async function main() {
     action: 'PAYMENT_RECEIVED',
     description: 'Pagamento recebido e conciliado para a OS-003.',
     personId: financePerson?.id,
+    customerId: customers[2].id,
+    serviceOrderId: serviceOrders[2].id,
+    chargeId: charge2.id,
     metadata: {
-      serviceOrderId: serviceOrders[2].id,
-      chargeId: charge2.id,
+      paymentId: payment2.id,
       amountCents: 98000,
       method: 'CARD',
+      status: 'PAID',
     },
   })
 
@@ -953,8 +1056,9 @@ async function main() {
     action: 'CHARGE_OVERDUE',
     description: 'Cobrança em atraso detectada para a Clínica Vida Leve.',
     personId: financePerson?.id,
+    customerId: customers[1].id,
+    chargeId: overdueCharge.id,
     metadata: {
-      customerId: customers[1].id,
       amountCents: 124000,
       status: 'OVERDUE',
     },
@@ -965,10 +1069,24 @@ async function main() {
     action: 'APPOINTMENT_NO_SHOW',
     description: 'Atendimento não realizado por ausência do responsável da loja.',
     personId: operatorPerson?.id,
+    customerId: customers[4].id,
+    appointmentId: appointments[4].id,
     metadata: {
-      appointmentId: appointments[4].id,
-      customerId: customers[4].id,
       status: 'NO_SHOW',
+    },
+  })
+
+  await createTimelineIfMissing({
+    orgId: org.id,
+    action: 'CHARGE_CREATED',
+    description: 'Cobrança inicial registrada para reestruturação de rede da loja.',
+    personId: financePerson?.id,
+    customerId: customers[4].id,
+    chargeId: pendingStandaloneCharge.id,
+    metadata: {
+      amountCents: pendingStandaloneCharge.amountCents,
+      dueDate: pendingStandaloneCharge.dueDate.toISOString(),
+      status: pendingStandaloneCharge.status,
     },
   })
 
