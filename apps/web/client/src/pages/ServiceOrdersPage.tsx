@@ -28,6 +28,7 @@ import type {
   FinancialFilter,
   ServiceOrder,
 } from "@/components/service-orders/service-order.types";
+import { normalizeArrayPayload } from "@/lib/query-helpers";
 
 type CustomerOption = {
   id: string;
@@ -72,24 +73,7 @@ function getQueueSummaryLabel(filter: FinancialFilter) {
 }
 
 function normalizeCustomers(payload: unknown): CustomerOption[] {
-  const raw = payload as
-    | { data?: unknown; items?: unknown[] }
-    | unknown[]
-    | null
-    | undefined;
-
-  const candidate =
-    Array.isArray(raw)
-      ? raw
-      : Array.isArray(raw?.items)
-        ? raw.items
-        : Array.isArray((raw as any)?.data?.items)
-          ? (raw as any).data.items
-          : Array.isArray((raw as any)?.data)
-            ? (raw as any).data
-            : [];
-
-  return candidate
+  return normalizeArrayPayload<any>(payload)
     .map((item) => {
       const customer = (item ?? {}) as Partial<CustomerOption>;
 
@@ -104,24 +88,7 @@ function normalizeCustomers(payload: unknown): CustomerOption[] {
 }
 
 function normalizePeople(payload: unknown): PersonOption[] {
-  const raw = payload as
-    | { data?: unknown; items?: unknown[] }
-    | unknown[]
-    | null
-    | undefined;
-
-  const candidate =
-    Array.isArray(raw)
-      ? raw
-      : Array.isArray(raw?.items)
-        ? raw.items
-        : Array.isArray((raw as any)?.data?.items)
-          ? (raw as any).data.items
-          : Array.isArray((raw as any)?.data)
-            ? (raw as any).data
-            : [];
-
-  return candidate
+  return normalizeArrayPayload<any>(payload)
     .map((item) => {
       const person = (item ?? {}) as Partial<PersonOption>;
 
@@ -320,9 +287,7 @@ export default function ServiceOrdersPage() {
 
         <Card>
           <CardContent className="space-y-3 p-6">
-            <p className="text-sm text-red-500">
-              {errorMessage}
-            </p>
+            <p className="text-sm text-red-500">{errorMessage}</p>
 
             <Button variant="outline" onClick={() => void refreshAll()}>
               <RefreshCw className="mr-2 h-4 w-4" />

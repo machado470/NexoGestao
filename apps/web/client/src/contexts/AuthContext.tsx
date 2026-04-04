@@ -1,7 +1,6 @@
 import React, {
   createContext,
   useCallback,
-  useEffect,
   useMemo,
   useState,
 } from "react";
@@ -56,7 +55,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const [localLoading, setLocalLoading] = useState(false);
   const [localError, setLocalError] = useState<unknown | null>(null);
-  const [hasResolvedSession, setHasResolvedSession] = useState(false);
 
   const meQuery = trpc.session.me.useQuery(undefined, {
     retry: false,
@@ -67,12 +65,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loginMutation = trpc.nexo.auth.login.useMutation();
   const registerMutation = trpc.nexo.auth.register.useMutation();
   const logoutMutation = trpc.session.logout.useMutation();
-
-  useEffect(() => {
-    if (meQuery.isFetched || meQuery.isError) {
-      setHasResolvedSession(true);
-    }
-  }, [meQuery.isFetched, meQuery.isError]);
 
   const refresh = useCallback(async () => {
     setLocalError(null);
@@ -137,9 +129,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       await logoutMutation.mutateAsync();
+      logoutMutation.reset();
+
       await utils.session.me.cancel();
       utils.session.me.setData(undefined, null);
       await utils.session.me.invalidate();
+
       redirectToLogin();
     } catch (err) {
       setLocalError(err);
@@ -174,8 +169,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localLoading || loginMutation.isPending || registerMutation.isPending;
 
   const isLoggingOut = logoutMutation.isPending;
-  const isSubmitting = isAuthenticating || isLoggingOut;
-  const isInitializing = !hasResolvedSession && meQuery.isLoading;
+  const isSubmitting = isAuthenticating;
+  const isInitializing = meQuery.isLoading && !isLoggingOut;
   const loading = isInitializing || isSubmitting;
 
   const value: AuthContextType = useMemo(() => {

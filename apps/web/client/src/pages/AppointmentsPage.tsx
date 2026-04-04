@@ -31,6 +31,7 @@ import {
   buildWhatsAppConversationUrl,
   normalizeOrders,
 } from "@/lib/operations/operations.utils";
+import { normalizeArrayPayload } from "@/lib/query-helpers";
 
 type CustomerRef = {
   id: string;
@@ -329,7 +330,7 @@ function getAppointmentNextAction(params: {
         "border-green-200 bg-green-50 text-green-900 dark:border-green-900/40 dark:bg-green-950/20 dark:text-green-300",
       title: "Acompanhar O.S.",
       description: latestOrder
-        ? `Já existe operação em andamento para este cliente. Use a ordem como hub.`
+        ? "Já existe operação em andamento para este cliente. Use a ordem como hub."
         : "Cliente confirmado com operação em andamento.",
     };
   }
@@ -411,25 +412,11 @@ export default function AppointmentsPage() {
   });
 
   const appointments = useMemo(() => {
-    const payload = listAppointments.data;
-    const rows = Array.isArray(payload?.data)
-      ? payload.data
-      : Array.isArray(payload)
-        ? payload
-        : [];
-
-    return rows as Appointment[];
+    return normalizeArrayPayload<Appointment>(listAppointments.data);
   }, [listAppointments.data]);
 
   const customers = useMemo(() => {
-    const payload = listCustomers.data;
-    const rows = Array.isArray(payload?.data)
-      ? payload.data
-      : Array.isArray(payload)
-        ? payload
-        : [];
-
-    return rows.map((customer: any) => ({
+    return normalizeArrayPayload<any>(listCustomers.data).map((customer) => ({
       id: String(customer.id),
       name: String(customer.name),
     }));
@@ -553,7 +540,7 @@ export default function AppointmentsPage() {
         data: { status },
       });
     } catch {
-      // toast já tratado no mutation
+      //
     }
   };
 
