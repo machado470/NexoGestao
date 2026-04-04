@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   buildServiceOrdersDeepLink,
   buildWhatsAppUrlFromServiceOrder,
+  getServiceOrderIdFromUrl,
   normalizeOrders,
 } from "@/lib/operations/operations.utils";
 import {
@@ -13,10 +14,9 @@ import {
   getFinancialStage,
   getOperationalStage,
   getPriorityScore,
-  getServiceOrderNextAction,
   matchesFinancialFilter,
 } from "@/lib/operations/operations.selectors";
-import { MessageCircle, Plus, RefreshCw } from "lucide-react";
+import { MessageCircle, Plus, RefreshCw, ArrowLeft } from "lucide-react";
 
 import ServiceOrderCard from "@/components/service-orders/ServiceOrderCard";
 import ServiceOrderDetailsPanel from "@/components/service-orders/ServiceOrderDetailsPanel";
@@ -30,77 +30,39 @@ import type {
 } from "@/components/service-orders/service-order.types";
 import { normalizeArrayPayload } from "@/lib/query-helpers";
 
-type CustomerOption = {
-  id: string;
-  name: string;
-  phone?: string | null;
-  email?: string | null;
-};
+const FINANCIAL_FILTERS: Array<{
+  value: FinancialFilter;
+  label: string;
+}> = [
+  { value: "ALL", label: "Todas" },
+  { value: "NO_CHARGE", label: "Sem cobrança" },
+  { value: "READY_TO_CHARGE", label: "Prontas para cobrar" },
+  { value: "PENDING", label: "Pendentes" },
+  { value: "PAID", label: "Pagas" },
+  { value: "OVERDUE", label: "Vencidas" },
+  { value: "CANCELED", label: "Canceladas" },
+];
 
-type PersonOption = {
-  id: string;
-  name: string;
-  role?: string | null;
-  email?: string | null;
-  active?: boolean;
-};
+function sortOrders(items: ServiceOrder[]) {
+  return [...items].sort((a, b) => {
+    const priorityDiff = getPriorityScore(b) - getPriorityScore(a);
+    if (priorityDiff !== 0) return priorityDiff;
 
-function getOsFromLocation(location: string) {
-  const params = new URLSearchParams(location.split("?")[1] || "");
-  return params.get("os");
+    const aUpdated = new Date(
+      a.updatedAt || a.createdAt || a.scheduledFor || 0
+    ).getTime();
+    const bUpdated = new Date(
+      b.updatedAt || b.createdAt || b.scheduledFor || 0
+    ).getTime();
+
+    return bUpdated - aUpdated;
+  });
 }
 
-function getFinancialFilterLabel(filter: FinancialFilter) {
-  if (filter === "ALL") return "Todas";
-  if (filter === "NO_CHARGE") return "Sem cobrança";
-  if (filter === "READY_TO_CHARGE") return "Prontas para cobrar";
-  if (filter === "PENDING") return "Pendentes";
-  if (filter === "PAID") return "Pagas";
-  if (filter === "OVERDUE") return "Vencidas";
-  if (filter === "CANCELED") return "Canceladas";
-  return filter;
-}
-
-function getQueueSummaryLabel(filter: FinancialFilter) {
-  if (filter === "ALL") return "Fila operacional completa";
-  if (filter === "NO_CHARGE") return "Ordens sem cobrança";
-  if (filter === "READY_TO_CHARGE") return "Ordens prontas para cobrar";
-  if (filter === "PENDING") return "Ordens com cobrança pendente";
-  if (filter === "PAID") return "Ordens com cobrança paga";
-  if (filter === "OVERDUE") return "Ordens com cobrança vencida";
-  if (filter === "CANCELED") return "Ordens canceladas";
-  return "Fila operacional";
-}
-
-function normalizeCustomers(payload: unknown): CustomerOption[] {
-  return normalizeArrayPayload<any>(payload)
-    .map((item) => {
-      const customer = (item ?? {}) as Partial<CustomerOption>;
-
-      return {
-        id: typeof customer.id === "string" ? customer.id : "",
-        name: typeof customer.name === "string" ? customer.name : "",
-        phone: typeof customer.phone === "string" ? customer.phone : null,
-        email: typeof customer.email === "string" ? customer.email : null,
-      };
-    })
-    .filter((customer) => customer.id && customer.name);
-}
-
-function normalizePeople(payload: unknown): PersonOption[] {
-  return normalizeArrayPayload<any>(payload)
-    .map((item) => {
-      const person = (item ?? {}) as Partial<PersonOption>;
-
-      return {
-        id: typeof person.id === "string" ? person.id : "",
-        name: typeof person.name === "string" ? person.name : "",
-        role: typeof person.role === "string" ? person.role : null,
-        email: typeof person.email === "string" ? person.email : null,
-        active: typeof person.active === "boolean" ? person.active : true,
-      };
-    })
-    .filter((person) => person.id && person.name);
+function buildOperationalQueue(items: ServiceOrder[]) {
+  return items.filter(
+    (item) => item.status !== "DONE" && item.status !== "CANCELED"
+  );
 }
 
 export default function ServiceOrdersPage() {
@@ -109,11 +71,16 @@ export default function ServiceOrdersPage() {
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(() =>
+    typeof window === "undefined" ? null : getServiceOrderIdFromUrl()
+  );
   const [filter, setFilter] = useState<FinancialFilter>("ALL");
+  const [search, setSearch] = useState("");
 
-  const listQuery = trpc.nexo.serviceOrders.list.useQuery(
-    { page: 1, limit: 50 },
+  const activeRef = useRef<HTMLDivElement | null>(null);
+
+  const ordersQuery = trpc.nexo.serviceOrders.list.useQuery(
+    { page: 1, limit: 100 },
     {
       retry: false,
       refetchOnWindowFocus: false,
@@ -125,13 +92,8 @@ export default function ServiceOrdersPage() {
     refetchOnWindowFocus: false,
   });
 
-  const peopleQuery = trpc.people.list.useQuery(undefined, {
-    retry: false,
-    refetchOnWindowFocus: false,
-  });
-
-  const activeQuery = trpc.nexo.serviceOrders.getById.useQuery(
-    { id: activeId as string },
+  const activeOrderQuery = trpc.nexo.serviceOrders.getById.useQuery(
+    { id: activeId ?? "" },
     {
       enabled: Boolean(activeId),
       retry: false,
@@ -139,78 +101,86 @@ export default function ServiceOrdersPage() {
     }
   );
 
-  const customers = useMemo(
-    () => normalizeCustomers(customersQuery.data),
-    [customersQuery.data]
-  );
+  const customers = useMemo(() => {
+    return normalizeArrayPayload<{ id: string; name: string }>(
+      customersQuery.data
+    );
+  }, [customersQuery.data]);
 
-  const people = useMemo(
-    () => normalizePeople(peopleQuery.data),
-    [peopleQuery.data]
-  );
+  const orders = useMemo(() => {
+    return normalizeOrders<ServiceOrder>(ordersQuery.data);
+  }, [ordersQuery.data]);
 
-  const list = useMemo(
-    () => normalizeOrders<ServiceOrder>(listQuery.data),
-    [listQuery.data]
-  );
+  const filtered = useMemo(() => {
+    const normalizedSearch = search.trim().toLowerCase();
 
-  const sorted = useMemo(
-    () => [...list].sort((a, b) => getPriorityScore(b) - getPriorityScore(a)),
-    [list]
-  );
+    return orders.filter((item) => {
+      if (!matchesFinancialFilter(item, filter)) {
+        return false;
+      }
+
+      if (!normalizedSearch) {
+        return true;
+      }
+
+      const haystack = [
+        item.title,
+        item.description,
+        item.customer?.name,
+        item.assignedTo?.name,
+        item.status,
+        item.financialSummary?.chargeStatus,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return haystack.includes(normalizedSearch);
+    });
+  }, [orders, filter, search]);
+
+  const sorted = useMemo(() => sortOrders(filtered), [filtered]);
 
   const operationalQueue = useMemo(
-    () => sorted.filter((os) => matchesFinancialFilter(os, filter)),
-    [sorted, filter]
+    () => buildOperationalQueue(sorted),
+    [sorted]
   );
 
-  const urgentCount = useMemo(() => {
-    return operationalQueue.filter(
-      (os) => getServiceOrderNextAction(os).tone === "red"
-    ).length;
-  }, [operationalQueue]);
+  const activeOrder = useMemo(() => {
+    const payload = activeOrderQuery.data as any;
+    const fromQuery = payload?.data ?? payload ?? null;
 
-  const pendingFinancialCount = useMemo(() => {
-    return sorted.filter((os) => {
-      const status = String(os.financialSummary?.chargeStatus ?? "").toUpperCase();
-      return status === "PENDING" || status === "OVERDUE";
-    }).length;
-  }, [sorted]);
-
-  const readyToChargeCount = useMemo(() => {
-    return sorted.filter((os) => matchesFinancialFilter(os, "READY_TO_CHARGE"))
-      .length;
-  }, [sorted]);
-
-  const activeFromList = useMemo(() => {
-    if (!activeId) return null;
-    return sorted.find((item) => item.id === activeId) ?? null;
-  }, [sorted, activeId]);
-
-  const activeOs = useMemo(() => {
-    const raw = activeQuery.data;
-
-    if (raw && typeof raw === "object") {
-      const normalized = normalizeOrders<ServiceOrder>(raw);
-      if (normalized.length > 0) return normalized[0];
-      return raw as ServiceOrder;
+    if (fromQuery && typeof fromQuery === "object" && "id" in fromQuery) {
+      return fromQuery as ServiceOrder;
     }
 
-    return activeFromList;
-  }, [activeQuery.data, activeFromList]);
+    return sorted.find((item) => item.id === activeId) ?? null;
+  }, [activeOrderQuery.data, sorted, activeId]);
+
+  const totalOrders = orders.length;
+  const totalVisible = sorted.length;
+  const totalOperational = operationalQueue.length;
+  const totalWithUrgency = useMemo(() => {
+    return sorted.filter(
+      (item) =>
+        item.financialSummary?.chargeStatus === "OVERDUE" ||
+        (item.status === "DONE" && !item.financialSummary?.hasCharge)
+    ).length;
+  }, [sorted]);
 
   useEffect(() => {
-    const id = getOsFromLocation(location);
-    if (id) {
-      setActiveId(id);
-    }
+    const id =
+      typeof window === "undefined" ? null : getServiceOrderIdFromUrl();
+    setActiveId(id);
   }, [location]);
 
   useEffect(() => {
-    if (activeId && sorted.some((item) => item.id === activeId)) return;
+    if (!activeId) return;
+    if (sorted.some((item) => item.id === activeId)) return;
 
     if (operationalQueue.length === 0) {
       setActiveId(null);
+      navigate("/service-orders");
       return;
     }
 
@@ -219,9 +189,22 @@ export default function ServiceOrdersPage() {
     navigate(buildServiceOrdersDeepLink(nextId));
   }, [operationalQueue, sorted, activeId, navigate]);
 
+  useEffect(() => {
+    if (!activeRef.current) return;
+
+    activeRef.current.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
+  }, [activeId]);
+
   function openAsActive(id: string) {
     navigate(buildServiceOrdersDeepLink(id));
     setActiveId(id);
+  }
+
+  function openWhatsApp(url: string) {
+    navigate(url);
   }
 
   async function refreshAll() {
@@ -230,83 +213,38 @@ export default function ServiceOrdersPage() {
       activeId
         ? utils.nexo.serviceOrders.getById.invalidate({ id: activeId })
         : Promise.resolve(),
+      utils.nexo.customers.list.invalidate(),
       utils.finance.charges.list.invalidate(),
       utils.dashboard.alerts.invalidate(),
     ]);
   }
 
-  const filters: FinancialFilter[] = [
-    "ALL",
-    "NO_CHARGE",
-    "READY_TO_CHARGE",
-    "PENDING",
-    "PAID",
-    "OVERDUE",
-  ];
+  const isLoading = ordersQuery.isLoading || customersQuery.isLoading;
 
-  const isLoading =
-    listQuery.isLoading || customersQuery.isLoading || peopleQuery.isLoading;
-
-  const hasError =
-    listQuery.isError || customersQuery.isError || peopleQuery.isError;
-
-  const errorMessage =
-    listQuery.error?.message ||
-    customersQuery.error?.message ||
-    peopleQuery.error?.message ||
-    "Não foi possível carregar a fila operacional.";
-
-  if (isLoading) {
-    return (
-      <div className="space-y-4 p-6">
-        <div>
-          <h1 className="text-2xl font-semibold">Ordens de Serviço</h1>
-          <p className="text-sm text-muted-foreground">
-            Carregando fila operacional...
-          </p>
-        </div>
-
-        <Card>
-          <CardContent className="p-6 text-sm text-muted-foreground">
-            Buscando ordens, clientes e responsáveis.
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  if (hasError) {
-    return (
-      <div className="space-y-4 p-6">
-        <div>
-          <h1 className="text-2xl font-semibold">Ordens de Serviço</h1>
-          <p className="text-sm text-muted-foreground">
-            Não foi possível carregar a fila operacional.
-          </p>
-        </div>
-
-        <Card>
-          <CardContent className="space-y-3 p-6">
-            <p className="text-sm text-red-500">{errorMessage}</p>
-
-            <Button variant="outline" onClick={() => void refreshAll()}>
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Tentar novamente
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  const hasError = ordersQuery.error || customersQuery.error;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6 p-6">
       <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Ordens de Serviço</h1>
-          <p className="text-sm text-muted-foreground">
-            Fila operacional central do NexoGestão.
-          </p>
+        <div className="flex items-center gap-2">
+          {activeId && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => navigate("/timeline")}
+              className="gap-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Voltar para timeline
+            </Button>
+          )}
+
+          <div>
+            <h1 className="text-2xl font-semibold">Ordens de Serviço</h1>
+            <p className="text-sm text-muted-foreground">
+              Fila operacional central do NexoGestão.
+            </p>
+          </div>
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -322,135 +260,199 @@ export default function ServiceOrdersPage() {
         </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      {activeId && (
+        <div className="rounded-lg border border-orange-200 bg-orange-50 p-3 text-sm text-orange-800 dark:border-orange-900/40 dark:bg-orange-950/20 dark:text-orange-300">
+          Você está visualizando uma O.S. em foco a partir de outro contexto.
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
         <Card>
           <CardContent className="p-4">
             <div className="text-xs uppercase tracking-wide text-muted-foreground">
-              Fila visível
+              Total de O.S.
             </div>
-            <div className="mt-1 text-2xl font-semibold">
-              {operationalQueue.length}
-            </div>
-            <div className="text-sm text-muted-foreground">
-              {getQueueSummaryLabel(filter)}
-            </div>
+            <div className="mt-2 text-2xl font-semibold">{totalOrders}</div>
           </CardContent>
         </Card>
 
         <Card>
           <CardContent className="p-4">
             <div className="text-xs uppercase tracking-wide text-muted-foreground">
-              Urgentes
+              Visíveis agora
             </div>
-            <div className="mt-1 text-2xl font-semibold">{urgentCount}</div>
+            <div className="mt-2 text-2xl font-semibold">{totalVisible}</div>
           </CardContent>
         </Card>
 
         <Card>
           <CardContent className="p-4">
             <div className="text-xs uppercase tracking-wide text-muted-foreground">
-              Prontas para cobrar
+              Fila operacional
             </div>
-            <div className="mt-1 text-2xl font-semibold">
-              {readyToChargeCount}
-            </div>
+            <div className="mt-2 text-2xl font-semibold">{totalOperational}</div>
           </CardContent>
         </Card>
 
         <Card>
           <CardContent className="p-4">
             <div className="text-xs uppercase tracking-wide text-muted-foreground">
-              Pendência financeira
+              Pedindo ação
             </div>
-            <div className="mt-1 text-2xl font-semibold">
-              {pendingFinancialCount}
-            </div>
+            <div className="mt-2 text-2xl font-semibold">{totalWithUrgency}</div>
           </CardContent>
         </Card>
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        {filters.map((f) => (
-          <Button
-            key={f}
-            size="sm"
-            variant={filter === f ? "default" : "outline"}
-            onClick={() => setFilter(f)}
-          >
-            {getFinancialFilterLabel(f)}
-          </Button>
-        ))}
-      </div>
+      <Card>
+        <CardContent className="flex flex-col gap-3 p-4 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex-1">
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Buscar por título, cliente, responsável ou status"
+              className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+            />
+          </div>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-        <div className="space-y-3 xl:col-span-5">
-          {operationalQueue.map((os) => {
-            const whatsappUrl = buildWhatsAppUrlFromServiceOrder(os);
-            const isActive = activeId === os.id;
-
-            return (
-              <div
-                key={os.id}
-                className={isActive ? "rounded-xl ring-2 ring-primary/20" : ""}
+          <div className="flex flex-wrap gap-2">
+            {FINANCIAL_FILTERS.map((item) => (
+              <Button
+                key={item.value}
+                size="sm"
+                variant={filter === item.value ? "default" : "outline"}
+                onClick={() => setFilter(item.value)}
               >
-                <ServiceOrderCard
-                  os={os}
-                  isProcessing={false}
-                  chargeBadge={getChargeBadge(os.financialSummary)}
-                  operationalStage={getOperationalStage(os)}
-                  financialStage={getFinancialStage(os)}
-                  onEdit={(id) => setEditId(id)}
-                  onOpenDeepLink={openAsActive}
-                  onOpenWhatsApp={(url) => navigate(url)}
-                  isUpdating={false}
-                />
+                {item.label}
+              </Button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
-                <div className="mt-2 flex justify-between px-2">
+      {isLoading ? (
+        <Card>
+          <CardContent className="p-6 text-sm text-muted-foreground">
+            Carregando ordens de serviço...
+          </CardContent>
+        </Card>
+      ) : hasError ? (
+        <Card>
+          <CardContent className="p-6 text-sm text-red-600">
+            Erro ao carregar a fila operacional.
+          </CardContent>
+        </Card>
+      ) : sorted.length === 0 ? (
+        <Card>
+          <CardContent className="space-y-3 p-6 text-sm text-muted-foreground">
+            <div>Nenhuma ordem encontrada para os filtros atuais.</div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setFilter("ALL")}>
+                Limpar filtro
+              </Button>
+              <Button onClick={() => setIsCreateOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Criar O.S.
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(380px,0.9fr)]">
+          <div className="space-y-4">
+            {sorted.map((os) => {
+              const isActive = os.id === activeId;
+              const chargeBadge = getChargeBadge(os.financialSummary);
+              const operationalStage = getOperationalStage(os);
+              const financialStage = getFinancialStage(os);
+              const whatsappUrl = buildWhatsAppUrlFromServiceOrder(os);
+
+              return (
+                <div
+                  key={os.id}
+                  ref={isActive ? activeRef : null}
+                  className={isActive ? "rounded-2xl ring-2 ring-orange-300" : ""}
+                >
+                  <ServiceOrderCard
+                    os={os}
+                    isProcessing={false}
+                    chargeBadge={chargeBadge}
+                    operationalStage={operationalStage}
+                    financialStage={financialStage}
+                    onEdit={setEditId}
+                    onOpenDeepLink={openAsActive}
+                    onOpenWhatsApp={
+                      whatsappUrl ? (url) => openWhatsApp(url) : undefined
+                    }
+                    isUpdating={false}
+                  />
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="space-y-4">
+            {activeOrder ? (
+              <ServiceOrderDetailsPanel os={activeOrder} />
+            ) : (
+              <Card>
+                <CardContent className="space-y-3 p-6">
+                  <div className="text-sm font-medium">
+                    Selecione uma O.S. para abrir o hub operacional.
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Aqui você acompanha execução, cobrança, pagamento, timeline e
+                    ação seguinte sem navegar no escuro.
+                  </p>
+                  {operationalQueue[0] ? (
+                    <Button onClick={() => openAsActive(operationalQueue[0].id)}>
+                      Abrir próxima da fila
+                    </Button>
+                  ) : null}
+                </CardContent>
+              </Card>
+            )}
+
+            {activeOrder?.customer?.phone ? (
+              <Card>
+                <CardContent className="p-4">
+                  <div className="mb-2 text-xs uppercase tracking-wide text-muted-foreground">
+                    Atalho rápido
+                  </div>
                   <Button
-                    size="sm"
                     variant="outline"
-                    onClick={() => whatsappUrl && navigate(whatsappUrl)}
+                    className="w-full"
+                    onClick={() => {
+                      const url = buildWhatsAppUrlFromServiceOrder(activeOrder);
+                      if (url) {
+                        navigate(url);
+                      }
+                    }}
                   >
                     <MessageCircle className="mr-2 h-4 w-4" />
-                    WhatsApp
+                    Abrir conversa da O.S.
                   </Button>
-
-                  <Button size="sm" onClick={() => openAsActive(os.id)}>
-                    Abrir
-                  </Button>
-                </div>
-              </div>
-            );
-          })}
+                </CardContent>
+              </Card>
+            ) : null}
+          </div>
         </div>
-
-        <div className="xl:col-span-7">
-          {activeOs ? (
-            <ServiceOrderDetailsPanel os={activeOs} />
-          ) : (
-            <Card>
-              <CardContent className="p-6 text-sm text-muted-foreground">
-                Selecione uma ordem para abrir o hub operacional.
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      </div>
+      )}
 
       <CreateServiceOrderModal
-        isOpen={isCreateOpen}
+        open={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
-        onSuccess={refreshAll}
+        onCreated={() => void refreshAll()}
         customers={customers}
-        people={people}
+        people={[]}
       />
 
       <EditServiceOrderModal
         isOpen={Boolean(editId)}
-        serviceOrderId={editId}
         onClose={() => setEditId(null)}
-        onSuccess={refreshAll}
-        people={people}
+        onSuccess={() => void refreshAll()}
+        serviceOrderId={editId}
+        people={[]}
       />
     </div>
   );

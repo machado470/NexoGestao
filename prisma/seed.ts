@@ -72,14 +72,14 @@ async function ensureDefaultAdmin() {
 
 async function runDemoOrgSeed() {
   const org = await ensureDefaultAdmin()
-
-  const user = await prisma.user.findFirst({
-    where: { orgId: org.id, role: 'ADMIN' },
-    select: { id: true },
-  })
-
-  await seedDemoOrg(org.id, user?.id ?? null)
+  await seedDemoOrg(org.id)
   console.log('Seed demo-org finalizado')
+}
+
+async function runPilotSeed() {
+  console.log('Seed principal configurado para rodar via prisma db seed -> prisma/seed-pilot.ts')
+  await ensureDefaultAdmin()
+  console.log('Seed base do root finalizada')
 }
 
 async function runBasicSeed() {
@@ -88,14 +88,19 @@ async function runBasicSeed() {
 }
 
 async function main() {
-  const seedMode = env('SEED_MODE', 'basic').toLowerCase()
+  const seedMode = env('SEED_MODE', 'pilot').toLowerCase()
 
   if (seedMode === 'demo' || seedMode === 'demo-org') {
     await runDemoOrgSeed()
     return
   }
 
-  await runBasicSeed()
+  if (seedMode === 'basic') {
+    await runBasicSeed()
+    return
+  }
+
+  await runPilotSeed()
 }
 
 main()

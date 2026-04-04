@@ -96,17 +96,74 @@ function startsWithSegment(location: string, route: string) {
   return location === route || location.startsWith(`${route}/`);
 }
 
+function buildDynamicBreadcrumbs(location: string): Breadcrumb[] | null {
+  const [pathname, query = ""] = location.split("?");
+  const params = new URLSearchParams(query);
+
+  if (pathname === "/service-orders" && params.get("os")) {
+    return [
+      { label: "Operação", href: "/operations" },
+      { label: "Ordens de Serviço", href: "/service-orders" },
+      { label: "Detalhe da O.S." },
+    ];
+  }
+
+  if (pathname === "/customers" && params.get("customerId")) {
+    return [
+      { label: "Operação", href: "/operations" },
+      { label: "Clientes", href: "/customers" },
+      { label: "Workspace do cliente" },
+    ];
+  }
+
+  if (pathname === "/timeline" && params.get("customerId")) {
+    return [
+      { label: "Operação", href: "/operations" },
+      { label: "Histórico", href: "/timeline" },
+      { label: "Timeline do cliente" },
+    ];
+  }
+
+  if (pathname === "/finances" && params.get("chargeId")) {
+    return [
+      { label: "Financeiro", href: "/finances" },
+      { label: "Cobrança em foco" },
+    ];
+  }
+
+  if (pathname === "/finances" && params.get("paymentId")) {
+    return [
+      { label: "Financeiro", href: "/finances" },
+      { label: "Pagamento em foco" },
+    ];
+  }
+
+  if (pathname === "/appointments" && params.get("id")) {
+    return [
+      { label: "Operação", href: "/operations" },
+      { label: "Agendamentos", href: "/appointments" },
+      { label: "Agendamento em foco" },
+    ];
+  }
+
+  return null;
+}
+
 function getBreadcrumbs(location: string) {
-  const exact = routeBreadcrumbs[location];
+  const dynamic = buildDynamicBreadcrumbs(location);
+  if (dynamic) return dynamic;
+
+  const pathname = location.split("?")[0];
+  const exact = routeBreadcrumbs[pathname];
   if (exact) return exact;
 
   const matched = Object.entries(routeBreadcrumbs).find(([route]) =>
-    startsWithSegment(location, route)
+    startsWithSegment(pathname, route)
   );
 
   if (matched) return matched[1];
 
-  return [{ label: humanizeSegment(location) }];
+  return [{ label: humanizeSegment(pathname) }];
 }
 
 export function Breadcrumbs() {
@@ -121,7 +178,7 @@ export function Breadcrumbs() {
         const isLast = index === all.length - 1;
 
         return (
-          <div key={index} className="flex items-center gap-2">
+          <div key={`${crumb.label}-${index}`} className="flex items-center gap-2">
             {index > 0 && (
               <ChevronRight className="h-3.5 w-3.5 text-zinc-300 dark:text-zinc-600" />
             )}

@@ -38,6 +38,39 @@ function atHour(base: Date, dayOffset: number, hour: number, minute = 0) {
   return date
 }
 
+function deriveStartedAt(params: {
+  status: ServiceOrderStatus
+  scheduledFor?: Date
+}) {
+  if (
+    params.status !== ServiceOrderStatus.IN_PROGRESS &&
+    params.status !== ServiceOrderStatus.DONE
+  ) {
+    return null
+  }
+
+  if (params.scheduledFor) {
+    return new Date(params.scheduledFor.getTime() + 30 * 60 * 1000)
+  }
+
+  return atHour(new Date(), -1, 9)
+}
+
+function deriveFinishedAt(params: {
+  status: ServiceOrderStatus
+  scheduledFor?: Date
+}) {
+  if (params.status !== ServiceOrderStatus.DONE) {
+    return null
+  }
+
+  if (params.scheduledFor) {
+    return new Date(params.scheduledFor.getTime() + 8 * 60 * 60 * 1000)
+  }
+
+  return atHour(new Date(), -1, 17)
+}
+
 async function upsertUser(orgId: string, user: PilotUser) {
   const passwordHash = await bcrypt.hash(user.password, 10)
 
@@ -157,7 +190,7 @@ async function upsertServiceOrder(params: {
   priority?: number
   scheduledFor?: Date
   outcomeSummary?: string
-  cancellationReason?: string
+  cancellationReason?: string | null
 }) {
   const found = await prisma.serviceOrder.findFirst({
     where: {
@@ -167,14 +200,15 @@ async function upsertServiceOrder(params: {
     },
   })
 
-  const startedAt =
-    params.status === ServiceOrderStatus.IN_PROGRESS ||
-    params.status === ServiceOrderStatus.DONE
-      ? atHour(new Date(), -1, 9)
-      : null
+  const startedAt = deriveStartedAt({
+    status: params.status,
+    scheduledFor: params.scheduledFor,
+  })
 
-  const finishedAt =
-    params.status === ServiceOrderStatus.DONE ? atHour(new Date(), -1, 17) : null
+  const finishedAt = deriveFinishedAt({
+    status: params.status,
+    scheduledFor: params.scheduledFor,
+  })
 
   if (found) {
     return prisma.serviceOrder.update({
@@ -189,7 +223,7 @@ async function upsertServiceOrder(params: {
         priority: params.priority ?? 2,
         scheduledFor: params.scheduledFor,
         outcomeSummary: params.outcomeSummary,
-        cancellationReason: params.cancellationReason,
+        cancellationReason: params.cancellationReason ?? null,
         startedAt,
         finishedAt,
       },
@@ -200,6 +234,7 @@ async function upsertServiceOrder(params: {
     data: {
       ...params,
       priority: params.priority ?? 2,
+      cancellationReason: params.cancellationReason ?? null,
       startedAt: startedAt ?? undefined,
       finishedAt: finishedAt ?? undefined,
     },
@@ -395,7 +430,7 @@ async function upsertInvoice(params: {
   customerId?: string
   description: string
   amountCents: number
-  status: string
+  status: 'DRAFT' | 'ISSUED' | 'PAID' | 'CANCELLED'
 }) {
   const existing = await prisma.invoice.findFirst({
     where: {
@@ -436,7 +471,10 @@ async function createTimelineIfMissing(params: {
     where: {
       orgId: params.orgId,
       action: params.action,
-      description: params.description,
+      customerId: params.customerId ?? null,
+      serviceOrderId: params.serviceOrderId ?? null,
+      appointmentId: params.appointmentId ?? null,
+      chargeId: params.chargeId ?? null,
     },
   })
 
@@ -444,11 +482,8 @@ async function createTimelineIfMissing(params: {
     return prisma.timelineEvent.update({
       where: { id: existing.id },
       data: {
+        description: params.description,
         personId: params.personId,
-        customerId: params.customerId,
-        serviceOrderId: params.serviceOrderId,
-        appointmentId: params.appointmentId,
-        chargeId: params.chargeId,
         metadata: params.metadata,
       },
     })
@@ -614,12 +649,15 @@ async function main() {
     },
   ]
 
-  const customers = await Promise.all(
-    customerSeeds.map((customer) => upsertCustomer(org.id, customer)),
-  )
+  const customers: Array<Awaited<ReturnType<typeof upsertCustomer>>> = []
+  for (const customer of customerSeeds) {
+    customers.push(await upsertCustomer(org.id, customer))
+  }
 
-  const appointments = await Promise.all([
-    upsertAppointment({
+  const appointments: Array<Awaited<ReturnType<typeof upsertAppointment>>> = []
+
+  appointments.push(
+    await upsertAppointment({
       orgId: org.id,
       customerId: customers[0].id,
       startsAt: atHour(now, 1, 8, 30),
@@ -628,7 +666,10 @@ async function main() {
       notes:
         'Visita técnica mensal elétrica nas áreas comuns. Validar acesso na portaria.',
     }),
-    upsertAppointment({
+  )
+
+  appointments.push(
+    await upsertAppointment({
       orgId: org.id,
       customerId: customers[1].id,
       startsAt: atHour(now, 2, 14, 0),
@@ -637,7 +678,10 @@ async function main() {
       notes:
         'Inspeção de ar-condicionado na recepção. Equipamento split 36.000 BTUs.',
     }),
-    upsertAppointment({
+  )
+
+  appointments.push(
+    await upsertAppointment({
       orgId: org.id,
       customerId: customers[2].id,
       startsAt: atHour(now, -2, 21, 0),
@@ -646,7 +690,10 @@ async function main() {
       notes:
         'Manutenção corretiva da coifa industrial concluída dentro do prazo.',
     }),
-    upsertAppointment({
+  )
+
+  appointments.push(
+    await upsertAppointment({
       orgId: org.id,
       customerId: customers[3].id,
       startsAt: atHour(now, 3, 9, 0),
@@ -655,7 +702,10 @@ async function main() {
       notes:
         'Revisão preventiva hidráulica com acompanhamento da coordenação escolar.',
     }),
-    upsertAppointment({
+  )
+
+  appointments.push(
+    await upsertAppointment({
       orgId: org.id,
       customerId: customers[4].id,
       startsAt: atHour(now, 0, 16, 0),
@@ -664,10 +714,12 @@ async function main() {
       notes:
         'Diagnóstico de rede interna. Responsável da loja não estava presente.',
     }),
-  ])
+  )
 
-  const serviceOrders = await Promise.all([
-    upsertServiceOrder({
+  const serviceOrders: Array<Awaited<ReturnType<typeof upsertServiceOrder>>> = []
+
+  serviceOrders.push(
+    await upsertServiceOrder({
       orgId: org.id,
       customerId: customers[0].id,
       appointmentId: appointments[0].id,
@@ -681,7 +733,10 @@ async function main() {
       priority: 3,
       scheduledFor: atHour(now, 1, 8, 30),
     }),
-    upsertServiceOrder({
+  )
+
+  serviceOrders.push(
+    await upsertServiceOrder({
       orgId: org.id,
       customerId: customers[1].id,
       appointmentId: appointments[1].id,
@@ -694,7 +749,10 @@ async function main() {
       priority: 2,
       scheduledFor: atHour(now, 2, 14, 0),
     }),
-    upsertServiceOrder({
+  )
+
+  serviceOrders.push(
+    await upsertServiceOrder({
       orgId: org.id,
       customerId: customers[2].id,
       appointmentId: appointments[2].id,
@@ -710,7 +768,10 @@ async function main() {
       outcomeSummary:
         'Equipamento liberado para uso com recomendação de monitoramento semanal.',
     }),
-    upsertServiceOrder({
+  )
+
+  serviceOrders.push(
+    await upsertServiceOrder({
       orgId: org.id,
       customerId: customers[3].id,
       appointmentId: appointments[3].id,
@@ -724,7 +785,10 @@ async function main() {
       priority: 2,
       scheduledFor: atHour(now, 3, 9, 0),
     }),
-    upsertServiceOrder({
+  )
+
+  serviceOrders.push(
+    await upsertServiceOrder({
       orgId: org.id,
       customerId: customers[4].id,
       assignedToPersonId: operatorPerson?.id,
@@ -738,7 +802,7 @@ async function main() {
       scheduledFor: atHour(now, 4, 13, 0),
       cancellationReason: null,
     }),
-  ])
+  )
 
   const charge1 = await upsertChargeByServiceOrder({
     orgId: org.id,

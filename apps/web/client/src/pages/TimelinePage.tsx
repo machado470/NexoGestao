@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import {
   History,
   RefreshCcw,
-  User,
   CalendarDays,
   Filter,
   Search,
@@ -25,8 +24,14 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import {
-  buildFinanceChargeUrl,
-  buildServiceOrdersDeepLink,
+  formatDateTime,
+  getTimelineEventDescription,
+  getTimelineEventKey,
+  getTimelineEventLabel,
+  getTimelineEventNextAction,
+  getTimelineEventPrimaryLink,
+  getTimelineEventSecondaryLinks,
+  getTimelineEventSummary,
 } from "@/lib/operations/operations.utils";
 
 type CustomerOption = {
@@ -38,6 +43,10 @@ type TimelineEvent = {
   id: string;
   action?: string | null;
   type?: string | null;
+  eventType?: string | null;
+  entityType?: string | null;
+  entityId?: string | null;
+  customerId?: string | null;
   description?: string | null;
   createdAt?: string | null;
   metadata?: Record<string, unknown> | null;
@@ -45,72 +54,15 @@ type TimelineEvent = {
 
 type EventScope =
   | "ALL"
+  | "CUSTOMERS"
   | "APPOINTMENTS"
   | "SERVICE_ORDERS"
   | "FINANCIAL"
   | "RISK"
   | "GOVERNANCE";
 
-function formatDateTime(value?: string | null) {
-  if (!value) return "—";
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) return "—";
-
-  return date.toLocaleString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function getEventKey(event: TimelineEvent) {
-  return String(event.action ?? event.type ?? "EVENT").toUpperCase();
-}
-
-function getEventLabel(event: TimelineEvent) {
-  const key = getEventKey(event);
-
-  const labels: Record<string, string> = {
-    CUSTOMER_CREATED: "Cliente criado",
-    CUSTOMER_UPDATED: "Cliente atualizado",
-    APPOINTMENT_CREATED: "Agendamento criado",
-    APPOINTMENT_UPDATED: "Agendamento atualizado",
-    APPOINTMENT_CONFIRMED: "Agendamento confirmado",
-    APPOINTMENT_CANCELED: "Agendamento cancelado",
-    APPOINTMENT_CANCELLED: "Agendamento cancelado",
-    SERVICE_ORDER_CREATED: "O.S. criada",
-    SERVICE_ORDER_UPDATED: "O.S. atualizada",
-    SERVICE_ORDER_ASSIGNED: "O.S. atribuída",
-    SERVICE_ORDER_STARTED: "Execução iniciada",
-    SERVICE_ORDER_DONE: "Execução concluída",
-    SERVICE_ORDER_COMPLETED: "Execução concluída",
-    SERVICE_ORDER_CANCELED: "O.S. cancelada",
-    CHARGE_CREATED: "Cobrança criada",
-    CHARGE_UPDATED: "Cobrança atualizada",
-    CHARGE_CANCELED: "Cobrança cancelada",
-    CHARGE_CANCELLED: "Cobrança cancelada",
-    CHARGE_DELETED: "Cobrança excluída",
-    CHARGE_PAID: "Cobrança paga",
-    CHARGE_OVERDUE: "Cobrança vencida",
-    PAYMENT_RECEIVED: "Pagamento recebido",
-    PAYMENT_CONFIRMED: "Pagamento confirmado",
-    RISK_UPDATED: "Risco atualizado",
-    GOVERNANCE_RUN_STARTED: "Governança iniciada",
-    GOVERNANCE_RUN_COMPLETED: "Governança concluída",
-    OPERATIONAL_STATE_CHANGED: "Estado operacional alterado",
-    MESSAGE_SENT: "Mensagem enviada",
-    PAYMENT_LINK_SENT: "Link de pagamento enviado",
-  };
-
-  return labels[key] ?? key.split("_").join(" ");
-}
-
-function getEventTone(action?: string | null) {
-  const key = String(action ?? "").toUpperCase();
+function getEventTone(event: TimelineEvent) {
+  const key = getTimelineEventKey(event);
 
   if (
     key.includes("PAID") ||
@@ -149,7 +101,7 @@ function getEventTone(action?: string | null) {
 }
 
 function getEventIcon(event: TimelineEvent) {
-  const key = getEventKey(event);
+  const key = getTimelineEventKey(event);
 
   if (key.includes("GOVERNANCE") || key.includes("STATE_CHANGED")) {
     return ShieldAlert;
@@ -179,8 +131,9 @@ function getEventIcon(event: TimelineEvent) {
 }
 
 function getEventScope(event: TimelineEvent): EventScope {
-  const key = getEventKey(event);
+  const key = getTimelineEventKey(event);
 
+  if (key.includes("CUSTOMER")) return "CUSTOMERS";
   if (key.includes("APPOINTMENT")) return "APPOINTMENTS";
   if (key.includes("SERVICE_ORDER")) return "SERVICE_ORDERS";
   if (key.includes("CHARGE") || key.includes("PAYMENT")) return "FINANCIAL";
@@ -190,165 +143,6 @@ function getEventScope(event: TimelineEvent): EventScope {
   }
 
   return "ALL";
-}
-
-function getEventSummary(event: TimelineEvent) {
-  const metadata = (event.metadata ?? {}) as Record<string, any>;
-  const appointmentId = metadata?.appointmentId;
-  const serviceOrderId = metadata?.serviceOrderId;
-  const chargeId = metadata?.chargeId;
-  const paymentId = metadata?.paymentId;
-  const amountCents = metadata?.amountCents;
-  const status = metadata?.status;
-  const dueDate = metadata?.dueDate;
-  const method = metadata?.method;
-  const previousState = metadata?.previousState;
-  const nextState = metadata?.nextState;
-
-  const pieces: string[] = [];
-
-  if (appointmentId) {
-    pieces.push(`Agendamento #${String(appointmentId).slice(0, 8)}`);
-  }
-
-  if (serviceOrderId) {
-    pieces.push(`O.S. #${String(serviceOrderId).slice(0, 8)}`);
-  }
-
-  if (chargeId) {
-    pieces.push(`Cobrança #${String(chargeId).slice(0, 8)}`);
-  }
-
-  if (paymentId) {
-    pieces.push(`Pagamento #${String(paymentId).slice(0, 8)}`);
-  }
-
-  if (typeof amountCents === "number" && Number.isFinite(amountCents)) {
-    pieces.push(
-      new Intl.NumberFormat("pt-BR", {
-        style: "currency",
-        currency: "BRL",
-      }).format(amountCents / 100)
-    );
-  }
-
-  if (typeof method === "string" && method.trim()) {
-    const methodLabels: Record<string, string> = {
-      PIX: "PIX",
-      CASH: "Dinheiro",
-      CARD: "Cartão",
-      TRANSFER: "Transferência",
-      BANK_TRANSFER: "Transferência",
-      OTHER: "Outro",
-    };
-
-    pieces.push(`Via ${methodLabels[method] ?? method}`);
-  }
-
-  if (typeof status === "string" && status.trim()) {
-    const statusLabels: Record<string, string> = {
-      PENDING: "Pendente",
-      PAID: "Pago",
-      OVERDUE: "Vencida",
-      CANCELED: "Cancelada",
-      OPEN: "Aberta",
-      ASSIGNED: "Atribuída",
-      IN_PROGRESS: "Em andamento",
-      DONE: "Concluída",
-      WARNING: "Atenção",
-      RESTRICTED: "Restrito",
-      SUSPENDED: "Suspenso",
-      NORMAL: "Normal",
-    };
-
-    pieces.push(`Status ${statusLabels[status] ?? status}`);
-  }
-
-  if (typeof previousState === "string" && typeof nextState === "string") {
-    pieces.push(`Estado ${previousState} → ${nextState}`);
-  }
-
-  if (typeof dueDate === "string" && dueDate.trim()) {
-    const date = new Date(dueDate);
-    if (!Number.isNaN(date.getTime())) {
-      pieces.push(
-        `Venc. ${date.toLocaleDateString("pt-BR", {
-          day: "2-digit",
-          month: "2-digit",
-          year: "numeric",
-        })}`
-      );
-    }
-  }
-
-  return pieces.join(" • ");
-}
-
-function getNextAction(event: TimelineEvent) {
-  const key = getEventKey(event);
-
-  if (key.includes("CHARGE_OVERDUE")) {
-    return {
-      label: "Cobrar cliente",
-      tone:
-        "border-red-200 bg-red-50 text-red-900 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300",
-    };
-  }
-
-  if (key.includes("SERVICE_ORDER_DONE")) {
-    return {
-      label: "Verificar cobrança",
-      tone:
-        "border-orange-200 bg-orange-50 text-orange-900 dark:border-orange-900/40 dark:bg-orange-950/20 dark:text-orange-300",
-    };
-  }
-
-  if (key.includes("APPOINTMENT_CREATED")) {
-    return {
-      label: "Confirmar agendamento",
-      tone:
-        "border-blue-200 bg-blue-50 text-blue-900 dark:border-blue-900/40 dark:bg-blue-950/20 dark:text-blue-300",
-    };
-  }
-
-  if (key.includes("APPOINTMENT_CONFIRMED")) {
-    return {
-      label: "Abrir execução",
-      tone:
-        "border-green-200 bg-green-50 text-green-900 dark:border-green-900/40 dark:bg-green-950/20 dark:text-green-300",
-    };
-  }
-
-  if (key.includes("RISK") || key.includes("GOVERNANCE")) {
-    return {
-      label: "Revisar impacto operacional",
-      tone:
-        "border-yellow-200 bg-yellow-50 text-yellow-900 dark:border-yellow-900/40 dark:bg-yellow-950/20 dark:text-yellow-300",
-    };
-  }
-
-  return {
-    label: "Sem ação crítica imediata",
-    tone:
-      "border-gray-200 bg-gray-50 text-gray-900 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-300",
-  };
-}
-
-function getMetadataId(
-  metadata: Record<string, unknown> | null | undefined,
-  key: string
-) {
-  const value = metadata?.[key];
-
-  if (typeof value === "string" && value.trim()) {
-    return value;
-  }
-
-  if (typeof value === "number") {
-    return String(value);
-  }
-
-  return null;
 }
 
 function normalizeCustomersPayload(payload: unknown): CustomerOption[] {
@@ -472,23 +266,23 @@ export default function TimelinePage() {
     const term = search.trim().toLowerCase();
 
     return events.filter((event) => {
-      const inScope =
-        scopeFilter === "ALL" || getEventScope(event) === scopeFilter;
+      const eventScope = getEventScope(event);
+      const inScope = scopeFilter === "ALL" || eventScope === scopeFilter;
 
       if (!inScope) return false;
 
       if (!term) return true;
 
-      const action = getEventLabel(event).toLowerCase();
-      const description = String(event.description ?? "").toLowerCase();
+      const label = getTimelineEventLabel(event).toLowerCase();
+      const description = getTimelineEventDescription(event).toLowerCase();
+      const summary = getTimelineEventSummary(event).toLowerCase();
       const metadata = JSON.stringify(event.metadata ?? {}).toLowerCase();
-      const summary = getEventSummary(event).toLowerCase();
 
       return (
-        action.includes(term) ||
+        label.includes(term) ||
         description.includes(term) ||
-        metadata.includes(term) ||
-        summary.includes(term)
+        summary.includes(term) ||
+        metadata.includes(term)
       );
     });
   }, [events, search, scopeFilter]);
@@ -551,6 +345,7 @@ export default function TimelinePage() {
 
   const filters: { value: EventScope; label: string }[] = [
     { value: "ALL", label: "Tudo" },
+    { value: "CUSTOMERS", label: "Clientes" },
     { value: "APPOINTMENTS", label: "Agendamentos" },
     { value: "SERVICE_ORDERS", label: "Execução" },
     { value: "FINANCIAL", label: "Financeiro" },
@@ -819,11 +614,11 @@ export default function TimelinePage() {
             <div className="space-y-4">
               {filteredEvents.map((event) => {
                 const Icon = getEventIcon(event);
-                const summary = getEventSummary(event);
-                const nextAction = getNextAction(event);
-                const metadata = (event.metadata ?? {}) as Record<string, unknown>;
-                const serviceOrderId = getMetadataId(metadata, "serviceOrderId");
-                const chargeId = getMetadataId(metadata, "chargeId");
+                const summary = getTimelineEventSummary(event);
+                const description = getTimelineEventDescription(event);
+                const nextAction = getTimelineEventNextAction(event);
+                const primaryLink = getTimelineEventPrimaryLink(event);
+                const secondaryLinks = getTimelineEventSecondaryLinks(event);
 
                 return (
                   <div
@@ -835,16 +630,11 @@ export default function TimelinePage() {
                         <div className="flex flex-wrap items-center gap-2">
                           <span
                             className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium ${getEventTone(
-                              event.action ?? event.type
+                              event
                             )}`}
                           >
                             <Icon className="h-3.5 w-3.5" />
-                            {getEventLabel(event)}
-                          </span>
-
-                          <span className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-                            <User className="h-3 w-3" />
-                            Evento #{event.id.slice(0, 8)}
+                            {getTimelineEventLabel(event)}
                           </span>
 
                           <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-300">
@@ -854,7 +644,7 @@ export default function TimelinePage() {
                         </div>
 
                         <p className="mt-3 text-sm text-gray-900 dark:text-white">
-                          {event.description?.trim() || "Sem descrição."}
+                          {description}
                         </p>
 
                         {summary ? (
@@ -876,65 +666,53 @@ export default function TimelinePage() {
                       <p className="mt-1 text-sm font-medium">{nextAction.label}</p>
                     </div>
 
-                    {(serviceOrderId || chargeId) && (
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        {serviceOrderId ? (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() =>
-                              navigate(buildServiceOrdersDeepLink(serviceOrderId))
-                            }
-                            className="gap-2"
-                          >
-                            <Wrench className="h-4 w-4" />
-                            Abrir O.S.
-                          </Button>
-                        ) : null}
-
-                        {chargeId ? (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() => navigate(buildFinanceChargeUrl(chargeId))}
-                            className="gap-2"
-                          >
-                            <Wallet className="h-4 w-4" />
-                            Abrir cobrança
-                          </Button>
-                        ) : null}
-
-                        {selectedCustomer ? (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() =>
-                              navigate(`/customers?customerId=${selectedCustomer.id}`)
-                            }
-                            className="gap-2"
-                          >
-                            <Users className="h-4 w-4" />
-                            Abrir cliente
-                          </Button>
-                        ) : null}
-
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {primaryLink ? (
                         <Button
                           type="button"
                           size="sm"
-                          variant="outline"
-                          onClick={() =>
-                            navigate(`/timeline?customerId=${selectedCustomer?.id ?? ""}`)
-                          }
+                          onClick={() => navigate(primaryLink.href)}
                           className="gap-2"
                         >
-                          <Link2 className="h-4 w-4" />
-                          Deep-link
+                          {primaryLink.target === "serviceOrder" ? (
+                            <Wrench className="h-4 w-4" />
+                          ) : primaryLink.target === "charge" ||
+                            primaryLink.target === "payment" ? (
+                            <Wallet className="h-4 w-4" />
+                          ) : primaryLink.target === "customer" ? (
+                            <Users className="h-4 w-4" />
+                          ) : (
+                            <Link2 className="h-4 w-4" />
+                          )}
+                          {primaryLink.label}
                         </Button>
-                      </div>
-                    )}
+                      ) : null}
+
+                      {secondaryLinks
+                        .filter((link) => link.href !== primaryLink?.href)
+                        .map((link) => (
+                          <Button
+                            key={`${event.id}-${link.target}-${link.href}`}
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => navigate(link.href)}
+                            className="gap-2"
+                          >
+                            {link.target === "serviceOrder" ? (
+                              <Wrench className="h-4 w-4" />
+                            ) : link.target === "charge" ||
+                              link.target === "payment" ? (
+                              <Wallet className="h-4 w-4" />
+                            ) : link.target === "customer" ? (
+                              <Users className="h-4 w-4" />
+                            ) : (
+                              <Link2 className="h-4 w-4" />
+                            )}
+                            {link.label}
+                          </Button>
+                        ))}
+                    </div>
 
                     {showMetadata && event.metadata ? (
                       <pre className="mt-4 overflow-x-auto rounded-lg bg-gray-50 p-3 text-xs text-gray-700 dark:bg-gray-900 dark:text-gray-300">
