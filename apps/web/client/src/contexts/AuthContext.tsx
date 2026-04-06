@@ -6,15 +6,16 @@ import React, {
 } from "react";
 import { trpc } from "@/lib/trpc";
 import { normalizeRole, type Role } from "@/lib/rbac";
-import type { AppRouter } from "../../../server/routers";
-import type { inferRouterOutputs } from "@trpc/server";
 
-type RouterOutputs = inferRouterOutputs<AppRouter>;
-type SessionMeOutput = RouterOutputs["session"]["me"];
-type SessionPayload = Exclude<SessionMeOutput, null>;
-type SessionUser = NonNullable<SessionPayload["data"]>["data"]["user"];
-
-type AuthUser = (SessionUser & { normalizedRole: Role | null }) | null;
+type AuthUser = {
+  token?: string;
+  id?: number;
+  organizationId?: number;
+  role?: string;
+  email?: string;
+  name?: string;
+  normalizedRole: Role | null;
+} | null;
 
 interface AuthContextType {
   user: AuthUser;
@@ -34,16 +35,60 @@ interface AuthContextType {
   logout: () => Promise<void>;
   isAuthenticated: boolean;
   refresh: () => Promise<void>;
-  payload: SessionMeOutput;
+  payload: unknown;
   redirectTo: string;
   role: Role | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-function getSessionData(payload: SessionMeOutput) {
-  return payload?.data?.data ?? null;
+/* =========================
+   NORMALIZADORES
+========================= */
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
+
+function getEnvelope(payload: unknown): Record<string, unknown> | null {
+  if (!isObject(payload)) return null;
+
+  if (isObject(payload.data) && isObject(payload.data.data)) {
+    return payload.data.data;
+  }
+
+  return payload;
+}
+
+function getUser(payload: unknown) {
+  const env = getEnvelope(payload);
+  if (!env) return null;
+
+  const raw = (env.user ?? env) as Record<string, unknown>;
+
+  if (!isObject(raw)) return null;
+
+  return {
+    token: raw.token as string | undefined,
+    id: raw.id as number | undefined,
+    organizationId: (raw.organizationId ?? raw.orgId) as number | undefined,
+    role: raw.role as string | undefined,
+    email: raw.email as string | undefined,
+    name: raw.name as string | undefined,
+  };
+}
+
+function getRequiresOnboarding(payload: unknown): boolean {
+  const env = getEnvelope(payload);
+  return Boolean(env?.requiresOnboarding);
+}
+
+function getRedirect(payload: unknown): string {
+  const env = getEnvelope(payload);
+  return (env?.redirect as string) || "/dashboard";
+}
+
+/* ========================= */
 
 function redirectToLogin() {
   if (typeof window === "undefined") return;
@@ -129,7 +174,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       await logoutMutation.mutateAsync();
-      logoutMutation.reset();
 
       await utils.session.me.cancel();
       utils.session.me.setData(undefined, null);
@@ -144,26 +188,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [logoutMutation, utils]);
 
-  const payload: SessionMeOutput = meQuery.data ?? null;
+  const payload = meQuery.data ?? null;
 
   const user: AuthUser = useMemo(() => {
-    const rawUser = getSessionData(payload)?.user ?? null;
-
-    if (!rawUser) return null;
+    const raw = getUser(payload);
+    if (!raw) return null;
 
     return {
-      ...rawUser,
-      normalizedRole: normalizeRole(rawUser.role),
+      ...raw,
+      normalizedRole: normalizeRole(raw.role),
     };
   }, [payload]);
 
-  const role = useMemo(() => {
-    return user?.normalizedRole ?? null;
-  }, [user]);
+  const role = user?.normalizedRole ?? null;
 
-  const redirectTo = useMemo(() => {
-    return getSessionData(payload)?.redirect ?? "/dashboard";
-  }, [payload]);
+  const redirectTo = useMemo(() => getRedirect(payload), [payload]);
 
   const isAuthenticating =
     localLoading || loginMutation.isPending || registerMutation.isPending;
@@ -173,31 +212,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const isInitializing = meQuery.isLoading && !isLoggingOut;
   const loading = isInitializing || isSubmitting;
 
-  const value: AuthContextType = useMemo(() => {
-    return {
-      user,
-      payload,
-      redirectTo,
-      role,
-      loading,
-      isInitializing,
-      isSubmitting,
-      isAuthenticating,
-      isLoggingOut,
-      error:
-        localError ||
-        meQuery.error ||
-        loginMutation.error ||
-        registerMutation.error ||
-        logoutMutation.error ||
-        null,
-      login,
-      register,
-      logout,
-      isAuthenticated: Boolean(user),
-      refresh,
-    };
-  }, [
+  const value: AuthContextType = {
     user,
     payload,
     redirectTo,
@@ -207,23 +222,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isSubmitting,
     isAuthenticating,
     isLoggingOut,
-    localError,
-    meQuery.error,
-    loginMutation.error,
-    registerMutation.error,
-    logoutMutation.error,
+    error:
+      localError ||
+      meQuery.error ||
+      loginMutation.error ||
+      registerMutation.error ||
+      logoutMutation.error ||
+      null,
     login,
     register,
     logout,
+    isAuthenticated: Boolean(user),
     refresh,
-  ]);
+  };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth(): AuthContextType {
   const context = React.useContext(AuthContext);
-  if (context === undefined) {
+  if (!context) {
     throw new Error("useAuth deve ser usado dentro de AuthProvider");
   }
   return context;

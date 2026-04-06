@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
+import { normalizeArrayPayload } from "@/lib/query-helpers";
 import { Button } from "@/components/ui/button";
 import {
   History,
@@ -145,55 +146,19 @@ function getEventScope(event: TimelineEvent): EventScope {
   return "ALL";
 }
 
-function normalizeCustomersPayload(payload: unknown): CustomerOption[] {
-  const raw = (payload as any)?.data?.data ?? (payload as any)?.data ?? payload;
-
-  if (Array.isArray(raw)) {
-    return raw
-      .map((customer: any) => ({
-        id: String(customer?.id ?? ""),
-        name: String(customer?.name ?? ""),
-      }))
-      .filter((customer) => customer.id && customer.name);
-  }
-
-  if (Array.isArray(raw?.items)) {
-    return raw.items
-      .map((customer: any) => ({
-        id: String(customer?.id ?? ""),
-        name: String(customer?.name ?? ""),
-      }))
-      .filter((customer: CustomerOption) => customer.id && customer.name);
-  }
-
-  if (Array.isArray(raw?.data)) {
-    return raw.data
-      .map((customer: any) => ({
-        id: String(customer?.id ?? ""),
-        name: String(customer?.name ?? ""),
-      }))
-      .filter((customer: CustomerOption) => customer.id && customer.name);
-  }
-
-  return [];
+function mapCustomerOptions(payload: unknown): CustomerOption[] {
+  return normalizeArrayPayload<any>(payload)
+    .map((customer) => ({
+      id: String(customer?.id ?? ""),
+      name: String(customer?.name ?? ""),
+    }))
+    .filter((customer) => customer.id && customer.name);
 }
 
-function normalizeTimelinePayload(payload: unknown): TimelineEvent[] {
-  const raw = (payload as any)?.data?.data ?? (payload as any)?.data ?? payload;
-
-  if (Array.isArray(raw)) {
-    return raw as TimelineEvent[];
-  }
-
-  if (Array.isArray(raw?.items)) {
-    return raw.items as TimelineEvent[];
-  }
-
-  if (Array.isArray(raw?.data)) {
-    return raw.data as TimelineEvent[];
-  }
-
-  return [];
+function mapTimelineEvents(payload: unknown): TimelineEvent[] {
+  return normalizeArrayPayload<TimelineEvent>(payload).filter(
+    (event) => Boolean(event?.id)
+  );
 }
 
 function SummaryCard({
@@ -255,11 +220,11 @@ export default function TimelinePage() {
   );
 
   const customers = useMemo(() => {
-    return normalizeCustomersPayload(customersQuery.data);
+    return mapCustomerOptions(customersQuery.data);
   }, [customersQuery.data]);
 
   const events = useMemo(() => {
-    return normalizeTimelinePayload(timelineQuery.data);
+    return mapTimelineEvents(timelineQuery.data);
   }, [timelineQuery.data]);
 
   const filteredEvents = useMemo(() => {
@@ -419,11 +384,7 @@ export default function TimelinePage() {
       ) : null}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
-        <SummaryCard
-          title="Eventos"
-          value={stats.total}
-          subtitle="Histórico visível"
-        />
+        <SummaryCard title="Eventos" value={stats.total} subtitle="Histórico visível" />
         <SummaryCard
           title="Agendamentos"
           value={stats.appointments}

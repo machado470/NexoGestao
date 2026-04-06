@@ -5,7 +5,7 @@ import type { Context } from "./context";
  * Valida se o usuário tem acesso à organização especificada
  * Previne acesso cruzado entre organizações
  */
-export function ensureOrgAccess(ctx: Context, targetOrgId: number | string) {
+export function ensureOrgAccess(ctx: Context, targetOrgId: string | number) {
   const userOrgId = ctx.user?.organizationId;
 
   if (!userOrgId) {
@@ -15,9 +15,7 @@ export function ensureOrgAccess(ctx: Context, targetOrgId: number | string) {
     });
   }
 
-  const targetId = typeof targetOrgId === "string" ? parseInt(targetOrgId, 10) : targetOrgId;
-
-  if (userOrgId !== targetId) {
+  if (String(userOrgId) !== String(targetOrgId)) {
     throw new TRPCError({
       code: "FORBIDDEN",
       message: "Acesso negado. Você não tem permissão para acessar esta organização.",
@@ -29,7 +27,7 @@ export function ensureOrgAccess(ctx: Context, targetOrgId: number | string) {
  * Valida se o usuário é admin da organização
  */
 export function ensureAdminAccess(ctx: Context) {
-  if (ctx.user?.role !== "admin") {
+  if (ctx.user?.role?.toUpperCase() !== "ADMIN") {
     throw new TRPCError({
       code: "FORBIDDEN",
       message: "Acesso negado. Apenas administradores podem realizar esta ação.",
@@ -53,7 +51,11 @@ setInterval(() => {
   }
 }, 60000); // Limpar a cada 1 minuto
 
-export function checkRateLimit(key: string, limit: number = 100, windowMs: number = 60000): boolean {
+export function checkRateLimit(
+  key: string,
+  limit: number = 100,
+  windowMs: number = 60000
+): boolean {
   const now = Date.now();
   const entry = rateLimitStore.get(key);
 
@@ -65,7 +67,9 @@ export function checkRateLimit(key: string, limit: number = 100, windowMs: numbe
   if (entry.count >= limit) {
     throw new TRPCError({
       code: "TOO_MANY_REQUESTS",
-      message: `Rate limit excedido. Tente novamente em ${Math.ceil((entry.resetAt - now) / 1000)}s.`,
+      message: `Rate limit excedido. Tente novamente em ${Math.ceil(
+        (entry.resetAt - now) / 1000
+      )}s.`,
     });
   }
 
@@ -78,9 +82,9 @@ export function checkRateLimit(key: string, limit: number = 100, windowMs: numbe
  */
 export function sanitizeInput(input: string): string {
   return input
-    .replace(/[<>]/g, "") // Remove < e >
+    .replace(/[<>]/g, "")
     .trim()
-    .substring(0, 1000); // Limita a 1000 caracteres
+    .substring(0, 1000);
 }
 
 /**
@@ -108,7 +112,7 @@ export function createAuditHash(data: any): string {
   for (let i = 0; i < json.length; i++) {
     const char = json.charCodeAt(i);
     hash = (hash << 5) - hash + char;
-    hash = hash & hash; // Convert to 32bit integer
+    hash = hash & hash;
   }
   return Math.abs(hash).toString(16);
 }
@@ -136,7 +140,6 @@ export async function logAudit(
     hash: createAuditHash({ action, entity, entityId, changes }),
   };
 
-  // TODO: Salvar em banco de dados
   console.log("[AUDIT]", JSON.stringify(auditLog));
 
   return auditLog;

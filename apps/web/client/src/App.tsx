@@ -19,43 +19,53 @@ import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { canAny, type Permission } from "./lib/rbac";
 
-// pages
+import Dashboard from "./pages/Dashboard";
+import CustomersPage from "./pages/CustomersPage";
+import AppointmentsPage from "./pages/AppointmentsPage";
+import ServiceOrdersPage from "./pages/ServiceOrdersPage";
+import PeoplePage from "./pages/PeoplePage";
+import GovernancePage from "./pages/GovernancePage";
+import FinancesPage from "./pages/FinancesPage";
+import ExecutiveDashboard from "./pages/ExecutiveDashboard";
+import ExecutiveDashboardNew from "./pages/ExecutiveDashboardNew";
+import WhatsAppPage from "./pages/WhatsAppPage";
+import LaunchesPage from "./pages/LaunchesPage";
+import InvoicesPage from "./pages/InvoicesPage";
+import ExpensesPage from "./pages/ExpensesPage";
+import ReferralsPage from "./pages/ReferralsPage";
+import CalendarPage from "./pages/CalendarPage";
+import SettingsPage from "./pages/SettingsPage";
+import TimelinePage from "./pages/TimelinePage";
+import OperationalWorkflowPage from "./pages/OperationalWorkflowPage";
+import OperationsDashboardPage from "./pages/OperationsDashboardPage";
+
 const Landing = lazy(() => import("./pages/Landing"));
 const Login = lazy(() => import("./pages/Login"));
 const Register = lazy(() => import("./pages/Register"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
-const Dashboard = lazy(() => import("./pages/Dashboard"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const About = lazy(() => import("./pages/About"));
 const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
 const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
 
-const CustomersPage = lazy(() => import("./pages/CustomersPage"));
-const AppointmentsPage = lazy(() => import("./pages/AppointmentsPage"));
-const ServiceOrdersPage = lazy(() => import("./pages/ServiceOrdersPage"));
-const PeoplePage = lazy(() => import("./pages/PeoplePage"));
-const GovernancePage = lazy(() => import("./pages/GovernancePage"));
-const FinancesPage = lazy(() => import("./pages/FinancesPage"));
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
 
-const ExecutiveDashboard = lazy(() => import("./pages/ExecutiveDashboard"));
-const ExecutiveDashboardNew = lazy(() => import("./pages/ExecutiveDashboardNew"));
+function getEnvelope(payload: unknown): Record<string, unknown> | null {
+  if (!isObject(payload)) return null;
 
-const WhatsAppPage = lazy(() => import("./pages/WhatsAppPage"));
-const LaunchesPage = lazy(() => import("./pages/LaunchesPage"));
-const InvoicesPage = lazy(() => import("./pages/InvoicesPage"));
-const ExpensesPage = lazy(() => import("./pages/ExpensesPage"));
-const ReferralsPage = lazy(() => import("./pages/ReferralsPage"));
+  if (isObject(payload.data) && isObject(payload.data.data)) {
+    return payload.data.data;
+  }
 
-const CalendarPage = lazy(() => import("./pages/CalendarPage"));
-const SettingsPage = lazy(() => import("./pages/SettingsPage"));
-const TimelinePage = lazy(() => import("./pages/TimelinePage"));
+  return payload;
+}
 
-const OperationalWorkflowPage = lazy(
-  () => import("./pages/OperationalWorkflowPage")
-);
-const OperationsDashboardPage = lazy(
-  () => import("./pages/OperationsDashboardPage")
-);
+function getRequiresOnboarding(payload: unknown): boolean {
+  const env = getEnvelope(payload);
+  return Boolean(env?.requiresOnboarding);
+}
 
 function FullScreenLoader() {
   return (
@@ -132,7 +142,7 @@ function ProtectedRoute({
   const { isAuthenticated, isInitializing, payload, role } = useAuth();
   const [, navigate] = useLocation();
 
-  const requiresOnboarding = Boolean(payload?.data?.data?.requiresOnboarding);
+  const requiresOnboarding = getRequiresOnboarding(payload);
 
   useEffect(() => {
     if (isInitializing) return;
@@ -227,14 +237,14 @@ function withMainLayout(Page: ComponentType) {
 }
 
 function protectedPage(
-  Page: LazyExoticComponent<ComponentType>,
+  Page: ComponentType,
   options?: {
     permissions?: Permission[];
     requireCompletedOnboarding?: boolean;
     onboardingOnly?: boolean;
   }
 ) {
-  const Wrapped = withMainLayout(() => <LazyPage component={Page} />);
+  const Wrapped = withMainLayout(Page);
 
   return function ProtectedPageRoute() {
     return (
@@ -268,8 +278,6 @@ function onboardingPage(Page: LazyExoticComponent<ComponentType>) {
 function RouteShell({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
-
-// ROUTES
 
 const DashboardRoute = protectedPage(Dashboard, {
   requireCompletedOnboarding: true,
@@ -351,9 +359,7 @@ const TimelineRoute = protectedPage(TimelinePage, {
   requireCompletedOnboarding: true,
 });
 
-// TESTE A/B TEMPORARIO:
-// /operations vai usar a mesma tela de /service-orders
-const OperationsRoute = protectedPage(ServiceOrdersPage, {
+const OperationsRoute = protectedPage(OperationalWorkflowPage, {
   requireCompletedOnboarding: true,
 });
 

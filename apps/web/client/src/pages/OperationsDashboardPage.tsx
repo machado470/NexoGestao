@@ -69,6 +69,10 @@ function EmptyState({ text }: { text: string }) {
   );
 }
 
+function buildOperationsServiceOrderUrl(serviceOrderId?: string | null) {
+  return buildServiceOrdersDeepLink(serviceOrderId, "operations");
+}
+
 export default function OperationsDashboardPage() {
   const { isAuthenticated, isInitializing } = useAuth();
   const canQuery = isAuthenticated && !isInitializing;
@@ -100,7 +104,9 @@ export default function OperationsDashboardPage() {
       ]);
 
       if (variables?.serviceOrderId) {
-        navigate(buildServiceOrdersDeepLink(variables.serviceOrderId));
+        navigate(
+          buildOperationsServiceOrderUrl(variables.serviceOrderId)
+        );
       }
     },
     onError: (error) => {
@@ -118,7 +124,7 @@ export default function OperationsDashboardPage() {
       ]);
 
       if (variables?.id) {
-        navigate(buildServiceOrdersDeepLink(variables.id));
+        navigate(buildOperationsServiceOrderUrl(variables.id));
       }
     },
     onError: (error) => {
@@ -160,13 +166,17 @@ export default function OperationsDashboardPage() {
 
   const urgentOrders = useMemo(() => {
     return serviceOrders
-      .filter((order: ServiceOrder) => getServiceOrderNextAction(order).tone === "red")
+      .filter(
+        (order: ServiceOrder) => getServiceOrderNextAction(order).tone === "red"
+      )
       .slice(0, 5);
   }, [serviceOrders]);
 
   const readyToChargeOrders = useMemo(() => {
     return serviceOrders
-      .filter((order: ServiceOrder) => matchesFinancialFilter(order, "READY_TO_CHARGE"))
+      .filter((order: ServiceOrder) =>
+        matchesFinancialFilter(order, "READY_TO_CHARGE")
+      )
       .slice(0, 5);
   }, [serviceOrders]);
 
@@ -251,7 +261,8 @@ export default function OperationsDashboardPage() {
                   Cobranças vencidas pedindo ação
                 </h3>
                 <p className="mt-1 text-sm text-red-800 dark:text-red-300">
-                  {overdueCount} cobranças em atraso • {formatCurrency(overdueAmount)}
+                  {overdueCount} cobranças em atraso •{" "}
+                  {formatCurrency(overdueAmount)}
                 </p>
               </div>
             </div>
@@ -370,7 +381,9 @@ export default function OperationsDashboardPage() {
                     <div className="mt-3 flex flex-wrap gap-2">
                       <Button
                         size="sm"
-                        onClick={() => navigate(buildServiceOrdersDeepLink(order.id))}
+                        onClick={() =>
+                          navigate(buildOperationsServiceOrderUrl(order.id))
+                        }
                         className="rounded-xl"
                       >
                         Abrir ordem
@@ -435,7 +448,9 @@ export default function OperationsDashboardPage() {
                     <div className="mt-3 flex flex-wrap gap-2">
                       <Button
                         size="sm"
-                        onClick={() => navigate(buildServiceOrdersDeepLink(order.id))}
+                        onClick={() =>
+                          navigate(buildOperationsServiceOrderUrl(order.id))
+                        }
                         className="rounded-xl"
                       >
                         Abrir ordem

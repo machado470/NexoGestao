@@ -39,7 +39,9 @@ export default function OperationalWorkflowPage() {
     [ordersQuery.data]
   );
 
-  if (ordersQuery.isLoading) {
+  const isInitialLoading = ordersQuery.isLoading && orders.length === 0;
+
+  if (isInitialLoading) {
     return (
       <div className="space-y-4 p-6">
         <div className="space-y-1">
@@ -58,7 +60,7 @@ export default function OperationalWorkflowPage() {
     );
   }
 
-  if (ordersQuery.error) {
+  if (ordersQuery.error && orders.length === 0) {
     return (
       <div className="space-y-4 p-6">
         <div className="space-y-1">
@@ -99,7 +101,7 @@ export default function OperationalWorkflowPage() {
 
         const ctx = buildOperationalContextFromServiceOrder(os);
 
-        const serviceOrderUrl = buildServiceOrdersDeepLink(os?.id);
+        const serviceOrderUrl = buildServiceOrdersDeepLink(os?.id, "operations");
         const financeUrl = buildFinanceChargeUrl(ctx.chargeId);
         const whatsappUrl = buildWhatsAppUrlFromContext(ctx);
 

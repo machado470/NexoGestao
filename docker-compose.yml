@@ -36,7 +36,7 @@ services:
       REDIS_PORT: "6379"
       AUTO_MIGRATE: "1"
       DB_WAIT_SECONDS: "40"
-      SEED_MODE: "demo-org"
+      SEED_MODE: ""
     depends_on:
       postgres:
         condition: service_healthy

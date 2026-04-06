@@ -26,6 +26,10 @@ import { Button } from "@/components/ui/button";
 import CreatePersonModal from "@/components/CreatePersonModal";
 import EditPersonModal from "@/components/EditPersonModal";
 import { buildServiceOrdersDeepLink } from "@/lib/operations/operations.utils";
+import {
+  normalizeArrayPayload,
+  normalizeObjectPayload,
+} from "@/lib/query-helpers";
 
 type PersonItem = {
   id: string;
@@ -62,70 +66,6 @@ type ServiceOrder = {
     name?: string | null;
   } | null;
 };
-
-function normalizePeoplePayload(payload: unknown): PersonItem[] {
-  const raw = (payload as any)?.data?.data ?? (payload as any)?.data ?? payload;
-
-  if (!Array.isArray(raw)) {
-    return [];
-  }
-
-  return raw
-    .map((item) => {
-      const candidate = (item ?? {}) as Partial<PersonItem>;
-
-      return {
-        id: typeof candidate.id === "string" ? candidate.id : "",
-        name: typeof candidate.name === "string" ? candidate.name : "Sem nome",
-        role: typeof candidate.role === "string" ? candidate.role : null,
-        email: typeof candidate.email === "string" ? candidate.email : null,
-        active: candidate.active === false ? false : true,
-        riskScore:
-          typeof candidate.riskScore === "number" && Number.isFinite(candidate.riskScore)
-            ? candidate.riskScore
-            : 0,
-        operationalState:
-          typeof candidate.operationalState === "string"
-            ? candidate.operationalState
-            : null,
-        userId: typeof candidate.userId === "string" ? candidate.userId : null,
-      };
-    })
-    .filter((person) => person.id);
-}
-
-function normalizeLinkedStats(payload: unknown): LinkedStatsResponse {
-  const raw = (payload as any)?.data?.data ?? (payload as any)?.data ?? payload;
-
-  if (!raw || typeof raw !== "object") {
-    return { count: 0 };
-  }
-
-  return {
-    count:
-      typeof (raw as any).count === "number" && Number.isFinite((raw as any).count)
-        ? (raw as any).count
-        : 0,
-  };
-}
-
-function normalizeServiceOrders(payload: unknown): ServiceOrder[] {
-  const raw = (payload as any)?.data?.data ?? (payload as any)?.data ?? payload;
-
-  if (Array.isArray(raw)) {
-    return raw as ServiceOrder[];
-  }
-
-  if (Array.isArray((raw as any)?.items)) {
-    return (raw as any).items as ServiceOrder[];
-  }
-
-  if (Array.isArray((payload as any)?.items)) {
-    return (payload as any).items as ServiceOrder[];
-  }
-
-  return [];
-}
 
 function getStateLabel(value?: string | null) {
   switch (value) {
@@ -261,6 +201,14 @@ function SummaryCard({
   );
 }
 
+function buildPersonServiceOrderUrl(serviceOrderId?: string | null) {
+  if (!serviceOrderId) {
+    return "/service-orders";
+  }
+
+  return buildServiceOrdersDeepLink(serviceOrderId, "operations");
+}
+
 export default function PeoplePage() {
   const [, navigate] = useLocation();
   const { isAuthenticated, isInitializing } = useAuth();
@@ -310,15 +258,43 @@ export default function PeoplePage() {
   });
 
   const people = useMemo(() => {
-    return normalizePeoplePayload(listPeople.data);
+    return normalizeArrayPayload<PersonItem>(listPeople.data)
+      .map((person) => ({
+        id: typeof person.id === "string" ? person.id : "",
+        name: typeof person.name === "string" ? person.name : "Sem nome",
+        role: typeof person.role === "string" ? person.role : null,
+        email: typeof person.email === "string" ? person.email : null,
+        active: person.active !== false,
+        riskScore:
+          typeof person.riskScore === "number" &&
+          Number.isFinite(person.riskScore)
+            ? person.riskScore
+            : 0,
+        operationalState:
+          typeof person.operationalState === "string"
+            ? person.operationalState
+            : null,
+        userId: typeof person.userId === "string" ? person.userId : null,
+      }))
+      .filter((person) => person.id);
   }, [listPeople.data]);
 
   const linkedStats = useMemo(() => {
-    return normalizeLinkedStats(statsLinked.data);
+    const raw =
+      normalizeObjectPayload<LinkedStatsResponse>(statsLinked.data) ?? {
+        count: 0,
+      };
+
+    return {
+      count:
+        typeof raw.count === "number" && Number.isFinite(raw.count)
+          ? raw.count
+          : 0,
+    };
   }, [statsLinked.data]);
 
   const serviceOrders = useMemo(() => {
-    return normalizeServiceOrders(serviceOrdersQuery.data);
+    return normalizeArrayPayload<ServiceOrder>(serviceOrdersQuery.data);
   }, [serviceOrdersQuery.data]);
 
   const peopleWithOperationalData = useMemo(() => {
@@ -375,8 +351,9 @@ export default function PeoplePage() {
   }, [peopleWithOperationalData]);
 
   const peopleWithAssignmentsCount = useMemo(() => {
-    return peopleWithOperationalData.filter((person) => person.linkedOrders.length > 0)
-      .length;
+    return peopleWithOperationalData.filter(
+      (person) => person.linkedOrders.length > 0
+    ).length;
   }, [peopleWithOperationalData]);
 
   const openAssignmentsCount = useMemo(() => {
@@ -509,7 +486,8 @@ export default function PeoplePage() {
 
             <p className="mt-2 text-sm opacity-70">
               Aqui a equipe deixa de ser cadastro morto e vira leitura operacional:
-              quem está vinculado à execução, quem concentra risco e quem precisa de atenção.
+              quem está vinculado à execução, quem concentra risco e quem precisa de
+              atenção.
             </p>
           </div>
 
@@ -577,7 +555,8 @@ export default function PeoplePage() {
               <div>
                 <div className="font-medium">Nenhuma pessoa cadastrada</div>
                 <p className="mt-1 text-sm opacity-70">
-                  Cadastre a primeira pessoa da organização para começar a gestão da equipe.
+                  Cadastre a primeira pessoa da organização para começar a gestão
+                  da equipe.
                 </p>
               </div>
               <button
@@ -727,14 +706,9 @@ export default function PeoplePage() {
                           <Button
                             type="button"
                             variant="outline"
-                            onClick={() => {
-                              if (person.recentOrder?.id) {
-                                navigate(buildServiceOrdersDeepLink(person.recentOrder.id));
-                                return;
-                              }
-
-                              navigate("/service-orders");
-                            }}
+                            onClick={() =>
+                              navigate(buildPersonServiceOrderUrl(person.recentOrder?.id))
+                            }
                             className="gap-2"
                           >
                             <Briefcase className="h-4 w-4" />
@@ -889,7 +863,9 @@ export default function PeoplePage() {
                                 size="sm"
                                 variant="outline"
                                 onClick={() =>
-                                  navigate(buildServiceOrdersDeepLink(person.recentOrder!.id))
+                                  navigate(
+                                    buildPersonServiceOrderUrl(person.recentOrder?.id)
+                                  )
                                 }
                                 className="mt-2 gap-2"
                               >
@@ -935,7 +911,9 @@ export default function PeoplePage() {
                                     type="button"
                                     size="sm"
                                     variant="outline"
-                                    onClick={() => navigate(buildServiceOrdersDeepLink(order.id))}
+                                    onClick={() =>
+                                      navigate(buildPersonServiceOrderUrl(order.id))
+                                    }
                                     className="gap-2"
                                   >
                                     <Briefcase className="h-4 w-4" />

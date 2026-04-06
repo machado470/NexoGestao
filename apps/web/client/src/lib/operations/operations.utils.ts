@@ -56,6 +56,7 @@ type TimelineEventLike = {
   entityType?: string | null;
   entityId?: string | null;
   customerId?: string | null;
+  description?: string | null;
   metadata?: Record<string, unknown> | null;
 };
 
@@ -127,23 +128,52 @@ export function buildTimelineDeepLink(customerId?: string | null) {
   return `/timeline?customerId=${customerId}`;
 }
 
-export function buildServiceOrdersDeepLink(id?: string | null) {
-  if (!id) return "/service-orders";
-  return `/service-orders?os=${id}`;
+export function buildServiceOrdersDeepLink(
+  id?: string | null,
+  base?: "operations" | "service-orders"
+) {
+  const root = base === "operations" ? "/operations" : "/service-orders";
+
+  if (!id) return root;
+
+  return `${root}?os=${id}`;
 }
 
-export function buildServiceOrdersUrl(id: string) {
-  const url = new URL(window.location.href);
-  url.searchParams.set("os", id);
-  return `${url.pathname}${url.search}`;
+export function buildServiceOrdersUrl(
+  id: string,
+  base?: "operations" | "service-orders"
+) {
+  const pathname =
+    typeof window !== "undefined"
+      ? window.location.pathname
+      : base === "operations"
+        ? "/operations"
+        : "/service-orders";
+
+  return `${pathname}?os=${id}`;
 }
 
-export function getServiceOrderIdFromUrl() {
+export function getServiceOrderIdFromUrl(location?: string) {
+  if (location) {
+    const query = location.split("?")[1] || "";
+    const params = new URLSearchParams(query);
+    return params.get("os");
+  }
+
+  if (typeof window === "undefined") return null;
+
   const url = new URL(window.location.href);
   return url.searchParams.get("os");
 }
 
-export function clearServiceOrderIdFromUrl() {
+export function clearServiceOrderIdFromUrl(location?: string) {
+  if (location) {
+    const [pathname] = location.split("?");
+    return pathname || "/service-orders";
+  }
+
+  if (typeof window === "undefined") return "/service-orders";
+
   const url = new URL(window.location.href);
   url.searchParams.delete("os");
   return `${url.pathname}${url.search}`;
@@ -178,8 +208,10 @@ export function getWhatsAppContextLabel(context?: string | null) {
 
   if (normalized === "overdue_charge") return "Cobrança vencida";
   if (normalized === "charge_pending") return "Cobrança pendente";
-  if (normalized === "service_order_followup")
+  if (normalized === "service_order_followup") {
     return "Acompanhamento da ordem de serviço";
+  }
+
   return "Contato geral";
 }
 
@@ -402,7 +434,8 @@ export function getTimelineEventLabel(event: TimelineEventLike) {
     PAYMENT_LINK_SENT: "Link de pagamento enviado",
   };
 
-  return labels[key] ?? key.split("_").join(" ") || "Evento";
+  const fallback = key.split("_").join(" ").trim();
+  return labels[key] ?? (fallback || "Evento");
 }
 
 export function getTimelineEventDescription(event: TimelineEventLike) {
@@ -596,7 +629,7 @@ export function getTimelineEventPrimaryLink(
   if (serviceOrderId) {
     return {
       label: "Abrir O.S.",
-      href: buildServiceOrdersDeepLink(serviceOrderId),
+      href: buildServiceOrdersDeepLink(serviceOrderId, "operations"),
       target: "serviceOrder",
     };
   }
@@ -681,7 +714,7 @@ export function getTimelineEventSecondaryLinks(
   if (serviceOrderId) {
     links.push({
       label: "O.S.",
-      href: buildServiceOrdersDeepLink(serviceOrderId),
+      href: buildServiceOrdersDeepLink(serviceOrderId, "operations"),
       target: "serviceOrder",
     });
   }

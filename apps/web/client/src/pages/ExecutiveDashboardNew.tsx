@@ -1,4 +1,6 @@
+import { useMemo } from "react";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   AlertTriangle,
   BarChart3,
@@ -9,14 +11,14 @@ import {
   Users,
 } from "lucide-react";
 
-function formatCurrency(cents?: number) {
+function formatCurrency(cents?: number | null) {
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL",
-  }).format((Number(cents ?? 0)) / 100);
+  }).format(Number(cents ?? 0) / 100);
 }
 
-function formatRevenueValue(value?: number) {
+function formatRevenueValue(value?: number | null) {
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL",
@@ -24,18 +26,30 @@ function formatRevenueValue(value?: number) {
 }
 
 function normalizeKeyLabel(key: string) {
+  const normalized = String(key ?? "").trim();
+
   const labels: Record<string, string> = {
+    OPEN: "Abertas",
+    ASSIGNED: "Atribuídas",
+    IN_PROGRESS: "Em andamento",
+    DONE: "Concluídas",
+    CANCELED: "Canceladas",
+    CANCELLED: "Canceladas",
+    PENDING: "Pendentes",
+    PAID: "Pagas",
+    OVERDUE: "Vencidas",
     open: "Abertas",
     assigned: "Atribuídas",
     inProgress: "Em andamento",
     completed: "Concluídas",
     cancelled: "Canceladas",
+    canceled: "Canceladas",
     pending: "Pendentes",
     paid: "Pagas",
     overdue: "Vencidas",
   };
 
-  return labels[key] ?? key;
+  return labels[normalized] ?? (normalized || "Sem rótulo");
 }
 
 type MetricCardProps = {
@@ -84,6 +98,8 @@ type DataListCardProps = {
     helper?: string;
   }>;
   emptyText: string;
+  isLoading?: boolean;
+  errorText?: string | null;
 };
 
 function DataListCard({
@@ -92,6 +108,8 @@ function DataListCard({
   icon: Icon,
   items,
   emptyText,
+  isLoading = false,
+  errorText = null,
 }: DataListCardProps) {
   return (
     <section className="nexo-surface p-5">
@@ -110,7 +128,16 @@ function DataListCard({
         ) : null}
       </div>
 
-      {items.length === 0 ? (
+      {isLoading ? (
+        <div className="flex items-center justify-center rounded-2xl border border-dashed border-slate-200/80 px-4 py-8 text-sm text-zinc-500 dark:border-white/8 dark:text-zinc-400">
+          <Loader2 className="mr-2 h-4 w-4 animate-spin text-orange-500" />
+          Carregando...
+        </div>
+      ) : errorText ? (
+        <div className="rounded-2xl border border-red-200 px-4 py-6 text-sm text-red-600 dark:border-red-900/40 dark:text-red-300">
+          {errorText}
+        </div>
+      ) : items.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-200/80 px-4 py-6 text-sm text-zinc-500 dark:border-white/8 dark:text-zinc-400">
           {emptyText}
         </div>
@@ -140,49 +167,229 @@ function DataListCard({
   );
 }
 
-export default function ExecutiveDashboardNew() {
-  const metricsQuery = trpc.dashboard.kpis.useQuery();
-  const revenueQuery = trpc.dashboard.revenueTrend.useQuery();
-  const growthQuery = trpc.dashboard.customerGrowth.useQuery();
-  const serviceOrdersStatusQuery = trpc.dashboard.serviceOrdersStatus.useQuery();
-  const chargesStatusQuery = trpc.dashboard.chargeDistribution.useQuery();
+function getErrorMessage(error: unknown) {
+  if (error && typeof error === "object" && "message" in error) {
+    const message = String((error as { message?: unknown }).message ?? "").trim();
+    if (message) return message;
+  }
 
-  const metrics = (metricsQuery.data as any) ?? {};
+  return "Erro ao carregar bloco.";
+}
 
-  const revenue = Array.isArray(revenueQuery.data) ? revenueQuery.data : [];
-  const growth = Array.isArray(growthQuery.data) ? growthQuery.data : [];
+function normalizeMetrics(payload: unknown) {
+  const raw =
+    (payload as any)?.data?.data ??
+    (payload as any)?.data ??
+    payload ??
+    {};
 
-  const rawServiceOrdersStatus =
-    serviceOrdersStatusQuery.data &&
-    typeof serviceOrdersStatusQuery.data === "object"
-      ? (serviceOrdersStatusQuery.data as Record<string, number>)
-      : {};
+  return {
+    totalCustomers: Number((raw as any)?.totalCustomers ?? 0),
+    totalServiceOrders: Number((raw as any)?.totalServiceOrders ?? 0),
+    openServiceOrders: Number(
+      (raw as any)?.openServiceOrders ?? (raw as any)?.openOrders ?? 0
+    ),
+    inProgressOrders: Number(
+      (raw as any)?.inProgressOrders ??
+        (raw as any)?.inProgressServiceOrders ??
+        0
+    ),
+    totalRevenueInCents: Number((raw as any)?.totalRevenueInCents ?? 0),
+    paidRevenueInCents: Number((raw as any)?.paidRevenueInCents ?? 0),
+    pendingPaymentsInCents: Number(
+      (raw as any)?.pendingPaymentsInCents ??
+        (raw as any)?.pendingRevenueInCents ??
+        0
+    ),
+    weeklyRevenueInCents: Number((raw as any)?.weeklyRevenueInCents ?? 0),
+    completedOrders: Number(
+      (raw as any)?.completedOrders ?? (raw as any)?.doneServiceOrders ?? 0
+    ),
+    riskTickets: Number((raw as any)?.riskTickets ?? 0),
+    delayedOrders: Number((raw as any)?.delayedOrders ?? 0),
+  };
+}
 
-  const rawChargesStatus =
-    chargesStatusQuery.data && typeof chargesStatusQuery.data === "object"
-      ? (chargesStatusQuery.data as Record<string, number>)
-      : {};
+function normalizeSeriesArray(payload: unknown) {
+  const raw =
+    (payload as any)?.data?.data ?? (payload as any)?.data ?? payload;
 
-  const serviceOrdersStatus = Object.entries(rawServiceOrdersStatus).map(
-    ([key, value]) => ({
+  if (Array.isArray(raw)) {
+    return raw;
+  }
+
+  if (Array.isArray((raw as any)?.items)) {
+    return (raw as any).items;
+  }
+
+  if (Array.isArray((raw as any)?.data)) {
+    return (raw as any).data;
+  }
+
+  return [];
+}
+
+function normalizeStatusCollection(payload: unknown) {
+  const raw =
+    (payload as any)?.data?.data ?? (payload as any)?.data ?? payload;
+
+  if (Array.isArray(raw)) {
+    return raw
+      .map((item: any, index: number) => {
+        const key =
+          String(
+            item?.key ??
+              item?.status ??
+              item?.name ??
+              item?.label ??
+              `item_${index}`
+          ).trim() || `item_${index}`;
+
+        const value = Number(
+          item?.value ?? item?.count ?? item?.total ?? item?.amount ?? 0
+        );
+
+        return {
+          key,
+          label: normalizeKeyLabel(key),
+          value,
+        };
+      })
+      .filter((item) => item.key);
+  }
+
+  if (raw && typeof raw === "object") {
+    return Object.entries(raw as Record<string, unknown>).map(([key, value]) => ({
       key,
       label: normalizeKeyLabel(key),
       value: Number(value ?? 0),
-    })
+    }));
+  }
+
+  return [];
+}
+
+export default function ExecutiveDashboardNew() {
+  const { isAuthenticated, isInitializing } = useAuth();
+  const canQuery = isAuthenticated && !isInitializing;
+
+  const queryOptions = useMemo(
+    () => ({
+      enabled: canQuery,
+      retry: false,
+      refetchOnWindowFocus: false,
+    }),
+    [canQuery]
   );
 
-  const chargesStatus = Object.entries(rawChargesStatus).map(([key, value]) => ({
-    key,
-    label: normalizeKeyLabel(key),
-    value: Number(value ?? 0),
-  }));
+  const metricsQuery = trpc.dashboard.kpis.useQuery(undefined, queryOptions);
 
-  const isLoading =
-    metricsQuery.isLoading ||
-    revenueQuery.isLoading ||
-    growthQuery.isLoading ||
-    serviceOrdersStatusQuery.isLoading ||
-    chargesStatusQuery.isLoading;
+  const revenueQuery = trpc.dashboard.revenueTrend.useQuery(
+    undefined,
+    queryOptions
+  );
+
+  const growthQuery = trpc.dashboard.customerGrowth.useQuery(
+    undefined,
+    queryOptions
+  );
+
+  const serviceOrdersStatusQuery = trpc.dashboard.serviceOrdersStatus.useQuery(
+    undefined,
+    queryOptions
+  );
+
+  const chargesStatusQuery = trpc.dashboard.chargeDistribution.useQuery(
+    undefined,
+    queryOptions
+  );
+
+  const metrics = normalizeMetrics(metricsQuery.data);
+  const revenue = normalizeSeriesArray(revenueQuery.data);
+  const growth = normalizeSeriesArray(growthQuery.data);
+  const serviceOrdersStatus = normalizeStatusCollection(
+    serviceOrdersStatusQuery.data
+  );
+  const chargesStatus = normalizeStatusCollection(chargesStatusQuery.data);
+
+  const allResolved =
+    !metricsQuery.isLoading &&
+    !revenueQuery.isLoading &&
+    !growthQuery.isLoading &&
+    !serviceOrdersStatusQuery.isLoading &&
+    !chargesStatusQuery.isLoading;
+
+  const hasAnyCriticalError =
+    allResolved &&
+    metricsQuery.isError &&
+    revenueQuery.isError &&
+    growthQuery.isError &&
+    serviceOrdersStatusQuery.isError &&
+    chargesStatusQuery.isError;
+
+  if (isInitializing) {
+    return (
+      <div className="space-y-8 p-6">
+        <section className="relative overflow-hidden rounded-[1.8rem] border border-slate-200/80 bg-white/90 px-6 py-6 shadow-sm dark:border-white/8 dark:bg-[linear-gradient(135deg,rgba(19,22,30,0.98),rgba(12,14,20,0.96))] dark:shadow-[0_24px_60px_rgba(0,0,0,0.42)]">
+          <h1 className="text-3xl font-semibold tracking-tight text-zinc-950 dark:text-white md:text-4xl">
+            Dashboard Executivo
+          </h1>
+          <p className="mt-3 max-w-xl text-sm leading-6 text-zinc-600 dark:text-zinc-400">
+            Preparando sessão e carregando contexto.
+          </p>
+        </section>
+
+        <div className="grid gap-6 lg:grid-cols-2">
+          <DataListCard
+            title="Receita por período"
+            items={[]}
+            emptyText="Carregando..."
+            isLoading
+          />
+          <DataListCard
+            title="Crescimento de clientes"
+            items={[]}
+            emptyText="Carregando..."
+            isLoading
+          />
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="space-y-6 p-6">
+        <section className="relative overflow-hidden rounded-[1.8rem] border border-slate-200/80 bg-white/90 px-6 py-6 shadow-sm dark:border-white/8 dark:bg-[linear-gradient(135deg,rgba(19,22,30,0.98),rgba(12,14,20,0.96))] dark:shadow-[0_24px_60px_rgba(0,0,0,0.42)]">
+          <h1 className="text-3xl font-semibold tracking-tight text-zinc-950 dark:text-white md:text-4xl">
+            Dashboard Executivo
+          </h1>
+          <p className="mt-3 max-w-xl text-sm leading-6 text-zinc-600 dark:text-zinc-400">
+            Sua sessão não está ativa.
+          </p>
+        </section>
+      </div>
+    );
+  }
+
+  if (hasAnyCriticalError) {
+    return (
+      <div className="space-y-6 p-6">
+        <section className="relative overflow-hidden rounded-[1.8rem] border border-slate-200/80 bg-white/90 px-6 py-6 shadow-sm dark:border-white/8 dark:bg-[linear-gradient(135deg,rgba(19,22,30,0.98),rgba(12,14,20,0.96))] dark:shadow-[0_24px_60px_rgba(0,0,0,0.42)]">
+          <h1 className="text-3xl font-semibold tracking-tight text-zinc-950 dark:text-white md:text-4xl">
+            Dashboard Executivo
+          </h1>
+          <p className="mt-3 max-w-xl text-sm leading-6 text-zinc-600 dark:text-zinc-400">
+            O painel não conseguiu carregar os blocos principais agora.
+          </p>
+        </section>
+
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300">
+          {getErrorMessage(metricsQuery.error)}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 p-6">
@@ -202,7 +409,7 @@ export default function ExecutiveDashboardNew() {
 
             <p className="mt-3 max-w-xl text-sm leading-6 text-zinc-600 dark:text-zinc-400">
               Visão consolidada de métricas, crescimento e operação em um painel
-              mais limpo, mais forte e com leitura mais premium.
+              mais limpo, mais forte e sem morrer por causa de um bloco só.
             </p>
           </div>
 
@@ -212,7 +419,9 @@ export default function ExecutiveDashboardNew() {
                 Receita semanal
               </p>
               <p className="mt-2 text-lg font-semibold text-zinc-950 dark:text-white">
-                {formatCurrency(metrics?.weeklyRevenueInCents)}
+                {metricsQuery.isLoading
+                  ? "..."
+                  : formatCurrency(metrics.weeklyRevenueInCents)}
               </p>
             </div>
 
@@ -221,7 +430,9 @@ export default function ExecutiveDashboardNew() {
                 Pendências
               </p>
               <p className="mt-2 text-lg font-semibold text-zinc-950 dark:text-white">
-                {formatCurrency(metrics?.pendingPaymentsInCents)}
+                {metricsQuery.isLoading
+                  ? "..."
+                  : formatCurrency(metrics.pendingPaymentsInCents)}
               </p>
             </div>
 
@@ -230,53 +441,48 @@ export default function ExecutiveDashboardNew() {
                 Ordens concluídas
               </p>
               <p className="mt-2 text-lg font-semibold text-zinc-950 dark:text-white">
-                {metrics?.completedOrders ?? 0}
+                {metricsQuery.isLoading ? "..." : metrics.completedOrders}
               </p>
             </div>
           </div>
         </div>
       </section>
 
-      {isLoading ? (
-        <div className="nexo-surface flex items-center justify-center p-10">
-          <Loader2 className="h-6 w-6 animate-spin text-orange-500" />
-        </div>
-      ) : null}
-
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           icon={Users}
           label="Clientes ativos"
-          value={metrics?.totalCustomers ?? 0}
+          value={metricsQuery.isLoading ? "..." : metrics.totalCustomers}
           description="Base ativa acompanhada pela operação."
         />
 
         <MetricCard
           icon={Briefcase}
           label="Ordens de serviço"
-          value={metrics?.totalServiceOrders ?? 0}
-          description={`${metrics?.openServiceOrders ?? 0} abertas • ${
-            metrics?.inProgressOrders ?? 0
-          } em andamento`}
+          value={metricsQuery.isLoading ? "..." : metrics.totalServiceOrders}
+          description={`${metrics.openServiceOrders} abertas • ${metrics.inProgressOrders} em andamento`}
         />
 
         <MetricCard
           icon={DollarSign}
           label="Receita total"
-          value={formatCurrency(metrics?.totalRevenueInCents)}
-          description={`Recebido: ${formatCurrency(metrics?.paidRevenueInCents)}`}
+          value={
+            metricsQuery.isLoading
+              ? "..."
+              : formatCurrency(metrics.totalRevenueInCents)
+          }
+          description={`Recebido: ${formatCurrency(metrics.paidRevenueInCents)}`}
         />
 
         <MetricCard
           icon={AlertTriangle}
           label="Risco / atrasos"
           value={
-            Number(metrics?.riskTickets ?? 0) +
-            Number(metrics?.delayedOrders ?? 0)
+            metricsQuery.isLoading
+              ? "..."
+              : Number(metrics.riskTickets) + Number(metrics.delayedOrders)
           }
-          description={`Tickets: ${metrics?.riskTickets ?? 0} • atrasadas: ${
-            metrics?.delayedOrders ?? 0
-          }`}
+          description={`Tickets: ${metrics.riskTickets} • atrasadas: ${metrics.delayedOrders}`}
         />
       </section>
 
@@ -290,6 +496,8 @@ export default function ExecutiveDashboardNew() {
             value: formatRevenueValue(item?.revenue),
           }))}
           emptyText="Sem dados de receita."
+          isLoading={revenueQuery.isLoading}
+          errorText={revenueQuery.isError ? getErrorMessage(revenueQuery.error) : null}
         />
 
         <DataListCard
@@ -302,6 +510,8 @@ export default function ExecutiveDashboardNew() {
             helper: `Total acumulado: ${item?.totalCustomers ?? 0}`,
           }))}
           emptyText="Sem dados de crescimento."
+          isLoading={growthQuery.isLoading}
+          errorText={growthQuery.isError ? getErrorMessage(growthQuery.error) : null}
         />
       </section>
 
@@ -314,6 +524,12 @@ export default function ExecutiveDashboardNew() {
             value: item.value,
           }))}
           emptyText="Sem dados de ordens de serviço."
+          isLoading={serviceOrdersStatusQuery.isLoading}
+          errorText={
+            serviceOrdersStatusQuery.isError
+              ? getErrorMessage(serviceOrdersStatusQuery.error)
+              : null
+          }
         />
 
         <DataListCard
@@ -324,6 +540,12 @@ export default function ExecutiveDashboardNew() {
             value: item.value,
           }))}
           emptyText="Sem dados de cobranças."
+          isLoading={chargesStatusQuery.isLoading}
+          errorText={
+            chargesStatusQuery.isError
+              ? getErrorMessage(chargesStatusQuery.error)
+              : null
+          }
         />
       </section>
     </div>

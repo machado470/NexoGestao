@@ -1,12 +1,12 @@
-import { useEffect, useState } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useEffect, useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 
 export interface OnboardingStep {
   id: string;
   title: string;
   description: string;
   target: string; // CSS selector
-  position?: 'top' | 'bottom' | 'left' | 'right';
+  position?: "top" | "bottom" | "left" | "right";
   action?: {
     label: string;
     onClick: () => void;
@@ -19,10 +19,30 @@ interface OnboardingState {
   completedSteps: string[];
 }
 
-const ONBOARDING_KEY = 'nexogestao_onboarding';
+const ONBOARDING_KEY = "nexogestao_onboarding";
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function getEnvelope(payload: unknown): Record<string, unknown> | null {
+  if (!isObject(payload)) return null;
+
+  if (isObject(payload.data) && isObject(payload.data.data)) {
+    return payload.data.data;
+  }
+
+  return payload;
+}
+
+function getRequiresOnboarding(payload: unknown): boolean {
+  const env = getEnvelope(payload);
+  return Boolean(env?.requiresOnboarding);
+}
 
 export function useOnboarding(steps: OnboardingStep[]) {
-  const { user } = useAuth();
+  const { user, payload, isAuthenticated } = useAuth();
+
   const [state, setState] = useState<OnboardingState>(() => {
     const saved = localStorage.getItem(ONBOARDING_KEY);
     return saved
@@ -31,16 +51,24 @@ export function useOnboarding(steps: OnboardingStep[]) {
   });
 
   useEffect(() => {
-    if (user && !state.isActive && state.completedSteps.length === 0) {
-      const createdAt = new Date(user.createdAt).getTime();
-      const now = Date.now();
-      const isNewUser = now - createdAt < 60 * 60 * 1000;
+    const requiresOnboarding = getRequiresOnboarding(payload);
 
-      if (isNewUser) {
-        startOnboarding();
-      }
+    if (
+      isAuthenticated &&
+      user &&
+      requiresOnboarding &&
+      !state.isActive &&
+      state.completedSteps.length === 0
+    ) {
+      startOnboarding();
     }
-  }, [user, state.isActive, state.completedSteps.length]);
+  }, [
+    isAuthenticated,
+    payload,
+    state.isActive,
+    state.completedSteps.length,
+    user,
+  ]);
 
   useEffect(() => {
     localStorage.setItem(ONBOARDING_KEY, JSON.stringify(state));
@@ -90,6 +118,9 @@ export function useOnboarding(steps: OnboardingStep[]) {
     nextStep,
     skipOnboarding,
     resetOnboarding,
-    progress: state.isActive ? ((state.currentStep + 1) / steps.length) * 100 : 0,
+    progress:
+      state.isActive && steps.length > 0
+        ? ((state.currentStep + 1) / steps.length) * 100
+        : 0,
   };
 }

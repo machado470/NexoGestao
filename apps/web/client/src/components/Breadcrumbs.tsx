@@ -11,69 +11,55 @@ const routeBreadcrumbs: Record<string, Breadcrumb[]> = {
     { label: "Visão", href: "/executive-dashboard" },
     { label: "Central de decisão" },
   ],
-  "/executive-dashboard": [
-    { label: "Visão", href: "/executive-dashboard" },
-    { label: "Visão Geral" },
-  ],
-  "/executive-dashboard-new": [
-    { label: "Visão", href: "/executive-dashboard" },
-    { label: "Visão Geral" },
-  ],
+
   "/dashboard/operations": [
     { label: "Visão", href: "/executive-dashboard" },
     { label: "Operação diária" },
   ],
+
   "/operations": [
-    { label: "Operação", href: "/operations" },
+    { label: "Operação diária", href: "/dashboard/operations" },
     { label: "Workflow" },
   ],
-  "/customers": [
-    { label: "Operação", href: "/operations" },
-    { label: "Clientes" },
-  ],
-  "/appointments": [
-    { label: "Operação", href: "/operations" },
-    { label: "Agendamentos" },
-  ],
-  "/calendar": [
-    { label: "Operação", href: "/operations" },
-    { label: "Calendário" },
-  ],
+
   "/service-orders": [
-    { label: "Operação", href: "/operations" },
+    { label: "Operação diária", href: "/dashboard/operations" },
     { label: "Ordens de Serviço" },
   ],
+
+  "/customers": [
+    { label: "Operação diária", href: "/dashboard/operations" },
+    { label: "Clientes" },
+  ],
+
+  "/appointments": [
+    { label: "Operação diária", href: "/dashboard/operations" },
+    { label: "Agendamentos" },
+  ],
+
+  "/calendar": [
+    { label: "Operação diária", href: "/dashboard/operations" },
+    { label: "Calendário" },
+  ],
+
   "/timeline": [
-    { label: "Operação", href: "/operations" },
+    { label: "Operação diária", href: "/dashboard/operations" },
     { label: "Histórico" },
   ],
+
+  "/whatsapp": [
+    { label: "Operação diária", href: "/dashboard/operations" },
+    { label: "Conversa" },
+  ],
+
   "/finances": [{ label: "Financeiro" }],
-  "/invoices": [
-    { label: "Financeiro", href: "/finances" },
-    { label: "Faturas" },
-  ],
-  "/expenses": [
-    { label: "Financeiro", href: "/finances" },
-    { label: "Despesas" },
-  ],
-  "/launches": [
-    { label: "Financeiro", href: "/finances" },
-    { label: "Lançamentos" },
-  ],
+
   "/governance": [{ label: "Governança" }],
+
   "/people": [
     { label: "Governança", href: "/governance" },
     { label: "Pessoas" },
   ],
-  "/referrals": [
-    { label: "Governança", href: "/governance" },
-    { label: "Referências" },
-  ],
-  "/whatsapp": [
-    { label: "Operação", href: "/service-orders" },
-    { label: "Conversa contextual" },
-  ],
-  "/settings": [{ label: "Sistema" }, { label: "Configurações" }],
 };
 
 function humanizeSegment(path: string) {
@@ -100,17 +86,17 @@ function buildDynamicBreadcrumbs(location: string): Breadcrumb[] | null {
   const [pathname, query = ""] = location.split("?");
   const params = new URLSearchParams(query);
 
-  if (pathname === "/service-orders" && params.get("os")) {
+  if (pathname === "/operations" && params.get("os")) {
     return [
-      { label: "Operação", href: "/operations" },
-      { label: "Ordens de Serviço", href: "/service-orders" },
+      { label: "Operação diária", href: "/dashboard/operations" },
+      { label: "Workflow", href: "/operations" },
       { label: "Detalhe da O.S." },
     ];
   }
 
   if (pathname === "/customers" && params.get("customerId")) {
     return [
-      { label: "Operação", href: "/operations" },
+      { label: "Operação diária", href: "/dashboard/operations" },
       { label: "Clientes", href: "/customers" },
       { label: "Workspace do cliente" },
     ];
@@ -118,31 +104,9 @@ function buildDynamicBreadcrumbs(location: string): Breadcrumb[] | null {
 
   if (pathname === "/timeline" && params.get("customerId")) {
     return [
-      { label: "Operação", href: "/operations" },
+      { label: "Operação diária", href: "/dashboard/operations" },
       { label: "Histórico", href: "/timeline" },
       { label: "Timeline do cliente" },
-    ];
-  }
-
-  if (pathname === "/finances" && params.get("chargeId")) {
-    return [
-      { label: "Financeiro", href: "/finances" },
-      { label: "Cobrança em foco" },
-    ];
-  }
-
-  if (pathname === "/finances" && params.get("paymentId")) {
-    return [
-      { label: "Financeiro", href: "/finances" },
-      { label: "Pagamento em foco" },
-    ];
-  }
-
-  if (pathname === "/appointments" && params.get("id")) {
-    return [
-      { label: "Operação", href: "/operations" },
-      { label: "Agendamentos", href: "/appointments" },
-      { label: "Agendamento em foco" },
     ];
   }
 
@@ -179,21 +143,14 @@ export function Breadcrumbs() {
 
         return (
           <div key={`${crumb.label}-${index}`} className="flex items-center gap-2">
-            {index > 0 && (
-              <ChevronRight className="h-3.5 w-3.5 text-zinc-300 dark:text-zinc-600" />
-            )}
+            {index > 0 && <ChevronRight className="h-3.5 w-3.5" />}
 
             {crumb.href && !isLast ? (
-              <button
-                onClick={() => navigate(crumb.href!)}
-                className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-zinc-500 hover:text-orange-600 dark:text-zinc-400 dark:hover:text-orange-400"
-              >
+              <button onClick={() => navigate(crumb.href!)}>
                 {index === 0 ? <Home className="h-3.5 w-3.5" /> : crumb.label}
               </button>
             ) : (
-              <span className="rounded-md px-1.5 py-0.5 font-semibold text-zinc-900 dark:text-white">
-                {crumb.label}
-              </span>
+              <span>{crumb.label}</span>
             )}
           </div>
         );

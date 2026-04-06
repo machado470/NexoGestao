@@ -2,15 +2,13 @@ import React, { useEffect, useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { normalizeObjectPayload } from "@/lib/query-helpers";
 import {
   Settings,
   Building2,
-  Globe,
   Save,
   Loader2,
   ShieldCheck,
-  Clock,
-  Coins,
   AlertTriangle,
   RefreshCw,
   Lock,
@@ -37,19 +35,17 @@ const DEFAULT_FORM: SettingsFormData = {
   currency: "BRL",
 };
 
-function normalizeSettingsPayload(payload: unknown): SettingsResponse | null {
-  const raw = (payload as any)?.data?.data ?? (payload as any)?.data ?? payload;
+function sanitizeSettings(payload: unknown): SettingsResponse | null {
+  const raw = normalizeObjectPayload<Partial<SettingsResponse>>(payload);
 
-  if (!raw || typeof raw !== "object") return null;
-
-  const candidate = raw as Partial<SettingsResponse>;
+  if (!raw) return null;
 
   return {
-    id: candidate.id ?? "",
-    name: candidate.name ?? "",
-    slug: candidate.slug ?? "",
-    timezone: candidate.timezone ?? "America/Sao_Paulo",
-    currency: candidate.currency ?? "BRL",
+    id: String(raw.id ?? ""),
+    name: String(raw.name ?? ""),
+    slug: String(raw.slug ?? ""),
+    timezone: String(raw.timezone ?? "America/Sao_Paulo"),
+    currency: String(raw.currency ?? "BRL"),
   };
 }
 
@@ -83,7 +79,7 @@ export default function SettingsPage() {
     refetchOnWindowFocus: false,
   });
 
-  const settings = useMemo(() => normalizeSettingsPayload(query.data), [query.data]);
+  const settings = useMemo(() => sanitizeSettings(query.data), [query.data]);
   const initialForm = useMemo(() => buildFormFromSettings(settings), [settings]);
 
   const [form, setForm] = useState<SettingsFormData>(DEFAULT_FORM);
@@ -96,8 +92,11 @@ export default function SettingsPage() {
 
   const mutation = trpc.nexo.settings.update.useMutation({
     onSuccess: async (res) => {
-      const normalized = normalizeSettingsPayload(res);
-      if (normalized) setForm(buildFormFromSettings(normalized));
+      const normalized = sanitizeSettings(res);
+
+      if (normalized) {
+        setForm(buildFormFromSettings(normalized));
+      }
 
       toast.success("Configurações atualizadas");
       await utils.nexo.settings.get.invalidate();
@@ -164,7 +163,6 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6 p-6">
-      {/* HEADER PREMIUM */}
       <div>
         <div className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs text-orange-700">
           <Sparkles className="h-3.5 w-3.5" />
@@ -181,10 +179,9 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      {/* FORM */}
       <form
         onSubmit={handleSubmit}
-        className="rounded-2xl border bg-white p-6 dark:bg-zinc-900 dark:border-zinc-800"
+        className="rounded-2xl border bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900"
       >
         <div className="mb-4 flex items-center gap-2">
           <Building2 className="h-5 w-5 text-orange-500" />
@@ -195,9 +192,7 @@ export default function SettingsPage() {
           <input
             name="name"
             value={form.name}
-            onChange={(e) =>
-              setForm((p) => ({ ...p, name: e.target.value }))
-            }
+            onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
             placeholder="Nome da empresa"
             className="rounded-md border px-3 py-2 text-sm dark:border-zinc-800"
           />
@@ -205,9 +200,7 @@ export default function SettingsPage() {
           <select
             name="timezone"
             value={form.timezone}
-            onChange={(e) =>
-              setForm((p) => ({ ...p, timezone: e.target.value }))
-            }
+            onChange={(e) => setForm((p) => ({ ...p, timezone: e.target.value }))}
             className="rounded-md border px-3 py-2 text-sm dark:border-zinc-800"
           >
             <option value="America/Sao_Paulo">Brasil</option>
@@ -217,9 +210,7 @@ export default function SettingsPage() {
           <select
             name="currency"
             value={form.currency}
-            onChange={(e) =>
-              setForm((p) => ({ ...p, currency: e.target.value }))
-            }
+            onChange={(e) => setForm((p) => ({ ...p, currency: e.target.value }))}
             className="rounded-md border px-3 py-2 text-sm dark:border-zinc-800"
           >
             <option value="BRL">Real</option>
@@ -253,7 +244,6 @@ export default function SettingsPage() {
         </div>
       </form>
 
-      {/* SEGURANÇA */}
       <div className="rounded-2xl border p-6 dark:border-zinc-800">
         <div className="mb-2 flex items-center gap-2">
           <ShieldCheck className="h-5 w-5 text-orange-500" />

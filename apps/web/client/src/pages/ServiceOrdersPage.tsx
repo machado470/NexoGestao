@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -69,11 +69,18 @@ export default function ServiceOrdersPage() {
   const [location, navigate] = useLocation();
   const utils = trpc.useUtils();
 
+  const basePath = useMemo(() => {
+    const [pathname] = location.split("?");
+    return pathname === "/operations" ? "/operations" : "/service-orders";
+  }, [location]);
+
+  const deepLinkBase =
+    basePath === "/operations" ? "operations" : "service-orders";
+
+  const activeId = useMemo(() => getServiceOrderIdFromUrl(location), [location]);
+
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-  const [activeId, setActiveId] = useState<string | null>(() =>
-    typeof window === "undefined" ? null : getServiceOrderIdFromUrl()
-  );
   const [filter, setFilter] = useState<FinancialFilter>("ALL");
   const [search, setSearch] = useState("");
 
@@ -160,6 +167,7 @@ export default function ServiceOrdersPage() {
   const totalOrders = orders.length;
   const totalVisible = sorted.length;
   const totalOperational = operationalQueue.length;
+
   const totalWithUrgency = useMemo(() => {
     return sorted.filter(
       (item) =>
@@ -169,28 +177,7 @@ export default function ServiceOrdersPage() {
   }, [sorted]);
 
   useEffect(() => {
-    const id =
-      typeof window === "undefined" ? null : getServiceOrderIdFromUrl();
-    setActiveId(id);
-  }, [location]);
-
-  useEffect(() => {
-    if (!activeId) return;
-    if (sorted.some((item) => item.id === activeId)) return;
-
-    if (operationalQueue.length === 0) {
-      setActiveId(null);
-      navigate("/service-orders");
-      return;
-    }
-
-    const nextId = operationalQueue[0].id;
-    setActiveId(nextId);
-    navigate(buildServiceOrdersDeepLink(nextId));
-  }, [operationalQueue, sorted, activeId, navigate]);
-
-  useEffect(() => {
-    if (!activeRef.current) return;
+    if (!activeId || !activeRef.current) return;
 
     activeRef.current.scrollIntoView({
       behavior: "smooth",
@@ -199,8 +186,17 @@ export default function ServiceOrdersPage() {
   }, [activeId]);
 
   function openAsActive(id: string) {
-    navigate(buildServiceOrdersDeepLink(id));
-    setActiveId(id);
+    const nextUrl = buildServiceOrdersDeepLink(id, deepLinkBase);
+
+    if (location !== nextUrl) {
+      navigate(nextUrl);
+    }
+  }
+
+  function closeActivePanel() {
+    if (location !== basePath) {
+      navigate(basePath);
+    }
   }
 
   function openWhatsApp(url: string) {
@@ -220,7 +216,6 @@ export default function ServiceOrdersPage() {
   }
 
   const isLoading = ordersQuery.isLoading || customersQuery.isLoading;
-
   const hasError = ordersQuery.error || customersQuery.error;
 
   return (
@@ -231,11 +226,11 @@ export default function ServiceOrdersPage() {
             <Button
               size="sm"
               variant="outline"
-              onClick={() => navigate("/timeline")}
+              onClick={closeActivePanel}
               className="gap-2"
             >
               <ArrowLeft className="h-4 w-4" />
-              Voltar para timeline
+              Voltar para a lista
             </Button>
           )}
 
@@ -262,7 +257,8 @@ export default function ServiceOrdersPage() {
 
       {activeId && (
         <div className="rounded-lg border border-orange-200 bg-orange-50 p-3 text-sm text-orange-800 dark:border-orange-900/40 dark:bg-orange-950/20 dark:text-orange-300">
-          Você está visualizando uma O.S. em foco a partir de outro contexto.
+          Você está visualizando uma O.S. em foco por deep-link. A lista continua
+          estável, sem redirecionamento automático.
         </div>
       )}
 

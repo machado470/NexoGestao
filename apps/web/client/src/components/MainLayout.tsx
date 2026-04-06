@@ -85,10 +85,8 @@ function getPageDescription(location: string) {
       "Visão consolidada de métricas, crescimento e operação.",
     "/executive-dashboard-new":
       "Visão consolidada de métricas, crescimento e operação.",
-    "/dashboard/operations":
-      "Fila prática do que precisa avançar agora.",
-    "/operations":
-      "Execução guiada sem perda de contexto entre etapas.",
+    "/dashboard/operations": "Fila prática do que precisa avançar agora.",
+    "/operations": "Execução guiada sem perda de contexto entre etapas.",
     "/customers": "Base operacional de clientes e relacionamento.",
     "/appointments": "Agenda operacional e preparação da execução.",
     "/calendar": "Visão temporal da agenda e da disponibilidade.",
@@ -233,17 +231,19 @@ export function MainLayout({ children }: MainLayoutProps) {
   ];
 
   const visibleSections = useMemo(() => {
-    if (!role) return [];
-
     return menuSections
       .map((section) => ({
         ...section,
         items: section.items.filter((item) => {
-          if (item.permissions?.length) {
-            return canAny(role, item.permissions);
+          if (!item.permissions?.length) {
+            return true;
           }
 
-          return true;
+          if (!role) {
+            return false;
+          }
+
+          return canAny(role, item.permissions);
         }),
       }))
       .filter((section) => section.items.length > 0);

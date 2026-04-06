@@ -342,7 +342,6 @@ export default function InvoicesPage() {
       number: draft.number.trim(),
       amount,
       status: draft.status,
-      notes: draft.notes.trim() || undefined,
       description: draft.description.trim() || undefined,
     });
   };
@@ -375,7 +374,7 @@ export default function InvoicesPage() {
 
   if (!isAuthenticated) {
     return (
-      <div className="p-6 space-y-4">
+      <div className="space-y-4 p-6">
         <div className="rounded-xl border p-4 text-sm opacity-70 dark:border-zinc-800">
           Faça login para visualizar faturas.
         </div>
@@ -449,7 +448,7 @@ export default function InvoicesPage() {
         </div>
       </div>
 
-      <div className="rounded-xl border p-3 space-y-3 dark:border-zinc-800">
+      <div className="space-y-3 rounded-xl border p-3 dark:border-zinc-800">
         <div className="flex flex-col gap-2 md:flex-row">
           <div className="relative w-full">
             <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 opacity-50" />
