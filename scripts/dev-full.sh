@@ -105,17 +105,20 @@ if ! node -e "new URL(process.env.REDIS_URL)" >/dev/null 2>&1; then
   exit 1
 fi
 
-export DATABASE_URL REDIS_URL JWT_SECRET PORT API_PORT REDIS_HOST REDIS_PORT
+API_PORT="${API_PORT:-3000}"
+WEB_PORT="${PORT:-3010}"
+NEXO_API_URL="${NEXO_API_URL:-http://127.0.0.1:${API_PORT}}"
 
-if [ -z "${API_PORT:-}" ]; then
-  export API_PORT="${PORT:-3001}"
-fi
+export DATABASE_URL REDIS_URL JWT_SECRET API_PORT REDIS_HOST REDIS_PORT NEXO_API_URL
 
 if [ -z "${REDIS_HOST:-}" ] || [ -z "${REDIS_PORT:-}" ]; then
   REDIS_HOST="$(node -e "const u=new URL(process.env.REDIS_URL); process.stdout.write(u.hostname)")"
   REDIS_PORT="$(node -e "const u=new URL(process.env.REDIS_URL); process.stdout.write(u.port || '6379')")"
   export REDIS_HOST REDIS_PORT
 fi
+
+echo "ℹ️ Portas locais: API=${API_PORT} | WEB=${WEB_PORT}"
+echo "ℹ️ NEXO_API_URL=${NEXO_API_URL}"
 
 echo "🧱 Subindo Postgres e Redis via Docker Compose..."
 "${COMPOSE_CMD[@]}" up -d postgres redis
@@ -150,5 +153,5 @@ pnpm --filter ./apps/api run prisma:seed
 
 echo "🚀 Iniciando API + Web..."
 trap 'kill 0' EXIT
-pnpm --filter ./apps/api run dev &
-pnpm --filter ./apps/web run dev
+API_PORT="$API_PORT" PORT="$API_PORT" pnpm --filter ./apps/api run dev &
+PORT="$WEB_PORT" NEXO_API_URL="$NEXO_API_URL" pnpm --filter ./apps/web run dev

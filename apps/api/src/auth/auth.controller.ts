@@ -43,7 +43,7 @@ export class AuthController {
   @UseGuards(AuthGuard('google'))
   async googleAuthRedirect(@Request() req: any, @Res() res: any) {
     const result = await this.auth.validateGoogleUser(req.user)
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000'
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3010'
     return res.redirect(`${frontendUrl}/auth/callback?token=${result.token}`)
   }
 
