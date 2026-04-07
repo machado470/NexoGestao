@@ -2,7 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import {
-  X,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Loader2,
   Wallet,
   CalendarDays,
@@ -186,18 +193,6 @@ export function EditChargeModal({
     });
   };
 
-  if (!isOpen) return null;
-
-  if (getCharge.isLoading) {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-        <div className="rounded-2xl bg-white p-6 shadow-lg dark:bg-zinc-900">
-          <Loader2 className="h-6 w-6 animate-spin text-orange-500" />
-        </div>
-      </div>
-    );
-  }
-
   const payload = getCharge.data as any;
   const charge = payload?.data ?? payload ?? null;
   const isCanceled = charge?.status === "CANCELED";
@@ -205,30 +200,26 @@ export function EditChargeModal({
   const disableEditing = isCanceled || isPaid;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-2xl rounded-2xl bg-white shadow-xl dark:bg-zinc-900">
-        <div className="flex items-start justify-between border-b border-gray-200 p-6 dark:border-zinc-800">
-          <div>
-            <h2 className="flex items-center gap-2 text-xl font-semibold text-gray-900 dark:text-white">
-              <Pencil className="h-5 w-5 text-orange-500" />
-              Editar Cobrança
-            </h2>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Ajuste valor, vencimento, cancelamento manual e observações da cobrança.
-            </p>
+    <Dialog open={isOpen} onOpenChange={(open) => (!open ? onClose() : null)}>
+      <DialogContent
+        showCloseButton={false}
+        className="max-h-[90vh] max-w-2xl overflow-hidden border-zinc-800/80 bg-white p-0 shadow-xl dark:bg-zinc-900"
+      >
+        <DialogHeader className="border-b border-gray-200 px-6 py-6 dark:border-zinc-800">
+          <DialogTitle className="flex items-center gap-2 text-xl text-gray-900 dark:text-white">
+            <Pencil className="h-5 w-5 text-orange-500" />
+            Editar Cobrança
+          </DialogTitle>
+          <DialogDescription className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            Ajuste valor, vencimento, cancelamento manual e observações da cobrança.
+          </DialogDescription>
+        </DialogHeader>
+        {getCharge.isLoading ? (
+          <div className="flex min-h-[220px] items-center justify-center">
+            <Loader2 className="h-6 w-6 animate-spin text-orange-500" />
           </div>
-
-          <button
-            onClick={onClose}
-            className="rounded-lg p-2 hover:bg-gray-100 dark:hover:bg-zinc-800"
-            type="button"
-            disabled={updateCharge.isPending}
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div className="max-h-[80vh] overflow-y-auto p-6">
+        ) : (
+          <div className="max-h-[70vh] overflow-y-auto p-6">
           <div className="space-y-6">
             <section className="rounded-xl border border-gray-200 p-4 dark:border-zinc-800">
               <SectionTitle
@@ -444,11 +435,11 @@ export function EditChargeModal({
             </section>
           </div>
         </div>
-
-        <div className="flex gap-2 border-t border-gray-200 p-6 dark:border-zinc-800">
+        )}
+        <DialogFooter className="flex gap-2 border-t border-gray-200 p-6 sm:justify-start dark:border-zinc-800">
           <Button
             onClick={() => void submitUpdate()}
-            disabled={updateCharge.isPending}
+            disabled={updateCharge.isPending || getCharge.isLoading}
             className="flex-1 bg-orange-500 text-white hover:bg-orange-600"
             type="button"
           >
@@ -466,12 +457,12 @@ export function EditChargeModal({
             onClick={onClose}
             variant="outline"
             type="button"
-            disabled={updateCharge.isPending}
+            disabled={updateCharge.isPending || getCharge.isLoading}
           >
             Cancelar
           </Button>
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

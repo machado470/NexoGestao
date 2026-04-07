@@ -4,6 +4,8 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { normalizeObjectPayload } from "@/lib/query-helpers";
 import { PageHero, PageShell, SurfaceSection } from "@/components/PagePattern";
+import { EmptyState } from "@/components/EmptyState";
+import { Loader2, Settings2 } from "lucide-react";
 
 type SettingsFormData = {
   name: string;
@@ -111,7 +113,15 @@ export default function SettingsPage() {
   });
 
   if (isInitializing) {
-    return <div className="p-6">Carregando sessão...</div>;
+    return (
+      <PageShell>
+        <PageHero eyebrow="Configurações" title="Configurações" description="Validando sessão atual." />
+        <SurfaceSection className="flex min-h-[180px] items-center justify-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Carregando sessão...
+        </SurfaceSection>
+      </PageShell>
+    );
   }
 
   if (!isAuthenticated) {
@@ -126,6 +136,10 @@ export default function SettingsPage() {
     return (
       <PageShell>
         <PageHero eyebrow="Configurações" title="Configurações" description="Carregando dados da organização." />
+        <SurfaceSection className="flex min-h-[180px] items-center justify-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Preparando configurações...
+        </SurfaceSection>
       </PageShell>
     );
   }
@@ -150,8 +164,16 @@ export default function SettingsPage() {
       />
 
       {!hasData ? (
-        <SurfaceSection className="text-sm opacity-70">
-          Nenhuma configuração carregada ainda. Você já pode preencher e salvar.
+        <SurfaceSection>
+          <EmptyState
+            icon={<Settings2 className="h-7 w-7" />}
+            title="Configurações prontas para personalização"
+            description="Defina nome, timezone e moeda da organização para padronizar o comportamento operacional."
+            action={{
+              label: "Recarregar",
+              onClick: () => void query.refetch(),
+            }}
+          />
         </SurfaceSection>
       ) : null}
 

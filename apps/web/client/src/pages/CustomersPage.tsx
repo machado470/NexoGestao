@@ -780,7 +780,7 @@ export default function CustomersPage() {
                   <SectionCard
                     title="Agendamentos recentes"
                     icon={CalendarDays}
-                    emptyText="Nenhum agendamento encontrado para este cliente."
+                    emptyText="Sem agendamentos recentes. Programe um novo horário para manter a operação em movimento."
                   >
                     {workspace.appointments.slice(0, 5).map(item => (
                       <div
@@ -803,7 +803,7 @@ export default function CustomersPage() {
                   <SectionCard
                     title="Ordens de serviço recentes"
                     icon={Briefcase}
-                    emptyText="Nenhuma ordem de serviço encontrada para este cliente."
+                    emptyText="Nenhuma O.S. vinculada ainda. Crie uma ordem para iniciar execução e rastreabilidade."
                   >
                     {workspace.serviceOrders.slice(0, 5).map(item => (
                       <div
@@ -842,7 +842,7 @@ export default function CustomersPage() {
                   <SectionCard
                     title="Cobranças recentes"
                     icon={Wallet}
-                    emptyText="Nenhuma cobrança encontrada para este cliente."
+                    emptyText="Sem cobranças registradas. Gere uma cobrança para acompanhar pendências e recebimentos."
                   >
                     {workspace.charges.slice(0, 5).map(item => (
                       <div
@@ -885,7 +885,7 @@ export default function CustomersPage() {
                   <SectionCard
                     title="Timeline recente"
                     icon={History}
-                    emptyText="Nenhum evento recente encontrado para este cliente."
+                    emptyText="Sem eventos recentes no histórico. Novas interações aparecerão aqui automaticamente."
                   >
                     {workspace.timeline.slice(0, 8).map(item => (
                       <div

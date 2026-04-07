@@ -1,5 +1,13 @@
 import { Button } from "@/components/ui/button";
 import { AlertCircle, Loader2 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface ConfirmDeleteModalProps {
   isOpen: boolean;
@@ -20,24 +28,18 @@ export function ConfirmDeleteModal({
   onConfirm,
   onCancel,
 }: ConfirmDeleteModalProps) {
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg max-w-md w-full mx-4">
-        {/* Header */}
-        <div className="flex items-start gap-4 p-6 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex-shrink-0">
-            <AlertCircle className="w-6 h-6 text-red-600 dark:text-red-400" />
-          </div>
-          <div>
-            <h2 className="text-lg font-bold text-gray-900 dark:text-white">
-              {title}
-            </h2>
-          </div>
-        </div>
-
-        {/* Body */}
+    <Dialog open={isOpen} onOpenChange={(open) => (!open ? onCancel() : null)}>
+      <DialogContent
+        showCloseButton={false}
+        className="max-w-md border-zinc-800/80 bg-white p-0 shadow-lg dark:bg-gray-800"
+      >
+        <DialogHeader className="border-b border-gray-200 p-6 dark:border-gray-700">
+          <DialogTitle className="flex items-start gap-3 text-lg text-gray-900 dark:text-white">
+            <AlertCircle className="mt-0.5 h-5 w-5 text-red-600 dark:text-red-400" />
+            {title}
+          </DialogTitle>
+        </DialogHeader>
         <div className="p-6">
           <p className="text-gray-700 dark:text-gray-300 mb-4">
             {message}
@@ -53,9 +55,7 @@ export function ConfirmDeleteModal({
             Esta ação não pode ser desfeita.
           </p>
         </div>
-
-        {/* Footer */}
-        <div className="flex gap-3 p-6 border-t border-gray-200 dark:border-gray-700 justify-end">
+        <DialogFooter className="flex justify-end gap-3 border-t border-gray-200 p-6 dark:border-gray-700">
           <Button
             onClick={onCancel}
             disabled={isLoading}
@@ -78,8 +78,8 @@ export function ConfirmDeleteModal({
               "Deletar"
             )}
           </Button>
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

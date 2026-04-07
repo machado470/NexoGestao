@@ -3,7 +3,9 @@ import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHero, PageShell, SurfaceSection } from "@/components/PagePattern";
+import { EmptyState } from "@/components/EmptyState";
 import { trpc } from "@/lib/trpc";
+import { Workflow } from "lucide-react";
 
 import {
   normalizeOrders,
@@ -169,8 +171,16 @@ export default function OperationalWorkflowPage() {
 
         {orders.length === 0 && (
           <Card>
-            <CardContent className="p-6 text-sm text-muted-foreground">
-              Nenhuma ordem encontrada.
+            <CardContent className="p-2">
+              <EmptyState
+                icon={<Workflow className="h-7 w-7" />}
+                title="Nenhuma ordem ativa no workflow"
+                description="Crie uma nova O.S. para iniciar a fila operacional e acompanhar a próxima ação sugerida."
+                action={{
+                  label: "Ir para Ordens de Serviço",
+                  onClick: () => navigate("/service-orders"),
+                }}
+              />
             </CardContent>
           </Card>
         )}

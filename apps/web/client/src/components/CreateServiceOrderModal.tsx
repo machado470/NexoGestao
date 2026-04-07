@@ -3,8 +3,15 @@ import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Loader2,
-  X,
   ClipboardList,
   CalendarDays,
   Wallet,
@@ -210,33 +217,23 @@ export default function CreateServiceOrderModal({
     });
   };
 
-  if (!resolvedOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-2xl rounded-2xl bg-white shadow-xl dark:bg-zinc-900">
-        <div className="flex items-start justify-between border-b border-gray-200 p-6 dark:border-zinc-800">
-          <div>
-            <h2 className="flex items-center gap-2 text-xl font-semibold text-gray-900 dark:text-white">
-              <ClipboardList className="h-5 w-5 text-orange-500" />
-              Nova Ordem de Serviço
-            </h2>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Cadastre a execução operacional e, se quiser, já deixe a base financeira preparada.
-            </p>
-          </div>
+    <Dialog open={resolvedOpen} onOpenChange={(open) => (!open ? handleClose() : null)}>
+      <DialogContent
+        showCloseButton={false}
+        className="max-h-[90vh] max-w-2xl overflow-hidden border-zinc-800/80 bg-white p-0 shadow-xl dark:bg-zinc-900"
+      >
+        <DialogHeader className="border-b border-gray-200 px-6 py-6 dark:border-zinc-800">
+          <DialogTitle className="flex items-center gap-2 text-xl text-gray-900 dark:text-white">
+            <ClipboardList className="h-5 w-5 text-orange-500" />
+            Nova Ordem de Serviço
+          </DialogTitle>
+          <DialogDescription className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            Cadastre a execução operacional e, se quiser, já deixe a base financeira preparada.
+          </DialogDescription>
+        </DialogHeader>
 
-          <button
-            onClick={handleClose}
-            className="rounded-lg p-2 hover:bg-gray-100 dark:hover:bg-zinc-800"
-            type="button"
-            disabled={createMutation.isPending}
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div className="max-h-[80vh] overflow-y-auto p-6">
+        <div className="max-h-[70vh] overflow-y-auto p-6">
           <div className="space-y-6">
             <section className="rounded-xl border border-gray-200 p-4 dark:border-zinc-800">
               <SectionTitle
@@ -499,7 +496,7 @@ export default function CreateServiceOrderModal({
           </div>
         </div>
 
-        <div className="flex gap-2 border-t border-gray-200 p-6 dark:border-zinc-800">
+        <DialogFooter className="flex gap-2 border-t border-gray-200 p-6 sm:justify-start dark:border-zinc-800">
           <Button
             onClick={() => void submit()}
             disabled={createMutation.isPending || !canSubmit}
@@ -523,8 +520,8 @@ export default function CreateServiceOrderModal({
           >
             Cancelar
           </Button>
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

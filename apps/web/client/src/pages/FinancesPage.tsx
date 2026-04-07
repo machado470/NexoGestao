@@ -94,9 +94,17 @@ export default function FinancesPage() {
 
   if (isInitializing) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <Loader2 className="animate-spin" />
-      </div>
+      <PageShell>
+        <PageHero
+          eyebrow="Financeiro"
+          title="Financeiro"
+          description="Validando sessão e restaurando o contexto financeiro."
+        />
+        <SurfaceSection className="flex min-h-[180px] items-center justify-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Carregando sessão...
+        </SurfaceSection>
+      </PageShell>
     );
   }
 
@@ -121,7 +129,10 @@ export default function FinancesPage() {
           description="Leitura consolidada de cobrança, recebimento e pendências sem alterar o fluxo funcional."
         />
         <SurfaceSection className="flex min-h-[180px] items-center justify-center">
-          <Loader2 className="animate-spin" />
+          <div className="inline-flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Carregando dados financeiros...
+          </div>
         </SurfaceSection>
       </PageShell>
     );
