@@ -189,7 +189,7 @@ export default function SettingsPage() {
       <PageHero
         eyebrow="Configurações"
         title="Configurações"
-        description="Ajustes institucionais com padrão visual unificado do dashboard executivo."
+        description="Fechamento do fluxo oficial com padronização institucional: nome, timezone e moeda da operação."
       />
 
       {!hasData ? (
@@ -197,9 +197,9 @@ export default function SettingsPage() {
           <EmptyState
             icon={<Settings2 className="h-7 w-7" />}
             title="Configurações prontas para personalização"
-            description="Defina nome, timezone e moeda da organização para padronizar o comportamento operacional."
+            description="Defina identidade e padrão institucional para consolidar operação, financeiro e governança em uma mesma base."
             action={{
-              label: "Recarregar",
+              label: "Atualizar configurações",
               onClick: () => void query.refetch(),
             }}
           />

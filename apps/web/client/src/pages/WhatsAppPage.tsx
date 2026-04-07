@@ -122,7 +122,7 @@ export default function WhatsAppPage() {
         <PageHero
           eyebrow="WhatsApp"
           title="WhatsApp"
-          description="Acesse via ordem ou cobrança para manter o contexto operacional."
+          description="Comunicação contextual do fluxo: abra via O.S. ou cobrança para manter histórico e próxima ação."
           actions={
             <Button variant="outline" onClick={() => navigate("/service-orders")}>
               <ArrowLeft className="mr-2 h-4 w-4" />
@@ -134,9 +134,9 @@ export default function WhatsAppPage() {
           <EmptyState
             icon={<MessageCircle className="h-7 w-7" />}
             title="Sem contexto selecionado"
-            description="Abra o WhatsApp por uma ordem de serviço ou cobrança para carregar cliente, histórico e mensagem sugerida."
+            description="Abra o WhatsApp por uma O.S. ou cobrança para trazer cliente, histórico e mensagem sugerida sem improviso."
             action={{
-              label: "Ir para O.S.",
+              label: "Começar por Ordens de Serviço",
               onClick: () => navigate("/service-orders"),
             }}
           />
@@ -174,7 +174,7 @@ export default function WhatsAppPage() {
       <PageHero
         eyebrow="WhatsApp"
         title="WhatsApp"
-        description="Conversa com contexto operacional."
+        description="Conversa com contexto de execução e cobrança para acelerar fechamento e reduzir retrabalho."
         actions={
           <Button variant="outline" onClick={() => navigate(resolveBack(route))}>
             <ArrowLeft className="mr-2 h-4 w-4" />
@@ -200,7 +200,7 @@ export default function WhatsAppPage() {
           <EmptyState
             icon={<MessageCircle className="h-7 w-7" />}
             title="Cliente não encontrado"
-            description="O contexto de WhatsApp não encontrou um cliente válido para este link."
+            description="Este link não encontrou um cliente válido. Volte para O.S. ou Financeiro e reabra o contexto."
             action={{
               label: "Voltar",
               onClick: () => navigate(resolveBack(route)),
@@ -245,9 +245,9 @@ export default function WhatsAppPage() {
           <EmptyState
             icon={<MessageCircle className="h-7 w-7" />}
             title="Nenhuma mensagem nesta conversa"
-            description="Inicie uma mensagem para registrar o primeiro contato deste contexto operacional."
+            description="Ainda não há mensagens neste contexto. Envie o primeiro contato para registrar comunicação rastreável na operação."
             action={{
-              label: "Atualizar",
+              label: "Atualizar conversa",
               onClick: () => void messagesQuery.refetch(),
             }}
           />

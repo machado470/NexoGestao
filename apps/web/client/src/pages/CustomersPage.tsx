@@ -398,7 +398,7 @@ export default function CustomersPage() {
             Clientes
           </span>
         }
-        description="O cliente deixa de ser cadastro simples e vira contexto: agenda, execução, cobrança e histórico no mesmo lugar."
+        description="Ponto de partida do fluxo oficial: cada cliente conecta agenda, execução, cobrança, comunicação e rastreabilidade."
         actions={
           <>
             <Button
@@ -473,13 +473,13 @@ export default function CustomersPage() {
               <EmptyState
                 icon={<Users className="h-7 w-7" />}
                 title="Sua base de clientes ainda está vazia"
-                description="Comece cadastrando o primeiro cliente para ativar agenda, ordens de serviço, cobrança e histórico no workspace."
+                description="Cadastre o primeiro cliente para destravar o fluxo Clientes → Agendamentos → O.S. → Financeiro → WhatsApp → Timeline."
                 action={{
-                  label: "Novo Cliente",
+                  label: "Cadastrar primeiro cliente",
                   onClick: () => setIsCreateOpen(true),
                 }}
                 secondaryAction={{
-                  label: "Atualizar lista",
+                  label: "Recarregar clientes",
                   onClick: () => void listCustomers.refetch(),
                 }}
               />

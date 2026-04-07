@@ -336,7 +336,7 @@ export default function TimelinePage() {
       <PageHero
         eyebrow="Auditoria operacional com leitura humana"
         title="Timeline"
-        description="Aqui o sistema mostra a história da operação: agenda, execução, financeiro, risco e governança em ordem cronológica."
+        description="Rastreabilidade ponta a ponta do fluxo: clientes, agenda, execução, financeiro, comunicação e governança em ordem cronológica."
         actions={<>
           <Button
             variant="outline"
@@ -422,7 +422,7 @@ export default function TimelinePage() {
                 ) : customers.length === 0 ? (
                   <div className="space-y-3">
                     <div className="text-sm text-gray-500 dark:text-gray-400">
-                      Nenhum cliente encontrado. Sem cliente não existe timeline viva.
+                      Ainda não há clientes para montar timeline. Comece em Clientes para ligar operação, cobrança e comunicação.
                     </div>
                     <DemoEnvironmentCta />
                   </div>
@@ -560,8 +560,9 @@ export default function TimelinePage() {
           ) : filteredEvents.length === 0 ? (
             <div className="space-y-4 py-10 text-center text-sm text-gray-500 dark:text-gray-400">
               <p>
-                Nenhum evento encontrado para este filtro. A timeline nasce de ações
-                em agenda, execução, financeiro e governança.
+                Ainda não há eventos para este recorte. A timeline nasce quando o
+                fluxo roda: Agendamentos → O.S. → Financeiro → WhatsApp →
+                Governança.
               </p>
               <div className="mx-auto flex max-w-xl flex-wrap justify-center gap-2">
                 <Button size="sm" variant="outline" onClick={() => navigate("/appointments")}>

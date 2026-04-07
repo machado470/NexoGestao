@@ -614,7 +614,7 @@ export default function AppointmentsPage() {
       <PageHero
         eyebrow="Porta de entrada da operação"
         title="Agendamentos"
-        description="O agendamento é o ponto onde o cliente entra no fluxo, confirma presença, vira execução e puxa o resto da operação."
+        description="Aqui o cliente vira operação: confirme presença, puxe O.S. e mantenha o financeiro conectado sem depender de contexto interno."
         actions={<>
           <Button
             type="button"
@@ -1110,8 +1110,8 @@ export default function AppointmentsPage() {
           <div className="flex h-40 items-center justify-center rounded-xl border border-dashed text-gray-500 dark:border-gray-700 dark:text-gray-400">
             <p>
               {appointments.length === 0
-                ? "Sem agendamentos ainda. Crie o primeiro ou gere ambiente demo para provar agenda → execução."
-                : "Nenhum agendamento corresponde aos filtros locais"}
+                ? "Ainda não há agendamentos. Crie o primeiro para evidenciar o caminho até O.S., financeiro e WhatsApp."
+                : "Nenhum agendamento bate com os filtros atuais. Limpe os filtros para retomar a leitura do fluxo."}
             </p>
           </div>
           {appointments.length === 0 ? <DemoEnvironmentCta /> : null}

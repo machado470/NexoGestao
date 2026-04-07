@@ -165,7 +165,7 @@ export default function GovernancePage() {
       <PageHero
         eyebrow="Governança"
         title="Governança"
-        description="Visão de score institucional e histórico de execução com o mesmo padrão visual do painel executivo."
+        description="Camada de supervisão do fluxo: risco institucional, rastreabilidade de decisões e leitura executiva de controle."
         actions={
           <div className="flex gap-2">
             <button
@@ -227,9 +227,9 @@ export default function GovernancePage() {
           <EmptyState
             icon={<ShieldAlert className="h-7 w-7" />}
             title="Histórico de governança ainda vazio"
-            description="Quando novas execuções de score acontecerem, este histórico mostrará evolução de risco e rastreabilidade."
+            description="Assim que a operação gerar eventos de risco e controle, este histórico passa a mostrar evolução institucional e trilha auditável."
             action={{
-              label: "Atualizar histórico",
+              label: "Atualizar governança",
               onClick: () => void runsQuery.refetch(),
             }}
           />
