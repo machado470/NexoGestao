@@ -28,6 +28,7 @@ export default function CreateCustomerModal({ open, onOpenChange, onCreated }: P
   const [email, setEmail] = useState("");
   const [notes, setNotes] = useState("");
 
+  const utils = trpc.useUtils();
   const createCustomer = trpc.nexo.customers.create.useMutation();
 
   const canSubmit = useMemo(() => {
@@ -60,19 +61,58 @@ export default function CreateCustomerModal({ open, onOpenChange, onCreated }: P
       return;
     }
 
+    const previousCustomers = utils.nexo.customers.list.getData(undefined);
+
     try {
-      await createCustomer.mutateAsync({
+      const tempId = `temp-customer-${Date.now()}`;
+      const optimisticCustomer = {
+        id: tempId,
+        name: parsed.data.name,
+        phone: parsed.data.phone,
+        email: parsed.data.email || null,
+        notes: parsed.data.notes?.trim() ? parsed.data.notes.trim() : null,
+        active: true,
+        createdAt: new Date().toISOString(),
+      };
+
+      utils.nexo.customers.list.setData(undefined, (old: any) => {
+        const raw = old as { data?: any[] } | any[] | undefined;
+        if (Array.isArray(raw)) {
+          return [optimisticCustomer, ...raw];
+        }
+        if (raw && Array.isArray(raw.data)) {
+          return { ...raw, data: [optimisticCustomer, ...raw.data] };
+        }
+        return [optimisticCustomer];
+      });
+
+      const created = await createCustomer.mutateAsync({
         name: parsed.data.name,
         phone: parsed.data.phone,
         email: parsed.data.email || undefined,
         notes: parsed.data.notes?.trim() ? parsed.data.notes.trim() : undefined,
       });
 
+      utils.nexo.customers.list.setData(undefined, (old: any) => {
+        const raw = old as { data?: any[] } | any[] | undefined;
+        const applyReplace = (items: any[]) =>
+          items.map((item) => (String(item?.id) === tempId ? created : item));
+
+        if (Array.isArray(raw)) {
+          return applyReplace(raw);
+        }
+        if (raw && Array.isArray(raw.data)) {
+          return { ...raw, data: applyReplace(raw.data) };
+        }
+        return [created];
+      });
+
       toast.success("Cliente criado com sucesso!");
       reset();
       close();
-      await onCreated?.();
+      void onCreated?.();
     } catch (err: any) {
+      utils.nexo.customers.list.setData(undefined, previousCustomers as any);
       toast.error("Falha ao criar cliente: " + (err?.message ?? "erro"));
     }
   };

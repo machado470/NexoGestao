@@ -43,6 +43,7 @@ export function CreateAppointmentModal({
   initialEndsAt,
 }: CreateAppointmentModalProps) {
   const [formData, setFormData] = useState(INITIAL_FORM);
+  const utils = trpc.useUtils();
 
   useEffect(() => {
     if (!isOpen) return;
@@ -54,17 +55,7 @@ export function CreateAppointmentModal({
     });
   }, [initialEndsAt, initialStartsAt, isOpen]);
 
-  const createAppointment = trpc.nexo.appointments.create.useMutation({
-    onSuccess: () => {
-      toast.success("Agendamento criado com sucesso!");
-      setFormData(INITIAL_FORM);
-      onSuccess();
-      onClose();
-    },
-    onError: (error) => {
-      toast.error(error.message || "Erro ao criar agendamento");
-    },
-  });
+  const createAppointment = trpc.nexo.appointments.create.useMutation();
 
   const handleClose = () => {
     if (createAppointment.isPending) return;
@@ -88,12 +79,56 @@ export function CreateAppointmentModal({
       return;
     }
 
-    createAppointment.mutate({
+    const payload = {
       customerId: formData.customerId,
       startsAt: formData.startsAt,
       endsAt: formData.endsAt || undefined,
       status: formData.status,
       notes: formData.notes.trim() || undefined,
+    };
+
+    const previousAppointments = utils.nexo.appointments.list.getData(undefined);
+    const tempId = `temp-appointment-${Date.now()}`;
+    const selectedCustomer = customers.find((item) => String(item.id) === payload.customerId);
+
+    utils.nexo.appointments.list.setData(undefined, (old: any) => {
+      const raw = old as any[] | { data?: any[] } | undefined;
+      const optimistic = {
+        id: tempId,
+        customerId: payload.customerId,
+        startsAt: payload.startsAt,
+        endsAt: payload.endsAt,
+        status: payload.status,
+        notes: payload.notes,
+        customer: selectedCustomer
+          ? { id: String(selectedCustomer.id), name: selectedCustomer.name }
+          : undefined,
+        createdAt: new Date().toISOString(),
+      };
+      if (Array.isArray(raw)) return [optimistic, ...raw];
+      if (raw && Array.isArray(raw.data)) return { ...raw, data: [optimistic, ...raw.data] };
+      return [optimistic];
+    });
+
+    createAppointment.mutate(payload, {
+      onSuccess: (created) => {
+        utils.nexo.appointments.list.setData(undefined, (old: any) => {
+          const raw = old as any[] | { data?: any[] } | undefined;
+          const applyReplace = (items: any[]) =>
+            items.map((item) => (String(item?.id) === tempId ? created : item));
+          if (Array.isArray(raw)) return applyReplace(raw);
+          if (raw && Array.isArray(raw.data)) return { ...raw, data: applyReplace(raw.data) };
+          return [created];
+        });
+        toast.success("Agendamento criado com sucesso!");
+        setFormData(INITIAL_FORM);
+        onSuccess();
+        onClose();
+      },
+      onError: (error) => {
+        utils.nexo.appointments.list.setData(undefined, previousAppointments as any);
+        toast.error(error.message || "Erro ao criar agendamento");
+      },
     });
   };
 

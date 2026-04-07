@@ -387,6 +387,7 @@ function getAppointmentNextAction(params: {
 
 export default function AppointmentsPage() {
   const [, navigate] = useLocation();
+  const utils = trpc.useUtils();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [statusFilter, setStatusFilter] = useState<AppointmentStatus | "">("");
   const [searchInput, setSearchInput] = useState("");
@@ -425,16 +426,43 @@ export default function AppointmentsPage() {
   );
 
   const updateAppointment = trpc.nexo.appointments.update.useMutation({
+    onMutate: async (variables) => {
+      const previous = listAppointments.data;
+      const targetId = String(variables.id);
+      const targetStatus = String(variables.status ?? "");
+
+      utils.nexo.appointments.list.setData(
+        statusFilter ? { status: statusFilter } : undefined,
+        (old: any) => {
+          const raw = old as any[] | { data?: any[] } | undefined;
+          const applyUpdate = (items: any[]) =>
+            items.map((item) =>
+              String(item?.id) === targetId ? { ...item, status: targetStatus } : item
+            );
+          if (Array.isArray(raw)) return applyUpdate(raw);
+          if (raw && Array.isArray(raw.data)) return { ...raw, data: applyUpdate(raw.data) };
+          return old;
+        }
+      );
+
+      return { previous };
+    },
     onSuccess: () => {
       toast.success("Agendamento atualizado com sucesso!");
-      void listAppointments.refetch();
-      void listServiceOrders.refetch();
     },
-    onError: (error) => {
+    onError: (error, _variables, context) => {
+      if (context?.previous) {
+        utils.nexo.appointments.list.setData(
+          statusFilter ? { status: statusFilter } : undefined,
+          context.previous as any
+        );
+      }
       toast.error(error.message || "Erro ao atualizar agendamento");
     },
     onSettled: () => {
       setProcessingId(null);
+      void utils.nexo.appointments.list.invalidate();
+      void listServiceOrders.refetch();
     },
   });
 
@@ -564,7 +592,7 @@ export default function AppointmentsPage() {
     filteredAppointments.length - appointmentsWithOperations;
 
   const handleCreateSuccess = () => {
-    void listAppointments.refetch();
+    return;
   };
 
   const handleUpdateStatus = async (

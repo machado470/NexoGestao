@@ -104,18 +104,8 @@ export function CreateChargeModal({
   onSuccess,
 }: CreateChargeModalProps) {
   const [formData, setFormData] = useState<FormState>(INITIAL_FORM);
-
-  const createCharge = trpc.finance.charges.create.useMutation({
-    onSuccess: () => {
-      toast.success("Cobrança criada com sucesso!");
-      setFormData(INITIAL_FORM);
-      onSuccess();
-      onClose();
-    },
-    onError: (error) => {
-      toast.error(error.message || "Erro ao criar cobrança");
-    },
-  });
+  const utils = trpc.useUtils();
+  const createCharge = trpc.finance.charges.create.useMutation();
 
   const { data: customersResponse } = trpc.nexo.customers.list.useQuery(undefined, {
     retry: false,
@@ -170,11 +160,46 @@ export function CreateChargeModal({
       return;
     }
 
-    await createCharge.mutateAsync({
+    const payload = {
       customerId: parsed.data.customerId,
       amountCents: parsed.data.amountCents,
       dueDate: new Date(`${parsed.data.dueDate}T12:00:00`).toISOString(),
       notes: parsed.data.notes || undefined,
+    };
+
+    const previousCharges = utils.finance.charges.list.getData(undefined);
+    const tempId = `temp-charge-${Date.now()}`;
+    utils.finance.charges.list.setData(undefined, (old: any) => {
+      const raw = old as { data: any[]; pagination: any } | undefined;
+      const optimistic = {
+        id: tempId,
+        ...payload,
+        status: "PENDING",
+        createdAt: new Date().toISOString(),
+      };
+      if (!raw || !Array.isArray(raw.data)) return undefined;
+      return { ...raw, data: [optimistic, ...raw.data] };
+    });
+
+    createCharge.mutate(payload, {
+      onSuccess: (created) => {
+        utils.finance.charges.list.setData(undefined, (old: any) => {
+          const raw = old as { data: any[]; pagination: any } | undefined;
+          const applyReplace = (items: any[]) =>
+            items.map((item) => (String(item?.id) === tempId ? created : item));
+          if (!raw || !Array.isArray(raw.data)) return undefined;
+          return { ...raw, data: applyReplace(raw.data) };
+        });
+
+        toast.success("Cobrança criada com sucesso!");
+        setFormData(INITIAL_FORM);
+        onSuccess();
+        onClose();
+      },
+      onError: (error) => {
+        utils.finance.charges.list.setData(undefined, previousCharges as any);
+        toast.error(error.message || "Erro ao criar cobrança");
+      },
     });
   };
 

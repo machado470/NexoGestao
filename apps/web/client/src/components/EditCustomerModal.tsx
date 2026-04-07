@@ -96,19 +96,36 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
       return;
     }
 
+    const previousCustomers = utils.nexo.customers.list.getData(undefined);
+
     try {
-      await updateMutation.mutateAsync({
+      const updatedPayload = {
         id: idStr,
         name: parsed.data.name,
         phone: parsed.data.phone,
         email: parsed.data.email || undefined,
         notes: parsed.data.notes?.trim() ? parsed.data.notes.trim() : undefined,
         active,
+      };
+
+      utils.nexo.customers.list.setData(undefined, (old: any) => {
+        const raw = old as { data?: any[] } | any[] | undefined;
+        const applyUpdate = (items: any[]) =>
+          items.map((item) =>
+            String(item?.id) === idStr ? { ...item, ...updatedPayload } : item
+          );
+
+        if (Array.isArray(raw)) return applyUpdate(raw);
+        if (raw && Array.isArray(raw.data)) return { ...raw, data: applyUpdate(raw.data) };
+        return old;
       });
+
+      await updateMutation.mutateAsync(updatedPayload);
       toast.success("Cliente atualizado com sucesso!");
       onSaved?.();
       onClose();
     } catch (error) {
+      utils.nexo.customers.list.setData(undefined, previousCustomers as any);
       const message =
         error instanceof Error ? error.message : "Erro ao atualizar cliente";
       toast.error(message);
@@ -241,3 +258,4 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
     </Dialog>
   );
 }
+  const utils = trpc.useUtils();
