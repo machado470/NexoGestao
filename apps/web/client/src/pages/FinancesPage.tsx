@@ -1,450 +1,55 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
-import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
-import { useChargeActions } from "@/hooks/useChargeActions";
 import { getErrorMessage } from "@/lib/query-helpers";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import FinanceOverviewAreaChart from "@/components/finance/FinanceOverviewAreaChart";
-import {
-  Loader2,
-  AlertCircle,
-  Plus,
-  Pencil,
-  CheckCircle2,
-  Trash2,
-  RefreshCw,
-  Search,
-  X,
-  CreditCard,
-  Wallet,
-  Receipt,
-  ArrowRightLeft,
-  BadgeDollarSign,
-  Link2,
-  Sparkles,
-  Clock3,
-  CircleDollarSign,
-  MessageCircle,
-} from "lucide-react";
-import { CreateChargeModal } from "@/components/CreateChargeModal";
-import { EditChargeModal } from "@/components/EditChargeModal";
-import { buildWhatsAppUrlFromCharge } from "@/lib/operations/operations.utils";
+import { Loader2 } from "lucide-react";
 
-type ChargeStatusFilter = "ALL" | "PENDING" | "PAID" | "OVERDUE" | "CANCELED";
-type ChargeStatus = "PENDING" | "PAID" | "OVERDUE" | "CANCELED";
+/* ================= HELPERS ================= */
 
-type Charge = {
-  id: string;
-  serviceOrderId?: string | null;
-  customerId: string;
-  amountCents: number;
-  status: ChargeStatus;
-  dueDate: string;
-  paidAt?: string | null;
-  createdAt?: string;
-  notes?: string | null;
-  customer?: {
-    id: string;
-    name: string;
-    phone?: string | null;
-  } | null;
-  serviceOrder?: {
-    id: string;
-    title: string;
-    status?: string;
-  } | null;
-};
-
-type ChargesMeta = {
-  page: number;
-  limit: number;
-  total: number;
-  pages: number;
-  orderBy?: string;
-  direction?: string;
-};
-
-type ChargeStats = {
-  totalCharges: number;
-  totalPaid: number;
-  totalPaidAmount: number;
-  totalPending: number;
-  totalPendingAmount: number;
-  totalOverdue: number;
-  totalOverdueAmount: number;
-};
-
-type ChargeBucket = {
-  count?: number;
-  amountCents?: number;
-};
-
-type ChargesResponseShape = {
-  data?: Charge[] | { items?: Charge[]; pagination?: ChargesMeta; meta?: ChargesMeta };
-  items?: Charge[];
-  pagination?: ChargesMeta;
-  meta?: ChargesMeta;
-};
-
-type StatsResponseShape =
-  | {
-      data?: ChargeStats | Record<string, unknown>;
-    }
-  | ChargeStats
-  | {
-      pending?: ChargeBucket;
-      overdue?: ChargeBucket;
-      paid?: ChargeBucket;
-    };
-
-function formatMoney(value: number) {
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  }).format(value);
-}
-
-function formatCurrencyFromCents(cents?: number | null) {
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  }).format(Number(cents ?? 0) / 100);
-}
-
-function formatDate(value?: string | null) {
-  if (!value) return "—";
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
-
-  return date.toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-}
-
-function safeExtractCharges(payload: unknown): Charge[] {
-  if (Array.isArray(payload)) {
-    return payload as Charge[];
-  }
-
-  const data = payload as ChargesResponseShape | null | undefined;
-  const raw = data?.data;
-
-  if (Array.isArray(raw)) {
-    return raw as Charge[];
-  }
-
-  if (raw && typeof raw === "object" && Array.isArray((raw as any).items)) {
-    return (raw as any).items as Charge[];
-  }
-
-  if (Array.isArray(data?.items)) {
-    return data.items;
-  }
-
+function safeExtractCharges(payload: any): any[] {
+  if (!payload) return [];
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.data)) return payload.data;
+  if (Array.isArray(payload?.data?.items)) return payload.data.items;
+  if (Array.isArray(payload?.items)) return payload.items;
   return [];
 }
 
-function safeExtractStats(payload: unknown): ChargeStats | null {
+function safeExtractStats(payload: any): any {
   if (!payload) return null;
-
-  const raw = ((payload as { data?: unknown } | null | undefined)?.data ??
-    payload) as any;
-
-  if (!raw || typeof raw !== "object") {
-    return null;
-  }
-
-  const hasLegacyShape =
-    typeof raw.totalCharges === "number" ||
-    typeof raw.totalPaid === "number" ||
-    typeof raw.totalPending === "number" ||
-    typeof raw.totalOverdue === "number";
-
-  if (hasLegacyShape) {
-    return {
-      totalCharges: Number(raw.totalCharges ?? 0),
-      totalPaid: Number(raw.totalPaid ?? 0),
-      totalPaidAmount: Number(raw.totalPaidAmount ?? 0),
-      totalPending: Number(raw.totalPending ?? 0),
-      totalPendingAmount: Number(raw.totalPendingAmount ?? 0),
-      totalOverdue: Number(raw.totalOverdue ?? 0),
-      totalOverdueAmount: Number(raw.totalOverdueAmount ?? 0),
-    };
-  }
-
-  const pendingCount = Number(raw.pending?.count ?? 0);
-  const overdueCount = Number(raw.overdue?.count ?? 0);
-  const paidCount = Number(raw.paid?.count ?? 0);
-
-  const pendingAmount = Number(raw.pending?.amountCents ?? 0) / 100;
-  const overdueAmount = Number(raw.overdue?.amountCents ?? 0) / 100;
-  const paidAmount = Number(raw.paid?.amountCents ?? 0) / 100;
-
-  return {
-    totalCharges: pendingCount + overdueCount + paidCount,
-    totalPaid: paidCount,
-    totalPaidAmount: paidAmount,
-    totalPending: pendingCount,
-    totalPendingAmount: pendingAmount,
-    totalOverdue: overdueCount,
-    totalOverdueAmount: overdueAmount,
-  };
+  return payload?.data ?? payload;
 }
 
-function safeExtractPagination(payload: unknown): ChargesMeta {
-  const data = payload as ChargesResponseShape | null | undefined;
-  const raw = data?.data;
-
-  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
-    return (
-      (raw as any).pagination ??
-      (raw as any).meta ?? {
-        page: 1,
-        limit: 20,
-        total: 0,
-        pages: 1,
-      }
-    );
-  }
-
-  return (
-    data?.pagination ??
-    data?.meta ?? {
-      page: 1,
-      limit: 20,
-      total: 0,
-      pages: 1,
-    }
-  );
+function formatCurrencyFromCents(cents?: number) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format((cents || 0) / 100);
 }
 
-function getStatusColor(status: string) {
-  switch (status) {
-    case "PAID":
-      return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400";
-    case "PENDING":
-      return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400";
-    case "OVERDUE":
-      return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400";
-    case "CANCELED":
-      return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400";
-    default:
-      return "bg-gray-100 text-gray-800";
-  }
-}
-
-function getStatusLabel(status: string) {
-  switch (status) {
-    case "PAID":
-      return "Pago";
-    case "PENDING":
-      return "Pendente";
-    case "OVERDUE":
-      return "Vencido";
-    case "CANCELED":
-      return "Cancelado";
-    default:
-      return status;
-  }
-}
-
-function getStatusFilterLabel(status: ChargeStatusFilter) {
-  switch (status) {
-    case "ALL":
-      return "Todos";
-    case "PAID":
-      return "Pago";
-    case "PENDING":
-      return "Pendente";
-    case "OVERDUE":
-      return "Vencido";
-    case "CANCELED":
-      return "Cancelado";
-    default:
-      return status;
-  }
-}
-
-function getChargeStage(charge: Charge) {
-  switch (charge.status) {
-    case "PAID":
-      return {
-        label: "Fluxo encerrado",
-        description: "Pagamento confirmado e ciclo financeiro concluído.",
-        className:
-          "border-green-200 bg-green-50 text-green-900 dark:border-green-900/40 dark:bg-green-950/20 dark:text-green-300",
-        icon: BadgeDollarSign,
-      };
-    case "OVERDUE":
-      return {
-        label: "Cobrança em atraso",
-        description: "Existe cobrança emitida, mas o vencimento já passou.",
-        className:
-          "border-red-200 bg-red-50 text-red-900 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300",
-        icon: AlertCircle,
-      };
-    case "PENDING":
-      return {
-        label: "Aguardando pagamento",
-        description: "Cobrança ativa aguardando liquidação.",
-        className:
-          "border-yellow-200 bg-yellow-50 text-yellow-900 dark:border-yellow-900/40 dark:bg-yellow-950/20 dark:text-yellow-300",
-        icon: Wallet,
-      };
-    case "CANCELED":
-    default:
-      return {
-        label: "Cobrança cancelada",
-        description: "Cobrança encerrada sem seguir para pagamento.",
-        className:
-          "border-gray-200 bg-gray-50 text-gray-900 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-300",
-        icon: Receipt,
-      };
-  }
-}
-
-function MetricCard({
-  title,
-  value,
-  subtitle,
-  icon: Icon,
-}: {
-  title: string;
-  value: string | number;
-  subtitle: string;
-  icon: React.ComponentType<{ className?: string }>;
-}) {
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardDescription className="flex items-center gap-2">
-          <Icon className="h-4 w-4" />
-          {title}
-        </CardDescription>
-        <CardTitle className="text-2xl">{value}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <p className="text-xs text-gray-500 dark:text-gray-400">{subtitle}</p>
-      </CardContent>
-    </Card>
-  );
-}
-
-function SummaryStripCard({
-  title,
-  description,
-  icon: Icon,
-  tone = "default",
-}: {
-  title: string;
-  description: string;
-  icon: React.ComponentType<{ className?: string }>;
-  tone?: "default" | "warning" | "success";
-}) {
-  const toneClass =
-    tone === "warning"
-      ? "border-amber-200 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-950/20"
-      : tone === "success"
-        ? "border-green-200 bg-green-50 dark:border-green-900/40 dark:bg-green-950/20"
-        : "border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800";
-
-  return (
-    <div className={`rounded-xl border p-4 ${toneClass}`}>
-      <div className="flex items-start gap-3">
-        <div className="rounded-lg bg-black/5 p-2 dark:bg-white/5">
-          <Icon className="h-4 w-4" />
-        </div>
-        <div>
-          <p className="text-sm font-semibold text-gray-900 dark:text-white">
-            {title}
-          </p>
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            {description}
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function InfoItem({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/40">
-      <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
-        {label}
-      </p>
-      <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
-        {value}
-      </p>
-    </div>
-  );
-}
-
-function getChargeIdFromParams(params: URLSearchParams) {
-  return params.get("chargeId")?.trim() || "";
-}
+/* ================= PAGE ================= */
 
 export default function FinancesPage() {
   const { isAuthenticated, isInitializing } = useAuth();
-  const canLoadFinance = isAuthenticated && !isInitializing;
+  const canLoadFinance = isAuthenticated;
 
-  const chargeRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const utils = trpc.useUtils();
-  const [location, navigate] = useLocation();
+  const [location] = useLocation();
 
   const searchParams = useMemo(() => {
     const queryString = location.includes("?") ? location.split("?")[1] : "";
     return new URLSearchParams(queryString);
   }, [location]);
 
-  const serviceOrderIdFromUrl = searchParams.get("serviceOrderId")?.trim() || "";
-  const chargeIdFromUrl = getChargeIdFromParams(searchParams);
+  const serviceOrderIdFromUrl = searchParams.get("serviceOrderId") || "";
   const isServiceOrderScoped = Boolean(serviceOrderIdFromUrl);
 
-  const [page, setPage] = useState(1);
-  const [createModalOpen, setCreateModalOpen] = useState(false);
-  const [editChargeId, setEditChargeId] = useState<string | null>(null);
-  const [searchInput, setSearchInput] = useState("");
-  const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<ChargeStatusFilter>("ALL");
-  const [highlightedChargeId, setHighlightedChargeId] = useState<string | null>(
-    chargeIdFromUrl || null
-  );
-
-  const limit = 20;
-
   const chargesQuery = trpc.finance.charges.list.useQuery(
-    {
-      page,
-      limit,
-      q: query || undefined,
-      status: statusFilter === "ALL" ? undefined : statusFilter,
-      serviceOrderId: serviceOrderIdFromUrl || undefined,
-    },
-    {
-      enabled: canLoadFinance,
-      retry: false,
-      refetchOnWindowFocus: false,
-    }
+    { page: 1, limit: 20 },
+    { enabled: canLoadFinance, retry: false }
   );
 
   const statsQuery = trpc.finance.charges.stats.useQuery(
@@ -452,723 +57,93 @@ export default function FinancesPage() {
     {
       enabled: canLoadFinance && !isServiceOrderScoped,
       retry: false,
-      refetchOnWindowFocus: false,
     }
   );
 
-  useEffect(() => {
-    setPage(1);
-  }, [query, statusFilter, serviceOrderIdFromUrl]);
+  const charges = useMemo(
+    () => safeExtractCharges(chargesQuery.data),
+    [chargesQuery.data]
+  );
 
-  useEffect(() => {
-    setHighlightedChargeId(chargeIdFromUrl || null);
-  }, [chargeIdFromUrl]);
+  const stats = useMemo(
+    () => safeExtractStats(statsQuery.data),
+    [statsQuery.data]
+  );
 
-  const refreshAll = async () => {
-    if (!canLoadFinance) return;
-
-    await Promise.all([
-      chargesQuery.refetch(),
-      utils.finance.charges.list.invalidate(),
-      utils.finance.charges.stats.invalidate(),
-      ...(isServiceOrderScoped ? [] : [statsQuery.refetch()]),
-    ]);
-  };
-
-  const {
-    registerPayment,
-    generateCheckout,
-    isSubmitting: isChargeActionSubmitting,
-  } = useChargeActions({
-    navigate,
-    returnPath: "/finances",
-  });
-
-  const deleteCharge = trpc.finance.charges.delete.useMutation({
-    onSuccess: async () => {
-      toast.success("Cobrança excluída com sucesso");
-      await Promise.all([
-        chargesQuery.refetch(),
-        utils.finance.charges.list.invalidate(),
-        utils.finance.charges.stats.invalidate(),
-        ...(isServiceOrderScoped ? [] : [statsQuery.refetch()]),
-      ]);
-    },
-    onError: (error) => {
-      toast.error(error.message || "Erro ao excluir cobrança");
-    },
-  });
-
-  const handleApplyFilters = () => {
-    setPage(1);
-    setQuery(searchInput.trim());
-  };
-
-  const handleClearFilters = () => {
-    setPage(1);
-    setSearchInput("");
-    setQuery("");
-    setStatusFilter("ALL");
-  };
-
-  const handleClearServiceOrderFilter = () => {
-    const params = new URLSearchParams(
-      location.includes("?") ? location.split("?")[1] : ""
-    );
-    params.delete("serviceOrderId");
-    const next = params.toString();
-    navigate(next ? `/finances?${next}` : "/finances");
-  };
-
-  const handleClearChargeFocus = () => {
-    const params = new URLSearchParams(
-      location.includes("?") ? location.split("?")[1] : ""
-    );
-    params.delete("chargeId");
-    const next = params.toString();
-    setHighlightedChargeId(null);
-    navigate(next ? `/finances?${next}` : "/finances");
-  };
-
-  const handleOpenChargeFocus = (chargeId: string) => {
-    const params = new URLSearchParams(
-      location.includes("?") ? location.split("?")[1] : ""
-    );
-    params.set("chargeId", chargeId);
-    setHighlightedChargeId(chargeId);
-    navigate(`/finances?${params.toString()}`);
-  };
-
-  const handleBackToServiceOrders = () => {
-    navigate("/service-orders");
-  };
-
-  const handleChangeStatusFilter = (value: ChargeStatusFilter) => {
-    setPage(1);
-    setStatusFilter(value);
-  };
-
-  const handleDeleteCharge = async (charge: Charge) => {
-    const confirmed = window.confirm(
-      `Excluir a cobrança de ${charge.customer?.name || "cliente"}?`
-    );
-
-    if (!confirmed) return;
-
-    await deleteCharge.mutateAsync({
-      id: String(charge.id),
-    });
-  };
-
-  const handleOpenWhatsApp = (charge: Charge) => {
-    const url = buildWhatsAppUrlFromCharge(charge);
-    if (!url) return;
-    navigate(url);
-  };
-
-  const isSubmitting = deleteCharge.isPending || isChargeActionSubmitting;
-
-  const stats = safeExtractStats(statsQuery.data);
-  const charges = safeExtractCharges(chargesQuery.data);
-  const pagination = safeExtractPagination(chargesQuery.data);
-
-  const highlightedCharge = useMemo(() => {
-    if (!highlightedChargeId) return null;
-    return charges.find((charge) => charge.id === highlightedChargeId) ?? null;
-  }, [charges, highlightedChargeId]);
-
-  const highlightedExistsOnCurrentPage = useMemo(() => {
-    if (!highlightedChargeId) return false;
-    return charges.some((charge) => charge.id === highlightedChargeId);
-  }, [charges, highlightedChargeId]);
-
-  useEffect(() => {
-    if (!highlightedChargeId) return;
-    if (chargesQuery.isLoading) return;
-    if (!highlightedExistsOnCurrentPage) return;
-
-    const element = chargeRefs.current[highlightedChargeId];
-    if (!element) return;
-
-    element.scrollIntoView({
-      behavior: "smooth",
-      block: "center",
-    });
-  }, [
-    highlightedChargeId,
-    highlightedExistsOnCurrentPage,
-    chargesQuery.isLoading,
-    charges,
-  ]);
-
-  const paidCount = charges.filter((charge) => charge.status === "PAID").length;
-  const pendingCount = charges.filter((charge) => charge.status === "PENDING").length;
-  const overdueCount = charges.filter((charge) => charge.status === "OVERDUE").length;
-  const pendingAmountOnPage = charges
-    .filter((charge) => charge.status === "PENDING" || charge.status === "OVERDUE")
-    .reduce((acc, charge) => acc + Number(charge.amountCents || 0), 0);
-
-  const hasActiveFilters =
-    Boolean(query) ||
-    statusFilter !== "ALL" ||
-    Boolean(serviceOrderIdFromUrl) ||
-    Boolean(highlightedChargeId);
+  const hasCharges = charges.length > 0;
+  const hasStats =
+    isServiceOrderScoped || !!(stats && (stats.pending || stats.overdue || stats.paid));
 
   const hasError =
     chargesQuery.isError || (!isServiceOrderScoped && statsQuery.isError);
 
   const errorMessage =
     getErrorMessage(chargesQuery.error, "") ||
-    (!isServiceOrderScoped ? getErrorMessage(statsQuery.error, "") : "") ||
-    "Não foi possível carregar o financeiro agora.";
+    getErrorMessage(statsQuery.error, "") ||
+    "Erro ao carregar";
+
+  const isInitialLoading =
+    (chargesQuery.isLoading && !hasCharges) ||
+    (!isServiceOrderScoped && statsQuery.isLoading && !hasStats);
+
+  const shouldBlockForError =
+    hasError && !hasCharges && (!isServiceOrderScoped ? !hasStats : true);
 
   if (isInitializing) {
     return (
       <div className="flex h-screen items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+        <Loader2 className="animate-spin" />
       </div>
     );
   }
 
   if (!isAuthenticated) {
-    return (
-      <div className="space-y-6 p-6">
-        <Card>
-          <CardContent className="pt-6 text-sm text-gray-500">
-            Faça login para visualizar o financeiro.
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <div className="p-6">Faça login</div>;
   }
 
-  if (chargesQuery.isLoading || (!isServiceOrderScoped && statsQuery.isLoading)) {
+  if (isInitialLoading) {
     return (
       <div className="flex h-screen items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+        <Loader2 className="animate-spin" />
       </div>
     );
   }
 
-  if (hasError) {
-    return (
-      <div className="space-y-6 p-6">
-        <Card className="border-red-200 bg-red-50 dark:border-red-900/60 dark:bg-red-950/40">
-          <CardContent className="pt-6 text-sm text-red-700 dark:text-red-300">
-            {errorMessage}
-          </CardContent>
-        </Card>
-      </div>
-    );
+  if (shouldBlockForError) {
+    return <div className="p-6 text-red-500">{errorMessage}</div>;
   }
 
   return (
-    <>
-      <CreateChargeModal
-        isOpen={createModalOpen}
-        onClose={() => setCreateModalOpen(false)}
-        onSuccess={() => {
-          void refreshAll();
-        }}
-      />
+    <div className="p-6 space-y-6">
+      <h1 className="text-2xl font-bold">Financeiro</h1>
 
-      <EditChargeModal
-        isOpen={!!editChargeId}
-        chargeId={editChargeId}
-        onClose={() => setEditChargeId(null)}
-        onSuccess={() => {
-          void refreshAll();
-        }}
-      />
+      {stats && !isServiceOrderScoped && (
+        <FinanceOverviewAreaChart
+          paidAmount={stats.paid?.amountCents || 0}
+          pendingAmount={stats.pending?.amountCents || 0}
+          overdueAmount={stats.overdue?.amountCents || 0}
+        />
+      )}
 
-      <div className="space-y-6 p-6">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-          <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs font-medium text-orange-700 dark:border-orange-900/40 dark:bg-orange-950/20 dark:text-orange-300">
-              <Sparkles className="h-3.5 w-3.5" />
-              Centro de fechamento financeiro do ciclo
-            </div>
-
-            <h1 className="mt-3 flex items-center gap-2 text-3xl font-bold">
-              <Wallet className="h-7 w-7 text-orange-500" />
-              {isServiceOrderScoped ? "Cobrança da O.S." : "Financeiro"}
-            </h1>
-
-            <p className="mt-2 text-gray-600 dark:text-gray-400">
-              {isServiceOrderScoped
-                ? "Leitura financeira vinculada a uma ordem de serviço específica."
-                : "Cobranças, recebimentos, atrasos e fechamento do fluxo operacional em uma leitura só."}
-            </p>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {isServiceOrderScoped ? (
-              <Button variant="outline" onClick={handleBackToServiceOrders}>
-                <ArrowRightLeft className="mr-2 h-4 w-4" />
-                Voltar para ordens de serviço
-              </Button>
-            ) : null}
-
-            <Button
-              variant="outline"
-              onClick={() => {
-                void refreshAll();
-              }}
-            >
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Atualizar
-            </Button>
-
-            <Button
-              onClick={() => setCreateModalOpen(true)}
-              className="bg-orange-500 text-white hover:bg-orange-600"
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Nova cobrança
-            </Button>
-          </div>
-        </div>
-
-        {!isServiceOrderScoped ? (
-          <div className="grid gap-4 xl:grid-cols-3">
-            <SummaryStripCard
-              title="1. Cobrar"
-              description="Registrar cobranças e garantir que a execução realmente caminhe para o financeiro."
-              icon={Receipt}
-            />
-            <SummaryStripCard
-              title="2. Receber"
-              description="Gerar checkout ou registrar baixa manual para transformar cobrança em entrada real."
-              icon={CircleDollarSign}
-              tone="warning"
-            />
-            <SummaryStripCard
-              title="3. Fechar"
-              description="Encerrar o ciclo com pagamento confirmado, atraso visível ou exceção tratada."
-              icon={BadgeDollarSign}
-              tone="success"
-            />
-          </div>
-        ) : null}
-
-        {!isServiceOrderScoped && stats ? (
-          <FinanceOverviewAreaChart
-            paidAmount={Number(stats.totalPaidAmount || 0)}
-            pendingAmount={Number(stats.totalPendingAmount || 0)}
-            overdueAmount={Number(stats.totalOverdueAmount || 0)}
-          />
-        ) : null}
-
-        {serviceOrderIdFromUrl ? (
-          <Card className="border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-900/20">
-            <CardContent className="flex flex-col gap-3 pt-6 md:flex-row md:items-center md:justify-between">
-              <div>
-                <p className="text-sm font-medium text-orange-900 dark:text-orange-300">
-                  Exibindo cobranças da O.S. {serviceOrderIdFromUrl.slice(0, 8)}
-                </p>
-                <p className="text-xs text-orange-800 dark:text-orange-400">
-                  A lista foi filtrada a partir da ordem de serviço.
-                </p>
-              </div>
-
-              <Button variant="outline" onClick={handleClearServiceOrderFilter}>
-                <X className="mr-2 h-4 w-4" />
-                Limpar filtro da O.S.
-              </Button>
-            </CardContent>
-          </Card>
-        ) : null}
-
-        {highlightedChargeId ? (
-          <Card className="border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-900/20">
-            <CardContent className="flex flex-col gap-3 pt-6 md:flex-row md:items-center md:justify-between">
-              <div>
-                <p className="text-sm font-medium text-orange-900 dark:text-orange-300">
-                  Deep-link ativo:{" "}
-                  {highlightedCharge?.notes?.trim() ||
-                    highlightedCharge?.serviceOrder?.title ||
-                    highlightedChargeId.slice(0, 8)}
-                </p>
-                <p className="text-xs text-orange-800 dark:text-orange-400">
-                  {highlightedExistsOnCurrentPage
-                    ? "A cobrança está em foco na página atual."
-                    : "A cobrança não está na página atual."}
-                </p>
-              </div>
-
-              <Button variant="outline" onClick={handleClearChargeFocus}>
-                <X className="mr-2 h-4 w-4" />
-                Limpar foco
-              </Button>
-            </CardContent>
-          </Card>
-        ) : null}
-
-        {!isServiceOrderScoped && stats && (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <MetricCard
-              title="Total de cobranças"
-              value={stats.totalCharges}
-              subtitle="Base financeira registrada"
-              icon={Receipt}
-            />
-
-            <MetricCard
-              title="Recebido"
-              value={formatMoney(Number(stats.totalPaidAmount || 0))}
-              subtitle={`${stats.totalPaid} cobranças pagas`}
-              icon={BadgeDollarSign}
-            />
-
-            <MetricCard
-              title="Em aberto"
-              value={formatMoney(Number(stats.totalPendingAmount || 0))}
-              subtitle={`${stats.totalPending} cobranças pendentes`}
-              icon={Wallet}
-            />
-
-            <MetricCard
-              title="Em atraso"
-              value={formatMoney(Number(stats.totalOverdueAmount || 0))}
-              subtitle={`${stats.totalOverdue} cobranças vencidas`}
-              icon={AlertCircle}
-            />
-          </div>
-        )}
-
-        {!isServiceOrderScoped && stats && stats.totalOverdue > 0 && (
-          <Card className="border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20">
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <AlertCircle className="h-5 w-5 text-red-600" />
-                <CardTitle className="text-red-900 dark:text-red-400">
-                  {stats.totalOverdue} cobranças vencidas exigem ação
-                </CardTitle>
-              </div>
-              <CardDescription className="text-red-800 dark:text-red-300">
-                Total em atraso: {formatMoney(Number(stats.totalOverdueAmount || 0))}
-              </CardDescription>
-            </CardHeader>
-          </Card>
-        )}
-
-        <Card>
-          <CardHeader className="space-y-4">
-            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <Receipt className="h-5 w-5 text-orange-500" />
-                  Cobranças
-                </CardTitle>
-                <CardDescription>
-                  Página {pagination.page} de {pagination.pages}
-                </CardDescription>
-              </div>
-
-              <div className="text-sm text-gray-500">
-                Exibidas: {charges.length} • Pagas: {paidCount} • Pendentes: {pendingCount} • Vencidas: {overdueCount}
-              </div>
-            </div>
-
-            <div className="grid gap-3 md:grid-cols-[1fr_220px_auto_auto]">
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                <input
-                  type="text"
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      handleApplyFilters();
-                    }
-                  }}
-                  placeholder="Buscar por cliente, telefone ou O.S."
-                  className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-10 pr-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-                />
-              </div>
-
-              <select
-                value={statusFilter}
-                onChange={(e) =>
-                  handleChangeStatusFilter(e.target.value as ChargeStatusFilter)
-                }
-                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-              >
-                <option value="ALL">Todos os status</option>
-                <option value="PENDING">Pendentes</option>
-                <option value="PAID">Pagas</option>
-                <option value="OVERDUE">Vencidas</option>
-                <option value="CANCELED">Canceladas</option>
-              </select>
-
-              <Button onClick={handleApplyFilters}>Buscar</Button>
-
-              <Button
-                variant="outline"
-                onClick={handleClearFilters}
-                disabled={!hasActiveFilters && !searchInput}
-              >
-                <X className="mr-2 h-4 w-4" />
-                Limpar
-              </Button>
-            </div>
-
-            {hasActiveFilters && (
-              <div className="flex flex-wrap gap-2 text-sm text-gray-500">
-                {serviceOrderIdFromUrl && (
-                  <span className="rounded-full border px-3 py-1">
-                    O.S.: {serviceOrderIdFromUrl.slice(0, 8)}
-                  </span>
-                )}
-                {highlightedChargeId && (
-                  <span className="rounded-full border px-3 py-1">
-                    Cobrança: {highlightedChargeId.slice(0, 8)}
-                  </span>
-                )}
-                {query && (
-                  <span className="rounded-full border px-3 py-1">
-                    Busca: {query}
-                  </span>
-                )}
-                {statusFilter !== "ALL" && (
-                  <span className="rounded-full border px-3 py-1">
-                    Status: {getStatusFilterLabel(statusFilter)}
-                  </span>
-                )}
-              </div>
-            )}
-          </CardHeader>
-
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/40">
-                <p className="flex items-center gap-2 text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                  <Clock3 className="h-3.5 w-3.5" />
-                  Valor pendente na página
-                </p>
-                <p className="mt-1 text-xl font-semibold text-gray-900 dark:text-white">
-                  {formatCurrencyFromCents(pendingAmountOnPage)}
-                </p>
-              </div>
-
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/40">
-                <p className="flex items-center gap-2 text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                  <BadgeDollarSign className="h-3.5 w-3.5" />
-                  Recebimentos nesta página
-                </p>
-                <p className="mt-1 text-xl font-semibold text-gray-900 dark:text-white">
-                  {paidCount}
-                </p>
-              </div>
-
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/40">
-                <p className="flex items-center gap-2 text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                  <AlertCircle className="h-3.5 w-3.5" />
-                  Estado predominante
-                </p>
-                <p className="mt-1 text-xl font-semibold text-gray-900 dark:text-white">
-                  {overdueCount > 0
-                    ? "Atrasos visíveis"
-                    : pendingCount > 0
-                      ? "Em cobrança"
-                      : paidCount > 0
-                        ? "Recebimentos fechando"
-                        : "Sem leitura relevante"}
-                </p>
-              </div>
-            </div>
-
-            {charges.length > 0 ? (
-              <div className="space-y-4">
-                {charges.map((charge) => {
-                  const stage = getChargeStage(charge);
-                  const StageIcon = stage.icon;
-                  const isHighlighted = highlightedChargeId === charge.id;
-
-                  return (
-                    <div
-                      key={charge.id}
-                      ref={(element) => {
-                        chargeRefs.current[charge.id] = element;
-                      }}
-                      className={`rounded-xl border bg-white p-4 transition-shadow hover:shadow-md dark:bg-gray-800 ${
-                        isHighlighted
-                          ? "border-orange-400 ring-2 ring-orange-200 dark:border-orange-500 dark:ring-orange-900/40"
-                          : "border-gray-200 dark:border-gray-700"
-                      }`}
-                    >
-                      <div className="flex flex-col gap-4">
-                        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <h3 className="truncate text-base font-semibold text-gray-900 dark:text-white">
-                                {charge.notes?.trim() ||
-                                  charge.serviceOrder?.title ||
-                                  `Cobrança #${charge.id.slice(0, 8)}`}
-                              </h3>
-
-                              <Badge className={getStatusColor(charge.status)}>
-                                {getStatusLabel(charge.status)}
-                              </Badge>
-
-                              {isHighlighted ? (
-                                <Badge className="bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300">
-                                  Em foco
-                                </Badge>
-                              ) : null}
-                            </div>
-
-                            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                              Cliente: {charge.customer?.name || "N/A"}
-                            </p>
-
-                            {charge.serviceOrder?.title ? (
-                              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                O.S. vinculada: {charge.serviceOrder.title}
-                              </p>
-                            ) : (
-                              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                Cobrança manual sem O.S. vinculada
-                              </p>
-                            )}
-                          </div>
-
-                          <div className="flex flex-wrap gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleOpenChargeFocus(charge.id)}
-                            >
-                              <Link2 className="mr-2 h-4 w-4" />
-                              Focar
-                            </Button>
-
-                            {(charge.status === "PENDING" || charge.status === "OVERDUE") && (
-                              <>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleOpenWhatsApp(charge)}
-                                  disabled={isSubmitting}
-                                >
-                                  <MessageCircle className="mr-2 h-4 w-4" />
-                                  WhatsApp
-                                </Button>
-
-                                <Button
-                                  size="sm"
-                                  onClick={() => void generateCheckout(charge)}
-                                  disabled={isSubmitting}
-                                  variant="outline"
-                                >
-                                  <CreditCard className="mr-2 h-4 w-4" />
-                                  Gerar checkout
-                                </Button>
-
-                                <Button
-                                  size="sm"
-                                  onClick={() => void registerPayment(charge, "PIX")}
-                                  disabled={isSubmitting}
-                                  className="bg-green-600 text-white hover:bg-green-700"
-                                >
-                                  <CheckCircle2 className="mr-2 h-4 w-4" />
-                                  Registrar pagamento
-                                </Button>
-                              </>
-                            )}
-
-                            {charge.status !== "PAID" && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setEditChargeId(String(charge.id))}
-                                disabled={isSubmitting}
-                              >
-                                <Pencil className="mr-2 h-4 w-4" />
-                                Editar
-                              </Button>
-                            )}
-
-                            {charge.status !== "PAID" && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => void handleDeleteCharge(charge)}
-                                disabled={isSubmitting}
-                                className="text-red-600 hover:text-red-700"
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Excluir
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className={`rounded-lg border p-3 ${stage.className}`}>
-                          <div className="flex items-start gap-2">
-                            <StageIcon className="mt-0.5 h-4 w-4 shrink-0" />
-                            <div>
-                              <p className="text-sm font-semibold">{stage.label}</p>
-                              <p className="mt-1 text-xs opacity-90">
-                                {stage.description}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                          <InfoItem
-                            label="Valor"
-                            value={formatCurrencyFromCents(charge.amountCents)}
-                          />
-                          <InfoItem
-                            label="Vencimento"
-                            value={formatDate(charge.dueDate)}
-                          />
-                          <InfoItem
-                            label="Criada em"
-                            value={formatDate(charge.createdAt)}
-                          />
-                          <InfoItem
-                            label="Pagamento"
-                            value={formatDate(charge.paidAt)}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-
-                <div className="mt-6 flex items-center justify-between border-t pt-4">
-                  <Button
-                    onClick={() => setPage(Math.max(1, page - 1))}
-                    disabled={page === 1}
-                    variant="outline"
-                  >
-                    Anterior
-                  </Button>
-
-                  <span className="text-sm text-gray-600">
-                    Página {pagination.page} de {pagination.pages}
-                  </span>
-
-                  <Button
-                    onClick={() => setPage(page + 1)}
-                    disabled={page >= pagination.pages}
-                    variant="outline"
-                  >
-                    Próxima
-                  </Button>
+      {charges.length === 0 ? (
+        <div>Nenhuma cobrança</div>
+      ) : (
+        <div className="space-y-3">
+          {charges.map((c: any) => (
+            <Card key={c.id}>
+              <CardContent className="flex justify-between pt-4">
+                <div>
+                  <p>{c.customer?.name}</p>
+                  <p className="text-sm text-gray-500">
+                    {formatCurrencyFromCents(c.amountCents)}
+                  </p>
                 </div>
-              </div>
-            ) : (
-              <div className="py-8 text-center text-gray-500">
-                Nenhuma cobrança encontrada
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    </>
+                <Badge>{c.status}</Badge>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

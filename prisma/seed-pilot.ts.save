@@ -6,10 +6,7 @@ import {
   ServiceOrderStatus,
   UserRole,
 } from '@prisma/client'
-
-import { createRequire } from 'node:module'
-const require = createRequire(import.meta.url)
-const bcrypt = require('../apps/api/node_modules/bcryptjs')
+import * as bcrypt from 'bcrypt'
 
 const prisma = new PrismaClient()
 
@@ -217,8 +214,7 @@ async function upsertServiceOrder(params: {
     return prisma.serviceOrder.update({
       where: { id: found.id },
       data: {
-        appointmentId: params.appointmentId,
-        assignedToPersonId: params.assignedToPersonId,
+        appointmentId: params.appointmentId,        assignedToPersonId: params.assignedToPersonId,
         description: params.description,
         amountCents: params.amountCents,
         dueDate: params.dueDate,
@@ -1167,13 +1163,11 @@ export async function seedPilot() {
   console.log(`Cobrança paga principal: ${charge2.id}`)
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
-  seedPilot()
-    .catch((error) => {
-      console.error('❌ Falha ao gerar seed piloto:', error)
-      process.exit(1)
-    })
-    .finally(async () => {
-      await prisma.$disconnect()
-    })
-}
+main()
+  .catch((error) => {
+    console.error('❌ Falha ao gerar seed piloto:', error)
+    process.exit(1)
+  })
+  .finally(async () => {
+    await prisma.$disconnect()
+  })

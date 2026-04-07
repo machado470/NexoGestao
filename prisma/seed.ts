@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client'
 import { createRequire } from 'node:module'
 import { seedDemoOrg } from './seed-demo-org'
+import { seedPilot } from './seed-pilot'
 
 const require = createRequire(import.meta.url)
 const bcrypt = require('../apps/api/node_modules/bcryptjs')
@@ -77,9 +78,9 @@ async function runDemoOrgSeed() {
 }
 
 async function runPilotSeed() {
-  console.log('Seed principal configurado para rodar via prisma db seed -> prisma/seed-pilot.ts')
   await ensureDefaultAdmin()
-  console.log('Seed base do root finalizada')
+  await seedPilot()
+  console.log('Seed pilot finalizado')
 }
 
 async function runBasicSeed() {

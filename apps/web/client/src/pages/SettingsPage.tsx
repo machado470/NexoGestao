@@ -1,19 +1,8 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { normalizeObjectPayload } from "@/lib/query-helpers";
-import {
-  Settings,
-  Building2,
-  Save,
-  Loader2,
-  ShieldCheck,
-  AlertTriangle,
-  RefreshCw,
-  Lock,
-  Sparkles,
-} from "lucide-react";
 
 type SettingsFormData = {
   name: string;
@@ -37,11 +26,13 @@ const DEFAULT_FORM: SettingsFormData = {
 
 function sanitizeSettings(payload: unknown): SettingsResponse | null {
   const raw = normalizeObjectPayload<Partial<SettingsResponse>>(payload);
+  if (!raw || typeof raw !== "object") return null;
 
-  if (!raw) return null;
+  const id = String(raw.id ?? "").trim();
+  if (!id) return null;
 
   return {
-    id: String(raw.id ?? ""),
+    id,
     name: String(raw.name ?? ""),
     slug: String(raw.slug ?? ""),
     timezone: String(raw.timezone ?? "America/Sao_Paulo"),
@@ -49,7 +40,9 @@ function sanitizeSettings(payload: unknown): SettingsResponse | null {
   };
 }
 
-function buildFormFromSettings(settings: SettingsResponse | null): SettingsFormData {
+function buildFormFromSettings(
+  settings: SettingsResponse | null
+): SettingsFormData {
   if (!settings) return DEFAULT_FORM;
 
   return {
@@ -69,8 +62,7 @@ function formsAreEqual(a: SettingsFormData, b: SettingsFormData) {
 
 export default function SettingsPage() {
   const { isAuthenticated, isInitializing } = useAuth();
-  const canLoad = isAuthenticated && !isInitializing;
-
+  const canLoad = isAuthenticated;
   const utils = trpc.useUtils();
 
   const query = trpc.nexo.settings.get.useQuery(undefined, {
@@ -83,12 +75,30 @@ export default function SettingsPage() {
   const initialForm = useMemo(() => buildFormFromSettings(settings), [settings]);
 
   const [form, setForm] = useState<SettingsFormData>(DEFAULT_FORM);
+  const [didHydrateFromServer, setDidHydrateFromServer] = useState(false);
 
   useEffect(() => {
-    setForm(initialForm);
-  }, [initialForm]);
+    if (settings) {
+      setForm(buildFormFromSettings(settings));
+      setDidHydrateFromServer(true);
+      return;
+    }
 
-  const hasChanges = useMemo(() => !formsAreEqual(form, initialForm), [form, initialForm]);
+    if (!query.isLoading && query.data !== undefined) {
+      setDidHydrateFromServer(true);
+    }
+  }, [settings, query.isLoading, query.data]);
+
+  const hasData = !!settings;
+  const hasChanges = useMemo(
+    () => !formsAreEqual(form, initialForm),
+    [form, initialForm]
+  );
+
+  const hasError = query.isError;
+  const isInitialLoading =
+    canLoad && query.isLoading && !hasData && !didHydrateFromServer;
+  const shouldBlockForError = hasError && !hasData;
 
   const mutation = trpc.nexo.settings.update.useMutation({
     onSuccess: async (res) => {
@@ -101,167 +111,90 @@ export default function SettingsPage() {
       toast.success("Configurações atualizadas");
       await utils.nexo.settings.get.invalidate();
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err) => {
+      toast.error(err.message);
+    },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!form.name.trim()) {
-      toast.error("Informe o nome da empresa.");
-      return;
-    }
-
-    if (!hasChanges) {
-      toast.message("Nada para salvar.");
-      return;
-    }
-
-    mutation.mutate({
-      name: form.name.trim(),
-      timezone: form.timezone,
-      currency: form.currency,
-    });
-  };
-
-  if (isInitializing || query.isLoading) {
-    return (
-      <div className="flex h-[80vh] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
-      </div>
-    );
+  if (isInitializing) {
+    return <div className="p-6">Carregando sessão...</div>;
   }
 
   if (!isAuthenticated) {
-    return (
-      <div className="p-6 text-sm text-zinc-500">
-        Faça login para acessar configurações.
-      </div>
-    );
+    return <div className="p-6">Faça login</div>;
   }
 
-  if (query.isError || !settings) {
-    return (
-      <div className="p-6">
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
-          <div className="flex items-center gap-2 font-medium">
-            <AlertTriangle className="h-4 w-4" />
-            Erro ao carregar configurações
-          </div>
+  if (isInitialLoading) {
+    return <div className="p-6">Carregando...</div>;
+  }
 
-          <button
-            onClick={() => query.refetch()}
-            className="mt-3 flex items-center gap-2 text-sm underline"
-          >
-            <RefreshCw className="h-4 w-4" />
-            Tentar novamente
-          </button>
-        </div>
+  if (shouldBlockForError) {
+    return (
+      <div className="p-6 text-red-500">
+        {query.error?.message || "Erro ao carregar configurações"}
       </div>
     );
   }
 
   return (
     <div className="space-y-6 p-6">
-      <div>
-        <div className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs text-orange-700">
-          <Sparkles className="h-3.5 w-3.5" />
-          Configuração organizacional
+      <h1 className="text-2xl font-bold">Configurações</h1>
+
+      {!hasData ? (
+        <div className="rounded border p-4 text-sm opacity-70">
+          Nenhuma configuração carregada ainda. Você já pode preencher e salvar.
         </div>
+      ) : null}
 
-        <h1 className="mt-3 flex items-center gap-2 text-2xl font-bold">
-          <Settings className="h-6 w-6 text-orange-500" />
-          Configurações
-        </h1>
-
-        <p className="mt-2 text-sm opacity-70">
-          Ajuste o núcleo da operação: identidade da empresa, fuso e moeda.
-        </p>
-      </div>
+      {hasError && !shouldBlockForError ? (
+        <div className="rounded border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200">
+          {query.error?.message ||
+            "Houve um problema ao recarregar as configurações."}
+        </div>
+      ) : null}
 
       <form
-        onSubmit={handleSubmit}
-        className="rounded-2xl border bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900"
+        className="space-y-4"
+        onSubmit={(e) => {
+          e.preventDefault();
+          mutation.mutate(form);
+        }}
       >
-        <div className="mb-4 flex items-center gap-2">
-          <Building2 className="h-5 w-5 text-orange-500" />
-          <h3 className="font-semibold">Organização</h3>
-        </div>
+        <input
+          className="w-full rounded border p-2"
+          value={form.name}
+          onChange={(e) =>
+            setForm((prev) => ({ ...prev, name: e.target.value }))
+          }
+          placeholder="Nome da organização"
+        />
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <input
-            name="name"
-            value={form.name}
-            onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-            placeholder="Nome da empresa"
-            className="rounded-md border px-3 py-2 text-sm dark:border-zinc-800"
-          />
+        <input
+          className="w-full rounded border p-2"
+          value={form.timezone}
+          onChange={(e) =>
+            setForm((prev) => ({ ...prev, timezone: e.target.value }))
+          }
+          placeholder="Timezone"
+        />
 
-          <select
-            name="timezone"
-            value={form.timezone}
-            onChange={(e) => setForm((p) => ({ ...p, timezone: e.target.value }))}
-            className="rounded-md border px-3 py-2 text-sm dark:border-zinc-800"
-          >
-            <option value="America/Sao_Paulo">Brasil</option>
-            <option value="UTC">UTC</option>
-          </select>
-
-          <select
-            name="currency"
-            value={form.currency}
-            onChange={(e) => setForm((p) => ({ ...p, currency: e.target.value }))}
-            className="rounded-md border px-3 py-2 text-sm dark:border-zinc-800"
-          >
-            <option value="BRL">Real</option>
-            <option value="USD">Dólar</option>
-          </select>
-
-          <input
-            disabled
-            value={settings.slug}
-            className="rounded-md border px-3 py-2 text-sm opacity-60 dark:border-zinc-800"
-          />
-        </div>
-
-        <div className="mt-6 flex justify-between">
-          <span className="text-xs opacity-60">
-            {hasChanges ? "Alterações pendentes" : "Tudo salvo"}
-          </span>
-
-          <button
-            type="submit"
-            disabled={!hasChanges || mutation.isPending}
-            className="flex items-center gap-2 rounded-md bg-orange-500 px-4 py-2 text-white disabled:opacity-50"
-          >
-            {mutation.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Save className="h-4 w-4" />
-            )}
-            Salvar
-          </button>
-        </div>
-      </form>
-
-      <div className="rounded-2xl border p-6 dark:border-zinc-800">
-        <div className="mb-2 flex items-center gap-2">
-          <ShieldCheck className="h-5 w-5 text-orange-500" />
-          <h3 className="font-semibold">Segurança</h3>
-        </div>
-
-        <p className="text-sm opacity-70">
-          Controle avançado ainda não exposto.
-        </p>
+        <input
+          className="w-full rounded border p-2"
+          value={form.currency}
+          onChange={(e) =>
+            setForm((prev) => ({ ...prev, currency: e.target.value }))
+          }
+          placeholder="Moeda"
+        />
 
         <button
-          disabled
-          className="mt-3 flex items-center gap-2 rounded-md border px-4 py-2 text-sm opacity-60"
+          className="rounded bg-orange-500 px-4 py-2 text-black disabled:opacity-50"
+          disabled={!hasChanges || mutation.isPending}
+          type="submit"
         >
-          <Lock className="h-4 w-4" />
-          Em breve
+          {mutation.isPending ? "Salvando..." : "Salvar"}
         </button>
-      </div>
+      </form>
     </div>
   );
 }

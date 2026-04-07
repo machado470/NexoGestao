@@ -43,7 +43,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 /* =========================
-   NORMALIZADORES
+   HELPERS
 ========================= */
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -78,22 +78,17 @@ function getUser(payload: unknown) {
   };
 }
 
-function getRequiresOnboarding(payload: unknown): boolean {
-  const env = getEnvelope(payload);
-  return Boolean(env?.requiresOnboarding);
-}
-
 function getRedirect(payload: unknown): string {
   const env = getEnvelope(payload);
   return (env?.redirect as string) || "/dashboard";
 }
 
-/* ========================= */
-
 function redirectToLogin() {
   if (typeof window === "undefined") return;
   window.location.assign("/login");
 }
+
+/* ========================= */
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const utils = trpc.useUtils();
@@ -201,7 +196,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [payload]);
 
   const role = user?.normalizedRole ?? null;
-
   const redirectTo = useMemo(() => getRedirect(payload), [payload]);
 
   const isAuthenticating =
@@ -209,7 +203,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const isLoggingOut = logoutMutation.isPending;
   const isSubmitting = isAuthenticating;
-  const isInitializing = meQuery.isLoading && !isLoggingOut;
+
+  /* 🔥 CORREÇÃO AQUI */
+  const isInitializing =
+    meQuery.isLoading && meQuery.data === undefined && !isLoggingOut;
+
   const loading = isInitializing || isSubmitting;
 
   const value: AuthContextType = {
