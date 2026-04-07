@@ -16,7 +16,7 @@ interface DetailModalProps {
 }
 
 const colorMap = {
-  blue: "from-blue-500/20 to-blue-600/20 border-blue-300/50",
+  blue: "from-orange-500/20 to-orange-600/20 border-orange-300/50",
   green: "from-emerald-500/20 to-emerald-600/20 border-emerald-300/50",
   purple: "from-purple-500/20 to-purple-600/20 border-purple-300/50",
   orange: "from-orange-500/20 to-orange-600/20 border-orange-300/50",
@@ -111,7 +111,7 @@ export default function DetailModal({
                   {technologies.map((tech, index) => (
                     <span
                       key={index}
-                      className="inline-block rounded-full bg-blue-100 px-4 py-2 text-sm font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                      className="inline-block rounded-full bg-orange-100 px-4 py-2 text-sm font-medium text-orange-700 dark:bg-orange-500/20 dark:text-orange-200"
                     >
                       {tech}
                     </span>
@@ -124,7 +124,7 @@ export default function DetailModal({
             <div className="border-t border-slate-200/50 bg-slate-50/50 px-8 py-4 dark:border-slate-700/50 dark:bg-slate-800/50">
               <button
                 onClick={onClose}
-                className="rounded-lg bg-blue-600 px-6 py-2 font-medium text-white transition-colors hover:bg-blue-700"
+                className="rounded-lg bg-primary px-6 py-2 font-medium text-primary-foreground transition-colors hover:bg-primary/90"
               >
                 Fechar
               </button>

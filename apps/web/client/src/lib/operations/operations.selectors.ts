@@ -126,7 +126,7 @@ export function getOperationalStage(os: ServiceOrder): StageTone {
     return {
       label: "Em execução",
       description: "Serviço em andamento.",
-      className: "border-blue-400 text-blue-700",
+      className: "border-orange-400 text-orange-700",
       icon: AlertCircle,
     };
   }

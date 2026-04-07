@@ -764,7 +764,7 @@ export function getTimelineEventNextAction(event: TimelineEventLike) {
     return {
       label: "Confirmar agendamento",
       tone:
-        "border-blue-200 bg-blue-50 text-blue-900 dark:border-blue-900/40 dark:bg-blue-950/20 dark:text-blue-300",
+        "border-orange-200 bg-orange-50 text-orange-900 dark:border-orange-500/40 dark:bg-orange-500/15 dark:text-orange-200",
     };
   }
 

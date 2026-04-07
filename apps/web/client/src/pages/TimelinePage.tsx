@@ -99,7 +99,7 @@ function getEventTone(event: TimelineEvent) {
     return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300";
   }
 
-  return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
+  return "bg-orange-100 text-orange-800 dark:bg-orange-500/20 dark:text-orange-200";
 }
 
 function getEventIcon(event: TimelineEvent) {
@@ -375,7 +375,7 @@ export default function TimelinePage() {
           title="Agendamentos"
           value={stats.appointments}
           subtitle="Entrada do fluxo"
-          valueClassName="text-blue-600 dark:text-blue-400"
+          valueClassName="text-orange-600 dark:text-orange-300"
         />
         <SummaryCard
           title="Execução"

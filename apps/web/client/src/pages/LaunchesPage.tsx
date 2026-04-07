@@ -192,7 +192,7 @@ function getTypeBadgeClass(type: ApiType) {
     case "EXPENSE":
       return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300";
     case "TRANSFER":
-      return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
+      return "bg-orange-100 text-orange-800 dark:bg-orange-500/20 dark:text-orange-200";
     default:
       return "bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-300";
   }
@@ -568,7 +568,7 @@ export default function LaunchesPage() {
                           ? "text-emerald-600 dark:text-emerald-400"
                           : launch.type === "EXPENSE"
                             ? "text-red-600 dark:text-red-400"
-                            : "text-blue-600 dark:text-blue-400"
+                            : "text-orange-600 dark:text-orange-300"
                       }`}
                     >
                       {launch.type === "EXPENSE" ? "-" : ""}

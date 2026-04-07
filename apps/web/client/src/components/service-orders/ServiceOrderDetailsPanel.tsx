@@ -39,7 +39,7 @@ import type {
 function getActionToneClass(tone: string) {
   if (tone === "red") return "border-red-200 bg-red-50 text-red-700";
   if (tone === "amber") return "border-amber-200 bg-amber-50 text-amber-700";
-  if (tone === "blue") return "border-blue-200 bg-blue-50 text-blue-700";
+  if (tone === "blue") return "border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-500/40 dark:bg-orange-500/15 dark:text-orange-200";
   if (tone === "green") return "border-green-200 bg-green-50 text-green-700";
   return "border-gray-200 bg-gray-50 text-gray-700";
 }
@@ -54,7 +54,7 @@ function getFlowStepClasses(done: boolean, active: boolean) {
 
   if (active) {
     return {
-      box: "border-blue-200 bg-blue-50 text-blue-700",
+      box: "border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-500/40 dark:bg-orange-500/15 dark:text-orange-200",
       icon: Clock3,
     };
   }

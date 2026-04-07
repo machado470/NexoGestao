@@ -184,10 +184,10 @@ export function DataTable<T extends { id?: number | string }>({
                         {onEdit && (
                           <button
                             onClick={() => onEdit(row)}
-                            className="p-1 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded transition-colors"
+                            className="p-1 hover:bg-orange-100 dark:hover:bg-orange-500/20 rounded transition-colors"
                             title="Editar"
                           >
-                            <Edit2 className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                            <Edit2 className="w-4 h-4 text-orange-600 dark:text-orange-300" />
                           </button>
                         )}
                         {onDelete && (
@@ -264,7 +264,7 @@ export function DataTable<T extends { id?: number | string }>({
                       {onEdit && (
                         <button
                           onClick={() => onEdit(row)}
-                          className="flex-1 px-3 py-2 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded text-sm font-medium hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors flex items-center justify-center gap-2"
+                          className="flex-1 px-3 py-2 bg-orange-50 dark:bg-orange-500/20 text-orange-700 dark:text-orange-200 rounded text-sm font-medium hover:bg-orange-100 dark:hover:bg-orange-500/30 transition-colors flex items-center justify-center gap-2"
                         >
                           <Edit2 className="w-4 h-4" />
                           Editar
