@@ -75,30 +75,23 @@ export default function SettingsPage() {
   const initialForm = useMemo(() => buildFormFromSettings(settings), [settings]);
 
   const [form, setForm] = useState<SettingsFormData>(DEFAULT_FORM);
-  const [didHydrateFromServer, setDidHydrateFromServer] = useState(false);
 
   useEffect(() => {
     if (settings) {
       setForm(buildFormFromSettings(settings));
-      setDidHydrateFromServer(true);
-      return;
     }
-
-    if (!query.isLoading && query.data !== undefined) {
-      setDidHydrateFromServer(true);
-    }
-  }, [settings, query.isLoading, query.data]);
+  }, [settings]);
 
   const hasData = !!settings;
+  const hasNormalizedSettings = query.data !== undefined;
   const hasChanges = useMemo(
     () => !formsAreEqual(form, initialForm),
     [form, initialForm]
   );
 
   const hasError = query.isError;
-  const isInitialLoading =
-    canLoad && query.isLoading && !hasData && !didHydrateFromServer;
-  const shouldBlockForError = hasError && !hasData;
+  const isInitialLoading = canLoad && query.isLoading && !hasNormalizedSettings;
+  const shouldBlockForError = hasError && !hasNormalizedSettings;
 
   const mutation = trpc.nexo.settings.update.useMutation({
     onSuccess: async (res) => {
