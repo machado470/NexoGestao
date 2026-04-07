@@ -495,6 +495,7 @@ export default function OperationsDashboardPage() {
                       <Button
                         size="sm"
                         onClick={() => void generateCheckout(charge)}
+                        disabled={isSubmitting}
                         className="rounded-xl"
                       >
                         Gerar cobrança
@@ -504,6 +505,7 @@ export default function OperationsDashboardPage() {
                         size="sm"
                         variant="outline"
                         onClick={() => void registerPayment(charge, "CASH")}
+                        disabled={isSubmitting}
                         className="rounded-xl"
                       >
                         Marcar como pago

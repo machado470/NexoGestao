@@ -118,7 +118,10 @@ export default function ServiceOrderDetailsPanel({ os }: { os: ServiceOrder }) {
       utils.nexo.serviceOrders.list.invalidate(),
       utils.nexo.serviceOrders.getById.invalidate({ id: os.id }),
       utils.finance.charges.list.invalidate(),
+      utils.finance.charges.stats.invalidate(),
       utils.dashboard.alerts.invalidate(),
+      utils.nexo.timeline.listByOrg.invalidate(),
+      utils.nexo.timeline.listByServiceOrder.invalidate(),
     ]);
   };
 
@@ -178,7 +181,9 @@ export default function ServiceOrderDetailsPanel({ os }: { os: ServiceOrder }) {
 
   const canStart = ["OPEN", "ASSIGNED"].includes(normalizeStatus(os.status));
   const canFinish =
-    normalizeStatus(os.status) === "IN_PROGRESS" && Boolean(latestExecution?.id);
+    normalizeStatus(os.status) === "IN_PROGRESS" &&
+    Boolean(latestExecution?.id) &&
+    normalizeStatus(latestExecution?.status) === "IN_PROGRESS";
   const canGenerateCharge =
     normalizeStatus(os.status) === "DONE" && !os.financialSummary?.hasCharge;
 
@@ -243,7 +248,7 @@ export default function ServiceOrderDetailsPanel({ os }: { os: ServiceOrder }) {
                 variant="outline"
                 onClick={() =>
                   latestExecution?.id &&
-                  finishExecution.mutate({ id: latestExecution.id })
+                  finishExecution.mutate({ executionId: latestExecution.id })
                 }
                 disabled={finishExecution.isPending || !canFinish}
               >
@@ -444,7 +449,10 @@ export default function ServiceOrderDetailsPanel({ os }: { os: ServiceOrder }) {
 
                       <Button
                         variant="outline"
-                        onClick={() => void registerPayment(charge, "CASH")}
+                        onClick={async () => {
+                          await registerPayment(charge, "CASH");
+                          await timelineQuery.refetch();
+                        }}
                         disabled={isSubmitting}
                       >
                         Marcar pago

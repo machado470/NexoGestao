@@ -59,6 +59,7 @@ export function useChargeActions(options?: UseChargeActionsOptions) {
       await Promise.all([
         utils.finance.charges.list.invalidate(),
         utils.finance.charges.stats.invalidate(),
+        utils.nexo.timeline.listByOrg.invalidate(),
       ]);
 
       await runRefreshActions();

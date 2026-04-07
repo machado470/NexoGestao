@@ -74,6 +74,18 @@ function buildOperationalQueue(items: ServiceOrder[]) {
   );
 }
 
+function extractServiceOrder(payload: unknown): ServiceOrder | null {
+  if (!payload || typeof payload !== "object") return null;
+  if ("id" in payload) return payload as ServiceOrder;
+  if ("data" in payload) {
+    const nested = (payload as { data?: unknown }).data;
+    if (nested && typeof nested === "object" && "id" in nested) {
+      return nested as ServiceOrder;
+    }
+  }
+  return null;
+}
+
 export default function ServiceOrdersPage() {
   const [location, navigate] = useLocation();
   const utils = trpc.useUtils();
@@ -163,12 +175,8 @@ export default function ServiceOrdersPage() {
   );
 
   const activeOrder = useMemo(() => {
-    const payload = activeOrderQuery.data as any;
-    const fromQuery = payload?.data ?? payload ?? null;
-
-    if (fromQuery && typeof fromQuery === "object" && "id" in fromQuery) {
-      return fromQuery as ServiceOrder;
-    }
+    const fromQuery = extractServiceOrder(activeOrderQuery.data);
+    if (fromQuery) return fromQuery;
 
     return sorted.find((item) => item.id === activeId) ?? null;
   }, [activeOrderQuery.data, sorted, activeId]);

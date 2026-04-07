@@ -3,13 +3,16 @@ import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/contexts/AuthContext";
 import { getErrorMessage } from "@/lib/query-helpers";
+import { normalizeStatus } from "@/lib/operations/operations.utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import FinanceOverviewAreaChart from "@/components/finance/FinanceOverviewAreaChart";
 import { Loader2, Receipt } from "lucide-react";
 import { PageHero, PageShell, SurfaceSection } from "@/components/PagePattern";
 import { EmptyState } from "@/components/EmptyState";
 import { DemoEnvironmentCta } from "@/components/DemoEnvironmentCta";
+import { useChargeActions } from "@/hooks/useChargeActions";
 
 type FinanceCharge = {
   id: string;
@@ -67,6 +70,7 @@ export default function FinancesPage() {
   }, [location]);
 
   const serviceOrderIdFromUrl = searchParams.get("serviceOrderId") || "";
+  const chargeIdFromUrl = searchParams.get("chargeId") || "";
   const isServiceOrderScoped = Boolean(serviceOrderIdFromUrl);
 
   const chargesQuery = trpc.finance.charges.list.useQuery(
@@ -86,10 +90,55 @@ export default function FinancesPage() {
     }
   );
 
+  const chargeByIdQuery = trpc.finance.charges.getById.useQuery(
+    { id: chargeIdFromUrl },
+    {
+      enabled: canLoadFinance && Boolean(chargeIdFromUrl),
+      retry: false,
+    }
+  );
+
+  const { registerPayment, isSubmitting } = useChargeActions({
+    location,
+    navigate,
+    returnPath: "/finances",
+    refreshActions: [
+      async () => {
+        await chargesQuery.refetch();
+      },
+      async () => {
+        if (chargeIdFromUrl) {
+          await chargeByIdQuery.refetch();
+        }
+      },
+    ],
+  });
+
   const charges = useMemo(
     () => safeExtractCharges(chargesQuery.data),
     [chargesQuery.data]
   );
+
+  const scopedCharge = useMemo(() => {
+    const payload = chargeByIdQuery.data as
+      | FinanceCharge
+      | { data?: FinanceCharge }
+      | null
+      | undefined;
+    if (!payload) return null;
+    if ("id" in (payload as Record<string, unknown>)) return payload as FinanceCharge;
+    if (payload && typeof payload === "object" && "data" in payload) {
+      const data = (payload as { data?: FinanceCharge }).data;
+      return data ?? null;
+    }
+    return null;
+  }, [chargeByIdQuery.data]);
+
+  const visibleCharges = useMemo(() => {
+    if (scopedCharge) return [scopedCharge];
+    if (chargeIdFromUrl) return [];
+    return charges;
+  }, [charges, chargeIdFromUrl, scopedCharge]);
 
   const stats = useMemo(
     () => safeExtractStats(statsQuery.data),
@@ -102,15 +151,20 @@ export default function FinancesPage() {
   const hasReusableData = hasNormalizedCharges || hasNormalizedStats;
 
   const hasError =
-    chargesQuery.isError || (!isServiceOrderScoped && statsQuery.isError);
+    chargesQuery.isError ||
+    (!isServiceOrderScoped && statsQuery.isError) ||
+    chargeByIdQuery.isError;
 
   const errorMessage =
     getErrorMessage(chargesQuery.error, "") ||
     getErrorMessage(statsQuery.error, "") ||
+    getErrorMessage(chargeByIdQuery.error, "") ||
     "Erro ao carregar";
 
   const hasAnyActiveLoading =
-    chargesQuery.isLoading || (!isServiceOrderScoped && statsQuery.isLoading);
+    chargesQuery.isLoading ||
+    (!isServiceOrderScoped && statsQuery.isLoading) ||
+    chargeByIdQuery.isLoading;
 
   const isInitialLoading = hasAnyActiveLoading && !hasReusableData;
 
@@ -202,12 +256,16 @@ export default function FinancesPage() {
         />
       )}
 
-      {charges.length === 0 ? (
+      {visibleCharges.length === 0 ? (
         <SurfaceSection className="space-y-3">
           <EmptyState
             icon={<Receipt className="h-7 w-7" />}
-            title="Sem cobranças registradas"
-            description="Assim que uma cobrança for criada, o financeiro passa a mostrar pendências, pagamentos e evolução do caixa."
+            title={chargeIdFromUrl ? "Cobrança não encontrada" : "Sem cobranças registradas"}
+            description={
+              chargeIdFromUrl
+                ? "A cobrança solicitada não foi localizada neste workspace."
+                : "Assim que uma cobrança for criada, o financeiro passa a mostrar pendências, pagamentos e evolução do caixa."
+            }
             action={{
               label: "Atualizar dados",
               onClick: () => void chargesQuery.refetch(),
@@ -221,19 +279,31 @@ export default function FinancesPage() {
         </SurfaceSection>
       ) : (
         <div className="space-y-3">
-          {charges.map((c) => (
+          {visibleCharges.map((c) => (
             <Card
               key={c.id}
               className="nexo-surface border-slate-200/70 bg-white/90 dark:border-white/8"
             >
-              <CardContent className="flex justify-between pt-4">
-                <div>
+              <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-4">
+                <div className="min-w-0">
                   <p>{c.customer?.name}</p>
                   <p className="text-sm text-gray-500">
                     {formatCurrencyFromCents(c.amountCents)}
                   </p>
                 </div>
-                <Badge>{c.status}</Badge>
+                <div className="flex items-center gap-2">
+                  <Badge>{c.status}</Badge>
+                  {normalizeStatus(c.status) !== "PAID" && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={isSubmitting}
+                      onClick={() => void registerPayment(c, "CASH")}
+                    >
+                      Marcar pago
+                    </Button>
+                  )}
+                </div>
               </CardContent>
             </Card>
           ))}

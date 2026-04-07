@@ -490,15 +490,24 @@ export const nexoProxyRouter = router({
       return authedPost(ctx as CtxLike, "/executions/start", input);
     }),
 
-    complete: protectedProcedure.input(z.any()).mutation(async ({ ctx, input }) => {
-      const id = input?.id;
-      if (!id || typeof id !== "string") {
-        throw new Error("ID da execução é obrigatório.");
-      }
+    complete: protectedProcedure
+      .input(
+        z.object({
+          executionId: z.string().min(1),
+          notes: z.string().optional(),
+          checklist: z.array(z.any()).optional(),
+          attachments: z.array(z.any()).optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const id = input.executionId;
+        if (!id || typeof id !== "string") {
+          throw new Error("ID da execução é obrigatório.");
+        }
 
-      const { id: _id, ...payload } = input ?? {};
-      return authedPost(ctx as CtxLike, `/executions/${id}/complete`, payload);
-    }),
+        const { executionId: _executionId, ...payload } = input ?? {};
+        return authedPost(ctx as CtxLike, `/executions/${id}/complete`, payload);
+      }),
   }),
 
   whatsapp: router({
