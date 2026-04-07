@@ -335,6 +335,60 @@
   .nexo-list-row {
     @apply flex items-center justify-between rounded-xl border border-slate-200/70 bg-white/70 px-3 py-3 text-sm transition-colors hover:bg-white dark:border-white/8 dark:bg-white/[0.03] dark:hover:bg-white/[0.05];
   }
+
+  .nexo-list-row-high {
+    @apply border-amber-300/70 bg-amber-50/80 dark:border-amber-500/30 dark:bg-amber-500/10;
+  }
+
+  .nexo-list-row-critical {
+    @apply min-h-20 border-red-300/70 bg-red-50/90 shadow-[0_8px_25px_rgba(239,68,68,0.15)] dark:border-red-500/30 dark:bg-red-500/12;
+  }
+
+  .nexo-cta-primary {
+    @apply inline-flex h-10 items-center justify-center rounded-xl bg-orange-500 px-4 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-orange-600 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400/60;
+  }
+
+  .nexo-cta-secondary {
+    @apply inline-flex h-10 items-center justify-center rounded-xl border border-zinc-300 px-4 text-sm font-semibold text-zinc-700 transition-all duration-200 hover:-translate-y-0.5 hover:bg-zinc-100 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-300/50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800;
+  }
+
+  .nexo-skeleton {
+    @apply relative overflow-hidden bg-zinc-200/75 dark:bg-zinc-700/55;
+  }
+
+  .nexo-skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.42) 50%, transparent 100%);
+    animation: nexo-shimmer 1.4s ease-in-out infinite;
+  }
+
+  .nexo-skeleton-panel {
+    @apply rounded-2xl border border-slate-200/80 bg-white/85 p-4 dark:border-white/8 dark:bg-white/[0.03];
+  }
+
+  .nexo-fade-in {
+    animation: nexo-fade-in 0.35s ease-out;
+  }
+}
+
+@keyframes nexo-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes nexo-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes pulse-flow {
