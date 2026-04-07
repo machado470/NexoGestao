@@ -53,6 +53,11 @@ function resolveBack(route: ReturnType<typeof parseWhatsAppRoute>) {
   return "/service-orders";
 }
 
+type WhatsAppMessage = {
+  id: string;
+  content: string;
+};
+
 export default function WhatsAppPage() {
   const [location, navigate] = useLocation();
   const route = useMemo(() => parseWhatsAppRoute(location), [location]);
@@ -69,16 +74,7 @@ export default function WhatsAppPage() {
     { enabled: !!route.customerId, retry: false, refetchOnWindowFocus: false }
   );
 
-  const sendMutation = trpc.nexo.whatsapp.send.useMutation({
-    onSuccess: async () => {
-      await messagesQuery.refetch();
-      setMessageInput("");
-      toast.success("Mensagem enviada");
-    },
-    onError: (error) => {
-      toast.error(error.message || "Erro ao enviar mensagem");
-    },
-  });
+  const sendMutation = trpc.nexo.whatsapp.send.useMutation();
 
   const customer = customerQuery.data?.data || customerQuery.data;
 
@@ -91,7 +87,7 @@ export default function WhatsAppPage() {
 
   const messages = useMemo(() => {
     const raw = messagesQuery.data?.data || messagesQuery.data || [];
-    return Array.isArray(raw) ? raw : [];
+    return Array.isArray(raw) ? (raw as WhatsAppMessage[]) : [];
   }, [messagesQuery.data]);
 
   const isLoading =
@@ -186,7 +182,14 @@ export default function WhatsAppPage() {
       </div>
 
       <div className="rounded-xl border p-4">
-        {messages.length === 0 ? (
+        {messagesQuery.error ? (
+          <div className="space-y-3 text-sm text-red-600">
+            <p>Não foi possível carregar as mensagens.</p>
+            <Button type="button" variant="outline" onClick={() => void messagesQuery.refetch()}>
+              Tentar novamente
+            </Button>
+          </div>
+        ) : messages.length === 0 ? (
           <div className="space-y-3 text-sm text-muted-foreground">
             <p>
               Ainda não há mensagens. Esta conversa será alimentada por contexto
@@ -195,7 +198,7 @@ export default function WhatsAppPage() {
             <DemoEnvironmentCta />
           </div>
         ) : (
-          messages.map((msg: any) => <div key={msg.id}>{msg.content}</div>)
+          messages.map((msg) => <div key={msg.id}>{msg.content}</div>)
         )}
       </div>
 
@@ -205,21 +208,30 @@ export default function WhatsAppPage() {
       />
 
       <Button
-        onClick={() =>
-          sendMutation.mutate({
-            customerId: route.customerId!,
-            content: messageInput.trim(),
-            entityType: getEntityType(route),
-            entityId: getEntityId(route),
-            messageType: getMessageTypeFromContext(route.context),
-            chargeId: route.chargeId,
-            serviceOrderId: route.serviceOrderId,
-          })
-        }
+        onClick={async () => {
+          try {
+            await sendMutation.mutateAsync({
+              customerId: route.customerId!,
+              content: messageInput.trim(),
+              entityType: getEntityType(route),
+              entityId: getEntityId(route) ?? undefined,
+              messageType: getMessageTypeFromContext(route.context),
+              chargeId: route.chargeId ?? undefined,
+              serviceOrderId: route.serviceOrderId ?? undefined,
+            });
+            await messagesQuery.refetch();
+            setMessageInput("");
+            toast.success("Mensagem enviada");
+          } catch (error) {
+            const message =
+              error instanceof Error ? error.message : "Erro ao enviar mensagem";
+            toast.error(message);
+          }
+        }}
         disabled={!canSend}
       >
         <ArrowRight className="mr-2 h-4 w-4" />
-        Enviar
+        {sendMutation.isPending ? "Enviando..." : "Enviar"}
       </Button>
     </div>
   );

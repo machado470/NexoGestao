@@ -23,6 +23,20 @@ type Props = {
   onSaved?: () => void;
 };
 
+type CustomerDetails = {
+  name?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  notes?: string | null;
+  active?: boolean | null;
+};
+
+function normalizeCustomerPayload(payload: unknown): CustomerDetails | null {
+  const raw = (payload as { data?: unknown } | null | undefined)?.data ?? payload;
+  if (!raw || typeof raw !== "object") return null;
+  return raw as CustomerDetails;
+}
+
 export default function EditCustomerModal({ open, customerId, onClose, onSaved }: Props) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -41,19 +55,10 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
     }
   );
 
-  const updateMutation = trpc.nexo.customers.update.useMutation({
-    onSuccess: () => {
-      toast.success("Cliente atualizado com sucesso!");
-      onSaved?.();
-      onClose();
-    },
-    onError: (err: any) => {
-      toast.error(err.message || "Erro ao atualizar cliente");
-    },
-  });
+  const updateMutation = trpc.nexo.customers.update.useMutation();
 
   const customer = useMemo(() => {
-    return (customerQuery.data as any)?.data ?? customerQuery.data ?? null;
+    return normalizeCustomerPayload(customerQuery.data);
   }, [customerQuery.data]);
 
   useEffect(() => {
@@ -91,16 +96,23 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
       return;
     }
 
-    updateMutation.mutate({
-      id: idStr,
-      data: {
+    try {
+      await updateMutation.mutateAsync({
+        id: idStr,
         name: parsed.data.name,
         phone: parsed.data.phone,
         email: parsed.data.email || undefined,
         notes: parsed.data.notes?.trim() ? parsed.data.notes.trim() : undefined,
         active,
-      },
-    });
+      });
+      toast.success("Cliente atualizado com sucesso!");
+      onSaved?.();
+      onClose();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Erro ao atualizar cliente";
+      toast.error(message);
+    }
   };
 
   const handleClose = () => {
@@ -123,6 +135,18 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
             <div className="flex items-center justify-center py-8 text-sm text-zinc-400">
               <Loader2 className="mr-2 h-5 w-5 animate-spin text-orange-500" />
               Carregando...
+            </div>
+          ) : customerQuery.error ? (
+            <div className="space-y-3 rounded-xl border border-red-900/40 bg-red-950/30 p-4 text-sm text-red-200">
+              <p>Não foi possível carregar os dados do cliente.</p>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void customerQuery.refetch()}
+                className="border-red-800/60 text-red-100 hover:bg-red-900/30"
+              >
+                Tentar novamente
+              </Button>
             </div>
           ) : (
             <>

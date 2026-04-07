@@ -39,6 +39,28 @@ interface EditServiceOrderModalProps {
   people: Array<{ id: string; name: string }>;
 }
 
+type ServiceOrderDetails = {
+  title?: string | null;
+  description?: string | null;
+  priority?: number | null;
+  scheduledFor?: string | null;
+  assignedToPersonId?: string | null;
+  amountCents?: number | null;
+  dueDate?: string | null;
+  status?: ServiceOrderStatus | null;
+  cancellationReason?: string | null;
+  outcomeSummary?: string | null;
+  customer?: { name?: string | null } | null;
+  assignedTo?: { name?: string | null } | null;
+  financialSummary?: { hasCharge?: boolean | null } | null;
+};
+
+function normalizeServiceOrderPayload(payload: unknown): ServiceOrderDetails | null {
+  const raw = (payload as { data?: unknown } | null | undefined)?.data ?? payload;
+  if (!raw || typeof raw !== "object") return null;
+  return raw as ServiceOrderDetails;
+}
+
 function parseAmountToCents(raw: string): number | undefined {
   const normalized = raw.replace(",", ".").trim();
 
@@ -181,22 +203,12 @@ export default function EditServiceOrderModal({
     }
   );
 
-  const updateServiceOrder = trpc.nexo.serviceOrders.update.useMutation({
-    onSuccess: () => {
-      toast.success("Ordem de serviço atualizada com sucesso!");
-      onSuccess();
-      onClose();
-    },
-    onError: (error) => {
-      toast.error(error.message || "Erro ao atualizar ordem de serviço");
-    },
-  });
+  const updateServiceOrder = trpc.nexo.serviceOrders.update.useMutation();
 
   useEffect(() => {
     if (!getServiceOrder.data) return;
 
-    const payload = getServiceOrder.data as any;
-    const serviceOrder = payload?.data ?? payload ?? null;
+    const serviceOrder = normalizeServiceOrderPayload(getServiceOrder.data);
 
     setFormData({
       title: serviceOrder?.title || "",
@@ -334,9 +346,9 @@ export default function EditServiceOrderModal({
       return;
     }
 
-    await updateServiceOrder.mutateAsync({
-      id: serviceOrderId,
-      data: {
+    try {
+      await updateServiceOrder.mutateAsync({
+        id: serviceOrderId,
         title: parsed.data.title,
         description: parsed.data.description || undefined,
         priority: parsed.data.priority,
@@ -355,18 +367,26 @@ export default function EditServiceOrderModal({
           parsed.data.status === "DONE"
             ? parsed.data.outcomeSummary || undefined
             : undefined,
-      },
-    });
+      });
+      toast.success("Ordem de serviço atualizada com sucesso!");
+      onSuccess();
+      onClose();
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Erro ao atualizar ordem de serviço";
+      toast.error(message);
+    }
   };
 
-  const payload = getServiceOrder.data as any;
-  const serviceOrder = payload?.data ?? payload ?? null;
+  const serviceOrder = normalizeServiceOrderPayload(getServiceOrder.data);
   const persistedStatus = serviceOrder?.status as ServiceOrderStatus | undefined;
   const isPersistedDone = persistedStatus === "DONE";
   const isPersistedCanceled = persistedStatus === "CANCELED";
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => (!open ? onClose() : null)}>
+    <Dialog open={isOpen} onOpenChange={(open) => (!open ? onClose() : undefined)}>
       <DialogContent
         showCloseButton={false}
         className="max-h-[90vh] max-w-2xl overflow-hidden border-zinc-800/80 bg-white p-0 shadow-xl dark:bg-zinc-900"
@@ -383,6 +403,13 @@ export default function EditServiceOrderModal({
         {getServiceOrder.isLoading ? (
           <div className="flex min-h-[220px] items-center justify-center">
             <Loader2 className="h-6 w-6 animate-spin text-orange-500" />
+          </div>
+        ) : getServiceOrder.error ? (
+          <div className="m-6 space-y-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-200">
+            <p>Não foi possível carregar os dados da ordem de serviço.</p>
+            <Button type="button" variant="outline" onClick={() => void getServiceOrder.refetch()}>
+              Tentar novamente
+            </Button>
           </div>
         ) : (
         <div className="max-h-[70vh] overflow-y-auto p-6">
@@ -411,10 +438,10 @@ export default function EditServiceOrderModal({
                   <div className="mt-1">
                     <span
                       className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getStatusBadgeClass(
-                        serviceOrder?.status
+                        serviceOrder?.status ?? undefined
                       )}`}
                     >
-                      {getStatusLabel(serviceOrder?.status)}
+                      {getStatusLabel(serviceOrder?.status ?? undefined)}
                     </span>
                   </div>
                 </div>
