@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHero, PageShell, SurfaceSection } from "@/components/PagePattern";
+import { DemoEnvironmentCta } from "@/components/DemoEnvironmentCta";
 import {
   formatDateTime,
   getTimelineEventDescription,
@@ -419,8 +420,11 @@ export default function TimelinePage() {
                     Carregando clientes...
                   </div>
                 ) : customers.length === 0 ? (
-                  <div className="text-sm text-gray-500 dark:text-gray-400">
-                    Nenhum cliente encontrado.
+                  <div className="space-y-3">
+                    <div className="text-sm text-gray-500 dark:text-gray-400">
+                      Nenhum cliente encontrado. Sem cliente não existe timeline viva.
+                    </div>
+                    <DemoEnvironmentCta />
                   </div>
                 ) : (
                   <select
@@ -554,8 +558,23 @@ export default function TimelinePage() {
               Carregando eventos...
             </div>
           ) : filteredEvents.length === 0 ? (
-            <div className="py-10 text-center text-sm text-gray-500 dark:text-gray-400">
-              Nenhum evento encontrado para este filtro.
+            <div className="space-y-4 py-10 text-center text-sm text-gray-500 dark:text-gray-400">
+              <p>
+                Nenhum evento encontrado para este filtro. A timeline nasce de ações
+                em agenda, execução, financeiro e governança.
+              </p>
+              <div className="mx-auto flex max-w-xl flex-wrap justify-center gap-2">
+                <Button size="sm" variant="outline" onClick={() => navigate("/appointments")}>
+                  Abrir agenda
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => navigate("/service-orders")}>
+                  Abrir O.S.
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => navigate("/finances")}>
+                  Abrir financeiro
+                </Button>
+              </div>
+              <DemoEnvironmentCta className="mx-auto max-w-xl text-left" />
             </div>
           ) : (
             <div className="space-y-4">

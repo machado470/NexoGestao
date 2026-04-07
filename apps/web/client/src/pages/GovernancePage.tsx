@@ -1,10 +1,12 @@
 import { useMemo } from "react";
+import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { getErrorMessage, getPayloadValue } from "@/lib/query-helpers";
 import { useAuth } from "@/contexts/AuthContext";
 import { PageHero, PageShell, SurfaceSection } from "@/components/PagePattern";
 import { EmptyState } from "@/components/EmptyState";
 import { Loader2, ShieldAlert } from "lucide-react";
+import { DemoEnvironmentCta } from "@/components/DemoEnvironmentCta";
 
 /* ================= HELPERS ================= */
 
@@ -28,6 +30,7 @@ function formatRiskLevel(score?: number | null) {
 
 export default function GovernancePage() {
   const { isAuthenticated, isInitializing } = useAuth();
+  const [, navigate] = useLocation();
   const canLoadGovernance = isAuthenticated;
 
   const summaryQuery = trpc.governance.summary.useQuery(undefined, {
@@ -168,6 +171,24 @@ export default function GovernancePage() {
         eyebrow="Governança"
         title="Governança"
         description="Visão de score institucional e histórico de execução com o mesmo padrão visual do painel executivo."
+        actions={
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => navigate("/timeline")}
+              className="inline-flex h-10 items-center justify-center rounded-xl border border-zinc-300 px-4 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+            >
+              Abrir timeline
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate("/dashboard/operations")}
+              className="inline-flex h-10 items-center justify-center rounded-xl border border-zinc-300 px-4 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+            >
+              Ver riscos operacionais
+            </button>
+          </div>
+        }
       />
 
       {hasError && !shouldBlockForError ? (
@@ -201,7 +222,7 @@ export default function GovernancePage() {
           ))}
         </SurfaceSection>
       ) : (
-        <SurfaceSection>
+        <SurfaceSection className="space-y-3">
           <EmptyState
             icon={<ShieldAlert className="h-7 w-7" />}
             title="Histórico de governança ainda vazio"
@@ -211,6 +232,7 @@ export default function GovernancePage() {
               onClick: () => void runsQuery.refetch(),
             }}
           />
+          <DemoEnvironmentCta />
         </SurfaceSection>
       )}
     </PageShell>

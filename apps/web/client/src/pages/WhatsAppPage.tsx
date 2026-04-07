@@ -21,6 +21,7 @@ import {
   buildFinanceChargeUrl,
   buildServiceOrdersDeepLink,
 } from "@/lib/operations/operations.utils";
+import { DemoEnvironmentCta } from "@/components/DemoEnvironmentCta";
 
 function getMessageTypeFromContext(context: string) {
   if (context === "overdue_charge") return "PAYMENT_REMINDER";
@@ -119,7 +120,7 @@ export default function WhatsAppPage() {
               WhatsApp
             </h1>
             <p className="text-sm text-muted-foreground">
-              Acesse via ordem ou cobrança.
+              Acesse via ordem ou cobrança para manter o contexto operacional.
             </p>
           </div>
 
@@ -131,6 +132,8 @@ export default function WhatsAppPage() {
             Voltar
           </Button>
         </div>
+
+        <DemoEnvironmentCta />
       </div>
     );
   }
@@ -183,9 +186,17 @@ export default function WhatsAppPage() {
       </div>
 
       <div className="rounded-xl border p-4">
-        {messages.map((msg: any) => (
-          <div key={msg.id}>{msg.content}</div>
-        ))}
+        {messages.length === 0 ? (
+          <div className="space-y-3 text-sm text-muted-foreground">
+            <p>
+              Ainda não há mensagens. Esta conversa será alimentada por contexto
+              de cobrança, execução e acompanhamento.
+            </p>
+            <DemoEnvironmentCta />
+          </div>
+        ) : (
+          messages.map((msg: any) => <div key={msg.id}>{msg.content}</div>)
+        )}
       </div>
 
       <Input

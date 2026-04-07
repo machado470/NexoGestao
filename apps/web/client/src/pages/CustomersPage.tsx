@@ -39,6 +39,7 @@ import {
 } from "@/lib/query-helpers";
 import { PageHero, PageShell, SurfaceSection } from "@/components/PagePattern";
 import { EmptyState } from "@/components/EmptyState";
+import { DemoEnvironmentCta } from "@/components/DemoEnvironmentCta";
 
 type Customer = {
   id: string;
@@ -447,7 +448,7 @@ export default function CustomersPage() {
               Carregando clientes...
             </SurfaceSection>
           ) : customers.length === 0 ? (
-            <SurfaceSection className="m-4">
+            <SurfaceSection className="m-4 space-y-3">
               <EmptyState
                 icon={<Users className="h-7 w-7" />}
                 title="Sua base de clientes ainda está vazia"
@@ -461,6 +462,7 @@ export default function CustomersPage() {
                   onClick: () => void listCustomers.refetch(),
                 }}
               />
+              <DemoEnvironmentCta />
             </SurfaceSection>
           ) : (
             <div className="overflow-x-auto">

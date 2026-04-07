@@ -16,6 +16,7 @@ import {
   Wallet,
   Workflow,
 } from "lucide-react";
+import { DemoEnvironmentCta } from "@/components/DemoEnvironmentCta";
 
 function formatCurrency(cents?: number): string {
   return new Intl.NumberFormat("pt-BR", {
@@ -542,6 +543,7 @@ export default function Dashboard() {
               </p>
             </div>
           </div>
+          <DemoEnvironmentCta className="mt-4" />
         </section>
       ) : null}
 

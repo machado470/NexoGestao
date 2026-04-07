@@ -9,6 +9,7 @@ import FinanceOverviewAreaChart from "@/components/finance/FinanceOverviewAreaCh
 import { Loader2, Receipt } from "lucide-react";
 import { PageHero, PageShell, SurfaceSection } from "@/components/PagePattern";
 import { EmptyState } from "@/components/EmptyState";
+import { DemoEnvironmentCta } from "@/components/DemoEnvironmentCta";
 
 /* ================= HELPERS ================= */
 
@@ -179,7 +180,7 @@ export default function FinancesPage() {
       )}
 
       {charges.length === 0 ? (
-        <SurfaceSection>
+        <SurfaceSection className="space-y-3">
           <EmptyState
             icon={<Receipt className="h-7 w-7" />}
             title="Sem cobranças registradas"
@@ -193,6 +194,7 @@ export default function FinancesPage() {
               onClick: () => navigate("/service-orders"),
             }}
           />
+          <DemoEnvironmentCta />
         </SurfaceSection>
       ) : (
         <div className="space-y-3">
