@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { getErrorMessage, getPayloadValue, getQueryUiState } from "@/lib/query-helpers";
@@ -55,13 +55,11 @@ export default function GovernancePage() {
     return payload && typeof payload === "object" ? payload : null;
   }, [alertsQuery.data]);
 
-  const institutionalRiskScore = clamp(
-    Number(summary?.institutionalRiskScore ?? autoScore?.institutionalRiskScore ?? autoScore?.score ?? 0)
-  );
-  const financialScore = clamp(100 - Number(summary?.financialRiskScore ?? autoScore?.financialRiskScore ?? 0));
-  const operationScore = clamp(100 - Number(summary?.operationalRiskScore ?? autoScore?.operationalRiskScore ?? 0));
-  const communicationScore = clamp(100 - Number(summary?.communicationRiskScore ?? autoScore?.communicationRiskScore ?? 0));
   const [actionRoutingId, setActionRoutingId] = useState<string | null>(null);
+  const [stableSummary, setStableSummary] = useState<any | null>(null);
+  const [stableRuns, setStableRuns] = useState<any[]>([]);
+  const [stableAlerts, setStableAlerts] = useState<any | null>(null);
+  const [optimisticBanner, setOptimisticBanner] = useState(false);
 
   const hasAnyData =
     summaryQuery.data !== undefined ||
@@ -70,6 +68,42 @@ export default function GovernancePage() {
     alertsQuery.data !== undefined;
 
   const queryState = getQueryUiState([summaryQuery, runsQuery, autoScoreQuery, alertsQuery], hasAnyData);
+
+  useEffect(() => {
+    if (summary) setStableSummary(summary);
+  }, [summary]);
+
+  useEffect(() => {
+    if (runs.length > 0) setStableRuns(runs);
+  }, [runs]);
+
+  useEffect(() => {
+    if (alerts) setStableAlerts(alerts);
+  }, [alerts]);
+
+  useEffect(() => {
+    const isRefreshing =
+      summaryQuery.isFetching || runsQuery.isFetching || autoScoreQuery.isFetching || alertsQuery.isFetching;
+
+    if (isRefreshing) {
+      setOptimisticBanner(true);
+      const timeoutId = window.setTimeout(() => setOptimisticBanner(false), 900);
+      return () => window.clearTimeout(timeoutId);
+    }
+
+    setOptimisticBanner(false);
+  }, [summaryQuery.isFetching, runsQuery.isFetching, autoScoreQuery.isFetching, alertsQuery.isFetching]);
+
+  const displaySummary = summary ?? stableSummary;
+  const displayRuns = runs.length > 0 ? runs : stableRuns;
+  const displayAlerts = alerts ?? stableAlerts;
+
+  const institutionalRiskScore = clamp(
+    Number(displaySummary?.institutionalRiskScore ?? autoScore?.institutionalRiskScore ?? autoScore?.score ?? 0)
+  );
+  const financialScore = clamp(100 - Number(displaySummary?.financialRiskScore ?? autoScore?.financialRiskScore ?? 0));
+  const operationScore = clamp(100 - Number(displaySummary?.operationalRiskScore ?? autoScore?.operationalRiskScore ?? 0));
+  const communicationScore = clamp(100 - Number(displaySummary?.communicationRiskScore ?? autoScore?.communicationRiskScore ?? 0));
 
   const hasError = summaryQuery.isError || runsQuery.isError || autoScoreQuery.isError || alertsQuery.isError;
   const errorMessage =
@@ -118,6 +152,33 @@ export default function GovernancePage() {
         ? "attention"
         : "healthy";
 
+  const autoProblems = [
+    {
+      id: "overdue-charge",
+      message: `${Math.max(Number(displaySummary?.overdueCharges ?? 0), 0)} cobranças vencidas → agir agora`,
+      weight: Math.max(Number(displaySummary?.overdueCharges ?? 0), 0) * 3,
+      cta: "Recuperar caixa",
+      route: "/finances",
+      severity: "critical",
+    },
+    {
+      id: "stalled-os",
+      message: `${Math.max(Number(displaySummary?.stalledServiceOrders ?? 0), 0)} O.S. paradas → risco operacional`,
+      weight: Math.max(Number(displaySummary?.stalledServiceOrders ?? 0), 0) * 2,
+      cta: "Destravar O.S.",
+      route: "/service-orders",
+      severity: "high",
+    },
+    {
+      id: "silent-comms",
+      message: "Cadência de comunicação abaixo do ideal",
+      weight: communicationScore < 70 ? 4 : 0,
+      cta: "Abrir WhatsApp",
+      route: "/whatsapp",
+      severity: "attention",
+    },
+  ].sort((a, b) => b.weight - a.weight);
+
   if (isInitializing) {
     return <PageShell><PageHero eyebrow="Governança" title="Governança" description="Validando sessão e permissões." /><SurfaceSection className="flex min-h-[180px] items-center justify-center gap-2 text-sm text-zinc-500 dark:text-zinc-400"><Loader2 className="h-4 w-4 animate-spin" />Carregando sessão...</SurfaceSection></PageShell>;
   }
@@ -140,8 +201,22 @@ export default function GovernancePage() {
         eyebrow="Governança"
         title="Governança Operacional"
         description="Aqui você prova valor executivo: o que mudou na operação, por que isso protege caixa e qual decisão tomar agora."
-        actions={<Button onClick={() => navigate("/dashboard/operations")}>Ver operação</Button>}
+        actions={<Button className="min-h-11 w-full md:w-auto" onClick={() => navigate("/dashboard/operations")}>Ver operação</Button>}
       />
+
+      <SurfaceSection className={`space-y-3 transition-all duration-300 ${optimisticBanner ? "ring-2 ring-orange-300/40 dark:ring-orange-500/30" : ""}`}>
+        <h2 className="font-semibold">O que precisa de atenção agora</h2>
+        <div className="space-y-2">
+          {autoProblems.map((problem) => (
+            <div key={problem.id} className="nexo-subtle-surface flex flex-col gap-3 p-3 md:flex-row md:items-center md:justify-between">
+              <p className="text-sm font-medium text-zinc-800 dark:text-zinc-100">{problem.message}</p>
+              <Button className="min-h-11 w-full md:w-auto" onClick={() => navigate(problem.route)}>
+                {problem.cta}
+              </Button>
+            </div>
+          ))}
+        </div>
+      </SurfaceSection>
 
       <div
         className={`nexo-surface p-6 text-center ${
@@ -186,6 +261,7 @@ export default function GovernancePage() {
                 <p className="text-sm text-zinc-500 dark:text-zinc-400">{item.description}</p>
               </div>
               <Button
+                className="min-h-11 w-full md:w-auto"
                 onClick={() => {
                   setActionRoutingId(item.id);
                   item.onClick();
@@ -202,10 +278,10 @@ export default function GovernancePage() {
         <SurfaceSection className="border-amber-500/30 bg-amber-500/10 text-sm text-amber-200">{errorMessage}</SurfaceSection>
       ) : null}
 
-      {runs.length > 0 ? (
+      {displayRuns.length > 0 ? (
         <SurfaceSection className="space-y-2">
           <h2 className="font-semibold">Histórico recente</h2>
-          {runs.slice(0, 5).map((run: any) => (
+          {displayRuns.slice(0, 5).map((run: any) => (
             <div key={run.id} className="rounded border p-3 text-sm">
               {formatDate(run.createdAt)} · Score {Number(run.institutionalRiskScore ?? run.score ?? 0)}
             </div>
@@ -223,7 +299,7 @@ export default function GovernancePage() {
         </SurfaceSection>
       )}
 
-      {runs.length > 1 ? (
+      {displayRuns.length > 1 ? (
         <SurfaceSection className="space-y-2 border-emerald-200 bg-emerald-50/80 dark:border-emerald-900/40 dark:bg-emerald-950/20">
           <h2 className="font-semibold">Antes vs agora</h2>
           <p className="text-sm text-zinc-700 dark:text-zinc-300">
@@ -232,9 +308,9 @@ export default function GovernancePage() {
         </SurfaceSection>
       ) : null}
 
-      {alerts?.total ? (
+      {displayAlerts?.total ? (
         <SurfaceSection className="text-sm text-zinc-500 dark:text-zinc-400">
-          Alertas monitorados: {Number(alerts.total ?? 0)}
+          Alertas monitorados: {Number(displayAlerts.total ?? 0)}
         </SurfaceSection>
       ) : null}
     </PageShell>
