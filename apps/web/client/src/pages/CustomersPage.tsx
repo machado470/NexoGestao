@@ -512,11 +512,10 @@ export default function CustomersPage() {
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-medium text-gray-900 dark:text-white">
-                  Lista de clientes
+                  Base que gera receita
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Abra o workspace para enxergar contexto consolidado e próxima
-                  ação.
+                  Abra um workspace para entender o contexto, o impacto e a ação imediata por cliente.
                 </p>
               </div>
             </div>
@@ -531,7 +530,7 @@ export default function CustomersPage() {
               <EmptyState
                 icon={<Users className="h-7 w-7" />}
                 title="Sua base de clientes ainda está vazia"
-                description="Cadastre o primeiro cliente para destravar o fluxo Clientes → Agendamentos → O.S. → Financeiro → WhatsApp → Timeline."
+                description="Comece criando seu primeiro cliente e veja sua operação acontecer do atendimento ao recebimento."
                 action={{
                   label: "Cadastrar primeiro cliente",
                   onClick: () => setIsCreateOpen(true),

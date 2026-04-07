@@ -252,8 +252,8 @@ export default function Dashboard() {
 
   const impactMessage =
     overdueChargesAmount > 0
-      ? `${formatCurrency(overdueChargesAmount)} travados em cobranças vencidas.`
-      : "Sem receita vencida travando o caixa agora.";
+      ? `Você tem ${formatCurrency(overdueChargesAmount)} de dinheiro parado aqui em cobranças vencidas.`
+      : "Sem receita vencida travando seu caixa neste momento.";
 
   if (isInitializing) {
     return (
@@ -347,9 +347,9 @@ export default function Dashboard() {
 
         <KpiCard
           icon={Receipt}
-          label="Cobranças vencidas"
+          label="Dinheiro parado"
           value={`${overdueChargesCount} · ${formatCurrency(overdueChargesAmount)}`}
-          description="Receita parada esperando ação."
+          description="Receita que depende de ação agora para virar caixa."
         />
 
         <KpiCard
@@ -383,8 +383,8 @@ export default function Dashboard() {
         />
 
         <ActionListCard
-          title="Cobranças vencidas"
-          description="Valores que já deveriam ter fechado o ciclo."
+          title="Dinheiro parado em cobrança"
+          description="Valores que já deveriam estar no caixa e ainda estão abertos."
           emptyText="Nenhuma cobrança vencida neste momento."
           tone="default"
           items={overdueCharges.slice(0, 5).map(charge => ({

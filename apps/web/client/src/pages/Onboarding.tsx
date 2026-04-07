@@ -170,6 +170,8 @@ export default function Onboarding() {
   const [progress, setProgress] = useState<Progress>(BASE_PROGRESS);
   const [journeyIds, setJourneyIds] = useState<JourneyIds>(BASE_IDS);
   const [error, setError] = useState<string | null>(null);
+  const [flowMessage, setFlowMessage] = useState<string | null>(null);
+  const [seedFallback, setSeedFallback] = useState<string | null>(null);
   const [chargeAmountCents, setChargeAmountCents] = useState(15000);
   const [governanceSnapshot, setGovernanceSnapshot] = useState<number | null>(null);
 
@@ -356,6 +358,11 @@ export default function Onboarding() {
     }
   };
 
+  const scoreDelta =
+    governanceSnapshot !== null && governanceScore !== null
+      ? governanceScore - governanceSnapshot
+      : null;
+
   if (isInitializing) {
     return (
       <div className="flex h-[80vh] items-center justify-center">
@@ -419,6 +426,18 @@ export default function Onboarding() {
         </div>
       ) : null}
 
+      {flowMessage ? (
+        <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-300">
+          {flowMessage}
+        </div>
+      ) : null}
+
+      {seedFallback ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300">
+          {seedFallback}
+        </div>
+      ) : null}
+
       <section className="rounded-2xl border border-orange-200 bg-orange-50/70 p-4 dark:border-orange-900/40 dark:bg-orange-950/20">
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-orange-700 dark:text-orange-300">
           Quer impressionar em 30 segundos?
@@ -428,6 +447,8 @@ export default function Onboarding() {
         </p>
         <Button className="mt-3" variant="secondary" disabled={isGenerating} onClick={async () => {
           setError(null);
+          setFlowMessage("Preparando dados da demonstração...");
+          setSeedFallback(null);
           try {
             const payload = await generateDemoEnvironment();
             if (payload?.customerId) {
@@ -440,8 +461,11 @@ export default function Onboarding() {
               chargesQuery.refetch(),
               governanceSummaryQuery.refetch(),
             ]);
+            setFlowMessage("Ambiente de demonstração pronto. Você já pode avançar pelas etapas sem bloqueios.");
           } catch (e) {
             setError((e as Error).message);
+            setSeedFallback("A geração automática de dados falhou. Continue pela jornada manual abaixo: ela possui fallback completo e não quebra o fluxo da demo.");
+            setFlowMessage(null);
           }
         }}>
           {isGenerating ? "Preparando ambiente demo..." : "Gerar dados de demo agora"}
@@ -485,6 +509,7 @@ export default function Onboarding() {
             </div>
             <Button className="mt-4" disabled={!canRun.customer || progress.customer || customerMutation.isPending} onClick={async () => {
               setError(null);
+              setFlowMessage("Criando cliente e preparando o próximo passo...");
               try {
                 if (!customerName.trim()) throw new Error("Informe o nome do cliente.");
                 if (!customerPhone.trim()) throw new Error("Informe o telefone do cliente.");
@@ -492,8 +517,10 @@ export default function Onboarding() {
                 setJourneyIds((prev) => ({ ...prev, customerId: extractEntityId(customerResult, ["customerId", "id"]) ?? prev.customerId }));
                 await utils.nexo.customers.list.invalidate();
                 completeStep("customer");
+                setFlowMessage("Cliente criado. Agora avance para o agendamento para mostrar previsibilidade operacional.");
               } catch (e) {
                 setError((e as Error).message);
+                setFlowMessage(null);
               }
             }}>{customerMutation.isPending ? "Criando..." : progress.customer ? "Concluído" : STEP_META[0].cta}</Button>
           </section>
@@ -504,6 +531,7 @@ export default function Onboarding() {
             <input className="mt-4 w-full rounded-md border bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-zinc-800" value={appointmentNotes} onChange={(e) => setAppointmentNotes(e.target.value)} placeholder="Observação do agendamento" />
             <Button className="mt-4" disabled={!canRun.appointment || progress.appointment || appointmentMutation.isPending} onClick={async () => {
               setError(null);
+              setFlowMessage("Registrando agendamento...");
               try {
                 if (!activeCustomerId) throw new Error("Crie um cliente primeiro.");
                 const startsAt = new Date();
@@ -518,8 +546,10 @@ export default function Onboarding() {
                 setJourneyIds((prev) => ({ ...prev, appointmentId: extractEntityId(result, ["appointmentId", "id"]) ?? prev.appointmentId }));
                 await utils.nexo.appointments.list.invalidate();
                 completeStep("appointment");
+                setFlowMessage("Agendamento criado. Agora formalize a entrega na O.S.");
               } catch (e) {
                 setError((e as Error).message);
+                setFlowMessage(null);
               }
             }}>{appointmentMutation.isPending ? "Criando..." : progress.appointment ? "Concluído" : STEP_META[1].cta}</Button>
           </section>
@@ -530,6 +560,7 @@ export default function Onboarding() {
             <input className="mt-4 w-full rounded-md border bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-zinc-800" value={serviceOrderTitle} onChange={(e) => setServiceOrderTitle(e.target.value)} placeholder="Título da ordem de serviço" />
             <Button className="mt-4" disabled={!canRun.serviceOrder || progress.serviceOrder || serviceOrderMutation.isPending} onClick={async () => {
               setError(null);
+              setFlowMessage("Criando ordem de serviço...");
               try {
                 if (!activeCustomerId) throw new Error("Crie um cliente primeiro.");
                 if (!serviceOrderTitle.trim()) throw new Error("Informe o título da ordem de serviço.");
@@ -537,8 +568,10 @@ export default function Onboarding() {
                 setJourneyIds((prev) => ({ ...prev, serviceOrderId: extractEntityId(result, ["serviceOrderId", "id"]) ?? prev.serviceOrderId }));
                 await utils.nexo.serviceOrders.list.invalidate();
                 completeStep("serviceOrder");
+                setFlowMessage("Execução registrada. Próximo passo: gerar cobrança para evidenciar valor financeiro.");
               } catch (e) {
                 setError((e as Error).message);
+                setFlowMessage(null);
               }
             }}>{serviceOrderMutation.isPending ? "Criando..." : progress.serviceOrder ? "Concluído" : STEP_META[2].cta}</Button>
           </section>
@@ -549,6 +582,7 @@ export default function Onboarding() {
             <input className="mt-4 w-full rounded-md border bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-zinc-800" type="number" min="1" value={chargeAmount} onChange={(e) => setChargeAmount(e.target.value)} placeholder="Valor da cobrança" />
             <Button className="mt-4" disabled={!canRun.charge || progress.charge || chargeMutation.isPending} onClick={async () => {
               setError(null);
+              setFlowMessage("Gerando cobrança e conectando operação ao caixa...");
               try {
                 if (!activeCustomerId) throw new Error("Crie um cliente primeiro.");
                 const amount = Number(chargeAmount);
@@ -558,8 +592,10 @@ export default function Onboarding() {
                 setChargeAmountCents(extractChargeAmountCents(result) ?? Math.round(amount * 100));
                 await utils.finance.charges.list.invalidate();
                 completeStep("charge");
+                setFlowMessage("Cobrança criada. Agora simule pagamento para mostrar dinheiro entrando.");
               } catch (e) {
                 setError((e as Error).message);
+                setFlowMessage(null);
               }
             }}>{chargeMutation.isPending ? "Gerando..." : progress.charge ? "Concluído" : STEP_META[3].cta}</Button>
           </section>
@@ -569,6 +605,7 @@ export default function Onboarding() {
             <p className="mt-1 text-sm text-muted-foreground">Comprove recuperação de receita em tempo real.</p>
             <Button className="mt-4" disabled={!canRun.payment || progress.payment || payChargeMutation.isPending || !activeChargeId} onClick={async () => {
               setError(null);
+              setFlowMessage("Registrando pagamento...");
               try {
                 if (!activeChargeId) throw new Error("Gere uma cobrança primeiro.");
                 await payChargeMutation.mutateAsync({
@@ -583,8 +620,10 @@ export default function Onboarding() {
                   utils.governance.summary.invalidate(),
                 ]);
                 completeStep("payment");
+                setFlowMessage("Pagamento confirmado. Atualize governança para fechar o argumento executivo da demo.");
               } catch (e) {
                 setError((e as Error).message);
+                setFlowMessage(null);
               }
             }}>{payChargeMutation.isPending ? "Processando..." : progress.payment ? "Concluído" : STEP_META[4].cta}</Button>
           </section>
@@ -609,13 +648,39 @@ export default function Onboarding() {
             </div>
             <Button className="mt-4" disabled={!canRun.governance || progress.governance || governanceSummaryQuery.isFetching} onClick={async () => {
               setError(null);
+              setFlowMessage("Atualizando score institucional...");
               try {
                 await governanceSummaryQuery.refetch();
                 completeStep("governance");
+                setFlowMessage("Jornada concluída. Use o resumo abaixo para fechar a demonstração com impacto.");
               } catch (e) {
                 setError((e as Error).message);
+                setFlowMessage(null);
               }
             }}>{governanceSummaryQuery.isFetching ? "Atualizando..." : progress.governance ? "Concluído" : STEP_META[5].cta}</Button>
+          </section>
+
+          <section className="rounded-2xl border border-emerald-200 bg-emerald-50/80 p-6 shadow-sm dark:border-emerald-900/40 dark:bg-emerald-950/20">
+            <h2 className="text-lg font-semibold">WOW moment: antes vs depois</h2>
+            <p className="mt-2 text-sm text-zinc-700 dark:text-zinc-300">
+              Antes: operação desorganizada e receita sem previsibilidade. Agora: fluxo completo, cobrança ativa e controle institucional.
+            </p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              <div className="rounded-xl border border-emerald-200 bg-white/80 p-3 text-sm dark:border-emerald-900/40 dark:bg-emerald-950/10">
+                <p className="text-xs uppercase tracking-wide text-zinc-500">Score antes</p>
+                <p className="mt-1 text-xl font-semibold">{governanceSnapshot ?? "—"}</p>
+              </div>
+              <div className="rounded-xl border border-emerald-200 bg-white/80 p-3 text-sm dark:border-emerald-900/40 dark:bg-emerald-950/10">
+                <p className="text-xs uppercase tracking-wide text-zinc-500">Score agora</p>
+                <p className="mt-1 text-xl font-semibold">{governanceScore ?? "—"}</p>
+              </div>
+              <div className="rounded-xl border border-emerald-200 bg-white/80 p-3 text-sm dark:border-emerald-900/40 dark:bg-emerald-950/10">
+                <p className="text-xs uppercase tracking-wide text-zinc-500">Mudança</p>
+                <p className="mt-1 text-xl font-semibold">
+                  {scoreDelta === null ? "—" : scoreDelta > 0 ? `+${scoreDelta}` : scoreDelta}
+                </p>
+              </div>
+            </div>
           </section>
 
           <section className="rounded-2xl border bg-card p-6 shadow-sm dark:border-zinc-800">

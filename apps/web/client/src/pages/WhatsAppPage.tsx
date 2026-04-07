@@ -122,7 +122,7 @@ export default function WhatsAppPage() {
         <PageHero
           eyebrow="WhatsApp"
           title="WhatsApp"
-          description="Comunicação contextual do fluxo: abra via O.S. ou cobrança para manter histórico e próxima ação."
+          description="Comunique com contexto comercial: veja o cenário, entenda o impacto e execute a mensagem certa agora."
           actions={
             <Button variant="outline" onClick={() => navigate("/service-orders")}>
               <ArrowLeft className="mr-2 h-4 w-4" />
@@ -134,7 +134,7 @@ export default function WhatsAppPage() {
           <EmptyState
             icon={<MessageCircle className="h-7 w-7" />}
             title="Sem contexto selecionado"
-            description="Abra o WhatsApp por uma O.S. ou cobrança para trazer cliente, histórico e mensagem sugerida sem improviso."
+            description="Abra o WhatsApp por uma O.S. ou cobrança para trazer cliente, impacto financeiro e mensagem sugerida sem improviso."
             action={{
               label: "Começar por Ordens de Serviço",
               onClick: () => navigate("/service-orders"),
@@ -149,10 +149,10 @@ export default function WhatsAppPage() {
   if (queryState.isInitialLoading) {
     return (
       <PageShell>
-        <PageHero eyebrow="WhatsApp" title="WhatsApp" description="Carregando contexto da conversa." />
+        <PageHero eyebrow="WhatsApp" title="WhatsApp" description="Preparando contexto da conversa para você agir em segundos." />
         <SurfaceSection className="flex min-h-[180px] items-center justify-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
           <RefreshCw className="h-4 w-4 animate-spin" />
-          Carregando conversa...
+          Carregando conversa e próxima ação...
         </SurfaceSection>
       </PageShell>
     );
@@ -171,10 +171,10 @@ export default function WhatsAppPage() {
 
   return (
     <PageShell>
-      <PageHero
-        eyebrow="WhatsApp"
-        title="WhatsApp"
-        description="Conversa com contexto de execução e cobrança para acelerar fechamento e reduzir retrabalho."
+        <PageHero
+          eyebrow="WhatsApp"
+          title="WhatsApp"
+          description="Transforme conversa em fechamento: o contexto já mostra o que aconteceu, por que importa e o que enviar agora."
         actions={
           <Button variant="outline" onClick={() => navigate(resolveBack(route))}>
             <ArrowLeft className="mr-2 h-4 w-4" />
@@ -245,7 +245,7 @@ export default function WhatsAppPage() {
           <EmptyState
             icon={<MessageCircle className="h-7 w-7" />}
             title="Nenhuma mensagem nesta conversa"
-            description="Ainda não há mensagens neste contexto. Envie o primeiro contato para registrar comunicação rastreável na operação."
+            description="Ainda não há mensagens neste contexto. Envie o primeiro contato para destravar a próxima etapa comercial."
             action={{
               label: "Atualizar conversa",
               onClick: () => void messagesQuery.refetch(),

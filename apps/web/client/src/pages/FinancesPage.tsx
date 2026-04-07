@@ -269,9 +269,9 @@ export default function FinancesPage() {
     if (overdue) {
       return {
         severity: "critical" as const,
-        title: "Cobrança vencida detectada",
-        description: "Priorize contato imediato por WhatsApp para reduzir atraso de caixa.",
-        ctaLabel: "Cobrar no WhatsApp",
+        title: "Você tem dinheiro parado aqui",
+        description: "Essa cobrança já venceu e está travando seu caixa. Acione o cliente agora e recupere receita.",
+        ctaLabel: "Recuperar no WhatsApp",
         onClick: () => {
           const phone = String(
             overdue.charge.customerPhone ?? overdue.charge.phone ?? ""
@@ -298,9 +298,9 @@ export default function FinancesPage() {
 
     return {
       severity: "attention" as const,
-      title: "Monitorar fila de cobrança",
-      description: "Sem urgências críticas no momento. Siga a fila priorizada automaticamente.",
-      ctaLabel: "Ver fila",
+      title: "Seu caixa está em ritmo saudável",
+      description: "Sem urgência crítica agora. Continue pela fila priorizada para manter previsibilidade de receita.",
+      ctaLabel: "Seguir fila",
       onClick: () => navigate("/finances"),
     };
   }, [billingQueue, isPaymentScoped, navigate, paymentById?.id, paymentScopedCharge?.serviceOrderId]);
@@ -373,12 +373,12 @@ export default function FinancesPage() {
         <PageHero
           eyebrow="Financeiro"
           title="Financeiro"
-          description="Leitura consolidada de cobrança, recebimento e pendências sem alterar o fluxo funcional."
+          description="Estamos organizando suas cobranças para mostrar onde está o dinheiro e qual ação gera caixa agora."
         />
         <SurfaceSection className="flex min-h-[180px] items-center justify-center">
           <div className="inline-flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
             <Loader2 className="h-4 w-4 animate-spin" />
-            Carregando dados financeiros...
+            Carregando painel de caixa...
           </div>
         </SurfaceSection>
       </PageShell>
@@ -402,10 +402,10 @@ export default function FinancesPage() {
 
   return (
     <PageShell>
-      <PageHero
-        eyebrow="Financeiro"
-        title="Financeiro"
-        description="Cobrança conectada à execução: acompanhe pendências, recebimentos e próximos passos comerciais."
+        <PageHero
+          eyebrow="Financeiro"
+          title="Financeiro"
+          description="Veja o que está acontecendo no caixa, por que isso importa para sua venda e qual ação executar agora."
         actions={
           <div className="flex flex-wrap gap-2">
             <button
@@ -462,9 +462,9 @@ export default function FinancesPage() {
       {billingQueue.length > 0 && (
         <SurfaceSection className="space-y-3">
           <div>
-            <h2 className="nexo-section-title">Fila de cobrança</h2>
+            <h2 className="nexo-section-title">O que gera caixa agora</h2>
             <p className="nexo-section-description">
-              Ordem automática por vencido primeiro e mais antigo no topo.
+              A fila já vem pronta com o que está vencido primeiro para você recuperar receita sem perder tempo.
             </p>
           </div>
 
@@ -541,14 +541,14 @@ export default function FinancesPage() {
                 ? "Cobrança não encontrada"
                 : isPaymentScoped
                   ? "Pagamento não encontrado"
-                  : "Financeiro pronto para começar"
+                  : "Seu caixa está pronto para começar"
             }
             description={
               chargeIdFromUrl
                 ? "A cobrança solicitada não foi localizada neste workspace."
                 : isPaymentScoped
                   ? "O pagamento solicitado não foi localizado neste workspace."
-                  : "Quando a primeira O.S. gerar cobrança, esta tela passa a mostrar pendências, recebimentos e evolução do caixa."
+                  : "Comece criando seu primeiro cliente e a primeira O.S.; em seguida, você verá aqui cobranças, recebimentos e evolução do caixa."
             }
             action={{
               label: "Atualizar financeiro",
