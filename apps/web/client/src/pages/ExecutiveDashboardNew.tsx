@@ -15,6 +15,7 @@ import {
   Cell,
   Funnel,
   FunnelChart,
+  Legend,
   LabelList,
   Line,
   LineChart,
@@ -65,6 +66,7 @@ type MetricCardProps = {
   label: string;
   value: string | number;
   description?: string;
+  loading?: boolean;
 };
 
 function MetricCard({
@@ -72,21 +74,40 @@ function MetricCard({
   label,
   value,
   description,
+  loading,
 }: MetricCardProps) {
   return (
-    <div className="nexo-kpi-card">
+    <div className="nexo-kpi-card nexo-fade-in">
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{label}</p>
-          <div className="mt-3 nexo-metric-value">{value}</div>
+          <div className="mt-3 nexo-metric-value min-h-10">
+            {loading ? <div className="nexo-skeleton h-10 w-24 rounded-lg" /> : value}
+          </div>
           {description ? (
-            <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">{description}</p>
+            <p className="mt-2 min-h-4 text-xs text-zinc-500 dark:text-zinc-400">
+              {loading ? <span className="nexo-skeleton inline-block h-4 w-44 rounded" /> : description}
+            </p>
           ) : null}
         </div>
 
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-orange-200/80 bg-orange-100/80 text-orange-700 dark:border-orange-500/20 dark:bg-orange-500/12 dark:text-orange-300">
           <Icon className="h-5 w-5" />
         </div>
+      </div>
+    </div>
+  );
+}
+
+function DashboardCardSkeleton({ className = "" }: { className?: string }) {
+  return (
+    <div className={`nexo-skeleton-panel ${className}`}>
+      <div className="nexo-skeleton h-5 w-56 rounded" />
+      <div className="mt-2 nexo-skeleton h-4 w-72 rounded" />
+      <div className="mt-4 space-y-3">
+        <div className="nexo-skeleton h-10 w-full rounded-xl" />
+        <div className="nexo-skeleton h-10 w-[92%] rounded-xl" />
+        <div className="nexo-skeleton h-10 w-[86%] rounded-xl" />
       </div>
     </div>
   );
@@ -220,6 +241,7 @@ export default function ExecutiveDashboardNew() {
       id: "no-billing",
       label: "O.S. sem cobrança",
       value: Math.max(metrics.openServiceOrders, 0),
+      severity: "high",
       action: "Cobrar agora",
       onClick: () => navigate("/finances"),
     },
@@ -228,17 +250,19 @@ export default function ExecutiveDashboardNew() {
       label: "Cobranças vencidas",
       value:
         chargesStatus.find((item) => item.key.toLowerCase() === "overdue")?.value ?? 0,
+      severity: "critical",
       action: "Ver vencidas",
       onClick: () => navigate("/finances"),
     },
     {
-      id: "unconfirmed",
-      label: "Agendamentos sem confirmação",
-      value: Math.max(metrics.inProgressOrders, 0),
-      action: "Confirmar agenda",
-      onClick: () => navigate("/appointments"),
+      id: "stalled",
+      label: "O.S. travadas",
+      value: Math.max(metrics.delayedOrders, 0),
+      severity: "critical",
+      action: "Destravar O.S.",
+      onClick: () => navigate("/service-orders"),
     },
-  ];
+  ].sort((a, b) => b.value - a.value);
 
   const hasAnyCriticalError =
     metricsQuery.isError &&
@@ -310,14 +334,14 @@ export default function ExecutiveDashboardNew() {
             <button
               type="button"
               onClick={() => navigate("/service-orders")}
-              className="inline-flex h-10 items-center justify-center rounded-xl bg-orange-500 px-4 text-sm font-medium text-white transition-colors hover:bg-orange-600"
+              className="nexo-cta-primary"
             >
               Atacar gargalos
             </button>
             <button
               type="button"
               onClick={() => navigate("/finances")}
-              className="inline-flex h-10 items-center justify-center rounded-xl border border-zinc-300 px-4 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+              className="nexo-cta-secondary"
             >
               Abrir financeiro
             </button>
@@ -326,17 +350,19 @@ export default function ExecutiveDashboardNew() {
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard icon={Users} label="Clientes ativos" value={metricsQuery.isLoading ? "..." : metrics.totalCustomers} description="Base ativa acompanhada pela operação." />
-        <MetricCard icon={Briefcase} label="Ordens de serviço" value={metricsQuery.isLoading ? "..." : metrics.totalServiceOrders} description={`${metrics.openServiceOrders} abertas • ${metrics.inProgressOrders} em andamento`} />
-        <MetricCard icon={DollarSign} label="Receita total" value={metricsQuery.isLoading ? "..." : formatCurrency(metrics.totalRevenueInCents)} description={`Recebido: ${formatCurrency(metrics.paidRevenueInCents)}`} />
-        <MetricCard icon={AlertTriangle} label="Risco / atrasos" value={metricsQuery.isLoading ? "..." : Number(metrics.riskTickets) + Number(metrics.delayedOrders)} description={`Tickets: ${metrics.riskTickets} • atrasadas: ${metrics.delayedOrders}`} />
+        <MetricCard icon={Users} label="Clientes ativos" value={metrics.totalCustomers} loading={metricsQuery.isLoading} description="Base ativa acompanhada pela operação." />
+        <MetricCard icon={Briefcase} label="Ordens de serviço" value={metrics.totalServiceOrders} loading={metricsQuery.isLoading} description={`${metrics.openServiceOrders} abertas • ${metrics.inProgressOrders} em andamento`} />
+        <MetricCard icon={DollarSign} label="Receita total" value={formatCurrency(metrics.totalRevenueInCents)} loading={metricsQuery.isLoading} description={`Recebido: ${formatCurrency(metrics.paidRevenueInCents)}`} />
+        <MetricCard icon={AlertTriangle} label="Risco / atrasos" value={Number(metrics.riskTickets) + Number(metrics.delayedOrders)} loading={metricsQuery.isLoading} description={`Tickets: ${metrics.riskTickets} • atrasadas: ${metrics.delayedOrders}`} />
       </section>
 
       <section className="grid gap-6 xl:grid-cols-3">
-        <article className="nexo-surface p-5 xl:col-span-2">
+        <article className="nexo-surface nexo-fade-in p-5 xl:col-span-2">
           <h2 className="nexo-section-title">Receita ao longo do tempo</h2>
           <p className="mt-1 nexo-section-description">Linha temporal de evolução de receita.</p>
-          {lineChartData.length === 0 ? (
+          {revenueQuery.isLoading ? (
+            <DashboardCardSkeleton className="mt-4 min-h-[260px]" />
+          ) : lineChartData.length === 0 ? (
             <EmptyState
               icon={<BarChart3 className="h-6 w-6" />}
               title="Ainda não há série temporal de receita"
@@ -344,20 +370,24 @@ export default function ExecutiveDashboardNew() {
               action={{ label: "Ir para financeiro", onClick: () => navigate("/finances") }}
             />
           ) : (
-            <div className="mt-4 h-[260px]">
+            <div className="mt-4 h-[260px] nexo-fade-in">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={lineChartData}>
-                  <XAxis dataKey="period" />
-                  <YAxis />
-                  <Tooltip formatter={(value) => formatCurrency(Number(value) * 100)} />
-                  <Line type="monotone" dataKey="value" stroke="#f97316" strokeWidth={2} dot={false} />
+                  <XAxis dataKey="period" tickLine={false} axisLine={false} tickMargin={8} />
+                  <YAxis tickLine={false} axisLine={false} width={84} tickFormatter={(value) => formatCurrency(Number(value) * 100)} />
+                  <Tooltip
+                    contentStyle={{ borderRadius: 14, border: "1px solid rgba(251,146,60,.25)", background: "rgba(9,9,11,.94)", color: "#fff" }}
+                    formatter={(value: number) => [formatCurrency(Number(value) * 100), "Receita"]}
+                    labelFormatter={(label) => `Período: ${label}`}
+                  />
+                  <Line type="monotone" dataKey="value" stroke="#f97316" strokeWidth={3} dot={false} activeDot={{ r: 5, fill: "#f97316" }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
           )}
         </article>
 
-        <article className="nexo-surface p-5">
+        <article className="nexo-surface nexo-fade-in p-5">
           <h2 className="nexo-section-title">Funil operacional</h2>
           <p className="mt-1 nexo-section-description">Cliente → Agendamento → O.S. → Pagamento.</p>
           {funnelData.every((item) => item.value <= 0) ? (
@@ -368,10 +398,13 @@ export default function ExecutiveDashboardNew() {
               action={{ label: "Abrir clientes", onClick: () => navigate("/customers") }}
             />
           ) : (
-            <div className="mt-4 h-[260px]">
+            <div className="mt-4 h-[260px] nexo-fade-in">
               <ResponsiveContainer width="100%" height="100%">
                 <FunnelChart>
-                  <Tooltip />
+                  <Tooltip
+                    contentStyle={{ borderRadius: 14, border: "1px solid rgba(251,146,60,.3)", background: "rgba(255,255,255,.96)" }}
+                    formatter={(value: number) => [value, "Volume"]}
+                  />
                   <Funnel dataKey="value" data={funnelData} isAnimationActive>
                     <LabelList position="right" fill="#52525b" stroke="none" dataKey="name" />
                   </Funnel>
@@ -383,37 +416,50 @@ export default function ExecutiveDashboardNew() {
       </section>
 
       <section className="grid gap-6 lg:grid-cols-2">
-        <article className="nexo-surface p-5">
+        <article className="nexo-surface nexo-fade-in p-5">
           <h2 className="nexo-section-title">Distribuição de status</h2>
           <p className="mt-1 nexo-section-description">Volume atual por status de cobrança.</p>
-          <div className="mt-4 h-[260px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={chargesStatus} dataKey="value" nameKey="label" innerRadius={52} outerRadius={86}>
-                  {chargesStatus.map((entry, index) => (
-                    <Cell key={entry.key} fill={["#f97316", "#22c55e", "#ef4444", "#3b82f6"][index % 4]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
+          {chargesStatusQuery.isLoading ? (
+            <DashboardCardSkeleton className="mt-4 min-h-[260px]" />
+          ) : (
+            <div className="mt-4 h-[260px] nexo-fade-in">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart margin={{ top: 6, right: 10, bottom: 12, left: 10 }}>
+                  <Pie data={chargesStatus} dataKey="value" nameKey="label" innerRadius={52} outerRadius={86} paddingAngle={3}>
+                    {chargesStatus.map((entry, index) => (
+                      <Cell key={entry.key} fill={["#f97316", "#22c55e", "#ef4444", "#3b82f6"][index % 4]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{ borderRadius: 14, border: "1px solid rgba(251,146,60,.25)", background: "rgba(9,9,11,.94)", color: "#fff" }}
+                    formatter={(value: number, name) => [value, String(name)]}
+                  />
+                  <Legend verticalAlign="bottom" wrapperStyle={{ paddingTop: 14, fontSize: 12 }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </article>
 
-        <article className="nexo-surface p-5">
+        <article className="nexo-surface nexo-fade-in p-5">
           <h2 className="nexo-section-title">Gargalos agora</h2>
           <p className="mt-1 nexo-section-description">Pendências com ação direta para destravar receita.</p>
           <div className="mt-4 space-y-3">
             {bottlenecks.map((item) => (
-              <div key={item.id} className="nexo-list-row">
+              <div key={item.id} className={`nexo-list-row ${item.severity === "critical" ? "nexo-list-row-critical" : "nexo-list-row-high"}`}>
                 <div>
-                  <p className="font-medium text-zinc-900 dark:text-zinc-100">{item.label}</p>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400">{item.value} itens</p>
+                  <p className="font-semibold text-zinc-900 dark:text-zinc-100">{item.label}</p>
+                  <p className="text-xs text-zinc-600 dark:text-zinc-300">
+                    <span className="mr-1.5 inline-block rounded-full bg-black/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide dark:bg-white/10">
+                      {item.severity === "critical" ? "Crítico" : "Alto"}
+                    </span>
+                    {item.value} itens
+                  </p>
                 </div>
                 <button
                   type="button"
                   onClick={item.onClick}
-                  className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                  className="nexo-cta-secondary !h-8 !rounded-lg !px-3 !text-xs"
                 >
                   {item.action}
                 </button>
