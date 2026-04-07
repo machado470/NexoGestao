@@ -10,17 +10,44 @@ if ! command -v docker >/dev/null 2>&1; then
 fi
 
 if [ ! -f .env ]; then
-  echo "ℹ️ .env não encontrado. Copiando .env.example -> .env"
-  cp .env.example .env
+  if [ -f .env.example ]; then
+    echo "ℹ️ .env não encontrado. Copiando .env.example -> .env"
+    cp .env.example .env
+  elif [ -f examples/env/.env.example ]; then
+    echo "ℹ️ .env não encontrado. Copiando examples/env/.env.example -> .env"
+    cp examples/env/.env.example .env
+  fi
 fi
 
-source .env
-export DATABASE_URL REDIS_URL JWT_SECRET PORT API_PORT REDIS_HOST REDIS_PORT
-
-if [ -z "${DATABASE_URL:-}" ] || [ -z "${REDIS_URL:-}" ] || [ -z "${JWT_SECRET:-}" ]; then
-  echo "❌ DATABASE_URL, REDIS_URL e JWT_SECRET são obrigatórios no .env"
+if [ ! -f .env ]; then
+  echo "❌ .env não encontrado e nenhum template disponível para cópia automática."
+  echo "   Crie .env na raiz com DATABASE_URL, REDIS_URL e JWT_SECRET."
   exit 1
 fi
+
+set -a
+source .env
+set +a
+
+required_vars=(DATABASE_URL REDIS_URL JWT_SECRET)
+missing_vars=()
+for var_name in "${required_vars[@]}"; do
+  if [ -z "${!var_name:-}" ]; then
+    missing_vars+=("$var_name")
+  fi
+done
+
+if [ "${#missing_vars[@]}" -gt 0 ]; then
+  echo "❌ Variáveis obrigatórias ausentes no .env: ${missing_vars[*]}"
+  echo "   Exemplo mínimo:"
+  echo "   DATABASE_URL=postgresql://postgres:postgres@localhost:5432/nexogestao?schema=public"
+  echo "   REDIS_URL=redis://localhost:6379"
+  echo "   JWT_SECRET=change-this-secret-in-local"
+  echo "   Dica: rode cp .env.example .env e ajuste os valores locais."
+  exit 1
+fi
+
+export DATABASE_URL REDIS_URL JWT_SECRET PORT API_PORT REDIS_HOST REDIS_PORT
 
 if [ -z "${API_PORT:-}" ]; then
   export API_PORT="${PORT:-3001}"

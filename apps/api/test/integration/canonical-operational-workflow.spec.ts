@@ -15,6 +15,7 @@ type WorkflowPrisma = PrismaService & {
 }
 
 describe('Canonical Operational Workflow (e2e)', () => {
+  jest.setTimeout(30000)
   let app: INestApplication
   let prisma: WorkflowPrisma
 
@@ -59,20 +60,25 @@ describe('Canonical Operational Workflow (e2e)', () => {
   })
 
   afterAll(async () => {
-    if (!prisma || !app) return
-
-    await prisma.payment.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
-    await prisma.whatsAppMessage.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
-    await prisma.charge.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
-    await prisma.execution.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
-    await prisma.serviceOrder.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
-    await prisma.appointment.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
-    await prisma.customer.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
-    await prisma.timelineEvent.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
-    await prisma.auditEvent.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
-    await prisma.person.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
-    await prisma.organization.deleteMany({ where: { id: { in: [primaryOrgId, secondaryOrgId] } } })
-    await app.close()
+    try {
+      if (prisma) {
+        await prisma.payment.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
+        await prisma.whatsAppMessage.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
+        await prisma.charge.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
+        await prisma.execution.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
+        await prisma.serviceOrder.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
+        await prisma.appointment.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
+        await prisma.customer.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
+        await prisma.timelineEvent.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
+        await prisma.auditEvent.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
+        await prisma.person.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
+        await prisma.organization.deleteMany({ where: { id: { in: [primaryOrgId, secondaryOrgId] } } })
+      }
+    } finally {
+      if (app) {
+        await app.close()
+      }
+    }
   })
 
   it('runs end-to-end operational flow with timeline, finance transitions, risk recalculation, and org isolation', async () => {
