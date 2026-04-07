@@ -1,7 +1,8 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/contexts/AuthContext";
+import { EmptyState } from "@/components/EmptyState";
 import {
   AlertTriangle,
   BarChart3,
@@ -190,6 +191,7 @@ export default function ExecutiveDashboardNew() {
   const revenueQuery = trpc.dashboard.revenueTrend.useQuery(undefined, queryOptions);
   const serviceOrdersStatusQuery = trpc.dashboard.serviceOrdersStatus.useQuery(undefined, queryOptions);
   const chargesStatusQuery = trpc.dashboard.chargeDistribution.useQuery(undefined, queryOptions);
+  const [isSlowLoading, setIsSlowLoading] = useState(false);
 
   const metrics = normalizeMetrics(metricsQuery.data);
   const revenue = normalizeSeriesArray(revenueQuery.data);
@@ -243,6 +245,22 @@ export default function ExecutiveDashboardNew() {
     revenueQuery.isError &&
     serviceOrdersStatusQuery.isError &&
     chargesStatusQuery.isError;
+
+  const isStillLoading =
+    metricsQuery.isLoading ||
+    revenueQuery.isLoading ||
+    serviceOrdersStatusQuery.isLoading ||
+    chargesStatusQuery.isLoading;
+
+  useEffect(() => {
+    if (!isStillLoading) {
+      setIsSlowLoading(false);
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => setIsSlowLoading(true), 10000);
+    return () => window.clearTimeout(timeoutId);
+  }, [isStillLoading]);
 
   if (isInitializing) {
     return (
@@ -318,31 +336,49 @@ export default function ExecutiveDashboardNew() {
         <article className="nexo-surface p-5 xl:col-span-2">
           <h2 className="nexo-section-title">Receita ao longo do tempo</h2>
           <p className="mt-1 nexo-section-description">Linha temporal de evolução de receita.</p>
-          <div className="mt-4 h-[260px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={lineChartData}>
-                <XAxis dataKey="period" />
-                <YAxis />
-                <Tooltip formatter={(value) => formatCurrency(Number(value) * 100)} />
-                <Line type="monotone" dataKey="value" stroke="#f97316" strokeWidth={2} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+          {lineChartData.length === 0 ? (
+            <EmptyState
+              icon={<BarChart3 className="h-6 w-6" />}
+              title="Ainda não há série temporal de receita"
+              description="Assim que houver cobranças registradas, você verá a evolução no tempo para decidir com mais precisão."
+              action={{ label: "Ir para financeiro", onClick: () => navigate("/finances") }}
+            />
+          ) : (
+            <div className="mt-4 h-[260px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={lineChartData}>
+                  <XAxis dataKey="period" />
+                  <YAxis />
+                  <Tooltip formatter={(value) => formatCurrency(Number(value) * 100)} />
+                  <Line type="monotone" dataKey="value" stroke="#f97316" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </article>
 
         <article className="nexo-surface p-5">
           <h2 className="nexo-section-title">Funil operacional</h2>
           <p className="mt-1 nexo-section-description">Cliente → Agendamento → O.S. → Pagamento.</p>
-          <div className="mt-4 h-[260px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <FunnelChart>
-                <Tooltip />
-                <Funnel dataKey="value" data={funnelData} isAnimationActive>
-                  <LabelList position="right" fill="#52525b" stroke="none" dataKey="name" />
-                </Funnel>
-              </FunnelChart>
-            </ResponsiveContainer>
-          </div>
+          {funnelData.every((item) => item.value <= 0) ? (
+            <EmptyState
+              icon={<Briefcase className="h-6 w-6" />}
+              title="Funil operacional sem dados"
+              description="Cadastre clientes, agendamentos e ordens para enxergar perdas entre as etapas."
+              action={{ label: "Abrir clientes", onClick: () => navigate("/customers") }}
+            />
+          ) : (
+            <div className="mt-4 h-[260px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <FunnelChart>
+                  <Tooltip />
+                  <Funnel dataKey="value" data={funnelData} isAnimationActive>
+                    <LabelList position="right" fill="#52525b" stroke="none" dataKey="name" />
+                  </Funnel>
+                </FunnelChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </article>
       </section>
 
@@ -392,6 +428,18 @@ export default function ExecutiveDashboardNew() {
           )}
         </article>
       </section>
+
+      {(metricsQuery.isError || revenueQuery.isError || serviceOrdersStatusQuery.isError || chargesStatusQuery.isError) && !hasAnyCriticalError ? (
+        <section className="rounded-2xl border border-amber-300/50 bg-amber-50/70 p-4 text-sm text-amber-800 dark:border-amber-800/60 dark:bg-amber-950/20 dark:text-amber-200">
+          Parte dos blocos não foi carregada. Os dados visíveis já são válidos; atualize a página para tentar completar o painel.
+        </section>
+      ) : null}
+
+      {isSlowLoading ? (
+        <section className="rounded-2xl border border-blue-300/50 bg-blue-50/70 p-4 text-sm text-blue-800 dark:border-blue-800/60 dark:bg-blue-950/20 dark:text-blue-200">
+          A atualização está mais lenta que o normal. Você pode continuar navegando enquanto os blocos terminam de carregar.
+        </section>
+      ) : null}
     </div>
   );
 }
