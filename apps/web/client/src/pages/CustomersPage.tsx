@@ -43,7 +43,7 @@ import {
   normalizeArrayPayload,
   normalizeObjectPayload,
 } from "@/lib/query-helpers";
-import { PageHero, PageShell, SurfaceSection } from "@/components/PagePattern";
+import { PageHero, PageShell, SmartPage, SurfaceSection } from "@/components/PagePattern";
 import { EmptyState } from "@/components/EmptyState";
 import { DemoEnvironmentCta } from "@/components/DemoEnvironmentCta";
 
@@ -379,6 +379,40 @@ export default function CustomersPage() {
     item => item.status === "PENDING" || item.status === "OVERDUE"
   ).length;
 
+
+  const smartPriorities = useMemo(() => [
+    {
+      id: "cust-overdue",
+      type: "overdue_charges" as const,
+      title: "Clientes com cobrança pendente",
+      count: workspacePendingCharges,
+      impactCents: workspacePendingCharges * 30000,
+      ctaLabel: "Cobrar cliente",
+      ctaPath: "/finances",
+      helperText: "Cobrança atrasada compromete relacionamento e caixa.",
+    },
+    {
+      id: "cust-ops",
+      type: "stalled_service_orders" as const,
+      title: "Clientes com execução aberta",
+      count: workspaceServiceOrdersCount,
+      impactCents: workspaceServiceOrdersCount * 25000,
+      ctaLabel: "Acompanhar execução",
+      ctaPath: "/service-orders",
+      helperText: "Execução sem fechamento reduz previsibilidade de receita.",
+    },
+    {
+      id: "cust-risk",
+      type: "operational_risk" as const,
+      title: "Clientes sem próxima ação",
+      count: workspace ? 0 : 1,
+      impactCents: 10000,
+      ctaLabel: "Abrir workspace",
+      ctaPath: "/customers",
+      helperText: "Sem foco por cliente o time opera no escuro.",
+    },
+  ], [workspace, workspacePendingCharges, workspaceServiceOrdersCount]);
+
   const nextActionLabel = !workspace
     ? "Selecione um cliente para abrir o workspace."
     : workspacePendingCharges > 0
@@ -420,13 +454,30 @@ export default function CustomersPage() {
             <Button
               type="button"
               onClick={() => setIsCreateOpen(true)}
-              className="flex items-center gap-2 bg-orange-500 text-white hover:bg-orange-600"
+              className="min-h-12 flex items-center gap-2 bg-orange-500 text-white"
             >
               <Plus className="h-4 w-4" />
               Novo Cliente
             </Button>
           </>
         }
+      />
+
+
+      <SmartPage
+        pageContext="customers"
+        headline="Cliente nunca fica sem próximo passo"
+        dominantProblem={nextActionLabel}
+        dominantImpact={workspace ? `${workspacePendingCharges} pendências financeiras` : "Sem cliente em foco"}
+        dominantCta={{
+          label: workspace ? "Executar próxima ação" : "Novo cliente",
+          onClick: () => {
+            if (workspace) navigate(`/service-orders?customerId=${workspace.customer.id}`);
+            else setIsCreateOpen(true);
+          },
+          path: workspace ? `/service-orders?customerId=${workspace?.customer.id}` : "/customers",
+        }}
+        priorities={smartPriorities}
       />
 
       <SurfaceSection className="space-y-6">

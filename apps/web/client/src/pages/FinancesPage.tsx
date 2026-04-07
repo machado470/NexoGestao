@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import FinanceOverviewAreaChart from "@/components/finance/FinanceOverviewAreaChart";
 import { Loader2, Receipt } from "lucide-react";
-import { PageHero, PageShell, SurfaceSection } from "@/components/PagePattern";
+import { PageHero, PageShell, SmartPage, SurfaceSection } from "@/components/PagePattern";
 import { EmptyState } from "@/components/EmptyState";
 import { DemoEnvironmentCta } from "@/components/DemoEnvironmentCta";
 import { useChargeActions } from "@/hooks/useChargeActions";
@@ -264,6 +264,44 @@ export default function FinancesPage() {
     [statsQuery.data]
   );
 
+
+  const smartPriorities = useMemo(() => [
+    {
+      id: "fin-overdue",
+      type: "overdue_charges" as const,
+      title: "Cobranças vencidas",
+      count: billingQueue.filter((item) => item.normalized === "OVERDUE").length,
+      impactCents: billingQueue
+        .filter((item) => item.normalized === "OVERDUE")
+        .reduce((acc, item) => acc + Math.max(item.charge.amountCents || 0, 0), 0),
+      ctaLabel: "Recuperar cobrança",
+      ctaPath: "/finances",
+      helperText: "Receita presa no caixa precisa de contato imediato.",
+    },
+    {
+      id: "fin-pending",
+      type: "idle_cash" as const,
+      title: "Cobranças pendentes",
+      count: billingQueue.filter((item) => item.normalized === "PENDING").length,
+      impactCents: billingQueue
+        .filter((item) => item.normalized === "PENDING")
+        .reduce((acc, item) => acc + Math.max(item.charge.amountCents || 0, 0), 0),
+      ctaLabel: "Seguir fila",
+      ctaPath: "/finances",
+      helperText: "Pendências de hoje viram vencimento amanhã.",
+    },
+    {
+      id: "fin-risk",
+      type: "operational_risk" as const,
+      title: "Pagamentos sem fechamento operacional",
+      count: isPaymentScoped ? 1 : 0,
+      impactCents: paymentScopedCharge?.amountCents ?? 0,
+      ctaLabel: "Fechar O.S.",
+      ctaPath: "/service-orders",
+      helperText: "Pagamento sem conclusão operacional reduz previsibilidade.",
+    },
+  ], [billingQueue, isPaymentScoped, paymentScopedCharge?.amountCents]);
+
   const nextAction = useMemo(() => {
     const overdue = billingQueue.find((item) => item.normalized === "OVERDUE");
     if (overdue) {
@@ -411,19 +449,33 @@ export default function FinancesPage() {
             <button
               type="button"
               onClick={() => navigate("/finances")}
-              className="inline-flex h-10 items-center justify-center rounded-xl bg-orange-500 px-4 text-sm font-medium text-white transition-colors hover:bg-orange-600"
+              className="inline-flex min-h-12 items-center justify-center rounded-xl bg-orange-500 px-4 text-sm font-medium text-white"
             >
               Priorizar cobranças
             </button>
             <button
               type="button"
               onClick={() => navigate("/service-orders")}
-              className="inline-flex h-10 items-center justify-center rounded-xl border border-zinc-300 px-4 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+              className="inline-flex min-h-12 items-center justify-center rounded-xl border border-zinc-300 px-4 text-sm font-medium text-zinc-700 dark:border-zinc-700 dark:text-zinc-200"
             >
               Ir para Ordens de Serviço
             </button>
           </div>
         }
+      />
+
+
+      <SmartPage
+        pageContext="finances"
+        headline="Caixa orientado por prioridade"
+        dominantProblem={nextAction.title}
+        dominantImpact={billingQueue.length > 0 ? `${billingQueue.length} cobranças na fila` : "Sem pressão crítica agora"}
+        dominantCta={{
+          label: nextAction.ctaLabel,
+          onClick: nextAction.onClick,
+          path: "/finances",
+        }}
+        priorities={smartPriorities}
       />
 
       {queryState.hasBackgroundUpdate ? (
