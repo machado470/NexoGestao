@@ -13,7 +13,10 @@
     "prisma:migrate:deploy": "prisma migrate deploy --schema ../../prisma/schema.prisma",
     "prisma:migrate:status": "prisma migrate status --schema ../../prisma/schema.prisma",
     "prisma:seed": "prisma db seed --schema ../../prisma/schema.prisma",
-    "prisma": "node ../../scripts/prisma-cli.mjs"
+    "prisma": "node ../../scripts/prisma-cli.mjs",
+    "test": "jest --config jest.config.js --runInBand",
+    "test:unit": "jest --config jest.config.js --runInBand --testPathIgnorePatterns test/integration/canonical-operational-workflow.spec.ts",
+    "test:integration:real": "RUN_REAL_INTEGRATION=true jest --config jest.config.js --runInBand test/integration/canonical-operational-workflow.spec.ts"
   },
   "prisma": {
     "seed": "tsx ../../prisma/seed.ts"

@@ -128,7 +128,7 @@ export const financeRouter = router({
           amount: z.number().min(0.01).optional(),
           amountCents: z.number().int().min(1).optional(),
           dueDate: z.coerce.date().optional(),
-          status: z.enum(["PENDING", "CANCELED"]).optional(),
+          status: z.enum(["PENDING", "OVERDUE", "CANCELED"]).optional(),
           notes: z.string().optional(),
         })
       )

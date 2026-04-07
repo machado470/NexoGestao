@@ -2,6 +2,11 @@ import { Test, TestingModule } from '@nestjs/testing'
 import { DashboardService } from './dashboard.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { MemoryCacheService } from '../common/cache/memory-cache.service'
+import { GovernanceReadService } from '../governance/governance-read.service'
+
+const mockGovernanceReadService = {
+  getAutoScore: jest.fn().mockResolvedValue({ score: 0, level: 'LOW' }),
+}
 
 const mockPrisma = {
   customer: {
@@ -40,6 +45,7 @@ describe('DashboardService', () => {
         DashboardService,
         MemoryCacheService,
         { provide: PrismaService, useValue: mockPrisma },
+        { provide: GovernanceReadService, useValue: mockGovernanceReadService },
       ],
     }).compile()
 
@@ -50,7 +56,9 @@ describe('DashboardService', () => {
   })
 
   afterEach(async () => {
-    await module.close()
+    if (module) {
+      await module.close()
+    }
   })
 
   describe('getMetrics', () => {
@@ -101,7 +109,7 @@ describe('DashboardService', () => {
 
     it('deve retornar contagem correta de ordens atrasadas', async () => {
       const overdueOrders = [
-        { id: '1', title: 'OS Atrasada', scheduledFor: new Date('2024-01-01'), status: 'OPEN', customer: { id: 'c1', name: 'Cliente 1' } },
+        { id: '1', title: 'OS Atrasada', scheduledFor: new Date('2024-01-01'), status: 'OPEN', createdAt: new Date('2024-01-01'), finishedAt: null, customer: { id: 'c1', name: 'Cliente 1' } },
       ]
       mockPrisma.serviceOrder.findMany.mockResolvedValue(overdueOrders)
       mockPrisma.charge.findMany.mockResolvedValue([])

@@ -6,12 +6,17 @@ import { randomUUID } from 'crypto'
 
 import { AppModule } from '../../src/app.module'
 import { PrismaService } from '../../src/prisma/prisma.service'
+import { describeRealIntegration, REAL_INTEGRATION_SKIP_REASON, RUN_REAL_INTEGRATION } from './infra-guards'
 
 type WorkflowPrisma = PrismaService & {
   serviceOrder: PrismaService['serviceOrder']
 }
 
-describe('Canonical Operational Workflow (e2e)', () => {
+if (!RUN_REAL_INTEGRATION) {
+  console.warn(`[integration-skip] ${REAL_INTEGRATION_SKIP_REASON}`)
+}
+
+describeRealIntegration('Canonical Operational Workflow (e2e)', () => {
   jest.setTimeout(30000)
   let app: INestApplication
   let prisma: WorkflowPrisma
