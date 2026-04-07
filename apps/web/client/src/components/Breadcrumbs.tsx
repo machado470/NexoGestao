@@ -7,52 +7,31 @@ interface Breadcrumb {
 }
 
 const routeBreadcrumbs: Record<string, Breadcrumb[]> = {
-  "/dashboard": [
-    { label: "Visão", href: "/executive-dashboard" },
-    { label: "Central de decisão" },
-  ],
+  "/dashboard": [{ label: "Dashboard Executivo (alias)" }],
+  "/executive-dashboard": [{ label: "Dashboard Executivo" }],
+  "/executive-dashboard-new": [{ label: "Dashboard Executivo (alias)" }],
+  "/dashboard/operations": [{ label: "Operação diária (legado)" }],
+  "/operations": [{ label: "Ordens de Serviço (alias legado)" }],
 
-  "/dashboard/operations": [
-    { label: "Visão", href: "/executive-dashboard" },
-    { label: "Operação diária" },
-  ],
-
-  "/operations": [
-    { label: "Operação diária", href: "/dashboard/operations" },
-    { label: "Workflow" },
-  ],
-
-  "/service-orders": [
-    { label: "Operação diária", href: "/dashboard/operations" },
-    { label: "Ordens de Serviço" },
-  ],
-
-  "/customers": [
-    { label: "Operação diária", href: "/dashboard/operations" },
-    { label: "Clientes" },
-  ],
+  "/customers": [{ label: "Clientes" }],
 
   "/appointments": [
-    { label: "Operação diária", href: "/dashboard/operations" },
+    { label: "Clientes", href: "/customers" },
     { label: "Agendamentos" },
   ],
 
   "/calendar": [
-    { label: "Operação diária", href: "/dashboard/operations" },
+    { label: "Agendamentos", href: "/appointments" },
     { label: "Calendário" },
   ],
 
-  "/timeline": [
-    { label: "Operação diária", href: "/dashboard/operations" },
-    { label: "Histórico" },
-  ],
-
-  "/whatsapp": [
-    { label: "Operação diária", href: "/dashboard/operations" },
-    { label: "Conversa" },
-  ],
+  "/service-orders": [{ label: "Ordens de Serviço" }],
 
   "/finances": [{ label: "Financeiro" }],
+
+  "/whatsapp": [{ label: "WhatsApp" }],
+
+  "/timeline": [{ label: "Timeline" }],
 
   "/governance": [{ label: "Governança" }],
 
@@ -60,6 +39,8 @@ const routeBreadcrumbs: Record<string, Breadcrumb[]> = {
     { label: "Governança", href: "/governance" },
     { label: "Pessoas" },
   ],
+
+  "/settings": [{ label: "Configurações" }],
 };
 
 function humanizeSegment(path: string) {
@@ -88,24 +69,30 @@ function buildDynamicBreadcrumbs(location: string): Breadcrumb[] | null {
 
   if (pathname === "/operations" && params.get("os")) {
     return [
-      { label: "Operação diária", href: "/dashboard/operations" },
-      { label: "Workflow", href: "/operations" },
+      { label: "Ordens de Serviço", href: "/service-orders" },
+      { label: "Alias legado /operations", href: "/operations" },
       { label: "Detalhe da O.S." },
     ];
   }
 
   if (pathname === "/customers" && params.get("customerId")) {
     return [
-      { label: "Operação diária", href: "/dashboard/operations" },
       { label: "Clientes", href: "/customers" },
       { label: "Workspace do cliente" },
     ];
   }
 
+  if (pathname === "/service-orders" && params.get("os")) {
+    return [
+      { label: "Ordens de Serviço", href: "/service-orders" },
+      { label: "Detalhe da O.S." },
+    ];
+  }
+
   if (pathname === "/timeline" && params.get("customerId")) {
     return [
-      { label: "Operação diária", href: "/dashboard/operations" },
-      { label: "Histórico", href: "/timeline" },
+      { label: "Clientes", href: "/customers" },
+      { label: "Workspace do cliente" },
       { label: "Timeline do cliente" },
     ];
   }

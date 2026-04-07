@@ -19,7 +19,6 @@ import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { canAny, type Permission } from "./lib/rbac";
 
-import Dashboard from "./pages/Dashboard";
 import CustomersPage from "./pages/CustomersPage";
 import AppointmentsPage from "./pages/AppointmentsPage";
 import ServiceOrdersPage from "./pages/ServiceOrdersPage";
@@ -27,7 +26,6 @@ import PeoplePage from "./pages/PeoplePage";
 import GovernancePage from "./pages/GovernancePage";
 import FinancesPage from "./pages/FinancesPage";
 import ExecutiveDashboard from "./pages/ExecutiveDashboard";
-import ExecutiveDashboardNew from "./pages/ExecutiveDashboardNew";
 import WhatsAppPage from "./pages/WhatsAppPage";
 import LaunchesPage from "./pages/LaunchesPage";
 import InvoicesPage from "./pages/InvoicesPage";
@@ -307,10 +305,6 @@ function RouteShell({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-const DashboardRoute = protectedPage(Dashboard, {
-  requireCompletedOnboarding: true,
-});
-
 const CustomersRoute = protectedPage(CustomersPage, {
   permissions: ["customers:read"],
   requireCompletedOnboarding: true,
@@ -342,10 +336,6 @@ const GovernanceRoute = protectedPage(GovernancePage, {
 });
 
 const ExecutiveDashboardRoute = protectedPage(ExecutiveDashboard, {
-  requireCompletedOnboarding: true,
-});
-
-const ExecutiveDashboardNewRoute = protectedPage(ExecutiveDashboardNew, {
   requireCompletedOnboarding: true,
 });
 
@@ -391,17 +381,21 @@ const OperationsDashboardRoute = protectedPage(OperationsDashboardPage, {
   requireCompletedOnboarding: true,
 });
 
-function OperationsRedirectRoute() {
+function LegacyAliasRoute({
+  targetPath,
+  message,
+}: {
+  targetPath: string;
+  message: string;
+}) {
   const [location, navigate] = useLocation();
 
   useEffect(() => {
     const query = location.includes("?") ? location.slice(location.indexOf("?")) : "";
-    navigate(`/service-orders${query}`, { replace: true });
-  }, [location, navigate]);
+    navigate(`${targetPath}${query}`, { replace: true });
+  }, [location, navigate, targetPath]);
 
-  return (
-    <RedirectingScreen message="Fluxo operacional consolidado em Ordens de Serviço. Redirecionando..." />
-  );
+  return <RedirectingScreen message={message} />;
 }
 
 function Router() {
@@ -431,7 +425,15 @@ function Router() {
         <RouteShell>{onboardingPage(Onboarding)()}</RouteShell>
       </Route>
 
-      <Route path="/dashboard" component={DashboardRoute} />
+      <Route
+        path="/dashboard"
+        component={() => (
+          <LegacyAliasRoute
+            targetPath="/executive-dashboard"
+            message="Dashboard executivo oficial em /executive-dashboard. Redirecionando..."
+          />
+        )}
+      />
       <Route path="/customers" component={CustomersRoute} />
       <Route path="/appointments" component={AppointmentsRoute} />
       <Route path="/service-orders" component={ServiceOrdersRoute} />
@@ -441,7 +443,12 @@ function Router() {
       <Route path="/executive-dashboard" component={ExecutiveDashboardRoute} />
       <Route
         path="/executive-dashboard-new"
-        component={ExecutiveDashboardNewRoute}
+        component={() => (
+          <LegacyAliasRoute
+            targetPath="/executive-dashboard"
+            message="Versão consolidada no dashboard executivo oficial. Redirecionando..."
+          />
+        )}
       />
       <Route path="/whatsapp" component={WhatsAppRoute} />
       <Route path="/launches" component={LaunchesRoute} />
@@ -451,7 +458,15 @@ function Router() {
       <Route path="/calendar" component={CalendarRoute} />
       <Route path="/settings" component={SettingsRoute} />
       <Route path="/timeline" component={TimelineRoute} />
-      <Route path="/operations" component={OperationsRedirectRoute} />
+      <Route
+        path="/operations"
+        component={() => (
+          <LegacyAliasRoute
+            targetPath="/service-orders"
+            message="Workflow legado consolidado em Ordens de Serviço. Redirecionando..."
+          />
+        )}
+      />
       <Route
         path="/dashboard/operations"
         component={OperationsDashboardRoute}

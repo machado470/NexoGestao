@@ -19,10 +19,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Settings,
-  Workflow,
-  Sparkles,
   History,
-  Building2,
+  MessageCircle,
 } from "lucide-react";
 
 interface MainLayoutProps {
@@ -49,11 +47,11 @@ function isRouteActive(location: string, route: string) {
 
 function getPageTitle(location: string) {
   const titles: Record<string, string> = {
-    "/dashboard": "Central de decisão",
+    "/dashboard": "Dashboard Executivo (alias)",
     "/executive-dashboard": "Dashboard Executivo",
-    "/executive-dashboard-new": "Dashboard Executivo",
-    "/dashboard/operations": "Operação diária",
-    "/operations": "Workflow Operacional",
+    "/executive-dashboard-new": "Dashboard Executivo (alias)",
+    "/dashboard/operations": "Operação diária (legado)",
+    "/operations": "Ordens de Serviço (alias legado)",
     "/customers": "Clientes",
     "/appointments": "Agendamentos",
     "/calendar": "Calendário",
@@ -61,7 +59,6 @@ function getPageTitle(location: string) {
     "/timeline": "Timeline",
     "/finances": "Financeiro",
     "/governance": "Governança",
-    "/people": "Pessoas",
     "/whatsapp": "WhatsApp",
     "/settings": "Configurações",
   };
@@ -78,14 +75,15 @@ function getPageTitle(location: string) {
 
 function getPageDescription(location: string) {
   const descriptions: Record<string, string> = {
-    "/dashboard":
-      "Leitura direta do que está travando execução, cobrança e fechamento.",
     "/executive-dashboard":
       "Visão consolidada de métricas, crescimento e operação.",
+    "/dashboard":
+      "Rota legada redirecionada para o dashboard executivo oficial.",
     "/executive-dashboard-new":
-      "Visão consolidada de métricas, crescimento e operação.",
-    "/dashboard/operations": "Fila prática do que precisa avançar agora.",
-    "/operations": "Execução guiada sem perda de contexto entre etapas.",
+      "Rota legada redirecionada para o dashboard executivo oficial.",
+    "/dashboard/operations": "Painel legado de operação diária.",
+    "/operations":
+      "Alias legado consolidado para Ordens de Serviço.",
     "/customers": "Base operacional de clientes e relacionamento.",
     "/appointments": "Agenda operacional e preparação da execução.",
     "/calendar": "Visão temporal da agenda e da disponibilidade.",
@@ -94,7 +92,6 @@ function getPageDescription(location: string) {
     "/timeline": "Rastreabilidade transversal dos eventos.",
     "/finances": "Cobranças, recebimentos e fluxo financeiro.",
     "/governance": "Regras, risco e leitura institucional.",
-    "/people": "Gestão da equipe e dos vínculos.",
     "/whatsapp": "Conversa contextual vinculada à operação.",
     "/settings": "Parâmetros e ajustes do sistema.",
   };
@@ -117,33 +114,15 @@ export function MainLayout({ children }: MainLayoutProps) {
 
   const menuSections: MenuSection[] = [
     {
-      id: "vision",
-      label: "Visão",
+      id: "main",
+      label: "Fluxo principal",
       items: [
         {
-          id: "overview",
-          label: "Visão Geral",
+          id: "executive-dashboard",
+          label: "Dashboard Executivo",
           icon: BarChart3,
           route: "/executive-dashboard",
         },
-        {
-          id: "operations-dashboard",
-          label: "Operação diária",
-          icon: Sparkles,
-          route: "/dashboard/operations",
-        },
-        {
-          id: "operations",
-          label: "Workflow",
-          icon: Workflow,
-          route: "/operations",
-        },
-      ],
-    },
-    {
-      id: "operation",
-      label: "Operação",
-      items: [
         {
           id: "customers",
           label: "Clientes",
@@ -173,31 +152,25 @@ export function MainLayout({ children }: MainLayoutProps) {
           permissions: ["orders:read"],
         },
         {
-          id: "timeline",
-          label: "Timeline",
-          icon: History,
-          route: "/timeline",
-          permissions: ["reports:read"],
-        },
-      ],
-    },
-    {
-      id: "finance",
-      label: "Financeiro",
-      items: [
-        {
           id: "finance",
           label: "Financeiro",
           icon: DollarSign,
           route: "/finances",
           permissions: ["finance:read"],
         },
-      ],
-    },
-    {
-      id: "governance",
-      label: "Governança",
-      items: [
+        {
+          id: "whatsapp",
+          label: "WhatsApp",
+          icon: MessageCircle,
+          route: "/whatsapp",
+        },
+        {
+          id: "timeline",
+          label: "Timeline",
+          icon: History,
+          route: "/timeline",
+          permissions: ["reports:read"],
+        },
         {
           id: "governance",
           label: "Governança",
@@ -206,24 +179,24 @@ export function MainLayout({ children }: MainLayoutProps) {
           permissions: ["governance:read"],
         },
         {
-          id: "people",
-          label: "Pessoas",
-          icon: Building2,
-          route: "/people",
-          permissions: ["people:manage"],
-        },
-      ],
-    },
-    {
-      id: "system",
-      label: "Sistema",
-      items: [
-        {
           id: "settings",
           label: "Configurações",
           icon: Settings,
           route: "/settings",
           permissions: ["settings:manage"],
+        },
+      ],
+    },
+    {
+      id: "secondary",
+      label: "Áreas secundárias",
+      items: [
+        {
+          id: "people",
+          label: "Pessoas",
+          icon: Users,
+          route: "/people",
+          permissions: ["people:manage"],
         },
       ],
     },
