@@ -59,6 +59,22 @@ function normalizeErrorMessage(error: unknown): string {
   return message;
 }
 
+function getSafeRedirectParam(): string | null {
+  if (typeof window === "undefined") return null;
+
+  const params = new URLSearchParams(window.location.search);
+  const value = (params.get("redirect") ?? "").trim();
+
+  if (!value.startsWith("/")) return null;
+  if (value.startsWith("//")) return null;
+  if (value.startsWith("/login")) return null;
+  if (value.startsWith("/register")) return null;
+  if (value.startsWith("/forgot-password")) return null;
+  if (value.startsWith("/reset-password")) return null;
+
+  return value;
+}
+
 export default function Login() {
   const { login, isSubmitting, error, redirectTo } = useAuth();
   const [, navigate] = useLocation();
@@ -86,7 +102,7 @@ export default function Login() {
 
     try {
       await login(normalizedEmail, password);
-      navigate(redirectTo || "/dashboard");
+      navigate(redirectTo || getSafeRedirectParam() || "/dashboard");
     } catch (err) {
       setLocalError(normalizeErrorMessage(err));
     }

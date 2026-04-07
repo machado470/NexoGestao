@@ -127,6 +127,34 @@ function RedirectingScreen({ message }: { message: string }) {
   return <FullScreenMessage title="Redirecionando..." description={message} />;
 }
 
+function buildLoginRedirectPath(currentPath: string) {
+  const normalizedCurrentPath = currentPath.trim();
+  if (!normalizedCurrentPath || normalizedCurrentPath === "/login") {
+    return "/login";
+  }
+
+  const params = new URLSearchParams();
+  params.set("redirect", normalizedCurrentPath);
+  return `/login?${params.toString()}`;
+}
+
+function readSafeRedirectFromPath(path: string): string | null {
+  const query = path.includes("?") ? path.slice(path.indexOf("?") + 1) : "";
+  if (!query) return null;
+
+  const params = new URLSearchParams(query);
+  const raw = (params.get("redirect") ?? "").trim();
+
+  if (!raw.startsWith("/")) return null;
+  if (raw.startsWith("//")) return null;
+  if (raw.startsWith("/login")) return null;
+  if (raw.startsWith("/register")) return null;
+  if (raw.startsWith("/forgot-password")) return null;
+  if (raw.startsWith("/reset-password")) return null;
+
+  return raw;
+}
+
 function ProtectedRoute({
   component: Component,
   permissions,
@@ -139,7 +167,7 @@ function ProtectedRoute({
   onboardingOnly?: boolean;
 }) {
   const { isAuthenticated, isInitializing, payload, role } = useAuth();
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
 
   const requiresOnboarding = getRequiresOnboarding(payload);
 
@@ -147,7 +175,7 @@ function ProtectedRoute({
     if (isInitializing) return;
 
     if (!isAuthenticated) {
-      navigate("/login");
+      navigate(buildLoginRedirectPath(location));
       return;
     }
 
@@ -206,13 +234,14 @@ function ProtectedRoute({
 
 function PublicRoute({ component: Component }: { component: ComponentType }) {
   const { isAuthenticated, isInitializing, redirectTo } = useAuth();
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
+  const redirectParam = readSafeRedirectFromPath(location);
 
   useEffect(() => {
     if (!isInitializing && isAuthenticated) {
-      navigate(redirectTo || "/dashboard");
+      navigate(redirectTo || redirectParam || "/dashboard");
     }
-  }, [isAuthenticated, isInitializing, navigate, redirectTo]);
+  }, [isAuthenticated, isInitializing, navigate, redirectParam, redirectTo]);
 
   if (isInitializing) return <FullScreenLoader />;
 

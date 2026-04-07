@@ -16,7 +16,7 @@ import { aiRouter } from "./routers/ai";
 import { financeAdvancedRouter } from "./routers/finance-advanced";
 import { paymentsRouter } from "./routers/payments";
 
-const NEXO_TOKEN_COOKIE = "nexo_token";
+const SESSION_COOKIES = ["nexo_token", "token", "auth_token"] as const;
 
 export const appRouter = router({
   system: systemRouter,
@@ -46,9 +46,11 @@ export const appRouter = router({
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
 
-      ctx.res.clearCookie(NEXO_TOKEN_COOKIE, {
-        ...cookieOptions,
-      });
+      for (const cookieName of SESSION_COOKIES) {
+        ctx.res.clearCookie(cookieName, {
+          ...cookieOptions,
+        });
+      }
 
       return {
         success: true,
