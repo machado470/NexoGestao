@@ -13,6 +13,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { registerActionFlowEvent } from "@/lib/actionFlow";
 
 type Props = {
   open: boolean;
@@ -43,6 +44,7 @@ export default function CreatePersonModal({ open, onClose, onSaved }: Props) {
 
   const createPerson = trpc.people.create.useMutation({
     onSuccess: () => {
+      registerActionFlowEvent("person_created", { pageContext: "people", ctaPath: "/people" });
       toast.success("Pessoa criada com sucesso.");
       setFormData(DEFAULT_FORM);
       onSaved();

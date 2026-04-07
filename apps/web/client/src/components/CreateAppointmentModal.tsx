@@ -14,6 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { registerActionFlowEvent } from "@/lib/actionFlow";
 
 interface CreateAppointmentModalProps {
   isOpen: boolean;
@@ -120,6 +121,7 @@ export function CreateAppointmentModal({
           if (raw && Array.isArray(raw.data)) return { ...raw, data: applyReplace(raw.data) };
           return [created];
         });
+        registerActionFlowEvent("appointment_created", { pageContext: "appointments", ctaPath: "/appointments" });
         toast.success("Agendamento criado com sucesso!");
         setFormData(INITIAL_FORM);
         onSuccess();

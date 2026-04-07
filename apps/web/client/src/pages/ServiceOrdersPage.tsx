@@ -23,7 +23,7 @@ import {
   ArrowLeft,
   BriefcaseBusiness,
 } from "lucide-react";
-import { PageHero, PageShell, SurfaceSection } from "@/components/PagePattern";
+import { PageHero, PageShell, SmartPage, SurfaceSection } from "@/components/PagePattern";
 import { EmptyState } from "@/components/EmptyState";
 import { DemoEnvironmentCta } from "@/components/DemoEnvironmentCta";
 
@@ -338,6 +338,40 @@ export default function ServiceOrdersPage() {
         ? "text-emerald-700 dark:text-emerald-300"
         : "text-amber-700 dark:text-amber-300";
 
+
+  const smartPriorities = useMemo(() => [
+    {
+      id: "so-stalled",
+      type: "stalled_service_orders" as const,
+      title: "O.S. paradas",
+      count: totalOperational,
+      impactCents: totalOperational * 35000,
+      ctaLabel: "Abrir próxima O.S.",
+      ctaPath: "/service-orders",
+      helperText: "Execução parada atrasa entrega e faturamento.",
+    },
+    {
+      id: "so-overdue",
+      type: "overdue_charges" as const,
+      title: "Risco financeiro na execução",
+      count: totalWithUrgency,
+      impactCents: totalWithUrgency * 50000,
+      ctaLabel: "Cobrar agora",
+      ctaPath: "/finances",
+      helperText: "O.S. concluída sem cobrança representa dinheiro parado.",
+    },
+    {
+      id: "so-risk",
+      type: "operational_risk" as const,
+      title: "Deep-links com foco ativo",
+      count: activeId ? 1 : 0,
+      impactCents: 0,
+      ctaLabel: "Revisar foco",
+      ctaPath: "/service-orders",
+      helperText: "Garantir foco certo evita retrabalho e desvio de fila.",
+    },
+  ], [activeId, totalOperational, totalWithUrgency]);
+
   async function refreshAll() {
     await Promise.all([
       utils.nexo.serviceOrders.list.invalidate(),
@@ -375,7 +409,8 @@ export default function ServiceOrdersPage() {
         description="Veja o que está parado na operação, por que isso impacta sua conversão e qual próximo passo deve acontecer agora."
         actions={
           <>
-            {activeId && (
+      
+      {activeId && (
               <Button
                 size="sm"
                 variant="outline"
@@ -391,12 +426,26 @@ export default function ServiceOrdersPage() {
               Atualizar
             </Button>
 
-            <Button onClick={() => setIsCreateOpen(true)}>
+            <Button onClick={() => setIsCreateOpen(true)} className="min-h-12">
               <Plus className="mr-2 h-4 w-4" />
               Nova O.S.
             </Button>
           </>
         }
+      />
+
+
+      <SmartPage
+        pageContext="service-orders"
+        headline="Execução guiada por impacto"
+        dominantProblem={nextAction.title}
+        dominantImpact={`${totalWithUrgency} itens com impacto imediato`}
+        dominantCta={{
+          label: nextAction.ctaLabel,
+          onClick: nextAction.onClick,
+          path: "/service-orders",
+        }}
+        priorities={smartPriorities}
       />
 
       {activeId && (

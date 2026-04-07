@@ -3,7 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/contexts/AuthContext";
 import { Loader2, Users, Plus, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { PageHero, PageShell, SurfaceSection } from "@/components/PagePattern";
+import { PageHero, PageShell, SmartPage, SurfaceSection } from "@/components/PagePattern";
 import { EmptyState } from "@/components/EmptyState";
 import {
   getQueryUiState,
@@ -109,6 +109,40 @@ export default function PeoplePage() {
     .sort((a, b) => b.workload - a.workload)
     .slice(0, 5);
 
+
+  const smartPriorities = useMemo(() => [
+    {
+      id: "people-unassigned",
+      type: "stalled_service_orders" as const,
+      title: "O.S. sem responsável",
+      count: unassignedOrders,
+      impactCents: unassignedOrders * 32000,
+      ctaLabel: "Distribuir equipe",
+      ctaPath: "/people",
+      helperText: "Sem responsável, a operação para e o faturamento atrasa.",
+    },
+    {
+      id: "people-warning",
+      type: "operational_risk" as const,
+      title: "Equipe em estado de atenção",
+      count: warningPeople,
+      impactCents: warningPeople * 15000,
+      ctaLabel: "Rebalancear carga",
+      ctaPath: "/people",
+      helperText: "Sinais de risco operacional aumentam chance de gargalo.",
+    },
+    {
+      id: "people-capacity",
+      type: "idle_cash" as const,
+      title: "Capacidade ativa da equipe",
+      count: activePeople,
+      impactCents: activePeople * 9000,
+      ctaLabel: "Acelerar execução",
+      ctaPath: "/service-orders",
+      helperText: "Pessoas ativas sem direcionamento viram capacidade ociosa.",
+    },
+  ], [activePeople, unassignedOrders, warningPeople]);
+
   const hasRenderableData =
     listPeople.data !== undefined ||
     statsLinked.data !== undefined ||
@@ -181,6 +215,26 @@ export default function PeoplePage() {
         description="Base de pessoas conectada à operação, com a mesma leitura visual do dashboard executivo."
       />
 
+
+      <SmartPage
+        pageContext="people"
+        headline="Equipe orientada por gargalo"
+        dominantProblem={unassignedOrders > 0 ? "Ordens sem responsável" : "Monitorar equipe em atenção"}
+        dominantImpact={`${unassignedOrders} O.S. podem travar por falta de dono`}
+        dominantCta={{
+          label: unassignedOrders > 0 ? "Distribuir ordens agora" : "Nova pessoa",
+          onClick: () => {
+            if (unassignedOrders > 0) {
+              window.location.href = "/service-orders";
+              return;
+            }
+            setIsCreateOpen(true);
+          },
+          path: "/people",
+        }}
+        priorities={smartPriorities}
+      />
+
       {queryState.hasBackgroundUpdate ? (
         <div className="rounded border border-blue-500/30 bg-blue-500/10 p-3 text-sm text-blue-200">
           Atualizando pessoas em segundo plano...
@@ -194,7 +248,7 @@ export default function PeoplePage() {
       ) : null}
 
       <div className="flex justify-end">
-        <Button type="button" className="gap-2" onClick={() => setIsCreateOpen(true)}>
+        <Button type="button" className="min-h-12 gap-2" onClick={() => setIsCreateOpen(true)}>
           <Plus className="h-4 w-4" />
           Nova pessoa
         </Button>

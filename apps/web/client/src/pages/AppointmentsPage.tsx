@@ -32,7 +32,7 @@ import {
   normalizeOrders,
 } from "@/lib/operations/operations.utils";
 import { normalizeArrayPayload } from "@/lib/query-helpers";
-import { PageHero, PageShell } from "@/components/PagePattern";
+import { PageHero, PageShell, SmartPage } from "@/components/PagePattern";
 import { DemoEnvironmentCta } from "@/components/DemoEnvironmentCta";
 
 type CustomerRef = {
@@ -591,6 +591,40 @@ export default function AppointmentsPage() {
   const appointmentsWithoutOperations =
     filteredAppointments.length - appointmentsWithOperations;
 
+
+  const smartPriorities = useMemo(() => [
+    {
+      id: "appt-unconfirmed",
+      type: "operational_risk" as const,
+      title: "Agendamentos sem confirmação",
+      count: totalScheduled,
+      impactCents: totalScheduled * 18000,
+      ctaLabel: "Confirmar agenda",
+      ctaPath: "/appointments",
+      helperText: "Sem confirmação o risco de no-show sobe.",
+    },
+    {
+      id: "appt-no-os",
+      type: "stalled_service_orders" as const,
+      title: "Agendamentos sem O.S.",
+      count: appointmentsWithoutOperations,
+      impactCents: appointmentsWithoutOperations * 28000,
+      ctaLabel: "Criar O.S.",
+      ctaPath: "/service-orders",
+      helperText: "Sem O.S. a agenda não vira entrega faturável.",
+    },
+    {
+      id: "appt-fin",
+      type: "overdue_charges" as const,
+      title: "Concluídos com risco financeiro",
+      count: totalDone,
+      impactCents: totalDone * 12000,
+      ctaLabel: "Ver financeiro",
+      ctaPath: "/finances",
+      helperText: "Concluir atendimento sem cobrança derruba conversão em caixa.",
+    },
+  ], [appointmentsWithoutOperations, totalDone, totalScheduled]);
+
   const handleCreateSuccess = () => {
     return;
   };
@@ -664,12 +698,29 @@ export default function AppointmentsPage() {
 
           <Button
             onClick={() => setShowCreateModal(true)}
-            className="gap-2 bg-orange-500 text-white hover:bg-orange-600"
+            className="min-h-12 gap-2 bg-orange-500 text-white"
           >
             <Plus className="h-4 w-4" />
             Novo Agendamento
           </Button>
         </>}
+      />
+
+
+      <SmartPage
+        pageContext="appointments"
+        headline="Agenda com direção operacional"
+        dominantProblem={appointmentsWithoutOperations > 0 ? "Agendamentos sem O.S. ativa" : "Agenda precisa de confirmação"}
+        dominantImpact={`${appointmentsWithoutOperations} agendamentos sem execução`}
+        dominantCta={{
+          label: appointmentsWithoutOperations > 0 ? "Criar O.S. agora" : "Confirmar agenda",
+          onClick: () => {
+            const target = filteredAppointments.find((item) => item.status === "SCHEDULED") ?? filteredAppointments[0];
+            if (target) handleOpenDeepLink(target.id);
+          },
+          path: "/appointments",
+        }}
+        priorities={smartPriorities}
       />
 
       <div className="grid gap-3 md:grid-cols-[1fr_auto_auto]">
