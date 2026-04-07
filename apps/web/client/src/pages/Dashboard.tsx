@@ -21,7 +21,7 @@ function formatCurrency(cents?: number): string {
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL",
-  }).format((Number(cents ?? 0)) / 100);
+  }).format(Number(cents ?? 0) / 100);
 }
 
 type AlertItem = {
@@ -128,16 +128,16 @@ function ActionListCard({
           row: "border-red-200/60 bg-red-50/70 dark:border-red-500/10 dark:bg-red-500/[0.06]",
         }
       : tone === "success"
-      ? {
-          badge:
-            "border-emerald-200/80 bg-emerald-100/80 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/12 dark:text-emerald-300",
-          row: "border-emerald-200/60 bg-emerald-50/70 dark:border-emerald-500/10 dark:bg-emerald-500/[0.06]",
-        }
-      : {
-          badge:
-            "border-slate-200/80 bg-white/80 text-zinc-700 dark:border-white/10 dark:bg-white/[0.04] dark:text-zinc-200",
-          row: "border-slate-200/70 bg-white/70 dark:border-white/8 dark:bg-white/[0.03]",
-        };
+        ? {
+            badge:
+              "border-emerald-200/80 bg-emerald-100/80 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/12 dark:text-emerald-300",
+            row: "border-emerald-200/60 bg-emerald-50/70 dark:border-emerald-500/10 dark:bg-emerald-500/[0.06]",
+          }
+        : {
+            badge:
+              "border-slate-200/80 bg-white/80 text-zinc-700 dark:border-white/10 dark:bg-white/[0.04] dark:text-zinc-200",
+            row: "border-slate-200/70 bg-white/70 dark:border-white/8 dark:bg-white/[0.03]",
+          };
 
   return (
     <section className="nexo-surface p-5">
@@ -160,7 +160,7 @@ function ActionListCard({
         </div>
       ) : (
         <div className="space-y-2.5">
-          {items.map((item) => (
+          {items.map(item => (
             <button
               key={item.id}
               type="button"
@@ -232,22 +232,22 @@ export default function Dashboard() {
     priorityScore === 0
       ? "normal"
       : priorityScore <= 6
-      ? "attention"
-      : "critical";
+        ? "attention"
+        : "critical";
 
   const executiveStatus =
     operationTone === "normal"
       ? "Operação sob controle."
       : operationTone === "attention"
-      ? "Existem pendências relevantes pedindo ação."
-      : "Risco operacional e financeiro aberto agora.";
+        ? "Existem pendências relevantes pedindo ação."
+        : "Risco operacional e financeiro aberto agora.";
 
   const cycleReading =
     operationTone === "normal"
       ? "Estável"
       : operationTone === "attention"
-      ? "Pressão"
-      : "Crítico";
+        ? "Pressão"
+        : "Crítico";
 
   const impactMessage =
     overdueChargesAmount > 0
@@ -255,11 +255,20 @@ export default function Dashboard() {
       : "Sem receita vencida travando o caixa agora.";
 
   if (isInitializing) {
-    return <div className="p-6">Carregando...</div>;
+    return (
+      <div className="nexo-surface flex min-h-[180px] items-center justify-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
+        <Loader2 className="h-4 w-4 animate-spin text-orange-500" />
+        Carregando painel...
+      </div>
+    );
   }
 
   if (!isAuthenticated) {
-    return <div className="p-6">Login</div>;
+    return (
+      <div className="nexo-surface min-h-[180px] p-6 text-sm text-zinc-500 dark:text-zinc-400">
+        Faça login para acessar o dashboard.
+      </div>
+    );
   }
 
   return (
@@ -279,8 +288,8 @@ export default function Dashboard() {
             </h1>
 
             <p className="mt-3 max-w-xl text-sm leading-6 text-zinc-600 dark:text-zinc-400">
-              Um hub curto, acionável e sem teatro: execução atrasada,
-              cobrança esquecida e ciclo aberto aparecem aqui primeiro.
+              Um hub curto, acionável e sem teatro: execução atrasada, cobrança
+              esquecida e ciclo aberto aparecem aqui primeiro.
             </p>
 
             <div className="mt-4 inline-flex max-w-xl items-center gap-2 rounded-2xl border border-slate-200/80 bg-white/70 px-4 py-3 text-sm text-zinc-700 dark:border-white/10 dark:bg-white/[0.04] dark:text-zinc-200">
@@ -364,7 +373,7 @@ export default function Dashboard() {
           description="O que está segurando a execução agora."
           emptyText="Nenhuma ordem atrasada neste momento."
           tone="danger"
-          items={overdueOrders.slice(0, 5).map((order) => ({
+          items={overdueOrders.slice(0, 5).map(order => ({
             id: order.id,
             title: order.title ?? "Ordem sem título",
             subtitle: order.customer?.name ?? "Cliente não identificado",
@@ -377,7 +386,7 @@ export default function Dashboard() {
           description="Valores que já deveriam ter fechado o ciclo."
           emptyText="Nenhuma cobrança vencida neste momento."
           tone="default"
-          items={overdueCharges.slice(0, 5).map((charge) => ({
+          items={overdueCharges.slice(0, 5).map(charge => ({
             id: charge.id,
             title: charge.customer?.name ?? "Cliente sem nome",
             subtitle: "Cobrança vinculada à operação",
@@ -392,7 +401,7 @@ export default function Dashboard() {
           description="Serviços finalizados que ainda não viraram receita."
           emptyText="Nenhuma execução concluída sem cobrança."
           tone="success"
-          items={doneWithoutCharge.slice(0, 5).map((order) => ({
+          items={doneWithoutCharge.slice(0, 5).map(order => ({
             id: order.id,
             title: order.title ?? "Ordem sem título",
             subtitle: order.customer?.name ?? "Cliente não identificado",
