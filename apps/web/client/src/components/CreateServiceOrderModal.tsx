@@ -20,6 +20,7 @@ import {
   User,
 } from "lucide-react";
 import { serviceOrderSchema } from "@/lib/validations";
+import { registerActionFlowEvent } from "@/lib/actionFlow";
 
 type Props = {
   open?: boolean;
@@ -252,6 +253,7 @@ export default function CreateServiceOrderModal({
         onCreated?.();
         onSuccess?.();
         onClose();
+        registerActionFlowEvent("service_order_created");
         toast.success("Ordem de serviço criada com sucesso.");
       },
       onError: (error) => {

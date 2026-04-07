@@ -15,6 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { registerActionFlowEvent } from "@/lib/actionFlow";
 
 type Props = {
   open: boolean;
@@ -108,6 +109,7 @@ export default function CreateCustomerModal({ open, onOpenChange, onCreated }: P
       });
 
       toast.success("Cliente criado com sucesso!");
+      registerActionFlowEvent("customer_created");
       reset();
       close();
       void onCreated?.();

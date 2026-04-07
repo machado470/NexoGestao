@@ -3,6 +3,8 @@ import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/contexts/AuthContext";
 import { EmptyState } from "@/components/EmptyState";
+import { getLatestActionFlowSuggestion } from "@/lib/actionFlow";
+import { rankPriorityProblems } from "@/lib/priorityEngine";
 import {
   AlertTriangle,
   BarChart3,
@@ -277,6 +279,73 @@ export default function ExecutiveDashboardNew() {
   ];
 
   const totalPausedRevenue = Math.max(displayMetrics.pendingPaymentsInCents ?? 0, 0);
+  const overdueCharges = displayChargesStatus.find((item) => item.key.toLowerCase() === "overdue")?.value ?? 0;
+  const averageOrderValueCents =
+    displayMetrics.totalServiceOrders > 0
+      ? Math.round(displayMetrics.totalRevenueInCents / Math.max(displayMetrics.totalServiceOrders, 1))
+      : 0;
+  const nonBilledServices = Math.max(displayMetrics.openServiceOrders, 0);
+  const nonBilledServicesImpact = Math.max(nonBilledServices * averageOrderValueCents, 0);
+  const overdueImpactCents = Math.max(
+    overdueCharges *
+      Math.max(
+        averageOrderValueCents,
+        Math.round((displayMetrics.pendingPaymentsInCents || 0) / Math.max(overdueCharges || 1, 1))
+      ),
+    0
+  );
+  const operationalRiskItems = Math.max(
+    Number(displayMetrics.riskTickets) + Number(displayMetrics.delayedOrders),
+    0
+  );
+  const operationalRiskImpact = Math.round(
+    operationalRiskItems * Math.max(averageOrderValueCents, 0) * 0.4
+  );
+
+  const priorityProblems = rankPriorityProblems([
+    {
+      id: "idle-cash",
+      type: "idle_cash",
+      title: "Dinheiro parado",
+      count: Math.max(overdueCharges + nonBilledServices, 0),
+      impactCents: totalPausedRevenue + nonBilledServicesImpact,
+      ctaLabel: "Recuperar receita agora",
+      ctaPath: "/finances",
+      helperText: `${formatCurrency(totalPausedRevenue + nonBilledServicesImpact)} aguardando ação.`,
+    },
+    {
+      id: "overdue",
+      type: "overdue_charges",
+      title: "Cobranças vencidas",
+      count: overdueCharges,
+      impactCents: overdueImpactCents,
+      ctaLabel: "Cobrar vencidas",
+      ctaPath: "/finances",
+      helperText: `${formatCurrency(overdueImpactCents)} pendente de recebimento.`,
+    },
+    {
+      id: "stalled-os",
+      type: "stalled_service_orders",
+      title: "O.S. paradas",
+      count: Math.max(displayMetrics.delayedOrders, 0),
+      impactCents: Math.max(displayMetrics.delayedOrders, 0) * Math.max(averageOrderValueCents, 0),
+      ctaLabel: "Destravar O.S.",
+      ctaPath: "/service-orders",
+      helperText: "Execução travada impactando faturamento.",
+    },
+    {
+      id: "operational-risk",
+      type: "operational_risk",
+      title: "Risco operacional",
+      count: operationalRiskItems,
+      impactCents: operationalRiskImpact,
+      ctaLabel: "Corrigir riscos",
+      ctaPath: "/service-orders",
+      helperText: `${formatCurrency(operationalRiskImpact)} em risco se não agir hoje.`,
+    },
+  ]);
+  const dominantProblem = priorityProblems[0];
+  const actionFlowSuggestion = getLatestActionFlowSuggestion();
 
   const bottlenecks = [
     {
@@ -290,8 +359,7 @@ export default function ExecutiveDashboardNew() {
     {
       id: "overdue",
       label: "Cobranças vencidas",
-      value:
-        displayChargesStatus.find((item) => item.key.toLowerCase() === "overdue")?.value ?? 0,
+      value: overdueCharges,
       severity: "critical",
       action: "Ver vencidas",
       onClick: () => navigate("/finances"),
@@ -378,6 +446,35 @@ export default function ExecutiveDashboardNew() {
 
   return (
     <div className="space-y-8 p-6">
+      {dominantProblem ? (
+        <section className="relative overflow-hidden rounded-[2rem] border-2 border-orange-400/70 bg-gradient-to-br from-orange-100 via-white to-orange-50 px-5 py-6 shadow-[0_20px_70px_rgba(251,146,60,.35)] dark:border-orange-400/35 dark:from-orange-950/45 dark:via-zinc-950 dark:to-zinc-900">
+          <div className="absolute -right-20 -top-20 h-52 w-52 rounded-full bg-orange-300/30 blur-3xl dark:bg-orange-500/25" />
+          <div className="relative grid gap-5 lg:grid-cols-[1.2fr_auto] lg:items-end">
+            <div>
+              <p className="inline-flex items-center rounded-full bg-orange-500 px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] text-white">
+                Prioridade nº1 de hoje
+              </p>
+              <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-zinc-950 dark:text-white md:text-4xl">
+                Hoje você tem {formatCurrency(totalPausedRevenue + nonBilledServicesImpact)} parado
+              </h2>
+              <p className="mt-3 text-base font-medium text-zinc-800 dark:text-zinc-100">
+                {overdueCharges} cobranças vencidas • {nonBilledServices} serviços sem faturamento.
+              </p>
+              <p className="mt-2 text-sm text-zinc-700 dark:text-zinc-300">
+                Próxima decisão já definida: <strong>{dominantProblem.title}</strong>. {dominantProblem.helperText}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate(dominantProblem.ctaPath)}
+              className="nexo-cta-primary min-h-14 min-w-[220px] !rounded-xl !text-base font-bold shadow-lg shadow-orange-500/35"
+            >
+              {dominantProblem.ctaLabel}
+            </button>
+          </div>
+        </section>
+      ) : null}
+
       <section className="relative overflow-hidden rounded-[1.8rem] border border-slate-200/80 bg-white/90 px-4 py-5 shadow-sm transition-all duration-300 sm:px-6 sm:py-6 dark:border-white/8 dark:bg-[linear-gradient(135deg,rgba(19,22,30,0.98),rgba(12,14,20,0.96))] dark:shadow-[0_24px_60px_rgba(0,0,0,0.42)]">
         <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-2xl">
@@ -414,7 +511,7 @@ export default function ExecutiveDashboardNew() {
           <p className="font-semibold">O que precisa de atenção agora</p>
           <p className="mt-1">
             Você tem <strong>{formatCurrency(totalPausedRevenue)}</strong> parado e{" "}
-            <strong>{Math.max(displayMetrics.delayedOrders, 0)} O.S.</strong> em risco operacional.
+            <strong>{formatCurrency(nonBilledServicesImpact)}</strong> em serviços ainda não faturados.
           </p>
         </div>
       </section>
@@ -548,6 +645,63 @@ export default function ExecutiveDashboardNew() {
             </p>
           ) : null}
         </article>
+      </section>
+
+      <section className="grid gap-6 lg:grid-cols-2">
+        <article className="nexo-surface nexo-fade-in p-5">
+          <h2 className="nexo-section-title">Top 3 prioridades automáticas</h2>
+          <p className="mt-1 nexo-section-description">Sem lista genérica: apenas o que gera caixa mais rápido.</p>
+          <div className="mt-4 space-y-3">
+            {priorityProblems.map((problem, index) => (
+              <div key={problem.id} className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-zinc-900/80">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-orange-600 dark:text-orange-300">
+                  #{index + 1} prioridade
+                </p>
+                <div className="mt-1 flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-zinc-900 dark:text-zinc-100">{problem.title}</p>
+                    <p className="text-xs text-zinc-600 dark:text-zinc-300">
+                      {problem.count} itens • {formatCurrency(problem.impactCents)} de impacto
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => navigate(problem.ctaPath)}
+                    className="nexo-cta-secondary !h-9 !rounded-lg !px-3 !text-xs"
+                  >
+                    {problem.ctaLabel}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </article>
+
+        {actionFlowSuggestion ? (
+          <article className="rounded-2xl border border-emerald-300/60 bg-emerald-50/70 p-5 dark:border-emerald-700/50 dark:bg-emerald-950/20">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-300">
+              Fluxo automático de ação
+            </p>
+            <h3 className="mt-2 text-lg font-semibold text-emerald-900 dark:text-emerald-100">
+              {actionFlowSuggestion.title}
+            </h3>
+            <p className="mt-1 text-sm text-emerald-700 dark:text-emerald-300">{actionFlowSuggestion.description}</p>
+            <button
+              type="button"
+              onClick={() => navigate(actionFlowSuggestion.ctaPath)}
+              className="nexo-cta-primary mt-4 !h-11 !rounded-xl !px-5"
+            >
+              {actionFlowSuggestion.ctaLabel}
+            </button>
+          </article>
+        ) : (
+          <article className="rounded-2xl border border-zinc-200/80 bg-white/80 p-5 dark:border-white/10 dark:bg-zinc-900/70">
+            <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Fluxo automático de ação</h3>
+            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-300">
+              Assim que você criar Cliente, O.S. ou Cobrança, a próxima ação aparece aqui sem precisar interpretar.
+            </p>
+          </article>
+        )}
       </section>
 
       {(metricsQuery.isError || revenueQuery.isError || serviceOrdersStatusQuery.isError || chargesStatusQuery.isError) && !hasAnyCriticalError ? (
