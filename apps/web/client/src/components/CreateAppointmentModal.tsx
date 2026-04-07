@@ -1,8 +1,19 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
-import { X, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 
 interface CreateAppointmentModalProps {
   isOpen: boolean;
@@ -72,35 +83,25 @@ export function CreateAppointmentModal({
     });
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-lg dark:bg-gray-800">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-            Novo Agendamento
-          </h2>
-          <button
-            onClick={handleClose}
-            className="rounded p-1 hover:bg-gray-100 dark:hover:bg-gray-700"
-            type="button"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
+    <Dialog open={isOpen} onOpenChange={(nextOpen) => (!nextOpen ? handleClose() : undefined)}>
+      <DialogContent className="max-w-xl border-zinc-800/80 bg-zinc-950/95 p-0 text-zinc-100 shadow-2xl backdrop-blur">
+        <DialogHeader className="border-b border-zinc-800/90 px-6 py-5">
+          <DialogTitle className="text-xl font-semibold">Novo Agendamento</DialogTitle>
+          <DialogDescription className="text-zinc-400">
+            Agende compromissos no mesmo padrão visual das páginas modernas.
+          </DialogDescription>
+        </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Cliente *
-            </label>
+        <form onSubmit={handleSubmit} className="space-y-4 px-6 py-5">
+          <div className="space-y-2">
+            <Label>Cliente *</Label>
             <select
               value={formData.customerId}
               onChange={(e) =>
                 setFormData({ ...formData, customerId: e.target.value })
               }
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              className="h-9 w-full rounded-md border border-zinc-700 bg-zinc-900/80 px-3 py-2 text-sm text-zinc-100 outline-none ring-offset-zinc-950 focus-visible:border-orange-400 focus-visible:ring-2 focus-visible:ring-orange-500/50"
             >
               <option value="">Selecione um cliente</option>
               {customers.map((customer) => (
@@ -111,38 +112,28 @@ export function CreateAppointmentModal({
             </select>
           </div>
 
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Data/Hora Início *
-            </label>
-            <input
+          <div className="space-y-2">
+            <Label>Data/Hora Início *</Label>
+            <Input
               type="datetime-local"
               value={formData.startsAt}
-              onChange={(e) =>
-                setFormData({ ...formData, startsAt: e.target.value })
-              }
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              onChange={(e) => setFormData({ ...formData, startsAt: e.target.value })}
+              className="border-zinc-700 bg-zinc-900/80"
             />
           </div>
 
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Data/Hora Fim
-            </label>
-            <input
+          <div className="space-y-2">
+            <Label>Data/Hora Fim</Label>
+            <Input
               type="datetime-local"
               value={formData.endsAt}
-              onChange={(e) =>
-                setFormData({ ...formData, endsAt: e.target.value })
-              }
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              onChange={(e) => setFormData({ ...formData, endsAt: e.target.value })}
+              className="border-zinc-700 bg-zinc-900/80"
             />
           </div>
 
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Status
-            </label>
+          <div className="space-y-2">
+            <Label>Status</Label>
             <select
               value={formData.status}
               onChange={(e) =>
@@ -151,7 +142,7 @@ export function CreateAppointmentModal({
                   status: e.target.value as AppointmentStatus,
                 })
               }
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              className="h-9 w-full rounded-md border border-zinc-700 bg-zinc-900/80 px-3 py-2 text-sm text-zinc-100 outline-none ring-offset-zinc-950 focus-visible:border-orange-400 focus-visible:ring-2 focus-visible:ring-orange-500/50"
             >
               <option value="SCHEDULED">Agendado</option>
               <option value="CONFIRMED">Confirmado</option>
@@ -161,27 +152,22 @@ export function CreateAppointmentModal({
             </select>
           </div>
 
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Observações
-            </label>
-            <textarea
+          <div className="space-y-2">
+            <Label>Observações</Label>
+            <Textarea
               value={formData.notes}
-              onChange={(e) =>
-                setFormData({ ...formData, notes: e.target.value })
-              }
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              className="border-zinc-700 bg-zinc-900/80"
               placeholder="Observações"
               rows={3}
             />
           </div>
 
-          <div className="flex gap-3 pt-4">
+          <DialogFooter className="border-t border-zinc-800/90 pt-4">
             <Button
               type="button"
               variant="outline"
               onClick={handleClose}
-              className="flex-1"
               disabled={createAppointment.isPending}
             >
               Cancelar
@@ -189,7 +175,7 @@ export function CreateAppointmentModal({
             <Button
               type="submit"
               disabled={createAppointment.isPending}
-              className="flex-1 bg-orange-500 text-white hover:bg-orange-600"
+              className="bg-orange-500 text-white hover:bg-orange-600"
             >
               {createAppointment.isPending ? (
                 <>
@@ -200,9 +186,9 @@ export function CreateAppointmentModal({
                 "Criar Agendamento"
               )}
             </Button>
-          </div>
+          </DialogFooter>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
