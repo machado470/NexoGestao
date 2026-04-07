@@ -78,7 +78,6 @@ async function runDemoOrgSeed() {
 }
 
 async function runPilotSeed() {
-  await ensureDefaultAdmin()
   await seedPilot()
   console.log('Seed pilot finalizado')
 }
