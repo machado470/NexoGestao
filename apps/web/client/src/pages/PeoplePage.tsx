@@ -115,7 +115,10 @@ export default function PeoplePage() {
       <PageShell>
         <PageHero eyebrow="Pessoas" title="Pessoas" description="Carregando sessão..." />
         <SurfaceSection className="flex min-h-[180px] items-center justify-center">
-          <Loader2 className="animate-spin" />
+          <div className="inline-flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Carregando sessão...
+          </div>
         </SurfaceSection>
       </PageShell>
     );
@@ -134,7 +137,10 @@ export default function PeoplePage() {
       <PageShell>
         <PageHero eyebrow="Pessoas" title="Pessoas" description="Carregando base de pessoas..." />
         <SurfaceSection className="flex min-h-[220px] items-center justify-center">
-          <Loader2 className="animate-spin" />
+          <div className="inline-flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Carregando base de pessoas...
+          </div>
         </SurfaceSection>
       </PageShell>
     );

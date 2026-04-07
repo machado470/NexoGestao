@@ -3,6 +3,8 @@ import { trpc } from "@/lib/trpc";
 import { getErrorMessage, getPayloadValue } from "@/lib/query-helpers";
 import { useAuth } from "@/contexts/AuthContext";
 import { PageHero, PageShell, SurfaceSection } from "@/components/PagePattern";
+import { EmptyState } from "@/components/EmptyState";
+import { Loader2, ShieldAlert } from "lucide-react";
 
 /* ================= HELPERS ================= */
 
@@ -120,7 +122,15 @@ export default function GovernancePage() {
     ) || 0;
 
   if (isInitializing) {
-    return <div className="p-6">Carregando sessão...</div>;
+    return (
+      <PageShell>
+        <PageHero eyebrow="Governança" title="Governança" description="Validando sessão e permissões." />
+        <SurfaceSection className="flex min-h-[180px] items-center justify-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Carregando sessão...
+        </SurfaceSection>
+      </PageShell>
+    );
   }
 
   if (!isAuthenticated) {
@@ -135,6 +145,10 @@ export default function GovernancePage() {
     return (
       <PageShell>
         <PageHero eyebrow="Governança" title="Governança" description="Carregando leituras de risco institucional." />
+        <SurfaceSection className="flex min-h-[180px] items-center justify-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Montando painel de governança...
+        </SurfaceSection>
       </PageShell>
     );
   }
@@ -187,8 +201,16 @@ export default function GovernancePage() {
           ))}
         </SurfaceSection>
       ) : (
-        <SurfaceSection className="text-sm opacity-70">
-          Nenhum histórico de governança disponível ainda.
+        <SurfaceSection>
+          <EmptyState
+            icon={<ShieldAlert className="h-7 w-7" />}
+            title="Histórico de governança ainda vazio"
+            description="Quando novas execuções de score acontecerem, este histórico mostrará evolução de risco e rastreabilidade."
+            action={{
+              label: "Atualizar histórico",
+              onClick: () => void runsQuery.refetch(),
+            }}
+          />
         </SurfaceSection>
       )}
     </PageShell>
