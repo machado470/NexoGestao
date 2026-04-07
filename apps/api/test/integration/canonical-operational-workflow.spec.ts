@@ -8,10 +8,7 @@ import { AppModule } from '../../src/app.module'
 import { PrismaService } from '../../src/prisma/prisma.service'
 
 type WorkflowPrisma = PrismaService & {
-  execution: {
-    deleteMany(args: { where: { orgId: { in: string[] } } }): Promise<{ count: number }>
-    findFirst(args: { where: { id: string; orgId: string } }): Promise<{ endedAt: Date | null; serviceOrderId: string } | null>
-  }
+  serviceOrder: PrismaService['serviceOrder']
 }
 
 describe('Canonical Operational Workflow (e2e)', () => {
@@ -65,7 +62,6 @@ describe('Canonical Operational Workflow (e2e)', () => {
         await prisma.payment.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
         await prisma.whatsAppMessage.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
         await prisma.charge.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
-        await prisma.execution.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
         await prisma.serviceOrder.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
         await prisma.appointment.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
         await prisma.customer.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
@@ -159,8 +155,8 @@ describe('Canonical Operational Workflow (e2e)', () => {
       .expect(201)
 
     const executionId = startExecution.body.id as string
-    const executionDb = await prisma.execution.findFirst({ where: { id: executionId, orgId: primaryOrgId } })
-    expect(executionDb?.serviceOrderId).toBe(serviceOrderId)
+    const executionDb = await prisma.serviceOrder.findFirst({ where: { id: executionId, orgId: primaryOrgId } })
+    expect(executionDb?.id).toBe(serviceOrderId)
 
     const serviceOrderInProgress = await prisma.serviceOrder.findFirst({ where: { id: serviceOrderId, orgId: primaryOrgId } })
     expect(serviceOrderInProgress?.status).toBe('IN_PROGRESS')
@@ -172,8 +168,8 @@ describe('Canonical Operational Workflow (e2e)', () => {
       .send({ notes: 'Concluído com sucesso', checklist: [{ key: 'final-review', done: true }] })
       .expect(201)
 
-    const completedExecutionDb = await prisma.execution.findFirst({ where: { id: executionId, orgId: primaryOrgId } })
-    expect(completedExecutionDb?.endedAt).toBeTruthy()
+    const completedExecutionDb = await prisma.serviceOrder.findFirst({ where: { id: executionId, orgId: primaryOrgId } })
+    expect(completedExecutionDb?.finishedAt).toBeTruthy()
 
     const serviceOrderDone = await prisma.serviceOrder.findFirst({ where: { id: serviceOrderId, orgId: primaryOrgId } })
     expect(serviceOrderDone?.status).toBe('DONE')
