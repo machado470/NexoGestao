@@ -2,6 +2,11 @@ import { Test, TestingModule } from '@nestjs/testing'
 import { NotFoundException } from '@nestjs/common'
 import { NotificationsService } from './notifications.service'
 import { PrismaService } from '../prisma/prisma.service'
+import { QueueService } from '../queue/queue.service'
+
+const mockQueueService = {
+  addJob: jest.fn(),
+}
 
 const mockPrisma = {
   notification: {
@@ -20,6 +25,7 @@ describe('NotificationsService', () => {
       providers: [
         NotificationsService,
         { provide: PrismaService, useValue: mockPrisma },
+        { provide: QueueService, useValue: mockQueueService },
       ],
     }).compile()
 

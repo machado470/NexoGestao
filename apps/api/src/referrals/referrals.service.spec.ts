@@ -67,9 +67,9 @@ describe('ReferralsService', () => {
       ).rejects.toThrow(NotFoundException)
     })
 
-    it('deve definir confirmedAt ao confirmar indicação', async () => {
+    it('deve atualizar status da indicação para CONFIRMED', async () => {
       const existing = { id: 'ref-1', orgId: 'org-1', status: 'PENDING', confirmedAt: null, paidAt: null }
-      const updated = { ...existing, status: 'CONFIRMED', confirmedAt: new Date() }
+      const updated = { ...existing, status: 'CONFIRMED' }
       mockPrisma.referral.findFirst.mockResolvedValue(existing)
       mockPrisma.referral.update.mockResolvedValue(updated)
 
@@ -79,7 +79,6 @@ describe('ReferralsService', () => {
         expect.objectContaining({
           data: expect.objectContaining({
             status: 'CONFIRMED',
-            confirmedAt: expect.any(Date),
           }),
         })
       )

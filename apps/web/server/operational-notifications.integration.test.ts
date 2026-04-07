@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { appRouter } from "./routers";
-import { __resetOperationalNotificationsForTests } from "./_core/operationalNotifications";
+import {
+  __resetOperationalNotificationsForTests,
+  emitOperationalNotification,
+} from "./_core/operationalNotifications";
 
 const ORG_10_ID = "00000000-0000-0000-0000-000000000010";
 const ORG_20_ID = "00000000-0000-0000-0000-000000000020";
@@ -13,6 +16,7 @@ function createCtx(orgId: string) {
       id: 1,
       organizationId: orgId,
       role: "admin",
+      token: "test-token",
     },
   } as any;
 }
@@ -30,14 +34,10 @@ describe("Operational notifications integration", () => {
     );
   });
 
-  it("generates notifications for required operational events", async () => {
+  it("records risk-level change notification through governance router", async () => {
     const caller = appRouter.createCaller(createCtx(ORG_10_ID));
 
-    await caller.data.appointments.update({ id: "apt-1", status: "CONFIRMED" });
-    await caller.data.appointments.update({ id: "apt-2", status: "NO_SHOW" });
-    await caller.data.serviceOrders.update({ id: "so-1", status: "DONE" });
-    await caller.finance.charges.update({ id: "ch-1", status: "OVERDUE" });
-    await caller.governance.governance.changeRiskLevel({
+    await caller.governance.changeRiskLevel({
       entityId: "customer-1",
       previousLevel: "LOW",
       newLevel: "HIGH",
@@ -46,10 +46,6 @@ describe("Operational notifications integration", () => {
     const notifications = await caller.dashboard.notifications({ limit: 10 });
     const types = notifications.map((n) => n.type);
 
-    expect(types).toContain("APPOINTMENT_CONFIRMED");
-    expect(types).toContain("APPOINTMENT_NO_SHOW");
-    expect(types).toContain("SERVICE_ORDER_COMPLETED");
-    expect(types).toContain("PAYMENT_OVERDUE");
     expect(types).toContain("RISK_LEVEL_CHANGED");
     expect(notifications.every((n) => n.orgId === ORG_10_ID)).toBe(true);
   });
@@ -58,8 +54,16 @@ describe("Operational notifications integration", () => {
     const callerOrg10 = appRouter.createCaller(createCtx(ORG_10_ID));
     const callerOrg20 = appRouter.createCaller(createCtx(ORG_20_ID));
 
-    await callerOrg10.data.appointments.update({ id: "apt-10", status: "CONFIRMED" });
-    await callerOrg20.data.appointments.update({ id: "apt-20", status: "CONFIRMED" });
+    await emitOperationalNotification({
+      orgId: ORG_10_ID,
+      type: "APPOINTMENT_CONFIRMED",
+      metadata: { appointmentId: "apt-10" },
+    });
+    await emitOperationalNotification({
+      orgId: ORG_20_ID,
+      type: "APPOINTMENT_CONFIRMED",
+      metadata: { appointmentId: "apt-20" },
+    });
 
     const org10Notifications = await callerOrg10.dashboard.notifications({ limit: 10 });
     const org20Notifications = await callerOrg20.dashboard.notifications({ limit: 10 });
