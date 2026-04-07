@@ -239,7 +239,7 @@ function PublicRoute({ component: Component }: { component: ComponentType }) {
 
   useEffect(() => {
     if (!isInitializing && isAuthenticated) {
-      navigate(redirectTo || redirectParam || "/dashboard");
+      navigate(redirectParam || redirectTo || "/dashboard");
     }
   }, [isAuthenticated, isInitializing, navigate, redirectParam, redirectTo]);
 

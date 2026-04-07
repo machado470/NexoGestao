@@ -102,7 +102,7 @@ export default function Login() {
 
     try {
       await login(normalizedEmail, password);
-      navigate(redirectTo || getSafeRedirectParam() || "/dashboard");
+      navigate(getSafeRedirectParam() || redirectTo || "/dashboard");
     } catch (err) {
       setLocalError(normalizeErrorMessage(err));
     }
