@@ -2,7 +2,12 @@ import { useMemo } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/contexts/AuthContext";
-import { getErrorMessage } from "@/lib/query-helpers";
+import {
+  getErrorMessage,
+  getQueryUiState,
+  normalizeArrayPayload,
+  normalizeObjectPayload,
+} from "@/lib/query-helpers";
 import { normalizeStatus } from "@/lib/operations/operations.utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -36,30 +41,6 @@ type FinanceStats = {
   pending?: { amountCents?: number };
   overdue?: { amountCents?: number };
 };
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function safeExtractCharges(payload: unknown): FinanceCharge[] {
-  if (!payload) return [];
-  if (Array.isArray(payload)) return payload as FinanceCharge[];
-  if (!isObject(payload)) return [];
-
-  const data = payload.data;
-  if (Array.isArray(data)) return data as FinanceCharge[];
-  if (isObject(data) && Array.isArray(data.items)) return data.items as FinanceCharge[];
-  if (Array.isArray(payload.items)) return payload.items as FinanceCharge[];
-
-  return [];
-}
-
-function safeExtractStats(payload: unknown): FinanceStats | null {
-  if (!payload) return null;
-  if (!isObject(payload)) return null;
-  if (isObject(payload.data)) return payload.data as FinanceStats;
-  return payload as FinanceStats;
-}
 
 function formatCurrencyFromCents(cents?: number) {
   return new Intl.NumberFormat("pt-BR", {
@@ -111,20 +92,10 @@ export default function FinancesPage() {
     }
   );
 
-  const paymentById = useMemo(() => {
-    const payload = paymentByIdQuery.data as
-      | FinancePayment
-      | { data?: FinancePayment }
-      | null
-      | undefined;
-    if (!payload) return null;
-    if ("id" in (payload as Record<string, unknown>)) return payload as FinancePayment;
-    if (payload && typeof payload === "object" && "data" in payload) {
-      const data = (payload as { data?: FinancePayment }).data;
-      return data ?? null;
-    }
-    return null;
-  }, [paymentByIdQuery.data]);
+  const paymentById = useMemo(
+    () => normalizeObjectPayload<FinancePayment>(paymentByIdQuery.data),
+    [paymentByIdQuery.data]
+  );
 
   const resolvedChargeIdFromPayment = useMemo(() => {
     if (!paymentById) return null;
@@ -164,24 +135,14 @@ export default function FinancesPage() {
   });
 
   const charges = useMemo(
-    () => safeExtractCharges(chargesQuery.data),
+    () => normalizeArrayPayload<FinanceCharge>(chargesQuery.data),
     [chargesQuery.data]
   );
 
-  const scopedCharge = useMemo(() => {
-    const payload = chargeByIdQuery.data as
-      | FinanceCharge
-      | { data?: FinanceCharge }
-      | null
-      | undefined;
-    if (!payload) return null;
-    if ("id" in (payload as Record<string, unknown>)) return payload as FinanceCharge;
-    if (payload && typeof payload === "object" && "data" in payload) {
-      const data = (payload as { data?: FinanceCharge }).data;
-      return data ?? null;
-    }
-    return null;
-  }, [chargeByIdQuery.data]);
+  const scopedCharge = useMemo(
+    () => normalizeObjectPayload<FinanceCharge>(chargeByIdQuery.data),
+    [chargeByIdQuery.data]
+  );
 
   const visibleCharges = useMemo(() => {
     if (scopedCharge) return [scopedCharge];
@@ -232,14 +193,24 @@ export default function FinancesPage() {
   }, [paymentScopedCharge, visibleCharges]);
 
   const stats = useMemo(
-    () => safeExtractStats(statsQuery.data),
+    () => normalizeObjectPayload<FinanceStats>(statsQuery.data),
     [statsQuery.data]
   );
 
-  const hasNormalizedCharges = chargesQuery.data !== undefined;
-  const hasNormalizedStats =
-    isServiceOrderScoped || statsQuery.data !== undefined;
-  const hasReusableData = hasNormalizedCharges || hasNormalizedStats;
+  const hasRenderableData =
+    chargesQuery.data !== undefined ||
+    isServiceOrderScoped ||
+    statsQuery.data !== undefined;
+
+  const queryState = getQueryUiState(
+    [
+      chargesQuery,
+      ...(isServiceOrderScoped ? [] : [statsQuery]),
+      chargeByIdQuery,
+      paymentByIdQuery,
+    ],
+    hasRenderableData
+  );
 
   const hasError =
     chargesQuery.isError ||
@@ -253,16 +224,6 @@ export default function FinancesPage() {
     getErrorMessage(chargeByIdQuery.error, "") ||
     getErrorMessage(paymentByIdQuery.error, "") ||
     "Erro ao carregar";
-
-  const hasAnyActiveLoading =
-    chargesQuery.isLoading ||
-    (!isServiceOrderScoped && statsQuery.isLoading) ||
-    chargeByIdQuery.isLoading ||
-    paymentByIdQuery.isLoading;
-
-  const isInitialLoading = hasAnyActiveLoading && !hasReusableData;
-
-  const shouldBlockForError = hasError && !hasReusableData;
 
   if (isInitializing) {
     return (
@@ -292,7 +253,7 @@ export default function FinancesPage() {
     );
   }
 
-  if (isInitialLoading) {
+  if (queryState.isInitialLoading) {
     return (
       <PageShell>
         <PageHero
@@ -310,7 +271,7 @@ export default function FinancesPage() {
     );
   }
 
-  if (shouldBlockForError) {
+  if (queryState.shouldBlockForError) {
     return (
       <PageShell>
         <PageHero
@@ -341,6 +302,18 @@ export default function FinancesPage() {
           </button>
         }
       />
+
+      {queryState.hasBackgroundUpdate ? (
+        <SurfaceSection className="border-blue-500/30 bg-blue-500/10 text-sm text-blue-200">
+          Atualizando financeiro em segundo plano...
+        </SurfaceSection>
+      ) : null}
+
+      {hasError && !queryState.shouldBlockForError ? (
+        <SurfaceSection className="border-amber-500/30 bg-amber-500/10 text-sm text-amber-200">
+          {errorMessage}
+        </SurfaceSection>
+      ) : null}
 
       {stats && !isServiceOrderScoped && (
         <FinanceOverviewAreaChart

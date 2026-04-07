@@ -2,7 +2,14 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-function unwrapTrpcPayload(payload: unknown): unknown {
+type QueryLike = {
+  isLoading?: boolean;
+  isFetching?: boolean;
+  isError?: boolean;
+  error?: unknown;
+};
+
+export function unwrapTrpcPayload(payload: unknown): unknown {
   let current = payload;
   let guard = 0;
 
@@ -150,4 +157,23 @@ export function normalizeAlertsPayload<T = any>(payload: unknown): T {
 export function getPayloadValue<T = unknown>(payload: unknown): T | null {
   const raw = unwrapTrpcPayload(payload);
   return (raw as T) ?? null;
+}
+
+export function getQueryUiState(
+  queries: QueryLike[],
+  hasRenderableData: boolean
+) {
+  const hasError = queries.some((query) => Boolean(query.isError));
+  const hasAnyLoading = queries.some((query) => Boolean(query.isLoading));
+  const hasAnyFetching = queries.some((query) => Boolean(query.isFetching));
+  const firstError = queries.find((query) => query.error)?.error;
+
+  return {
+    hasError,
+    hasAnyFetching,
+    isInitialLoading: hasAnyLoading && !hasRenderableData,
+    shouldBlockForError: hasError && !hasRenderableData,
+    hasBackgroundUpdate: hasAnyFetching && hasRenderableData,
+    firstError,
+  };
 }

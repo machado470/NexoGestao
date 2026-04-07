@@ -37,7 +37,7 @@ import type {
   FinancialFilter,
   ServiceOrder,
 } from "@/components/service-orders/service-order.types";
-import { normalizeArrayPayload } from "@/lib/query-helpers";
+import { getErrorMessage, getQueryUiState, normalizeArrayPayload } from "@/lib/query-helpers";
 
 const FINANCIAL_FILTERS: Array<{
   value: FinancialFilter;
@@ -268,9 +268,21 @@ export default function ServiceOrdersPage() {
     ]);
   }
 
-  const isLoading =
-    ordersQuery.isLoading || customersQuery.isLoading || peopleQuery.isLoading;
-  const hasError = ordersQuery.error || customersQuery.error || peopleQuery.error;
+  const hasRenderableData =
+    ordersQuery.data !== undefined ||
+    customersQuery.data !== undefined ||
+    peopleQuery.data !== undefined;
+
+  const queryState = getQueryUiState(
+    [ordersQuery, customersQuery, peopleQuery],
+    hasRenderableData
+  );
+
+  const errorMessage =
+    getErrorMessage(ordersQuery.error, "") ||
+    getErrorMessage(customersQuery.error, "") ||
+    getErrorMessage(peopleQuery.error, "") ||
+    "Erro ao carregar a fila operacional.";
 
   return (
     <PageShell>
@@ -375,13 +387,25 @@ export default function ServiceOrdersPage() {
         </CardContent>
       </Card>
 
-      {isLoading ? (
+      {queryState.hasBackgroundUpdate ? (
+        <div className="rounded border border-blue-500/30 bg-blue-500/10 p-3 text-sm text-blue-200">
+          Atualizando dados em segundo plano...
+        </div>
+      ) : null}
+
+      {queryState.hasError && !queryState.shouldBlockForError ? (
+        <div className="rounded border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200">
+          {errorMessage}
+        </div>
+      ) : null}
+
+      {queryState.isInitialLoading ? (
         <SurfaceSection className="flex min-h-[160px] items-center justify-center text-sm text-muted-foreground">
           Carregando ordens de serviço...
         </SurfaceSection>
-      ) : hasError ? (
+      ) : queryState.shouldBlockForError ? (
         <SurfaceSection className="border-red-200 text-sm text-red-700 dark:border-red-900/40 dark:text-red-300">
-          Erro ao carregar a fila operacional.
+          {errorMessage}
         </SurfaceSection>
       ) : sorted.length === 0 ? (
         <SurfaceSection className="space-y-3">

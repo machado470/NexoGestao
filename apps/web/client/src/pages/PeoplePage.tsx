@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { PageHero, PageShell, SurfaceSection } from "@/components/PagePattern";
 import { EmptyState } from "@/components/EmptyState";
 import {
+  getQueryUiState,
   normalizeArrayPayload,
   normalizeObjectPayload,
 } from "@/lib/query-helpers";
@@ -95,8 +96,10 @@ export default function PeoplePage() {
     return normalizeArrayPayload<ServiceOrder>(serviceOrdersQuery.data);
   }, [serviceOrdersQuery.data]);
 
-  const hasData =
-    listPeople.isSuccess || statsLinked.isSuccess || serviceOrdersQuery.isSuccess;
+  const hasRenderableData =
+    listPeople.data !== undefined ||
+    statsLinked.data !== undefined ||
+    serviceOrdersQuery.data !== undefined;
 
   const hasError =
     listPeople.isError || statsLinked.isError || serviceOrdersQuery.isError;
@@ -107,12 +110,10 @@ export default function PeoplePage() {
     serviceOrdersQuery.error?.message ||
     "Erro ao carregar pessoas";
 
-  const hasAnyActiveLoading =
-    listPeople.isLoading || statsLinked.isLoading || serviceOrdersQuery.isLoading;
-
-  const isInitialLoading = hasAnyActiveLoading && !hasData;
-
-  const shouldBlockForError = hasError && !hasData;
+  const queryState = getQueryUiState(
+    [listPeople, statsLinked, serviceOrdersQuery],
+    hasRenderableData
+  );
 
   if (isInitializing) {
     return (
@@ -136,7 +137,7 @@ export default function PeoplePage() {
     );
   }
 
-  if (isInitialLoading) {
+  if (queryState.isInitialLoading) {
     return (
       <PageShell>
         <PageHero eyebrow="Pessoas" title="Pessoas" description="Carregando base de pessoas..." />
@@ -150,7 +151,7 @@ export default function PeoplePage() {
     );
   }
 
-  if (shouldBlockForError) {
+  if (queryState.shouldBlockForError) {
     return (
       <PageShell>
         <PageHero eyebrow="Pessoas" title="Pessoas" description="Não foi possível carregar os dados de pessoas." />
@@ -167,7 +168,13 @@ export default function PeoplePage() {
         description="Base de pessoas conectada à operação, com a mesma leitura visual do dashboard executivo."
       />
 
-      {hasError && !shouldBlockForError ? (
+      {queryState.hasBackgroundUpdate ? (
+        <div className="rounded border border-blue-500/30 bg-blue-500/10 p-3 text-sm text-blue-200">
+          Atualizando pessoas em segundo plano...
+        </div>
+      ) : null}
+
+      {hasError && !queryState.shouldBlockForError ? (
         <div className="rounded border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200">
           {errorMessage}
         </div>

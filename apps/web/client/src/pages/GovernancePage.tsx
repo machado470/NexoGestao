@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
-import { getErrorMessage, getPayloadValue } from "@/lib/query-helpers";
+import { getErrorMessage, getPayloadValue, getQueryUiState } from "@/lib/query-helpers";
 import { useAuth } from "@/contexts/AuthContext";
 import { PageHero, PageShell, SurfaceSection } from "@/components/PagePattern";
 import { EmptyState } from "@/components/EmptyState";
@@ -106,15 +106,10 @@ export default function GovernancePage() {
     getErrorMessage(alertsQuery.error, "") ||
     "Erro ao carregar governança";
 
-  const hasAnyActiveLoading =
-    summaryQuery.isLoading ||
-    runsQuery.isLoading ||
-    autoScoreQuery.isLoading ||
-    alertsQuery.isLoading;
-
-  const isInitialLoading = hasAnyActiveLoading && !hasAnyData;
-
-  const shouldBlockForError = hasError && !hasAnyData;
+  const queryState = getQueryUiState(
+    [summaryQuery, runsQuery, autoScoreQuery, alertsQuery],
+    hasAnyData
+  );
 
   const institutionalRiskScore =
     Number(
@@ -144,7 +139,7 @@ export default function GovernancePage() {
     );
   }
 
-  if (isInitialLoading) {
+  if (queryState.isInitialLoading) {
     return (
       <PageShell>
         <PageHero eyebrow="Governança" title="Governança" description="Carregando leituras de risco institucional." />
@@ -156,7 +151,7 @@ export default function GovernancePage() {
     );
   }
 
-  if (shouldBlockForError) {
+  if (queryState.shouldBlockForError) {
     return (
       <PageShell>
         <PageHero eyebrow="Governança" title="Governança" description="Não foi possível montar os blocos de governança." />
@@ -191,7 +186,13 @@ export default function GovernancePage() {
         }
       />
 
-      {hasError && !shouldBlockForError ? (
+      {queryState.hasBackgroundUpdate ? (
+        <div className="rounded border border-blue-500/30 bg-blue-500/10 p-3 text-sm text-blue-200">
+          Atualizando governança em segundo plano...
+        </div>
+      ) : null}
+
+      {hasError && !queryState.shouldBlockForError ? (
         <div className="rounded border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200">
           {errorMessage}
         </div>
