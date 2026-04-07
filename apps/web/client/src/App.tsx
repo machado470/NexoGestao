@@ -1,11 +1,4 @@
-import {
-  lazy,
-  Suspense,
-  useEffect,
-  type ComponentType,
-  type LazyExoticComponent,
-  type ReactNode,
-} from "react";
+import { lazy, Suspense, useEffect, type ComponentType, type LazyExoticComponent } from "react";
 import { Route, Switch, useLocation } from "wouter";
 import { Loader } from "lucide-react";
 
@@ -37,6 +30,8 @@ const Register = lazy(() => import("./pages/Register"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const About = lazy(() => import("./pages/About"));
+const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
+const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
 const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
 
@@ -296,10 +291,6 @@ function onboardingPage(Page: LazyExoticComponent<ComponentType>) {
   };
 }
 
-function RouteShell({ children }: { children: ReactNode }) {
-  return <>{children}</>;
-}
-
 const CustomersRoute = protectedPage(CustomersPage, {
   permissions: ["customers:read"],
   requireCompletedOnboarding: true,
@@ -374,27 +365,27 @@ function Router() {
   return (
     <Switch>
       <Route path="/">
-        <RouteShell>{publicPage(Landing)()}</RouteShell>
+        {publicPage(Landing)()}
       </Route>
 
       <Route path="/login">
-        <RouteShell>{publicPage(Login)()}</RouteShell>
+        {publicPage(Login)()}
       </Route>
 
       <Route path="/register">
-        <RouteShell>{publicPage(Register)()}</RouteShell>
+        {publicPage(Register)()}
       </Route>
 
       <Route path="/forgot-password">
-        <RouteShell>{publicPage(ForgotPasswordPage)()}</RouteShell>
+        {publicPage(ForgotPasswordPage)()}
       </Route>
 
       <Route path="/reset-password">
-        <RouteShell>{publicPage(ResetPasswordPage)()}</RouteShell>
+        {publicPage(ResetPasswordPage)()}
       </Route>
 
       <Route path="/onboarding">
-        <RouteShell>{onboardingPage(Onboarding)()}</RouteShell>
+        {onboardingPage(Onboarding)()}
       </Route>
 
       <Route
@@ -482,6 +473,8 @@ function Router() {
       />
 
       <Route path="/about" component={() => <LazyPage component={About} />} />
+      <Route path="/privacy" component={() => <LazyPage component={PrivacyPolicy} />} />
+      <Route path="/terms" component={() => <LazyPage component={TermsOfService} />} />
       <Route path="/404" component={() => <LazyPage component={NotFound} />} />
       <Route component={() => <LazyPage component={NotFound} />} />
     </Switch>
