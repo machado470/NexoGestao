@@ -164,16 +164,6 @@ export default function ServiceOrderDetailsPanel({ os }: { os: ServiceOrder }) {
     },
   });
 
-  const canStart = ["OPEN", "ASSIGNED"].includes(normalizeStatus(os.status));
-  const canFinish = normalizeStatus(os.status) === "IN_PROGRESS";
-  const canGenerateCharge =
-    normalizeStatus(os.status) === "DONE" && !os.financialSummary?.hasCharge;
-
-  const operationalStage = getOperationalStage(os);
-  const financialStage = getFinancialStage(os);
-  const nextAction = getServiceOrderNextAction(os);
-  const flowSteps = getServiceOrderFlowSteps(os);
-
   const timeline = useMemo(
     () => normalizeOrders<TimelineEvent>(timelineQuery.data),
     [timelineQuery.data]
@@ -185,6 +175,17 @@ export default function ServiceOrderDetailsPanel({ os }: { os: ServiceOrder }) {
   );
 
   const latestExecution = executions[0] ?? null;
+
+  const canStart = ["OPEN", "ASSIGNED"].includes(normalizeStatus(os.status));
+  const canFinish =
+    normalizeStatus(os.status) === "IN_PROGRESS" && Boolean(latestExecution?.id);
+  const canGenerateCharge =
+    normalizeStatus(os.status) === "DONE" && !os.financialSummary?.hasCharge;
+
+  const operationalStage = getOperationalStage(os);
+  const financialStage = getFinancialStage(os);
+  const nextAction = getServiceOrderNextAction(os);
+  const flowSteps = getServiceOrderFlowSteps(os);
   const chargeIsPaid =
     normalizeStatus(os.financialSummary?.chargeStatus) === "PAID";
 
@@ -240,7 +241,10 @@ export default function ServiceOrderDetailsPanel({ os }: { os: ServiceOrder }) {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => finishExecution.mutate({ id: os.id })}
+                onClick={() =>
+                  latestExecution?.id &&
+                  finishExecution.mutate({ id: latestExecution.id })
+                }
                 disabled={finishExecution.isPending || !canFinish}
               >
                 <CheckCircle2 className="mr-2 h-4 w-4" />

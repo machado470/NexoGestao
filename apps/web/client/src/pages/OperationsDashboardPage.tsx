@@ -112,23 +112,6 @@ export default function OperationsDashboardPage() {
     },
   });
 
-  const finishExecution = trpc.nexo.executions.complete.useMutation({
-    onSuccess: async (_data, variables) => {
-      toast.success("Execução concluída");
-      await Promise.all([
-        utils.nexo.serviceOrders.list.invalidate(),
-        utils.finance.charges.list.invalidate(),
-        utils.dashboard.alerts.invalidate(),
-      ]);
-
-      if (variables?.id) {
-        navigate(buildOperationsServiceOrderUrl(variables.id));
-      }
-    },
-    onError: error => {
-      toast.error(error.message || "Não foi possível finalizar a execução");
-    },
-  });
 
   const { registerPayment, generateCheckout, isSubmitting } = useChargeActions({
     location,
@@ -413,7 +396,7 @@ export default function OperationsDashboardPage() {
                           size="sm"
                           variant="outline"
                           onClick={() =>
-                            finishExecution.mutate({ id: order.id })
+                            navigate(buildOperationsServiceOrderUrl(order.id))
                           }
                           className="rounded-xl"
                         >
