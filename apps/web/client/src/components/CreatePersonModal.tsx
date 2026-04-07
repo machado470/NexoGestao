@@ -1,7 +1,18 @@
 import { useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { Loader2, X, UserPlus } from "lucide-react";
+import { Loader2, UserPlus } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 
 type Props = {
   open: boolean;
@@ -42,8 +53,6 @@ export default function CreatePersonModal({ open, onClose, onSaved }: Props) {
     },
   });
 
-  if (!open) return null;
-
   const handleChange = (field: keyof FormData, value: string) => {
     setFormData((prev) => ({
       ...prev,
@@ -76,69 +85,60 @@ export default function CreatePersonModal({ open, onClose, onSaved }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-lg rounded-2xl border bg-white shadow-xl dark:border-zinc-800 dark:bg-zinc-950">
-        <div className="flex items-center justify-between border-b p-4 dark:border-zinc-800">
-          <div className="flex items-center gap-2">
+    <Dialog open={open} onOpenChange={(nextOpen) => (!nextOpen ? onClose() : undefined)}>
+      <DialogContent className="max-w-xl border-zinc-800/80 bg-zinc-950/95 p-0 text-zinc-100 shadow-2xl backdrop-blur">
+        <DialogHeader className="border-b border-zinc-800/90 px-6 py-5">
+          <DialogTitle className="flex items-center gap-2 text-xl font-semibold">
             <UserPlus className="h-5 w-5 text-orange-500" />
-            <h2 className="text-lg font-semibold">Nova pessoa</h2>
-          </div>
+            Nova pessoa
+          </DialogTitle>
+          <DialogDescription className="text-zinc-400">Cadastre colaboradores mantendo a experiência visual unificada.</DialogDescription>
+        </DialogHeader>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-2 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-900"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4 p-4">
+        <form onSubmit={handleSubmit} className="space-y-4 px-6 py-5">
           <div className="space-y-2">
-            <label className="text-sm font-medium">Nome</label>
-            <input
+            <Label htmlFor="person-name">Nome</Label>
+            <Input
+              id="person-name"
               value={formData.name}
               onChange={(e) => handleChange("name", e.target.value)}
-              className="w-full rounded-md border bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-zinc-800"
+              className="border-zinc-700 bg-zinc-900/80"
               placeholder="Ex: João da Silva"
             />
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">Cargo / Papel</label>
-            <input
+            <Label htmlFor="person-role">Cargo / Papel</Label>
+            <Input
+              id="person-role"
               value={formData.role}
               onChange={(e) => handleChange("role", e.target.value)}
-              className="w-full rounded-md border bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-zinc-800"
+              className="border-zinc-700 bg-zinc-900/80"
               placeholder="Ex: Técnico, Supervisor, Administrativo"
             />
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">Email</label>
-            <input
+            <Label htmlFor="person-email">Email</Label>
+            <Input
+              id="person-email"
               type="email"
               value={formData.email}
               onChange={(e) => handleChange("email", e.target.value)}
-              className="w-full rounded-md border bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-zinc-800"
+              className="border-zinc-700 bg-zinc-900/80"
               placeholder="Ex: pessoa@empresa.com"
             />
           </div>
 
-          <div className="flex items-center justify-end gap-2 border-t pt-4 dark:border-zinc-800">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={createPerson.isPending}
-              className="rounded-md border px-4 py-2 text-sm font-medium transition-colors hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
-            >
+          <DialogFooter className="border-t border-zinc-800/90 pt-4">
+            <Button type="button" variant="outline" onClick={onClose} disabled={createPerson.isPending}>
               Cancelar
-            </button>
+            </Button>
 
-            <button
+            <Button
               type="submit"
               disabled={createPerson.isPending}
-              className="inline-flex items-center gap-2 rounded-md bg-orange-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600 disabled:opacity-50"
+              className="inline-flex items-center gap-2 bg-orange-500 text-white hover:bg-orange-600"
             >
               {createPerson.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -146,10 +146,10 @@ export default function CreatePersonModal({ open, onClose, onSaved }: Props) {
                 <UserPlus className="h-4 w-4" />
               )}
               Criar pessoa
-            </button>
-          </div>
+            </Button>
+          </DialogFooter>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

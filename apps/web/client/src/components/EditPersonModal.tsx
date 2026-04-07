@@ -1,7 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { Loader2, Pencil, Save, X } from "lucide-react";
+import { Loader2, Pencil, Save } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 
 type Props = {
   open: boolean;
@@ -122,8 +133,6 @@ export default function EditPersonModal({
     },
   });
 
-  if (!open) return null;
-
   const handleChange = (field: keyof FormData, value: string | boolean) => {
     setFormData((prev) => ({
       ...prev,
@@ -168,77 +177,71 @@ export default function EditPersonModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-lg rounded-2xl border bg-white shadow-xl dark:border-zinc-800 dark:bg-zinc-950">
-        <div className="flex items-center justify-between border-b p-4 dark:border-zinc-800">
-          <div className="flex items-center gap-2">
+    <Dialog open={open} onOpenChange={(nextOpen) => (!nextOpen ? onClose() : undefined)}>
+      <DialogContent className="max-w-xl border-zinc-800/80 bg-zinc-950/95 p-0 text-zinc-100 shadow-2xl backdrop-blur">
+        <DialogHeader className="border-b border-zinc-800/90 px-6 py-5">
+          <DialogTitle className="flex items-center gap-2 text-xl font-semibold">
             <Pencil className="h-5 w-5 text-orange-500" />
-            <h2 className="text-lg font-semibold">Editar pessoa</h2>
-          </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-2 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-900"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+            Editar pessoa
+          </DialogTitle>
+          <DialogDescription className="text-zinc-400">
+            Atualize dados de equipe sem romper o padrão visual do produto.
+          </DialogDescription>
+        </DialogHeader>
 
         {personQuery.isLoading ? (
           <div className="flex items-center justify-center p-8">
             <Loader2 className="h-6 w-6 animate-spin text-orange-500" />
           </div>
         ) : personQuery.isError || !personData ? (
-          <div className="space-y-4 p-4">
-            <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
+          <div className="space-y-4 px-6 py-5">
+            <div className="rounded-xl border border-red-900/60 bg-red-950/40 p-4 text-sm text-red-300">
               Não foi possível carregar os dados da pessoa.
             </div>
 
             <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={onClose}
-                className="rounded-md border px-4 py-2 text-sm font-medium transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
-              >
+              <Button type="button" variant="outline" onClick={onClose}>
                 Fechar
-              </button>
+              </Button>
             </div>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-4 p-4">
+          <form onSubmit={handleSubmit} className="space-y-4 px-6 py-5">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Nome</label>
-              <input
+              <Label htmlFor="edit-person-name">Nome</Label>
+              <Input
+                id="edit-person-name"
                 value={formData.name}
                 onChange={(e) => handleChange("name", e.target.value)}
-                className="w-full rounded-md border bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-zinc-800"
+                className="border-zinc-700 bg-zinc-900/80"
                 placeholder="Nome da pessoa"
               />
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Cargo / Papel</label>
-              <input
+              <Label htmlFor="edit-person-role">Cargo / Papel</Label>
+              <Input
+                id="edit-person-role"
                 value={formData.role}
                 onChange={(e) => handleChange("role", e.target.value)}
-                className="w-full rounded-md border bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-zinc-800"
+                className="border-zinc-700 bg-zinc-900/80"
                 placeholder="Cargo ou papel"
               />
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Email</label>
-              <input
+              <Label htmlFor="edit-person-email">Email</Label>
+              <Input
+                id="edit-person-email"
                 type="email"
                 value={formData.email}
                 onChange={(e) => handleChange("email", e.target.value)}
-                className="w-full rounded-md border bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-zinc-800"
+                className="border-zinc-700 bg-zinc-900/80"
                 placeholder="Email"
               />
             </div>
 
-            <label className="flex items-center gap-2 rounded-lg border p-3 text-sm dark:border-zinc-800">
+            <label className="flex items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/60 p-3 text-sm">
               <input
                 type="checkbox"
                 checked={formData.active}
@@ -247,38 +250,36 @@ export default function EditPersonModal({
               Pessoa ativa
             </label>
 
-            <div className="flex items-center justify-between border-t pt-4 dark:border-zinc-800">
-              <span className="text-xs text-muted-foreground">
+            <DialogFooter className="border-t border-zinc-800/90 pt-4">
+              <span className="mr-auto text-xs text-zinc-500">
                 {hasChanges ? "Alterações pendentes" : "Nada para salvar"}
               </span>
 
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setFormData(initialForm)}
-                  disabled={!hasChanges || updatePerson.isPending}
-                  className="rounded-md border px-4 py-2 text-sm font-medium transition-colors hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
-                >
-                  Descartar
-                </button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setFormData(initialForm)}
+                disabled={!hasChanges || updatePerson.isPending}
+              >
+                Descartar
+              </Button>
 
-                <button
-                  type="submit"
-                  disabled={updatePerson.isPending || !hasChanges}
-                  className="inline-flex items-center gap-2 rounded-md bg-orange-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600 disabled:opacity-50"
-                >
-                  {updatePerson.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Save className="h-4 w-4" />
-                  )}
-                  Salvar
-                </button>
-              </div>
-            </div>
+              <Button
+                type="submit"
+                disabled={updatePerson.isPending || !hasChanges}
+                className="inline-flex items-center gap-2 bg-orange-500 text-white hover:bg-orange-600"
+              >
+                {updatePerson.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
+                Salvar
+              </Button>
+            </DialogFooter>
           </form>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
