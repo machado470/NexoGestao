@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
@@ -20,6 +20,8 @@ interface CreateAppointmentModalProps {
   onClose: () => void;
   onSuccess: () => void;
   customers: Array<{ id: string | number; name: string }>;
+  initialStartsAt?: string;
+  initialEndsAt?: string;
 }
 
 type AppointmentStatus = "SCHEDULED" | "CONFIRMED" | "DONE" | "CANCELED" | "NO_SHOW";
@@ -37,8 +39,20 @@ export function CreateAppointmentModal({
   onClose,
   onSuccess,
   customers,
+  initialStartsAt,
+  initialEndsAt,
 }: CreateAppointmentModalProps) {
   const [formData, setFormData] = useState(INITIAL_FORM);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    setFormData({
+      ...INITIAL_FORM,
+      startsAt: initialStartsAt ?? "",
+      endsAt: initialEndsAt ?? "",
+    });
+  }, [initialEndsAt, initialStartsAt, isOpen]);
 
   const createAppointment = trpc.nexo.appointments.create.useMutation({
     onSuccess: () => {
