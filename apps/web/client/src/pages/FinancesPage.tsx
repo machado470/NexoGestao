@@ -70,9 +70,9 @@ export default function FinancesPage() {
     [statsQuery.data]
   );
 
-  const hasCharges = charges.length > 0;
-  const hasStats =
-    isServiceOrderScoped || !!(stats && (stats.pending || stats.overdue || stats.paid));
+  const hasNormalizedCharges = chargesQuery.data !== undefined;
+  const hasNormalizedStats = isServiceOrderScoped || statsQuery.data !== undefined;
+  const hasReusableData = hasNormalizedCharges || hasNormalizedStats;
 
   const hasError =
     chargesQuery.isError || (!isServiceOrderScoped && statsQuery.isError);
@@ -82,12 +82,12 @@ export default function FinancesPage() {
     getErrorMessage(statsQuery.error, "") ||
     "Erro ao carregar";
 
-  const isInitialLoading =
-    (chargesQuery.isLoading && !hasCharges) ||
-    (!isServiceOrderScoped && statsQuery.isLoading && !hasStats);
+  const hasAnyActiveLoading =
+    chargesQuery.isLoading || (!isServiceOrderScoped && statsQuery.isLoading);
 
-  const shouldBlockForError =
-    hasError && !hasCharges && (!isServiceOrderScoped ? !hasStats : true);
+  const isInitialLoading = hasAnyActiveLoading && !hasReusableData;
+
+  const shouldBlockForError = hasError && !hasReusableData;
 
   if (isInitializing) {
     return (

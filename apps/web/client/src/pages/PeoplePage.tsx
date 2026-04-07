@@ -89,10 +89,11 @@ export default function PeoplePage() {
     return normalizeArrayPayload<ServiceOrder>(serviceOrdersQuery.data);
   }, [serviceOrdersQuery.data]);
 
-  const hasPeople = people.length > 0;
-  const hasStats = linkedStats !== null;
-  const hasOrders = serviceOrders.length > 0;
-  const hasAnyData = hasPeople || hasStats || hasOrders;
+  const hasNormalizedPeople = listPeople.data !== undefined;
+  const hasNormalizedStats = statsLinked.data !== undefined;
+  const hasNormalizedOrders = serviceOrdersQuery.data !== undefined;
+  const hasAnyData =
+    hasNormalizedPeople || hasNormalizedStats || hasNormalizedOrders;
 
   const hasError =
     listPeople.isError || statsLinked.isError || serviceOrdersQuery.isError;
@@ -103,10 +104,10 @@ export default function PeoplePage() {
     serviceOrdersQuery.error?.message ||
     "Erro ao carregar pessoas";
 
-  const isInitialLoading =
-    (listPeople.isLoading && !hasPeople) &&
-    (statsLinked.isLoading && !hasStats) &&
-    (serviceOrdersQuery.isLoading && !hasOrders);
+  const hasAnyActiveLoading =
+    listPeople.isLoading || statsLinked.isLoading || serviceOrdersQuery.isLoading;
+
+  const isInitialLoading = hasAnyActiveLoading && !hasAnyData;
 
   const shouldBlockForError = hasError && !hasAnyData;
 

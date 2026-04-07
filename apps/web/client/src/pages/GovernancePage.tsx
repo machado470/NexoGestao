@@ -77,11 +77,15 @@ export default function GovernancePage() {
     return payload && typeof payload === "object" ? payload : null;
   }, [alertsQuery.data]);
 
-  const hasSummary = !!summary;
-  const hasRuns = runs.length > 0;
-  const hasAutoScore = !!autoScore;
-  const hasAlerts = !!alerts;
-  const hasAnyData = hasSummary || hasRuns || hasAutoScore || hasAlerts;
+  const hasNormalizedSummary = summaryQuery.data !== undefined;
+  const hasNormalizedRuns = runsQuery.data !== undefined;
+  const hasNormalizedAutoScore = autoScoreQuery.data !== undefined;
+  const hasNormalizedAlerts = alertsQuery.data !== undefined;
+  const hasAnyData =
+    hasNormalizedSummary ||
+    hasNormalizedRuns ||
+    hasNormalizedAutoScore ||
+    hasNormalizedAlerts;
 
   const hasError =
     summaryQuery.isError ||
@@ -96,11 +100,13 @@ export default function GovernancePage() {
     getErrorMessage(alertsQuery.error, "") ||
     "Erro ao carregar governança";
 
-  const isInitialLoading =
-    (summaryQuery.isLoading && !hasSummary) &&
-    (runsQuery.isLoading && !hasRuns) &&
-    (autoScoreQuery.isLoading && !hasAutoScore) &&
-    (alertsQuery.isLoading && !hasAlerts);
+  const hasAnyActiveLoading =
+    summaryQuery.isLoading ||
+    runsQuery.isLoading ||
+    autoScoreQuery.isLoading ||
+    alertsQuery.isLoading;
+
+  const isInitialLoading = hasAnyActiveLoading && !hasAnyData;
 
   const shouldBlockForError = hasError && !hasAnyData;
 
