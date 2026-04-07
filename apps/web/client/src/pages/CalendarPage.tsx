@@ -17,13 +17,20 @@ import { Button } from "@/components/ui/button";
 import {
   CalendarDays,
   Plus,
-  X,
-  Loader2,
   MessageCircle,
   Briefcase,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageHero, PageShell, SurfaceSection } from "@/components/PagePattern";
+import { CreateAppointmentModal } from "@/components/CreateAppointmentModal";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const STATUS_COLORS: Record<string, string> = {
   SCHEDULED: "#f97316",
@@ -113,202 +120,6 @@ function CalendarSkeleton() {
   );
 }
 
-function CreateAppointmentModal({
-  state,
-  onClose,
-  onSuccess,
-  customers,
-}: {
-  state: CreateModalState;
-  onClose: () => void;
-  onSuccess: () => void;
-  customers: Array<{ id: string; name: string }>;
-}) {
-  const [form, setForm] = useState({
-    customerId: "",
-    startsAt: state.startStr,
-    endsAt: state.endStr,
-    status: "SCHEDULED" as AppointmentEvent["status"],
-    notes: "",
-  });
-
-  const createMutation = trpc.nexo.appointments.create.useMutation({
-    onSuccess: () => {
-      toast.success("Agendamento criado com sucesso!");
-      onSuccess();
-      onClose();
-      setForm({
-        customerId: "",
-        startsAt: "",
-        endsAt: "",
-        status: "SCHEDULED",
-        notes: "",
-      });
-    },
-    onError: err => {
-      toast.error("Erro ao criar agendamento: " + err.message);
-    },
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!form.customerId || !form.startsAt) {
-      toast.error("Cliente e data/hora de início são obrigatórios");
-      return;
-    }
-
-    if (
-      form.endsAt &&
-      new Date(form.endsAt).getTime() <= new Date(form.startsAt).getTime()
-    ) {
-      toast.error("Data/hora final deve ser maior que a inicial");
-      return;
-    }
-
-    createMutation.mutate({
-      customerId: form.customerId,
-      startsAt: form.startsAt,
-      endsAt: form.endsAt || undefined,
-      status: form.status,
-      notes: form.notes.trim() || undefined,
-    });
-  };
-
-  if (!state.open) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-md rounded-xl bg-white shadow-xl dark:bg-gray-800">
-        <div className="flex items-center justify-between border-b border-gray-200 p-5 dark:border-gray-700">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Novo Agendamento
-          </h2>
-          <button
-            onClick={onClose}
-            className="rounded-lg p-1 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700"
-            type="button"
-          >
-            <X className="h-5 w-5 text-gray-500" />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4 p-5">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Cliente *
-            </label>
-            <select
-              value={form.customerId}
-              onChange={e =>
-                setForm(prev => ({ ...prev, customerId: e.target.value }))
-              }
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-            >
-              <option value="">Selecione um cliente</option>
-              {customers.map(customer => (
-                <option key={customer.id} value={customer.id}>
-                  {customer.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Início *
-            </label>
-            <input
-              type="datetime-local"
-              value={form.startsAt}
-              onChange={e =>
-                setForm(prev => ({ ...prev, startsAt: e.target.value }))
-              }
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Fim
-            </label>
-            <input
-              type="datetime-local"
-              value={form.endsAt}
-              onChange={e =>
-                setForm(prev => ({ ...prev, endsAt: e.target.value }))
-              }
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Status
-            </label>
-            <select
-              value={form.status}
-              onChange={e =>
-                setForm(prev => ({
-                  ...prev,
-                  status: e.target.value as AppointmentEvent["status"],
-                }))
-              }
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-            >
-              <option value="SCHEDULED">Agendado</option>
-              <option value="CONFIRMED">Confirmado</option>
-              <option value="DONE">Concluído</option>
-              <option value="CANCELED">Cancelado</option>
-              <option value="NO_SHOW">Não compareceu</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Observações
-            </label>
-            <textarea
-              value={form.notes}
-              onChange={e =>
-                setForm(prev => ({ ...prev, notes: e.target.value }))
-              }
-              rows={3}
-              placeholder="Observações do agendamento"
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-            />
-          </div>
-
-          <div className="flex gap-3 pt-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              className="flex-1"
-            >
-              Cancelar
-            </Button>
-            <Button
-              type="submit"
-              disabled={createMutation.isPending}
-              className="flex-1 bg-orange-500 text-white hover:bg-orange-600"
-            >
-              {createMutation.isPending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Criando...
-                </>
-              ) : (
-                "Criar"
-              )}
-            </Button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
 function EventDetailModal({
   state,
   onClose,
@@ -333,57 +144,53 @@ function EventDetailModal({
     },
   });
 
-  if (!state.open || !state.event) return null;
+  if (!state.event) return null;
 
   const event = state.event;
 
   const handleStatusChange = (newStatus: AppointmentEvent["status"]) => {
     updateMutation.mutate({
       id: event.id,
-      data: { status: newStatus },
+      status: newStatus,
     });
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-sm rounded-xl bg-white shadow-xl dark:bg-gray-800">
-        <div className="flex items-center justify-between border-b border-gray-200 p-5 dark:border-gray-700">
-          <h2 className="pr-2 text-lg font-semibold text-gray-900 dark:text-white">
+    <Dialog open={state.open} onOpenChange={(open) => (!open ? onClose() : undefined)}>
+      <DialogContent className="max-w-sm border-zinc-800/80 bg-zinc-950/95 p-0 text-zinc-100 shadow-2xl backdrop-blur">
+        <DialogHeader className="border-b border-zinc-800/90 px-6 py-5">
+          <DialogTitle className="pr-2 text-lg font-semibold">
             Detalhes do Agendamento
-          </h2>
-          <button
-            onClick={onClose}
-            className="rounded-lg p-1 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700"
-            type="button"
-          >
-            <X className="h-5 w-5 text-gray-500" />
-          </button>
-        </div>
+          </DialogTitle>
+          <DialogDescription className="text-zinc-400">
+            Atualize o status ou siga para execução e atendimento no WhatsApp.
+          </DialogDescription>
+        </DialogHeader>
 
-        <div className="space-y-3 p-5">
+        <div className="space-y-3 px-6 py-5">
           <div>
-            <span className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">
               Cliente
             </span>
-            <p className="mt-0.5 text-sm text-gray-900 dark:text-white">
+            <p className="mt-0.5 text-sm text-zinc-100">
               {event.customer?.name ?? "Cliente não identificado"}
             </p>
           </div>
 
           <div>
-            <span className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">
               Início
             </span>
-            <p className="mt-0.5 text-sm text-gray-900 dark:text-white">
+            <p className="mt-0.5 text-sm text-zinc-100">
               {new Date(event.startsAt).toLocaleString("pt-BR")}
             </p>
           </div>
 
           <div>
-            <span className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">
               Fim
             </span>
-            <p className="mt-0.5 text-sm text-gray-900 dark:text-white">
+            <p className="mt-0.5 text-sm text-zinc-100">
               {event.endsAt
                 ? new Date(event.endsAt).toLocaleString("pt-BR")
                 : "—"}
@@ -391,7 +198,7 @@ function EventDetailModal({
           </div>
 
           <div>
-            <span className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">
               Status
             </span>
             <div className="mt-1.5">
@@ -403,7 +210,7 @@ function EventDetailModal({
                   )
                 }
                 disabled={updateMutation.isPending}
-                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                className="h-9 w-full rounded-md border border-zinc-700 bg-zinc-900/80 px-3 py-2 text-sm text-zinc-100 outline-none ring-offset-zinc-950 focus-visible:border-orange-400 focus-visible:ring-2 focus-visible:ring-orange-500/50"
               >
                 <option value="SCHEDULED">Agendado</option>
                 <option value="CONFIRMED">Confirmado</option>
@@ -415,19 +222,20 @@ function EventDetailModal({
           </div>
 
           <div>
-            <span className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">
               Observações
             </span>
-            <p className="mt-0.5 text-sm text-gray-900 dark:text-white">
+            <p className="mt-0.5 text-sm text-zinc-100">
               {event.notes?.trim() ? event.notes : "—"}
             </p>
           </div>
         </div>
 
-        <div className="space-y-2 px-5 pb-5">
+        <DialogFooter className="space-y-2 border-t border-zinc-800/90 px-6 py-4 sm:flex-col sm:space-x-0">
           <Button
             type="button"
             className="w-full"
+            disabled={updateMutation.isPending}
             onClick={() => onOpenExecution(event.customerId)}
           >
             <Briefcase className="mr-2 h-4 w-4" />
@@ -438,18 +246,24 @@ function EventDetailModal({
             type="button"
             variant="outline"
             className="w-full"
+            disabled={updateMutation.isPending}
             onClick={() => onOpenWhatsApp(event.customerId)}
           >
             <MessageCircle className="mr-2 h-4 w-4" />
             Falar com cliente
           </Button>
 
-          <Button variant="outline" onClick={onClose} className="w-full">
+          <Button
+            variant="outline"
+            onClick={onClose}
+            disabled={updateMutation.isPending}
+            className="w-full"
+          >
             Fechar
           </Button>
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -555,10 +369,8 @@ export default function CalendarPage() {
 
       updateMutation.mutate({
         id,
-        data: {
-          startsAt: newStart.toISOString(),
-          endsAt: newEnd ? newEnd.toISOString() : undefined,
-        },
+        startsAt: newStart.toISOString(),
+        endsAt: newEnd ? newEnd.toISOString() : undefined,
       });
     },
     [updateMutation]
@@ -616,6 +428,42 @@ export default function CalendarPage() {
       />
 
       <SurfaceSection className="space-y-6">
+        {appointmentsQuery.error ? (
+          <SurfaceSection className="rounded-xl border border-red-500/40 bg-red-500/10 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-red-200">
+                Não foi possível carregar os agendamentos.{" "}
+                {appointmentsQuery.error.message}
+              </p>
+              <Button
+                variant="outline"
+                className="border-red-400/40"
+                onClick={() => void appointmentsQuery.refetch()}
+              >
+                Tentar novamente
+              </Button>
+            </div>
+          </SurfaceSection>
+        ) : null}
+
+        {customersQuery.error ? (
+          <SurfaceSection className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-amber-100">
+                Falha ao carregar clientes. O modal de criação pode ficar sem
+                opções até recarregar.
+              </p>
+              <Button
+                variant="outline"
+                className="border-amber-400/40"
+                onClick={() => void customersQuery.refetch()}
+              >
+                Recarregar clientes
+              </Button>
+            </div>
+          </SurfaceSection>
+        ) : null}
+
         <div className="flex flex-wrap gap-3">
           {(
             [
@@ -685,12 +533,14 @@ export default function CalendarPage() {
       </SurfaceSection>
 
       <CreateAppointmentModal
-        state={createModal}
+        isOpen={createModal.open}
         onClose={() =>
           setCreateModal({ open: false, startStr: "", endStr: "" })
         }
         onSuccess={handleCreateSuccess}
         customers={customers}
+        initialStartsAt={createModal.startStr}
+        initialEndsAt={createModal.endStr}
       />
 
       <EventDetailModal
