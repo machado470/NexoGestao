@@ -25,11 +25,11 @@ export function DemoEnvironmentCta({ className }: Props) {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-sm font-semibold text-orange-900 dark:text-orange-200">
-            Ambiente vivo para demo
+            Ambiente de venda em 1 clique
           </p>
           <p className="mt-1 text-xs text-orange-700 dark:text-orange-300">
-            Gera cliente → agendamento → O.S. concluída → cobrança → pagamento,
-            com atualização imediata de timeline, risco, governança e WhatsApp.
+            Entrega jornada completa: cliente → agenda → O.S. → cobrança → pagamento,
+            com timeline ativa e score de governança fora do neutro.
           </p>
         </div>
 

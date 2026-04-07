@@ -219,7 +219,7 @@ export function getWhatsAppContextLabel(context?: string | null) {
   const normalized = normalizeWhatsAppContext(context);
 
   if (normalized === "overdue_charge") return "Cobrança vencida";
-  if (normalized === "charge_pending") return "Cobrança pendente";
+  if (normalized === "charge_pending") return "Dinheiro parado (cobrança pendente)";
   if (normalized === "service_order_followup") {
     return "Acompanhamento da ordem de serviço";
   }
@@ -246,14 +246,14 @@ export function getWhatsAppContextDescription(route: ParsedWhatsAppRoute) {
 
   if (route.context === "charge_pending") {
     if (amountLabel && dueDateLabel) {
-      return `Cobrança pendente de ${amountLabel} com vencimento em ${dueDateLabel}.`;
+      return `Você tem ${amountLabel} parado, com vencimento em ${dueDateLabel}.`;
     }
 
     if (amountLabel) {
-      return `Cobrança pendente de ${amountLabel}.`;
+      return `Você tem ${amountLabel} parado aguardando recebimento.`;
     }
 
-    return "Cobrança pendente vinculada ao cliente.";
+    return "Existe dinheiro parado nesta conta aguardando ação.";
   }
 
   if (route.context === "service_order_followup") {

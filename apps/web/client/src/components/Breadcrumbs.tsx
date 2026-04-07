@@ -7,11 +7,11 @@ interface Breadcrumb {
 }
 
 const routeBreadcrumbs: Record<string, Breadcrumb[]> = {
-  "/dashboard": [{ label: "Dashboard Executivo (alias)" }],
+  "/dashboard": [{ label: "Dashboard Executivo" }],
   "/executive-dashboard": [{ label: "Dashboard Executivo" }],
-  "/executive-dashboard-new": [{ label: "Dashboard Executivo (alias)" }],
-  "/dashboard/operations": [{ label: "Operação diária (legado)" }],
-  "/operations": [{ label: "Ordens de Serviço (alias legado)" }],
+  "/executive-dashboard-new": [{ label: "Dashboard Executivo" }],
+  "/dashboard/operations": [{ label: "Operação diária" }],
+  "/operations": [{ label: "Ordens de Serviço" }],
 
   "/customers": [{ label: "Clientes" }],
 
@@ -41,6 +41,7 @@ const routeBreadcrumbs: Record<string, Breadcrumb[]> = {
   ],
 
   "/settings": [{ label: "Configurações" }],
+  "/onboarding": [{ label: "Jornada de Demonstração" }],
 };
 
 function humanizeSegment(path: string) {
@@ -70,7 +71,7 @@ function buildDynamicBreadcrumbs(location: string): Breadcrumb[] | null {
   if (pathname === "/operations" && params.get("os")) {
     return [
       { label: "Ordens de Serviço", href: "/service-orders" },
-      { label: "Alias legado /operations", href: "/operations" },
+      { label: "Ordens de Serviço", href: "/operations" },
       { label: "Detalhe da O.S." },
     ];
   }
