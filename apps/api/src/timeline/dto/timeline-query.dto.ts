@@ -3,6 +3,14 @@ import { Transform } from 'class-transformer'
 
 export class TimelineQueryDto {
   @IsOptional()
+  @IsString()
+  action?: string
+
+  @IsOptional()
+  @IsString()
+  personId?: string
+
+  @IsOptional()
   @Transform(({ value }) => (value === undefined ? undefined : Number(value)))
   @IsInt()
   @Min(1)
