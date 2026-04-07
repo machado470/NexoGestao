@@ -6,8 +6,9 @@ import { getErrorMessage } from "@/lib/query-helpers";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import FinanceOverviewAreaChart from "@/components/finance/FinanceOverviewAreaChart";
-import { Loader2 } from "lucide-react";
+import { Loader2, Receipt } from "lucide-react";
 import { PageHero, PageShell, SurfaceSection } from "@/components/PagePattern";
+import { EmptyState } from "@/components/EmptyState";
 
 /* ================= HELPERS ================= */
 
@@ -38,7 +39,7 @@ export default function FinancesPage() {
   const { isAuthenticated, isInitializing } = useAuth();
   const canLoadFinance = isAuthenticated;
 
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
 
   const searchParams = useMemo(() => {
     const queryString = location.includes("?") ? location.split("?")[1] : "";
@@ -147,6 +148,15 @@ export default function FinancesPage() {
         eyebrow="Financeiro"
         title="Financeiro"
         description="Leitura consolidada de cobrança, recebimento e pendências sem alterar o fluxo funcional."
+        actions={
+          <button
+            type="button"
+            onClick={() => navigate("/service-orders")}
+            className="inline-flex h-10 items-center justify-center rounded-xl border border-zinc-300 px-4 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+          >
+            Ir para Ordens de Serviço
+          </button>
+        }
       />
 
       {stats && !isServiceOrderScoped && (
@@ -158,8 +168,20 @@ export default function FinancesPage() {
       )}
 
       {charges.length === 0 ? (
-        <SurfaceSection className="text-sm text-zinc-500 dark:text-zinc-400">
-          Nenhuma cobrança
+        <SurfaceSection>
+          <EmptyState
+            icon={<Receipt className="h-7 w-7" />}
+            title="Sem cobranças registradas"
+            description="Assim que uma cobrança for criada, o financeiro passa a mostrar pendências, pagamentos e evolução do caixa."
+            action={{
+              label: "Atualizar dados",
+              onClick: () => void chargesQuery.refetch(),
+            }}
+            secondaryAction={{
+              label: "Abrir O.S.",
+              onClick: () => navigate("/service-orders"),
+            }}
+          />
         </SurfaceSection>
       ) : (
         <div className="space-y-3">

@@ -55,9 +55,22 @@ type KpiCardProps = {
   label: string;
   value: string | number;
   description: string;
+  zeroMessage?: string;
 };
 
-function KpiCard({ icon: Icon, label, value, description }: KpiCardProps) {
+function KpiCard({
+  icon: Icon,
+  label,
+  value,
+  description,
+  zeroMessage,
+}: KpiCardProps) {
+  const numericValue =
+    typeof value === "number"
+      ? value
+      : Number.parseFloat(String(value).replace(/[^\d.-]/g, ""));
+  const showZeroMessage = Number.isFinite(numericValue) && numericValue === 0;
+
   return (
     <div className="nexo-kpi-card">
       <div className="flex items-start justify-between gap-4">
@@ -71,6 +84,11 @@ function KpiCard({ icon: Icon, label, value, description }: KpiCardProps) {
           <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
             {description}
           </p>
+          {showZeroMessage && zeroMessage ? (
+            <p className="mt-2 inline-flex rounded-full border border-dashed border-emerald-300/70 bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300">
+              {zeroMessage}
+            </p>
+          ) : null}
         </div>
 
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-orange-200/80 bg-orange-100/80 text-orange-700 dark:border-orange-500/20 dark:bg-orange-500/12 dark:text-orange-300">
@@ -314,6 +332,7 @@ export default function Dashboard() {
           label="Ordens atrasadas"
           value={overdueOrdersCount}
           description="Execuções fora do tempo esperado."
+          zeroMessage="Sem movimentação crítica no momento."
         />
 
         <KpiCard
@@ -328,6 +347,7 @@ export default function Dashboard() {
           label="Execução sem cobrança"
           value={doneWithoutChargeCount}
           description="Serviço concluído sem fechamento financeiro."
+          zeroMessage="Ciclo execução → cobrança está completo."
         />
 
         <KpiCard
