@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { canAny, type Permission } from "@/lib/rbac";
+import { useIsMobile } from "@/hooks/useMobile";
 import { Breadcrumbs } from "./Breadcrumbs";
 import {
   LogOut,
@@ -21,6 +22,8 @@ import {
   Settings,
   History,
   MessageCircle,
+  Menu,
+  X,
 } from "lucide-react";
 
 interface MainLayoutProps {
@@ -101,7 +104,9 @@ export function MainLayout({ children }: MainLayoutProps) {
   const [location, navigate] = useLocation();
   const { role, logout, isLoggingOut } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const isMobile = useIsMobile();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const menuSections: MenuSection[] = [
     {
@@ -212,6 +217,19 @@ export function MainLayout({ children }: MainLayoutProps) {
     [location]
   );
 
+  useEffect(() => {
+    if (isMobile) {
+      setMobileMenuOpen(false);
+    }
+  }, [isMobile, location]);
+
+  const handleNavigate = (route: string) => {
+    navigate(route);
+    if (isMobile) {
+      setMobileMenuOpen(false);
+    }
+  };
+
   const handleLogout = async () => {
     try {
       await logout();
@@ -225,9 +243,24 @@ export function MainLayout({ children }: MainLayoutProps) {
   return (
     <div className="nexo-app-shell min-h-screen text-zinc-900 dark:text-zinc-100">
       <div className="flex min-h-screen w-full gap-3 p-2 md:gap-4 md:p-3">
+        {isMobile && mobileMenuOpen ? (
+          <button
+            type="button"
+            aria-label="Fechar menu lateral"
+            className="fixed inset-0 z-30 bg-black/50"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+        ) : null}
+
         <aside
-          className={`nexo-app-panel-strong sticky top-2 flex h-[calc(100vh-1rem)] shrink-0 flex-col overflow-hidden transition-all duration-300 md:top-3 md:h-[calc(100vh-1.5rem)] ${
-            sidebarCollapsed ? "w-[76px]" : "w-[248px]"
+          className={`nexo-app-panel-strong ${
+            isMobile
+              ? `fixed inset-y-2 left-2 z-40 h-[calc(100vh-1rem)] ${
+                  mobileMenuOpen ? "translate-x-0" : "-translate-x-[110%]"
+                }`
+              : "sticky top-2 h-[calc(100vh-1rem)] md:top-3 md:h-[calc(100vh-1.5rem)]"
+          } flex shrink-0 flex-col overflow-hidden transition-all duration-300 ${
+            sidebarCollapsed && !isMobile ? "w-[76px]" : "w-[248px]"
           }`}
         >
           <div className="border-b border-slate-200/70 px-3 py-3 dark:border-white/6">
@@ -252,6 +285,7 @@ export function MainLayout({ children }: MainLayoutProps) {
               <button
                 type="button"
                 onClick={() => setSidebarCollapsed(prev => !prev)}
+                disabled={isMobile}
                 className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-zinc-500 transition-colors hover:bg-zinc-100/80 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-white/[0.05] dark:hover:text-white"
               >
                 {sidebarCollapsed ? (
@@ -282,7 +316,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                         <button
                           key={item.id}
                           type="button"
-                          onClick={() => navigate(item.route)}
+                          onClick={() => handleNavigate(item.route)}
                           title={item.label}
                           className={`flex w-full items-center rounded-xl px-2.5 py-2 text-[13px] transition-colors ${
                             sidebarCollapsed ? "justify-center" : "gap-2.5"
@@ -351,6 +385,29 @@ export function MainLayout({ children }: MainLayoutProps) {
         <div className="flex min-w-0 flex-1 flex-col gap-3 md:gap-4">
           <header className="nexo-app-panel-strong px-4 py-3 md:px-5 md:py-4">
             <div className="flex flex-col gap-3">
+              {isMobile ? (
+                <div className="flex items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setMobileMenuOpen(prev => !prev)}
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-200/80 text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-white/10 dark:text-zinc-200 dark:hover:bg-white/[0.08]"
+                    aria-label={
+                      mobileMenuOpen ? "Fechar menu lateral" : "Abrir menu lateral"
+                    }
+                    aria-expanded={mobileMenuOpen}
+                  >
+                    {mobileMenuOpen ? (
+                      <X className="h-5 w-5" />
+                    ) : (
+                      <Menu className="h-5 w-5" />
+                    )}
+                  </button>
+                  <span className="truncate text-sm font-semibold text-zinc-900 dark:text-white">
+                    NexoGestão
+                  </span>
+                </div>
+              ) : null}
+
               <Breadcrumbs />
 
               <div className="flex flex-col gap-1">

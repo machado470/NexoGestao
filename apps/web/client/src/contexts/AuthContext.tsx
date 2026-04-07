@@ -97,6 +97,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const [localLoading, setLocalLoading] = useState(false);
   const [localError, setLocalError] = useState<unknown | null>(null);
+  const [forcedLoggedOut, setForcedLoggedOut] = useState(false);
 
   const meQuery = trpc.session.me.useQuery(undefined, {
     retry: false,
@@ -125,6 +126,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           password,
         });
 
+        setForcedLoggedOut(false);
         queryClient.removeQueries();
         await meQuery.refetch();
       } catch (err) {
@@ -155,6 +157,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           password: payload.password,
         });
 
+        setForcedLoggedOut(false);
         queryClient.removeQueries();
         await meQuery.refetch();
       } catch (err) {
@@ -170,25 +173,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(async () => {
     setLocalLoading(true);
     setLocalError(null);
+    setForcedLoggedOut(true);
 
     try {
-      await logoutMutation.mutateAsync();
-
       await utils.session.me.cancel();
       utils.session.me.setData(undefined, null);
       await utils.session.me.invalidate();
       queryClient.clear();
+      await logoutMutation.mutateAsync();
 
       redirectToLogin();
     } catch (err) {
       setLocalError(err);
-      throw err;
+      redirectToLogin();
     } finally {
       setLocalLoading(false);
     }
   }, [logoutMutation, queryClient, utils]);
 
-  const payload = meQuery.data ?? null;
+  const payload = forcedLoggedOut ? null : meQuery.data ?? null;
 
   const user: AuthUser = useMemo(() => {
     const raw = getUser(payload);
@@ -211,7 +214,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   /* 🔥 CORREÇÃO AQUI */
   const isInitializing =
-    meQuery.isLoading && meQuery.data === undefined && !isLoggingOut;
+    !forcedLoggedOut &&
+    meQuery.isLoading &&
+    meQuery.data === undefined &&
+    !isLoggingOut;
 
   const loading = isInitializing || isSubmitting;
 

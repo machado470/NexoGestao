@@ -22,7 +22,9 @@ const isPublicPath = (pathname: string): boolean => {
     pathname === "/register" ||
     pathname === "/forgot-password" ||
     pathname === "/reset-password" ||
-    pathname === "/about"
+    pathname === "/about" ||
+    pathname === "/privacy" ||
+    pathname === "/terms"
   );
 };
 
