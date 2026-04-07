@@ -163,17 +163,17 @@ function ProtectedRoute({
     if (isInitializing) return;
 
     if (!isAuthenticated) {
-      navigate(buildLoginRedirectPath(location));
+      navigate(buildLoginRedirectPath(location), { replace: true });
       return;
     }
 
     if (requireCompletedOnboarding && requiresOnboarding) {
-      navigate("/onboarding");
+      navigate("/onboarding", { replace: true });
       return;
     }
 
     if (onboardingOnly && !requiresOnboarding) {
-      navigate("/dashboard");
+      navigate("/dashboard", { replace: true });
     }
   }, [
     isAuthenticated,
@@ -227,7 +227,7 @@ function PublicRoute({ component: Component }: { component: ComponentType }) {
 
   useEffect(() => {
     if (!isInitializing && isAuthenticated) {
-      navigate(redirectParam || redirectTo || "/dashboard");
+      navigate(redirectParam || redirectTo || "/dashboard", { replace: true });
     }
   }, [isAuthenticated, isInitializing, navigate, redirectParam, redirectTo]);
 
