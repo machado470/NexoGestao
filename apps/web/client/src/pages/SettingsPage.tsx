@@ -6,6 +6,9 @@ import { normalizeObjectPayload } from "@/lib/query-helpers";
 import { PageHero, PageShell, SurfaceSection } from "@/components/PagePattern";
 import { EmptyState } from "@/components/EmptyState";
 import { Loader2, Settings2 } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 type SettingsFormData = {
   name: string;
@@ -112,6 +115,33 @@ export default function SettingsPage() {
     },
   });
 
+  const submitForm = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    const payload = {
+      name: form.name.trim(),
+      timezone: form.timezone.trim(),
+      currency: form.currency.trim().toUpperCase(),
+    };
+
+    if (!payload.name) {
+      toast.error("Informe o nome da organização.");
+      return;
+    }
+
+    if (!payload.timezone) {
+      toast.error("Informe a timezone da organização.");
+      return;
+    }
+
+    if (!payload.currency) {
+      toast.error("Informe a moeda padrão.");
+      return;
+    }
+
+    mutation.mutate(payload);
+  };
+
   if (isInitializing) {
     return (
       <PageShell>
@@ -185,47 +215,46 @@ export default function SettingsPage() {
       ) : null}
 
       <SurfaceSection>
-        <form
-          className="space-y-4"
-          onSubmit={(e) => {
-            e.preventDefault();
-            mutation.mutate(form);
-          }}
-        >
-          <input
-            className="w-full rounded border p-2"
-            value={form.name}
-            onChange={(e) =>
-              setForm((prev) => ({ ...prev, name: e.target.value }))
-            }
-            placeholder="Nome da organização"
-          />
+        <form className="space-y-4" onSubmit={submitForm}>
+          <div className="space-y-2">
+            <Label htmlFor="settings-name">Nome da organização</Label>
+            <Input
+              id="settings-name"
+              value={form.name}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, name: e.target.value }))
+              }
+              placeholder="Nome da organização"
+            />
+          </div>
 
-          <input
-            className="w-full rounded border p-2"
-            value={form.timezone}
-            onChange={(e) =>
-              setForm((prev) => ({ ...prev, timezone: e.target.value }))
-            }
-            placeholder="Timezone"
-          />
+          <div className="space-y-2">
+            <Label htmlFor="settings-timezone">Timezone</Label>
+            <Input
+              id="settings-timezone"
+              value={form.timezone}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, timezone: e.target.value }))
+              }
+              placeholder="America/Sao_Paulo"
+            />
+          </div>
 
-          <input
-            className="w-full rounded border p-2"
-            value={form.currency}
-            onChange={(e) =>
-              setForm((prev) => ({ ...prev, currency: e.target.value }))
-            }
-            placeholder="Moeda"
-          />
+          <div className="space-y-2">
+            <Label htmlFor="settings-currency">Moeda padrão</Label>
+            <Input
+              id="settings-currency"
+              value={form.currency}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, currency: e.target.value }))
+              }
+              placeholder="BRL"
+            />
+          </div>
 
-          <button
-            className="rounded bg-orange-500 px-4 py-2 text-black disabled:opacity-50"
-            disabled={!hasChanges || mutation.isPending}
-            type="submit"
-          >
-            {mutation.isPending ? "Salvando..." : "Salvar"}
-          </button>
+          <Button disabled={!hasChanges || mutation.isPending} type="submit">
+            {mutation.isPending ? "Salvando..." : "Salvar alterações"}
+          </Button>
         </form>
       </SurfaceSection>
     </PageShell>

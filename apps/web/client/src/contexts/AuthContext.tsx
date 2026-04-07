@@ -4,6 +4,7 @@ import React, {
   useMemo,
   useState,
 } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { trpc } from "@/lib/trpc";
 import { normalizeRole, type Role } from "@/lib/rbac";
 
@@ -92,6 +93,7 @@ function redirectToLogin() {
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const utils = trpc.useUtils();
+  const queryClient = useQueryClient();
 
   const [localLoading, setLocalLoading] = useState(false);
   const [localError, setLocalError] = useState<unknown | null>(null);
@@ -123,6 +125,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           password,
         });
 
+        queryClient.removeQueries();
         await meQuery.refetch();
       } catch (err) {
         setLocalError(err);
@@ -131,7 +134,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLocalLoading(false);
       }
     },
-    [loginMutation, meQuery]
+    [loginMutation, meQuery, queryClient]
   );
 
   const register = useCallback(
@@ -152,6 +155,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           password: payload.password,
         });
 
+        queryClient.removeQueries();
         await meQuery.refetch();
       } catch (err) {
         setLocalError(err);
@@ -160,7 +164,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLocalLoading(false);
       }
     },
-    [registerMutation, meQuery]
+    [registerMutation, meQuery, queryClient]
   );
 
   const logout = useCallback(async () => {
@@ -173,6 +177,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await utils.session.me.cancel();
       utils.session.me.setData(undefined, null);
       await utils.session.me.invalidate();
+      queryClient.clear();
 
       redirectToLogin();
     } catch (err) {
@@ -181,7 +186,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLocalLoading(false);
     }
-  }, [logoutMutation, utils]);
+  }, [logoutMutation, queryClient, utils]);
 
   const payload = meQuery.data ?? null;
 

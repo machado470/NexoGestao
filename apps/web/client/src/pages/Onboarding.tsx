@@ -24,6 +24,12 @@ type StepKey =
   | "charge";
 
 type Progress = Record<StepKey, boolean>;
+type JourneyIds = {
+  customerId: string | null;
+  appointmentId: string | null;
+  serviceOrderId: string | null;
+  chargeId: string | null;
+};
 
 const BASE_PROGRESS: Progress = {
   company: false,
@@ -31,6 +37,13 @@ const BASE_PROGRESS: Progress = {
   appointment: false,
   serviceOrder: false,
   charge: false,
+};
+
+const BASE_IDS: JourneyIds = {
+  customerId: null,
+  appointmentId: null,
+  serviceOrderId: null,
+  chargeId: null,
 };
 
 const STEP_META: Array<{
@@ -77,6 +90,39 @@ function getStepStatusLabel(done: boolean, enabled: boolean) {
   return "Aguardando etapa anterior";
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function extractId(value: unknown): string | null {
+  if (typeof value === "string" || typeof value === "number") {
+    const normalized = String(value).trim();
+    return normalized || null;
+  }
+
+  return null;
+}
+
+function extractEntityId(payload: unknown, keys: string[] = ["id"]): string | null {
+  if (!payload) return null;
+  if (Array.isArray(payload)) return null;
+
+  if (isRecord(payload)) {
+    for (const key of keys) {
+      const direct = extractId(payload[key]);
+      if (direct) return direct;
+    }
+
+    const nestedCandidates = [payload.data, payload.result, payload.item];
+    for (const nested of nestedCandidates) {
+      const nestedId = extractEntityId(nested, keys);
+      if (nestedId) return nestedId;
+    }
+  }
+
+  return null;
+}
+
 export default function Onboarding() {
   const [, navigate] = useLocation();
   const { user, isAuthenticated, isInitializing } = useAuth();
@@ -85,6 +131,7 @@ export default function Onboarding() {
   const canQuery = isAuthenticated && !isInitializing;
 
   const [progress, setProgress] = useState<Progress>(BASE_PROGRESS);
+  const [journeyIds, setJourneyIds] = useState<JourneyIds>(BASE_IDS);
   const [error, setError] = useState<string | null>(null);
 
   const [companyName, setCompanyName] = useState("");
@@ -213,6 +260,7 @@ export default function Onboarding() {
 
   const firstCustomer =
     ((customersQuery.data as any)?.data ?? customersQuery.data ?? [])[0];
+  const activeCustomerId = journeyIds.customerId ?? firstCustomer?.id ?? null;
 
   const canRun = {
     company: true,
@@ -466,11 +514,17 @@ export default function Onboarding() {
                     throw new Error("Informe o telefone do cliente.");
                   }
 
-                  await customerMutation.mutateAsync({
+                  const customerResult = await customerMutation.mutateAsync({
                     name: customerName.trim(),
                     phone: customerPhone.trim(),
                   });
 
+                  setJourneyIds((prev) => ({
+                    ...prev,
+                    customerId:
+                      extractEntityId(customerResult, ["customerId", "id"]) ??
+                      prev.customerId,
+                  }));
                   await utils.nexo.customers.list.invalidate();
                   completeStep("customer");
                 } catch (e) {
@@ -517,21 +571,27 @@ export default function Onboarding() {
                 setError(null);
 
                 try {
-                  if (!firstCustomer?.id) {
+                  if (!activeCustomerId) {
                     throw new Error("Crie um cliente primeiro.");
                   }
 
                   const startsAt = new Date();
                   const endsAt = new Date(startsAt.getTime() + 30 * 60 * 1000);
 
-                  await appointmentMutation.mutateAsync({
-                    customerId: String(firstCustomer.id),
+                  const appointmentResult = await appointmentMutation.mutateAsync({
+                    customerId: String(activeCustomerId),
                     startsAt: startsAt.toISOString(),
                     endsAt: endsAt.toISOString(),
                     notes: appointmentNotes.trim() || "Primeiro atendimento",
                     status: "SCHEDULED",
                   });
 
+                  setJourneyIds((prev) => ({
+                    ...prev,
+                    appointmentId:
+                      extractEntityId(appointmentResult, ["appointmentId", "id"]) ??
+                      prev.appointmentId,
+                  }));
                   await utils.nexo.appointments.list.invalidate();
                   completeStep("appointment");
                 } catch (e) {
@@ -578,7 +638,7 @@ export default function Onboarding() {
                 setError(null);
 
                 try {
-                  if (!firstCustomer?.id) {
+                  if (!activeCustomerId) {
                     throw new Error("Crie um cliente primeiro.");
                   }
 
@@ -586,12 +646,18 @@ export default function Onboarding() {
                     throw new Error("Informe o título da ordem de serviço.");
                   }
 
-                  await serviceOrderMutation.mutateAsync({
-                    customerId: String(firstCustomer.id),
+                  const serviceOrderResult = await serviceOrderMutation.mutateAsync({
+                    customerId: String(activeCustomerId),
                     title: serviceOrderTitle.trim(),
                     priority: 2,
                   });
 
+                  setJourneyIds((prev) => ({
+                    ...prev,
+                    serviceOrderId:
+                      extractEntityId(serviceOrderResult, ["serviceOrderId", "id"]) ??
+                      prev.serviceOrderId,
+                  }));
                   await utils.nexo.serviceOrders.list.invalidate();
                   completeStep("serviceOrder");
                 } catch (e) {
@@ -636,7 +702,7 @@ export default function Onboarding() {
                 setError(null);
 
                 try {
-                  if (!firstCustomer?.id) {
+                  if (!activeCustomerId) {
                     throw new Error("Crie um cliente primeiro.");
                   }
 
@@ -645,13 +711,17 @@ export default function Onboarding() {
                     throw new Error("Informe um valor de cobrança válido.");
                   }
 
-                  await chargeMutation.mutateAsync({
-                    customerId: String(firstCustomer.id),
+                  const chargeResult = await chargeMutation.mutateAsync({
+                    customerId: String(activeCustomerId),
                     amount,
                     dueDate: new Date(),
                     notes: "Primeira cobrança",
                   });
 
+                  setJourneyIds((prev) => ({
+                    ...prev,
+                    chargeId: extractEntityId(chargeResult, ["chargeId", "id"]) ?? prev.chargeId,
+                  }));
                   await utils.finance.charges.list.invalidate();
                   completeStep("charge");
                 } catch (e) {
