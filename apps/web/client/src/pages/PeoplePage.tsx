@@ -96,6 +96,19 @@ export default function PeoplePage() {
     return normalizeArrayPayload<ServiceOrder>(serviceOrdersQuery.data);
   }, [serviceOrdersQuery.data]);
 
+  const activePeople = people.filter((person) => person.active).length;
+  const warningPeople = people.filter(
+    (person) => person.operationalState === "WARNING" || person.operationalState === "RESTRICTED"
+  ).length;
+  const unassignedOrders = serviceOrders.filter((order) => !order.assignedToPersonId).length;
+  const queue = people
+    .map((person) => ({
+      person,
+      workload: serviceOrders.filter((order) => order.assignedToPersonId === person.id).length,
+    }))
+    .sort((a, b) => b.workload - a.workload)
+    .slice(0, 5);
+
   const hasRenderableData =
     listPeople.data !== undefined ||
     statsLinked.data !== undefined ||
@@ -187,8 +200,27 @@ export default function PeoplePage() {
         </Button>
       </div>
 
-      <SurfaceSection className="text-sm opacity-80">
-        Pessoas vinculadas: {linkedStats?.count ?? 0}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+        <div className="nexo-kpi-card p-4"><p className="text-xs text-zinc-500">Pessoas vinculadas</p><p className="text-2xl font-bold">{linkedStats?.count ?? 0}</p></div>
+        <div className="nexo-kpi-card p-4"><p className="text-xs text-zinc-500">Ativas</p><p className="text-2xl font-bold">{activePeople}</p></div>
+        <div className="nexo-kpi-card p-4"><p className="text-xs text-zinc-500">Com atenção</p><p className="text-2xl font-bold">{warningPeople}</p></div>
+        <div className="nexo-kpi-card p-4"><p className="text-xs text-zinc-500">O.S. sem responsável</p><p className="text-2xl font-bold">{unassignedOrders}</p></div>
+      </div>
+
+      <SurfaceSection>
+        <p className="text-sm text-zinc-600 dark:text-zinc-300">
+          Bloco analítico: distribua carga da equipe para evitar gargalos de execução e reduzir riscos operacionais.
+        </p>
+      </SurfaceSection>
+
+      <SurfaceSection className="space-y-2">
+        <h2 className="font-semibold">Fila operacional da equipe</h2>
+        {queue.length > 0 ? queue.map((item) => (
+          <div key={item.person.id} className="nexo-subtle-surface flex items-center justify-between p-3">
+            <span>{item.person.name}</span>
+            <span className="text-sm text-zinc-500">{item.workload} O.S.</span>
+          </div>
+        )) : <p className="text-sm text-zinc-500">Sem carga operacional registrada.</p>}
       </SurfaceSection>
 
       {people.length === 0 ? (

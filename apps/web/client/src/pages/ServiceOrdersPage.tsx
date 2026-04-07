@@ -223,6 +223,56 @@ export default function ServiceOrdersPage() {
     ).length;
   }, [sorted]);
 
+  const nextAction = useMemo(() => {
+    if (activeOrder?.status === "DONE" && !activeOrder.financialSummary?.hasCharge) {
+      return {
+        title: "Gerar cobrança desta O.S.",
+        description: "A execução foi concluída e o próximo passo ideal é faturar imediatamente.",
+        ctaLabel: "Gerar cobrança",
+        onClick: () => navigate(`/finances?serviceOrderId=${activeOrder.id}`),
+      };
+    }
+
+    if (activeOrder?.financialSummary?.chargeStatus === "OVERDUE") {
+      const url = buildWhatsAppUrlFromServiceOrder(activeOrder);
+      return {
+        title: "Cobrança vencida: acionar WhatsApp",
+        description: "A cobrança está vencida. Conduza recuperação com contato direto.",
+        ctaLabel: "Enviar WhatsApp",
+        onClick: () => {
+          if (url) openWhatsApp(url);
+          else navigate("/whatsapp");
+        },
+      };
+    }
+
+    if (activeOrder?.financialSummary?.chargeStatus === "PAID") {
+      return {
+        title: "Pagamento confirmado: fechar execução",
+        description: "Finalize a O.S. com resultado registrado para encerrar o ciclo.",
+        ctaLabel: "Revisar e concluir",
+        onClick: () => openAsActive(activeOrder.id),
+      };
+    }
+
+    const queueOrder = operationalQueue[0];
+    if (queueOrder) {
+      return {
+        title: "Retomar fila operacional",
+        description: "Sem foco definido: abra a próxima O.S. prioritária.",
+        ctaLabel: "Abrir próxima O.S.",
+        onClick: () => openAsActive(queueOrder.id),
+      };
+    }
+
+    return {
+      title: "Criar nova ordem de serviço",
+      description: "Não há itens pendentes. Gere uma nova O.S. para manter o fluxo ativo.",
+      ctaLabel: "Nova O.S.",
+      onClick: () => setIsCreateOpen(true),
+    };
+  }, [activeOrder, navigate, operationalQueue]);
+
   useEffect(() => {
     if (!activeId || !activeRef.current) return;
 
@@ -400,6 +450,23 @@ export default function ServiceOrdersPage() {
           </div>
         </CardContent>
       </Card>
+
+      <SurfaceSection className="border-orange-200 bg-orange-50/70 dark:border-orange-900/40 dark:bg-orange-950/20">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-orange-600 dark:text-orange-300">
+              Próxima ação
+            </p>
+            <p className="mt-1 font-medium text-orange-900 dark:text-orange-100">
+              {nextAction.title}
+            </p>
+            <p className="text-sm text-orange-700 dark:text-orange-300">
+              {nextAction.description}
+            </p>
+          </div>
+          <Button onClick={nextAction.onClick}>{nextAction.ctaLabel}</Button>
+        </div>
+      </SurfaceSection>
 
       {queryState.hasBackgroundUpdate ? (
         <div className="rounded border border-blue-500/30 bg-blue-500/10 p-3 text-sm text-blue-200">

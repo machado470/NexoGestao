@@ -262,6 +262,44 @@ export default function FinancesPage() {
     [statsQuery.data]
   );
 
+  const nextAction = useMemo(() => {
+    const overdue = billingQueue.find((item) => item.normalized === "OVERDUE");
+    if (overdue) {
+      return {
+        title: "Cobrança vencida detectada",
+        description: "Priorize contato imediato por WhatsApp para reduzir atraso de caixa.",
+        ctaLabel: "Cobrar no WhatsApp",
+        onClick: () => {
+          const phone = String(
+            overdue.charge.customerPhone ?? overdue.charge.phone ?? ""
+          ).trim();
+          if (phone) window.open(`https://wa.me/${phone}`, "_blank");
+          else navigate("/whatsapp");
+        },
+      };
+    }
+
+    if (isPaymentScoped && paymentById?.id) {
+      return {
+        title: "Pagamento registrado",
+        description: "Feche o ciclo operacional marcando a O.S. como concluída e com resultado.",
+        ctaLabel: "Ir para O.S.",
+        onClick: () => {
+          const serviceOrderId = String(paymentScopedCharge?.serviceOrderId ?? "").trim();
+          if (serviceOrderId) navigate(`/service-orders?os=${serviceOrderId}`);
+          else navigate("/service-orders");
+        },
+      };
+    }
+
+    return {
+      title: "Monitorar fila de cobrança",
+      description: "Sem urgências críticas no momento. Siga a fila priorizada automaticamente.",
+      ctaLabel: "Ver fila",
+      onClick: () => navigate("/finances"),
+    };
+  }, [billingQueue, isPaymentScoped, navigate, paymentById?.id, paymentScopedCharge?.serviceOrderId]);
+
   const hasRenderableData =
     chargesQuery.data !== undefined ||
     isServiceOrderScoped ||
@@ -392,6 +430,23 @@ export default function FinancesPage() {
       {stats && !isServiceOrderScoped && (
         <FinanceOverviewAreaChart timeline={timelineData} />
       )}
+
+      <SurfaceSection className="border-orange-200 bg-orange-50/70 dark:border-orange-900/40 dark:bg-orange-950/20">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-orange-600 dark:text-orange-300">
+              Próxima ação
+            </p>
+            <p className="mt-1 font-medium text-orange-900 dark:text-orange-100">
+              {nextAction.title}
+            </p>
+            <p className="text-sm text-orange-700 dark:text-orange-300">
+              {nextAction.description}
+            </p>
+          </div>
+          <Button onClick={nextAction.onClick}>{nextAction.ctaLabel}</Button>
+        </div>
+      </SurfaceSection>
 
       {billingQueue.length > 0 && (
         <SurfaceSection className="space-y-3">

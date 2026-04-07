@@ -449,6 +449,45 @@ export default function CustomersPage() {
           />
         </div>
 
+        <SurfaceSection className="border-orange-200 bg-orange-50/70 dark:border-orange-900/40 dark:bg-orange-950/20">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-orange-600 dark:text-orange-300">
+                Próxima ação
+              </p>
+              <p className="mt-1 font-medium text-orange-900 dark:text-orange-100">
+                {nextActionLabel}
+              </p>
+              <p className="text-sm text-orange-700 dark:text-orange-300">
+                {workspace
+                  ? "O sistema já leu o contexto do cliente em foco e direcionou o melhor próximo passo."
+                  : "Abra um workspace para condução personalizada por cliente."}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                onClick={() =>
+                  workspace
+                    ? navigate(`/service-orders?customerId=${workspace.customer.id}`)
+                    : setIsCreateOpen(true)
+                }
+              >
+                {workspace ? "Executar próxima ação" : "Novo cliente"}
+              </Button>
+              {workspace ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => navigate(`/whatsapp?customerId=${workspace.customer.id}`)}
+                >
+                  WhatsApp
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        </SurfaceSection>
+
         <SurfaceSection className="overflow-hidden rounded-xl border border-gray-200 bg-white p-0 dark:border-gray-700 dark:bg-gray-800">
           <div className="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
             <div className="flex items-center justify-between gap-3">

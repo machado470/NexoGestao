@@ -190,6 +190,15 @@ export default function SettingsPage() {
         eyebrow="Configurações"
         title="Configurações"
         description="Fechamento do fluxo oficial com padronização institucional: nome, timezone e moeda da operação."
+        actions={
+          <Button
+            type="button"
+            onClick={() => query.refetch()}
+            variant="outline"
+          >
+            Atualizar leitura
+          </Button>
+        }
       />
 
       {!hasData ? (
@@ -218,6 +227,26 @@ export default function SettingsPage() {
             "Houve um problema ao recarregar as configurações."}
         </div>
       ) : null}
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+        <div className="nexo-kpi-card p-4"><p className="text-xs text-zinc-500">Organização</p><p className="text-lg font-semibold">{settings?.name || "—"}</p></div>
+        <div className="nexo-kpi-card p-4"><p className="text-xs text-zinc-500">Timezone</p><p className="text-lg font-semibold">{form.timezone}</p></div>
+        <div className="nexo-kpi-card p-4"><p className="text-xs text-zinc-500">Moeda</p><p className="text-lg font-semibold">{form.currency}</p></div>
+        <div className="nexo-kpi-card p-4"><p className="text-xs text-zinc-500">Status</p><p className="text-lg font-semibold">{hasChanges ? "Com alterações" : "Sincronizado"}</p></div>
+      </div>
+
+      <SurfaceSection>
+        <p className="text-sm text-zinc-600 dark:text-zinc-300">
+          Bloco analítico: padronização institucional consistente reduz erro de operação, relatórios e faturamento.
+        </p>
+      </SurfaceSection>
+
+      <SurfaceSection className="space-y-2">
+        <h2 className="font-semibold">Fila operacional de configuração</h2>
+        <div className="nexo-subtle-surface p-3 text-sm">1. Validar nome institucional.</div>
+        <div className="nexo-subtle-surface p-3 text-sm">2. Confirmar timezone oficial da operação.</div>
+        <div className="nexo-subtle-surface p-3 text-sm">3. Validar moeda padrão para financeiro e governança.</div>
+      </SurfaceSection>
 
       <SurfaceSection>
         <form className="space-y-4" onSubmit={submitForm}>
