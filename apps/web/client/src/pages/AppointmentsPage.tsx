@@ -256,11 +256,26 @@ function getAppointmentIdFromUrl() {
   return appointmentId || null;
 }
 
-function buildAppointmentsUrl(appointmentId?: string | null) {
+function getCustomerIdFromUrl() {
+  if (typeof window === "undefined") return null;
+
+  const params = new URLSearchParams(window.location.search);
+  const customerId = params.get("customerId")?.trim() ?? "";
+
+  return customerId || null;
+}
+
+function buildAppointmentsUrl(
+  appointmentId?: string | null,
+  customerId?: string | null
+) {
   const params = new URLSearchParams();
 
   if (appointmentId) {
     params.set("appointmentId", appointmentId);
+  }
+  if (customerId) {
+    params.set("customerId", customerId);
   }
 
   const query = params.toString();
@@ -376,6 +391,9 @@ export default function AppointmentsPage() {
   const [statusFilter, setStatusFilter] = useState<AppointmentStatus | "">("");
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [customerFilter, setCustomerFilter] = useState<string | null>(() =>
+    getCustomerIdFromUrl()
+  );
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [highlightedAppointmentId, setHighlightedAppointmentId] = useState<
     string | null
@@ -441,6 +459,13 @@ export default function AppointmentsPage() {
     const q = searchQuery.trim().toLowerCase();
 
     return appointments.filter((appointment) => {
+      if (
+        customerFilter &&
+        String(appointment.customerId ?? "") !== String(customerFilter)
+      ) {
+        return false;
+      }
+
       if (!q) return true;
 
       return (
@@ -449,7 +474,7 @@ export default function AppointmentsPage() {
         String(getStatusLabel(appointment.status)).toLowerCase().includes(q)
       );
     });
-  }, [appointments, searchQuery]);
+  }, [appointments, searchQuery, customerFilter]);
 
   const highlightedAppointment = useMemo(() => {
     if (!highlightedAppointmentId) return null;
@@ -480,9 +505,14 @@ export default function AppointmentsPage() {
   useEffect(() => {
     const syncFromUrl = () => {
       const appointmentIdFromUrl = getAppointmentIdFromUrl();
+      const customerIdFromUrl = getCustomerIdFromUrl();
       setHighlightedAppointmentId((current) => {
         if (current === appointmentIdFromUrl) return current;
         return appointmentIdFromUrl;
+      });
+      setCustomerFilter((current) => {
+        if (current === customerIdFromUrl) return current;
+        return customerIdFromUrl;
       });
     };
 
@@ -567,12 +597,14 @@ export default function AppointmentsPage() {
 
   const handleOpenDeepLink = (appointmentId: string) => {
     setHighlightedAppointmentId(appointmentId);
-    navigate(buildAppointmentsUrl(appointmentId), { replace: false });
+    navigate(buildAppointmentsUrl(appointmentId, customerFilter), {
+      replace: false,
+    });
   };
 
   const handleClearDeepLink = () => {
     setHighlightedAppointmentId(null);
-    navigate(buildAppointmentsUrl(null), { replace: false });
+    navigate(buildAppointmentsUrl(null, customerFilter), { replace: false });
   };
 
   const hasLocalFilters = Boolean(searchQuery);

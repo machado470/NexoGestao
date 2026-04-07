@@ -16,9 +16,12 @@ import { useChargeActions } from "@/hooks/useChargeActions";
 
 type FinanceCharge = {
   id: string;
+  customerId?: string | null;
+  serviceOrderId?: string | null;
   customer?: { name?: string | null } | null;
   amountCents: number;
   status: string;
+  payments?: Array<{ id?: string | null }>;
 };
 
 type FinanceStats = {
@@ -70,13 +73,15 @@ export default function FinancesPage() {
   }, [location]);
 
   const serviceOrderIdFromUrl = searchParams.get("serviceOrderId") || "";
+  const customerIdFromUrl = searchParams.get("customerId") || "";
   const chargeIdFromUrl = searchParams.get("chargeId") || "";
+  const paymentIdFromUrl = searchParams.get("paymentId") || "";
   const isServiceOrderScoped = Boolean(serviceOrderIdFromUrl);
 
   const chargesQuery = trpc.finance.charges.list.useQuery(
     {
       page: 1,
-      limit: 20,
+      limit: 100,
       serviceOrderId: serviceOrderIdFromUrl || undefined,
     },
     { enabled: canLoadFinance, retry: false }
@@ -137,8 +142,32 @@ export default function FinancesPage() {
   const visibleCharges = useMemo(() => {
     if (scopedCharge) return [scopedCharge];
     if (chargeIdFromUrl) return [];
-    return charges;
-  }, [charges, chargeIdFromUrl, scopedCharge]);
+    return charges.filter((charge) => {
+      if (
+        customerIdFromUrl &&
+        String(charge.customerId ?? "") !== String(customerIdFromUrl)
+      ) {
+        return false;
+      }
+      return true;
+    });
+  }, [charges, chargeIdFromUrl, customerIdFromUrl, scopedCharge]);
+
+  const paymentScopedCharge = useMemo(() => {
+    if (!paymentIdFromUrl) return null;
+    return (
+      visibleCharges.find((charge) =>
+        (charge.payments ?? []).some(
+          (payment) => String(payment?.id ?? "") === paymentIdFromUrl
+        )
+      ) ?? null
+    );
+  }, [paymentIdFromUrl, visibleCharges]);
+
+  const finalVisibleCharges = useMemo(() => {
+    if (paymentScopedCharge) return [paymentScopedCharge];
+    return visibleCharges;
+  }, [paymentScopedCharge, visibleCharges]);
 
   const stats = useMemo(
     () => safeExtractStats(statsQuery.data),
@@ -256,14 +285,22 @@ export default function FinancesPage() {
         />
       )}
 
-      {visibleCharges.length === 0 ? (
+      {finalVisibleCharges.length === 0 ? (
         <SurfaceSection className="space-y-3">
           <EmptyState
             icon={<Receipt className="h-7 w-7" />}
-            title={chargeIdFromUrl ? "Cobrança não encontrada" : "Sem cobranças registradas"}
+            title={
+              chargeIdFromUrl
+                ? "Cobrança não encontrada"
+                : paymentIdFromUrl
+                  ? "Pagamento não encontrado"
+                  : "Sem cobranças registradas"
+            }
             description={
               chargeIdFromUrl
                 ? "A cobrança solicitada não foi localizada neste workspace."
+                : paymentIdFromUrl
+                  ? "O pagamento solicitado não foi localizado nas cobranças visíveis."
                 : "Assim que uma cobrança for criada, o financeiro passa a mostrar pendências, pagamentos e evolução do caixa."
             }
             action={{
@@ -279,7 +316,7 @@ export default function FinancesPage() {
         </SurfaceSection>
       ) : (
         <div className="space-y-3">
-          {visibleCharges.map((c) => (
+          {finalVisibleCharges.map((c) => (
             <Card
               key={c.id}
               className="nexo-surface border-slate-200/70 bg-white/90 dark:border-white/8"

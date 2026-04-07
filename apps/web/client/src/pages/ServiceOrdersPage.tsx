@@ -99,6 +99,10 @@ export default function ServiceOrdersPage() {
     basePath === "/operations" ? "operations" : "service-orders";
 
   const activeId = useMemo(() => getServiceOrderIdFromUrl(location), [location]);
+  const customerIdFromUrl = useMemo(() => {
+    const query = location.includes("?") ? location.split("?")[1] : "";
+    return new URLSearchParams(query).get("customerId");
+  }, [location]);
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -116,6 +120,10 @@ export default function ServiceOrdersPage() {
   );
 
   const customersQuery = trpc.nexo.customers.list.useQuery(undefined, {
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+  const peopleQuery = trpc.people.list.useQuery(undefined, {
     retry: false,
     refetchOnWindowFocus: false,
   });
@@ -139,10 +147,21 @@ export default function ServiceOrdersPage() {
     return normalizeOrders<ServiceOrder>(ordersQuery.data);
   }, [ordersQuery.data]);
 
+  const people = useMemo(() => {
+    return normalizeArrayPayload<{ id: string; name: string }>(peopleQuery.data);
+  }, [peopleQuery.data]);
+
   const filtered = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
 
     return orders.filter((item) => {
+      if (
+        customerIdFromUrl &&
+        String(item.customerId ?? item.customer?.id ?? "") !== customerIdFromUrl
+      ) {
+        return false;
+      }
+
       if (!matchesFinancialFilter(item, filter)) {
         return false;
       }
@@ -165,7 +184,7 @@ export default function ServiceOrdersPage() {
 
       return haystack.includes(normalizedSearch);
     });
-  }, [orders, filter, search]);
+  }, [orders, filter, search, customerIdFromUrl]);
 
   const sorted = useMemo(() => sortOrders(filtered), [filtered]);
 
@@ -203,7 +222,11 @@ export default function ServiceOrdersPage() {
   }, [activeId]);
 
   function openAsActive(id: string) {
-    const nextUrl = buildServiceOrdersDeepLink(id, deepLinkBase);
+    const nextUrl = (() => {
+      const baseUrl = buildServiceOrdersDeepLink(id, deepLinkBase);
+      if (!customerIdFromUrl) return baseUrl;
+      return `${baseUrl}&customerId=${customerIdFromUrl}`;
+    })();
 
     if (location !== nextUrl) {
       navigate(nextUrl);
@@ -211,8 +234,11 @@ export default function ServiceOrdersPage() {
   }
 
   function closeActivePanel() {
-    if (location !== basePath) {
-      navigate(basePath);
+    const target = customerIdFromUrl
+      ? `${basePath}?customerId=${customerIdFromUrl}`
+      : basePath;
+    if (location !== target) {
+      navigate(target);
     }
   }
 
@@ -227,13 +253,15 @@ export default function ServiceOrdersPage() {
         ? utils.nexo.serviceOrders.getById.invalidate({ id: activeId })
         : Promise.resolve(),
       utils.nexo.customers.list.invalidate(),
+      utils.people.list.invalidate(),
       utils.finance.charges.list.invalidate(),
       utils.dashboard.alerts.invalidate(),
     ]);
   }
 
-  const isLoading = ordersQuery.isLoading || customersQuery.isLoading;
-  const hasError = ordersQuery.error || customersQuery.error;
+  const isLoading =
+    ordersQuery.isLoading || customersQuery.isLoading || peopleQuery.isLoading;
+  const hasError = ordersQuery.error || customersQuery.error || peopleQuery.error;
 
   return (
     <PageShell>
@@ -450,7 +478,7 @@ export default function ServiceOrdersPage() {
         onClose={() => setIsCreateOpen(false)}
         onCreated={() => void refreshAll()}
         customers={customers}
-        people={[]}
+        people={people}
       />
 
       <EditServiceOrderModal
@@ -458,7 +486,7 @@ export default function ServiceOrdersPage() {
         onClose={() => setEditId(null)}
         onSuccess={() => void refreshAll()}
         serviceOrderId={editId}
-        people={[]}
+        people={people}
       />
     </PageShell>
   );

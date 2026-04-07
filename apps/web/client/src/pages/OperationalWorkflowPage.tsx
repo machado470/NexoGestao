@@ -105,10 +105,7 @@ export default function OperationalWorkflowPage() {
 
           const ctx = buildOperationalContextFromServiceOrder(os);
 
-          const serviceOrderUrl = buildServiceOrdersDeepLink(
-            os?.id,
-            "operations"
-          );
+          const serviceOrderUrl = buildServiceOrdersDeepLink(os?.id);
           const financeUrl = buildFinanceChargeUrl(ctx.chargeId);
           const whatsappUrl = buildWhatsAppUrlFromContext(ctx);
 
