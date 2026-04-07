@@ -8,6 +8,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { $Enums, Prisma, WhatsAppEntityType, WhatsAppMessageType } from '@prisma/client'
 import { WhatsAppService } from '../whatsapp/whatsapp.service'
 import { TimelineService } from '../timeline/timeline.service'
+import { ChargesQueryDto } from './dto/charges-query.dto'
 
 @Injectable()
 export class FinanceService {
@@ -54,7 +55,7 @@ export class FinanceService {
   // =========================
   // LIST
   // =========================
-  async listCharges(orgId: string, query?: any) {
+  async listCharges(orgId: string, query?: ChargesQueryDto) {
     const page = Number(query?.page) || 1
     const limit = Number(query?.limit) || 20
     const skip = (page - 1) * limit
@@ -131,6 +132,27 @@ export class FinanceService {
     notes?: string | null
     serviceOrderId?: string | null
   }) {
+    const customer = await this.prisma.customer.findFirst({
+      where: { id: input.customerId, orgId: input.orgId },
+      select: { id: true },
+    })
+    if (!customer) {
+      throw new NotFoundException('Cliente não encontrado para a organização')
+    }
+
+    if (input.serviceOrderId) {
+      const serviceOrder = await this.prisma.serviceOrder.findFirst({
+        where: { id: input.serviceOrderId, orgId: input.orgId },
+        select: { id: true, customerId: true },
+      })
+      if (!serviceOrder) {
+        throw new NotFoundException('Ordem de serviço não encontrada para a organização')
+      }
+      if (serviceOrder.customerId !== input.customerId) {
+        throw new BadRequestException('serviceOrderId deve pertencer ao mesmo customerId')
+      }
+    }
+
     const charge = await this.prisma.charge.create({
       data: {
         orgId: input.orgId,
@@ -175,7 +197,8 @@ export class FinanceService {
     id: string
     amountCents?: number
     dueDate?: Date
-    status?: string
+    status?: $Enums.ChargeStatus
+    notes?: string | null
     actorUserId?: string | null
   }) {
     const charge = await this.prisma.charge.findFirst({
@@ -190,7 +213,8 @@ export class FinanceService {
       data: {
         amountCents: input.amountCents,
         dueDate: input.dueDate,
-        status: input.status as any,
+        status: input.status,
+        notes: input.notes,
       },
     })
   }
@@ -220,31 +244,47 @@ export class FinanceService {
     method: $Enums.PaymentMethod
     actorUserId?: string | null
   }) {
-    const charge = await this.prisma.charge.findFirst({
-      where: { id: input.chargeId, orgId: input.orgId },
-    })
+    const { charge, payment } = await this.prisma.$transaction(async (tx) => {
+      const charge = await tx.charge.findFirst({
+        where: { id: input.chargeId, orgId: input.orgId },
+      })
 
-    if (!charge) throw new NotFoundException('Charge não encontrada')
-    if (charge.status === 'PAID') {
-      throw new BadRequestException('Charge já está paga')
-    }
-    if (charge.status === 'CANCELED') {
-      throw new BadRequestException('Charge cancelada não pode ser paga')
-    }
+      if (!charge) throw new NotFoundException('Charge não encontrada')
+      if (charge.status === 'PAID') {
+        throw new BadRequestException('Charge já está paga')
+      }
+      if (charge.status === 'CANCELED') {
+        throw new BadRequestException('Charge cancelada não pode ser paga')
+      }
+      if (input.amountCents <= 0) {
+        throw new BadRequestException('amountCents deve ser maior que zero')
+      }
 
-    const payment = await this.prisma.payment.create({
-      data: {
-        orgId: input.orgId,
-        chargeId: charge.id,
-        amountCents: input.amountCents,
-        method: input.method,
-        paidAt: new Date(),
-      },
-    })
+      const paidAt = new Date()
+      const mutation = await tx.charge.updateMany({
+        where: {
+          id: charge.id,
+          orgId: input.orgId,
+          status: { in: ['PENDING', 'OVERDUE'] },
+        },
+        data: { status: 'PAID', paidAt },
+      })
 
-    await this.prisma.charge.update({
-      where: { id: charge.id },
-      data: { status: 'PAID', paidAt: new Date() },
+      if (mutation.count !== 1) {
+        throw new BadRequestException('Charge já foi processada por outra operação')
+      }
+
+      const payment = await tx.payment.create({
+        data: {
+          orgId: input.orgId,
+          chargeId: charge.id,
+          amountCents: input.amountCents,
+          method: input.method,
+          paidAt,
+        },
+      })
+
+      return { charge, payment }
     })
 
     await this.sendPaymentConfirmationWhatsApp(charge.id).catch((err) =>
@@ -255,6 +295,23 @@ export class FinanceService {
       orgId: input.orgId,
       action: 'CHARGE_PAID',
       description: `Pagamento confirmado para cobrança ${charge.id}`,
+      customerId: charge.customerId,
+      serviceOrderId: charge.serviceOrderId,
+      chargeId: charge.id,
+      metadata: {
+        actorUserId: input.actorUserId ?? null,
+        customerId: charge.customerId,
+        serviceOrderId: charge.serviceOrderId,
+        chargeId: charge.id,
+        paymentId: payment.id,
+        amountCents: input.amountCents,
+        method: input.method,
+      },
+    })
+    await this.timeline.log({
+      orgId: input.orgId,
+      action: 'PAYMENT_RECEIVED',
+      description: `Pagamento recebido para cobrança ${charge.id}`,
       customerId: charge.customerId,
       serviceOrderId: charge.serviceOrderId,
       chargeId: charge.id,
@@ -283,6 +340,21 @@ export class FinanceService {
     dueDate?: Date | null
     actorUserId?: string | null
   }) {
+    if (!input.serviceOrderId) {
+      throw new BadRequestException('serviceOrderId é obrigatório para vincular cobrança')
+    }
+
+    const serviceOrder = await this.prisma.serviceOrder.findFirst({
+      where: { id: input.serviceOrderId, orgId: input.orgId },
+      select: { id: true, customerId: true },
+    })
+    if (!serviceOrder) {
+      throw new NotFoundException('Ordem de serviço não encontrada para a organização')
+    }
+    if (serviceOrder.customerId !== input.customerId) {
+      throw new BadRequestException('Ordem de serviço não pertence ao cliente informado')
+    }
+
     const existing = await this.prisma.charge.findFirst({
       where: {
         orgId: input.orgId,
@@ -290,7 +362,7 @@ export class FinanceService {
       },
     })
 
-    if (existing) return { created: false }
+    if (existing) return { created: false, chargeId: existing.id }
 
     const created = await this.prisma.charge.create({
       data: {
@@ -433,11 +505,11 @@ export class FinanceService {
       .sort((a, b) => a.month.localeCompare(b.month))
   }
 
-  async createAutomationCharge(data: any) {
+  async createAutomationCharge(data: Record<string, string | number | boolean | null>) {
     return { ok: true }
   }
 
-  async sendPaymentReminder(data: any) {
+  async sendPaymentReminder(data: Record<string, string | number | boolean | null>) {
     return { ok: true }
   }
 
@@ -524,5 +596,14 @@ export class FinanceService {
       messageKey: `reminder_${charge.id}_${new Date().toISOString().split('T')[0]}`,
       renderedText: text,
     })
+  }
+
+  async remindChargeInOrg(orgId: string, chargeId: string) {
+    const charge = await this.prisma.charge.findFirst({
+      where: { id: chargeId, orgId },
+      select: { id: true },
+    })
+    if (!charge) throw new NotFoundException('Charge não encontrada')
+    await this.sendPaymentReminderWhatsApp(charge.id)
   }
 }

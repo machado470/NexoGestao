@@ -11,6 +11,7 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common'
+import { Response } from 'express'
 import { Throttle } from '@nestjs/throttler'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
@@ -23,6 +24,8 @@ import { CreatePaymentDto } from './dto/create-payment.dto'
 import { ChargesQueryDto } from './dto/charges-query.dto'
 import { CreateChargeDto } from './dto/create-charge.dto'
 import { UpdateChargeDto } from './dto/update-charge.dto'
+
+type AuthUser = { userId?: string; sub?: string } | null | undefined
 
 function parseDueDate(value?: string | Date | null): Date | undefined {
   if (value == null) return undefined
@@ -64,7 +67,7 @@ export class FinanceController {
 
   @Get('charges/export')
   @Roles('ADMIN', 'MANAGER')
-  async exportCharges(@Org() orgId: string, @Res() res: any) {
+  async exportCharges(@Org() orgId: string, @Res() res: Response) {
     const csv = await this.finance.exportChargesCsv(orgId)
     res.set('Content-Type', 'text/csv')
     res.attachment(`charges-${orgId}-${Date.now()}.csv`)
@@ -96,16 +99,18 @@ export class FinanceController {
   @Roles('ADMIN', 'MANAGER')
   async createCharge(
     @Org() orgId: string,
-    @User() user: any,
+    @User() user: AuthUser,
     @Body() body: CreateChargeDto,
   ) {
     const actorUserId = user?.userId ?? user?.sub ?? null
+    const dueDate = parseDueDate(body.dueDate)
+    if (!dueDate) throw new BadRequestException('dueDate é obrigatório')
 
     const data = await this.finance.createCharge({
       orgId,
       customerId: body.customerId,
       amountCents: body.amountCents,
-      dueDate: parseDueDate(body.dueDate) as Date,
+      dueDate,
       notes: body.notes,
       serviceOrderId: body.serviceOrderId,
       actorUserId,
@@ -118,7 +123,7 @@ export class FinanceController {
   @Roles('ADMIN', 'MANAGER')
   async updateCharge(
     @Org() orgId: string,
-    @User() user: any,
+    @User() user: AuthUser,
     @Param('id') id: string,
     @Body() body: UpdateChargeDto,
   ) {
@@ -131,6 +136,7 @@ export class FinanceController {
       amountCents: body.amountCents,
       dueDate: parseDueDate(body.dueDate),
       status: body.status,
+      notes: body.notes,
     })
 
     return { ok: true, data }
@@ -140,7 +146,7 @@ export class FinanceController {
   @Roles('ADMIN', 'MANAGER')
   async deleteCharge(
     @Org() orgId: string,
-    @User() user: any,
+    @User() user: AuthUser,
     @Param('id') id: string,
   ) {
     const actorUserId = user?.userId ?? user?.sub ?? null
@@ -159,7 +165,7 @@ export class FinanceController {
   @Roles('ADMIN', 'MANAGER')
   async payCharge(
     @Org() orgId: string,
-    @User() user: any,
+    @User() user: AuthUser,
     @Param('chargeId') chargeId: string,
     @Body() body: CreatePaymentDto,
   ) {
@@ -182,7 +188,7 @@ export class FinanceController {
     @Org() orgId: string,
     @Param('chargeId') chargeId: string,
   ) {
-    await this.finance.sendPaymentReminderWhatsApp(chargeId)
+    await this.finance.remindChargeInOrg(orgId, chargeId)
     return { ok: true }
   }
 }

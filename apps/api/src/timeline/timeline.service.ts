@@ -3,6 +3,7 @@ import { RequestContextService } from '../common/context/request-context.service
 import { PrismaService } from '../prisma/prisma.service'
 import { TimelineQueryDto } from './dto/timeline-query.dto'
 import { WebhookDispatcher } from '../webhooks/webhook.dispatcher'
+import { Prisma } from '@prisma/client'
 
 type TimelineLogInput = {
   orgId: string
@@ -13,10 +14,10 @@ type TimelineLogInput = {
   serviceOrderId?: string | null
   appointmentId?: string | null
   chargeId?: string | null
-  metadata?: Record<string, any> | null
+  metadata?: Record<string, unknown> | null
 }
 
-function pickActorUserId(metadata?: Record<string, any> | null): string | null {
+function pickActorUserId(metadata?: Record<string, unknown> | null): string | null {
   if (!metadata) return null
 
   const v1 = metadata.actorUserId
@@ -28,7 +29,7 @@ function pickActorUserId(metadata?: Record<string, any> | null): string | null {
   return s ? s : null
 }
 
-function pickActorPersonId(metadata?: Record<string, any> | null): string | null {
+function pickActorPersonId(metadata?: Record<string, unknown> | null): string | null {
   if (!metadata) return null
   const v = metadata.actorPersonId
   if (typeof v !== 'string') return null
@@ -36,7 +37,10 @@ function pickActorPersonId(metadata?: Record<string, any> | null): string | null
   return s ? s : null
 }
 
-function pickString(metadata: Record<string, any> | null | undefined, key: string): string | null {
+function pickString(
+  metadata: Record<string, unknown> | null | undefined,
+  key: string,
+): string | null {
   if (!metadata) return null
   const value = metadata[key]
   if (typeof value !== 'string') return null
@@ -116,6 +120,13 @@ export class TimelineService {
 
     const requestId = this.requestContext.requestId
 
+    const metadata = JSON.parse(
+      JSON.stringify({
+        ...(input.metadata ?? {}),
+        ...(requestId ? { requestId } : {}),
+      }),
+    ) as Prisma.InputJsonValue
+
     const event = await this.prisma.timelineEvent.create({
       data: {
         orgId: input.orgId,
@@ -126,10 +137,7 @@ export class TimelineService {
         serviceOrderId,
         appointmentId,
         chargeId,
-        metadata: {
-          ...(input.metadata ?? {}),
-          ...(requestId ? { requestId } : {}),
-        },
+        metadata,
       },
     })
 
@@ -158,12 +166,12 @@ export class TimelineService {
 
   async listByOrg(orgId: string, query?: TimelineQueryDto) {
     const take =
-      (query as any)?.limit && Number((query as any).limit) > 0
-        ? Math.min(Number((query as any).limit), 200)
+      query?.limit && Number(query.limit) > 0
+        ? Math.min(Number(query.limit), 200)
         : 50
 
-    const action = (query as any)?.action
-    const personId = (query as any)?.personId
+    const action = query?.action
+    const personId = query?.personId
 
     return this.prisma.timelineEvent.findMany({
       where: {

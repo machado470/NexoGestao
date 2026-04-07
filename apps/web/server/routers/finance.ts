@@ -7,6 +7,19 @@ const paginationInput = z.object({
   limit: z.number().int().positive().default(20),
 });
 
+const wrappedDataSchema = z.object({ data: z.unknown() });
+const wrappedListSchema = z.object({
+  data: z.object({
+    items: z.array(z.unknown()),
+    meta: z.object({
+      page: z.number(),
+      limit: z.number(),
+      total: z.number(),
+      pages: z.number(),
+    }),
+  }),
+});
+
 export const financeRouter = router({
   charges: router({
     create: protectedProcedure
@@ -29,7 +42,7 @@ export const financeRouter = router({
           throw new Error("Valor da cobrança é obrigatório e deve ser maior que 0");
         }
 
-        const res = await nexoFetch<any>(ctx, `/finance/charges`, {
+        const raw = await nexoFetch<unknown>(ctx, `/finance/charges`, {
           method: "POST",
           body: JSON.stringify({
             customerId: input.customerId,
@@ -40,7 +53,7 @@ export const financeRouter = router({
           }),
         });
 
-        return res?.data ?? res;
+        return wrappedDataSchema.parse(raw).data;
       }),
 
     list: protectedProcedure
@@ -64,22 +77,17 @@ export const financeRouter = router({
         if (input?.q) params.set("q", input.q);
         if (input?.serviceOrderId) params.set("serviceOrderId", input.serviceOrderId);
 
-        const raw = await nexoFetch<any>(
+        const raw = await nexoFetch<unknown>(
           ctx,
           `/finance/charges?${params.toString()}`,
           { method: "GET" }
         );
 
-        const payload = raw?.data ?? raw;
+        const payload = wrappedListSchema.parse(raw).data;
 
         return {
-          data: payload?.items ?? [],
-          pagination: payload?.meta ?? {
-            page,
-            limit,
-            total: 0,
-            pages: 1,
-          },
+          data: payload.items,
+          pagination: payload.meta,
         };
       }),
 
@@ -90,11 +98,11 @@ export const financeRouter = router({
         })
       )
       .query(async ({ input, ctx }) => {
-        const raw = await nexoFetch<any>(ctx, `/finance/charges/${input.id}`, {
+        const raw = await nexoFetch<unknown>(ctx, `/finance/charges/${input.id}`, {
           method: "GET",
         });
 
-        return raw?.data ?? raw;
+        return wrappedDataSchema.parse(raw).data;
       }),
 
     update: protectedProcedure
@@ -115,7 +123,7 @@ export const financeRouter = router({
           amountCentsInput ??
           (amount ? Math.round(amount * 100) : undefined);
 
-        const raw = await nexoFetch<any>(ctx, `/finance/charges/${id}`, {
+        const raw = await nexoFetch<unknown>(ctx, `/finance/charges/${id}`, {
           method: "PATCH",
           body: JSON.stringify({
             ...rest,
@@ -124,7 +132,7 @@ export const financeRouter = router({
           }),
         });
 
-        return raw?.data ?? raw;
+        return wrappedDataSchema.parse(raw).data;
       }),
 
     delete: protectedProcedure
@@ -134,29 +142,29 @@ export const financeRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
-        const raw = await nexoFetch<any>(ctx, `/finance/charges/${input.id}`, {
+        const raw = await nexoFetch<unknown>(ctx, `/finance/charges/${input.id}`, {
           method: "DELETE",
         });
 
-        return raw?.data ?? raw;
+        return wrappedDataSchema.parse(raw).data;
       }),
 
     stats: protectedProcedure
       .input(z.object({}).optional())
       .query(async ({ ctx }) => {
-        const raw = await nexoFetch<any>(ctx, `/finance/charges/stats`, {
+        const raw = await nexoFetch<unknown>(ctx, `/finance/charges/stats`, {
           method: "GET",
         });
 
-        return raw?.data ?? raw;
+        return wrappedDataSchema.parse(raw).data;
       }),
 
     revenueByMonth: protectedProcedure.query(async ({ ctx }) => {
-      const raw = await nexoFetch<any>(ctx, `/finance/charges/revenue-by-month`, {
+      const raw = await nexoFetch<unknown>(ctx, `/finance/charges/revenue-by-month`, {
         method: "GET",
       });
 
-      return raw?.data ?? raw ?? [];
+      return wrappedDataSchema.parse(raw).data ?? [];
     }),
 
     pay: protectedProcedure
@@ -168,7 +176,7 @@ export const financeRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
-        const raw = await nexoFetch<any>(
+        const raw = await nexoFetch<unknown>(
           ctx,
           `/finance/charges/${input.chargeId}/pay`,
           {
@@ -180,7 +188,7 @@ export const financeRouter = router({
           }
         );
 
-        return raw?.data ?? raw;
+        return wrappedDataSchema.parse(raw).data;
       }),
   }),
 });

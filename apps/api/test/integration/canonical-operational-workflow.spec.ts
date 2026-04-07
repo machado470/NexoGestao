@@ -7,9 +7,16 @@ import { randomUUID } from 'crypto'
 import { AppModule } from '../../src/app.module'
 import { PrismaService } from '../../src/prisma/prisma.service'
 
+type WorkflowPrisma = PrismaService & {
+  execution: {
+    deleteMany(args: { where: { orgId: { in: string[] } } }): Promise<{ count: number }>
+    findFirst(args: { where: { id: string; orgId: string } }): Promise<{ endedAt: Date | null; serviceOrderId: string } | null>
+  }
+}
+
 describe('Canonical Operational Workflow (e2e)', () => {
   let app: INestApplication
-  let prisma: any
+  let prisma: WorkflowPrisma
 
   const jwt = new JwtService({ secret: process.env.JWT_SECRET || 'dev-secret' })
 
@@ -34,7 +41,7 @@ describe('Canonical Operational Workflow (e2e)', () => {
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }))
     await app.init()
 
-    prisma = app.get(PrismaService)
+    prisma = app.get(PrismaService) as WorkflowPrisma
 
     await prisma.organization.createMany({
       data: [

@@ -11,20 +11,41 @@ import { PageHero, PageShell, SurfaceSection } from "@/components/PagePattern";
 import { EmptyState } from "@/components/EmptyState";
 import { DemoEnvironmentCta } from "@/components/DemoEnvironmentCta";
 
-/* ================= HELPERS ================= */
+type FinanceCharge = {
+  id: string;
+  customer?: { name?: string | null } | null;
+  amountCents: number;
+  status: string;
+};
 
-function safeExtractCharges(payload: any): any[] {
+type FinanceStats = {
+  paid?: { amountCents?: number };
+  pending?: { amountCents?: number };
+  overdue?: { amountCents?: number };
+};
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function safeExtractCharges(payload: unknown): FinanceCharge[] {
   if (!payload) return [];
-  if (Array.isArray(payload)) return payload;
-  if (Array.isArray(payload?.data)) return payload.data;
-  if (Array.isArray(payload?.data?.items)) return payload.data.items;
-  if (Array.isArray(payload?.items)) return payload.items;
+  if (Array.isArray(payload)) return payload as FinanceCharge[];
+  if (!isObject(payload)) return [];
+
+  const data = payload.data;
+  if (Array.isArray(data)) return data as FinanceCharge[];
+  if (isObject(data) && Array.isArray(data.items)) return data.items as FinanceCharge[];
+  if (Array.isArray(payload.items)) return payload.items as FinanceCharge[];
+
   return [];
 }
 
-function safeExtractStats(payload: any): any {
+function safeExtractStats(payload: unknown): FinanceStats | null {
   if (!payload) return null;
-  return payload?.data ?? payload;
+  if (!isObject(payload)) return null;
+  if (isObject(payload.data)) return payload.data as FinanceStats;
+  return payload as FinanceStats;
 }
 
 function formatCurrencyFromCents(cents?: number) {
@@ -33,8 +54,6 @@ function formatCurrencyFromCents(cents?: number) {
     currency: "BRL",
   }).format((cents || 0) / 100);
 }
-
-/* ================= PAGE ================= */
 
 export default function FinancesPage() {
   const { isAuthenticated, isInitializing } = useAuth();
@@ -202,7 +221,7 @@ export default function FinancesPage() {
         </SurfaceSection>
       ) : (
         <div className="space-y-3">
-          {charges.map((c: any) => (
+          {charges.map((c) => (
             <Card
               key={c.id}
               className="nexo-surface border-slate-200/70 bg-white/90 dark:border-white/8"
