@@ -27,14 +27,9 @@ import GovernancePage from "./pages/GovernancePage";
 import FinancesPage from "./pages/FinancesPage";
 import ExecutiveDashboard from "./pages/ExecutiveDashboard";
 import WhatsAppPage from "./pages/WhatsAppPage";
-import LaunchesPage from "./pages/LaunchesPage";
-import InvoicesPage from "./pages/InvoicesPage";
-import ExpensesPage from "./pages/ExpensesPage";
-import ReferralsPage from "./pages/ReferralsPage";
 import CalendarPage from "./pages/CalendarPage";
 import SettingsPage from "./pages/SettingsPage";
 import TimelinePage from "./pages/TimelinePage";
-import OperationsDashboardPage from "./pages/OperationsDashboardPage";
 
 const Landing = lazy(() => import("./pages/Landing"));
 const Login = lazy(() => import("./pages/Login"));
@@ -343,25 +338,6 @@ const WhatsAppRoute = protectedPage(WhatsAppPage, {
   requireCompletedOnboarding: true,
 });
 
-const LaunchesRoute = protectedPage(LaunchesPage, {
-  permissions: ["finance:read"],
-  requireCompletedOnboarding: true,
-});
-
-const InvoicesRoute = protectedPage(InvoicesPage, {
-  permissions: ["finance:read"],
-  requireCompletedOnboarding: true,
-});
-
-const ExpensesRoute = protectedPage(ExpensesPage, {
-  permissions: ["finance:read"],
-  requireCompletedOnboarding: true,
-});
-
-const ReferralsRoute = protectedPage(ReferralsPage, {
-  requireCompletedOnboarding: true,
-});
-
 const CalendarRoute = protectedPage(CalendarPage, {
   permissions: ["appointments:read"],
   requireCompletedOnboarding: true,
@@ -374,10 +350,6 @@ const SettingsRoute = protectedPage(SettingsPage, {
 
 const TimelineRoute = protectedPage(TimelinePage, {
   permissions: ["reports:read"],
-  requireCompletedOnboarding: true,
-});
-
-const OperationsDashboardRoute = protectedPage(OperationsDashboardPage, {
   requireCompletedOnboarding: true,
 });
 
@@ -451,10 +423,42 @@ function Router() {
         )}
       />
       <Route path="/whatsapp" component={WhatsAppRoute} />
-      <Route path="/launches" component={LaunchesRoute} />
-      <Route path="/invoices" component={InvoicesRoute} />
-      <Route path="/expenses" component={ExpensesRoute} />
-      <Route path="/referrals" component={ReferralsRoute} />
+      <Route
+        path="/launches"
+        component={() => (
+          <LegacyAliasRoute
+            targetPath="/finances"
+            message="Lançamentos foram consolidados em Financeiro. Redirecionando..."
+          />
+        )}
+      />
+      <Route
+        path="/invoices"
+        component={() => (
+          <LegacyAliasRoute
+            targetPath="/finances"
+            message="Faturas foram consolidadas em Financeiro. Redirecionando..."
+          />
+        )}
+      />
+      <Route
+        path="/expenses"
+        component={() => (
+          <LegacyAliasRoute
+            targetPath="/finances"
+            message="Despesas foram consolidadas em Financeiro. Redirecionando..."
+          />
+        )}
+      />
+      <Route
+        path="/referrals"
+        component={() => (
+          <LegacyAliasRoute
+            targetPath="/customers"
+            message="Indicações foram consolidadas em Clientes. Redirecionando..."
+          />
+        )}
+      />
       <Route path="/calendar" component={CalendarRoute} />
       <Route path="/settings" component={SettingsRoute} />
       <Route path="/timeline" component={TimelineRoute} />
@@ -469,7 +473,12 @@ function Router() {
       />
       <Route
         path="/dashboard/operations"
-        component={OperationsDashboardRoute}
+        component={() => (
+          <LegacyAliasRoute
+            targetPath="/service-orders"
+            message="Operações foram consolidadas em Ordens de Serviço. Redirecionando..."
+          />
+        )}
       />
 
       <Route path="/about" component={() => <LazyPage component={About} />} />

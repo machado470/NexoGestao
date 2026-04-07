@@ -47,11 +47,7 @@ function isRouteActive(location: string, route: string) {
 
 function getPageTitle(location: string) {
   const titles: Record<string, string> = {
-    "/dashboard": "Dashboard Executivo (alias)",
     "/executive-dashboard": "Dashboard Executivo",
-    "/executive-dashboard-new": "Dashboard Executivo (alias)",
-    "/dashboard/operations": "Operação diária (legado)",
-    "/operations": "Ordens de Serviço (alias legado)",
     "/customers": "Clientes",
     "/appointments": "Agendamentos",
     "/calendar": "Calendário",
@@ -77,13 +73,6 @@ function getPageDescription(location: string) {
   const descriptions: Record<string, string> = {
     "/executive-dashboard":
       "Visão consolidada de métricas, crescimento e operação.",
-    "/dashboard":
-      "Rota legada redirecionada para o dashboard executivo oficial.",
-    "/executive-dashboard-new":
-      "Rota legada redirecionada para o dashboard executivo oficial.",
-    "/dashboard/operations": "Painel legado de operação diária.",
-    "/operations":
-      "Alias legado consolidado para Ordens de Serviço.",
     "/customers": "Base operacional de clientes e relacionamento.",
     "/appointments": "Agenda operacional e preparação da execução.",
     "/calendar": "Visão temporal da agenda e da disponibilidade.",
@@ -179,24 +168,18 @@ export function MainLayout({ children }: MainLayoutProps) {
           permissions: ["governance:read"],
         },
         {
-          id: "settings",
-          label: "Configurações",
-          icon: Settings,
-          route: "/settings",
-          permissions: ["settings:manage"],
-        },
-      ],
-    },
-    {
-      id: "secondary",
-      label: "Áreas secundárias",
-      items: [
-        {
           id: "people",
           label: "Pessoas",
           icon: Users,
           route: "/people",
           permissions: ["people:manage"],
+        },
+        {
+          id: "settings",
+          label: "Configurações",
+          icon: Settings,
+          route: "/settings",
+          permissions: ["settings:manage"],
         },
       ],
     },
