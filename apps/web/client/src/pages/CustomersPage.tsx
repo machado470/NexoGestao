@@ -14,7 +14,6 @@ import {
   RefreshCcw,
   Pencil,
   PanelRightOpen,
-  X,
   CalendarDays,
   Briefcase,
   Wallet,
@@ -29,6 +28,13 @@ import {
 import CreateCustomerModal from "@/components/CreateCustomerModal";
 import EditCustomerModal from "@/components/EditCustomerModal";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   buildFinanceChargeUrl,
   buildServiceOrdersDeepLink,
@@ -581,39 +587,28 @@ export default function CustomersPage() {
         </SurfaceSection>
       </SurfaceSection>
 
-      {workspaceCustomerId ? (
-        <div className="fixed inset-0 z-50 flex justify-end">
-          <div
-            className="absolute inset-0 bg-black/50 backdrop-blur-[1px]"
-            onClick={closeWorkspace}
-          />
-
-          <div className="relative h-full w-full max-w-2xl overflow-y-auto border-l border-gray-200 bg-gray-50 shadow-2xl dark:border-gray-700 dark:bg-gray-900">
-            <div className="sticky top-0 z-10 border-b border-gray-200 bg-white/95 px-5 py-4 backdrop-blur dark:border-gray-700 dark:bg-gray-800/95">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-orange-500">
-                    Workspace do cliente
-                  </p>
-                  <h2 className="mt-1 text-xl font-semibold text-gray-900 dark:text-white">
-                    {workspace?.customer?.name ?? "Carregando..."}
-                  </h2>
-                  <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                    Hub lateral de contexto, histórico e próxima ação.
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={closeWorkspace}
-                  className="rounded-lg p-2 hover:bg-gray-100 dark:hover:bg-gray-700"
-                >
-                  <X className="h-5 w-5 text-gray-700 dark:text-gray-300" />
-                </button>
-              </div>
+      <Dialog
+        open={Boolean(workspaceCustomerId)}
+        onOpenChange={(open) => (!open ? closeWorkspace() : undefined)}
+      >
+        <DialogContent
+          className="left-auto right-0 top-0 h-screen w-full max-h-screen max-w-2xl translate-x-0 translate-y-0 overflow-y-auto rounded-none border-l border-gray-200 bg-gray-50 p-0 shadow-2xl dark:border-gray-700 dark:bg-gray-900"
+        >
+          <DialogHeader className="sticky top-0 z-10 border-b border-gray-200 bg-white/95 px-5 py-4 backdrop-blur dark:border-gray-700 dark:bg-gray-800/95">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-orange-500">
+                Workspace do cliente
+              </p>
+              <DialogTitle className="mt-1 text-left text-xl font-semibold text-gray-900 dark:text-white">
+                {workspace?.customer?.name ?? "Carregando..."}
+              </DialogTitle>
+              <DialogDescription className="mt-1 text-left text-sm text-gray-600 dark:text-gray-400">
+                Hub lateral de contexto, histórico e próxima ação.
+              </DialogDescription>
             </div>
+          </DialogHeader>
 
-            <div className="space-y-4 p-5">
+          <div className="space-y-4 p-5">
               {workspaceQuery.isLoading ? (
                 <div className="rounded-xl border border-gray-200 bg-white p-5 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
                   Carregando workspace...
@@ -909,9 +904,8 @@ export default function CustomersPage() {
                 </>
               )}
             </div>
-          </div>
-        </div>
-      ) : null}
+        </DialogContent>
+      </Dialog>
 
       <CreateCustomerModal
         open={isCreateOpen}

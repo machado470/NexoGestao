@@ -41,6 +41,11 @@ type CustomerRef = {
   phone?: string | null;
 };
 
+type CustomerOption = {
+  id: string;
+  name: string;
+};
+
 type AppointmentStatus =
   | "SCHEDULED"
   | "CONFIRMED"
@@ -418,7 +423,7 @@ export default function AppointmentsPage() {
   }, [listAppointments.data]);
 
   const customers = useMemo(() => {
-    return normalizeArrayPayload<any>(listCustomers.data).map((customer) => ({
+    return normalizeArrayPayload<CustomerOption>(listCustomers.data).map((customer) => ({
       id: String(customer.id),
       name: String(customer.name),
     }));
@@ -539,10 +544,15 @@ export default function AppointmentsPage() {
     try {
       await updateAppointment.mutateAsync({
         id: appointmentId,
-        data: { status },
+        status,
       });
-    } catch {
-      //
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Erro ao atualizar agendamento";
+      toast.error(message);
+      setProcessingId(null);
     }
   };
 
