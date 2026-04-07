@@ -395,6 +395,8 @@ export default function AppointmentsPage() {
     getCustomerIdFromUrl()
   );
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [routingActionId, setRoutingActionId] = useState<string | null>(null);
+  const [successActionId, setSuccessActionId] = useState<string | null>(null);
   const [highlightedAppointmentId, setHighlightedAppointmentId] = useState<
     string | null
   >(() => getAppointmentIdFromUrl());
@@ -785,21 +787,31 @@ export default function AppointmentsPage() {
                   ? {
                       label: "Criar O.S.",
                       icon: Briefcase,
-                      onClick: () =>
+                      onClick: () => {
+                        setRoutingActionId(`create-${appointment.id}`);
                         navigate(
                           `/service-orders?customerId=${appointment.customerId}&appointmentId=${appointment.id}`
-                        ),
+                        );
+                        setSuccessActionId(`create-${appointment.id}`);
+                        setTimeout(() => setRoutingActionId(null), 220);
+                        setTimeout(() => setSuccessActionId(null), 1300);
+                      },
                       disabled: false,
                     }
                   : {
                       label: "Abrir O.S.",
                       icon: Briefcase,
-                      onClick: () =>
+                      onClick: () => {
+                        setRoutingActionId(`open-${appointment.id}`);
                         navigate(
                           latestOrder
                             ? buildServiceOrdersDeepLink(latestOrder.id)
                             : `/service-orders?customerId=${appointment.customerId}`
-                        ),
+                        );
+                        setSuccessActionId(`open-${appointment.id}`);
+                        setTimeout(() => setRoutingActionId(null), 220);
+                        setTimeout(() => setSuccessActionId(null), 1300);
+                      },
                       disabled: false,
                     };
             const PrimaryActionIcon = primaryAction.icon;
@@ -882,7 +894,15 @@ export default function AppointmentsPage() {
                         disabled={primaryAction.disabled}
                       >
                         <PrimaryActionIcon className="h-4 w-4" />
-                        {primaryAction.label}
+                        {isProcessing
+                          ? "Processando..."
+                          : successActionId === `create-${appointment.id}` ||
+                              successActionId === `open-${appointment.id}`
+                            ? "Ação iniciada"
+                            : routingActionId === `create-${appointment.id}` ||
+                                routingActionId === `open-${appointment.id}`
+                              ? "Abrindo..."
+                              : primaryAction.label}
                       </Button>
                       <Button
                         type="button"
@@ -913,11 +933,22 @@ export default function AppointmentsPage() {
                         size="sm"
                         variant="outline"
                         className="gap-2"
-                        onClick={() => whatsappUrl && navigate(whatsappUrl)}
+                        onClick={() => {
+                          if (!whatsappUrl) return;
+                          setRoutingActionId(`wa-${appointment.id}`);
+                          navigate(whatsappUrl);
+                          setSuccessActionId(`wa-${appointment.id}`);
+                          setTimeout(() => setRoutingActionId(null), 220);
+                          setTimeout(() => setSuccessActionId(null), 1300);
+                        }}
                         disabled={!whatsappUrl}
                       >
                         <MessageCircle className="h-4 w-4" />
-                        WhatsApp
+                        {routingActionId === `wa-${appointment.id}`
+                          ? "Abrindo..."
+                          : successActionId === `wa-${appointment.id}`
+                            ? "Conversa aberta"
+                            : "WhatsApp"}
                       </Button>
 
                       <Button

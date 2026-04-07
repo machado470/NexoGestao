@@ -133,6 +133,17 @@ function getEventIcon(event: TimelineEvent) {
   return Clock3;
 }
 
+function getEventCardClass(event: TimelineEvent) {
+  const key = getTimelineEventKey(event);
+  if (key.includes("OVERDUE") || key.includes("RISK") || key.includes("NO_CHARGE")) {
+    return "border-red-200 bg-red-50/70 dark:border-red-900/40 dark:bg-red-950/20";
+  }
+  if (key.includes("PENDING") || key.includes("WARNING")) {
+    return "border-amber-200 bg-amber-50/70 dark:border-amber-900/40 dark:bg-amber-950/20";
+  }
+  return "border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900/30";
+}
+
 function getEventScope(event: TimelineEvent): EventScope {
   const key = getTimelineEventKey(event);
 
@@ -206,6 +217,7 @@ export default function TimelinePage() {
   const [search, setSearch] = useState("");
   const [scopeFilter, setScopeFilter] = useState<EventScope>("ALL");
   const [showMetadata, setShowMetadata] = useState(false);
+  const [routingTarget, setRoutingTarget] = useState<string | null>(null);
 
   const customersQuery = trpc.nexo.customers.list.useQuery(undefined, {
     retry: false,
@@ -590,7 +602,7 @@ export default function TimelinePage() {
                 return (
                   <div
                     key={event.id}
-                    className="nexo-subtle-surface p-4"
+                    className={`nexo-subtle-surface border p-4 ${getEventCardClass(event)}`}
                   >
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                       <div className="min-w-0 flex-1">
@@ -638,7 +650,10 @@ export default function TimelinePage() {
                         <Button
                           type="button"
                           size="sm"
-                          onClick={() => navigate(primaryLink.href)}
+                          onClick={() => {
+                            setRoutingTarget(`${event.id}-primary`);
+                            navigate(primaryLink.href);
+                          }}
                           className="gap-2"
                         >
                           {primaryLink.target === "serviceOrder" ? (
@@ -651,7 +666,7 @@ export default function TimelinePage() {
                           ) : (
                             <Link2 className="h-4 w-4" />
                           )}
-                          {primaryLink.label}
+                          {routingTarget === `${event.id}-primary` ? "Abrindo..." : primaryLink.label}
                         </Button>
                       ) : null}
 
@@ -663,7 +678,10 @@ export default function TimelinePage() {
                             type="button"
                             size="sm"
                             variant="outline"
-                            onClick={() => navigate(link.href)}
+                            onClick={() => {
+                              setRoutingTarget(`${event.id}-${link.href}`);
+                              navigate(link.href);
+                            }}
                             className="gap-2"
                           >
                             {link.target === "serviceOrder" ? (
@@ -676,7 +694,7 @@ export default function TimelinePage() {
                             ) : (
                               <Link2 className="h-4 w-4" />
                             )}
-                            {link.label}
+                            {routingTarget === `${event.id}-${link.href}` ? "Abrindo..." : link.label}
                           </Button>
                         ))}
                     </div>

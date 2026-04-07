@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/contexts/AuthContext";
@@ -71,6 +71,8 @@ export default function FinancesPage() {
   const paymentIdFromUrl = searchParams.get("paymentId") || "";
   const isServiceOrderScoped = Boolean(serviceOrderIdFromUrl);
   const isPaymentScoped = Boolean(paymentIdFromUrl);
+  const [whatsAppOpeningId, setWhatsAppOpeningId] = useState<string | null>(null);
+  const [paymentDoneId, setPaymentDoneId] = useState<string | null>(null);
 
   const chargesQuery = trpc.finance.charges.list.useQuery(
     {
@@ -266,6 +268,7 @@ export default function FinancesPage() {
     const overdue = billingQueue.find((item) => item.normalized === "OVERDUE");
     if (overdue) {
       return {
+        severity: "critical" as const,
         title: "Cobrança vencida detectada",
         description: "Priorize contato imediato por WhatsApp para reduzir atraso de caixa.",
         ctaLabel: "Cobrar no WhatsApp",
@@ -281,6 +284,7 @@ export default function FinancesPage() {
 
     if (isPaymentScoped && paymentById?.id) {
       return {
+        severity: "healthy" as const,
         title: "Pagamento registrado",
         description: "Feche o ciclo operacional marcando a O.S. como concluída e com resultado.",
         ctaLabel: "Ir para O.S.",
@@ -293,12 +297,19 @@ export default function FinancesPage() {
     }
 
     return {
+      severity: "attention" as const,
       title: "Monitorar fila de cobrança",
       description: "Sem urgências críticas no momento. Siga a fila priorizada automaticamente.",
       ctaLabel: "Ver fila",
       onClick: () => navigate("/finances"),
     };
   }, [billingQueue, isPaymentScoped, navigate, paymentById?.id, paymentScopedCharge?.serviceOrderId]);
+
+  function getSeverityClass(severity: "critical" | "attention" | "healthy") {
+    if (severity === "critical") return "border-red-200 bg-red-50/80 dark:border-red-900/40 dark:bg-red-950/20";
+    if (severity === "healthy") return "border-emerald-200 bg-emerald-50/80 dark:border-emerald-900/40 dark:bg-emerald-950/20";
+    return "border-amber-200 bg-amber-50/80 dark:border-amber-900/40 dark:bg-amber-950/20";
+  }
 
   const hasRenderableData =
     chargesQuery.data !== undefined ||
@@ -431,16 +442,16 @@ export default function FinancesPage() {
         <FinanceOverviewAreaChart timeline={timelineData} />
       )}
 
-      <SurfaceSection className="border-orange-200 bg-orange-50/70 dark:border-orange-900/40 dark:bg-orange-950/20">
+      <SurfaceSection className={getSeverityClass(nextAction.severity)}>
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-orange-600 dark:text-orange-300">
+            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-700 dark:text-zinc-200">
               Próxima ação
             </p>
-            <p className="mt-1 font-medium text-orange-900 dark:text-orange-100">
+            <p className="mt-1 font-medium text-zinc-900 dark:text-zinc-100">
               {nextAction.title}
             </p>
-            <p className="text-sm text-orange-700 dark:text-orange-300">
+            <p className="text-sm text-zinc-700 dark:text-zinc-300">
               {nextAction.description}
             </p>
           </div>
@@ -465,7 +476,13 @@ export default function FinancesPage() {
               <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-4">
                 <div className="min-w-0">
                   <p>{charge.customer?.name || "Cliente sem nome"}</p>
-                  <p className="text-sm text-gray-500">
+                  <p
+                    className={`text-sm ${
+                      normalized === "OVERDUE"
+                        ? "text-red-600 dark:text-red-300"
+                        : "text-gray-500"
+                    }`}
+                  >
                     {formatCurrencyFromCents(charge.amountCents)} • {normalized}
                   </p>
                 </div>
@@ -474,6 +491,7 @@ export default function FinancesPage() {
                     size="sm"
                     variant="outline"
                     onClick={() => {
+                      setWhatsAppOpeningId(charge.id);
                       const customerPhone = String(
                         charge.customerPhone ?? charge.phone ?? ""
                       ).trim();
@@ -482,9 +500,10 @@ export default function FinancesPage() {
                       } else {
                         navigate("/whatsapp");
                       }
+                      setTimeout(() => setWhatsAppOpeningId(null), 1300);
                     }}
                   >
-                    WhatsApp
+                    {whatsAppOpeningId === charge.id ? "WhatsApp aberto" : "WhatsApp"}
                   </Button>
                   <Button
                     size="sm"
@@ -492,13 +511,19 @@ export default function FinancesPage() {
                     onClick={async () => {
                       try {
                         await registerPayment(charge, "CASH");
+                        setPaymentDoneId(charge.id);
+                        setTimeout(() => setPaymentDoneId(null), 1500);
                         void chargesQuery.refetch();
                       } catch {
                         // handled by hook
                       }
                     }}
                   >
-                    Marcar pago
+                    {isSubmitting
+                      ? "Processando..."
+                      : paymentDoneId === charge.id
+                        ? "Pago registrado"
+                        : "Marcar pago"}
                   </Button>
                 </div>
               </CardContent>
@@ -551,7 +576,19 @@ export default function FinancesPage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge>{c.status}</Badge>
+                  <Badge
+                    className={
+                      normalizeStatus(c.status) === "OVERDUE"
+                        ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300"
+                        : normalizeStatus(c.status) === "PENDING"
+                          ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
+                          : normalizeStatus(c.status) === "PAID"
+                            ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300"
+                            : ""
+                    }
+                  >
+                    {c.status}
+                  </Badge>
                   {normalizeStatus(c.status) !== "PAID" && (
                     <Button
                       size="sm"
@@ -562,6 +599,8 @@ export default function FinancesPage() {
                           const result = (await registerPayment(c, "CASH")) as
                             | { paymentId?: string }
                             | undefined;
+                          setPaymentDoneId(c.id);
+                          setTimeout(() => setPaymentDoneId(null), 1500);
                           const paymentId = String(result?.paymentId ?? "").trim();
                           const params = new URLSearchParams();
                           params.set("chargeId", c.id);
@@ -575,7 +614,11 @@ export default function FinancesPage() {
                         }
                       }}
                     >
-                      Marcar pago
+                      {isSubmitting
+                        ? "Processando..."
+                        : paymentDoneId === c.id
+                          ? "Pago registrado"
+                          : "Marcar pago"}
                     </Button>
                   )}
                 </div>

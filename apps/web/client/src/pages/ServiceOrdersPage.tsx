@@ -119,6 +119,9 @@ export default function ServiceOrdersPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [filter, setFilter] = useState<FinancialFilter>("ALL");
   const [search, setSearch] = useState("");
+  const [nextActionState, setNextActionState] = useState<
+    "idle" | "running" | "done"
+  >("idle");
 
   const activeRef = useRef<HTMLDivElement | null>(null);
 
@@ -226,6 +229,7 @@ export default function ServiceOrdersPage() {
   const nextAction = useMemo(() => {
     if (activeOrder?.status === "DONE" && !activeOrder.financialSummary?.hasCharge) {
       return {
+        severity: "critical" as const,
         title: "Gerar cobrança desta O.S.",
         description: "A execução foi concluída e o próximo passo ideal é faturar imediatamente.",
         ctaLabel: "Gerar cobrança",
@@ -236,6 +240,7 @@ export default function ServiceOrdersPage() {
     if (activeOrder?.financialSummary?.chargeStatus === "OVERDUE") {
       const url = buildWhatsAppUrlFromServiceOrder(activeOrder);
       return {
+        severity: "critical" as const,
         title: "Cobrança vencida: acionar WhatsApp",
         description: "A cobrança está vencida. Conduza recuperação com contato direto.",
         ctaLabel: "Enviar WhatsApp",
@@ -248,6 +253,7 @@ export default function ServiceOrdersPage() {
 
     if (activeOrder?.financialSummary?.chargeStatus === "PAID") {
       return {
+        severity: "healthy" as const,
         title: "Pagamento confirmado: fechar execução",
         description: "Finalize a O.S. com resultado registrado para encerrar o ciclo.",
         ctaLabel: "Revisar e concluir",
@@ -258,6 +264,7 @@ export default function ServiceOrdersPage() {
     const queueOrder = operationalQueue[0];
     if (queueOrder) {
       return {
+        severity: "attention" as const,
         title: "Retomar fila operacional",
         description: "Sem foco definido: abra a próxima O.S. prioritária.",
         ctaLabel: "Abrir próxima O.S.",
@@ -266,6 +273,7 @@ export default function ServiceOrdersPage() {
     }
 
     return {
+      severity: "healthy" as const,
       title: "Criar nova ordem de serviço",
       description: "Não há itens pendentes. Gere uma nova O.S. para manter o fluxo ativo.",
       ctaLabel: "Nova O.S.",
@@ -312,6 +320,23 @@ export default function ServiceOrdersPage() {
     const returnTo = activeId ? `${basePath}?os=${activeId}` : basePath;
     navigate(appendReturnTo(url, returnTo));
   }
+
+  function getSeverityClasses(severity: "critical" | "attention" | "healthy") {
+    if (severity === "critical") {
+      return "border-red-200 bg-red-50/90 dark:border-red-900/40 dark:bg-red-950/20";
+    }
+    if (severity === "healthy") {
+      return "border-emerald-200 bg-emerald-50/90 dark:border-emerald-900/40 dark:bg-emerald-950/20";
+    }
+    return "border-amber-200 bg-amber-50/90 dark:border-amber-900/40 dark:bg-amber-950/20";
+  }
+
+  const nextActionAccent =
+    nextAction.severity === "critical"
+      ? "text-red-700 dark:text-red-300"
+      : nextAction.severity === "healthy"
+        ? "text-emerald-700 dark:text-emerald-300"
+        : "text-amber-700 dark:text-amber-300";
 
   async function refreshAll() {
     await Promise.all([
@@ -451,20 +476,33 @@ export default function ServiceOrdersPage() {
         </CardContent>
       </Card>
 
-      <SurfaceSection className="border-orange-200 bg-orange-50/70 dark:border-orange-900/40 dark:bg-orange-950/20">
+      <SurfaceSection className={getSeverityClasses(nextAction.severity)}>
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-orange-600 dark:text-orange-300">
+            <p className={`text-xs font-semibold uppercase tracking-wide ${nextActionAccent}`}>
               Próxima ação
             </p>
-            <p className="mt-1 font-medium text-orange-900 dark:text-orange-100">
+            <p className={`mt-1 font-medium ${nextActionAccent}`}>
               {nextAction.title}
             </p>
-            <p className="text-sm text-orange-700 dark:text-orange-300">
+            <p className={`text-sm ${nextActionAccent}`}>
               {nextAction.description}
             </p>
           </div>
-          <Button onClick={nextAction.onClick}>{nextAction.ctaLabel}</Button>
+          <Button
+            onClick={() => {
+              setNextActionState("running");
+              nextAction.onClick();
+              setTimeout(() => setNextActionState("done"), 220);
+              setTimeout(() => setNextActionState("idle"), 1400);
+            }}
+          >
+            {nextActionState === "running"
+              ? "Abrindo..."
+              : nextActionState === "done"
+                ? "Ação iniciada"
+                : nextAction.ctaLabel}
+          </Button>
         </div>
       </SurfaceSection>
 

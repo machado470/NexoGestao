@@ -303,6 +303,7 @@ export default function CustomersPage() {
   const [workspaceCustomerId, setWorkspaceCustomerId] = useState<string | null>(
     () => getCustomerIdFromUrl()
   );
+  const [nextActionRouting, setNextActionRouting] = useState(false);
 
   const listCustomers = trpc.nexo.customers.list.useQuery(undefined, {
     retry: false,
@@ -387,6 +388,11 @@ export default function CustomersPage() {
         : workspaceAppointmentsCount > 0
           ? "Preparar atendimento agendado"
           : "Iniciar relacionamento com este cliente";
+  const nextActionSeverity = !workspace
+    ? "attention"
+    : workspacePendingCharges > 0
+      ? "critical"
+      : "healthy";
 
   return (
     <PageShell>
@@ -449,7 +455,15 @@ export default function CustomersPage() {
           />
         </div>
 
-        <SurfaceSection className="border-orange-200 bg-orange-50/70 dark:border-orange-900/40 dark:bg-orange-950/20">
+        <SurfaceSection
+          className={
+            nextActionSeverity === "critical"
+              ? "border-red-200 bg-red-50/80 dark:border-red-900/40 dark:bg-red-950/20"
+              : nextActionSeverity === "healthy"
+                ? "border-emerald-200 bg-emerald-50/80 dark:border-emerald-900/40 dark:bg-emerald-950/20"
+                : "border-amber-200 bg-amber-50/80 dark:border-amber-900/40 dark:bg-amber-950/20"
+          }
+        >
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-orange-600 dark:text-orange-300">
@@ -467,13 +481,18 @@ export default function CustomersPage() {
             <div className="flex flex-wrap gap-2">
               <Button
                 type="button"
-                onClick={() =>
-                  workspace
-                    ? navigate(`/service-orders?customerId=${workspace.customer.id}`)
-                    : setIsCreateOpen(true)
-                }
+                onClick={() => {
+                  setNextActionRouting(true);
+                  if (workspace) navigate(`/service-orders?customerId=${workspace.customer.id}`);
+                  else setIsCreateOpen(true);
+                  setTimeout(() => setNextActionRouting(false), 1200);
+                }}
               >
-                {workspace ? "Executar próxima ação" : "Novo cliente"}
+                {nextActionRouting
+                  ? "Ação iniciada"
+                  : workspace
+                    ? "Executar próxima ação"
+                    : "Novo cliente"}
               </Button>
               {workspace ? (
                 <Button
@@ -908,7 +927,13 @@ export default function CustomersPage() {
                     {workspace.charges.slice(0, 5).map(item => (
                       <div
                         key={item.id}
-                        className="rounded-lg border border-gray-200 p-3 dark:border-gray-700"
+                        className={`rounded-lg border p-3 ${
+                          item.status === "OVERDUE"
+                            ? "border-red-200 bg-red-50/70 dark:border-red-900/40 dark:bg-red-950/20"
+                            : item.status === "PENDING"
+                              ? "border-amber-200 bg-amber-50/70 dark:border-amber-900/40 dark:bg-amber-950/20"
+                              : "border-gray-200 dark:border-gray-700"
+                        }`}
                       >
                         <div className="flex items-center justify-between gap-3">
                           <div className="min-w-0">
