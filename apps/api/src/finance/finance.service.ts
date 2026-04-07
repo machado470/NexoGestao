@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   Logger,
   NotFoundException,
@@ -6,6 +7,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service'
 import { $Enums, Prisma, WhatsAppEntityType, WhatsAppMessageType } from '@prisma/client'
 import { WhatsAppService } from '../whatsapp/whatsapp.service'
+import { TimelineService } from '../timeline/timeline.service'
 
 @Injectable()
 export class FinanceService {
@@ -14,6 +16,7 @@ export class FinanceService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly whatsapp: WhatsAppService,
+    private readonly timeline: TimelineService,
   ) {}
 
   // =========================
@@ -147,6 +150,23 @@ export class FinanceService {
       )
     }
 
+    await this.timeline.log({
+      orgId: input.orgId,
+      action: 'CHARGE_CREATED',
+      description: `Cobrança criada para ${charge.customer?.name ?? 'cliente'}`,
+      customerId: charge.customerId,
+      serviceOrderId: charge.serviceOrderId,
+      chargeId: charge.id,
+      metadata: {
+        actorUserId: input.actorUserId ?? null,
+        customerId: charge.customerId,
+        serviceOrderId: charge.serviceOrderId,
+        chargeId: charge.id,
+        amountCents: charge.amountCents,
+        dueDate: charge.dueDate.toISOString(),
+      },
+    })
+
     return charge
   }
 
@@ -158,8 +178,15 @@ export class FinanceService {
     status?: string
     actorUserId?: string | null
   }) {
+    const charge = await this.prisma.charge.findFirst({
+      where: { id: input.id, orgId: input.orgId },
+      select: { id: true },
+    })
+
+    if (!charge) throw new NotFoundException('Charge não encontrada')
+
     return this.prisma.charge.update({
-      where: { id: input.id },
+      where: { id: charge.id },
       data: {
         amountCents: input.amountCents,
         dueDate: input.dueDate,
@@ -173,9 +200,14 @@ export class FinanceService {
     id: string
     actorUserId?: string | null
   }) {
-    return this.prisma.charge.delete({
-      where: { id: input.id },
+    const charge = await this.prisma.charge.findFirst({
+      where: { id: input.id, orgId: input.orgId },
+      select: { id: true },
     })
+
+    if (!charge) throw new NotFoundException('Charge não encontrada')
+
+    return this.prisma.charge.delete({ where: { id: charge.id } })
   }
 
   // =========================
@@ -193,8 +225,14 @@ export class FinanceService {
     })
 
     if (!charge) throw new NotFoundException('Charge não encontrada')
+    if (charge.status === 'PAID') {
+      throw new BadRequestException('Charge já está paga')
+    }
+    if (charge.status === 'CANCELED') {
+      throw new BadRequestException('Charge cancelada não pode ser paga')
+    }
 
-    await this.prisma.payment.create({
+    const payment = await this.prisma.payment.create({
       data: {
         orgId: input.orgId,
         chargeId: charge.id,
@@ -213,7 +251,25 @@ export class FinanceService {
       this.logger.error(`Erro ao enviar confirmação WhatsApp: ${err.message}`),
     )
 
-    return { ok: true }
+    await this.timeline.log({
+      orgId: input.orgId,
+      action: 'CHARGE_PAID',
+      description: `Pagamento confirmado para cobrança ${charge.id}`,
+      customerId: charge.customerId,
+      serviceOrderId: charge.serviceOrderId,
+      chargeId: charge.id,
+      metadata: {
+        actorUserId: input.actorUserId ?? null,
+        customerId: charge.customerId,
+        serviceOrderId: charge.serviceOrderId,
+        chargeId: charge.id,
+        paymentId: payment.id,
+        amountCents: input.amountCents,
+        method: input.method,
+      },
+    })
+
+    return { ok: true, paymentId: payment.id }
   }
 
   // =========================

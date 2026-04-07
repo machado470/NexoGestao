@@ -51,7 +51,11 @@ export default function FinancesPage() {
   const isServiceOrderScoped = Boolean(serviceOrderIdFromUrl);
 
   const chargesQuery = trpc.finance.charges.list.useQuery(
-    { page: 1, limit: 20 },
+    {
+      page: 1,
+      limit: 20,
+      serviceOrderId: serviceOrderIdFromUrl || undefined,
+    },
     { enabled: canLoadFinance, retry: false }
   );
 

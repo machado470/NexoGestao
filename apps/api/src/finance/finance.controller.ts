@@ -107,6 +107,7 @@ export class FinanceController {
       amountCents: body.amountCents,
       dueDate: parseDueDate(body.dueDate) as Date,
       notes: body.notes,
+      serviceOrderId: body.serviceOrderId,
       actorUserId,
     })
 
