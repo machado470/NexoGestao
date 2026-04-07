@@ -485,7 +485,7 @@ export class ServiceOrdersService {
         scheduledFor,
         amountCents,
         dueDate,
-        status: 'OPEN',
+        status: params.assignedToPersonId ? 'ASSIGNED' : 'OPEN',
       },
       include: {
         customer: { select: { id: true, name: true, phone: true } },
