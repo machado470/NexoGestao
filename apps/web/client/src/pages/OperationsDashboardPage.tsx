@@ -214,10 +214,10 @@ export default function OperationsDashboardPage() {
         <div className="flex flex-wrap gap-2">
           <Button
             variant="outline"
-            onClick={() => navigate("/operations")}
+            onClick={() => navigate("/service-orders")}
             className="h-10 rounded-xl border-slate-200/80 bg-white/80 px-4 dark:border-white/10 dark:bg-white/[0.03]"
           >
-            Ir para fila operacional
+            Ir para Ordens de Serviço
           </Button>
 
           <Button
