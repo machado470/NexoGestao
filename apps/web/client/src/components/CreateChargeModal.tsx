@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { chargeSchema } from "@/lib/validations";
+import { registerActionFlowEvent } from "@/lib/actionFlow";
 
 interface CreateChargeModalProps {
   isOpen: boolean;
@@ -192,6 +193,7 @@ export function CreateChargeModal({
         });
 
         toast.success("Cobrança criada com sucesso!");
+        registerActionFlowEvent("charge_created");
         setFormData(INITIAL_FORM);
         onSuccess();
         onClose();
