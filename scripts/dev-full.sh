@@ -107,6 +107,17 @@ fi
 
 API_PORT="${API_PORT:-3000}"
 WEB_PORT="${PORT:-3010}"
+
+if [ "$WEB_PORT" = "$API_PORT" ]; then
+  if [ "$API_PORT" != "3010" ]; then
+    echo "⚠️ PORT (${WEB_PORT}) conflita com API_PORT (${API_PORT}). Forçando Web/BFF para 3010."
+    WEB_PORT="3010"
+  else
+    echo "⚠️ PORT (${WEB_PORT}) conflita com API_PORT (${API_PORT}). Forçando Web/BFF para 3011."
+    WEB_PORT="3011"
+  fi
+fi
+
 NEXO_API_URL="${NEXO_API_URL:-http://127.0.0.1:${API_PORT}}"
 
 export DATABASE_URL REDIS_URL JWT_SECRET API_PORT REDIS_HOST REDIS_PORT NEXO_API_URL
