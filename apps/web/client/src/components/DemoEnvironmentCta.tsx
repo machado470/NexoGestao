@@ -28,8 +28,8 @@ export function DemoEnvironmentCta({ className }: Props) {
             Ambiente vivo para demo
           </p>
           <p className="mt-1 text-xs text-orange-700 dark:text-orange-300">
-            Gera automaticamente cliente, agendamento, O.S., cobrança, pagamento e
-            evento contextual no WhatsApp.
+            Gera cliente → agendamento → O.S. concluída → cobrança → pagamento,
+            com atualização imediata de timeline, risco, governança e WhatsApp.
           </p>
         </div>
 

@@ -190,6 +190,83 @@ async function authedPatch(ctx: CtxLike, path: string, body?: unknown) {
 
 const anyInput = z.any().optional();
 
+const customerCreateInput = z.object({
+  name: z.string().min(1),
+  phone: z.string().min(1),
+  email: z.string().email().optional(),
+  notes: z.string().optional(),
+});
+
+const customerUpdateInput = customerCreateInput
+  .partial()
+  .extend({
+    id: z.string().min(1),
+    active: z.boolean().optional(),
+  });
+
+const appointmentCreateInput = z.object({
+  customerId: z.string().min(1),
+  startsAt: z.string().min(1),
+  endsAt: z.string().optional(),
+  status: z.enum(["SCHEDULED", "CONFIRMED", "CANCELED", "DONE", "NO_SHOW"]).optional(),
+  notes: z.string().optional(),
+});
+
+const appointmentUpdateInput = z.object({
+  id: z.string().min(1),
+  startsAt: z.string().optional(),
+  endsAt: z.string().optional(),
+  status: z.enum(["SCHEDULED", "CONFIRMED", "CANCELED", "DONE", "NO_SHOW"]).optional(),
+  notes: z.string().optional(),
+});
+
+const serviceOrderCreateInput = z.object({
+  customerId: z.string().min(1),
+  title: z.string().min(1),
+  description: z.string().optional(),
+  priority: z.number().int().min(1).max(5).optional(),
+  scheduledFor: z.string().optional(),
+  appointmentId: z.string().optional(),
+  assignedToPersonId: z.string().optional(),
+  amountCents: z.number().int().min(1).optional(),
+  dueDate: z.string().optional(),
+});
+
+const serviceOrderUpdateInput = z.object({
+  id: z.string().min(1),
+  title: z.string().optional(),
+  description: z.string().optional(),
+  priority: z.number().int().min(1).max(5).optional(),
+  scheduledFor: z.string().optional(),
+  status: z.enum(["OPEN", "ASSIGNED", "IN_PROGRESS", "DONE", "CANCELED"]).optional(),
+  assignedToPersonId: z.string().nullable().optional(),
+  amountCents: z.number().int().min(1).optional(),
+  dueDate: z.string().optional(),
+  cancellationReason: z.string().optional(),
+  outcomeSummary: z.string().optional(),
+});
+
+const whatsappSendInput = z.object({
+  customerId: z.string().min(1),
+  content: z.string().min(1),
+  toPhone: z.string().optional(),
+  receiverNumber: z.string().optional(),
+  entityType: z.enum(["CUSTOMER", "APPOINTMENT", "SERVICE_ORDER", "CHARGE"]).optional(),
+  entityId: z.string().optional(),
+  messageType: z
+    .enum([
+      "APPOINTMENT_CONFIRMATION",
+      "SERVICE_UPDATE",
+      "PAYMENT_REMINDER",
+      "PAYMENT_CONFIRMATION",
+      "EXECUTION_CONFIRMATION",
+      "CUSTOMER_NOTIFICATION",
+    ])
+    .optional(),
+  chargeId: z.string().optional(),
+  serviceOrderId: z.string().optional(),
+});
+
 export const nexoProxyRouter = router({
   auth: router({
     login: publicProcedure
@@ -291,11 +368,11 @@ export const nexoProxyRouter = router({
         return authedGet(ctx as CtxLike, `/customers/${input.id}/workspace`);
       }),
 
-    create: protectedProcedure.input(z.any()).mutation(async ({ ctx, input }) => {
+    create: protectedProcedure.input(customerCreateInput).mutation(async ({ ctx, input }) => {
       return authedPost(ctx as CtxLike, "/customers", input);
     }),
 
-    update: protectedProcedure.input(z.any()).mutation(async ({ ctx, input }) => {
+    update: protectedProcedure.input(customerUpdateInput).mutation(async ({ ctx, input }) => {
       const id = input?.id;
       if (!id || typeof id !== "string") {
         throw new Error("ID do cliente é obrigatório.");
@@ -317,11 +394,11 @@ export const nexoProxyRouter = router({
         return authedGet(ctx as CtxLike, `/appointments/${input.id}`);
       }),
 
-    create: protectedProcedure.input(z.any()).mutation(async ({ ctx, input }) => {
+    create: protectedProcedure.input(appointmentCreateInput).mutation(async ({ ctx, input }) => {
       return authedPost(ctx as CtxLike, "/appointments", input);
     }),
 
-    update: protectedProcedure.input(z.any()).mutation(async ({ ctx, input }) => {
+    update: protectedProcedure.input(appointmentUpdateInput).mutation(async ({ ctx, input }) => {
       const id = input?.id;
       if (!id || typeof id !== "string") {
         throw new Error("ID do agendamento é obrigatório.");
@@ -343,11 +420,11 @@ export const nexoProxyRouter = router({
         return authedGet(ctx as CtxLike, `/service-orders/${input.id}`);
       }),
 
-    create: protectedProcedure.input(z.any()).mutation(async ({ ctx, input }) => {
+    create: protectedProcedure.input(serviceOrderCreateInput).mutation(async ({ ctx, input }) => {
       return authedPost(ctx as CtxLike, "/service-orders", input);
     }),
 
-    update: protectedProcedure.input(z.any()).mutation(async ({ ctx, input }) => {
+    update: protectedProcedure.input(serviceOrderUpdateInput).mutation(async ({ ctx, input }) => {
       const id = input?.id;
       if (!id || typeof id !== "string") {
         throw new Error("ID da ordem de serviço é obrigatório.");
@@ -434,9 +511,17 @@ export const nexoProxyRouter = router({
         );
       }),
 
-    send: protectedProcedure.input(z.any()).mutation(async ({ ctx, input }) => {
+    send: protectedProcedure.input(whatsappSendInput).mutation(async ({ ctx, input }) => {
       return authedPost(ctx as CtxLike, "/whatsapp/messages", input);
     }),
+  }),
+
+  demo: router({
+    bootstrapLive: protectedProcedure
+      .input(z.object({}).optional())
+      .mutation(async ({ ctx }) => {
+        return authedPost(ctx as CtxLike, "/demo/bootstrap/live");
+      }),
   }),
 
   settings: router({
