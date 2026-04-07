@@ -66,9 +66,13 @@ async function bootstrap() {
 
     logger.error('Erro fatal no bootstrap')
     logger.error(message)
-    if ((err as NodeJS.ErrnoException | undefined)?.code === 'EADDRINUSE') {
+    const errno = err as NodeJS.ErrnoException | undefined
+    if (errno?.code === 'EADDRINUSE') {
+      const requestedPort = process.env.API_PORT || process.env.PORT || '3000'
+      const suggestedPort = Number(requestedPort) + 1
       logger.error(
-        'Conflito de porta detectado (EADDRINUSE). Verifique API_PORT/PORT e processos ativos.',
+        `Conflito de porta detectado (EADDRINUSE) na API: ${requestedPort}. ` +
+          `Tente API_PORT=${suggestedPort} ou libere a porta atual.`,
       )
     }
     logger.error(stack)

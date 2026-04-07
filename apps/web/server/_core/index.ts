@@ -38,7 +38,7 @@ async function startServer() {
     if (error.code === "EADDRINUSE") {
       console.error(
         `[web] Falha ao iniciar: porta ${port} já está em uso. ` +
-          "Verifique se outro processo web/bff já está rodando."
+          `[web] Sugestão: tente PORT=${port + 1} ou finalize o processo atual.`
       );
     }
     throw error;

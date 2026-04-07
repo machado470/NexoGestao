@@ -38,7 +38,7 @@ COPY --from=builder /app/apps/web/node_modules ./apps/web/node_modules
 
 WORKDIR /app/apps/web
 
-EXPOSE 3000
+EXPOSE 3010
 
 # O comando `start` já define NODE_ENV=production
 CMD ["pnpm", "run", "start"]
