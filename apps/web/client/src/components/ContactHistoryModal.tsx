@@ -117,7 +117,7 @@ function getContactTypeLabel(type: ContactType) {
 function getContactTypeColor(type: ContactType) {
   switch (type) {
     case "phone":
-      return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
+      return "bg-orange-100 text-orange-800 dark:bg-orange-500/20 dark:text-orange-200";
     case "email":
       return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300";
     case "whatsapp":

@@ -219,7 +219,7 @@ export default function Landing() {
                       <div className="rounded-xl border bg-background p-4">
                         <div className="text-sm text-muted-foreground">Ordens em andamento</div>
                         <div className="mt-2 text-3xl font-semibold">24</div>
-                        <div className="mt-2 text-xs text-blue-600">Acompanhamento contínuo</div>
+                        <div className="mt-2 text-xs text-primary">Acompanhamento contínuo</div>
                       </div>
 
                       <div className="rounded-xl border bg-background p-4">

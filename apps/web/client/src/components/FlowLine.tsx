@@ -14,7 +14,7 @@ export default function FlowLine({
   y1,
   x2,
   y2,
-  color = "#60a5fa",
+  color = "#f97316",
   animated = true,
 }: FlowLineProps) {
   const length = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));

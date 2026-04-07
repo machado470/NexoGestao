@@ -26,7 +26,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { PageHero, PageShell, SurfaceSection } from "@/components/PagePattern";
 
 const STATUS_COLORS: Record<string, string> = {
-  SCHEDULED: "#3b82f6",
+  SCHEDULED: "#f97316",
   CONFIRMED: "#22c55e",
   DONE: "#10b981",
   CANCELED: "#ef4444",

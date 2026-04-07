@@ -357,7 +357,7 @@ export default function ReferralsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+            <p className="text-2xl font-bold text-orange-600 dark:text-orange-300">
               {isLoadingCards ? "..." : formatMoney(credits.available)}
             </p>
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">

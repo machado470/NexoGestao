@@ -79,7 +79,7 @@ function getStatusBadgeClass(status: InvoiceStatus) {
     case "DRAFT":
       return "bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-300";
     case "ISSUED":
-      return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
+      return "bg-orange-100 text-orange-800 dark:bg-orange-500/20 dark:text-orange-200";
     case "PAID":
       return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300";
     case "CANCELLED":

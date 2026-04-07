@@ -48,7 +48,7 @@ function getStatusLabel(status: string) {
 function getCardToneClass(tone: string) {
   if (tone === "red") return "border-red-500 ring-2 ring-red-200";
   if (tone === "amber") return "border-amber-400";
-  if (tone === "blue") return "border-blue-400";
+  if (tone === "blue") return "border-orange-400";
   if (tone === "green") return "border-green-400";
   return "";
 }

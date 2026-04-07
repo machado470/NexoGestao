@@ -132,7 +132,7 @@ function getStatusLabel(status: AppointmentStatus) {
 function getStatusColor(status: AppointmentStatus) {
   const colors: Record<AppointmentStatus, string> = {
     SCHEDULED:
-      "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
+      "bg-orange-100 text-orange-800 dark:bg-orange-500/20 dark:text-orange-200",
     CONFIRMED:
       "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
     DONE:
@@ -153,7 +153,7 @@ function getStage(appointment: Appointment) {
         label: "Aguardando confirmação",
         description: "O horário foi criado, mas ainda depende de confirmação.",
         className:
-          "border-blue-200 bg-blue-50 text-blue-900 dark:border-blue-900/40 dark:bg-blue-950/20 dark:text-blue-300",
+          "border-orange-200 bg-orange-50 text-orange-900 dark:border-orange-500/40 dark:bg-orange-500/15 dark:text-orange-200",
         icon: CircleDashed,
       };
     case "CONFIRMED":
@@ -308,7 +308,7 @@ function getAppointmentNextAction(params: {
   if (appointment.status === "SCHEDULED") {
     return {
       tone:
-        "border-blue-200 bg-blue-50 text-blue-900 dark:border-blue-900/40 dark:bg-blue-950/20 dark:text-blue-300",
+        "border-orange-200 bg-orange-50 text-orange-900 dark:border-orange-500/40 dark:bg-orange-500/15 dark:text-orange-200",
       title: "Confirmar o horário",
       description:
         "O próximo passo é validar presença e reduzir risco de ausência.",
@@ -662,7 +662,7 @@ export default function AppointmentsPage() {
           title="Agendados"
           value={totalScheduled}
           subtitle="Ainda sem confirmação"
-          valueClassName="text-blue-600 dark:text-blue-400"
+          valueClassName="text-orange-600 dark:text-orange-300"
         />
         <SummaryCard
           title="Confirmados"

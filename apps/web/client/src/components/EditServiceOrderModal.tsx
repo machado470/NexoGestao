@@ -90,7 +90,7 @@ function getStatusLabel(status?: string) {
 function getStatusBadgeClass(status?: string) {
   switch (status) {
     case "OPEN":
-      return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
+      return "bg-orange-100 text-orange-800 dark:bg-orange-500/20 dark:text-orange-200";
     case "ASSIGNED":
       return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300";
     case "IN_PROGRESS":

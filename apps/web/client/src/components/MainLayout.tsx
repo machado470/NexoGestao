@@ -376,7 +376,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                 type="button"
                 onClick={() => void handleLogout()}
                 disabled={isLoggingOut}
-                className={`flex w-full items-center rounded-xl px-2.5 py-2 text-[13px] text-red-600 transition-colors hover:bg-red-50/90 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-60 dark:text-red-400 dark:hover:bg-red-500/10 dark:hover:text-red-300 ${
+                className={`flex w-full items-center rounded-xl px-2.5 py-2 text-[13px] text-red-600 transition-colors hover:bg-red-50/90 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:text-red-400 dark:hover:bg-red-500/10 dark:hover:text-red-300 dark:focus-visible:ring-offset-[#0d1015] ${
                   sidebarCollapsed ? "justify-center" : "gap-2.5"
                 }`}
               >

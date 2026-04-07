@@ -42,7 +42,7 @@ function getRiskColor(score: number): string {
   if (score >= 80) return 'text-red-600 dark:text-red-400'
   if (score >= 60) return 'text-orange-600 dark:text-orange-400'
   if (score >= 40) return 'text-yellow-600 dark:text-yellow-400'
-  if (score >= 20) return 'text-blue-600 dark:text-blue-400'
+  if (score >= 20) return 'text-orange-600 dark:text-orange-300'
   return 'text-green-600 dark:text-green-400'
 }
 
@@ -50,7 +50,7 @@ function getRiskBgColor(score: number): string {
   if (score >= 80) return 'bg-red-100 dark:bg-red-900/30'
   if (score >= 60) return 'bg-orange-100 dark:bg-orange-900/30'
   if (score >= 40) return 'bg-yellow-100 dark:bg-yellow-900/30'
-  if (score >= 20) return 'bg-blue-100 dark:bg-blue-900/30'
+  if (score >= 20) return 'bg-orange-100 dark:bg-orange-500/20'
   return 'bg-green-100 dark:bg-green-900/30'
 }
 
@@ -212,11 +212,11 @@ export default function RiskExplainPage() {
                   </div>
                 </div>
 
-                <div className="rounded-lg bg-blue-100 p-4 dark:bg-blue-900/30">
+                <div className="rounded-lg bg-orange-100 p-4 dark:bg-orange-500/20">
                   <div className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
                     Risco Operacional
                   </div>
-                  <div className="mt-2 text-3xl font-bold text-blue-600 dark:text-blue-400">
+                  <div className="mt-2 text-3xl font-bold text-orange-600 dark:text-orange-300">
                     {explanation.operationalRiskScore}
                   </div>
                 </div>

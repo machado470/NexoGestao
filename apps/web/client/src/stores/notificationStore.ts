@@ -45,7 +45,7 @@ const getColor = (type: NotificationType) => {
     case 'warning':
       return 'bg-yellow-50 border-yellow-200 text-yellow-900';
     case 'info':
-      return 'bg-blue-50 border-blue-200 text-blue-900';
+      return 'bg-orange-50 border-orange-200 text-orange-900';
   }
 };
 

@@ -12,14 +12,14 @@ interface ArchitectureCardProps {
 }
 
 const colorMap = {
-  blue: "from-blue-500/20 to-blue-600/20 border-blue-300/50 hover:border-blue-400/80",
+  blue: "from-orange-500/20 to-orange-600/20 border-orange-300/50 hover:border-orange-400/80",
   green: "from-emerald-500/20 to-emerald-600/20 border-emerald-300/50 hover:border-emerald-400/80",
   purple: "from-purple-500/20 to-purple-600/20 border-purple-300/50 hover:border-purple-400/80",
   orange: "from-orange-500/20 to-orange-600/20 border-orange-300/50 hover:border-orange-400/80",
 };
 
 const iconColorMap = {
-  blue: "text-blue-600",
+  blue: "text-orange-600",
   green: "text-emerald-600",
   purple: "text-purple-600",
   orange: "text-orange-600",

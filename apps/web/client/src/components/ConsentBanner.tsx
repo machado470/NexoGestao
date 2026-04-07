@@ -74,7 +74,7 @@ export function ConsentBanner() {
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
               Usamos cookies e tecnologias similares para melhorar sua experiência. Você pode
               personalizar suas preferências ou aceitar todas. Leia nossa{' '}
-              <a href="/privacy" className="text-blue-600 hover:underline">
+              <a href="/privacy" className="text-primary hover:underline">
                 Política de Privacidade
               </a>
               .
