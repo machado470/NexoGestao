@@ -719,6 +719,18 @@ export async function seedPilot() {
     }),
   )
 
+  appointments.push(
+    await upsertAppointment({
+      orgId: org.id,
+      customerId: customers[3].id,
+      startsAt: atHour(now, -4, 8, 0),
+      endsAt: atHour(now, -4, 10, 0),
+      status: AppointmentStatus.DONE,
+      notes:
+        'Atendimento emergencial no bloco B para reparo de vazamento no reservatório.',
+    }),
+  )
+
   const serviceOrders: Array<Awaited<ReturnType<typeof upsertServiceOrder>>> = []
 
   serviceOrders.push(
@@ -807,6 +819,25 @@ export async function seedPilot() {
     }),
   )
 
+  serviceOrders.push(
+    await upsertServiceOrder({
+      orgId: org.id,
+      customerId: customers[3].id,
+      appointmentId: appointments[5].id,
+      assignedToPersonId: operatorPerson?.id,
+      title: 'OS-006 - Reparo emergencial reservatório escola',
+      description:
+        'Troca de boia, vedação de conexões e normalização do abastecimento do bloco B.',
+      amountCents: 143000,
+      dueDate: atHour(now, 2, 17, 0),
+      status: ServiceOrderStatus.DONE,
+      priority: 3,
+      scheduledFor: atHour(now, -4, 8, 0),
+      outcomeSummary:
+        'Sistema estabilizado e operação normalizada; recomendado retorno preventivo em 30 dias.',
+    }),
+  )
+
   const charge1 = await upsertChargeByServiceOrder({
     orgId: org.id,
     customerId: customers[0].id,
@@ -854,6 +885,16 @@ export async function seedPilot() {
     dueDate: atHour(now, 18, 12, 0),
     status: ChargeStatus.PENDING,
     notes: 'Cobrança inicial para início da reestruturação de rede.',
+  })
+
+  const pendingDoneCharge = await upsertChargeByServiceOrder({
+    orgId: org.id,
+    customerId: customers[3].id,
+    serviceOrderId: serviceOrders[5].id,
+    amountCents: 143000,
+    dueDate: atHour(now, 2, 12, 0),
+    status: ChargeStatus.PENDING,
+    notes: 'OS concluída aguardando processamento no contas a pagar da escola.',
   })
 
   const year = now.getFullYear()
@@ -1001,7 +1042,7 @@ export async function seedPilot() {
       customers: customerSeeds.length,
       appointments: appointments.length,
       serviceOrders: serviceOrders.length,
-      chargesSeeded: 4,
+      chargesSeeded: 5,
       invoicesSeeded: 4,
     },
   })
@@ -1070,6 +1111,35 @@ export async function seedPilot() {
       amountCents: charge1.amountCents,
       dueDate: charge1.dueDate.toISOString(),
       status: charge1.status,
+    },
+  })
+
+  await createTimelineIfMissing({
+    orgId: org.id,
+    action: 'SERVICE_ORDER_DONE',
+    description: 'OS-006 concluída com restabelecimento do abastecimento na escola.',
+    personId: operatorPerson?.id,
+    customerId: customers[3].id,
+    serviceOrderId: serviceOrders[5].id,
+    appointmentId: appointments[5].id,
+    metadata: {
+      status: serviceOrders[5].status,
+      outcomeSummary: serviceOrders[5].outcomeSummary,
+    },
+  })
+
+  await createTimelineIfMissing({
+    orgId: org.id,
+    action: 'CHARGE_CREATED',
+    description: 'Cobrança pendente gerada para a OS-006 já concluída.',
+    personId: financePerson?.id,
+    customerId: customers[3].id,
+    serviceOrderId: serviceOrders[5].id,
+    chargeId: pendingDoneCharge.id,
+    metadata: {
+      amountCents: pendingDoneCharge.amountCents,
+      dueDate: pendingDoneCharge.dueDate.toISOString(),
+      status: pendingDoneCharge.status,
     },
   })
 
