@@ -322,12 +322,13 @@ export default function Onboarding() {
             </div>
 
             <h1 className="text-3xl font-semibold tracking-tight text-zinc-950 dark:text-white md:text-4xl">
-              Coloque sua operação para rodar em poucos passos
+              Deixe o produto demonstrável em poucos passos
             </h1>
 
             <p className="mt-3 max-w-xl text-sm leading-6 text-zinc-600 dark:text-zinc-400">
-              Esse fluxo prepara a base inicial do ambiente para você sair do zero
-              e enxergar o ciclo principal acontecendo dentro da plataforma.
+              Esta primeira experiência prepara a narrativa do produto para demo e
+              uso real: cliente entra, operação acontece, cobrança fecha e a
+              rastreabilidade aparece.
             </p>
           </div>
 
@@ -360,6 +361,16 @@ export default function Onboarding() {
           {error}
         </div>
       ) : null}
+
+      <section className="rounded-2xl border border-orange-200 bg-orange-50/70 p-4 dark:border-orange-900/40 dark:bg-orange-950/20">
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-orange-700 dark:text-orange-300">
+          Fluxo oficial do NexoGestão
+        </p>
+        <p className="mt-2 text-sm text-orange-900 dark:text-orange-200">
+          Clientes → Agendamentos → Ordens de Serviço → Financeiro → WhatsApp →
+          Timeline → Governança → Configurações
+        </p>
+      </section>
 
       <div className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
         <aside className="space-y-3">
@@ -747,7 +758,8 @@ export default function Onboarding() {
               <div>
                 <h2 className="text-lg font-semibold">Finalizar configuração inicial</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Quando o ciclo base estiver pronto, você segue para o dashboard.
+                  Depois do ciclo base, continue a demo guiada no Dashboard e
+                  percorra o fluxo oficial pelos módulos.
                 </p>
               </div>
 

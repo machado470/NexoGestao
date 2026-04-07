@@ -408,8 +408,9 @@ export default function ExecutiveDashboardNew() {
             </h1>
 
             <p className="mt-3 max-w-xl text-sm leading-6 text-zinc-600 dark:text-zinc-400">
-              Visão consolidada de métricas, crescimento e operação em um painel
-              mais limpo, mais forte e sem morrer por causa de um bloco só.
+              Visão executiva para conduzir o fluxo oficial do produto: Clientes →
+              Agendamentos → Ordens de Serviço → Financeiro → WhatsApp →
+              Timeline → Governança → Configurações.
             </p>
           </div>
 
@@ -495,7 +496,7 @@ export default function ExecutiveDashboardNew() {
             label: item?.month ?? `Período ${index + 1}`,
             value: formatRevenueValue(item?.revenue),
           }))}
-          emptyText="Sem dados de receita."
+          emptyText="Ainda sem receita registrada. Assim que as O.S. virarem cobrança, a evolução aparece aqui."
           isLoading={revenueQuery.isLoading}
           errorText={revenueQuery.isError ? getErrorMessage(revenueQuery.error) : null}
         />
@@ -509,7 +510,7 @@ export default function ExecutiveDashboardNew() {
             value: `+${item?.newCustomers ?? 0}`,
             helper: `Total acumulado: ${item?.totalCustomers ?? 0}`,
           }))}
-          emptyText="Sem dados de crescimento."
+          emptyText="Ainda sem novos clientes no período. Comece por Clientes para ativar o ciclo operacional."
           isLoading={growthQuery.isLoading}
           errorText={growthQuery.isError ? getErrorMessage(growthQuery.error) : null}
         />
@@ -523,7 +524,7 @@ export default function ExecutiveDashboardNew() {
             label: item.label,
             value: item.value,
           }))}
-          emptyText="Sem dados de ordens de serviço."
+          emptyText="Sem distribuição de O.S. ainda. O próximo passo é transformar agendamentos em execução."
           isLoading={serviceOrdersStatusQuery.isLoading}
           errorText={
             serviceOrdersStatusQuery.isError
@@ -539,7 +540,7 @@ export default function ExecutiveDashboardNew() {
             label: item.label,
             value: item.value,
           }))}
-          emptyText="Sem dados de cobranças."
+          emptyText="Sem distribuição de cobranças ainda. Gere a primeira cobrança para ligar execução ao financeiro."
           isLoading={chargesStatusQuery.isLoading}
           errorText={
             chargesStatusQuery.isError

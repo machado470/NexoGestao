@@ -297,7 +297,7 @@ export default function ServiceOrdersPage() {
       <PageHero
         eyebrow="Execução operacional"
         title="Ordens de Serviço"
-        description="Fila operacional central do NexoGestão com o mesmo padrão visual da visão executiva."
+        description="Hub de execução do fluxo comercial: aqui a agenda vira entrega, cobrança e comunicação contextual."
         actions={
           <>
             {activeId && (
@@ -426,14 +426,17 @@ export default function ServiceOrdersPage() {
           <EmptyState
             icon={<BriefcaseBusiness className="h-7 w-7" />}
             title="Nenhuma ordem encontrada"
-            description="Ajuste os filtros ou crie uma nova O.S. para iniciar o ciclo operacional e financeiro."
+            description="Ainda não há O.S. visíveis. Crie a primeira ordem para transformar agendamento em execução rastreável e cobrança."
             action={{
-              label: "Nova O.S.",
+              label: "Criar primeira O.S.",
               onClick: () => setIsCreateOpen(true),
             }}
             secondaryAction={{
-              label: "Limpar filtro",
-              onClick: () => setFilter("ALL"),
+              label: "Ver sem filtros",
+              onClick: () => {
+                setFilter("ALL");
+                setSearch("");
+              },
             }}
           />
           <DemoEnvironmentCta />

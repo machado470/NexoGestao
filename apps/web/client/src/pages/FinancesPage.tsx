@@ -291,7 +291,7 @@ export default function FinancesPage() {
       <PageHero
         eyebrow="Financeiro"
         title="Financeiro"
-        description="Leitura consolidada de cobrança, recebimento e pendências sem alterar o fluxo funcional."
+        description="Cobrança conectada à execução: acompanhe pendências, recebimentos e próximos passos comerciais."
         actions={
           <button
             type="button"
@@ -332,21 +332,21 @@ export default function FinancesPage() {
                 ? "Cobrança não encontrada"
                 : isPaymentScoped
                   ? "Pagamento não encontrado"
-                  : "Sem cobranças registradas"
+                  : "Financeiro pronto para começar"
             }
             description={
               chargeIdFromUrl
                 ? "A cobrança solicitada não foi localizada neste workspace."
                 : isPaymentScoped
                   ? "O pagamento solicitado não foi localizado neste workspace."
-                  : "Assim que uma cobrança for criada, o financeiro passa a mostrar pendências, pagamentos e evolução do caixa."
+                  : "Quando a primeira O.S. gerar cobrança, esta tela passa a mostrar pendências, recebimentos e evolução do caixa."
             }
             action={{
-              label: "Atualizar dados",
+              label: "Atualizar financeiro",
               onClick: () => void chargesQuery.refetch(),
             }}
             secondaryAction={{
-              label: "Abrir O.S.",
+              label: "Ir para Ordens de Serviço",
               onClick: () => navigate("/service-orders"),
             }}
           />
