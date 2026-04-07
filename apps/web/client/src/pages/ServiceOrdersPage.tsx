@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { PageHero, PageShell, SurfaceSection } from "@/components/PagePattern";
 import { EmptyState } from "@/components/EmptyState";
+import { DemoEnvironmentCta } from "@/components/DemoEnvironmentCta";
 
 import ServiceOrderCard from "@/components/service-orders/ServiceOrderCard";
 import ServiceOrderDetailsPanel from "@/components/service-orders/ServiceOrderDetailsPanel";
@@ -338,7 +339,7 @@ export default function ServiceOrdersPage() {
           Erro ao carregar a fila operacional.
         </SurfaceSection>
       ) : sorted.length === 0 ? (
-        <SurfaceSection>
+        <SurfaceSection className="space-y-3">
           <EmptyState
             icon={<BriefcaseBusiness className="h-7 w-7" />}
             title="Nenhuma ordem encontrada"
@@ -352,6 +353,7 @@ export default function ServiceOrdersPage() {
               onClick: () => setFilter("ALL"),
             }}
           />
+          <DemoEnvironmentCta />
         </SurfaceSection>
       ) : (
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(380px,0.9fr)]">

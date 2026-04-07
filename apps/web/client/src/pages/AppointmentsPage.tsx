@@ -33,6 +33,7 @@ import {
 } from "@/lib/operations/operations.utils";
 import { normalizeArrayPayload } from "@/lib/query-helpers";
 import { PageHero, PageShell } from "@/components/PagePattern";
+import { DemoEnvironmentCta } from "@/components/DemoEnvironmentCta";
 
 type CustomerRef = {
   id: string;
@@ -1063,12 +1064,15 @@ export default function AppointmentsPage() {
           })}
         </div>
       ) : (
-        <div className="flex h-64 items-center justify-center text-gray-500 dark:text-gray-400">
-          <p>
-            {appointments.length === 0
-              ? "Nenhum agendamento encontrado"
-              : "Nenhum agendamento corresponde aos filtros locais"}
-          </p>
+        <div className="space-y-4">
+          <div className="flex h-40 items-center justify-center rounded-xl border border-dashed text-gray-500 dark:border-gray-700 dark:text-gray-400">
+            <p>
+              {appointments.length === 0
+                ? "Sem agendamentos ainda. Crie o primeiro ou gere ambiente demo para provar agenda → execução."
+                : "Nenhum agendamento corresponde aos filtros locais"}
+            </p>
+          </div>
+          {appointments.length === 0 ? <DemoEnvironmentCta /> : null}
         </div>
       )}
 
