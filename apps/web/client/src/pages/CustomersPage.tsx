@@ -998,16 +998,14 @@ export default function CustomersPage() {
       <CreateCustomerModal
         open={isCreateOpen}
         onOpenChange={setIsCreateOpen}
-        onCreated={async () => {
-          await listCustomers.refetch();
-        }}
+        onCreated={() => undefined}
       />
 
       <EditCustomerModal
         open={Boolean(editingCustomerId)}
         customerId={editingCustomerId}
         onClose={() => setEditingCustomerId(null)}
-        onSaved={() => void listCustomers.refetch()}
+        onSaved={() => undefined}
       />
     </PageShell>
   );

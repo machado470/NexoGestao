@@ -99,17 +99,34 @@ export default function SettingsPage() {
   const queryState = getQueryUiState([query], hasNormalizedSettings);
 
   const mutation = trpc.nexo.settings.update.useMutation({
+    onMutate: async (variables) => {
+      const previous = utils.nexo.settings.get.getData(undefined);
+      utils.nexo.settings.get.setData(undefined, (old: any) => {
+        const raw = (old as any)?.data ? (old as any).data : old;
+        if (!raw || typeof raw !== "object") return old;
+        const next = { ...raw, ...variables };
+        if ((old as any)?.data) {
+          return { ...(old as any), data: next };
+        }
+        return next;
+      });
+      return { previous };
+    },
     onSuccess: async (res) => {
       const normalized = sanitizeSettings(res);
 
       if (normalized) {
         setForm(buildFormFromSettings(normalized));
+        utils.nexo.settings.get.setData(undefined, normalized);
       }
 
       toast.success("Configurações atualizadas");
-      await utils.nexo.settings.get.invalidate();
+      void utils.nexo.settings.get.invalidate();
     },
-    onError: (err) => {
+    onError: (err, _variables, context) => {
+      if (context?.previous) {
+        utils.nexo.settings.get.setData(undefined, context.previous as any);
+      }
       toast.error(err.message);
     },
   });

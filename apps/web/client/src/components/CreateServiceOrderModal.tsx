@@ -129,27 +129,14 @@ export default function CreateServiceOrderModal({
   initialCustomerId,
   appointmentId,
 }: Props) {
+  const utils = trpc.useUtils();
   const resolvedOpen = open ?? isOpen ?? false;
   const [formData, setFormData] = useState<FormState>({
     ...INITIAL_FORM,
     customerId: initialCustomerId ? String(initialCustomerId) : "",
   });
 
-  const createMutation = trpc.nexo.serviceOrders.create.useMutation({
-    onSuccess: () => {
-      setFormData({
-        ...INITIAL_FORM,
-        customerId: initialCustomerId ? String(initialCustomerId) : "",
-      });
-      onCreated?.();
-      onSuccess?.();
-      onClose();
-      toast.success("Ordem de serviço criada com sucesso.");
-    },
-    onError: (error) => {
-      toast.error(error.message || "Erro ao criar ordem de serviço");
-    },
-  });
+  const createMutation = trpc.nexo.serviceOrders.create.useMutation();
 
   const canSubmit = useMemo(() => {
     return (
@@ -226,7 +213,7 @@ export default function CreateServiceOrderModal({
       return;
     }
 
-    await createMutation.mutateAsync({
+    const payload = {
       customerId: parsed.data.customerId,
       appointmentId: appointmentId ? String(appointmentId) : undefined,
       assignedToPersonId: parsed.data.assignedToPersonId || undefined,
@@ -236,6 +223,44 @@ export default function CreateServiceOrderModal({
       scheduledFor: parsed.data.scheduledFor || undefined,
       amountCents: parsed.data.amountCents,
       dueDate: parsed.data.dueDate || undefined,
+    };
+
+    const previousServiceOrders = utils.nexo.serviceOrders.list.getData({ page: 1, limit: 100 });
+    const tempId = `temp-os-${Date.now()}`;
+    utils.nexo.serviceOrders.list.setData({ page: 1, limit: 100 }, (old: any) => {
+      const raw = old as any[] | { data?: any[] } | undefined;
+      const optimistic = { id: tempId, ...payload, createdAt: new Date().toISOString() };
+      if (Array.isArray(raw)) return [optimistic, ...raw];
+      if (raw && Array.isArray(raw.data)) return { ...raw, data: [optimistic, ...raw.data] };
+      return [optimistic];
+    });
+
+    createMutation.mutate(payload, {
+      onSuccess: (created) => {
+        utils.nexo.serviceOrders.list.setData({ page: 1, limit: 100 }, (old: any) => {
+          const raw = old as any[] | { data?: any[] } | undefined;
+          const applyReplace = (items: any[]) =>
+            items.map((item) => (String(item?.id) === tempId ? created : item));
+          if (Array.isArray(raw)) return applyReplace(raw);
+          if (raw && Array.isArray(raw.data)) return { ...raw, data: applyReplace(raw.data) };
+          return [created];
+        });
+        setFormData({
+          ...INITIAL_FORM,
+          customerId: initialCustomerId ? String(initialCustomerId) : "",
+        });
+        onCreated?.();
+        onSuccess?.();
+        onClose();
+        toast.success("Ordem de serviço criada com sucesso.");
+      },
+      onError: (error) => {
+        utils.nexo.serviceOrders.list.setData(
+          { page: 1, limit: 100 },
+          previousServiceOrders as any
+        );
+        toast.error(error.message || "Erro ao criar ordem de serviço");
+      },
     });
   };
 

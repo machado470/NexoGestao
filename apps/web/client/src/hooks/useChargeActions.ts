@@ -56,21 +56,40 @@ export function useChargeActions(options?: UseChargeActionsOptions) {
   };
 
   const payCharge = trpc.finance.charges.pay.useMutation({
-    onSuccess: async () => {
+    onSuccess: async (_result, variables) => {
+      utils.finance.charges.list.setData(undefined, (old: any) => {
+        const raw = old as { data: any[]; pagination: any } | undefined;
+        const applyPaid = (items: any[]) =>
+          items.map((item) =>
+            String(item?.id) === String(variables.chargeId)
+              ? {
+                  ...item,
+                  status: "PAID",
+                  paidAt: new Date().toISOString(),
+                  paidAmountCents: variables.amountCents,
+                  paidMethod: variables.method,
+                }
+              : item
+          );
+        if (!raw || !Array.isArray(raw.data)) return undefined;
+        return { ...raw, data: applyPaid(raw.data) };
+      });
+
       toast.success("Pagamento registrado com sucesso");
       await Promise.all([
-        utils.finance.charges.list.invalidate(),
         utils.finance.charges.stats.invalidate(),
         utils.dashboard.alerts.invalidate(),
         utils.dashboard.kpis.invalidate(),
         utils.dashboard.revenueTrend.invalidate(),
         utils.dashboard.chargeDistribution.invalidate(),
-        utils.dashboard.serviceOrdersStatus.invalidate(),
+        utils.dashboard.serviceOrdersStatus.invalidate()
+      ]);
+
+      await Promise.all([
         utils.nexo.timeline.listByOrg.invalidate(),
         utils.governance.summary.invalidate(),
         utils.governance.runs.invalidate(),
-        utils.governance.autoScore.invalidate(),
-        utils.nexo.whatsapp.messages.invalidate(),
+        utils.governance.autoScore.invalidate()
       ]);
 
       await runRefreshActions();
