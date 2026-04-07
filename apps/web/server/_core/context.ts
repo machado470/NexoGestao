@@ -21,6 +21,23 @@ export type TrpcContext = {
 export type Context = TrpcContext;
 
 export function getNexoTokenFromReq(req: any): string | null {
+  const reqCookies = req?.cookies;
+  if (reqCookies && typeof reqCookies?.[NEXO_TOKEN_COOKIE] === "string") {
+    const token = reqCookies[NEXO_TOKEN_COOKIE].trim();
+    if (token) return token;
+  }
+
+  const authHeader = req?.headers?.authorization;
+  if (typeof authHeader === "string" && authHeader.trim()) {
+    const normalized = authHeader.trim();
+    if (normalized.toLowerCase().startsWith("bearer ")) {
+      const token = normalized.slice(7).trim();
+      if (token) return token;
+    } else {
+      return normalized;
+    }
+  }
+
   const raw = req?.headers?.cookie;
   if (!raw || typeof raw !== "string") return null;
 
