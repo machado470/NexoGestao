@@ -695,7 +695,7 @@ export default function AppointmentsPage() {
         </div>
       ) : null}
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-4 xl:grid-cols-8">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <SummaryCard
           title="Total"
           value={total}
@@ -720,27 +720,9 @@ export default function AppointmentsPage() {
           valueClassName="text-emerald-600 dark:text-emerald-400"
         />
         <SummaryCard
-          title="No-show"
-          value={totalNoShow}
-          subtitle="Pedem retomada"
-          valueClassName="text-yellow-600 dark:text-yellow-400"
-        />
-        <SummaryCard
-          title="Cancelados"
-          value={totalCanceled}
-          subtitle="Fluxo interrompido"
-          valueClassName="text-red-600 dark:text-red-400"
-        />
-        <SummaryCard
-          title="Com operação"
-          value={appointmentsWithOperations}
-          subtitle="Já puxaram O.S."
-          valueClassName="text-orange-600 dark:text-orange-400"
-        />
-        <SummaryCard
           title="Sem operação"
           value={appointmentsWithoutOperations}
-          subtitle="Ainda não viraram execução"
+          subtitle="Prioridade para criar O.S."
         />
       </div>
 
@@ -791,6 +773,36 @@ export default function AppointmentsPage() {
               appointment,
               serviceOrders,
             });
+            const primaryAction =
+              appointment.status === "SCHEDULED"
+                ? {
+                    label: "Confirmar",
+                    icon: CheckCheck,
+                    onClick: () => void handleUpdateStatus(appointment.id, "CONFIRMED"),
+                    disabled: isProcessing || updateAppointment.isPending,
+                  }
+                : !hasOperation
+                  ? {
+                      label: "Criar O.S.",
+                      icon: Briefcase,
+                      onClick: () =>
+                        navigate(
+                          `/service-orders?customerId=${appointment.customerId}&appointmentId=${appointment.id}`
+                        ),
+                      disabled: false,
+                    }
+                  : {
+                      label: "Abrir O.S.",
+                      icon: Briefcase,
+                      onClick: () =>
+                        navigate(
+                          latestOrder
+                            ? buildServiceOrdersDeepLink(latestOrder.id)
+                            : `/service-orders?customerId=${appointment.customerId}`
+                        ),
+                      disabled: false,
+                    };
+            const PrimaryActionIcon = primaryAction.icon;
 
             const whatsappUrl = buildWhatsAppConversationUrl({
               customerId: appointment.customerId,
@@ -865,6 +877,16 @@ export default function AppointmentsPage() {
                       <Button
                         type="button"
                         size="sm"
+                        className="gap-2"
+                        onClick={primaryAction.onClick}
+                        disabled={primaryAction.disabled}
+                      >
+                        <PrimaryActionIcon className="h-4 w-4" />
+                        {primaryAction.label}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
                         variant="outline"
                         className="gap-2"
                         onClick={() => handleOpenDeepLink(appointment.id)}
@@ -891,46 +913,11 @@ export default function AppointmentsPage() {
                         size="sm"
                         variant="outline"
                         className="gap-2"
-                        onClick={() =>
-                          navigate(
-                            latestOrder
-                              ? buildServiceOrdersDeepLink(latestOrder.id)
-                              : `/service-orders?customerId=${appointment.customerId}&appointmentId=${appointment.id}`
-                          )
-                        }
-                      >
-                        <Briefcase className="h-4 w-4" />
-                        {latestOrder ? "Abrir O.S." : "Ir para O.S."}
-                      </Button>
-
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="gap-2"
                         onClick={() => whatsappUrl && navigate(whatsappUrl)}
                         disabled={!whatsappUrl}
                       >
                         <MessageCircle className="h-4 w-4" />
                         WhatsApp
-                      </Button>
-
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="gap-2"
-                        onClick={() =>
-                          void handleUpdateStatus(appointment.id, "CONFIRMED")
-                        }
-                        disabled={
-                          isProcessing ||
-                          updateAppointment.isPending ||
-                          appointment.status !== "SCHEDULED"
-                        }
-                      >
-                        <CheckCheck className="h-4 w-4" />
-                        Confirmar
                       </Button>
 
                       <Button
