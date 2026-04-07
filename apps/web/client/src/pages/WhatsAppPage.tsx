@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import {
   MessageCircle,
   RefreshCw,
-  ArrowRight,
   ArrowLeft,
+  Send,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -22,6 +22,9 @@ import {
   buildServiceOrdersDeepLink,
 } from "@/lib/operations/operations.utils";
 import { DemoEnvironmentCta } from "@/components/DemoEnvironmentCta";
+import { EmptyState } from "@/components/EmptyState";
+import { PageHero, PageShell, SurfaceSection } from "@/components/PagePattern";
+import { getQueryUiState } from "@/lib/query-helpers";
 
 function getMessageTypeFromContext(context: string) {
   if (context === "overdue_charge") return "PAYMENT_REMINDER";
@@ -40,7 +43,6 @@ function getEntityId(route: ReturnType<typeof parseWhatsAppRoute>) {
   return route.chargeId || route.serviceOrderId || route.customerId;
 }
 
-// 🔥 NOVO: resolve retorno inteligente
 function resolveBack(route: ReturnType<typeof parseWhatsAppRoute>) {
   if (route.serviceOrderId) {
     return buildServiceOrdersDeepLink(route.serviceOrderId, "operations");
@@ -90,11 +92,8 @@ export default function WhatsAppPage() {
     return Array.isArray(raw) ? (raw as WhatsAppMessage[]) : [];
   }, [messagesQuery.data]);
 
-  const isLoading =
-    !!route.customerId &&
-    (customerQuery.isLoading ||
-      messagesQuery.isLoading ||
-      sendMutation.isPending);
+  const hasRenderableData = customerQuery.data !== undefined || messagesQuery.data !== undefined;
+  const queryState = getQueryUiState([customerQuery, messagesQuery], hasRenderableData);
 
   const canSend =
     Boolean(route.customerId) &&
@@ -106,56 +105,89 @@ export default function WhatsAppPage() {
 
   const dueDateLabel = route.dueDate ? formatDate(route.dueDate) : null;
 
+  const nonBlockingErrorMessage =
+    customerQuery.error?.message ||
+    messagesQuery.error?.message ||
+    "Falha ao atualizar contexto de WhatsApp.";
+
   if (!route.customerId) {
     return (
-      <div className="space-y-6 p-6">
-        <div className="flex justify-between">
-          <div>
-            <h1 className="flex items-center gap-2 text-xl font-bold">
-              <MessageCircle className="h-5 w-5" />
-              WhatsApp
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Acesse via ordem ou cobrança para manter o contexto operacional.
-            </p>
-          </div>
-
-          <Button
-            variant="outline"
-            onClick={() => navigate("/service-orders")}
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Voltar
-          </Button>
-        </div>
-
+      <PageShell>
+        <PageHero
+          eyebrow="WhatsApp"
+          title="WhatsApp"
+          description="Acesse via ordem ou cobrança para manter o contexto operacional."
+          actions={
+            <Button variant="outline" onClick={() => navigate("/service-orders")}>
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Voltar
+            </Button>
+          }
+        />
+        <SurfaceSection>
+          <EmptyState
+            icon={<MessageCircle className="h-7 w-7" />}
+            title="Sem contexto selecionado"
+            description="Abra o WhatsApp por uma ordem de serviço ou cobrança para carregar cliente, histórico e mensagem sugerida."
+            action={{
+              label: "Ir para O.S.",
+              onClick: () => navigate("/service-orders"),
+            }}
+          />
+        </SurfaceSection>
         <DemoEnvironmentCta />
-      </div>
+      </PageShell>
+    );
+  }
+
+  if (queryState.isInitialLoading) {
+    return (
+      <PageShell>
+        <PageHero eyebrow="WhatsApp" title="WhatsApp" description="Carregando contexto da conversa." />
+        <SurfaceSection className="flex min-h-[180px] items-center justify-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
+          <RefreshCw className="h-4 w-4 animate-spin" />
+          Carregando conversa...
+        </SurfaceSection>
+      </PageShell>
+    );
+  }
+
+  if (queryState.shouldBlockForError) {
+    return (
+      <PageShell>
+        <PageHero eyebrow="WhatsApp" title="WhatsApp" description="Não foi possível carregar o contexto da conversa." />
+        <SurfaceSection className="border-red-200 text-red-700 dark:border-red-900/40 dark:text-red-300">
+          {nonBlockingErrorMessage}
+        </SurfaceSection>
+      </PageShell>
     );
   }
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex justify-between">
-        <div>
-          <h1 className="flex items-center gap-2 text-xl font-bold">
-            <MessageCircle className="h-5 w-5" />
-            WhatsApp
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Conversa com contexto operacional.
-          </p>
-        </div>
+    <PageShell>
+      <PageHero
+        eyebrow="WhatsApp"
+        title="WhatsApp"
+        description="Conversa com contexto operacional."
+        actions={
+          <Button variant="outline" onClick={() => navigate(resolveBack(route))}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Voltar
+          </Button>
+        }
+      />
 
-        {/* 🔥 BOTÃO CORRIGIDO */}
-        <Button
-          variant="outline"
-          onClick={() => navigate(resolveBack(route))}
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Voltar
-        </Button>
-      </div>
+      {queryState.hasBackgroundUpdate ? (
+        <SurfaceSection className="border-blue-500/30 bg-blue-500/10 text-sm text-blue-200">
+          Atualizando histórico de mensagens em segundo plano...
+        </SurfaceSection>
+      ) : null}
+
+      {(customerQuery.isError || messagesQuery.isError) && !queryState.shouldBlockForError ? (
+        <SurfaceSection className="border-amber-500/30 bg-amber-500/10 text-sm text-amber-200">
+          {nonBlockingErrorMessage}
+        </SurfaceSection>
+      ) : null}
 
       <div className="flex gap-2">
         {route.chargeId && (
@@ -181,58 +213,71 @@ export default function WhatsAppPage() {
         )}
       </div>
 
-      <div className="rounded-xl border p-4">
-        {messagesQuery.error ? (
-          <div className="space-y-3 text-sm text-red-600">
-            <p>Não foi possível carregar as mensagens.</p>
-            <Button type="button" variant="outline" onClick={() => void messagesQuery.refetch()}>
-              Tentar novamente
-            </Button>
-          </div>
-        ) : messages.length === 0 ? (
-          <div className="space-y-3 text-sm text-muted-foreground">
-            <p>
-              Ainda não há mensagens. Esta conversa será alimentada por contexto
-              de cobrança, execução e acompanhamento.
-            </p>
-            <DemoEnvironmentCta />
-          </div>
+      <SurfaceSection className="space-y-3">
+        <div className="text-sm text-muted-foreground">
+          <strong>{getWhatsAppContextLabel(route.context)}:</strong>{" "}
+          {getWhatsAppContextDescription(route)}
+          {amountLabel ? ` • Valor: ${amountLabel}` : ""}
+          {dueDateLabel ? ` • Vencimento: ${dueDateLabel}` : ""}
+        </div>
+
+        {messages.length === 0 ? (
+          <EmptyState
+            icon={<MessageCircle className="h-7 w-7" />}
+            title="Nenhuma mensagem nesta conversa"
+            description="Inicie uma mensagem para registrar o primeiro contato deste contexto operacional."
+            action={{
+              label: "Atualizar",
+              onClick: () => void messagesQuery.refetch(),
+            }}
+          />
         ) : (
-          messages.map((msg) => <div key={msg.id}>{msg.content}</div>)
+          <div className="space-y-2">
+            {messages.map((msg) => (
+              <div key={msg.id} className="rounded border p-3 text-sm">
+                {msg.content}
+              </div>
+            ))}
+          </div>
         )}
-      </div>
+      </SurfaceSection>
 
-      <Input
-        value={messageInput}
-        onChange={(e) => setMessageInput(e.target.value)}
-      />
+      <SurfaceSection className="space-y-3">
+        <Input
+          value={messageInput}
+          onChange={(e) => setMessageInput(e.target.value)}
+          placeholder="Digite a mensagem"
+        />
 
-      <Button
-        onClick={async () => {
-          try {
-            await sendMutation.mutateAsync({
-              customerId: route.customerId!,
-              content: messageInput.trim(),
-              entityType: getEntityType(route),
-              entityId: getEntityId(route) ?? undefined,
-              messageType: getMessageTypeFromContext(route.context),
-              chargeId: route.chargeId ?? undefined,
-              serviceOrderId: route.serviceOrderId ?? undefined,
-            });
-            await messagesQuery.refetch();
-            setMessageInput("");
-            toast.success("Mensagem enviada");
-          } catch (error) {
-            const message =
-              error instanceof Error ? error.message : "Erro ao enviar mensagem";
-            toast.error(message);
-          }
-        }}
-        disabled={!canSend}
-      >
-        <ArrowRight className="mr-2 h-4 w-4" />
-        {sendMutation.isPending ? "Enviando..." : "Enviar"}
-      </Button>
-    </div>
+        <Button
+          onClick={async () => {
+            try {
+              await sendMutation.mutateAsync({
+                customerId: route.customerId!,
+                content: messageInput.trim(),
+                entityType: getEntityType(route),
+                entityId: getEntityId(route) ?? undefined,
+                messageType: getMessageTypeFromContext(route.context),
+                chargeId: route.chargeId ?? undefined,
+                serviceOrderId: route.serviceOrderId ?? undefined,
+              });
+              await messagesQuery.refetch();
+              setMessageInput("");
+              toast.success("Mensagem enviada");
+            } catch (error) {
+              const message =
+                error instanceof Error ? error.message : "Erro ao enviar mensagem";
+              toast.error(message);
+            }
+          }}
+          disabled={!canSend}
+        >
+          <Send className="mr-2 h-4 w-4" />
+          {sendMutation.isPending ? "Enviando..." : "Enviar"}
+        </Button>
+      </SurfaceSection>
+
+      <DemoEnvironmentCta />
+    </PageShell>
   );
 }

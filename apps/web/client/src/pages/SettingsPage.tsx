@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
-import { normalizeObjectPayload } from "@/lib/query-helpers";
+import { getQueryUiState, normalizeObjectPayload } from "@/lib/query-helpers";
 import { PageHero, PageShell, SurfaceSection } from "@/components/PagePattern";
 import { EmptyState } from "@/components/EmptyState";
 import { Loader2, Settings2 } from "lucide-react";
@@ -96,8 +96,7 @@ export default function SettingsPage() {
   );
 
   const hasError = query.isError;
-  const isInitialLoading = canLoad && query.isLoading && !hasNormalizedSettings;
-  const shouldBlockForError = hasError && !hasNormalizedSettings;
+  const queryState = getQueryUiState([query], hasNormalizedSettings);
 
   const mutation = trpc.nexo.settings.update.useMutation({
     onSuccess: async (res) => {
@@ -162,7 +161,7 @@ export default function SettingsPage() {
     );
   }
 
-  if (isInitialLoading) {
+  if (queryState.isInitialLoading) {
     return (
       <PageShell>
         <PageHero eyebrow="Configurações" title="Configurações" description="Carregando dados da organização." />
@@ -174,7 +173,7 @@ export default function SettingsPage() {
     );
   }
 
-  if (shouldBlockForError) {
+  if (queryState.shouldBlockForError) {
     return (
       <PageShell>
         <PageHero eyebrow="Configurações" title="Configurações" description="Não foi possível carregar as configurações." />
@@ -207,7 +206,13 @@ export default function SettingsPage() {
         </SurfaceSection>
       ) : null}
 
-      {hasError && !shouldBlockForError ? (
+      {queryState.hasBackgroundUpdate ? (
+        <SurfaceSection className="border-blue-500/30 bg-blue-500/10 text-sm text-blue-200">
+          Atualizando configurações em segundo plano...
+        </SurfaceSection>
+      ) : null}
+
+      {hasError && !queryState.shouldBlockForError ? (
         <div className="rounded border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200">
           {query.error?.message ||
             "Houve um problema ao recarregar as configurações."}
