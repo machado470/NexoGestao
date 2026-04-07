@@ -86,6 +86,13 @@ function extractServiceOrder(payload: unknown): ServiceOrder | null {
   return null;
 }
 
+function appendReturnTo(url: string, returnTo: string) {
+  const [pathname, rawQuery = ""] = url.split("?");
+  const params = new URLSearchParams(rawQuery);
+  params.set("returnTo", returnTo);
+  return `${pathname}?${params.toString()}`;
+}
+
 export default function ServiceOrdersPage() {
   const [location, navigate] = useLocation();
   const utils = trpc.useUtils();
@@ -252,7 +259,8 @@ export default function ServiceOrdersPage() {
   }
 
   function openWhatsApp(url: string) {
-    navigate(url);
+    const returnTo = activeId ? `${basePath}?os=${activeId}` : basePath;
+    navigate(appendReturnTo(url, returnTo));
   }
 
   async function refreshAll() {
@@ -322,6 +330,12 @@ export default function ServiceOrdersPage() {
           estável, sem redirecionamento automático.
         </div>
       )}
+      {activeId && !activeOrder && !activeOrderQuery.isLoading ? (
+        <SurfaceSection className="border-amber-500/30 bg-amber-500/10 text-sm text-amber-200">
+          Deep link inválido: a O.S. <strong>{activeId}</strong> não foi encontrada.
+          Revise o link ou volte para a lista.
+        </SurfaceSection>
+      ) : null}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
         <Card className="nexo-kpi-card">
@@ -492,7 +506,9 @@ export default function ServiceOrdersPage() {
                     onClick={() => {
                       const url = buildWhatsAppUrlFromServiceOrder(activeOrder);
                       if (url) {
-                        navigate(url);
+                        navigate(
+                          appendReturnTo(url, `${basePath}?os=${activeOrder.id}`)
+                        );
                       }
                     }}
                   >

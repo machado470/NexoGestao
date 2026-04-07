@@ -13,6 +13,7 @@ export type ParsedWhatsAppRoute = {
   dueDate: string | null;
   chargeId: string | null;
   serviceOrderId: string | null;
+  returnTo: string | null;
 };
 
 export type OperationalContext = {
@@ -46,7 +47,16 @@ type WhatsAppUrlInput = {
   serviceOrderId?: string | null;
   amountCents?: number | null;
   dueDate?: string | null;
+  returnTo?: string | null;
 };
+
+function sanitizeReturnPath(path?: string | null) {
+  if (!path) return null;
+  const normalized = String(path).trim();
+  if (!normalized.startsWith("/")) return null;
+  if (normalized.startsWith("//")) return null;
+  return normalized;
+}
 
 type TimelineEventLike = {
   id?: string | null;
@@ -191,6 +201,7 @@ export function normalizeWhatsAppContext(
 export function parseWhatsAppRoute(location: string): ParsedWhatsAppRoute {
   const params = new URLSearchParams(location.split("?")[1] || "");
   const amountRaw = params.get("amountCents");
+  const returnTo = sanitizeReturnPath(params.get("returnTo"));
 
   return {
     customerId: params.get("customerId"),
@@ -200,6 +211,7 @@ export function parseWhatsAppRoute(location: string): ParsedWhatsAppRoute {
     dueDate: params.get("dueDate"),
     chargeId: params.get("chargeId"),
     serviceOrderId: params.get("serviceOrderId"),
+    returnTo,
   };
 }
 
@@ -318,6 +330,11 @@ export function buildWhatsAppConversationUrl(input: WhatsAppUrlInput) {
 
   if (input.dueDate) {
     params.set("dueDate", String(input.dueDate));
+  }
+
+  const returnTo = sanitizeReturnPath(input.returnTo);
+  if (returnTo) {
+    params.set("returnTo", returnTo);
   }
 
   return `/whatsapp?${params.toString()}`;

@@ -1,6 +1,7 @@
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { buildFinanceChargeUrl } from "@/lib/operations/operations.utils";
+import { toast } from "sonner";
 
 type NavigateFn = (path: string) => void;
 
@@ -56,9 +57,15 @@ export function useChargeActions(options?: UseChargeActionsOptions) {
 
   const payCharge = trpc.finance.charges.pay.useMutation({
     onSuccess: async () => {
+      toast.success("Pagamento registrado com sucesso");
       await Promise.all([
         utils.finance.charges.list.invalidate(),
         utils.finance.charges.stats.invalidate(),
+        utils.dashboard.alerts.invalidate(),
+        utils.dashboard.kpis.invalidate(),
+        utils.dashboard.revenueTrend.invalidate(),
+        utils.dashboard.chargeDistribution.invalidate(),
+        utils.dashboard.serviceOrdersStatus.invalidate(),
         utils.nexo.timeline.listByOrg.invalidate(),
         utils.governance.summary.invalidate(),
         utils.governance.runs.invalidate(),
@@ -67,6 +74,9 @@ export function useChargeActions(options?: UseChargeActionsOptions) {
       ]);
 
       await runRefreshActions();
+    },
+    onError: (error) => {
+      toast.error(error.message || "Não foi possível registrar o pagamento");
     },
   });
 
