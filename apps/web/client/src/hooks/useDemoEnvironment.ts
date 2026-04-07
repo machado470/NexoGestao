@@ -43,9 +43,17 @@ export function useDemoEnvironment() {
 
       return data;
     } catch (error: any) {
-      const message =
-        error?.message || "Falha ao gerar ambiente de demonstração.";
-      toast.error(message);
+      const message = String(
+        error?.message || "Falha ao gerar ambiente de demonstração."
+      );
+      const isConnectivityIssue =
+        message.includes("NEXO_API_URL") ||
+        message.toLowerCase().includes("falha ao conectar");
+      toast.error(
+        isConnectivityIssue
+          ? "Não foi possível acessar a API do demo. Verifique NEXO_API_URL e se o backend está ativo."
+          : message
+      );
       throw error;
     }
   };

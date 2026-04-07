@@ -24,6 +24,13 @@ type FinanceCharge = {
   payments?: Array<{ id?: string | null }>;
 };
 
+type FinancePayment = {
+  id: string;
+  chargeId?: string | null;
+  amountCents?: number;
+  method?: string;
+};
+
 type FinanceStats = {
   paid?: { amountCents?: number };
   pending?: { amountCents?: number };
@@ -77,6 +84,7 @@ export default function FinancesPage() {
   const chargeIdFromUrl = searchParams.get("chargeId") || "";
   const paymentIdFromUrl = searchParams.get("paymentId") || "";
   const isServiceOrderScoped = Boolean(serviceOrderIdFromUrl);
+  const isPaymentScoped = Boolean(paymentIdFromUrl);
 
   const chargesQuery = trpc.finance.charges.list.useQuery(
     {
@@ -95,10 +103,41 @@ export default function FinancesPage() {
     }
   );
 
-  const chargeByIdQuery = trpc.finance.charges.getById.useQuery(
-    { id: chargeIdFromUrl },
+  const paymentByIdQuery = trpc.finance.payments.getById.useQuery(
+    { id: paymentIdFromUrl },
     {
-      enabled: canLoadFinance && Boolean(chargeIdFromUrl),
+      enabled: canLoadFinance && Boolean(paymentIdFromUrl),
+      retry: false,
+    }
+  );
+
+  const paymentById = useMemo(() => {
+    const payload = paymentByIdQuery.data as
+      | FinancePayment
+      | { data?: FinancePayment }
+      | null
+      | undefined;
+    if (!payload) return null;
+    if ("id" in (payload as Record<string, unknown>)) return payload as FinancePayment;
+    if (payload && typeof payload === "object" && "data" in payload) {
+      const data = (payload as { data?: FinancePayment }).data;
+      return data ?? null;
+    }
+    return null;
+  }, [paymentByIdQuery.data]);
+
+  const resolvedChargeIdFromPayment = useMemo(() => {
+    if (!paymentById) return null;
+    const fromPayment = String(paymentById.chargeId ?? "").trim();
+    return fromPayment || null;
+  }, [paymentById]);
+
+  const effectiveChargeId = chargeIdFromUrl || resolvedChargeIdFromPayment || "";
+
+  const chargeByIdQuery = trpc.finance.charges.getById.useQuery(
+    { id: effectiveChargeId },
+    {
+      enabled: canLoadFinance && Boolean(effectiveChargeId),
       retry: false,
     }
   );
@@ -112,8 +151,13 @@ export default function FinancesPage() {
         await chargesQuery.refetch();
       },
       async () => {
-        if (chargeIdFromUrl) {
+        if (effectiveChargeId) {
           await chargeByIdQuery.refetch();
+        }
+      },
+      async () => {
+        if (paymentIdFromUrl) {
+          await paymentByIdQuery.refetch();
         }
       },
     ],
@@ -141,7 +185,7 @@ export default function FinancesPage() {
 
   const visibleCharges = useMemo(() => {
     if (scopedCharge) return [scopedCharge];
-    if (chargeIdFromUrl) return [];
+    if (effectiveChargeId) return [];
     return charges.filter((charge) => {
       if (
         customerIdFromUrl &&
@@ -151,10 +195,22 @@ export default function FinancesPage() {
       }
       return true;
     });
-  }, [charges, chargeIdFromUrl, customerIdFromUrl, scopedCharge]);
+  }, [charges, effectiveChargeId, customerIdFromUrl, scopedCharge]);
 
   const paymentScopedCharge = useMemo(() => {
     if (!paymentIdFromUrl) return null;
+
+    if (resolvedChargeIdFromPayment) {
+      if (scopedCharge && String(scopedCharge.id) === resolvedChargeIdFromPayment) {
+        return scopedCharge;
+      }
+
+      const directMatch = charges.find(
+        (charge) => String(charge.id) === resolvedChargeIdFromPayment
+      );
+      if (directMatch) return directMatch;
+    }
+
     return (
       visibleCharges.find((charge) =>
         (charge.payments ?? []).some(
@@ -162,7 +218,13 @@ export default function FinancesPage() {
         )
       ) ?? null
     );
-  }, [paymentIdFromUrl, visibleCharges]);
+  }, [
+    paymentIdFromUrl,
+    resolvedChargeIdFromPayment,
+    scopedCharge,
+    charges,
+    visibleCharges,
+  ]);
 
   const finalVisibleCharges = useMemo(() => {
     if (paymentScopedCharge) return [paymentScopedCharge];
@@ -182,18 +244,21 @@ export default function FinancesPage() {
   const hasError =
     chargesQuery.isError ||
     (!isServiceOrderScoped && statsQuery.isError) ||
-    chargeByIdQuery.isError;
+    chargeByIdQuery.isError ||
+    paymentByIdQuery.isError;
 
   const errorMessage =
     getErrorMessage(chargesQuery.error, "") ||
     getErrorMessage(statsQuery.error, "") ||
     getErrorMessage(chargeByIdQuery.error, "") ||
+    getErrorMessage(paymentByIdQuery.error, "") ||
     "Erro ao carregar";
 
   const hasAnyActiveLoading =
     chargesQuery.isLoading ||
     (!isServiceOrderScoped && statsQuery.isLoading) ||
-    chargeByIdQuery.isLoading;
+    chargeByIdQuery.isLoading ||
+    paymentByIdQuery.isLoading;
 
   const isInitialLoading = hasAnyActiveLoading && !hasReusableData;
 
@@ -292,16 +357,16 @@ export default function FinancesPage() {
             title={
               chargeIdFromUrl
                 ? "Cobrança não encontrada"
-                : paymentIdFromUrl
+                : isPaymentScoped
                   ? "Pagamento não encontrado"
                   : "Sem cobranças registradas"
             }
             description={
               chargeIdFromUrl
                 ? "A cobrança solicitada não foi localizada neste workspace."
-                : paymentIdFromUrl
-                  ? "O pagamento solicitado não foi localizado nas cobranças visíveis."
-                : "Assim que uma cobrança for criada, o financeiro passa a mostrar pendências, pagamentos e evolução do caixa."
+                : isPaymentScoped
+                  ? "O pagamento solicitado não foi localizado neste workspace."
+                  : "Assim que uma cobrança for criada, o financeiro passa a mostrar pendências, pagamentos e evolução do caixa."
             }
             action={{
               label: "Atualizar dados",
@@ -335,7 +400,17 @@ export default function FinancesPage() {
                       size="sm"
                       variant="outline"
                       disabled={isSubmitting}
-                      onClick={() => void registerPayment(c, "CASH")}
+                      onClick={async () => {
+                        const result = (await registerPayment(c, "CASH")) as
+                          | { paymentId?: string }
+                          | undefined;
+                        const paymentId = String(result?.paymentId ?? "").trim();
+                        const params = new URLSearchParams();
+                        params.set("chargeId", c.id);
+                        if (paymentId) params.set("paymentId", paymentId);
+                        if (customerIdFromUrl) params.set("customerId", customerIdFromUrl);
+                        navigate(`/finances?${params.toString()}`);
+                      }}
                     >
                       Marcar pago
                     </Button>

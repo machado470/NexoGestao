@@ -101,13 +101,22 @@ function toQueryString(input?: Record<string, unknown> | null): string {
 async function nexoFetch(path: string, options: RequestInit = {}) {
   const url = `${NEXO_API_URL}${path}`;
 
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-    },
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...(options.headers || {}),
+      },
+    });
+  } catch (error: any) {
+    const reason = error?.message || "Falha de conexão";
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: `Falha ao conectar no backend Nexo API (${NEXO_API_URL}) para ${path}. Verifique NEXO_API_URL e disponibilidade da API. Motivo: ${reason}`,
+    });
+  }
 
   const text = await response.text();
 
@@ -529,7 +538,17 @@ export const nexoProxyRouter = router({
     bootstrapLive: protectedProcedure
       .input(z.object({}).optional())
       .mutation(async ({ ctx }) => {
-        return authedPost(ctx as CtxLike, "/demo/bootstrap/live");
+        try {
+          return await authedPost(ctx as CtxLike, "/demo/bootstrap/live");
+        } catch (error: any) {
+          if (error instanceof TRPCError) throw error;
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message:
+              error?.message ||
+              `Falha ao iniciar bootstrap live. Verifique NEXO_API_URL (${NEXO_API_URL}) e permissões do usuário.`,
+          });
+        }
       }),
   }),
 

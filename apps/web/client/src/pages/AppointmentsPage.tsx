@@ -895,7 +895,7 @@ export default function AppointmentsPage() {
                           navigate(
                             latestOrder
                               ? buildServiceOrdersDeepLink(latestOrder.id)
-                              : "/service-orders"
+                              : `/service-orders?customerId=${appointment.customerId}&appointmentId=${appointment.id}`
                           )
                         }
                       >

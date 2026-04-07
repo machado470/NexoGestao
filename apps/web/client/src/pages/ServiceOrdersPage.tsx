@@ -103,6 +103,10 @@ export default function ServiceOrdersPage() {
     const query = location.includes("?") ? location.split("?")[1] : "";
     return new URLSearchParams(query).get("customerId");
   }, [location]);
+  const appointmentIdFromUrl = useMemo(() => {
+    const query = location.includes("?") ? location.split("?")[1] : "";
+    return new URLSearchParams(query).get("appointmentId");
+  }, [location]);
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -220,6 +224,11 @@ export default function ServiceOrdersPage() {
       block: "center",
     });
   }, [activeId]);
+
+  useEffect(() => {
+    if (!appointmentIdFromUrl || activeId) return;
+    setIsCreateOpen(true);
+  }, [appointmentIdFromUrl, activeId]);
 
   function openAsActive(id: string) {
     const nextUrl = (() => {
@@ -477,6 +486,8 @@ export default function ServiceOrdersPage() {
         open={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
         onCreated={() => void refreshAll()}
+        initialCustomerId={customerIdFromUrl}
+        appointmentId={appointmentIdFromUrl}
         customers={customers}
         people={people}
       />
