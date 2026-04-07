@@ -139,7 +139,7 @@ export default function GovernancePage() {
       <PageHero
         eyebrow="Governança"
         title="Governança Operacional"
-        description="Painel executivo guiado: score institucional, explicação causal e plano de ação direto por módulo."
+        description="Aqui você prova valor executivo: o que mudou na operação, por que isso protege caixa e qual decisão tomar agora."
         actions={<Button onClick={() => navigate("/dashboard/operations")}>Ver operação</Button>}
       />
 
@@ -152,7 +152,7 @@ export default function GovernancePage() {
               : "border-emerald-200 bg-emerald-50 dark:border-emerald-900/40 dark:bg-emerald-950/20"
         }`}
       >
-        <p className="text-xs uppercase tracking-[0.18em] text-zinc-600 dark:text-zinc-300">Score principal</p>
+        <p className="text-xs uppercase tracking-[0.18em] text-zinc-600 dark:text-zinc-300">Score institucional</p>
         <p className="mt-2 text-5xl font-bold text-zinc-900 dark:text-zinc-100">{institutionalRiskScore}</p>
         <p className="mt-2 text-sm text-zinc-700 dark:text-zinc-300">
           {scoreTone === "critical"
@@ -170,14 +170,14 @@ export default function GovernancePage() {
       </div>
 
       <SurfaceSection className="space-y-2">
-        <h2 className="font-semibold">Por que o score está assim?</h2>
+        <h2 className="font-semibold">O que está acontecendo e por que importa</h2>
         <ul className="list-disc space-y-1 pl-5 text-sm text-zinc-600 dark:text-zinc-300">
           {whyScore.map((item) => <li key={item}>{item}</li>)}
         </ul>
       </SurfaceSection>
 
       <SurfaceSection className="space-y-3">
-        <h2 className="font-semibold">Plano de ação</h2>
+        <h2 className="font-semibold">O que fazer agora</h2>
         <div className="space-y-2">
           {actionPlan.map((item) => (
             <div key={item.id} className="nexo-subtle-surface flex flex-col gap-3 p-3 md:flex-row md:items-center md:justify-between">
@@ -222,6 +222,15 @@ export default function GovernancePage() {
           <DemoEnvironmentCta />
         </SurfaceSection>
       )}
+
+      {runs.length > 1 ? (
+        <SurfaceSection className="space-y-2 border-emerald-200 bg-emerald-50/80 dark:border-emerald-900/40 dark:bg-emerald-950/20">
+          <h2 className="font-semibold">Antes vs agora</h2>
+          <p className="text-sm text-zinc-700 dark:text-zinc-300">
+            Antes: operação desorganizada e decisões reativas. Agora: fluxo completo, cobrança ativa e controle institucional visível no score.
+          </p>
+        </SurfaceSection>
+      ) : null}
 
       {alerts?.total ? (
         <SurfaceSection className="text-sm text-zinc-500 dark:text-zinc-400">

@@ -371,8 +371,8 @@ export default function ServiceOrdersPage() {
     <PageShell>
       <PageHero
         eyebrow="Execução operacional"
-        title="Ordens de Serviço"
-        description="Hub de execução do fluxo comercial: aqui a agenda vira entrega, cobrança e comunicação contextual."
+        title="O que precisa ser executado agora"
+        description="Veja o que está parado na operação, por que isso impacta sua conversão e qual próximo passo deve acontecer agora."
         actions={
           <>
             {activeId && (
@@ -416,7 +416,7 @@ export default function ServiceOrdersPage() {
         <Card className="nexo-kpi-card">
           <CardContent className="p-4">
             <div className="text-xs uppercase tracking-wide text-muted-foreground">
-              Total de O.S.
+              Total em execução
             </div>
             <div className="mt-2 text-2xl font-semibold">{totalOrders}</div>
           </CardContent>
@@ -434,7 +434,7 @@ export default function ServiceOrdersPage() {
         <Card className="nexo-kpi-card">
           <CardContent className="p-4">
             <div className="text-xs uppercase tracking-wide text-muted-foreground">
-              Fila operacional
+              O que precisa andar
             </div>
             <div className="mt-2 text-2xl font-semibold">{totalOperational}</div>
           </CardContent>
@@ -443,7 +443,7 @@ export default function ServiceOrdersPage() {
         <Card className="nexo-kpi-card">
           <CardContent className="p-4">
             <div className="text-xs uppercase tracking-wide text-muted-foreground">
-              Pedindo ação
+              Impacto imediato
             </div>
             <div className="mt-2 text-2xl font-semibold">{totalWithUrgency}</div>
           </CardContent>
@@ -530,8 +530,8 @@ export default function ServiceOrdersPage() {
         <SurfaceSection className="space-y-3">
           <EmptyState
             icon={<BriefcaseBusiness className="h-7 w-7" />}
-            title="Nenhuma ordem encontrada"
-            description="Ainda não há O.S. visíveis. Crie a primeira ordem para transformar agendamento em execução rastreável e cobrança."
+            title="Ainda não há execução ativa"
+            description="Comece criando sua primeira ordem de serviço para sair do planejamento e entrar em entrega com cobrança."
             action={{
               label: "Criar primeira O.S.",
               onClick: () => setIsCreateOpen(true),
