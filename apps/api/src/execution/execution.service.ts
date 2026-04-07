@@ -285,17 +285,23 @@ export class ExecutionService {
     const alreadyDone = existing.status === 'DONE'
     const normalizedNotes = normalizeText(input.notes)
 
-    if (!alreadyDone) {
-      await this.prisma.serviceOrder.updateMany({
-        where: { id: input.executionId, orgId: input.orgId },
-        data: {
-          status: 'DONE',
-          startedAt: existing.startedAt ?? new Date(),
-          finishedAt: new Date(),
-          ...(normalizedNotes ? { outcomeSummary: normalizedNotes } : {}),
-        },
-      })
-    }
+    const completionResult = alreadyDone
+      ? { count: 0 }
+      : await this.prisma.serviceOrder.updateMany({
+          where: {
+            id: input.executionId,
+            orgId: input.orgId,
+            status: { not: 'DONE' },
+          },
+          data: {
+            status: 'DONE',
+            startedAt: existing.startedAt ?? new Date(),
+            finishedAt: new Date(),
+            ...(normalizedNotes ? { outcomeSummary: normalizedNotes } : {}),
+          },
+        })
+
+    const completedNow = !alreadyDone && completionResult.count > 0
 
     const updated = await this.prisma.serviceOrder.findFirst({
       where: { id: input.executionId, orgId: input.orgId },
@@ -320,7 +326,7 @@ export class ExecutionService {
       throw new NotFoundException('Execution não encontrada')
     }
 
-    if (!alreadyDone) {
+    if (completedNow) {
       const requestId = this.requestContext.requestId
       const userId = this.requestContext.userId
       const actorPersonId = updated.assignedToPersonId ?? null
@@ -425,7 +431,7 @@ export class ExecutionService {
       mode: 'service-order-fallback',
       createdAt: updated.createdAt,
       updatedAt: updated.updatedAt,
-      ...(alreadyDone ? { idempotent: true } : {}),
+      ...(!completedNow ? { idempotent: true } : {}),
     }
   }
 }
