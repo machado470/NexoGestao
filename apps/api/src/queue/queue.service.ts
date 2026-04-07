@@ -1,11 +1,11 @@
-import { Inject, Injectable, Logger, OnModuleDestroy } from '@nestjs/common'
+import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common'
 import { Job, JobsOptions, Queue, QueueOptions, QueueEvents } from 'bullmq'
 import IORedis from 'ioredis'
 import { PrismaService } from '../prisma/prisma.service'
 import { QUEUE_CONNECTION, QUEUE_DEFAULT_JOB_OPTIONS, QUEUE_NAMES, QueueName } from './queue.constants'
 
 @Injectable()
-export class QueueService implements OnModuleDestroy {
+export class QueueService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(QueueService.name)
   private readonly queueMap = new Map<QueueName, Queue>()
   private readonly queueEventsMap = new Map<QueueName, QueueEvents>()
@@ -16,6 +16,29 @@ export class QueueService implements OnModuleDestroy {
     private readonly prisma: PrismaService,
   ) {
     this.registerQueues()
+  }
+
+  async onModuleInit() {
+    const maxAttempts = 10
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        await this.connection.connect()
+        const ping = await this.connection.ping()
+        this.logger.log(`Redis conectado (tentativa ${attempt}/${maxAttempts}) ping=${ping}`)
+        this.logger.log(`Queue ativa: ${Object.values(QUEUE_NAMES).join(', ')}`)
+        return
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        this.logger.error(`Falha ao conectar no Redis (tentativa ${attempt}/${maxAttempts}): ${msg}`)
+
+        if (attempt === maxAttempts) {
+          throw new Error(`Não foi possível conectar no Redis após ${maxAttempts} tentativas: ${msg}`)
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, attempt * 500))
+      }
+    }
   }
 
   private registerQueues() {
@@ -105,6 +128,7 @@ export class QueueService implements OnModuleDestroy {
       await queue.close()
     }
 
+    await this.connection.quit()
     this.logger.log('Queues closed')
   }
 }

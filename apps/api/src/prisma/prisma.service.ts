@@ -84,7 +84,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         await this.$connect()
-        this.logger.log(`Prisma conectado (tentativa ${attempt}/${maxAttempts})`)
+        this.logger.log(`DB conectado (Prisma) (tentativa ${attempt}/${maxAttempts})`)
         return
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)

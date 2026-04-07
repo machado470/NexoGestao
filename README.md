@@ -76,3 +76,33 @@ O NexoGestão está em desenvolvimento ativo, com as funcionalidades principais 
 ---
 
 **Última atualização:** 2026-03-05
+
+---
+
+## 🧪 Execução local real (Postgres + Redis)
+
+1. Copie variáveis padrão:
+
+```bash
+cp .env.example .env
+```
+
+2. Inicie stack completa (infra + migrations + seed + API + Web):
+
+```bash
+pnpm dev:full
+```
+
+Esse comando:
+- sobe `postgres:15` e `redis:7` via Docker Compose;
+- aguarda infra ficar pronta;
+- executa migrations e seed;
+- inicia API e Web localmente.
+
+3. Em outro terminal, execute os testes de integração com infra real:
+
+```bash
+pnpm --filter ./apps/api exec jest test/integration --runInBand
+```
+
+Checklist manual completa em `docs/REAL_VALIDATION_CHECKLIST.md`.
