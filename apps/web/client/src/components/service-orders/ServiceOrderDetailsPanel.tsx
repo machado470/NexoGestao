@@ -97,11 +97,21 @@ function isValidId(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
 
+function withReturnTo(url: string, returnTo: string) {
+  const [pathname, rawQuery = ""] = url.split("?");
+  const params = new URLSearchParams(rawQuery);
+  params.set("returnTo", returnTo);
+  return `${pathname}?${params.toString()}`;
+}
+
 export default function ServiceOrderDetailsPanel({ os }: { os: ServiceOrder }) {
   const [location, navigate] = useLocation();
   const utils = trpc.useUtils();
 
   const whatsappUrl = buildWhatsAppUrlFromServiceOrder(os);
+  const whatsappUrlWithReturn = whatsappUrl
+    ? withReturnTo(whatsappUrl, `/service-orders?os=${os.id}`)
+    : null;
 
   const timelineQuery = trpc.nexo.timeline.listByServiceOrder.useQuery(
     { serviceOrderId: os.id, limit: 20 },
@@ -270,9 +280,9 @@ export default function ServiceOrderDetailsPanel({ os }: { os: ServiceOrder }) {
                 size="sm"
                 variant="outline"
                 onClick={() => {
-                  if (whatsappUrl) navigate(whatsappUrl);
+                  if (whatsappUrlWithReturn) navigate(whatsappUrlWithReturn);
                 }}
-                disabled={!whatsappUrl}
+                disabled={!whatsappUrlWithReturn}
               >
                 <MessageCircle className="mr-2 h-4 w-4" />
                 WhatsApp
@@ -450,8 +460,12 @@ export default function ServiceOrderDetailsPanel({ os }: { os: ServiceOrder }) {
                       <Button
                         variant="outline"
                         onClick={async () => {
-                          await registerPayment(charge, "CASH");
-                          await timelineQuery.refetch();
+                          try {
+                            await registerPayment(charge, "CASH");
+                            await timelineQuery.refetch();
+                          } catch {
+                            // toast already handled by shared hook
+                          }
                         }}
                         disabled={isSubmitting}
                       >
@@ -463,9 +477,9 @@ export default function ServiceOrderDetailsPanel({ os }: { os: ServiceOrder }) {
                   <Button
                     variant="outline"
                     onClick={() => {
-                      if (whatsappUrl) navigate(whatsappUrl);
+                      if (whatsappUrlWithReturn) navigate(whatsappUrlWithReturn);
                     }}
-                    disabled={!whatsappUrl}
+                    disabled={!whatsappUrlWithReturn}
                   >
                     <MessageCircle className="mr-2 h-4 w-4" />
                     {chargeIsPaid ? "Falar com cliente" : "Cobrar no WhatsApp"}

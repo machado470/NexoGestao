@@ -374,15 +374,21 @@ export default function FinancesPage() {
                       variant="outline"
                       disabled={isSubmitting}
                       onClick={async () => {
-                        const result = (await registerPayment(c, "CASH")) as
-                          | { paymentId?: string }
-                          | undefined;
-                        const paymentId = String(result?.paymentId ?? "").trim();
-                        const params = new URLSearchParams();
-                        params.set("chargeId", c.id);
-                        if (paymentId) params.set("paymentId", paymentId);
-                        if (customerIdFromUrl) params.set("customerId", customerIdFromUrl);
-                        navigate(`/finances?${params.toString()}`);
+                        try {
+                          const result = (await registerPayment(c, "CASH")) as
+                            | { paymentId?: string }
+                            | undefined;
+                          const paymentId = String(result?.paymentId ?? "").trim();
+                          const params = new URLSearchParams();
+                          params.set("chargeId", c.id);
+                          if (paymentId) params.set("paymentId", paymentId);
+                          if (customerIdFromUrl) {
+                            params.set("customerId", customerIdFromUrl);
+                          }
+                          navigate(`/finances?${params.toString()}`);
+                        } catch {
+                          // feedback handled in useChargeActions
+                        }
                       }}
                     >
                       Marcar pago

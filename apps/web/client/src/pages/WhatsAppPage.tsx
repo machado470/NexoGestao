@@ -44,6 +44,10 @@ function getEntityId(route: ReturnType<typeof parseWhatsAppRoute>) {
 }
 
 function resolveBack(route: ReturnType<typeof parseWhatsAppRoute>) {
+  if (route.returnTo) {
+    return route.returnTo;
+  }
+
   if (route.serviceOrderId) {
     return buildServiceOrdersDeepLink(route.serviceOrderId, "operations");
   }
@@ -79,6 +83,7 @@ export default function WhatsAppPage() {
   const sendMutation = trpc.nexo.whatsapp.send.useMutation();
 
   const customer = customerQuery.data?.data || customerQuery.data;
+  const hasCustomer = Boolean(customer && typeof customer === "object");
 
   useEffect(() => {
     if (!customer || messageInput) return;
@@ -97,6 +102,7 @@ export default function WhatsAppPage() {
 
   const canSend =
     Boolean(route.customerId) &&
+    hasCustomer &&
     messageInput.trim().length > 0 &&
     !sendMutation.isPending;
 
@@ -189,6 +195,20 @@ export default function WhatsAppPage() {
         </SurfaceSection>
       ) : null}
 
+      {!hasCustomer ? (
+        <SurfaceSection>
+          <EmptyState
+            icon={<MessageCircle className="h-7 w-7" />}
+            title="Cliente não encontrado"
+            description="O contexto de WhatsApp não encontrou um cliente válido para este link."
+            action={{
+              label: "Voltar",
+              onClick: () => navigate(resolveBack(route)),
+            }}
+          />
+        </SurfaceSection>
+      ) : null}
+
       <div className="flex gap-2">
         {route.chargeId && (
           <Button
@@ -251,6 +271,11 @@ export default function WhatsAppPage() {
 
         <Button
           onClick={async () => {
+            if (!hasCustomer) {
+              toast.error("Cliente inválido para envio de mensagem");
+              return;
+            }
+
             try {
               await sendMutation.mutateAsync({
                 customerId: route.customerId!,
