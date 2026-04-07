@@ -11,6 +11,7 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
   private readonly queueEventsMap = new Map<QueueName, QueueEvents>()
   private connectionInitPromise?: Promise<void>
   private hasLoggedAlreadyConnecting = false
+  private redisEnabled = true
 
   constructor(
     @Inject(QUEUE_CONNECTION)
@@ -21,8 +22,15 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleInit() {
-    await this.ensureRedisReady()
-    this.logger.log(`Queue ativa: ${Object.values(QUEUE_NAMES).join(', ')}`)
+    try {
+      await this.ensureRedisReady()
+      this.logger.log(`Queue ativa: ${Object.values(QUEUE_NAMES).join(', ')}`)
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error)
+      this.redisEnabled = false
+      this.logger.error(`Redis indisponível no bootstrap da fila: ${msg}`)
+      this.logger.warn('Fila em modo degradado (sem Redis): jobs serão ignorados em ambiente local.')
+    }
   }
 
   private async ensureRedisReady() {
@@ -148,11 +156,36 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
     payload: T,
     options?: JobsOptions,
   ): Promise<Job<T>> {
+    if (!this.redisEnabled) {
+      this.logger.warn(
+        `Redis indisponível: job descartado (${queueName}:${name}). Retornando job simulado.`,
+      )
+
+      const simulatedId = `simulated-${Date.now()}-${Math.random().toString(16).slice(2)}`
+      return {
+        id: simulatedId,
+        name,
+        data: payload,
+        opts: {
+          ...QUEUE_DEFAULT_JOB_OPTIONS,
+          ...options,
+        },
+      } as Job<T>
+    }
+
     const queue = this.getQueue(queueName)
-    const job = await queue.add(name, payload, {
-      ...QUEUE_DEFAULT_JOB_OPTIONS,
-      ...options,
-    })
+    let job: Job<T>
+
+    try {
+      job = await queue.add(name, payload, {
+        ...QUEUE_DEFAULT_JOB_OPTIONS,
+        ...options,
+      })
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error)
+      this.logger.error(`Falha ao enfileirar job (${queueName}:${name}): ${msg}`)
+      throw error
+    }
 
     // await this.prisma.queueJob.create({
     //   data: {
@@ -184,6 +217,13 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
   }
 
   async getQueueStatus() {
+    if (!this.redisEnabled) {
+      return {
+        redisEnabled: false,
+        reason: 'Redis indisponível no ambiente local',
+      }
+    }
+
     const result: Record<string, any> = {}
 
     for (const queueName of Object.values(QUEUE_NAMES)) {
@@ -203,16 +243,28 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleDestroy() {
     for (const events of this.queueEventsMap.values()) {
-      await events.close()
+      try {
+        await events.close()
+      } catch {
+        // noop (modo degradado pode não abrir conexões)
+      }
     }
     for (const queue of this.queueMap.values()) {
-      await queue.close()
+      try {
+        await queue.close()
+      } catch {
+        // noop (modo degradado pode não abrir conexões)
+      }
     }
 
-    if (this.connection.status === 'connecting' || this.connection.status === 'reconnecting') {
-      await this.connection.disconnect(false)
-    } else if (this.connection.status !== 'end') {
-      await this.connection.quit()
+    try {
+      if (this.connection.status === 'connecting' || this.connection.status === 'reconnecting') {
+        await this.connection.disconnect(false)
+      } else if (this.connection.status !== 'end') {
+        await this.connection.quit()
+      }
+    } catch {
+      // noop
     }
 
     this.logger.log('Queues closed')
