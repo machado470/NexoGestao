@@ -378,7 +378,7 @@ export default function Dashboard() {
             id: order.id,
             title: order.title ?? "Ordem sem título",
             subtitle: order.customer?.name ?? "Cliente não identificado",
-            onClick: () => navigate(`/service-orders?id=${order.id}`),
+            onClick: () => navigate(`/service-orders?os=${order.id}`),
           }))}
         />
 
@@ -393,7 +393,7 @@ export default function Dashboard() {
             subtitle: "Cobrança vinculada à operação",
             value: formatCurrency(charge.amountCents),
             onClick: () =>
-              navigate(`/service-orders?id=${charge.serviceOrderId}`),
+              navigate(`/service-orders?os=${charge.serviceOrderId}`),
           }))}
         />
 
@@ -406,7 +406,7 @@ export default function Dashboard() {
             id: order.id,
             title: order.title ?? "Ordem sem título",
             subtitle: order.customer?.name ?? "Cliente não identificado",
-            onClick: () => navigate(`/service-orders?id=${order.id}`),
+            onClick: () => navigate(`/service-orders?os=${order.id}`),
           }))}
         />
       </section>

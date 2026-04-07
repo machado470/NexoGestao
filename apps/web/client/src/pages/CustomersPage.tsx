@@ -76,7 +76,7 @@ type ServiceOrder = {
 
 type Charge = {
   id: string;
-  amount?: number;
+  amountCents?: number;
   status?: string;
   dueDate?: string | null;
   createdAt?: string;
@@ -140,7 +140,7 @@ function formatCurrency(value?: number) {
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL",
-  }).format(value);
+  }).format(value / 100);
 }
 
 function getCustomerIdFromUrl() {
@@ -180,7 +180,22 @@ function normalizeWorkspacePayload(payload: unknown): CustomerWorkspace | null {
     customer: customer as Customer,
     appointments: Array.isArray(raw.appointments) ? raw.appointments : [],
     serviceOrders: Array.isArray(raw.serviceOrders) ? raw.serviceOrders : [],
-    charges: Array.isArray(raw.charges) ? raw.charges : [],
+    charges: Array.isArray(raw.charges)
+      ? raw.charges.map((item: unknown) => {
+          const charge = (item ?? {}) as Record<string, unknown>;
+          const amountCentsRaw =
+            typeof charge.amountCents === "number"
+              ? charge.amountCents
+              : typeof charge.amount === "number"
+                ? charge.amount
+                : undefined;
+
+          return {
+            ...charge,
+            amountCents: amountCentsRaw,
+          } as Charge;
+        })
+      : [],
     timeline: Array.isArray(raw.timeline) ? raw.timeline : [],
   };
 }
@@ -636,7 +651,11 @@ export default function CustomersPage() {
                           type="button"
                           variant="outline"
                           size="sm"
-                          onClick={() => navigate("/appointments")}
+                          onClick={() =>
+                            navigate(
+                              `/appointments?customerId=${workspace.customer.id}`
+                            )
+                          }
                           className="gap-2"
                         >
                           <CalendarDays className="h-4 w-4" />
@@ -647,7 +666,11 @@ export default function CustomersPage() {
                           type="button"
                           variant="outline"
                           size="sm"
-                          onClick={() => navigate("/service-orders")}
+                          onClick={() =>
+                            navigate(
+                              `/service-orders?customerId=${workspace.customer.id}`
+                            )
+                          }
                           className="gap-2"
                         >
                           <Briefcase className="h-4 w-4" />
@@ -658,7 +681,9 @@ export default function CustomersPage() {
                           type="button"
                           variant="outline"
                           size="sm"
-                          onClick={() => navigate("/finances")}
+                          onClick={() =>
+                            navigate(`/finances?customerId=${workspace.customer.id}`)
+                          }
                           className="gap-2"
                         >
                           <Wallet className="h-4 w-4" />
@@ -849,7 +874,7 @@ export default function CustomersPage() {
                         <div className="flex items-center justify-between gap-3">
                           <div className="min-w-0">
                             <p className="text-sm font-medium text-gray-900 dark:text-white">
-                              {formatCurrency(item.amount)}
+                              {formatCurrency(item.amountCents)}
                             </p>
                             <p className="mt-1">
                               <span

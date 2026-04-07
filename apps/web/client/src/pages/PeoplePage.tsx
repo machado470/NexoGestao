@@ -1,7 +1,7 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/contexts/AuthContext";
-import { Loader2, Users, Plus } from "lucide-react";
+import { Loader2, Users, Plus, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHero, PageShell, SurfaceSection } from "@/components/PagePattern";
 import { EmptyState } from "@/components/EmptyState";
@@ -9,6 +9,8 @@ import {
   normalizeArrayPayload,
   normalizeObjectPayload,
 } from "@/lib/query-helpers";
+import CreatePersonModal from "@/components/CreatePersonModal";
+import EditPersonModal from "@/components/EditPersonModal";
 
 /* ================= TYPES ================= */
 
@@ -55,6 +57,8 @@ function getStateLabel(value?: string | null) {
 /* ================= PAGE ================= */
 
 export default function PeoplePage() {
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [editingPersonId, setEditingPersonId] = useState<string | null>(null);
   const { isAuthenticated, isInitializing } = useAuth();
   const canLoadPeople = isAuthenticated;
 
@@ -170,7 +174,7 @@ export default function PeoplePage() {
       ) : null}
 
       <div className="flex justify-end">
-        <Button type="button" className="gap-2">
+        <Button type="button" className="gap-2" onClick={() => setIsCreateOpen(true)}>
           <Plus className="h-4 w-4" />
           Nova pessoa
         </Button>
@@ -196,14 +200,49 @@ export default function PeoplePage() {
         <div className="space-y-2">
           {people.map((p) => (
             <div key={p.id} className="nexo-surface p-4">
-              <div className="font-medium">{p.name}</div>
-              <div className="text-sm text-gray-500">
-                {getStateLabel(p.operationalState)}
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="font-medium">{p.name}</div>
+                  <div className="text-sm text-gray-500">
+                    {getStateLabel(p.operationalState)}
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="gap-2"
+                  onClick={() => setEditingPersonId(p.id)}
+                >
+                  <Pencil className="h-4 w-4" />
+                  Editar
+                </Button>
               </div>
             </div>
           ))}
         </div>
       )}
+
+      <CreatePersonModal
+        open={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+        onSaved={() => {
+          void listPeople.refetch();
+          void statsLinked.refetch();
+          void serviceOrdersQuery.refetch();
+        }}
+      />
+
+      <EditPersonModal
+        open={Boolean(editingPersonId)}
+        personId={editingPersonId ?? undefined}
+        onClose={() => setEditingPersonId(null)}
+        onSaved={() => {
+          void listPeople.refetch();
+          void statsLinked.refetch();
+          void serviceOrdersQuery.refetch();
+        }}
+      />
     </PageShell>
   );
 }

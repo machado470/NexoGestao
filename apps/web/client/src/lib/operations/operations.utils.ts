@@ -120,7 +120,7 @@ export function buildCustomersDeepLink(customerId?: string | null) {
 
 export function buildAppointmentsDeepLink(appointmentId?: string | null) {
   if (!appointmentId) return "/appointments";
-  return `/appointments?id=${appointmentId}`;
+  return `/appointments?appointmentId=${appointmentId}`;
 }
 
 export function buildTimelineDeepLink(customerId?: string | null) {

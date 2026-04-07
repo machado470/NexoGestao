@@ -36,7 +36,6 @@ import ReferralsPage from "./pages/ReferralsPage";
 import CalendarPage from "./pages/CalendarPage";
 import SettingsPage from "./pages/SettingsPage";
 import TimelinePage from "./pages/TimelinePage";
-import OperationalWorkflowPage from "./pages/OperationalWorkflowPage";
 import OperationsDashboardPage from "./pages/OperationsDashboardPage";
 
 const Landing = lazy(() => import("./pages/Landing"));
@@ -359,13 +358,22 @@ const TimelineRoute = protectedPage(TimelinePage, {
   requireCompletedOnboarding: true,
 });
 
-const OperationsRoute = protectedPage(OperationalWorkflowPage, {
-  requireCompletedOnboarding: true,
-});
-
 const OperationsDashboardRoute = protectedPage(OperationsDashboardPage, {
   requireCompletedOnboarding: true,
 });
+
+function OperationsRedirectRoute() {
+  const [location, navigate] = useLocation();
+
+  useEffect(() => {
+    const query = location.includes("?") ? location.slice(location.indexOf("?")) : "";
+    navigate(`/service-orders${query}`, { replace: true });
+  }, [location, navigate]);
+
+  return (
+    <RedirectingScreen message="Fluxo operacional consolidado em Ordens de Serviço. Redirecionando..." />
+  );
+}
 
 function Router() {
   return (
@@ -414,7 +422,7 @@ function Router() {
       <Route path="/calendar" component={CalendarRoute} />
       <Route path="/settings" component={SettingsRoute} />
       <Route path="/timeline" component={TimelineRoute} />
-      <Route path="/operations" component={OperationsRoute} />
+      <Route path="/operations" component={OperationsRedirectRoute} />
       <Route
         path="/dashboard/operations"
         component={OperationsDashboardRoute}
