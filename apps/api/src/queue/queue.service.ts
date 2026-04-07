@@ -9,6 +9,8 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(QueueService.name)
   private readonly queueMap = new Map<QueueName, Queue>()
   private readonly queueEventsMap = new Map<QueueName, QueueEvents>()
+  private connectionInitPromise?: Promise<void>
+  private hasLoggedAlreadyConnecting = false
 
   constructor(
     @Inject(QUEUE_CONNECTION)
@@ -19,17 +21,63 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleInit() {
+    await this.ensureRedisReady()
+    this.logger.log(`Queue ativa: ${Object.values(QUEUE_NAMES).join(', ')}`)
+  }
+
+  private async ensureRedisReady() {
+    if (this.connectionInitPromise) {
+      return this.connectionInitPromise
+    }
+
+    this.connectionInitPromise = this.ensureRedisReadyInternal()
+
+    try {
+      await this.connectionInitPromise
+    } catch (error) {
+      this.connectionInitPromise = undefined
+      throw error
+    }
+  }
+
+  private async ensureRedisReadyInternal() {
+    const status = this.connection.status
+
+    if (status === 'ready' || status === 'connect') {
+      return
+    }
+
+    if (status === 'connecting' || status === 'reconnecting') {
+      if (!this.hasLoggedAlreadyConnecting) {
+        this.hasLoggedAlreadyConnecting = true
+        this.logger.debug(`Redis já está ${status}; aguardando estado ready`)
+      }
+      await this.waitForReady()
+      return
+    }
+
     const maxAttempts = 10
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         await this.connection.connect()
+        await this.waitForReady()
         const ping = await this.connection.ping()
         this.logger.log(`Redis conectado (tentativa ${attempt}/${maxAttempts}) ping=${ping}`)
-        this.logger.log(`Queue ativa: ${Object.values(QUEUE_NAMES).join(', ')}`)
         return
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
+        const isAlreadyConnecting = msg.includes('already connecting') || msg.includes('already connected')
+
+        if (isAlreadyConnecting) {
+          if (!this.hasLoggedAlreadyConnecting) {
+            this.hasLoggedAlreadyConnecting = true
+            this.logger.debug(`Redis já está em conexão ativa (${msg}); aguardando estado ready`)
+          }
+          await this.waitForReady()
+          return
+        }
+
         this.logger.error(`Falha ao conectar no Redis (tentativa ${attempt}/${maxAttempts}): ${msg}`)
 
         if (attempt === maxAttempts) {
@@ -39,6 +87,39 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
         await new Promise((resolve) => setTimeout(resolve, attempt * 500))
       }
     }
+  }
+
+  private waitForReady() {
+    if (this.connection.status === 'ready' || this.connection.status === 'connect') {
+      return Promise.resolve()
+    }
+
+    return new Promise<void>((resolve, reject) => {
+      const cleanup = () => {
+        this.connection.off('ready', onReady)
+        this.connection.off('error', onError)
+        this.connection.off('end', onEnd)
+      }
+
+      const onReady = () => {
+        cleanup()
+        resolve()
+      }
+
+      const onError = (error: unknown) => {
+        cleanup()
+        reject(error)
+      }
+
+      const onEnd = () => {
+        cleanup()
+        reject(new Error('Conexão Redis finalizada antes de ficar ready'))
+      }
+
+      this.connection.once('ready', onReady)
+      this.connection.once('error', onError)
+      this.connection.once('end', onEnd)
+    })
   }
 
   private registerQueues() {
@@ -128,7 +209,12 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
       await queue.close()
     }
 
-    await this.connection.quit()
+    if (this.connection.status === 'connecting' || this.connection.status === 'reconnecting') {
+      await this.connection.disconnect(false)
+    } else if (this.connection.status !== 'end') {
+      await this.connection.quit()
+    }
+
     this.logger.log('Queues closed')
   }
 }
