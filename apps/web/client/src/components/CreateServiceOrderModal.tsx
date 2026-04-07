@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,8 @@ type Props = {
   onSuccess?: () => void;
   customers: Array<{ id: string; name: string }>;
   people: Array<{ id: string; name: string }>;
+  initialCustomerId?: string | null;
+  appointmentId?: string | null;
 };
 
 type FormState = {
@@ -124,13 +126,21 @@ export default function CreateServiceOrderModal({
   onSuccess,
   customers,
   people,
+  initialCustomerId,
+  appointmentId,
 }: Props) {
   const resolvedOpen = open ?? isOpen ?? false;
-  const [formData, setFormData] = useState<FormState>(INITIAL_FORM);
+  const [formData, setFormData] = useState<FormState>({
+    ...INITIAL_FORM,
+    customerId: initialCustomerId ? String(initialCustomerId) : "",
+  });
 
   const createMutation = trpc.nexo.serviceOrders.create.useMutation({
     onSuccess: () => {
-      setFormData(INITIAL_FORM);
+      setFormData({
+        ...INITIAL_FORM,
+        customerId: initialCustomerId ? String(initialCustomerId) : "",
+      });
       onCreated?.();
       onSuccess?.();
       onClose();
@@ -169,9 +179,20 @@ export default function CreateServiceOrderModal({
 
   const handleClose = () => {
     if (createMutation.isPending) return;
-    setFormData(INITIAL_FORM);
+    setFormData({
+      ...INITIAL_FORM,
+      customerId: initialCustomerId ? String(initialCustomerId) : "",
+    });
     onClose();
   };
+
+  useEffect(() => {
+    if (!resolvedOpen) return;
+    setFormData((current) => ({
+      ...current,
+      customerId: current.customerId || (initialCustomerId ? String(initialCustomerId) : ""),
+    }));
+  }, [initialCustomerId, resolvedOpen]);
 
   const submit = async () => {
     const priority = Number(formData.priority);
@@ -207,6 +228,7 @@ export default function CreateServiceOrderModal({
 
     await createMutation.mutateAsync({
       customerId: parsed.data.customerId,
+      appointmentId: appointmentId ? String(appointmentId) : undefined,
       assignedToPersonId: parsed.data.assignedToPersonId || undefined,
       title: parsed.data.title,
       description: parsed.data.description || undefined,

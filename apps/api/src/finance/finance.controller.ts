@@ -95,6 +95,13 @@ export class FinanceController {
     return { ok: true, data }
   }
 
+  @Get('payments/:id')
+  @Roles('ADMIN', 'MANAGER')
+  async getPayment(@Org() orgId: string, @Param('id') id: string) {
+    const data = await this.finance.getPayment(orgId, id)
+    return { ok: true, data }
+  }
+
   @Post('charges')
   @Roles('ADMIN', 'MANAGER')
   async createCharge(

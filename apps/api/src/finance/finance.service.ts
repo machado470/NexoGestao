@@ -120,6 +120,20 @@ export class FinanceService {
     return charge
   }
 
+  async getPayment(orgId: string, id: string) {
+    const payment = await this.prisma.payment.findFirst({
+      where: { id, orgId },
+      include: {
+        charge: {
+          include: { customer: true },
+        },
+      },
+    })
+
+    if (!payment) throw new NotFoundException('Pagamento não encontrado')
+    return payment
+  }
+
   // =========================
   // CREATE
   // =========================

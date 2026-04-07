@@ -60,6 +60,10 @@ export function useChargeActions(options?: UseChargeActionsOptions) {
         utils.finance.charges.list.invalidate(),
         utils.finance.charges.stats.invalidate(),
         utils.nexo.timeline.listByOrg.invalidate(),
+        utils.governance.summary.invalidate(),
+        utils.governance.runs.invalidate(),
+        utils.governance.autoScore.invalidate(),
+        utils.nexo.whatsapp.messages.invalidate(),
       ]);
 
       await runRefreshActions();
@@ -67,7 +71,7 @@ export function useChargeActions(options?: UseChargeActionsOptions) {
   });
 
   const registerPayment = async (charge: ChargeLike, method: PaymentMethod) => {
-    await payCharge.mutateAsync({
+    return await payCharge.mutateAsync({
       chargeId: charge.id,
       method,
       amountCents: charge.amountCents,

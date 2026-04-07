@@ -21,6 +21,22 @@ const wrappedListSchema = z.object({
 });
 
 export const financeRouter = router({
+  payments: router({
+    getById: protectedProcedure
+      .input(
+        z.object({
+          id: z.union([z.string(), z.number()]).transform((v) => String(v)),
+        })
+      )
+      .query(async ({ input, ctx }) => {
+        const raw = await nexoFetch<unknown>(ctx, `/finance/payments/${input.id}`, {
+          method: "GET",
+        });
+
+        return wrappedDataSchema.parse(raw).data;
+      }),
+  }),
+
   charges: router({
     create: protectedProcedure
       .input(
