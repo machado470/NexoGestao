@@ -29,7 +29,7 @@ export const financeRouter = router({
           throw new Error("Valor da cobrança é obrigatório e deve ser maior que 0");
         }
 
-        const res = await nexoFetch<any>(ctx.req, `/finance/charges`, {
+        const res = await nexoFetch<any>(ctx, `/finance/charges`, {
           method: "POST",
           body: JSON.stringify({
             customerId: input.customerId,
@@ -65,7 +65,7 @@ export const financeRouter = router({
         if (input?.serviceOrderId) params.set("serviceOrderId", input.serviceOrderId);
 
         const raw = await nexoFetch<any>(
-          ctx.req,
+          ctx,
           `/finance/charges?${params.toString()}`,
           { method: "GET" }
         );
@@ -90,7 +90,7 @@ export const financeRouter = router({
         })
       )
       .query(async ({ input, ctx }) => {
-        const raw = await nexoFetch<any>(ctx.req, `/finance/charges/${input.id}`, {
+        const raw = await nexoFetch<any>(ctx, `/finance/charges/${input.id}`, {
           method: "GET",
         });
 
@@ -115,7 +115,7 @@ export const financeRouter = router({
           amountCentsInput ??
           (amount ? Math.round(amount * 100) : undefined);
 
-        const raw = await nexoFetch<any>(ctx.req, `/finance/charges/${id}`, {
+        const raw = await nexoFetch<any>(ctx, `/finance/charges/${id}`, {
           method: "PATCH",
           body: JSON.stringify({
             ...rest,
@@ -134,7 +134,7 @@ export const financeRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
-        const raw = await nexoFetch<any>(ctx.req, `/finance/charges/${input.id}`, {
+        const raw = await nexoFetch<any>(ctx, `/finance/charges/${input.id}`, {
           method: "DELETE",
         });
 
@@ -144,7 +144,7 @@ export const financeRouter = router({
     stats: protectedProcedure
       .input(z.object({}).optional())
       .query(async ({ ctx }) => {
-        const raw = await nexoFetch<any>(ctx.req, `/finance/charges/stats`, {
+        const raw = await nexoFetch<any>(ctx, `/finance/charges/stats`, {
           method: "GET",
         });
 
@@ -152,7 +152,7 @@ export const financeRouter = router({
       }),
 
     revenueByMonth: protectedProcedure.query(async ({ ctx }) => {
-      const raw = await nexoFetch<any>(ctx.req, `/finance/charges/revenue-by-month`, {
+      const raw = await nexoFetch<any>(ctx, `/finance/charges/revenue-by-month`, {
         method: "GET",
       });
 
@@ -169,7 +169,7 @@ export const financeRouter = router({
       )
       .mutation(async ({ input, ctx }) => {
         const raw = await nexoFetch<any>(
-          ctx.req,
+          ctx,
           `/finance/charges/${input.chargeId}/pay`,
           {
             method: "POST",

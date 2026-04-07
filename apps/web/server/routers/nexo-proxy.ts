@@ -1,4 +1,5 @@
 import { publicProcedure, protectedProcedure, router } from "../_core/trpc";
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import cookie from "cookie";
 import { getSessionCookieOptions } from "../_core/cookies";
@@ -20,17 +21,27 @@ function getTokenFromCookie(ctx: CtxLike): string | null {
   return typeof token === "string" && token.trim().length > 0 ? token : null;
 }
 
-function getAuthHeader(ctx: CtxLike): string {
+function getAuthHeader(ctx: CtxLike & { user?: { token?: string } | null }): string {
+  const userToken = ctx?.user?.token;
+  if (typeof userToken === "string" && userToken.trim()) {
+    return `Bearer ${userToken.trim()}`;
+  }
+
   const header = ctx?.req?.headers?.authorization;
 
   if (typeof header === "string" && header.trim().length > 0) {
     return header;
   }
 
-  const token = getTokenFromCookie(ctx);
+  const cookieToken =
+    typeof ctx?.req?.cookies?.[NEXO_TOKEN_COOKIE] === "string"
+      ? ctx.req.cookies[NEXO_TOKEN_COOKIE].trim()
+      : "";
+
+  const token = cookieToken || getTokenFromCookie(ctx);
 
   if (!token) {
-    throw new Error("Não autenticado");
+    throw new TRPCError({ code: "UNAUTHORIZED", message: "Não autenticado" });
   }
 
   return `Bearer ${token}`;
@@ -115,7 +126,25 @@ async function nexoFetch(path: string, options: RequestInit = {}) {
       text ||
       `API error: ${response.status}`;
 
-    throw new Error(String(message));
+    const normalizedMessage = String(message);
+
+    if (response.status === 401) {
+      throw new TRPCError({ code: "UNAUTHORIZED", message: normalizedMessage });
+    }
+
+    if (response.status === 403) {
+      throw new TRPCError({ code: "FORBIDDEN", message: normalizedMessage });
+    }
+
+    if (response.status === 404) {
+      throw new TRPCError({ code: "NOT_FOUND", message: normalizedMessage });
+    }
+
+    if (response.status === 400) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: normalizedMessage });
+    }
+
+    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: normalizedMessage });
   }
 
   return body;
