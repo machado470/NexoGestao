@@ -7,7 +7,7 @@ import { ApiResponseInterceptor } from './common/http/api-response.interceptor'
 
 function parseCorsOrigins(raw?: string): string[] {
   const v = (raw ?? '').trim()
-  if (!v) return ['http://localhost:3001', 'http://127.0.0.1:3001']
+  if (!v) return ['http://localhost:3010', 'http://127.0.0.1:3010']
 
   return v
     .split(',')
@@ -51,18 +51,27 @@ async function bootstrap() {
       exposedHeaders: ['X-RateLimit-Limit', 'X-RateLimit-Remaining'],
     })
 
-    const portRaw = process.env.API_PORT || process.env.PORT || '3001'
-    const port = Number(portRaw) || 3001
+    const portRaw = process.env.API_PORT || process.env.PORT || '3000'
+    const port = Number(portRaw) || 3000
 
     await app.listen(port, '0.0.0.0')
 
     logger.log(`API online na porta ${port}`)
+    logger.log(`API_PORT=${process.env.API_PORT || 'não definido'} | PORT=${process.env.PORT || 'não definido'}`)
     logger.log(`CORS_ORIGINS: ${origins.join(', ')}`)
     logger.log(`NODE_ENV: ${process.env.NODE_ENV || 'development'}`)
   } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    const stack = err instanceof Error ? err.stack : 'Sem stack disponível'
+
     logger.error('Erro fatal no bootstrap')
-    logger.error(err instanceof Error ? err.message : String(err))
-    logger.error(err instanceof Error ? err.stack : 'Sem stack disponível')
+    logger.error(message)
+    if ((err as NodeJS.ErrnoException | undefined)?.code === 'EADDRINUSE') {
+      logger.error(
+        'Conflito de porta detectado (EADDRINUSE). Verifique API_PORT/PORT e processos ativos.',
+      )
+    }
+    logger.error(stack)
     throw err
   }
 }

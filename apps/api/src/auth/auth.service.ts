@@ -238,7 +238,7 @@ export class AuthService {
     expiresAt.setHours(expiresAt.getHours() + 1)
 
     const frontendUrl =
-      this.config.get<string>('FRONTEND_URL') || 'http://localhost:3001'
+      this.config.get<string>('FRONTEND_URL') || 'http://localhost:3010'
     const resetLink = `${frontendUrl}/reset-password?token=${token}`
 
     await this.prisma.user.update({

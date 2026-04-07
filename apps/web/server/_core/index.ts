@@ -1,10 +1,11 @@
 import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
+import type { AddressInfo } from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
-import { createContext, fetchNexoMe } from "./context";
+import { createContext } from "./context";
 import { subscribeToNotificationCenterEvents } from "./notificationCenterEvents";
 import { serveStatic, setupVite } from "./vite";
 
@@ -31,11 +32,24 @@ async function startServer() {
     serveStatic(app);
   }
 
-  const port = Number(process.env.PORT || "3000");
+  const port = Number(process.env.PORT || "3010");
+
+  server.on("error", (error: NodeJS.ErrnoException) => {
+    if (error.code === "EADDRINUSE") {
+      console.error(
+        `[web] Falha ao iniciar: porta ${port} já está em uso. ` +
+          "Verifique se outro processo web/bff já está rodando."
+      );
+    }
+    throw error;
+  });
 
   server.listen(port, () => {
-    console.log(`Server running on http://localhost:${port}/`);
-    console.log(`NEXO_API_URL=${process.env.NEXO_API_URL}`);
+    const address = server.address() as AddressInfo | null;
+    const finalPort = address?.port ?? port;
+    console.log(`[web] Server running on http://localhost:${finalPort}/`);
+    console.log(`[web] PORT=${finalPort}`);
+    console.log(`[web] NEXO_API_URL=${process.env.NEXO_API_URL || "http://127.0.0.1:3000"}`);
   });
 }
 
