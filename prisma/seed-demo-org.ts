@@ -1,9 +1,13 @@
 import {
   AppointmentStatus,
   ChargeStatus,
+  OperationalStateValue,
   PaymentMethod,
   PrismaClient,
   ServiceOrderStatus,
+  WhatsAppEntityType,
+  WhatsAppMessageStatus,
+  WhatsAppMessageType,
 } from '@prisma/client'
 
 const prisma = new PrismaClient()
@@ -318,6 +322,47 @@ async function createTimelineIfMissing(params: {
   })
 }
 
+async function createWhatsAppIfMissing(params: {
+  orgId: string
+  customerId: string
+  toPhone: string
+  entityType: WhatsAppEntityType
+  entityId: string
+  messageType: WhatsAppMessageType
+  messageKey: string
+  renderedText: string
+  status?: WhatsAppMessageStatus
+}) {
+  const existing = await prisma.whatsAppMessage.findUnique({
+    where: { messageKey: params.messageKey },
+  })
+
+  if (existing) {
+    return prisma.whatsAppMessage.update({
+      where: { id: existing.id },
+      data: {
+        toPhone: params.toPhone,
+        renderedText: params.renderedText,
+        status: params.status ?? existing.status,
+      },
+    })
+  }
+
+  return prisma.whatsAppMessage.create({
+    data: {
+      orgId: params.orgId,
+      customerId: params.customerId,
+      toPhone: params.toPhone,
+      entityType: params.entityType,
+      entityId: params.entityId,
+      messageType: params.messageType,
+      messageKey: params.messageKey,
+      renderedText: params.renderedText,
+      status: params.status ?? WhatsAppMessageStatus.SENT,
+    },
+  })
+}
+
 export async function seedDemoOrg(orgId: string) {
   const now = new Date()
 
@@ -424,6 +469,65 @@ export async function seedDemoOrg(orgId: string) {
     paidAt: atHour(now, -3, 15, 0),
   })
 
+  await createWhatsAppIfMissing({
+    orgId,
+    customerId: c3.id,
+    toPhone: c3.phone,
+    entityType: 'CHARGE',
+    entityId: charge2.id,
+    messageType: 'PAYMENT_CONFIRMATION',
+    messageKey: `seed-demo-org:payment-confirmation:${orgId}:${charge2.id}`,
+    renderedText:
+      'Pagamento confirmado com sucesso. Obrigado pela confiança no atendimento da NexoGestão.',
+    status: WhatsAppMessageStatus.SENT,
+  })
+
+  const adminPerson = await prisma.person.findFirst({
+    where: { orgId, role: 'ADMIN' },
+    orderBy: { createdAt: 'asc' },
+    select: { id: true },
+  })
+
+  if (adminPerson) {
+    await prisma.person.update({
+      where: { id: adminPerson.id },
+      data: {
+        operationalState: OperationalStateValue.WARNING,
+        operationalRiskScore: 58,
+      },
+    })
+  }
+
+  const bucket = `seed-demo-${now.toISOString().slice(0, 10)}`
+  await prisma.governanceRun.upsert({
+    where: { orgId_bucket: { orgId, bucket } },
+    create: {
+      orgId,
+      bucket,
+      startedAt: new Date(now.getTime() - 2 * 60 * 1000),
+      finishedAt: new Date(now.getTime() - 60 * 1000),
+      evaluated: 1,
+      warnings: 1,
+      correctives: 0,
+      institutionalRiskScore: 58,
+      restrictedCount: 0,
+      suspendedCount: 0,
+      openCorrectivesCount: 0,
+      durationMs: 60000,
+    },
+    update: {
+      evaluated: 1,
+      warnings: 1,
+      correctives: 0,
+      institutionalRiskScore: 58,
+      restrictedCount: 0,
+      suspendedCount: 0,
+      openCorrectivesCount: 0,
+      durationMs: 60000,
+      finishedAt: new Date(now.getTime() - 60 * 1000),
+    },
+  })
+
   const year = now.getFullYear()
 
   await upsertInvoice({
@@ -453,6 +557,34 @@ export async function seedDemoOrg(orgId: string) {
       appointments: 2,
       serviceOrders: 2,
       charges: 2,
+    },
+  })
+
+  await createTimelineIfMissing({
+    orgId,
+    action: 'CUSTOMER_OPERATIONAL_RISK_UPDATED',
+    description: 'Risco operacional recalculado após cobrança vencida.',
+    customerId: c1.id,
+    metadata: {
+      customerId: c1.id,
+      score: 45,
+      factors: { noShowCount: 0, overdueCount: 1, canceledCount: 0 },
+      reason: 'seed-demo-org',
+    },
+  })
+
+  await createTimelineIfMissing({
+    orgId,
+    action: 'GOVERNANCE_RUN_COMPLETED',
+    description: 'Execução de governança registrada pela seed demo.',
+    personId: adminPerson?.id,
+    metadata: {
+      institutionalRiskScore: 58,
+      evaluated: 1,
+      warnings: 1,
+      restrictedCount: 0,
+      suspendedCount: 0,
+      source: 'seed-demo-org',
     },
   })
 

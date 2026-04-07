@@ -47,6 +47,7 @@ import { PlansModule } from './plans/plans.module'
 import { EmailModule } from './email/email.module'
 import { PaymentsModule } from './payments/payments.module'
 import { BillingModule } from './billing/billing.module'
+import { DemoModule } from './demo/demo.module'
 import { AnalyticsModule } from './analytics/analytics.module'
 import { CorrectiveActionsModule } from './corrective-actions/corrective-actions.module'
 import { AdminModule } from './admin/admin.module'
@@ -121,6 +122,7 @@ import { SentryModule } from './common/sentry/sentry.module'
     ExpensesModule,
     InvoicesModule,
     BillingModule,
+    DemoModule,
     WhatsAppModule,
     InvitesModule,
     AutomationModule,
