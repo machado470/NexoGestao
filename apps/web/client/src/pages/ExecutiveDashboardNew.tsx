@@ -213,34 +213,76 @@ export default function ExecutiveDashboardNew() {
   const serviceOrdersStatusQuery = trpc.dashboard.serviceOrdersStatus.useQuery(undefined, queryOptions);
   const chargesStatusQuery = trpc.dashboard.chargeDistribution.useQuery(undefined, queryOptions);
   const [isSlowLoading, setIsSlowLoading] = useState(false);
+  const [optimisticTick, setOptimisticTick] = useState(false);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
+  const [stableMetrics, setStableMetrics] = useState(() => normalizeMetrics(undefined));
+  const [stableRevenue, setStableRevenue] = useState<any[]>([]);
+  const [stableServiceOrdersStatus, setStableServiceOrdersStatus] = useState<any[]>([]);
+  const [stableChargesStatus, setStableChargesStatus] = useState<any[]>([]);
 
   const metrics = normalizeMetrics(metricsQuery.data);
   const revenue = normalizeSeriesArray(revenueQuery.data);
   const serviceOrdersStatus = normalizeStatusCollection(serviceOrdersStatusQuery.data);
   const chargesStatus = normalizeStatusCollection(chargesStatusQuery.data);
 
+  useEffect(() => {
+    if (metricsQuery.data !== undefined) {
+      setStableMetrics(metrics);
+      setLastUpdatedAt(new Date());
+    }
+  }, [metrics, metricsQuery.data]);
+
+  useEffect(() => {
+    if (revenueQuery.data !== undefined) {
+      setStableRevenue(revenue);
+      setLastUpdatedAt(new Date());
+    }
+  }, [revenue, revenueQuery.data]);
+
+  useEffect(() => {
+    if (serviceOrdersStatusQuery.data !== undefined) {
+      setStableServiceOrdersStatus(serviceOrdersStatus);
+      setLastUpdatedAt(new Date());
+    }
+  }, [serviceOrdersStatus, serviceOrdersStatusQuery.data]);
+
+  useEffect(() => {
+    if (chargesStatusQuery.data !== undefined) {
+      setStableChargesStatus(chargesStatus);
+      setLastUpdatedAt(new Date());
+    }
+  }, [chargesStatus, chargesStatusQuery.data]);
+
+  const displayMetrics = metricsQuery.data !== undefined ? metrics : stableMetrics;
+  const displayRevenue = revenueQuery.data !== undefined ? revenue : stableRevenue;
+  const displayServiceOrdersStatus =
+    serviceOrdersStatusQuery.data !== undefined ? serviceOrdersStatus : stableServiceOrdersStatus;
+  const displayChargesStatus = chargesStatusQuery.data !== undefined ? chargesStatus : stableChargesStatus;
+
   const lineChartData = useMemo(
     () =>
-      revenue.map((item: any, index: number) => ({
+      displayRevenue.map((item: any, index: number) => ({
         period: item?.month ?? item?.date ?? `P${index + 1}`,
         value: Number(item?.revenue ?? item?.amount ?? 0),
       })),
-    [revenue]
+    [displayRevenue]
   );
 
-  const paidCharges = chargesStatus.find((item) => item.key.toLowerCase() === "paid")?.value ?? 0;
+  const paidCharges = displayChargesStatus.find((item) => item.key.toLowerCase() === "paid")?.value ?? 0;
   const funnelData = [
-    { value: Math.max(metrics.totalCustomers, 0), name: "Clientes" },
-    { value: Math.max(metrics.totalServiceOrders + metrics.openServiceOrders, 0), name: "Agendamentos" },
-    { value: Math.max(metrics.totalServiceOrders, 0), name: "O.S." },
+    { value: Math.max(displayMetrics.totalCustomers, 0), name: "Clientes" },
+    { value: Math.max(displayMetrics.totalServiceOrders + displayMetrics.openServiceOrders, 0), name: "Agendamentos" },
+    { value: Math.max(displayMetrics.totalServiceOrders, 0), name: "O.S." },
     { value: Math.max(paidCharges, 0), name: "Pagamentos" },
   ];
+
+  const totalPausedRevenue = Math.max(displayMetrics.pendingPaymentsInCents ?? 0, 0);
 
   const bottlenecks = [
     {
       id: "no-billing",
-      label: "O.S. sem cobrança",
-      value: Math.max(metrics.openServiceOrders, 0),
+      label: "Serviços sem faturamento",
+      value: Math.max(displayMetrics.openServiceOrders, 0),
       severity: "high",
       action: "Cobrar agora",
       onClick: () => navigate("/finances"),
@@ -249,7 +291,7 @@ export default function ExecutiveDashboardNew() {
       id: "overdue",
       label: "Cobranças vencidas",
       value:
-        chargesStatus.find((item) => item.key.toLowerCase() === "overdue")?.value ?? 0,
+        displayChargesStatus.find((item) => item.key.toLowerCase() === "overdue")?.value ?? 0,
       severity: "critical",
       action: "Ver vencidas",
       onClick: () => navigate("/finances"),
@@ -257,7 +299,7 @@ export default function ExecutiveDashboardNew() {
     {
       id: "stalled",
       label: "O.S. travadas",
-      value: Math.max(metrics.delayedOrders, 0),
+      value: Math.max(displayMetrics.delayedOrders, 0),
       severity: "critical",
       action: "Destravar O.S.",
       onClick: () => navigate("/service-orders"),
@@ -275,6 +317,27 @@ export default function ExecutiveDashboardNew() {
     revenueQuery.isLoading ||
     serviceOrdersStatusQuery.isLoading ||
     chargesStatusQuery.isLoading;
+
+  useEffect(() => {
+    const hasBackgroundRefresh =
+      metricsQuery.isFetching ||
+      revenueQuery.isFetching ||
+      serviceOrdersStatusQuery.isFetching ||
+      chargesStatusQuery.isFetching;
+
+    if (hasBackgroundRefresh) {
+      setOptimisticTick(true);
+      const timer = window.setTimeout(() => setOptimisticTick(false), 800);
+      return () => window.clearTimeout(timer);
+    }
+
+    setOptimisticTick(false);
+  }, [
+    metricsQuery.isFetching,
+    revenueQuery.isFetching,
+    serviceOrdersStatusQuery.isFetching,
+    chargesStatusQuery.isFetching,
+  ]);
 
   useEffect(() => {
     if (!isStillLoading) {
@@ -315,7 +378,7 @@ export default function ExecutiveDashboardNew() {
 
   return (
     <div className="space-y-8 p-6">
-      <section className="relative overflow-hidden rounded-[1.8rem] border border-slate-200/80 bg-white/90 px-6 py-6 shadow-sm dark:border-white/8 dark:bg-[linear-gradient(135deg,rgba(19,22,30,0.98),rgba(12,14,20,0.96))] dark:shadow-[0_24px_60px_rgba(0,0,0,0.42)]">
+      <section className="relative overflow-hidden rounded-[1.8rem] border border-slate-200/80 bg-white/90 px-4 py-5 shadow-sm transition-all duration-300 sm:px-6 sm:py-6 dark:border-white/8 dark:bg-[linear-gradient(135deg,rgba(19,22,30,0.98),rgba(12,14,20,0.96))] dark:shadow-[0_24px_60px_rgba(0,0,0,0.42)]">
         <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-2xl">
             <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-orange-200/80 bg-orange-100/80 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-orange-700 dark:border-orange-500/20 dark:bg-orange-500/12 dark:text-orange-300">
@@ -334,33 +397,40 @@ export default function ExecutiveDashboardNew() {
             <button
               type="button"
               onClick={() => navigate("/service-orders")}
-              className="nexo-cta-primary"
+              className="nexo-cta-primary min-h-12 flex-1 sm:flex-none"
             >
               Atacar gargalos
             </button>
             <button
               type="button"
               onClick={() => navigate("/finances")}
-              className="nexo-cta-secondary"
+              className="nexo-cta-secondary min-h-12 flex-1 sm:flex-none"
             >
               Abrir financeiro
             </button>
           </div>
         </div>
+        <div className="mt-4 rounded-xl border border-orange-200/60 bg-orange-50/80 px-4 py-3 text-sm text-orange-700 dark:border-orange-500/20 dark:bg-orange-500/10 dark:text-orange-200">
+          <p className="font-semibold">O que precisa de atenção agora</p>
+          <p className="mt-1">
+            Você tem <strong>{formatCurrency(totalPausedRevenue)}</strong> parado e{" "}
+            <strong>{Math.max(displayMetrics.delayedOrders, 0)} O.S.</strong> em risco operacional.
+          </p>
+        </div>
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard icon={Users} label="Clientes ativos" value={metrics.totalCustomers} loading={metricsQuery.isLoading} description="Base ativa acompanhada pela operação." />
-        <MetricCard icon={Briefcase} label="Ordens de serviço" value={metrics.totalServiceOrders} loading={metricsQuery.isLoading} description={`${metrics.openServiceOrders} abertas • ${metrics.inProgressOrders} em andamento`} />
-        <MetricCard icon={DollarSign} label="Receita total" value={formatCurrency(metrics.totalRevenueInCents)} loading={metricsQuery.isLoading} description={`Recebido: ${formatCurrency(metrics.paidRevenueInCents)}`} />
-        <MetricCard icon={AlertTriangle} label="Risco / atrasos" value={Number(metrics.riskTickets) + Number(metrics.delayedOrders)} loading={metricsQuery.isLoading} description={`Tickets: ${metrics.riskTickets} • atrasadas: ${metrics.delayedOrders}`} />
+        <MetricCard icon={Users} label="Clientes ativos" value={displayMetrics.totalCustomers} loading={metricsQuery.isLoading && metricsQuery.data === undefined} description="Base ativa acompanhada pela operação." />
+        <MetricCard icon={Briefcase} label="Ordens de serviço" value={displayMetrics.totalServiceOrders} loading={metricsQuery.isLoading && metricsQuery.data === undefined} description={`${displayMetrics.openServiceOrders} abertas • ${displayMetrics.inProgressOrders} em andamento`} />
+        <MetricCard icon={DollarSign} label="Receita total" value={formatCurrency(displayMetrics.totalRevenueInCents)} loading={metricsQuery.isLoading && metricsQuery.data === undefined} description={`Recebido: ${formatCurrency(displayMetrics.paidRevenueInCents)}`} />
+        <MetricCard icon={AlertTriangle} label="Risco / atrasos" value={Number(displayMetrics.riskTickets) + Number(displayMetrics.delayedOrders)} loading={metricsQuery.isLoading && metricsQuery.data === undefined} description={`Tickets: ${displayMetrics.riskTickets} • atrasadas: ${displayMetrics.delayedOrders}`} />
       </section>
 
       <section className="grid gap-6 xl:grid-cols-3">
         <article className="nexo-surface nexo-fade-in p-5 xl:col-span-2">
           <h2 className="nexo-section-title">Receita ao longo do tempo</h2>
           <p className="mt-1 nexo-section-description">Linha temporal de evolução de receita.</p>
-          {revenueQuery.isLoading ? (
+          {revenueQuery.isLoading && revenueQuery.data === undefined && displayRevenue.length === 0 ? (
             <DashboardCardSkeleton className="mt-4 min-h-[260px]" />
           ) : lineChartData.length === 0 ? (
             <EmptyState
@@ -419,14 +489,14 @@ export default function ExecutiveDashboardNew() {
         <article className="nexo-surface nexo-fade-in p-5">
           <h2 className="nexo-section-title">Distribuição de status</h2>
           <p className="mt-1 nexo-section-description">Volume atual por status de cobrança.</p>
-          {chargesStatusQuery.isLoading ? (
+          {chargesStatusQuery.isLoading && chargesStatusQuery.data === undefined && displayChargesStatus.length === 0 ? (
             <DashboardCardSkeleton className="mt-4 min-h-[260px]" />
           ) : (
             <div className="mt-4 h-[260px] nexo-fade-in">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart margin={{ top: 6, right: 10, bottom: 12, left: 10 }}>
-                  <Pie data={chargesStatus} dataKey="value" nameKey="label" innerRadius={52} outerRadius={86} paddingAngle={3}>
-                    {chargesStatus.map((entry, index) => (
+                  <Pie data={displayChargesStatus} dataKey="value" nameKey="label" innerRadius={52} outerRadius={86} paddingAngle={3}>
+                    {displayChargesStatus.map((entry, index) => (
                       <Cell key={entry.key} fill={["#f97316", "#22c55e", "#ef4444", "#3b82f6"][index % 4]} />
                     ))}
                   </Pie>
@@ -441,7 +511,7 @@ export default function ExecutiveDashboardNew() {
           )}
         </article>
 
-        <article className="nexo-surface nexo-fade-in p-5">
+        <article className={`nexo-surface nexo-fade-in p-5 transition-all duration-300 ${optimisticTick ? "ring-2 ring-orange-300/40 dark:ring-orange-500/30" : ""}`}>
           <h2 className="nexo-section-title">Gargalos agora</h2>
           <p className="mt-1 nexo-section-description">Pendências com ação direta para destravar receita.</p>
           <div className="mt-4 space-y-3">
@@ -459,19 +529,24 @@ export default function ExecutiveDashboardNew() {
                 <button
                   type="button"
                   onClick={item.onClick}
-                  className="nexo-cta-secondary !h-8 !rounded-lg !px-3 !text-xs"
+                  className="nexo-cta-secondary !h-10 !rounded-lg !px-4 !text-xs md:!h-8 md:!px-3"
                 >
                   {item.action}
                 </button>
               </div>
             ))}
           </div>
-          {(metricsQuery.isLoading || revenueQuery.isLoading) && (
+          {(metricsQuery.isFetching || revenueQuery.isFetching || serviceOrdersStatusQuery.isFetching || chargesStatusQuery.isFetching) && (
             <div className="mt-3 inline-flex items-center gap-2 text-xs text-zinc-500">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Atualizando blocos...
+              Atualizando blocos sem interromper sua leitura...
             </div>
           )}
+          {lastUpdatedAt ? (
+            <p className="mt-2 text-xs text-zinc-400 dark:text-zinc-500">
+              Última atualização: {lastUpdatedAt.toLocaleTimeString("pt-BR")}
+            </p>
+          ) : null}
         </article>
       </section>
 
