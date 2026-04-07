@@ -16,8 +16,15 @@ import {
   getPriorityScore,
   matchesFinancialFilter,
 } from "@/lib/operations/operations.selectors";
-import { MessageCircle, Plus, RefreshCw, ArrowLeft } from "lucide-react";
+import {
+  MessageCircle,
+  Plus,
+  RefreshCw,
+  ArrowLeft,
+  BriefcaseBusiness,
+} from "lucide-react";
 import { PageHero, PageShell, SurfaceSection } from "@/components/PagePattern";
+import { EmptyState } from "@/components/EmptyState";
 
 import ServiceOrderCard from "@/components/service-orders/ServiceOrderCard";
 import ServiceOrderDetailsPanel from "@/components/service-orders/ServiceOrderDetailsPanel";
@@ -323,32 +330,29 @@ export default function ServiceOrdersPage() {
       </Card>
 
       {isLoading ? (
-        <Card className="nexo-kpi-card">
-          <CardContent className="p-6 text-sm text-muted-foreground">
-            Carregando ordens de serviço...
-          </CardContent>
-        </Card>
+        <SurfaceSection className="flex min-h-[160px] items-center justify-center text-sm text-muted-foreground">
+          Carregando ordens de serviço...
+        </SurfaceSection>
       ) : hasError ? (
-        <Card className="nexo-kpi-card">
-          <CardContent className="p-6 text-sm text-red-600">
-            Erro ao carregar a fila operacional.
-          </CardContent>
-        </Card>
+        <SurfaceSection className="border-red-200 text-sm text-red-700 dark:border-red-900/40 dark:text-red-300">
+          Erro ao carregar a fila operacional.
+        </SurfaceSection>
       ) : sorted.length === 0 ? (
-        <Card className="nexo-kpi-card">
-          <CardContent className="space-y-3 p-6 text-sm text-muted-foreground">
-            <div>Nenhuma ordem encontrada para os filtros atuais.</div>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setFilter("ALL")}>
-                Limpar filtro
-              </Button>
-              <Button onClick={() => setIsCreateOpen(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                Criar O.S.
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <SurfaceSection>
+          <EmptyState
+            icon={<BriefcaseBusiness className="h-7 w-7" />}
+            title="Nenhuma ordem encontrada"
+            description="Ajuste os filtros ou crie uma nova O.S. para iniciar o ciclo operacional e financeiro."
+            action={{
+              label: "Nova O.S.",
+              onClick: () => setIsCreateOpen(true),
+            }}
+            secondaryAction={{
+              label: "Limpar filtro",
+              onClick: () => setFilter("ALL"),
+            }}
+          />
+        </SurfaceSection>
       ) : (
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(380px,0.9fr)]">
           <div className="space-y-4">

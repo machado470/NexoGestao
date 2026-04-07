@@ -38,6 +38,7 @@ import {
   normalizeObjectPayload,
 } from "@/lib/query-helpers";
 import { PageHero, PageShell, SurfaceSection } from "@/components/PagePattern";
+import { EmptyState } from "@/components/EmptyState";
 
 type Customer = {
   id: string;
@@ -442,13 +443,25 @@ export default function CustomersPage() {
           </div>
 
           {listCustomers.isLoading ? (
-            <div className="p-6 text-sm text-gray-600 dark:text-gray-400">
-              Carregando...
-            </div>
+            <SurfaceSection className="m-4 flex min-h-[140px] items-center justify-center text-sm text-gray-600 dark:text-gray-400">
+              Carregando clientes...
+            </SurfaceSection>
           ) : customers.length === 0 ? (
-            <div className="p-6 text-sm text-gray-600 dark:text-gray-400">
-              Nenhum cliente ainda. Crie o primeiro.
-            </div>
+            <SurfaceSection className="m-4">
+              <EmptyState
+                icon={<Users className="h-7 w-7" />}
+                title="Sua base de clientes ainda está vazia"
+                description="Comece cadastrando o primeiro cliente para ativar agenda, ordens de serviço, cobrança e histórico no workspace."
+                action={{
+                  label: "Novo Cliente",
+                  onClick: () => setIsCreateOpen(true),
+                }}
+                secondaryAction={{
+                  label: "Atualizar lista",
+                  onClick: () => void listCustomers.refetch(),
+                }}
+              />
+            </SurfaceSection>
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">

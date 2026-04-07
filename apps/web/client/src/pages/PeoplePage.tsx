@@ -1,9 +1,10 @@
 import { useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/contexts/AuthContext";
-import { Loader2 } from "lucide-react";
+import { Loader2, Users, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHero, PageShell, SurfaceSection } from "@/components/PagePattern";
+import { EmptyState } from "@/components/EmptyState";
 import {
   normalizeArrayPayload,
   normalizeObjectPayload,
@@ -90,11 +91,8 @@ export default function PeoplePage() {
     return normalizeArrayPayload<ServiceOrder>(serviceOrdersQuery.data);
   }, [serviceOrdersQuery.data]);
 
-  const hasNormalizedPeople = listPeople.data !== undefined;
-  const hasNormalizedStats = statsLinked.data !== undefined;
-  const hasNormalizedOrders = serviceOrdersQuery.data !== undefined;
-  const hasAnyData =
-    hasNormalizedPeople || hasNormalizedStats || hasNormalizedOrders;
+  const hasData =
+    listPeople.isSuccess || statsLinked.isSuccess || serviceOrdersQuery.isSuccess;
 
   const hasError =
     listPeople.isError || statsLinked.isError || serviceOrdersQuery.isError;
@@ -108,12 +106,19 @@ export default function PeoplePage() {
   const hasAnyActiveLoading =
     listPeople.isLoading || statsLinked.isLoading || serviceOrdersQuery.isLoading;
 
-  const isInitialLoading = hasAnyActiveLoading && !hasAnyData;
+  const isInitialLoading = hasAnyActiveLoading && !hasData;
 
-  const shouldBlockForError = hasError && !hasAnyData;
+  const shouldBlockForError = hasError && !hasData;
 
   if (isInitializing) {
-    return <div className="p-6">Carregando sessão...</div>;
+    return (
+      <PageShell>
+        <PageHero eyebrow="Pessoas" title="Pessoas" description="Carregando sessão..." />
+        <SurfaceSection className="flex min-h-[180px] items-center justify-center">
+          <Loader2 className="animate-spin" />
+        </SurfaceSection>
+      </PageShell>
+    );
   }
 
   if (!isAuthenticated) {
@@ -126,9 +131,12 @@ export default function PeoplePage() {
 
   if (isInitialLoading) {
     return (
-      <div className="flex h-[80vh] items-center justify-center">
-        <Loader2 className="animate-spin" />
-      </div>
+      <PageShell>
+        <PageHero eyebrow="Pessoas" title="Pessoas" description="Carregando base de pessoas..." />
+        <SurfaceSection className="flex min-h-[220px] items-center justify-center">
+          <Loader2 className="animate-spin" />
+        </SurfaceSection>
+      </PageShell>
     );
   }
 
@@ -155,14 +163,29 @@ export default function PeoplePage() {
         </div>
       ) : null}
 
-      <Button type="button">Nova pessoa</Button>
+      <div className="flex justify-end">
+        <Button type="button" className="gap-2">
+          <Plus className="h-4 w-4" />
+          Nova pessoa
+        </Button>
+      </div>
 
       <SurfaceSection className="text-sm opacity-80">
         Pessoas vinculadas: {linkedStats?.count ?? 0}
       </SurfaceSection>
 
       {people.length === 0 ? (
-        <SurfaceSection>Nenhuma pessoa</SurfaceSection>
+        <SurfaceSection>
+          <EmptyState
+            icon={<Users className="h-7 w-7" />}
+            title="Nenhuma pessoa cadastrada ainda"
+            description="Cadastre membros da equipe para distribuir ordens de serviço, acompanhar estado operacional e dar contexto às execuções."
+            action={{
+              label: "Atualizar lista",
+              onClick: () => void listPeople.refetch(),
+            }}
+          />
+        </SurfaceSection>
       ) : (
         <div className="space-y-2">
           {people.map((p) => (
