@@ -72,7 +72,8 @@ export default function FinancesPage() {
   );
 
   const hasNormalizedCharges = chargesQuery.data !== undefined;
-  const hasNormalizedStats = isServiceOrderScoped || statsQuery.data !== undefined;
+  const hasNormalizedStats =
+    isServiceOrderScoped || statsQuery.data !== undefined;
   const hasReusableData = hasNormalizedCharges || hasNormalizedStats;
 
   const hasError =
@@ -112,16 +113,27 @@ export default function FinancesPage() {
 
   if (isInitialLoading) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <Loader2 className="animate-spin" />
-      </div>
+      <PageShell>
+        <PageHero
+          eyebrow="Financeiro"
+          title="Financeiro"
+          description="Leitura consolidada de cobrança, recebimento e pendências sem alterar o fluxo funcional."
+        />
+        <SurfaceSection className="flex min-h-[180px] items-center justify-center">
+          <Loader2 className="animate-spin" />
+        </SurfaceSection>
+      </PageShell>
     );
   }
 
   if (shouldBlockForError) {
     return (
       <PageShell>
-        <PageHero eyebrow="Financeiro" title="Financeiro" description="Não foi possível carregar os dados financeiros." />
+        <PageHero
+          eyebrow="Financeiro"
+          title="Financeiro"
+          description="Não foi possível carregar os dados financeiros."
+        />
         <SurfaceSection className="border-red-200 text-red-700 dark:border-red-900/40 dark:text-red-300">
           {errorMessage}
         </SurfaceSection>
@@ -146,11 +158,16 @@ export default function FinancesPage() {
       )}
 
       {charges.length === 0 ? (
-        <SurfaceSection className="text-sm text-zinc-500 dark:text-zinc-400">Nenhuma cobrança</SurfaceSection>
+        <SurfaceSection className="text-sm text-zinc-500 dark:text-zinc-400">
+          Nenhuma cobrança
+        </SurfaceSection>
       ) : (
         <div className="space-y-3">
           {charges.map((c: any) => (
-            <Card key={c.id} className="nexo-surface border-slate-200/70 bg-white/90 dark:border-white/8">
+            <Card
+              key={c.id}
+              className="nexo-surface border-slate-200/70 bg-white/90 dark:border-white/8"
+            >
               <CardContent className="flex justify-between pt-4">
                 <div>
                   <p>{c.customer?.name}</p>

@@ -2,14 +2,28 @@ import { useMemo, useRef, useState, useCallback } from "react";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
-import interactionPlugin, { type DateClickArg } from "@fullcalendar/interaction";
-import type { EventClickArg, EventDropArg, EventInput } from "@fullcalendar/core";
+import interactionPlugin, {
+  type DateClickArg,
+} from "@fullcalendar/interaction";
+import type {
+  EventClickArg,
+  EventDropArg,
+  EventInput,
+} from "@fullcalendar/core";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { CalendarDays, Plus, X, Loader2, MessageCircle, Briefcase } from "lucide-react";
+import {
+  CalendarDays,
+  Plus,
+  X,
+  Loader2,
+  MessageCircle,
+  Briefcase,
+} from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageHero, PageShell, SurfaceSection } from "@/components/PagePattern";
 
 const STATUS_COLORS: Record<string, string> = {
   SCHEDULED: "#3b82f6",
@@ -131,7 +145,7 @@ function CreateAppointmentModal({
         notes: "",
       });
     },
-    onError: (err) => {
+    onError: err => {
       toast.error("Erro ao criar agendamento: " + err.message);
     },
   });
@@ -186,13 +200,13 @@ function CreateAppointmentModal({
             </label>
             <select
               value={form.customerId}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, customerId: e.target.value }))
+              onChange={e =>
+                setForm(prev => ({ ...prev, customerId: e.target.value }))
               }
               className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
             >
               <option value="">Selecione um cliente</option>
-              {customers.map((customer) => (
+              {customers.map(customer => (
                 <option key={customer.id} value={customer.id}>
                   {customer.name}
                 </option>
@@ -207,8 +221,8 @@ function CreateAppointmentModal({
             <input
               type="datetime-local"
               value={form.startsAt}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, startsAt: e.target.value }))
+              onChange={e =>
+                setForm(prev => ({ ...prev, startsAt: e.target.value }))
               }
               className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
             />
@@ -221,8 +235,8 @@ function CreateAppointmentModal({
             <input
               type="datetime-local"
               value={form.endsAt}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, endsAt: e.target.value }))
+              onChange={e =>
+                setForm(prev => ({ ...prev, endsAt: e.target.value }))
               }
               className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
             />
@@ -234,8 +248,8 @@ function CreateAppointmentModal({
             </label>
             <select
               value={form.status}
-              onChange={(e) =>
-                setForm((prev) => ({
+              onChange={e =>
+                setForm(prev => ({
                   ...prev,
                   status: e.target.value as AppointmentEvent["status"],
                 }))
@@ -256,8 +270,8 @@ function CreateAppointmentModal({
             </label>
             <textarea
               value={form.notes}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, notes: e.target.value }))
+              onChange={e =>
+                setForm(prev => ({ ...prev, notes: e.target.value }))
               }
               rows={3}
               placeholder="Observações do agendamento"
@@ -314,7 +328,7 @@ function EventDetailModal({
       onUpdate();
       onClose();
     },
-    onError: (err) => {
+    onError: err => {
       toast.error("Erro ao atualizar: " + err.message);
     },
   });
@@ -370,7 +384,9 @@ function EventDetailModal({
               Fim
             </span>
             <p className="mt-0.5 text-sm text-gray-900 dark:text-white">
-              {event.endsAt ? new Date(event.endsAt).toLocaleString("pt-BR") : "—"}
+              {event.endsAt
+                ? new Date(event.endsAt).toLocaleString("pt-BR")
+                : "—"}
             </p>
           </div>
 
@@ -381,8 +397,10 @@ function EventDetailModal({
             <div className="mt-1.5">
               <select
                 value={event.status}
-                onChange={(e) =>
-                  handleStatusChange(e.target.value as AppointmentEvent["status"])
+                onChange={e =>
+                  handleStatusChange(
+                    e.target.value as AppointmentEvent["status"]
+                  )
                 }
                 disabled={updateMutation.isPending}
                 className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
@@ -463,7 +481,7 @@ export default function CalendarPage() {
       toast.success("Agendamento atualizado!");
       void appointmentsQuery.refetch();
     },
-    onError: (err) => {
+    onError: err => {
       toast.error("Erro ao atualizar: " + err.message);
       void appointmentsQuery.refetch();
     },
@@ -481,7 +499,7 @@ export default function CalendarPage() {
   }, [appointmentsQuery.data]);
 
   const events: EventInput[] = useMemo(() => {
-    return rawAppointments.map((appointment) => ({
+    return rawAppointments.map(appointment => ({
       id: String(appointment.id),
       title: `${appointment.customer?.name ?? "Agendamento"} • ${getStatusLabel(
         appointment.status
@@ -567,104 +585,110 @@ export default function CalendarPage() {
   );
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="flex items-center gap-2 text-3xl font-bold text-gray-900 dark:text-white">
+    <PageShell>
+      <PageHero
+        eyebrow="Agenda"
+        title={
+          <span className="inline-flex items-center gap-2">
             <CalendarDays className="h-8 w-8 text-orange-500" />
             Calendário
-          </h1>
-          <p className="mt-1 text-gray-600 dark:text-gray-400">
-            Agenda operacional conectada com atendimento, execução e contato com o cliente.
-          </p>
+          </span>
+        }
+        description="Agenda operacional conectada com atendimento, execução e contato com o cliente."
+        actions={
+          <Button
+            onClick={() => {
+              const now = new Date();
+              const end = new Date(now.getTime() + 60 * 60 * 1000);
+
+              setCreateModal({
+                open: true,
+                startStr: formatDateTimeLocalInput(now),
+                endStr: formatDateTimeLocalInput(end),
+              });
+            }}
+            className="gap-2 bg-orange-500 text-white hover:bg-orange-600"
+          >
+            <Plus className="h-4 w-4" />
+            Novo Agendamento
+          </Button>
+        }
+      />
+
+      <SurfaceSection className="space-y-6">
+        <div className="flex flex-wrap gap-3">
+          {(
+            [
+              ["SCHEDULED", "Agendado"],
+              ["CONFIRMED", "Confirmado"],
+              ["DONE", "Concluído"],
+              ["CANCELED", "Cancelado"],
+              ["NO_SHOW", "Não compareceu"],
+            ] as const
+          ).map(([status, label]) => (
+            <div key={status} className="flex items-center gap-1.5">
+              <div
+                className="h-3 w-3 rounded-full"
+                style={{ backgroundColor: STATUS_COLORS[status] }}
+              />
+              <span className="text-xs text-gray-600 dark:text-gray-400">
+                {label}
+              </span>
+            </div>
+          ))}
         </div>
 
-        <Button
-          onClick={() => {
-            const now = new Date();
-            const end = new Date(now.getTime() + 60 * 60 * 1000);
-
-            setCreateModal({
-              open: true,
-              startStr: formatDateTimeLocalInput(now),
-              endStr: formatDateTimeLocalInput(end),
-            });
-          }}
-          className="gap-2 bg-orange-500 text-white hover:bg-orange-600"
-        >
-          <Plus className="h-4 w-4" />
-          Novo Agendamento
-        </Button>
-      </div>
-
-      <div className="flex flex-wrap gap-3">
-        {(
-          [
-            ["SCHEDULED", "Agendado"],
-            ["CONFIRMED", "Confirmado"],
-            ["DONE", "Concluído"],
-            ["CANCELED", "Cancelado"],
-            ["NO_SHOW", "Não compareceu"],
-          ] as const
-        ).map(([status, label]) => (
-          <div key={status} className="flex items-center gap-1.5">
-            <div
-              className="h-3 w-3 rounded-full"
-              style={{ backgroundColor: STATUS_COLORS[status] }}
+        <SurfaceSection className="overflow-hidden rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+          {appointmentsQuery.isLoading ? (
+            <CalendarSkeleton />
+          ) : (
+            <FullCalendar
+              ref={calendarRef}
+              plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+              initialView="timeGridWeek"
+              headerToolbar={{
+                left: "prev,next today",
+                center: "title",
+                right: "dayGridMonth,timeGridWeek,timeGridDay",
+              }}
+              buttonText={{
+                today: "Hoje",
+                month: "Mês",
+                week: "Semana",
+                day: "Dia",
+              }}
+              locale="pt-br"
+              firstDay={0}
+              slotMinTime="06:00:00"
+              slotMaxTime="22:00:00"
+              allDaySlot={false}
+              editable
+              selectable
+              selectMirror
+              dayMaxEvents
+              weekends
+              events={events}
+              dateClick={handleDateClick}
+              eventClick={handleEventClick}
+              eventDrop={handleEventDrop}
+              eventTimeFormat={{
+                hour: "2-digit",
+                minute: "2-digit",
+                meridiem: false,
+                hour12: false,
+              }}
+              height="auto"
+              eventClassNames="cursor-pointer hover:opacity-90 transition-opacity"
             />
-            <span className="text-xs text-gray-600 dark:text-gray-400">{label}</span>
-          </div>
-        ))}
-      </div>
-
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-        {appointmentsQuery.isLoading ? (
-          <CalendarSkeleton />
-        ) : (
-          <FullCalendar
-            ref={calendarRef}
-            plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-            initialView="timeGridWeek"
-            headerToolbar={{
-              left: "prev,next today",
-              center: "title",
-              right: "dayGridMonth,timeGridWeek,timeGridDay",
-            }}
-            buttonText={{
-              today: "Hoje",
-              month: "Mês",
-              week: "Semana",
-              day: "Dia",
-            }}
-            locale="pt-br"
-            firstDay={0}
-            slotMinTime="06:00:00"
-            slotMaxTime="22:00:00"
-            allDaySlot={false}
-            editable
-            selectable
-            selectMirror
-            dayMaxEvents
-            weekends
-            events={events}
-            dateClick={handleDateClick}
-            eventClick={handleEventClick}
-            eventDrop={handleEventDrop}
-            eventTimeFormat={{
-              hour: "2-digit",
-              minute: "2-digit",
-              meridiem: false,
-              hour12: false,
-            }}
-            height="auto"
-            eventClassNames="cursor-pointer hover:opacity-90 transition-opacity"
-          />
-        )}
-      </div>
+          )}
+        </SurfaceSection>
+      </SurfaceSection>
 
       <CreateAppointmentModal
         state={createModal}
-        onClose={() => setCreateModal({ open: false, startStr: "", endStr: "" })}
+        onClose={() =>
+          setCreateModal({ open: false, startStr: "", endStr: "" })
+        }
         onSuccess={handleCreateSuccess}
         customers={customers}
       />
@@ -676,6 +700,6 @@ export default function CalendarPage() {
         onOpenExecution={handleOpenExecution}
         onOpenWhatsApp={handleOpenWhatsApp}
       />
-    </div>
+    </PageShell>
   );
 }

@@ -37,6 +37,7 @@ import {
   normalizeArrayPayload,
   normalizeObjectPayload,
 } from "@/lib/query-helpers";
+import { PageHero, PageShell, SurfaceSection } from "@/components/PagePattern";
 
 type Customer = {
   id: string;
@@ -233,7 +234,9 @@ function SummaryCard({
       <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">
         {value}
       </p>
-      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{subtitle}</p>
+      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+        {subtitle}
+      </p>
     </div>
   );
 }
@@ -271,7 +274,9 @@ function getChargeStatusTone(status?: string) {
 export default function CustomersPage() {
   const [, navigate] = useLocation();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
+  const [editingCustomerId, setEditingCustomerId] = useState<string | null>(
+    null
+  );
   const [workspaceCustomerId, setWorkspaceCustomerId] = useState<string | null>(
     () => getCustomerIdFromUrl()
   );
@@ -315,7 +320,7 @@ export default function CustomersPage() {
   useEffect(() => {
     const syncFromUrl = () => {
       const customerIdFromUrl = getCustomerIdFromUrl();
-      setWorkspaceCustomerId((current) => {
+      setWorkspaceCustomerId(current => {
         if (current === customerIdFromUrl) return current;
         return customerIdFromUrl;
       });
@@ -330,7 +335,7 @@ export default function CustomersPage() {
   }, []);
 
   const total = customers.length;
-  const totalActive = customers.filter((c) => c.active).length;
+  const totalActive = customers.filter(c => c.active).length;
   const totalInactive = total - totalActive;
 
   const openWorkspace = (customerId: string) => {
@@ -347,7 +352,7 @@ export default function CustomersPage() {
   const workspaceServiceOrdersCount = workspace?.serviceOrders?.length ?? 0;
   const workspaceChargesCount = workspace?.charges?.length ?? 0;
   const workspacePendingCharges = (workspace?.charges ?? []).filter(
-    (item) => item.status === "PENDING" || item.status === "OVERDUE"
+    item => item.status === "PENDING" || item.status === "OVERDUE"
   ).length;
 
   const nextActionLabel = !workspace
@@ -361,204 +366,205 @@ export default function CustomersPage() {
           : "Iniciar relacionamento com este cliente";
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-        <div className="max-w-3xl">
-          <div className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs font-medium text-orange-700 dark:border-orange-900/40 dark:bg-orange-950/20 dark:text-orange-300">
-            <Sparkles className="h-3.5 w-3.5" />
-            Entidade central do relacionamento operacional
-          </div>
-
-          <h1 className="mt-3 flex items-center gap-2 text-2xl font-bold text-gray-900 dark:text-white">
+    <PageShell>
+      <PageHero
+        eyebrow="Clientes"
+        title={
+          <span className="inline-flex items-center gap-2">
             <Users className="h-6 w-6 text-orange-500" />
             Clientes
-          </h1>
+          </span>
+        }
+        description="O cliente deixa de ser cadastro simples e vira contexto: agenda, execução, cobrança e histórico no mesmo lugar."
+        actions={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void listCustomers.refetch()}
+              className="flex items-center gap-2"
+            >
+              <RefreshCcw className="h-4 w-4" />
+              Atualizar
+            </Button>
 
-          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-            O cliente deixa de ser cadastro simples e vira contexto: agenda,
-            execução, cobrança e histórico no mesmo lugar.
-          </p>
+            <Button
+              type="button"
+              onClick={() => setIsCreateOpen(true)}
+              className="flex items-center gap-2 bg-orange-500 text-white hover:bg-orange-600"
+            >
+              <Plus className="h-4 w-4" />
+              Novo Cliente
+            </Button>
+          </>
+        }
+      />
+
+      <SurfaceSection className="space-y-6">
+        <div className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs font-medium text-orange-700 dark:border-orange-900/40 dark:bg-orange-950/20 dark:text-orange-300">
+          <Sparkles className="h-3.5 w-3.5" />
+          Entidade central do relacionamento operacional
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => void listCustomers.refetch()}
-            className="flex items-center gap-2"
-          >
-            <RefreshCcw className="h-4 w-4" />
-            Atualizar
-          </Button>
-
-          <Button
-            type="button"
-            onClick={() => setIsCreateOpen(true)}
-            className="flex items-center gap-2 bg-orange-500 text-white hover:bg-orange-600"
-          >
-            <Plus className="h-4 w-4" />
-            Novo Cliente
-          </Button>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <SummaryCard
+            title="Total de clientes"
+            value={total}
+            subtitle="Base cadastrada e visível"
+          />
+          <SummaryCard
+            title="Clientes ativos"
+            value={totalActive}
+            subtitle="Prontos para operar no fluxo"
+            tone="success"
+          />
+          <SummaryCard
+            title="Clientes inativos"
+            value={totalInactive}
+            subtitle="Base sem operação ativa no momento"
+            tone="muted"
+          />
         </div>
-      </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <SummaryCard
-          title="Total de clientes"
-          value={total}
-          subtitle="Base cadastrada e visível"
-        />
-        <SummaryCard
-          title="Clientes ativos"
-          value={totalActive}
-          subtitle="Prontos para operar no fluxo"
-          tone="success"
-        />
-        <SummaryCard
-          title="Clientes inativos"
-          value={totalInactive}
-          subtitle="Base sem operação ativa no momento"
-          tone="muted"
-        />
-      </div>
-
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
-        <div className="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-medium text-gray-900 dark:text-white">
-                Lista de clientes
-              </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                Abra o workspace para enxergar contexto consolidado e próxima ação.
-              </p>
+        <SurfaceSection className="overflow-hidden rounded-xl border border-gray-200 bg-white p-0 dark:border-gray-700 dark:bg-gray-800">
+          <div className="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                  Lista de clientes
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Abra o workspace para enxergar contexto consolidado e próxima
+                  ação.
+                </p>
+              </div>
             </div>
           </div>
-        </div>
 
-        {listCustomers.isLoading ? (
-          <div className="p-6 text-sm text-gray-600 dark:text-gray-400">
-            Carregando...
-          </div>
-        ) : customers.length === 0 ? (
-          <div className="p-6 text-sm text-gray-600 dark:text-gray-400">
-            Nenhum cliente ainda. Crie o primeiro.
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="bg-gray-50 dark:bg-gray-900/40">
-                <tr className="text-left">
-                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
-                    Nome
-                  </th>
-                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
-                    Telefone
-                  </th>
-                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
-                    Email
-                  </th>
-                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
-                    Observações
-                  </th>
-                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
-                    Criado em
-                  </th>
-                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
-                    Status
-                  </th>
-                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
-                    Ações
-                  </th>
-                </tr>
-              </thead>
+          {listCustomers.isLoading ? (
+            <div className="p-6 text-sm text-gray-600 dark:text-gray-400">
+              Carregando...
+            </div>
+          ) : customers.length === 0 ? (
+            <div className="p-6 text-sm text-gray-600 dark:text-gray-400">
+              Nenhum cliente ainda. Crie o primeiro.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead className="bg-gray-50 dark:bg-gray-900/40">
+                  <tr className="text-left">
+                    <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
+                      Nome
+                    </th>
+                    <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
+                      Telefone
+                    </th>
+                    <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
+                      Email
+                    </th>
+                    <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
+                      Observações
+                    </th>
+                    <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
+                      Criado em
+                    </th>
+                    <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
+                      Status
+                    </th>
+                    <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
+                      Ações
+                    </th>
+                  </tr>
+                </thead>
 
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {customers.map((customer) => {
-                  const isOpen = workspaceCustomerId === customer.id;
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                  {customers.map(customer => {
+                    const isOpen = workspaceCustomerId === customer.id;
 
-                  return (
-                    <tr
-                      key={customer.id}
-                      className={`hover:bg-gray-50 dark:hover:bg-gray-900/30 ${
-                        isOpen ? "bg-orange-50/60 dark:bg-orange-950/10" : ""
-                      }`}
-                    >
-                      <td className="px-4 py-3 text-gray-900 dark:text-white">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">{customer.name}</span>
-                          {isOpen ? (
-                            <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-800 dark:bg-orange-900/30 dark:text-orange-300">
-                              Em foco
-                            </span>
-                          ) : null}
-                        </div>
-                      </td>
-
-                      <td className="px-4 py-3 text-gray-700 dark:text-gray-300">
-                        {customer.phone ?? "—"}
-                      </td>
-
-                      <td className="px-4 py-3 text-gray-700 dark:text-gray-300">
-                        {customer.email ?? "—"}
-                      </td>
-
-                      <td
-                        className="max-w-[260px] px-4 py-3 text-gray-700 dark:text-gray-300"
-                        title={customer.notes ?? ""}
+                    return (
+                      <tr
+                        key={customer.id}
+                        className={`hover:bg-gray-50 dark:hover:bg-gray-900/30 ${
+                          isOpen ? "bg-orange-50/60 dark:bg-orange-950/10" : ""
+                        }`}
                       >
-                        {truncateText(customer.notes)}
-                      </td>
+                        <td className="px-4 py-3 text-gray-900 dark:text-white">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{customer.name}</span>
+                            {isOpen ? (
+                              <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-800 dark:bg-orange-900/30 dark:text-orange-300">
+                                Em foco
+                              </span>
+                            ) : null}
+                          </div>
+                        </td>
 
-                      <td className="px-4 py-3 text-gray-700 dark:text-gray-300">
-                        {formatDate(customer.createdAt)}
-                      </td>
+                        <td className="px-4 py-3 text-gray-700 dark:text-gray-300">
+                          {customer.phone ?? "—"}
+                        </td>
 
-                      <td className="px-4 py-3">
-                        <span
-                          className={
-                            customer.active
-                              ? "inline-flex items-center rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-300"
-                              : "inline-flex items-center rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-800 dark:bg-gray-900/30 dark:text-gray-300"
-                          }
+                        <td className="px-4 py-3 text-gray-700 dark:text-gray-300">
+                          {customer.email ?? "—"}
+                        </td>
+
+                        <td
+                          className="max-w-[260px] px-4 py-3 text-gray-700 dark:text-gray-300"
+                          title={customer.notes ?? ""}
                         >
-                          {customer.active ? "Ativo" : "Inativo"}
-                        </span>
-                      </td>
+                          {truncateText(customer.notes)}
+                        </td>
 
-                      <td className="px-4 py-3">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Button
-                            type="button"
-                            variant={isOpen ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => openWorkspace(customer.id)}
-                            className="inline-flex items-center gap-2"
-                          >
-                            <PanelRightOpen className="h-4 w-4" />
-                            Workspace
-                          </Button>
+                        <td className="px-4 py-3 text-gray-700 dark:text-gray-300">
+                          {formatDate(customer.createdAt)}
+                        </td>
 
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setEditingCustomerId(customer.id)}
-                            className="inline-flex items-center gap-2"
+                        <td className="px-4 py-3">
+                          <span
+                            className={
+                              customer.active
+                                ? "inline-flex items-center rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-300"
+                                : "inline-flex items-center rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-800 dark:bg-gray-900/30 dark:text-gray-300"
+                            }
                           >
-                            <Pencil className="h-4 w-4" />
-                            Editar
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+                            {customer.active ? "Ativo" : "Inativo"}
+                          </span>
+                        </td>
+
+                        <td className="px-4 py-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Button
+                              type="button"
+                              variant={isOpen ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => openWorkspace(customer.id)}
+                              className="inline-flex items-center gap-2"
+                            >
+                              <PanelRightOpen className="h-4 w-4" />
+                              Workspace
+                            </Button>
+
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setEditingCustomerId(customer.id)}
+                              className="inline-flex items-center gap-2"
+                            >
+                              <Pencil className="h-4 w-4" />
+                              Editar
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </SurfaceSection>
+      </SurfaceSection>
 
       {workspaceCustomerId ? (
         <div className="fixed inset-0 z-50 flex justify-end">
@@ -654,7 +660,9 @@ export default function CustomersPage() {
                           variant="outline"
                           size="sm"
                           onClick={() =>
-                            navigate(`/whatsapp?customerId=${workspace.customer.id}`)
+                            navigate(
+                              `/whatsapp?customerId=${workspace.customer.id}`
+                            )
                           }
                           className="gap-2"
                         >
@@ -666,7 +674,9 @@ export default function CustomersPage() {
                           type="button"
                           variant="outline"
                           size="sm"
-                          onClick={() => navigate(buildCustomersUrl(workspace.customer.id))}
+                          onClick={() =>
+                            navigate(buildCustomersUrl(workspace.customer.id))
+                          }
                           className="gap-2"
                         >
                           <Link2 className="h-4 w-4" />
@@ -675,7 +685,8 @@ export default function CustomersPage() {
                       </div>
 
                       <p className="text-xs text-orange-800 dark:text-orange-300">
-                        Use este cliente como ponto de partida para navegar pelo resto do fluxo.
+                        Use este cliente como ponto de partida para navegar pelo
+                        resto do fluxo.
                       </p>
                     </div>
                   </div>
@@ -758,7 +769,7 @@ export default function CustomersPage() {
                     icon={CalendarDays}
                     emptyText="Nenhum agendamento encontrado para este cliente."
                   >
-                    {workspace.appointments.slice(0, 5).map((item) => (
+                    {workspace.appointments.slice(0, 5).map(item => (
                       <div
                         key={item.id}
                         className="rounded-lg border border-gray-200 p-3 dark:border-gray-700"
@@ -781,7 +792,7 @@ export default function CustomersPage() {
                     icon={Briefcase}
                     emptyText="Nenhuma ordem de serviço encontrada para este cliente."
                   >
-                    {workspace.serviceOrders.slice(0, 5).map((item) => (
+                    {workspace.serviceOrders.slice(0, 5).map(item => (
                       <div
                         key={item.id}
                         className="rounded-lg border border-gray-200 p-3 dark:border-gray-700"
@@ -803,7 +814,9 @@ export default function CustomersPage() {
                             type="button"
                             size="sm"
                             variant="outline"
-                            onClick={() => navigate(buildServiceOrdersDeepLink(item.id))}
+                            onClick={() =>
+                              navigate(buildServiceOrdersDeepLink(item.id))
+                            }
                           >
                             <ArrowRightLeft className="mr-1 h-4 w-4" />
                             Abrir ordem
@@ -818,7 +831,7 @@ export default function CustomersPage() {
                     icon={Wallet}
                     emptyText="Nenhuma cobrança encontrada para este cliente."
                   >
-                    {workspace.charges.slice(0, 5).map((item) => (
+                    {workspace.charges.slice(0, 5).map(item => (
                       <div
                         key={item.id}
                         className="rounded-lg border border-gray-200 p-3 dark:border-gray-700"
@@ -844,7 +857,9 @@ export default function CustomersPage() {
                             type="button"
                             size="sm"
                             variant="outline"
-                            onClick={() => navigate(buildFinanceChargeUrl(item.id))}
+                            onClick={() =>
+                              navigate(buildFinanceChargeUrl(item.id))
+                            }
                           >
                             <ArrowRightLeft className="mr-1 h-4 w-4" />
                             Abrir cobrança
@@ -859,7 +874,7 @@ export default function CustomersPage() {
                     icon={History}
                     emptyText="Nenhum evento recente encontrado para este cliente."
                   >
-                    {workspace.timeline.slice(0, 8).map((item) => (
+                    {workspace.timeline.slice(0, 8).map(item => (
                       <div
                         key={item.id}
                         className="rounded-lg border border-gray-200 p-3 dark:border-gray-700"
@@ -897,6 +912,6 @@ export default function CustomersPage() {
         onClose={() => setEditingCustomerId(null)}
         onSaved={() => void listCustomers.refetch()}
       />
-    </div>
+    </PageShell>
   );
 }
