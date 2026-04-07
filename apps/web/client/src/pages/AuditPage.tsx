@@ -1,15 +1,15 @@
-import { useMemo, useState } from 'react'
-import { useAuth } from '@/contexts/AuthContext'
-import { trpc } from '@/lib/trpc'
-import { Button } from '@/components/ui/button'
+import { useMemo, useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { trpc } from "@/lib/trpc";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card'
-import { toast } from 'sonner'
+} from "@/components/ui/card";
+import { toast } from "sonner";
 import {
   RefreshCw,
   Search,
@@ -18,58 +18,63 @@ import {
   Clock,
   User,
   FileText,
-} from 'lucide-react'
+  Loader2,
+} from "lucide-react";
 
 type AuditEvent = {
-  id: string
-  action: string
-  entityType?: string | null
-  entityId?: string | null
-  description?: string | null
-  createdAt: string
-  actorName?: string
-  metadata?: Record<string, any> | null
-}
+  id: string;
+  action: string;
+  entityType?: string | null;
+  entityId?: string | null;
+  description?: string | null;
+  createdAt: string;
+  actorName?: string;
+  metadata?: Record<string, any> | null;
+};
 
 export default function AuditPage() {
-  const { isAuthenticated, isInitializing, user } = useAuth()
-  const canQuery = isAuthenticated && !isInitializing && user?.role === 'ADMIN'
+  const { isAuthenticated, isInitializing, user } = useAuth();
+  const canQuery = isAuthenticated && !isInitializing && user?.role === "ADMIN";
 
-  const [search, setSearch] = useState('')
-  const [action, setAction] = useState('')
-  const [page, setPage] = useState(1)
+  const [search, setSearch] = useState("");
+  const [action, setAction] = useState("");
+  const [page, setPage] = useState(1);
 
   const eventsQuery = trpc.audit.listEvents.useQuery(
     { page, limit: 50, action: action || undefined },
     { enabled: canQuery, retry: false }
-  )
+  );
 
   const summaryQuery = trpc.audit.getSummary.useQuery(
     {},
     { enabled: canQuery, retry: false }
-  )
+  );
 
   const events = useMemo<AuditEvent[]>(() => {
-    const payload = eventsQuery.data
+    const payload = eventsQuery.data;
     const rows = Array.isArray((payload as any)?.data)
       ? (payload as any).data
       : Array.isArray(payload)
         ? payload
-        : []
+        : [];
 
     return rows.filter((event: any) => {
-      if (!search) return true
-      const term = search.toLowerCase()
+      if (!search) return true;
+      const term = search.toLowerCase();
       return (
         String(event.action).toLowerCase().includes(term) ||
-        String(event.description ?? '').toLowerCase().includes(term) ||
-        String(event.actorName ?? '').toLowerCase().includes(term)
-      )
-    }) as AuditEvent[]
-  }, [eventsQuery.data, search])
+        String(event.description ?? "")
+          .toLowerCase()
+          .includes(term) ||
+        String(event.actorName ?? "")
+          .toLowerCase()
+          .includes(term)
+      );
+    }) as AuditEvent[];
+  }, [eventsQuery.data, search]);
 
   const summary = useMemo(() => {
-    const payload = summaryQuery.data
+    const payload = summaryQuery.data;
     return {
       total: Number((payload as any)?.total ?? 0),
       byAction: Array.isArray((payload as any)?.byAction)
@@ -78,23 +83,36 @@ export default function AuditPage() {
       byActor: Array.isArray((payload as any)?.byActor)
         ? (payload as any).byActor
         : [],
-    }
-  }, [summaryQuery.data])
+    };
+  }, [summaryQuery.data]);
 
   const topActions = useMemo(() => {
-    return summary.byAction.slice(0, 5)
-  }, [summary.byAction])
+    return summary.byAction.slice(0, 5);
+  }, [summary.byAction]);
 
   if (isInitializing) {
-    return <div className="p-6">Carregando...</div>
+    return (
+      <div className="nexo-surface flex min-h-[180px] items-center justify-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
+        <Loader2 className="h-4 w-4 animate-spin text-purple-500" />
+        Carregando auditoria...
+      </div>
+    );
   }
 
   if (!isAuthenticated) {
-    return <div className="p-6">Faça login.</div>
+    return (
+      <div className="nexo-surface min-h-[180px] p-6 text-sm text-zinc-500 dark:text-zinc-400">
+        Faça login para acessar a auditoria.
+      </div>
+    );
   }
 
-  if (user?.role !== 'ADMIN') {
-    return <div className="p-6">Acesso restrito a administradores.</div>
+  if (user?.role !== "ADMIN") {
+    return (
+      <div className="nexo-surface min-h-[180px] p-6 text-sm text-zinc-500 dark:text-zinc-400">
+        Acesso restrito a administradores.
+      </div>
+    );
   }
 
   return (
@@ -196,15 +214,11 @@ export default function AuditPage() {
                     type="text"
                     placeholder="Buscar por ação, descrição ou usuário..."
                     value={search}
-                    onChange={(e) => setSearch(e.target.value)}
+                    onChange={e => setSearch(e.target.value)}
                     className="w-full rounded-lg border border-zinc-200 bg-white pl-10 pr-3 py-2 text-sm text-zinc-900 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-purple-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:placeholder-zinc-400"
                   />
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-2"
-                >
+                <Button variant="outline" size="sm" className="gap-2">
                   <Filter className="h-4 w-4" />
                   Filtros
                 </Button>
@@ -220,7 +234,7 @@ export default function AuditPage() {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {events.map((event) => (
+                  {events.map(event => (
                     <div
                       key={event.id}
                       className="flex items-start gap-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-800/50"
@@ -234,7 +248,7 @@ export default function AuditPage() {
                             {event.action}
                           </span>
                           <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                            {new Date(event.createdAt).toLocaleString('pt-BR')}
+                            {new Date(event.createdAt).toLocaleString("pt-BR")}
                           </span>
                         </div>
                         {event.description && (
@@ -292,5 +306,5 @@ export default function AuditPage() {
         </Card>
       </div>
     </div>
-  )
+  );
 }

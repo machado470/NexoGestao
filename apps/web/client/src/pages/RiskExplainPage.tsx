@@ -1,15 +1,15 @@
-import { useMemo, useState } from 'react'
-import { useAuth } from '@/contexts/AuthContext'
-import { trpc } from '@/lib/trpc'
-import { Button } from '@/components/ui/button'
+import { useMemo, useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { trpc } from "@/lib/trpc";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card'
-import { toast } from 'sonner'
+} from "@/components/ui/card";
+import { toast } from "sonner";
 import {
   AlertTriangle,
   AlertCircle,
@@ -17,90 +17,113 @@ import {
   TrendingUp,
   RefreshCw,
   Search,
-} from 'lucide-react'
+  Loader2,
+} from "lucide-react";
 
 type RiskFactor = {
-  factor: string
-  weight: number
-  impact: 'high' | 'medium' | 'low'
-  reason: string
-}
+  factor: string;
+  weight: number;
+  impact: "high" | "medium" | "low";
+  reason: string;
+};
 
 type RiskExplanation = {
-  personId: string
-  personName: string
-  riskScore: number
-  operationalRiskScore: number
-  operationalState: string
-  factors: RiskFactor[]
-  summary: string
-  recommendations: string[]
-  lastUpdated: string
-}
+  personId: string;
+  personName: string;
+  riskScore: number;
+  operationalRiskScore: number;
+  operationalState: string;
+  factors: RiskFactor[];
+  summary: string;
+  recommendations: string[];
+  lastUpdated: string;
+};
 
 function getRiskColor(score: number): string {
-  if (score >= 80) return 'text-red-600 dark:text-red-400'
-  if (score >= 60) return 'text-orange-600 dark:text-orange-400'
-  if (score >= 40) return 'text-yellow-600 dark:text-yellow-400'
-  if (score >= 20) return 'text-orange-600 dark:text-orange-300'
-  return 'text-green-600 dark:text-green-400'
+  if (score >= 80) return "text-red-600 dark:text-red-400";
+  if (score >= 60) return "text-orange-600 dark:text-orange-400";
+  if (score >= 40) return "text-yellow-600 dark:text-yellow-400";
+  if (score >= 20) return "text-orange-600 dark:text-orange-300";
+  return "text-green-600 dark:text-green-400";
 }
 
 function getRiskBgColor(score: number): string {
-  if (score >= 80) return 'bg-red-100 dark:bg-red-900/30'
-  if (score >= 60) return 'bg-orange-100 dark:bg-orange-900/30'
-  if (score >= 40) return 'bg-yellow-100 dark:bg-yellow-900/30'
-  if (score >= 20) return 'bg-orange-100 dark:bg-orange-500/20'
-  return 'bg-green-100 dark:bg-green-900/30'
+  if (score >= 80) return "bg-red-100 dark:bg-red-900/30";
+  if (score >= 60) return "bg-orange-100 dark:bg-orange-900/30";
+  if (score >= 40) return "bg-yellow-100 dark:bg-yellow-900/30";
+  if (score >= 20) return "bg-orange-100 dark:bg-orange-500/20";
+  return "bg-green-100 dark:bg-green-900/30";
 }
 
 function getImpactIcon(impact: string) {
   switch (impact) {
-    case 'high':
-      return <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
-    case 'medium':
-      return <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400" />
-    case 'low':
-      return <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+    case "high":
+      return (
+        <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
+      );
+    case "medium":
+      return (
+        <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+      );
+    case "low":
+      return (
+        <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+      );
     default:
-      return null
+      return null;
   }
 }
 
 export default function RiskExplainPage() {
-  const { isAuthenticated, isInitializing, user } = useAuth()
-  const canQuery = isAuthenticated && !isInitializing && (user?.role === 'ADMIN' || user?.role === 'MANAGER')
+  const { isAuthenticated, isInitializing, user } = useAuth();
+  const canQuery =
+    isAuthenticated &&
+    !isInitializing &&
+    (user?.role === "ADMIN" || user?.role === "MANAGER");
 
-  const [personId, setPersonId] = useState('')
-  const [searchInput, setSearchInput] = useState('')
+  const [personId, setPersonId] = useState("");
+  const [searchInput, setSearchInput] = useState("");
 
   const riskQuery = trpc.risk.explainPerson.useQuery(
     { personId },
     { enabled: canQuery && Boolean(personId), retry: false }
-  )
+  );
 
   const explanation = useMemo<RiskExplanation | null>(() => {
-    const payload = riskQuery.data
-    if (!payload) return null
-    return (payload as any)?.data ?? null
-  }, [riskQuery.data])
+    const payload = riskQuery.data;
+    if (!payload) return null;
+    return (payload as any)?.data ?? null;
+  }, [riskQuery.data]);
 
   const handleSearch = () => {
     if (searchInput.trim()) {
-      setPersonId(searchInput.trim())
+      setPersonId(searchInput.trim());
     }
-  }
+  };
 
   if (isInitializing) {
-    return <div className="p-6">Carregando...</div>
+    return (
+      <div className="nexo-surface flex min-h-[180px] items-center justify-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
+        <Loader2 className="h-4 w-4 animate-spin text-red-500" />
+        Carregando análise de risco...
+      </div>
+    );
   }
 
   if (!isAuthenticated) {
-    return <div className="p-6">Faça login.</div>
+    return (
+      <div className="nexo-surface min-h-[180px] p-6 text-sm text-zinc-500 dark:text-zinc-400">
+        Faça login para acessar a análise de risco.
+      </div>
+    );
   }
 
-  if (user?.role !== 'ADMIN' && user?.role !== 'MANAGER') {
-    return <div className="p-6">Acesso restrito a administradores e gerentes.</div>
+  if (user?.role !== "ADMIN" && user?.role !== "MANAGER") {
+    return (
+      <div className="nexo-surface min-h-[180px] p-6 text-sm text-zinc-500 dark:text-zinc-400">
+        Acesso restrito a administradores e gerentes.
+      </div>
+    );
   }
 
   return (
@@ -116,8 +139,8 @@ export default function RiskExplainPage() {
             Análise Detalhada de Risco
           </h2>
           <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            Entenda por que cada pessoa tem um score de risco específico. Decomposição
-            transparente de fatores e recomendações.
+            Entenda por que cada pessoa tem um score de risco específico.
+            Decomposição transparente de fatores e recomendações.
           </p>
         </div>
 
@@ -149,9 +172,9 @@ export default function RiskExplainPage() {
                 type="text"
                 placeholder="ID ou nome da pessoa..."
                 value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleSearch()
+                onChange={e => setSearchInput(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === "Enter") handleSearch();
                 }}
                 className="w-full rounded-lg border border-zinc-200 bg-white pl-10 pr-3 py-2 text-sm text-zinc-900 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-red-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:placeholder-zinc-400"
               />
@@ -195,19 +218,23 @@ export default function RiskExplainPage() {
                 <div>
                   <CardTitle>{explanation.personName}</CardTitle>
                   <CardDescription>
-                    Análise atualizada em{' '}
-                    {new Date(explanation.lastUpdated).toLocaleString('pt-BR')}
+                    Análise atualizada em{" "}
+                    {new Date(explanation.lastUpdated).toLocaleString("pt-BR")}
                   </CardDescription>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
               <div className="grid gap-4 md:grid-cols-4">
-                <div className={`rounded-lg ${getRiskBgColor(explanation.riskScore)} p-4`}>
+                <div
+                  className={`rounded-lg ${getRiskBgColor(explanation.riskScore)} p-4`}
+                >
                   <div className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
                     Score de Risco
                   </div>
-                  <div className={`mt-2 text-3xl font-bold ${getRiskColor(explanation.riskScore)}`}>
+                  <div
+                    className={`mt-2 text-3xl font-bold ${getRiskColor(explanation.riskScore)}`}
+                  >
                     {explanation.riskScore}
                   </div>
                 </div>
@@ -268,9 +295,7 @@ export default function RiskExplainPage() {
                     key={idx}
                     className="flex items-start gap-3 rounded-lg border border-zinc-200 p-3 dark:border-zinc-700"
                   >
-                    <div className="mt-0.5">
-                      {getImpactIcon(factor.impact)}
-                    </div>
+                    <div className="mt-0.5">{getImpactIcon(factor.impact)}</div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
                         <span className="font-medium text-zinc-900 dark:text-white">
@@ -286,11 +311,11 @@ export default function RiskExplainPage() {
                       <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-700">
                         <div
                           className={`h-full ${
-                            factor.impact === 'high'
-                              ? 'bg-red-500'
-                              : factor.impact === 'medium'
-                                ? 'bg-orange-500'
-                                : 'bg-green-500'
+                            factor.impact === "high"
+                              ? "bg-red-500"
+                              : factor.impact === "medium"
+                                ? "bg-orange-500"
+                                : "bg-green-500"
                           }`}
                           style={{ width: `${Math.min(factor.weight, 100)}%` }}
                         />
@@ -326,5 +351,5 @@ export default function RiskExplainPage() {
         </div>
       )}
     </div>
-  )
+  );
 }

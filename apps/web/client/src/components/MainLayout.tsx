@@ -23,7 +23,6 @@ import {
   Sparkles,
   History,
   Building2,
-  Loader2,
 } from "lucide-react";
 
 interface MainLayoutProps {
@@ -232,9 +231,9 @@ export function MainLayout({ children }: MainLayoutProps) {
 
   const visibleSections = useMemo(() => {
     return menuSections
-      .map((section) => ({
+      .map(section => ({
         ...section,
-        items: section.items.filter((item) => {
+        items: section.items.filter(item => {
           if (!item.permissions?.length) {
             return true;
           }
@@ -246,7 +245,7 @@ export function MainLayout({ children }: MainLayoutProps) {
           return canAny(role, item.permissions);
         }),
       }))
-      .filter((section) => section.items.length > 0);
+      .filter(section => section.items.length > 0);
   }, [role]);
 
   const pageTitle = useMemo(() => getPageTitle(location), [location]);
@@ -294,7 +293,7 @@ export function MainLayout({ children }: MainLayoutProps) {
 
               <button
                 type="button"
-                onClick={() => setSidebarCollapsed((prev) => !prev)}
+                onClick={() => setSidebarCollapsed(prev => !prev)}
                 className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-zinc-500 transition-colors hover:bg-zinc-100/80 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-white/[0.05] dark:hover:text-white"
               >
                 {sidebarCollapsed ? (
@@ -308,7 +307,7 @@ export function MainLayout({ children }: MainLayoutProps) {
 
           <nav className="min-h-0 flex-1 overflow-y-auto px-2 py-3">
             <div className="space-y-4">
-              {visibleSections.map((section) => (
+              {visibleSections.map(section => (
                 <div key={section.id}>
                   {!sidebarCollapsed && (
                     <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-400 dark:text-zinc-500">
@@ -317,7 +316,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                   )}
 
                   <div className="space-y-1">
-                    {section.items.map((item) => {
+                    {section.items.map(item => {
                       const Icon = item.icon;
                       const active = isRouteActive(location, item.route);
 
@@ -379,17 +378,12 @@ export function MainLayout({ children }: MainLayoutProps) {
                 className={`flex w-full items-center rounded-xl px-2.5 py-2 text-[13px] text-red-600 transition-colors hover:bg-red-50/90 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:text-red-400 dark:hover:bg-red-500/10 dark:hover:text-red-300 dark:focus-visible:ring-offset-[#0d1015] ${
                   sidebarCollapsed ? "justify-center" : "gap-2.5"
                 }`}
+                aria-busy={isLoggingOut}
               >
-                {isLoggingOut ? (
-                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-                ) : (
-                  <LogOut className="h-4 w-4 shrink-0" />
-                )}
+                <LogOut className="h-4 w-4 shrink-0" />
 
                 {!sidebarCollapsed && (
-                  <span className="truncate font-medium">
-                    {isLoggingOut ? "Saindo..." : "Sair"}
-                  </span>
+                  <span className="truncate font-medium">Sair</span>
                 )}
               </button>
             </div>

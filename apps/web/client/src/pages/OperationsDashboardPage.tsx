@@ -104,12 +104,10 @@ export default function OperationsDashboardPage() {
       ]);
 
       if (variables?.serviceOrderId) {
-        navigate(
-          buildOperationsServiceOrderUrl(variables.serviceOrderId)
-        );
+        navigate(buildOperationsServiceOrderUrl(variables.serviceOrderId));
       }
     },
-    onError: (error) => {
+    onError: error => {
       toast.error(error.message || "Não foi possível iniciar a execução");
     },
   });
@@ -127,7 +125,7 @@ export default function OperationsDashboardPage() {
         navigate(buildOperationsServiceOrderUrl(variables.id));
       }
     },
-    onError: (error) => {
+    onError: error => {
       toast.error(error.message || "Não foi possível finalizar a execução");
     },
   });
@@ -197,11 +195,19 @@ export default function OperationsDashboardPage() {
   }
 
   if (isInitializing) {
-    return <div className="p-6">Carregando...</div>;
+    return (
+      <div className="nexo-surface min-h-[180px] p-6 text-sm text-zinc-500 dark:text-zinc-400">
+        Carregando centro de operações...
+      </div>
+    );
   }
 
   if (!isAuthenticated) {
-    return <div className="p-6">Faça login.</div>;
+    return (
+      <div className="nexo-surface min-h-[180px] p-6 text-sm text-zinc-500 dark:text-zinc-400">
+        Faça login para acessar o centro de operações.
+      </div>
+    );
   }
 
   return (
@@ -406,7 +412,9 @@ export default function OperationsDashboardPage() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => finishExecution.mutate({ id: order.id })}
+                          onClick={() =>
+                            finishExecution.mutate({ id: order.id })
+                          }
                           className="rounded-xl"
                         >
                           Finalizar execução
