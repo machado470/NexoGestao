@@ -3,6 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/contexts/AuthContext";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PageHero, PageShell, SurfaceSection } from "@/components/PagePattern";
 import {
   normalizeArrayPayload,
   normalizeObjectPayload,
@@ -116,7 +117,11 @@ export default function PeoplePage() {
   }
 
   if (!isAuthenticated) {
-    return <div className="p-6">Faça login</div>;
+    return (
+      <PageShell>
+        <PageHero eyebrow="Pessoas" title="Pessoas" description="Sua sessão não está ativa." />
+      </PageShell>
+    );
   }
 
   if (isInitialLoading) {
@@ -128,12 +133,21 @@ export default function PeoplePage() {
   }
 
   if (shouldBlockForError) {
-    return <div className="p-6 text-red-500">{errorMessage}</div>;
+    return (
+      <PageShell>
+        <PageHero eyebrow="Pessoas" title="Pessoas" description="Não foi possível carregar os dados de pessoas." />
+        <SurfaceSection className="border-red-200 text-red-700 dark:border-red-900/40 dark:text-red-300">{errorMessage}</SurfaceSection>
+      </PageShell>
+    );
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-bold">Pessoas</h1>
+    <PageShell>
+      <PageHero
+        eyebrow="Pessoas"
+        title="Pessoas"
+        description="Base de pessoas conectada à operação, com a mesma leitura visual do dashboard executivo."
+      />
 
       {hasError && !shouldBlockForError ? (
         <div className="rounded border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200">
@@ -143,16 +157,16 @@ export default function PeoplePage() {
 
       <Button type="button">Nova pessoa</Button>
 
-      <div className="rounded border p-4 text-sm opacity-80">
+      <SurfaceSection className="text-sm opacity-80">
         Pessoas vinculadas: {linkedStats?.count ?? 0}
-      </div>
+      </SurfaceSection>
 
       {people.length === 0 ? (
-        <div className="rounded border p-4">Nenhuma pessoa</div>
+        <SurfaceSection>Nenhuma pessoa</SurfaceSection>
       ) : (
         <div className="space-y-2">
           {people.map((p) => (
-            <div key={p.id} className="rounded border p-3">
+            <div key={p.id} className="nexo-surface p-4">
               <div className="font-medium">{p.name}</div>
               <div className="text-sm text-gray-500">
                 {getStateLabel(p.operationalState)}
@@ -161,6 +175,6 @@ export default function PeoplePage() {
           ))}
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }

@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import FinanceOverviewAreaChart from "@/components/finance/FinanceOverviewAreaChart";
 import { Loader2 } from "lucide-react";
+import { PageHero, PageShell, SurfaceSection } from "@/components/PagePattern";
 
 /* ================= HELPERS ================= */
 
@@ -98,7 +99,15 @@ export default function FinancesPage() {
   }
 
   if (!isAuthenticated) {
-    return <div className="p-6">Faça login</div>;
+    return (
+      <PageShell>
+        <PageHero
+          eyebrow="Financeiro"
+          title="Financeiro"
+          description="Sua sessão não está ativa."
+        />
+      </PageShell>
+    );
   }
 
   if (isInitialLoading) {
@@ -110,12 +119,23 @@ export default function FinancesPage() {
   }
 
   if (shouldBlockForError) {
-    return <div className="p-6 text-red-500">{errorMessage}</div>;
+    return (
+      <PageShell>
+        <PageHero eyebrow="Financeiro" title="Financeiro" description="Não foi possível carregar os dados financeiros." />
+        <SurfaceSection className="border-red-200 text-red-700 dark:border-red-900/40 dark:text-red-300">
+          {errorMessage}
+        </SurfaceSection>
+      </PageShell>
+    );
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-bold">Financeiro</h1>
+    <PageShell>
+      <PageHero
+        eyebrow="Financeiro"
+        title="Financeiro"
+        description="Leitura consolidada de cobrança, recebimento e pendências sem alterar o fluxo funcional."
+      />
 
       {stats && !isServiceOrderScoped && (
         <FinanceOverviewAreaChart
@@ -126,11 +146,11 @@ export default function FinancesPage() {
       )}
 
       {charges.length === 0 ? (
-        <div>Nenhuma cobrança</div>
+        <SurfaceSection className="text-sm text-zinc-500 dark:text-zinc-400">Nenhuma cobrança</SurfaceSection>
       ) : (
         <div className="space-y-3">
           {charges.map((c: any) => (
-            <Card key={c.id}>
+            <Card key={c.id} className="nexo-surface border-slate-200/70 bg-white/90 dark:border-white/8">
               <CardContent className="flex justify-between pt-4">
                 <div>
                   <p>{c.customer?.name}</p>
@@ -144,6 +164,6 @@ export default function FinancesPage() {
           ))}
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }

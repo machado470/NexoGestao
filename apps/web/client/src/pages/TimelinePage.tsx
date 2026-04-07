@@ -24,6 +24,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { PageHero, PageShell, SurfaceSection } from "@/components/PagePattern";
 import {
   formatDateTime,
   getTimelineEventDescription,
@@ -173,7 +174,7 @@ function SummaryCard({
   valueClassName?: string;
 }) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+    <div className="nexo-kpi-card">
       <p className="text-sm text-gray-500 dark:text-gray-400">{title}</p>
       <p
         className={`mt-1 text-2xl font-bold text-gray-900 dark:text-white ${
@@ -330,27 +331,12 @@ export default function TimelinePage() {
     customersQuery.isLoading || (Boolean(customerId) && timelineQuery.isLoading);
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-        <div className="max-w-3xl">
-          <div className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs font-medium text-orange-700 dark:border-orange-900/40 dark:bg-orange-950/20 dark:text-orange-300">
-            <Sparkles className="h-3.5 w-3.5" />
-            Auditoria operacional com leitura humana
-          </div>
-
-          <h1 className="mt-3 flex items-center gap-2 text-2xl font-bold text-gray-900 dark:text-white">
-            <History className="h-6 w-6 text-orange-500" />
-            Timeline
-          </h1>
-
-          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-            Aqui o sistema para de parecer tela solta e mostra a história da
-            operação: agenda, execução, financeiro, risco e governança em ordem
-            cronológica.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
+    <PageShell>
+      <PageHero
+        eyebrow="Auditoria operacional com leitura humana"
+        title="Timeline"
+        description="Aqui o sistema mostra a história da operação: agenda, execução, financeiro, risco e governança em ordem cronológica."
+        actions={<>
           <Button
             variant="outline"
             onClick={() => void timelineQuery.refetch()}
@@ -374,8 +360,8 @@ export default function TimelinePage() {
             <FileJson className="h-4 w-4" />
             {showMetadata ? "Ocultar metadata" : "Mostrar metadata"}
           </Button>
-        </div>
-      </div>
+        </>}
+      />
 
       {hasFatalError ? (
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300">
@@ -413,7 +399,7 @@ export default function TimelinePage() {
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[340px_1fr]">
         <div className="space-y-4">
-          <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+          <div className="nexo-kpi-card">
             <div className="mb-4 flex items-center gap-2">
               <Filter className="h-4 w-4 text-orange-500" />
               <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
@@ -508,7 +494,7 @@ export default function TimelinePage() {
             </div>
           </div>
 
-          <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+          <div className="nexo-kpi-card">
             <div className="mb-3 flex items-center gap-2">
               <ArrowRight className="h-4 w-4 text-orange-500" />
               <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
@@ -517,7 +503,7 @@ export default function TimelinePage() {
             </div>
 
             <div className="space-y-3 text-sm text-gray-600 dark:text-gray-400">
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/40">
+              <div className="nexo-subtle-surface p-3">
                 <p className="font-medium text-gray-900 dark:text-white">
                   Agenda → execução
                 </p>
@@ -527,7 +513,7 @@ export default function TimelinePage() {
                 </p>
               </div>
 
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/40">
+              <div className="nexo-subtle-surface p-3">
                 <p className="font-medium text-gray-900 dark:text-white">
                   Execução → financeiro
                 </p>
@@ -537,7 +523,7 @@ export default function TimelinePage() {
                 </p>
               </div>
 
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/40">
+              <div className="nexo-subtle-surface p-3">
                 <p className="font-medium text-gray-900 dark:text-white">
                   Risco → governança
                 </p>
@@ -550,7 +536,7 @@ export default function TimelinePage() {
           </div>
         </div>
 
-        <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+        <div className="nexo-kpi-card">
           <div className="mb-4 flex items-center gap-2">
             <CalendarDays className="h-4 w-4 text-orange-500" />
             <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
@@ -584,7 +570,7 @@ export default function TimelinePage() {
                 return (
                   <div
                     key={event.id}
-                    className="rounded-xl border border-gray-200 p-4 dark:border-gray-700"
+                    className="nexo-subtle-surface p-4"
                   >
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                       <div className="min-w-0 flex-1">
@@ -676,7 +662,7 @@ export default function TimelinePage() {
                     </div>
 
                     {showMetadata && event.metadata ? (
-                      <pre className="mt-4 overflow-x-auto rounded-lg bg-gray-50 p-3 text-xs text-gray-700 dark:bg-gray-900 dark:text-gray-300">
+                      <pre className="mt-4 overflow-x-auto rounded-lg bg-slate-50 p-3 text-xs text-gray-700 dark:bg-gray-900 dark:text-gray-300">
                         {JSON.stringify(event.metadata, null, 2)}
                       </pre>
                     ) : null}
@@ -687,6 +673,6 @@ export default function TimelinePage() {
           )}
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 }

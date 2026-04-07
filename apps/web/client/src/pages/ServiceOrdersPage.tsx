@@ -17,6 +17,7 @@ import {
   matchesFinancialFilter,
 } from "@/lib/operations/operations.selectors";
 import { MessageCircle, Plus, RefreshCw, ArrowLeft } from "lucide-react";
+import { PageHero, PageShell, SurfaceSection } from "@/components/PagePattern";
 
 import ServiceOrderCard from "@/components/service-orders/ServiceOrderCard";
 import ServiceOrderDetailsPanel from "@/components/service-orders/ServiceOrderDetailsPanel";
@@ -219,41 +220,36 @@ export default function ServiceOrdersPage() {
   const hasError = ordersQuery.error || customersQuery.error;
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-        <div className="flex items-center gap-2">
-          {activeId && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={closeActivePanel}
-              className="gap-2"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Voltar para a lista
+    <PageShell>
+      <PageHero
+        eyebrow="Execução operacional"
+        title="Ordens de Serviço"
+        description="Fila operacional central do NexoGestão com o mesmo padrão visual da visão executiva."
+        actions={
+          <>
+            {activeId && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={closeActivePanel}
+                className="gap-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Voltar para a lista
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => void refreshAll()}>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Atualizar
             </Button>
-          )}
 
-          <div>
-            <h1 className="text-2xl font-semibold">Ordens de Serviço</h1>
-            <p className="text-sm text-muted-foreground">
-              Fila operacional central do NexoGestão.
-            </p>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => void refreshAll()}>
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Atualizar
-          </Button>
-
-          <Button onClick={() => setIsCreateOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Nova O.S.
-          </Button>
-        </div>
-      </div>
+            <Button onClick={() => setIsCreateOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Nova O.S.
+            </Button>
+          </>
+        }
+      />
 
       {activeId && (
         <div className="rounded-lg border border-orange-200 bg-orange-50 p-3 text-sm text-orange-800 dark:border-orange-900/40 dark:bg-orange-950/20 dark:text-orange-300">
@@ -263,7 +259,7 @@ export default function ServiceOrdersPage() {
       )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-        <Card>
+        <Card className="nexo-kpi-card">
           <CardContent className="p-4">
             <div className="text-xs uppercase tracking-wide text-muted-foreground">
               Total de O.S.
@@ -272,7 +268,7 @@ export default function ServiceOrdersPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="nexo-kpi-card">
           <CardContent className="p-4">
             <div className="text-xs uppercase tracking-wide text-muted-foreground">
               Visíveis agora
@@ -281,7 +277,7 @@ export default function ServiceOrdersPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="nexo-kpi-card">
           <CardContent className="p-4">
             <div className="text-xs uppercase tracking-wide text-muted-foreground">
               Fila operacional
@@ -290,7 +286,7 @@ export default function ServiceOrdersPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="nexo-kpi-card">
           <CardContent className="p-4">
             <div className="text-xs uppercase tracking-wide text-muted-foreground">
               Pedindo ação
@@ -300,7 +296,7 @@ export default function ServiceOrdersPage() {
         </Card>
       </div>
 
-      <Card>
+      <Card className="nexo-kpi-card">
         <CardContent className="flex flex-col gap-3 p-4 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex-1">
             <input
@@ -327,19 +323,19 @@ export default function ServiceOrdersPage() {
       </Card>
 
       {isLoading ? (
-        <Card>
+        <Card className="nexo-kpi-card">
           <CardContent className="p-6 text-sm text-muted-foreground">
             Carregando ordens de serviço...
           </CardContent>
         </Card>
       ) : hasError ? (
-        <Card>
+        <Card className="nexo-kpi-card">
           <CardContent className="p-6 text-sm text-red-600">
             Erro ao carregar a fila operacional.
           </CardContent>
         </Card>
       ) : sorted.length === 0 ? (
-        <Card>
+        <Card className="nexo-kpi-card">
           <CardContent className="space-y-3 p-6 text-sm text-muted-foreground">
             <div>Nenhuma ordem encontrada para os filtros atuais.</div>
             <div className="flex gap-2">
@@ -391,7 +387,7 @@ export default function ServiceOrdersPage() {
             {activeOrder ? (
               <ServiceOrderDetailsPanel os={activeOrder} />
             ) : (
-              <Card>
+              <Card className="nexo-kpi-card">
                 <CardContent className="space-y-3 p-6">
                   <div className="text-sm font-medium">
                     Selecione uma O.S. para abrir o hub operacional.
@@ -410,7 +406,7 @@ export default function ServiceOrdersPage() {
             )}
 
             {activeOrder?.customer?.phone ? (
-              <Card>
+              <Card className="nexo-kpi-card">
                 <CardContent className="p-4">
                   <div className="mb-2 text-xs uppercase tracking-wide text-muted-foreground">
                     Atalho rápido
@@ -450,6 +446,6 @@ export default function ServiceOrdersPage() {
         serviceOrderId={editId}
         people={[]}
       />
-    </div>
+    </PageShell>
   );
 }

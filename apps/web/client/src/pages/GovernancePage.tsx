@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { getErrorMessage, getPayloadValue } from "@/lib/query-helpers";
 import { useAuth } from "@/contexts/AuthContext";
+import { PageHero, PageShell, SurfaceSection } from "@/components/PagePattern";
 
 /* ================= HELPERS ================= */
 
@@ -123,20 +124,37 @@ export default function GovernancePage() {
   }
 
   if (!isAuthenticated) {
-    return <div className="p-6">Faça login</div>;
+    return (
+      <PageShell>
+        <PageHero eyebrow="Governança" title="Governança" description="Sua sessão não está ativa." />
+      </PageShell>
+    );
   }
 
   if (isInitialLoading) {
-    return <div className="p-6">Carregando...</div>;
+    return (
+      <PageShell>
+        <PageHero eyebrow="Governança" title="Governança" description="Carregando leituras de risco institucional." />
+      </PageShell>
+    );
   }
 
   if (shouldBlockForError) {
-    return <div className="p-6 text-red-500">{errorMessage}</div>;
+    return (
+      <PageShell>
+        <PageHero eyebrow="Governança" title="Governança" description="Não foi possível montar os blocos de governança." />
+        <SurfaceSection className="border-red-200 text-red-700 dark:border-red-900/40 dark:text-red-300">{errorMessage}</SurfaceSection>
+      </PageShell>
+    );
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-bold">Governança</h1>
+    <PageShell>
+      <PageHero
+        eyebrow="Governança"
+        title="Governança"
+        description="Visão de score institucional e histórico de execução com o mesmo padrão visual do painel executivo."
+      />
 
       {hasError && !shouldBlockForError ? (
         <div className="rounded border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200">
@@ -145,12 +163,12 @@ export default function GovernancePage() {
       ) : null}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div className="rounded border p-4">
+        <div className="nexo-kpi-card">
           <p className="text-sm opacity-70">Score</p>
           <p className="text-xl font-semibold">{institutionalRiskScore}</p>
         </div>
 
-        <div className="rounded border p-4">
+        <div className="nexo-kpi-card">
           <p className="text-sm opacity-70">Nível</p>
           <p className="text-xl font-semibold">
             {formatRiskLevel(institutionalRiskScore)}
@@ -159,7 +177,7 @@ export default function GovernancePage() {
       </div>
 
       {runs.length > 0 ? (
-        <div className="space-y-2">
+        <SurfaceSection className="space-y-2">
           <h2 className="font-semibold">Histórico</h2>
 
           {runs.map((r: any) => (
@@ -167,12 +185,12 @@ export default function GovernancePage() {
               {formatDate(r.createdAt)} - {Number(r.institutionalRiskScore ?? r.score ?? 0)}
             </div>
           ))}
-        </div>
+        </SurfaceSection>
       ) : (
-        <div className="rounded border p-4 text-sm opacity-70">
+        <SurfaceSection className="text-sm opacity-70">
           Nenhum histórico de governança disponível ainda.
-        </div>
+        </SurfaceSection>
       )}
-    </div>
+    </PageShell>
   );
 }

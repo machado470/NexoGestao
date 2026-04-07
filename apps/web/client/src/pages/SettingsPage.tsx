@@ -3,6 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { normalizeObjectPayload } from "@/lib/query-helpers";
+import { PageHero, PageShell, SurfaceSection } from "@/components/PagePattern";
 
 type SettingsFormData = {
   name: string;
@@ -114,29 +115,44 @@ export default function SettingsPage() {
   }
 
   if (!isAuthenticated) {
-    return <div className="p-6">Faça login</div>;
+    return (
+      <PageShell>
+        <PageHero eyebrow="Configurações" title="Configurações" description="Sua sessão não está ativa." />
+      </PageShell>
+    );
   }
 
   if (isInitialLoading) {
-    return <div className="p-6">Carregando...</div>;
+    return (
+      <PageShell>
+        <PageHero eyebrow="Configurações" title="Configurações" description="Carregando dados da organização." />
+      </PageShell>
+    );
   }
 
   if (shouldBlockForError) {
     return (
-      <div className="p-6 text-red-500">
-        {query.error?.message || "Erro ao carregar configurações"}
-      </div>
+      <PageShell>
+        <PageHero eyebrow="Configurações" title="Configurações" description="Não foi possível carregar as configurações." />
+        <SurfaceSection className="border-red-200 text-red-700 dark:border-red-900/40 dark:text-red-300">
+          {query.error?.message || "Erro ao carregar configurações"}
+        </SurfaceSection>
+      </PageShell>
     );
   }
 
   return (
-    <div className="space-y-6 p-6">
-      <h1 className="text-2xl font-bold">Configurações</h1>
+    <PageShell>
+      <PageHero
+        eyebrow="Configurações"
+        title="Configurações"
+        description="Ajustes institucionais com padrão visual unificado do dashboard executivo."
+      />
 
       {!hasData ? (
-        <div className="rounded border p-4 text-sm opacity-70">
+        <SurfaceSection className="text-sm opacity-70">
           Nenhuma configuração carregada ainda. Você já pode preencher e salvar.
-        </div>
+        </SurfaceSection>
       ) : null}
 
       {hasError && !shouldBlockForError ? (
@@ -146,48 +162,50 @@ export default function SettingsPage() {
         </div>
       ) : null}
 
-      <form
-        className="space-y-4"
-        onSubmit={(e) => {
-          e.preventDefault();
-          mutation.mutate(form);
-        }}
-      >
-        <input
-          className="w-full rounded border p-2"
-          value={form.name}
-          onChange={(e) =>
-            setForm((prev) => ({ ...prev, name: e.target.value }))
-          }
-          placeholder="Nome da organização"
-        />
-
-        <input
-          className="w-full rounded border p-2"
-          value={form.timezone}
-          onChange={(e) =>
-            setForm((prev) => ({ ...prev, timezone: e.target.value }))
-          }
-          placeholder="Timezone"
-        />
-
-        <input
-          className="w-full rounded border p-2"
-          value={form.currency}
-          onChange={(e) =>
-            setForm((prev) => ({ ...prev, currency: e.target.value }))
-          }
-          placeholder="Moeda"
-        />
-
-        <button
-          className="rounded bg-orange-500 px-4 py-2 text-black disabled:opacity-50"
-          disabled={!hasChanges || mutation.isPending}
-          type="submit"
+      <SurfaceSection>
+        <form
+          className="space-y-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            mutation.mutate(form);
+          }}
         >
-          {mutation.isPending ? "Salvando..." : "Salvar"}
-        </button>
-      </form>
-    </div>
+          <input
+            className="w-full rounded border p-2"
+            value={form.name}
+            onChange={(e) =>
+              setForm((prev) => ({ ...prev, name: e.target.value }))
+            }
+            placeholder="Nome da organização"
+          />
+
+          <input
+            className="w-full rounded border p-2"
+            value={form.timezone}
+            onChange={(e) =>
+              setForm((prev) => ({ ...prev, timezone: e.target.value }))
+            }
+            placeholder="Timezone"
+          />
+
+          <input
+            className="w-full rounded border p-2"
+            value={form.currency}
+            onChange={(e) =>
+              setForm((prev) => ({ ...prev, currency: e.target.value }))
+            }
+            placeholder="Moeda"
+          />
+
+          <button
+            className="rounded bg-orange-500 px-4 py-2 text-black disabled:opacity-50"
+            disabled={!hasChanges || mutation.isPending}
+            type="submit"
+          >
+            {mutation.isPending ? "Salvando..." : "Salvar"}
+          </button>
+        </form>
+      </SurfaceSection>
+    </PageShell>
   );
 }

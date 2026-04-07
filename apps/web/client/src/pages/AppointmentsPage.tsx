@@ -32,6 +32,7 @@ import {
   normalizeOrders,
 } from "@/lib/operations/operations.utils";
 import { normalizeArrayPayload } from "@/lib/query-helpers";
+import { PageHero, PageShell } from "@/components/PagePattern";
 
 type CustomerRef = {
   id: string;
@@ -201,7 +202,7 @@ function InfoItem({
   value: string;
 }) {
   return (
-    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/40">
+    <div className="nexo-subtle-surface p-3">
       <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
         {label}
       </p>
@@ -224,7 +225,7 @@ function SummaryCard({
   valueClassName?: string;
 }) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+    <div className="nexo-kpi-card">
       <p className="text-sm text-gray-600 dark:text-gray-400">{title}</p>
       <p
         className={`mt-1 text-2xl font-bold text-gray-900 dark:text-white ${
@@ -566,26 +567,12 @@ export default function AppointmentsPage() {
   const hasLocalFilters = Boolean(searchQuery);
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-        <div className="max-w-3xl">
-          <div className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs font-medium text-orange-700 dark:border-orange-900/40 dark:bg-orange-950/20 dark:text-orange-300">
-            <ArrowRight className="h-3.5 w-3.5" />
-            Porta de entrada da operação
-          </div>
-
-          <h1 className="mt-3 flex items-center gap-2 text-3xl font-bold text-gray-900 dark:text-white">
-            <Calendar className="h-8 w-8 text-orange-500" />
-            Agendamentos
-          </h1>
-
-          <p className="mt-2 text-gray-600 dark:text-gray-400">
-            O agendamento não é agenda solta. Ele é o ponto onde o cliente entra
-            no fluxo, confirma presença, vira execução e puxa o resto da operação.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
+    <PageShell>
+      <PageHero
+        eyebrow="Porta de entrada da operação"
+        title="Agendamentos"
+        description="O agendamento é o ponto onde o cliente entra no fluxo, confirma presença, vira execução e puxa o resto da operação."
+        actions={<>
           <Button
             type="button"
             variant="outline"
@@ -609,8 +596,8 @@ export default function AppointmentsPage() {
             <Plus className="h-4 w-4" />
             Novo Agendamento
           </Button>
-        </div>
-      </div>
+        </>}
+      />
 
       <div className="grid gap-3 md:grid-cols-[1fr_auto_auto]">
         <div className="relative">
@@ -1006,7 +993,7 @@ export default function AppointmentsPage() {
                   </div>
 
                   <div className="grid gap-3 md:grid-cols-3">
-                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/40">
+                    <div className="nexo-subtle-surface p-3">
                       <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
                         <Briefcase className="h-3.5 w-3.5" />
                         Execução
@@ -1023,7 +1010,7 @@ export default function AppointmentsPage() {
                       </p>
                     </div>
 
-                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/40">
+                    <div className="nexo-subtle-surface p-3">
                       <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
                         <Wallet className="h-3.5 w-3.5" />
                         Financeiro
@@ -1044,7 +1031,7 @@ export default function AppointmentsPage() {
                       </p>
                     </div>
 
-                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/40">
+                    <div className="nexo-subtle-surface p-3">
                       <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
                         <MessageCircle className="h-3.5 w-3.5" />
                         Comunicação
@@ -1091,6 +1078,6 @@ export default function AppointmentsPage() {
         onSuccess={handleCreateSuccess}
         customers={customers}
       />
-    </div>
+    </PageShell>
   );
 }
