@@ -3,8 +3,20 @@ if (!process.env.DATABASE_URL && process.env.TEST_DATABASE_URL) {
 }
 
 if (!process.env.DATABASE_URL) {
-  process.env.DATABASE_URL = 'postgresql://postgres:postgres@localhost:5432/nexogestao_test';
+  process.env.DATABASE_URL = 'postgresql://postgres:postgres@localhost:5432/nexogestao?schema=public';
 }
+
+if (!process.env.REDIS_URL && process.env.TEST_REDIS_URL) {
+  process.env.REDIS_URL = process.env.TEST_REDIS_URL;
+}
+
+if (!process.env.REDIS_URL) {
+  process.env.REDIS_URL = 'redis://localhost:6379';
+}
+
+const redisUrl = new URL(process.env.REDIS_URL);
+process.env.REDIS_HOST = process.env.REDIS_HOST || redisUrl.hostname;
+process.env.REDIS_PORT = process.env.REDIS_PORT || redisUrl.port || '6379';
 
 process.env.GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || 'test-google-client-id';
 process.env.GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || 'test-google-client-secret';
