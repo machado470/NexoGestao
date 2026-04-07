@@ -57,6 +57,7 @@ function getPageTitle(location: string) {
     "/governance": "Governança",
     "/whatsapp": "WhatsApp",
     "/settings": "Configurações",
+    "/onboarding": "Jornada de Demonstração",
   };
 
   const exact = titles[location];
@@ -83,6 +84,7 @@ function getPageDescription(location: string) {
     "/governance": "Regras, risco e leitura institucional.",
     "/whatsapp": "Conversa contextual vinculada à operação.",
     "/settings": "Parâmetros e ajustes do sistema.",
+    "/onboarding": "Fluxo guiado para mostrar valor: operação, receita e governança.",
   };
 
   const exact = descriptions[location];
