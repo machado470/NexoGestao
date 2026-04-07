@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { getErrorMessage, getPayloadValue, getQueryUiState } from "@/lib/query-helpers";
@@ -61,6 +61,7 @@ export default function GovernancePage() {
   const financialScore = clamp(100 - Number(summary?.financialRiskScore ?? autoScore?.financialRiskScore ?? 0));
   const operationScore = clamp(100 - Number(summary?.operationalRiskScore ?? autoScore?.operationalRiskScore ?? 0));
   const communicationScore = clamp(100 - Number(summary?.communicationRiskScore ?? autoScore?.communicationRiskScore ?? 0));
+  const [actionRoutingId, setActionRoutingId] = useState<string | null>(null);
 
   const hasAnyData =
     summaryQuery.data !== undefined ||
@@ -110,6 +111,13 @@ export default function GovernancePage() {
     },
   ];
 
+  const scoreTone =
+    institutionalRiskScore < 50
+      ? "critical"
+      : institutionalRiskScore < 75
+        ? "attention"
+        : "healthy";
+
   if (isInitializing) {
     return <PageShell><PageHero eyebrow="Governança" title="Governança" description="Validando sessão e permissões." /><SurfaceSection className="flex min-h-[180px] items-center justify-center gap-2 text-sm text-zinc-500 dark:text-zinc-400"><Loader2 className="h-4 w-4 animate-spin" />Carregando sessão...</SurfaceSection></PageShell>;
   }
@@ -135,10 +143,24 @@ export default function GovernancePage() {
         actions={<Button onClick={() => navigate("/dashboard/operations")}>Ver operação</Button>}
       />
 
-      <div className="nexo-surface border-orange-200 bg-orange-50 p-6 text-center dark:border-orange-900/40 dark:bg-orange-950/20">
-        <p className="text-xs uppercase tracking-[0.18em] text-orange-600 dark:text-orange-300">Score principal</p>
-        <p className="mt-2 text-5xl font-bold text-orange-700 dark:text-orange-200">{institutionalRiskScore}</p>
-        <p className="mt-2 text-sm text-orange-700 dark:text-orange-300">Leitura consolidada da saúde institucional do fluxo.</p>
+      <div
+        className={`nexo-surface p-6 text-center ${
+          scoreTone === "critical"
+            ? "border-red-200 bg-red-50 dark:border-red-900/40 dark:bg-red-950/20"
+            : scoreTone === "attention"
+              ? "border-amber-200 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-950/20"
+              : "border-emerald-200 bg-emerald-50 dark:border-emerald-900/40 dark:bg-emerald-950/20"
+        }`}
+      >
+        <p className="text-xs uppercase tracking-[0.18em] text-zinc-600 dark:text-zinc-300">Score principal</p>
+        <p className="mt-2 text-5xl font-bold text-zinc-900 dark:text-zinc-100">{institutionalRiskScore}</p>
+        <p className="mt-2 text-sm text-zinc-700 dark:text-zinc-300">
+          {scoreTone === "critical"
+            ? "Risco alto: trate gargalos críticos agora para proteger caixa e operação."
+            : scoreTone === "attention"
+              ? "Atenção operacional: existem pontos de risco pedindo ajuste imediato."
+              : "Saúde estável: mantenha disciplina para preservar o ritmo do fluxo."}
+        </p>
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -163,7 +185,14 @@ export default function GovernancePage() {
                 <p className="font-medium">{item.title}</p>
                 <p className="text-sm text-zinc-500 dark:text-zinc-400">{item.description}</p>
               </div>
-              <Button onClick={item.onClick}>{item.cta}</Button>
+              <Button
+                onClick={() => {
+                  setActionRoutingId(item.id);
+                  item.onClick();
+                }}
+              >
+                {actionRoutingId === item.id ? "Abrindo..." : item.cta}
+              </Button>
             </div>
           ))}
         </div>
