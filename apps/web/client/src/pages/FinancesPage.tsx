@@ -26,6 +26,11 @@ type FinanceCharge = {
   customer?: { name?: string | null } | null;
   amountCents: number;
   status: string;
+  dueDate?: string | Date | null;
+  createdAt?: string | Date | null;
+  updatedAt?: string | Date | null;
+  phone?: string | null;
+  customerPhone?: string | null;
   payments?: Array<{ id?: string | null }>;
 };
 
@@ -192,6 +197,66 @@ export default function FinancesPage() {
     return visibleCharges;
   }, [paymentScopedCharge, visibleCharges]);
 
+  const timelineData = useMemo(() => {
+    const ordered = [...finalVisibleCharges];
+    if (ordered.length === 0) {
+      return [];
+    }
+
+    const points = ordered
+      .map((charge, index) => {
+        const dateRaw =
+          charge.dueDate ?? charge.updatedAt ?? charge.createdAt ?? new Date();
+        const parsed = new Date(dateRaw);
+        const day = Number.isNaN(parsed.getTime())
+          ? `D${index + 1}`
+          : parsed.toLocaleDateString("pt-BR", {
+              day: "2-digit",
+              month: "2-digit",
+            });
+
+        const normalized = normalizeStatus(charge.status);
+
+        return {
+          day,
+          paid: normalized === "PAID" ? Math.max(charge.amountCents || 0, 0) : 0,
+          pending:
+            normalized !== "PAID" && normalized !== "OVERDUE"
+              ? Math.max(charge.amountCents || 0, 0)
+              : 0,
+          overdue:
+            normalized === "OVERDUE" ? Math.max(charge.amountCents || 0, 0) : 0,
+        };
+      })
+      .slice(0, 12);
+
+    return points;
+  }, [finalVisibleCharges]);
+
+  const billingQueue = useMemo(() => {
+    const ranked = finalVisibleCharges
+      .filter((charge) => normalizeStatus(charge.status) !== "PAID")
+      .map((charge) => {
+        const normalized = normalizeStatus(charge.status);
+        const dueDateRaw = charge.dueDate ?? charge.updatedAt ?? charge.createdAt ?? null;
+        const dueDate = dueDateRaw ? new Date(dueDateRaw) : null;
+        const dueTime = dueDate && !Number.isNaN(dueDate.getTime()) ? dueDate.getTime() : Number.MAX_SAFE_INTEGER;
+
+        return {
+          charge,
+          normalized,
+          priority: normalized === "OVERDUE" ? 0 : 1,
+          dueTime,
+        };
+      })
+      .sort((a, b) => {
+        if (a.priority !== b.priority) return a.priority - b.priority;
+        return a.dueTime - b.dueTime;
+      });
+
+    return ranked.slice(0, 8);
+  }, [finalVisibleCharges]);
+
   const stats = useMemo(
     () => normalizeObjectPayload<FinanceStats>(statsQuery.data),
     [statsQuery.data]
@@ -293,13 +358,22 @@ export default function FinancesPage() {
         title="Financeiro"
         description="Cobrança conectada à execução: acompanhe pendências, recebimentos e próximos passos comerciais."
         actions={
-          <button
-            type="button"
-            onClick={() => navigate("/service-orders")}
-            className="inline-flex h-10 items-center justify-center rounded-xl border border-zinc-300 px-4 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
-          >
-            Ir para Ordens de Serviço
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => navigate("/finances")}
+              className="inline-flex h-10 items-center justify-center rounded-xl bg-orange-500 px-4 text-sm font-medium text-white transition-colors hover:bg-orange-600"
+            >
+              Priorizar cobranças
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate("/service-orders")}
+              className="inline-flex h-10 items-center justify-center rounded-xl border border-zinc-300 px-4 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+            >
+              Ir para Ordens de Serviço
+            </button>
+          </div>
         }
       />
 
@@ -316,11 +390,66 @@ export default function FinancesPage() {
       ) : null}
 
       {stats && !isServiceOrderScoped && (
-        <FinanceOverviewAreaChart
-          paidAmount={stats.paid?.amountCents || 0}
-          pendingAmount={stats.pending?.amountCents || 0}
-          overdueAmount={stats.overdue?.amountCents || 0}
-        />
+        <FinanceOverviewAreaChart timeline={timelineData} />
+      )}
+
+      {billingQueue.length > 0 && (
+        <SurfaceSection className="space-y-3">
+          <div>
+            <h2 className="nexo-section-title">Fila de cobrança</h2>
+            <p className="nexo-section-description">
+              Ordem automática por vencido primeiro e mais antigo no topo.
+            </p>
+          </div>
+
+          {billingQueue.map(({ charge, normalized }) => (
+            <Card
+              key={`queue-${charge.id}`}
+              className="nexo-surface border-slate-200/70 bg-white/90 dark:border-white/8"
+            >
+              <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-4">
+                <div className="min-w-0">
+                  <p>{charge.customer?.name || "Cliente sem nome"}</p>
+                  <p className="text-sm text-gray-500">
+                    {formatCurrencyFromCents(charge.amountCents)} • {normalized}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      const customerPhone = String(
+                        charge.customerPhone ?? charge.phone ?? ""
+                      ).trim();
+                      if (customerPhone) {
+                        window.open(`https://wa.me/${customerPhone}`, "_blank");
+                      } else {
+                        navigate("/whatsapp");
+                      }
+                    }}
+                  >
+                    WhatsApp
+                  </Button>
+                  <Button
+                    size="sm"
+                    disabled={isSubmitting}
+                    onClick={async () => {
+                      try {
+                        await registerPayment(charge, "CASH");
+                        void chargesQuery.refetch();
+                      } catch {
+                        // handled by hook
+                      }
+                    }}
+                  >
+                    Marcar pago
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </SurfaceSection>
       )}
 
       {finalVisibleCharges.length === 0 ? (
