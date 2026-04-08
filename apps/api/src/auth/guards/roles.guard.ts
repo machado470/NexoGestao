@@ -7,6 +7,15 @@ import {
 import { Reflector } from '@nestjs/core'
 import { ROLES_KEY, AppRole } from '../decorators/roles.decorator'
 
+const ROLE_NORMALIZATION: Record<string, 'ADMIN' | 'OPERADOR' | 'FINANCEIRO'> = {
+  ADMIN: 'ADMIN',
+  MANAGER: 'OPERADOR',
+  STAFF: 'OPERADOR',
+  OPERADOR: 'OPERADOR',
+  VIEWER: 'FINANCEIRO',
+  FINANCEIRO: 'FINANCEIRO',
+}
+
 @Injectable()
 export class RolesGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}
@@ -28,7 +37,14 @@ export class RolesGuard implements CanActivate {
       throw new ForbiddenException('Sem permissão (role ausente).')
     }
 
-    if (!requiredRoles.includes(user.role)) {
+    const userRole = ROLE_NORMALIZATION[user.role] ?? user.role
+    const acceptedRoles = new Set(
+      requiredRoles.map((role) => ROLE_NORMALIZATION[role] ?? role),
+    )
+
+    if (userRole === 'ADMIN') return true
+
+    if (!acceptedRoles.has(userRole)) {
       throw new ForbiddenException('Sem permissão (role).')
     }
 

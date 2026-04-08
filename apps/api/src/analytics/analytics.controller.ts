@@ -45,4 +45,22 @@ export class AnalyticsController {
   ) {
     return this.analytics.getDailyMetrics(orgId, days ? Number(days) : 30)
   }
+
+  /**
+   * GET /analytics/saas-funnel
+   * Funil interno de monetização e conversão
+   */
+  @Get('saas-funnel')
+  @Roles('ADMIN', 'FINANCEIRO')
+  getSaasFunnel(
+    @Org() orgId: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.analytics.getSaasFunnel(
+      orgId,
+      from ? new Date(from) : undefined,
+      to ? new Date(to) : undefined,
+    )
+  }
 }

@@ -12,6 +12,7 @@ import { NotificationsModule } from '../notifications/notifications.module'
 import { OnboardingModule } from '../onboarding/onboarding.module'
 import { WhatsAppModule } from '../whatsapp/whatsapp.module'
 import { QuotasModule } from '../quotas/quotas.module'
+import { AnalyticsModule } from '../analytics/analytics.module'
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { QuotasModule } from '../quotas/quotas.module'
     OnboardingModule,
     WhatsAppModule,
     QuotasModule,
+    AnalyticsModule,
   ],
   controllers: [ServiceOrdersController],
   providers: [ServiceOrdersService],

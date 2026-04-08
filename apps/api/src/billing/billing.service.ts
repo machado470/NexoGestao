@@ -20,6 +20,7 @@ const PLAN_PRICE_MAP: Record<string, string> = {
   STARTER: process.env.STRIPE_PRICE_STARTER ?? 'price_starter',
   PRO: process.env.STRIPE_PRICE_PRO ?? 'price_pro',
   BUSINESS: process.env.STRIPE_PRICE_BUSINESS ?? 'price_business',
+  SCALE: process.env.STRIPE_PRICE_BUSINESS ?? 'price_business',
 }
 
 export const PLAN_LIMITS: Record<
@@ -53,12 +54,19 @@ export const PLAN_LIMITS: Record<
     appointments: 2000,
     label: 'Pro',
   },
+  SCALE: {
+    customers: 999999,
+    users: 999999,
+    serviceOrders: 999999,
+    appointments: 999999,
+    label: 'Scale',
+  },
   BUSINESS: {
     customers: 999999,
     users: 999999,
     serviceOrders: 999999,
     appointments: 999999,
-    label: 'Business',
+    label: 'Scale',
   },
 }
 
@@ -87,6 +95,11 @@ export class BillingService {
 
   get isStripeConfigured(): boolean {
     return this.stripe !== null
+  }
+
+  private normalizePlanName(planName: string): string {
+    if (planName === 'BUSINESS') return 'SCALE'
+    return planName
   }
 
   private assertStripeAvailable(operation: string) {
@@ -118,7 +131,8 @@ export class BillingService {
       return this.simulateCheckoutSession(orgId, planName)
     }
 
-    const priceId = PLAN_PRICE_MAP[planName]
+    const normalizedPlanName = this.normalizePlanName(planName)
+    const priceId = PLAN_PRICE_MAP[normalizedPlanName]
 
     if (!priceId) {
       throw new Error(`Plano ${planName} não possui priceId`)
@@ -130,7 +144,7 @@ export class BillingService {
       mode: 'subscription',
       success_url: successUrl ?? 'http://localhost:5173/billing/success',
       cancel_url: cancelUrl ?? 'http://localhost:5173/billing/cancel',
-      metadata: { orgId, planName },
+      metadata: { orgId, planName: normalizedPlanName },
     })
 
     return {
@@ -194,7 +208,7 @@ export class BillingService {
       }
     }
 
-    const planName = subscription.plan.name
+    const planName = this.normalizePlanName(subscription.plan.name)
 
     return {
       ...subscription,
@@ -218,9 +232,11 @@ export class BillingService {
       }
     }
 
+    const planName = this.normalizePlanName(subscription.plan.name)
+
     return {
       status: subscription.status,
-      plan: subscription.plan.name,
+      plan: planName,
       isActive:
         subscription.status === SubscriptionStatus.ACTIVE ||
         subscription.status === SubscriptionStatus.TRIALING,

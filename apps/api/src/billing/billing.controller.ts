@@ -21,6 +21,7 @@ const PRICE_PLAN_MAP: Record<string, PlanName> = {
   price_starter: 'STARTER',
   price_pro: 'PRO',
   price_business: 'BUSINESS',
+  price_scale: 'BUSINESS',
 }
 
 @Controller('billing')

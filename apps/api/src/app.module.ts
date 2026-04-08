@@ -4,6 +4,7 @@ import { ScheduleModule } from '@nestjs/schedule'
 import { ClsModule } from 'nestjs-cls'
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core'
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler'
+import { TenantAccessGuard } from './common/guards/tenant-access.guard'
 
 import { CoreModule } from './core/core.module'
 import { OrgContextInterceptor } from './auth/org-context.interceptor'
@@ -146,6 +147,10 @@ import { SentryModule } from './common/sentry/sentry.module'
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: TenantAccessGuard,
     },
   ],
 })
