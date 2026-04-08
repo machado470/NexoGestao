@@ -52,6 +52,11 @@ export const appRouter = router({
         ctx.res.clearCookie(cookieName, {
           ...cookieOptions,
         });
+        ctx.res.clearCookie(cookieName, {
+          ...cookieOptions,
+          sameSite: "none",
+          secure: true,
+        });
       }
 
       return {

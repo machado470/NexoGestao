@@ -86,7 +86,7 @@ function getRedirect(payload: unknown): string {
 
 function redirectToLogin() {
   if (typeof window === "undefined") return;
-  window.location.replace("/login");
+  window.location.replace(`/login?logoutAt=${Date.now()}`);
 }
 
 /* ========================= */
@@ -180,12 +180,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         window.sessionStorage.clear();
         window.localStorage.removeItem("nexo:last-action-flow");
         window.localStorage.removeItem("onboarding-state");
+        window.localStorage.removeItem("pilot-onboarding");
       }
       await utils.session.me.cancel();
       utils.session.me.setData(undefined, null);
+      await logoutMutation.mutateAsync();
       await utils.session.me.invalidate();
       queryClient.clear();
-      await logoutMutation.mutateAsync();
 
       redirectToLogin();
     } catch (err) {
