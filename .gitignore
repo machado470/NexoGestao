@@ -32,10 +32,11 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 *.log
+*.bak
+*.save
 
 # prisma
 /generated/prisma/
 
 # OS
 Thumbs.db
-
