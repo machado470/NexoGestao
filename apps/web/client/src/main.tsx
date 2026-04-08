@@ -11,32 +11,12 @@ import superjson from "superjson";
 import App from "./App";
 import "./index.css";
 import { initSentry } from "./lib/sentry";
+import { isPublicPath } from "./lib/publicRoutes";
 
 initSentry();
 
 let isRedirectingToLogin = false;
 
-const isPublicPath = (pathname: string): boolean => {
-  return (
-    pathname === "/" ||
-    pathname === "/login" ||
-    pathname === "/register" ||
-    pathname === "/forgot-password" ||
-    pathname === "/reset-password" ||
-    pathname === "/auth/accept-invite" ||
-    pathname === "/auth/callback" ||
-    pathname === "/auth/confirm-email" ||
-    pathname === "/about" ||
-    pathname === "/sobre" ||
-    pathname === "/produto" ||
-    pathname === "/precos" ||
-    pathname === "/contato" ||
-    pathname === "/privacy" ||
-    pathname === "/privacidade" ||
-    pathname === "/terms" ||
-    pathname === "/termos"
-  );
-};
 
 const shouldRedirectToLogin = (error: unknown): boolean => {
   if (!(error instanceof TRPCClientError)) return false;
