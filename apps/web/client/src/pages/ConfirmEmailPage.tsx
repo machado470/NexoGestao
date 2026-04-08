@@ -7,18 +7,28 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AuthMarketingShell } from "@/components/AuthMarketingShell";
+import { usePageMeta } from "@/hooks/usePageMeta";
 
 function getToken() {
   if (typeof window === "undefined") return "";
-  return (new URLSearchParams(window.location.search).get("token") ?? "").trim();
+  return (
+    new URLSearchParams(window.location.search).get("token") ?? ""
+  ).trim();
 }
 
 function getEmail() {
   if (typeof window === "undefined") return "";
-  return (new URLSearchParams(window.location.search).get("email") ?? "").trim().toLowerCase();
+  return (new URLSearchParams(window.location.search).get("email") ?? "")
+    .trim()
+    .toLowerCase();
 }
 
 export default function ConfirmEmailPage() {
+  usePageMeta({
+    title: "NexoGestão | Confirmar e-mail",
+    description:
+      "Confirme seu e-mail para ativar e proteger o acesso à sua conta NexoGestão.",
+  });
   const [, navigate] = useLocation();
   const token = useMemo(() => getToken(), []);
   const queryEmail = useMemo(() => getEmail(), []);
@@ -45,7 +55,9 @@ export default function ConfirmEmailPage() {
 
     setLocalError(null);
     await resendMutation.mutateAsync({ email: normalizedEmail });
-    setResendMessage("Se o e-mail existir, um novo link de confirmação será enviado.");
+    setResendMessage(
+      "Se o e-mail existir, um novo link de confirmação será enviado."
+    );
   };
 
   return (
@@ -62,8 +74,16 @@ export default function ConfirmEmailPage() {
       ]}
       bottomPanelTitle="Fluxo de verificação"
       bottomPanelSteps={[
-        { label: "01", value: "Abrir e-mail", description: "Use o link recebido." },
-        { label: "02", value: "Validar token", description: "Confirmamos seu endereço." },
+        {
+          label: "01",
+          value: "Abrir e-mail",
+          description: "Use o link recebido.",
+        },
+        {
+          label: "02",
+          value: "Validar token",
+          description: "Confirmamos seu endereço.",
+        },
         { label: "03", value: "Entrar", description: "Acesso liberado." },
       ]}
       backTo="/login"
@@ -76,7 +96,8 @@ export default function ConfirmEmailPage() {
       ) : hasError ? (
         <div className="space-y-4">
           <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            O link de confirmação é inválido ou expirou. Solicite um novo e-mail de verificação.
+            O link de confirmação é inválido ou expirou. Solicite um novo e-mail
+            de verificação.
           </div>
 
           <div className="space-y-2">
@@ -87,7 +108,7 @@ export default function ConfirmEmailPage() {
                 id="confirm-email-resend"
                 type="email"
                 value={email}
-                onChange={(event) => {
+                onChange={event => {
                   setEmail(event.target.value);
                   setResendMessage(null);
                 }}
@@ -96,20 +117,50 @@ export default function ConfirmEmailPage() {
             </div>
           </div>
 
-          {localError ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{localError}</div> : null}
-          {resendMessage ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{resendMessage}</div> : null}
+          {localError ? (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {localError}
+            </div>
+          ) : null}
+          {resendMessage ? (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+              {resendMessage}
+            </div>
+          ) : null}
 
-          <Button variant="outline" className="w-full" onClick={resendVerification} disabled={resendMutation.isPending}>
-            {resendMutation.isPending ? <><Loader2 className="size-4 animate-spin" />Reenviando confirmação...</> : "Reenviar e-mail de confirmação"}
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={resendVerification}
+            disabled={resendMutation.isPending}
+          >
+            {resendMutation.isPending ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                Reenviando confirmação...
+              </>
+            ) : (
+              "Reenviar e-mail de confirmação"
+            )}
           </Button>
-          <Button className="w-full bg-orange-500 hover:bg-orange-600" onClick={() => navigate("/login")}>Ir para login</Button>
+          <Button
+            className="w-full bg-orange-500 hover:bg-orange-600"
+            onClick={() => navigate("/login")}
+          >
+            Ir para login
+          </Button>
         </div>
       ) : (
         <div className="space-y-4">
           <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
             E-mail confirmado com sucesso. Você já pode entrar na plataforma.
           </div>
-          <Button className="w-full bg-orange-500 hover:bg-orange-600" onClick={() => navigate("/login")}>Entrar</Button>
+          <Button
+            className="w-full bg-orange-500 hover:bg-orange-600"
+            onClick={() => navigate("/login")}
+          >
+            Entrar
+          </Button>
         </div>
       )}
     </AuthMarketingShell>
