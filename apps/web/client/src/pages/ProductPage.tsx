@@ -108,22 +108,19 @@ export default function ProductPage() {
               Começar agora <ArrowRight className="size-4" />
             </a>
             <a
-              href="/precos"
+              href="/funcionalidades"
               className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-6 py-3 font-semibold text-slate-700 transition hover:bg-slate-50"
             >
-              Ver planos
+              Explorar funcionalidades
             </a>
           </div>
         </div>
       </section>
 
-      <section
-        id="funcionalidades"
-        className="border-y border-slate-200/70 bg-white/80 py-16 md:py-20"
-      >
+      <section className="border-y border-slate-200/70 bg-white/80 py-16 md:py-20">
         <div className="container">
           <h2 className="text-3xl font-semibold text-slate-900 md:text-4xl">
-            Módulos que sustentam a operação
+            Módulos integrados do sistema
           </h2>
           <p className="mt-3 max-w-3xl text-slate-600">
             Cada módulo resolve uma etapa crítica do serviço, sem ilhas de
