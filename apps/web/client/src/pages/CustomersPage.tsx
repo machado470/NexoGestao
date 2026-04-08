@@ -1061,7 +1061,7 @@ export default function CustomersPage() {
                 title="Sua base de clientes ainda está vazia"
                 description="Comece criando seu primeiro cliente e veja sua operação acontecer do atendimento ao recebimento."
                 action={{
-                  label: "Cadastrar primeiro cliente",
+                  label: "Crie seu primeiro cliente",
                   onClick: () => setIsCreateOpen(true),
                 }}
                 secondaryAction={{

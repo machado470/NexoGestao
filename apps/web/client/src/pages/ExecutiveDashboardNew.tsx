@@ -526,6 +526,25 @@ export default function ExecutiveDashboardNew() {
         <MetricCard icon={Briefcase} label="Conversão O.S. → pagamento" value={`${conversionRate}%`} loading={metricsQuery.isLoading && metricsQuery.data === undefined} description={`${paidCharges} pagamentos para ${displayMetrics.totalServiceOrders} O.S.`} />
       </section>
 
+      {displayMetrics.totalCustomers === 0 ? (
+        <section className="rounded-xl border border-orange-200 bg-orange-50/80 p-4 dark:border-orange-900/40 dark:bg-orange-950/20">
+          <p className="text-sm font-semibold text-orange-800 dark:text-orange-200">
+            Seu dashboard não precisa ficar vazio.
+          </p>
+          <p className="mt-1 text-sm text-orange-700 dark:text-orange-300">
+            Comece agora com ações simples: crie seu primeiro cliente e agende seu primeiro serviço.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button type="button" onClick={() => navigate("/customers")} className="nexo-cta-primary min-h-10">
+              Crie seu primeiro cliente
+            </button>
+            <button type="button" onClick={() => navigate("/appointments")} className="nexo-cta-secondary min-h-10">
+              Agende seu primeiro serviço
+            </button>
+          </div>
+        </section>
+      ) : null}
+
       <section className="grid gap-6 xl:grid-cols-3">
         <article className="nexo-surface nexo-fade-in p-5 xl:col-span-2">
           <h2 className="nexo-section-title">Receita ao longo do tempo</h2>
@@ -564,8 +583,9 @@ export default function ExecutiveDashboardNew() {
             <EmptyState
               icon={<Briefcase className="h-6 w-6" />}
               title="Funil operacional sem dados"
-              description="Cadastre clientes, agendamentos e ordens para enxergar perdas entre as etapas."
-              action={{ label: "Abrir clientes", onClick: () => navigate("/customers") }}
+              description="Cadastre clientes e agendamentos para abrir o fluxo customer → appointment → service order → charge."
+              action={{ label: "Crie seu primeiro cliente", onClick: () => navigate("/customers") }}
+              secondaryAction={{ label: "Agende seu primeiro serviço", onClick: () => navigate("/appointments") }}
             />
           ) : (
             <div className="mt-4 h-[260px] nexo-fade-in">
