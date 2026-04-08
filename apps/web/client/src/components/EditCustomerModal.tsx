@@ -15,12 +15,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { normalizeObjectPayload } from "@/lib/query-helpers";
 
 type Props = {
   open: boolean;
   customerId?: string | number | null;
   onClose: () => void;
-  onSaved?: () => void;
+  onSaved?: (savedCustomer?: { id?: string | null }) => void | Promise<void>;
 };
 
 type CustomerDetails = {
@@ -32,7 +33,11 @@ type CustomerDetails = {
 };
 
 function normalizeCustomerPayload(payload: unknown): CustomerDetails | null {
-  const raw = (payload as { data?: unknown } | null | undefined)?.data ?? payload;
+  const root = normalizeObjectPayload<any>(payload);
+  const raw =
+    root && typeof root === "object" && root.data && typeof root.data === "object"
+      ? root.data
+      : root;
   if (!raw || typeof raw !== "object") return null;
   return raw as CustomerDetails;
 }
@@ -125,9 +130,11 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
       await Promise.all([
         utils.nexo.customers.list.invalidate(),
         utils.nexo.customers.getById.invalidate({ id: idStr }),
+        utils.nexo.customers.workspace.invalidate({ id: idStr }),
+        utils.nexo.serviceOrders.list.invalidate(),
       ]);
       toast.success("Cliente atualizado com sucesso!");
-      onSaved?.();
+      await onSaved?.({ id: idStr });
       onClose();
     } catch (error) {
       utils.nexo.customers.list.setData(undefined, previousCustomers as any);
