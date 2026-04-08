@@ -2,92 +2,76 @@ import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import {
   ArrowRight,
+  BarChart3,
   Calendar,
   CheckCircle2,
-  ChevronRight,
-  ClipboardList,
-  Coins,
+  CircleDollarSign,
+  Clock3,
   CreditCard,
-  HelpCircle,
-  ShieldCheck,
-  Sparkles,
-  Timer,
+  FileSpreadsheet,
+  HandCoins,
+  Instagram,
+  Linkedin,
+  MessageCircle,
+  Shield,
+  Target,
+  TrendingUp,
+  Twitter,
   Users,
+  Wrench,
 } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { ConsentBanner } from "@/components/ConsentBanner";
 import { TermsModal } from "@/components/TermsModal";
 
-const coreFlow = [
-  { icon: Users, title: "Cliente", subtitle: "Cadastro vivo com histórico e contexto" },
-  { icon: Calendar, title: "Agendamento", subtitle: "Compromisso registrado com dono e status" },
-  { icon: ClipboardList, title: "O.S.", subtitle: "Execução operacional sem perder o fio" },
-  { icon: Coins, title: "Cobrança", subtitle: "Receita gerada já conectada à operação" },
-  { icon: CreditCard, title: "Pagamento", subtitle: "Baixa financeira com rastreabilidade" },
-  { icon: Timer, title: "Timeline", subtitle: "Linha do tempo auditável da jornada" },
-  { icon: ShieldCheck, title: "Governança", subtitle: "Risco, pendências e alçadas com clareza" },
+import "./landing.css";
+
+const flowItems = [
+  { icon: Users, title: "Cliente", subtitle: "Cadastro centralizado" },
+  { icon: Calendar, title: "Agendamento", subtitle: "Agenda com prioridade" },
+  { icon: Wrench, title: "Ordem Serviço", subtitle: "Execução monitorada" },
+  { icon: CircleDollarSign, title: "Cobrança", subtitle: "Fatura sem esquecimento" },
+  { icon: CreditCard, title: "Pagamento", subtitle: "Baixa em tempo real" },
+  { icon: Clock3, title: "Timeline", subtitle: "Rastro operacional" },
+  { icon: Shield, title: "Governança", subtitle: "SLA, NPS e controle" },
+];
+
+const howSteps = [
+  ["Recebe cliente", "Centraliza contato e histórico do atendimento."],
+  ["Agenda serviço", "Organiza técnico, data e janela de execução."],
+  ["Executa O.S.", "Acompanha status, prioridade e progresso."],
+  ["Gera cobrança", "Cria fatura conectada ao serviço executado."],
+  ["Recebe pagamento", "Confirma recebimento com rastreabilidade."],
+];
+
+const problems = [
+  {
+    icon: MessageCircle,
+    title: "Mensagens no WhatsApp",
+    text: "Atendimento e decisão ficam em conversas perdidas e sem histórico operacional.",
+  },
+  {
+    icon: FileSpreadsheet,
+    title: "Planilhas desorganizadas",
+    text: "Dados críticos ficam espalhados, duplicados e difíceis de confiar.",
+  },
+  {
+    icon: Wrench,
+    title: "Operação no improviso",
+    text: "Sem fluxo claro, prazos estouram e a execução perde consistência.",
+  },
+  {
+    icon: HandCoins,
+    title: "Cobrança esquecida",
+    text: "Serviço executado sem cobrança no tempo certo vira perda de caixa.",
+  },
 ];
 
 const benefits = [
-  {
-    title: "Menos retrabalho administrativo",
-    description:
-      "Sem caça a informação no WhatsApp, planilha e caderno. O time trabalha com um fluxo único.",
-  },
-  {
-    title: "Decisão com contexto real",
-    description:
-      "Painel executivo, timeline e governança ajudam a agir antes da operação virar incêndio.",
-  },
-  {
-    title: "Receita mais previsível",
-    description:
-      "Cobrança e pagamento conectados ao serviço executado melhoram visibilidade de caixa e follow-up.",
-  },
-  {
-    title: "Pronto para crescimento",
-    description:
-      "Estrutura preparada para equipe, papéis, trilhas de onboarding e evolução sem improviso eterno.",
-  },
-];
-
-const differentials = [
-  "Produto orientado para empresa de serviço (não é ERP genérico com mil módulos vazios)",
-  "Fluxo ponta a ponta: cliente → agenda → O.S. → financeiro → governança",
-  "Onboarding operacional guiado para acelerar primeiros resultados",
-  "Base com trilha de auditoria e visão executiva para gestão madura",
-];
-
-const faqItems = [
-  {
-    question: "Para quem o NexoGestão foi desenhado?",
-    answer:
-      "Para operações de serviço que cresceram no improviso e agora precisam de rotina previsível, controle de execução e visão financeira conectada.",
-  },
-  {
-    question: "Preciso trocar toda a operação de uma vez?",
-    answer:
-      "Não. Você pode começar com o fluxo principal (cliente, agenda, O.S. e cobrança) e expandir para governança conforme o time ganha tração.",
-  },
-  {
-    question: "Como fica o onboarding da equipe?",
-    answer:
-      "O produto já possui etapas de onboarding e status por organização para guiar a adoção e evitar que usuários caiam no dashboard sem contexto.",
-  },
-  {
-    question: "O produto já está pronto para uso comercial?",
-    answer:
-      "Sim. O foco atual é consolidar funil público/auth, onboarding e experiência mobile para suportar entrada de clientes pagantes com segurança.",
-  },
+  ["Pare de perder informação", "Cliente, atendimento e execução ficam no mesmo fluxo."],
+  ["Saiba o que está acontecendo", "Timeline e status mostram cada etapa em tempo real."],
+  ["Nunca esqueça de cobrar", "Cobrança nasce do serviço executado com rastreio."],
+  ["Escale com controle", "Governança e indicadores sustentam crescimento sem caos."],
 ];
 
 export default function Landing() {
@@ -96,258 +80,357 @@ export default function Landing() {
   const year = useMemo(() => new Date().getFullYear(), []);
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <nav className="sticky top-0 z-50 border-b border-border/70 bg-background/90 backdrop-blur">
-        <div className="container flex h-16 items-center justify-between gap-4">
-          <button
-            type="button"
-            onClick={() => navigate("/")}
-            className="flex items-center gap-3"
-          >
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
-              <span className="text-lg font-bold">N</span>
+    <div className="landing-root">
+      <header className="sticky top-0 z-50 border-b border-slate-200/70 bg-[#f8f9fb]/90 backdrop-blur-xl">
+        <div className="container flex h-20 items-center justify-between gap-4">
+          <button type="button" onClick={() => navigate("/")} className="flex items-center gap-3">
+            <div className="grid h-11 w-11 place-content-center rounded-xl bg-slate-900 shadow-sm">
+              <div className="grid grid-cols-2 gap-1">
+                <span className="h-2.5 w-2.5 rounded-[3px] bg-white" />
+                <span className="h-2.5 w-2.5 rounded-[3px] bg-orange-500" />
+                <span className="h-2.5 w-2.5 rounded-[3px] bg-blue-500" />
+                <span className="h-2.5 w-2.5 rounded-[3px] bg-white" />
+              </div>
             </div>
-            <div className="text-left">
-              <div className="text-sm font-semibold leading-none sm:text-base">NexoGestão</div>
-              <div className="text-xs text-muted-foreground">produto de gestão operacional</div>
-            </div>
+            <span className="text-lg font-semibold text-slate-900">NexoGestão</span>
           </button>
 
-          <div className="hidden items-center gap-6 md:flex">
-            <a href="#fluxo" className="text-sm text-muted-foreground hover:text-foreground">
-              Fluxo
-            </a>
-            <a href="#beneficios" className="text-sm text-muted-foreground hover:text-foreground">
-              Benefícios
-            </a>
-            <a href="#faq" className="text-sm text-muted-foreground hover:text-foreground">
-              FAQ
-            </a>
-          </div>
+          <nav className="hidden items-center gap-8 md:flex">
+            {["Produto", "Funcionalidades", "Preços", "Contato"].map((item) => (
+              <a key={item} href="#" className="text-sm font-medium text-slate-600 transition hover:text-slate-900">
+                {item}
+              </a>
+            ))}
+          </nav>
 
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" onClick={() => navigate("/login")}>Entrar</Button>
-            <Button onClick={() => navigate("/register")}>Começar avaliação</Button>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <button
+              type="button"
+              onClick={() => navigate("/login")}
+              className="rounded-xl px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+            >
+              Entrar
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate("/register")}
+              className="rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_8px_24px_rgba(249,115,22,0.35)] transition hover:bg-orange-600"
+            >
+              Começar agora
+            </button>
           </div>
         </div>
-      </nav>
+      </header>
 
       <main>
-        <section className="relative overflow-hidden border-b">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.16),transparent_35%),radial-gradient(circle_at_bottom_right,rgba(59,130,246,0.12),transparent_30%)]" />
-          <div className="container relative py-16 sm:py-20 lg:py-24">
-            <div className="grid items-center gap-10 lg:grid-cols-[1.1fr_0.9fr]">
-              <div className="max-w-3xl">
-                <Badge variant="outline" className="mb-5 rounded-full px-3 py-1">
-                  <Sparkles className="size-3.5" />
-                  Gestão operacional + financeira para empresas de serviço
-                </Badge>
+        <section className="container py-14 md:py-20">
+          <div className="grid items-center gap-10 lg:grid-cols-2">
+            <div className="animate-fade-up">
+              <div className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-white/80 px-3 py-1 text-xs font-semibold tracking-[0.12em] text-slate-700">
+                <span className="h-2 w-2 rounded-full bg-orange-500" /> PLATAFORMA OPERACIONAL
+              </div>
+              <h1 className="mt-5 text-4xl font-semibold leading-tight text-slate-900 sm:text-5xl lg:text-6xl">
+                Pare de operar no improviso.
+              </h1>
+              <p className="mt-5 max-w-xl text-lg text-slate-600">
+                Organize atendimento, execução, cobrança e controle em um fluxo único.
+              </p>
 
-                <h1 className="text-4xl font-bold leading-tight tracking-tight sm:text-5xl lg:text-6xl">
-                  Transforme operação dispersa em um fluxo confiável e vendável
-                </h1>
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                <button
+                  type="button"
+                  onClick={() => navigate("/register")}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-orange-500 px-6 py-3 font-semibold text-white shadow-[0_12px_28px_rgba(249,115,22,0.35)] transition hover:bg-orange-600"
+                >
+                  Começar avaliação <ArrowRight className="size-4" />
+                </button>
+                <a href="#fluxo" className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-6 py-3 font-semibold text-slate-700 transition hover:bg-slate-50">
+                  Ver como funciona
+                </a>
+              </div>
 
-                <p className="mt-6 max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg">
-                  O NexoGestão organiza atendimento, execução, cobrança e governança com uma trilha única.
-                  É o caminho para sair do improviso e operar com padrão de produto real.
-                </p>
-
-                <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                  <Button size="lg" className="gap-2" onClick={() => navigate("/register")}>
-                    Começar agora
-                    <ArrowRight className="size-4" />
-                  </Button>
-                  <Button size="lg" variant="outline" onClick={() => navigate("/login")}>
-                    Já tenho conta
-                  </Button>
-                </div>
-
-                <div className="mt-8 grid gap-3 sm:grid-cols-2">
-                  {[
-                    "Autenticação com fluxo de verificação por e-mail",
-                    "Onboarding guiado para primeira experiência",
-                    "Visão executiva e governança operacional",
-                    "Experiência otimizada para desktop e mobile",
-                  ].map((item) => (
-                    <div key={item} className="flex items-start gap-3 rounded-xl border bg-card/70 p-4">
-                      <CheckCircle2 className="mt-0.5 size-5 text-primary" />
-                      <p className="text-sm text-muted-foreground">{item}</p>
+              <div className="mt-8 flex items-center gap-4">
+                <div className="flex -space-x-3">
+                  {["A", "B", "C", "D"].map((i) => (
+                    <div key={i} className="grid h-10 w-10 place-content-center rounded-full border-2 border-[#f8f9fb] bg-gradient-to-br from-slate-200 to-slate-300 text-xs font-bold text-slate-600">
+                      {i}
                     </div>
                   ))}
                 </div>
+                <p className="text-sm font-medium text-slate-600">Usado por +320 empresas de serviço</p>
               </div>
+            </div>
 
-              <Card className="border-border/80 bg-card/95 shadow-xl">
-                <CardHeader>
-                  <CardTitle className="text-xl">Painel de execução da operação</CardTitle>
-                  <CardDescription>
-                    Dados de exemplo para visualizar rotina, receita e risco em um único ambiente.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-xl border bg-background p-4">
-                    <p className="text-xs text-muted-foreground">Clientes ativos</p>
-                    <p className="mt-2 text-2xl font-semibold">148</p>
-                  </div>
-                  <div className="rounded-xl border bg-background p-4">
-                    <p className="text-xs text-muted-foreground">O.S. em andamento</p>
-                    <p className="mt-2 text-2xl font-semibold">29</p>
-                  </div>
-                  <div className="rounded-xl border bg-background p-4">
-                    <p className="text-xs text-muted-foreground">Cobranças abertas</p>
-                    <p className="mt-2 text-2xl font-semibold">R$ 26,3k</p>
-                  </div>
-                  <div className="rounded-xl border bg-background p-4">
-                    <p className="text-xs text-muted-foreground">Risco operacional</p>
-                    <p className="mt-2 text-2xl font-semibold">Controlado</p>
-                  </div>
-                </CardContent>
-              </Card>
+            <div className="hero-stage">
+              <article className="hero-card float-a top-0 left-0 w-60">
+                <p className="label">Cliente</p>
+                <p className="title">Marina Rodrigues</p>
+                <div className="mt-3 flex items-center justify-between">
+                  <span className="chip chip-green">cliente ativo</span>
+                  <span className="chip">12 serviços</span>
+                </div>
+              </article>
+
+              <article className="hero-card float-b top-8 right-0 w-64">
+                <div className="mb-3 flex items-center justify-between">
+                  <p className="title text-base">Agendamento</p>
+                  <span className="chip chip-blue">Hoje</span>
+                </div>
+                <ul className="space-y-2 text-sm text-slate-600">
+                  <li>09:00 • Vistoria inicial</li>
+                  <li>11:30 • Execução técnica</li>
+                  <li>15:00 • Fechamento e validação</li>
+                </ul>
+              </article>
+
+              <article className="hero-card float-c top-40 left-10 w-80">
+                <p className="title">Ordem de Serviço #1847</p>
+                <div className="mt-3 grid grid-cols-2 gap-2 text-sm text-slate-600">
+                  <p>Status: <span className="font-medium text-blue-600">Em execução</span></p>
+                  <p>Tipo: Manutenção</p>
+                  <p>Técnico: Rafael Lima</p>
+                  <p>Prioridade: Alta</p>
+                </div>
+                <div className="mt-4">
+                  <div className="mb-1 flex justify-between text-xs text-slate-500"><span>Progresso</span><span>65%</span></div>
+                  <div className="h-2 rounded-full bg-slate-200"><div className="h-2 w-[65%] rounded-full bg-orange-500" /></div>
+                </div>
+              </article>
+
+              <article className="hero-card float-d top-64 right-10 w-56">
+                <p className="title">Cobrança</p>
+                <p className="mt-2 text-2xl font-semibold text-slate-900">R$ 2.450</p>
+                <p className="mt-1 text-sm text-slate-500">Vencimento: 14/04</p>
+                <span className="chip chip-orange mt-3">Fatura enviada</span>
+              </article>
+
+              <article className="hero-card float-b top-96 left-0 w-56">
+                <p className="title">Pagamento confirmado</p>
+                <p className="mt-1 text-sm text-slate-500">PIX • há 2 min</p>
+                <p className="mt-3 font-semibold text-emerald-600">+ R$ 2.450,00</p>
+              </article>
+
+              <article className="hero-card float-a top-[22rem] right-0 w-60">
+                <p className="title">Timeline</p>
+                <ul className="mt-2 space-y-2 text-sm text-slate-600">
+                  <li>• OS criada</li>
+                  <li>• Técnico alocado</li>
+                  <li>• Pagamento recebido</li>
+                </ul>
+              </article>
+
+              <article className="hero-card float-c bottom-0 left-24 w-64">
+                <p className="title">Governança / SLA</p>
+                <div className="mt-3 grid grid-cols-3 gap-2 text-center text-sm">
+                  <div className="rounded-lg bg-violet-50 p-2"><p className="font-semibold text-violet-600">97%</p><p className="text-slate-500">SLA</p></div>
+                  <div className="rounded-lg bg-blue-50 p-2"><p className="font-semibold text-blue-600">74</p><p className="text-slate-500">NPS</p></div>
+                  <div className="rounded-lg bg-emerald-50 p-2"><p className="font-semibold text-emerald-600">2h12</p><p className="text-slate-500">Tempo médio</p></div>
+                </div>
+              </article>
             </div>
           </div>
         </section>
 
-        <section id="fluxo" className="py-16 sm:py-20">
+        <section className="border-y border-slate-200/70 bg-white/70 py-10">
+          <div className="container grid gap-6 text-center md:grid-cols-3">
+            {[
+              ["O.S. PROCESSADAS", "1.2M+"],
+              ["VALOR EM COBRANÇAS", "R$ 450M+"],
+              ["EXECUÇÃO NO PRAZO", "94%"],
+            ].map(([label, value]) => (
+              <div key={label}>
+                <p className="text-xs font-semibold tracking-[0.14em] text-slate-500">{label}</p>
+                <p className="mt-2 text-3xl font-semibold text-slate-900">{value}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="container py-16 md:py-20">
+          <h2 className="text-3xl font-semibold text-slate-900 md:text-4xl">Sua operação está espalhada — e você sabe disso.</h2>
+          <p className="mt-3 max-w-3xl text-slate-600">Enquanto tenta manter tudo junto, informações críticas se perdem.</p>
+          <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {problems.map((problem) => {
+              const Icon = problem.icon;
+              return (
+                <article key={problem.title} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
+                  <div className="mb-4 inline-flex rounded-xl bg-slate-100 p-2.5 text-slate-700"><Icon className="size-5" /></div>
+                  <h3 className="text-lg font-semibold text-slate-900">{problem.title}</h3>
+                  <p className="mt-2 text-sm text-slate-600">{problem.text}</p>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+
+        <section id="fluxo" className="border-y border-slate-200/70 bg-white/80 py-16 md:py-20">
           <div className="container">
-            <div className="max-w-3xl">
-              <Badge variant="outline" className="mb-4">Fluxo operacional do produto</Badge>
-              <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-                Cliente → Agendamento → O.S. → Cobrança → Pagamento → Timeline → Governança
-              </h2>
-              <p className="mt-4 text-muted-foreground">
-                Esse fluxo conecta ponta a ponta da operação. Cada etapa alimenta a próxima e fortalece a visão gerencial.
-              </p>
-            </div>
-
-            <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              {coreFlow.map((step, index) => {
-                const Icon = step.icon;
-                const isLast = index === coreFlow.length - 1;
-                return (
-                  <Card key={step.title} className="border-border/80 bg-card/90 shadow-sm">
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                          <Icon className="size-5" />
-                        </div>
-                        {!isLast ? <ChevronRight className="size-4 text-muted-foreground" /> : null}
-                      </div>
-                      <CardTitle>{step.title}</CardTitle>
-                      <CardDescription>{step.subtitle}</CardDescription>
-                    </CardHeader>
-                  </Card>
-                );
-              })}
+            <h2 className="text-3xl font-semibold text-slate-900 md:text-4xl">O fluxo completo em um único lugar</h2>
+            <div className="mt-8 overflow-x-auto pb-2">
+              <div className="flex min-w-max items-stretch gap-3 pr-2">
+                {flowItems.map((item, index) => {
+                  const Icon = item.icon;
+                  return (
+                    <article key={item.title} className="w-52 rounded-2xl border border-slate-200 bg-white p-4">
+                      <div className="inline-flex rounded-lg bg-slate-100 p-2 text-slate-700"><Icon className="size-4" /></div>
+                      <h3 className="mt-3 text-sm font-semibold text-slate-900">{item.title}</h3>
+                      <p className="mt-1 text-xs text-slate-600">{item.subtitle}</p>
+                      {index < flowItems.length - 1 ? <ArrowRight className="mt-3 size-3 text-slate-400" /> : null}
+                    </article>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </section>
 
-        <section id="beneficios" className="border-y bg-muted/30 py-16 sm:py-20">
-          <div className="container">
-            <div className="max-w-2xl">
-              <Badge variant="outline" className="mb-4">Benefícios reais</Badge>
-              <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-                Não é só software bonito: é ganho operacional no dia a dia
-              </h2>
-            </div>
-
-            <div className="mt-10 grid gap-4 md:grid-cols-2">
-              {benefits.map((benefit) => (
-                <Card key={benefit.title} className="border-border/80 bg-card/95">
-                  <CardHeader>
-                    <CardTitle className="text-xl">{benefit.title}</CardTitle>
-                    <CardDescription>{benefit.description}</CardDescription>
-                  </CardHeader>
-                </Card>
-              ))}
-            </div>
+        <section className="container py-16 md:py-20">
+          <h2 className="text-3xl font-semibold text-slate-900 md:text-4xl">Como funciona</h2>
+          <p className="mt-3 text-slate-600">Cinco passos. Sem complicação. Sua operação flui.</p>
+          <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+            {howSteps.map(([title, text], index) => (
+              <article key={title} className="rounded-2xl border border-slate-200 bg-white p-5">
+                <div className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-orange-500 font-semibold text-white">{index + 1}</div>
+                <h3 className="mt-3 text-base font-semibold text-slate-900">{title}</h3>
+                <p className="mt-2 text-sm text-slate-600">{text}</p>
+              </article>
+            ))}
           </div>
         </section>
 
-        <section className="py-16 sm:py-20">
-          <div className="container grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
-            <div>
-              <Badge variant="outline" className="mb-4">Diferenciais</Badge>
-              <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-                Posicionamento premium com foco em confiança operacional
-              </h2>
-              <div className="mt-6 space-y-3">
-                {differentials.map((item) => (
-                  <div key={item} className="flex items-start gap-3 rounded-xl border bg-card/80 p-4">
-                    <CheckCircle2 className="mt-0.5 size-5 text-primary" />
-                    <p className="text-sm text-muted-foreground">{item}</p>
+        <section className="container pb-16 md:pb-20">
+          <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_20px_45px_rgba(15,23,42,0.08)] md:p-8">
+            <div className="border-b border-slate-200 pb-5">
+              <h3 className="text-xl font-semibold text-slate-900">Marina Rodrigues — OS #1847</h3>
+              <p className="mt-1 text-sm text-slate-600">Manutenção preventiva • 08/04/2026 • 09:00</p>
+            </div>
+            <div className="mt-5 grid gap-4 md:grid-cols-3">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4"><p className="text-xs text-slate-500">STATUS</p><p className="mt-1 text-lg font-semibold text-blue-600">Em execução</p></div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4"><p className="text-xs text-slate-500">COBRANÇA</p><p className="mt-1 text-lg font-semibold text-slate-900">R$ 2.450 • enviada</p></div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4"><p className="text-xs text-slate-500">PAGAMENTO</p><p className="mt-1 text-lg font-semibold text-emerald-600">PIX confirmado</p></div>
+            </div>
+            <div className="mt-6 rounded-2xl border border-violet-100 bg-violet-50/50 p-5">
+              <p className="mb-4 text-sm font-semibold text-violet-700">Timeline operacional</p>
+              <div className="space-y-3 text-sm text-slate-700">
+                <p>• Ordem criada</p>
+                <p>• Técnico alocado</p>
+                <p>• Chegada no local</p>
+                <p>• Execução completa</p>
+                <p>• Pagamento recebido</p>
+              </div>
+            </div>
+          </article>
+        </section>
+
+        <section className="container pb-16 md:pb-20">
+          <h2 className="text-3xl font-semibold text-slate-900 md:text-4xl">Benefícios reais. Visíveis todos os dias.</h2>
+          <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {benefits.map(([title, text], i) => {
+              const icons = [Target, BarChart3, HandCoins, TrendingUp];
+              const Icon = icons[i];
+              return (
+                <article key={title} className="rounded-2xl border border-slate-200 bg-white p-5">
+                  <div className="inline-flex rounded-xl bg-slate-100 p-2.5 text-slate-700"><Icon className="size-5" /></div>
+                  <h3 className="mt-4 text-lg font-semibold text-slate-900">{title}</h3>
+                  <p className="mt-2 text-sm text-slate-600">{text}</p>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="container pb-16 md:pb-20">
+          <article className="rounded-3xl bg-gradient-to-br from-slate-950 via-slate-900 to-black p-8 text-white shadow-[0_20px_50px_rgba(2,6,23,0.45)] md:p-10">
+            <div className="grid gap-8 lg:grid-cols-2">
+              <div>
+                <h2 className="text-3xl font-semibold md:text-4xl">Não é só gestão. É operação estruturada.</h2>
+                <p className="mt-4 text-slate-300">O sistema não só guarda dados, organiza fluxo operacional real do primeiro atendimento até a governança executiva.</p>
+                <div className="mt-6 space-y-3">
+                  {[
+                    "fluxo real cliente → agendamento → execução → cobrança → pagamento",
+                    "controle total com timeline, status, SLA e governança",
+                    "sem integração macarrônica",
+                  ].map((line) => (
+                    <div key={line} className="flex items-start gap-2 text-sm text-slate-200"><CheckCircle2 className="mt-0.5 size-4 text-emerald-400" />{line}</div>
+                  ))}
+                </div>
+              </div>
+              <div className="grid gap-3">
+                {["Operação + Dados", "Velocidade Operacional", "Escala Sem Improviso"].map((card) => (
+                  <div key={card} className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur">
+                    <p className="font-semibold">{card}</p>
+                    <p className="mt-1 text-sm text-slate-300">Painéis conectados com execução real, menos ruído e mais decisão.</p>
                   </div>
                 ))}
               </div>
             </div>
-
-            <Card className="border-border/80 bg-slate-950 text-slate-100 shadow-xl">
-              <CardHeader>
-                <CardTitle>Pronto para vender com confiança</CardTitle>
-                <CardDescription className="text-slate-300">
-                  Funil público, autenticação e onboarding alinhados para converter sem quebrar experiência.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3 text-sm text-slate-300">
-                  <p>• Verificação de e-mail com regras de rollout seguro.</p>
-                  <p>• Fluxos públicos padronizados com mensagens claras.</p>
-                  <p>• Jornada inicial orientada por onboarding.status.</p>
-                  <p>• Camada BFF alinhada com API para evitar comportamento divergente.</p>
-                </div>
-                <Button className="mt-6 w-full" onClick={() => navigate("/register")}>
-                  Iniciar onboarding comercial
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
+          </article>
         </section>
 
-        <section id="faq" className="border-t py-16 sm:py-20">
+        <section className="container pb-16 md:pb-20">
+          <article className="mx-auto max-w-4xl rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-[0_15px_40px_rgba(15,23,42,0.06)]">
+            <h2 className="text-3xl font-semibold text-slate-900">Comece simples. Evolua rápido.</h2>
+            <p className="mx-auto mt-3 max-w-2xl text-slate-600">Começa com o básico e evolui para governança, análises e integrações.</p>
+            <div className="mt-6 grid gap-3 text-left md:grid-cols-3">
+              {["MONTH 1|Início rápido", "MONTH 3|Operação estável", "MONTH 6|Evolução contínua"].map((item) => {
+                const [month, title] = item.split("|");
+                return (
+                  <div key={item} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <p className="text-xs font-semibold tracking-[0.12em] text-orange-600">{month}</p>
+                    <p className="mt-2 font-semibold text-slate-900">{title}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </article>
+        </section>
+
+        <section className="border-y border-slate-200/70 bg-white py-16 text-center md:py-20">
           <div className="container">
-            <div className="max-w-2xl">
-              <Badge variant="outline" className="mb-4">
-                <HelpCircle className="size-3.5" />
-                FAQ
-              </Badge>
-              <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Perguntas frequentes</h2>
-            </div>
-
-            <div className="mt-8 grid gap-4 md:grid-cols-2">
-              {faqItems.map((item) => (
-                <Card key={item.question} className="border-border/80 bg-card/95">
-                  <CardHeader>
-                    <CardTitle className="text-lg">{item.question}</CardTitle>
-                    <CardDescription>{item.answer}</CardDescription>
-                  </CardHeader>
-                </Card>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="border-t bg-muted/40 py-14">
-          <div className="container text-center">
-            <h3 className="text-2xl font-bold">Sua operação merece processo, previsibilidade e governança.</h3>
-            <p className="mx-auto mt-3 max-w-2xl text-muted-foreground">
-              Comece agora e veja o NexoGestão funcionar como plataforma operacional completa, não como mais uma ferramenta isolada.
+            <h2 className="mx-auto max-w-4xl text-3xl font-semibold text-slate-900 md:text-5xl">Ou você organiza sua operação… ou continua no improviso.</h2>
+            <p className="mx-auto mt-5 max-w-3xl text-slate-600">
+              Sem fluxo operacional único, sua equipe se perde, o cliente sente, a cobrança atrasa e o crescimento trava.
+              Com o NexoGestão, atendimento, execução, cobrança e controle trabalham na mesma direção.
             </p>
-            <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
-              <Button size="lg" onClick={() => navigate("/register")}>Criar conta</Button>
-              <Button size="lg" variant="outline" onClick={() => navigate("/login")}>
-                Entrar na plataforma
-              </Button>
+            <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+              <button type="button" onClick={() => navigate("/register")} className="rounded-xl bg-orange-500 px-6 py-3 font-semibold text-white shadow-[0_12px_28px_rgba(249,115,22,0.35)] transition hover:bg-orange-600">Começar avaliação</button>
+              <a href="#fluxo" className="rounded-xl border border-slate-200 bg-white px-6 py-3 font-semibold text-slate-700 transition hover:bg-slate-50">Ver como funciona</a>
             </div>
           </div>
         </section>
       </main>
 
-      <footer className="border-t py-8">
-        <div className="container flex flex-col items-center justify-between gap-3 text-sm text-muted-foreground sm:flex-row">
-          <p>© {year} NexoGestão. Todos os direitos reservados.</p>
-          <div className="flex items-center gap-4">
-            <button type="button" className="hover:text-foreground" onClick={() => setTermsModal("terms")}>Termos</button>
-            <button type="button" className="hover:text-foreground" onClick={() => setTermsModal("privacy")}>Privacidade</button>
+      <footer className="bg-white py-12">
+        <div className="container">
+          <div className="grid gap-8 border-b border-slate-200 pb-8 md:grid-cols-4">
+            <div>
+              <p className="text-lg font-semibold text-slate-900">NexoGestão</p>
+              <p className="mt-2 text-sm text-slate-600">Plataforma operacional para empresas de serviço.</p>
+            </div>
+            <div>
+              <p className="font-semibold text-slate-900">Produto</p>
+              <ul className="mt-3 space-y-2 text-sm text-slate-600"><li>Fluxo operacional</li><li>Cobrança</li><li>Governança</li></ul>
+            </div>
+            <div>
+              <p className="font-semibold text-slate-900">Empresa</p>
+              <ul className="mt-3 space-y-2 text-sm text-slate-600"><li>Sobre</li><li>Contato</li><li>Carreiras</li></ul>
+            </div>
+            <div>
+              <p className="font-semibold text-slate-900">Legal</p>
+              <ul className="mt-3 space-y-2 text-sm text-slate-600">
+                <li><button type="button" onClick={() => setTermsModal("terms")}>Termos</button></li>
+                <li><button type="button" onClick={() => setTermsModal("privacy")}>Privacidade</button></li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="mt-6 flex flex-col items-center justify-between gap-3 text-sm text-slate-500 sm:flex-row">
+            <p>© {year} NexoGestão. Todos os direitos reservados.</p>
+            <div className="flex items-center gap-3">
+              <Twitter className="size-4" />
+              <Instagram className="size-4" />
+              <Linkedin className="size-4" />
+            </div>
           </div>
         </div>
       </footer>
