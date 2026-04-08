@@ -22,6 +22,7 @@ import { chargeSchema } from "@/lib/validations";
 import { registerActionFlowEvent } from "@/lib/actionFlow";
 import { useCriticalActionGuard } from "@/hooks/useCriticalActionGuard";
 import { invalidateOperationalGraph } from "@/lib/operationalConsistency";
+import { useProductAnalytics } from "@/hooks/useProductAnalytics";
 
 interface CreateChargeModalProps {
   isOpen: boolean;
@@ -108,6 +109,7 @@ export function CreateChargeModal({
 }: CreateChargeModalProps) {
   const [formData, setFormData] = useState<FormState>(INITIAL_FORM);
   const utils = trpc.useUtils();
+  const { track } = useProductAnalytics();
   const createCharge = trpc.finance.charges.create.useMutation();
   useCriticalActionGuard({
     isPending: createCharge.isPending,
@@ -207,6 +209,13 @@ export function CreateChargeModal({
           },
         });
         registerActionFlowEvent("charge_created");
+        track("generate_charge", {
+          screen: "finances",
+          chargeId: String((created as any)?.id ?? ""),
+          customerId,
+          amountCents: payload.amountCents,
+          nextStep: "register_payment_or_send_whatsapp",
+        });
         setFormData(INITIAL_FORM);
         onSuccess();
         onClose();

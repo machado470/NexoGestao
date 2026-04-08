@@ -1,6 +1,8 @@
 import {
+  Body,
   Controller,
   Get,
+  Post,
   Query,
   UseGuards,
 } from '@nestjs/common'
@@ -8,6 +10,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
 import { Roles } from '../auth/decorators/roles.decorator'
 import { Org } from '../auth/decorators/org.decorator'
+import { User } from '../auth/decorators/user.decorator'
 import { AnalyticsService } from './analytics.service'
 
 @Controller('analytics')
@@ -62,5 +65,30 @@ export class AnalyticsController {
       from ? new Date(from) : undefined,
       to ? new Date(to) : undefined,
     )
+  }
+
+  /**
+   * POST /analytics/track
+   * Registro de eventos de conversão do produto.
+   */
+  @Post('track')
+  @Roles('ADMIN', 'MANAGER', 'STAFF', 'VIEWER')
+  async trackProductEvent(
+    @Org() orgId: string,
+    @User('id') userId: string,
+    @Body()
+    body: {
+      eventName?: string
+      metadata?: Record<string, unknown>
+    },
+  ) {
+    await this.analytics.trackProductEvent({
+      orgId,
+      userId,
+      eventName: body?.eventName ?? '',
+      metadata: body?.metadata ?? {},
+    })
+
+    return { ok: true }
   }
 }

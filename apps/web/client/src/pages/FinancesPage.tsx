@@ -21,6 +21,7 @@ import { PageHero, PageShell, SmartPage, SurfaceSection } from "@/components/Pag
 import { EmptyState } from "@/components/EmptyState";
 import { DemoEnvironmentCta } from "@/components/DemoEnvironmentCta";
 import { useChargeActions } from "@/hooks/useChargeActions";
+import { useProductAnalytics } from "@/hooks/useProductAnalytics";
 
 type FinanceCharge = {
   id: string;
@@ -58,6 +59,7 @@ function formatCurrencyFromCents(cents?: number) {
 }
 
 export default function FinancesPage() {
+  const { track } = useProductAnalytics();
   const { isAuthenticated, isInitializing } = useAuth();
   const canLoadFinance = isAuthenticated;
 
@@ -336,6 +338,11 @@ export default function FinancesPage() {
           const phone = String(
             overdue.charge.customerPhone ?? overdue.charge.phone ?? ""
           ).trim();
+          track("send_whatsapp", {
+            screen: "finances",
+            chargeId: overdue.charge.id,
+            source: "next_action_overdue",
+          });
           if (phone) window.open(`https://wa.me/${phone}`, "_blank");
           else navigate("/whatsapp");
         },
@@ -471,7 +478,10 @@ export default function FinancesPage() {
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={() => navigate("/finances")}
+              onClick={() => {
+                track("cta_click", { screen: "finances", ctaId: "hero_prioritize_charges" });
+                navigate("/finances");
+              }}
               className="inline-flex min-h-12 items-center justify-center rounded-xl bg-orange-500 px-4 text-sm font-medium text-white"
             >
               Priorizar cobranças
@@ -530,7 +540,18 @@ export default function FinancesPage() {
               {nextAction.description}
             </p>
           </div>
-          <Button onClick={nextAction.onClick}>{nextAction.ctaLabel}</Button>
+          <Button
+            onClick={() => {
+              track("cta_click", {
+                screen: "finances",
+                ctaId: "next_action_primary",
+                label: nextAction.ctaLabel,
+              });
+              nextAction.onClick();
+            }}
+          >
+            {nextAction.ctaLabel}
+          </Button>
         </div>
       </SurfaceSection>
 
@@ -611,6 +632,11 @@ export default function FinancesPage() {
                     size="sm"
                     variant="outline"
                     onClick={() => {
+                      track("send_whatsapp", {
+                        screen: "finances",
+                        chargeId: charge.id,
+                        source: "billing_queue",
+                      });
                       setWhatsAppOpeningId(charge.id);
                       const nextPath =
                         buildWhatsAppUrlFromCharge(charge) ??

@@ -16,6 +16,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { useDemoEnvironment } from "@/hooks/useDemoEnvironment";
+import { useProductAnalytics } from "@/hooks/useProductAnalytics";
 
 type StepKey =
   | "customer"
@@ -161,6 +162,7 @@ function extractChargeAmountCents(payload: unknown): number | null {
 
 export default function Onboarding() {
   const [, navigate] = useLocation();
+  const { track } = useProductAnalytics();
   const { user, isAuthenticated, isInitializing } = useAuth();
   const utils = trpc.useUtils();
   const { isGenerating, generateDemoEnvironment } = useDemoEnvironment();
@@ -446,6 +448,7 @@ export default function Onboarding() {
           Preencha dados reais de demo instantaneamente (clientes, agenda, O.S., cobrança, pagamento, timeline e governança).
         </p>
         <Button className="mt-3" variant="secondary" disabled={isGenerating} onClick={async () => {
+          track("cta_click", { screen: "onboarding", ctaId: "generate_demo_data" });
           setError(null);
           setFlowMessage("Preparando dados da demonstração...");
           setSeedFallback(null);
@@ -508,6 +511,7 @@ export default function Onboarding() {
               <input className="w-full rounded-md border bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-zinc-800" placeholder="Telefone / WhatsApp" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
             </div>
             <Button className="mt-4" disabled={!canRun.customer || progress.customer || customerMutation.isPending} onClick={async () => {
+              track("cta_click", { screen: "onboarding", ctaId: "step_create_customer" });
               setError(null);
               setFlowMessage("Criando cliente e preparando o próximo passo...");
               try {
@@ -559,6 +563,7 @@ export default function Onboarding() {
             <p className="mt-1 text-sm text-muted-foreground">Deixe explícito que a execução está pronta para faturar.</p>
             <input className="mt-4 w-full rounded-md border bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-zinc-800" value={serviceOrderTitle} onChange={(e) => setServiceOrderTitle(e.target.value)} placeholder="Título da ordem de serviço" />
             <Button className="mt-4" disabled={!canRun.serviceOrder || progress.serviceOrder || serviceOrderMutation.isPending} onClick={async () => {
+              track("cta_click", { screen: "onboarding", ctaId: "step_create_service_order" });
               setError(null);
               setFlowMessage("Criando ordem de serviço...");
               try {
@@ -581,6 +586,7 @@ export default function Onboarding() {
             <p className="mt-1 text-sm text-muted-foreground">Mostre dinheiro em potencial pronto para entrar no caixa.</p>
             <input className="mt-4 w-full rounded-md border bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-zinc-800" type="number" min="1" value={chargeAmount} onChange={(e) => setChargeAmount(e.target.value)} placeholder="Valor da cobrança" />
             <Button className="mt-4" disabled={!canRun.charge || progress.charge || chargeMutation.isPending} onClick={async () => {
+              track("cta_click", { screen: "onboarding", ctaId: "step_generate_charge" });
               setError(null);
               setFlowMessage("Gerando cobrança e conectando operação ao caixa...");
               try {
@@ -604,6 +610,7 @@ export default function Onboarding() {
             <h2 className="text-lg font-semibold">5. Simular pagamento</h2>
             <p className="mt-1 text-sm text-muted-foreground">Comprove recuperação de receita em tempo real.</p>
             <Button className="mt-4" disabled={!canRun.payment || progress.payment || payChargeMutation.isPending || !activeChargeId} onClick={async () => {
+              track("cta_click", { screen: "onboarding", ctaId: "step_register_payment" });
               setError(null);
               setFlowMessage("Registrando pagamento...");
               try {

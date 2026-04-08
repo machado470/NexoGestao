@@ -38,6 +38,7 @@ import type {
   ServiceOrder,
 } from "@/components/service-orders/service-order.types";
 import { getErrorMessage, getQueryUiState, normalizeArrayPayload } from "@/lib/query-helpers";
+import { useProductAnalytics } from "@/hooks/useProductAnalytics";
 
 const FINANCIAL_FILTERS: Array<{
   value: FinancialFilter;
@@ -94,6 +95,7 @@ function appendReturnTo(url: string, returnTo: string) {
 }
 
 export default function ServiceOrdersPage() {
+  const { track } = useProductAnalytics();
   const [location, navigate] = useLocation();
   const utils = trpc.useUtils();
 
@@ -317,6 +319,11 @@ export default function ServiceOrdersPage() {
   }
 
   function openWhatsApp(url: string) {
+    track("send_whatsapp", {
+      screen: "service-orders",
+      serviceOrderId: activeId,
+      source: "service_order_next_action",
+    });
     const returnTo = activeId ? `${basePath}?os=${activeId}` : basePath;
     navigate(appendReturnTo(url, returnTo));
   }
@@ -426,7 +433,16 @@ export default function ServiceOrdersPage() {
               Atualizar
             </Button>
 
-            <Button onClick={() => setIsCreateOpen(true)} className="min-h-12">
+            <Button
+              onClick={() => {
+                track("cta_click", {
+                  screen: "service-orders",
+                  ctaId: "hero_new_service_order",
+                });
+                setIsCreateOpen(true);
+              }}
+              className="min-h-12"
+            >
               <Plus className="mr-2 h-4 w-4" />
               Nova O.S.
             </Button>
@@ -540,6 +556,11 @@ export default function ServiceOrdersPage() {
           </div>
           <Button
             onClick={() => {
+              track("cta_click", {
+                screen: "service-orders",
+                ctaId: "next_action_primary",
+                label: nextAction.ctaLabel,
+              });
               setNextActionState("running");
               nextAction.onClick();
               setTimeout(() => setNextActionState("done"), 220);
