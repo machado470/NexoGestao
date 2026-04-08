@@ -184,4 +184,72 @@ export class AnalyticsService {
       })),
     }
   }
+
+  async getSaasFunnel(orgId: string, from?: Date, to?: Date) {
+    const wherePeriod: { createdAt?: { gte?: Date; lte?: Date } } = {}
+
+    if (from || to) {
+      wherePeriod.createdAt = {}
+      if (from) wherePeriod.createdAt.gte = from
+      if (to) wherePeriod.createdAt.lte = to
+    }
+
+    const [customersCreated, serviceOrdersCreated, chargesCreated] =
+      await Promise.all([
+        this.prisma.customer.count({
+          where: { orgId, ...wherePeriod },
+        }),
+        this.prisma.serviceOrder.count({
+          where: { orgId, ...wherePeriod },
+        }),
+        this.prisma.charge.count({
+          where: { orgId, ...wherePeriod },
+        }),
+      ])
+
+    const serviceOrdersWithCustomer = await this.prisma.serviceOrder.findMany({
+      where: { orgId, ...wherePeriod },
+      select: { customerId: true },
+      distinct: ['customerId'],
+    })
+
+    const paidCharges = await this.prisma.charge.count({
+      where: {
+        orgId,
+        status: 'PAID',
+        ...(wherePeriod.createdAt ? { paidAt: wherePeriod.createdAt } : {}),
+      },
+    })
+
+    const pct = (num: number, den: number) =>
+      den <= 0 ? 0 : Number(((num / den) * 100).toFixed(1))
+
+    return {
+      orgId,
+      period: {
+        from: from?.toISOString() ?? null,
+        to: to?.toISOString() ?? null,
+      },
+      totals: {
+        customersCreated,
+        serviceOrdersCreated,
+        chargesCreated,
+        paidCharges,
+      },
+      conversions: {
+        customerToServiceOrder: {
+          value: serviceOrdersWithCustomer.length,
+          percentage: pct(serviceOrdersWithCustomer.length, customersCreated),
+        },
+        serviceOrderToCharge: {
+          value: chargesCreated,
+          percentage: pct(chargesCreated, serviceOrdersCreated),
+        },
+        chargeToPaid: {
+          value: paidCharges,
+          percentage: pct(paidCharges, chargesCreated),
+        },
+      },
+    }
+  }
 }

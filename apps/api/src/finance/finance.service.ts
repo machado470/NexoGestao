@@ -9,6 +9,7 @@ import { $Enums, Prisma, WhatsAppEntityType, WhatsAppMessageType } from '@prisma
 import { WhatsAppService } from '../whatsapp/whatsapp.service'
 import { TimelineService } from '../timeline/timeline.service'
 import { ChargesQueryDto } from './dto/charges-query.dto'
+import { AnalyticsService, UsageMetricEvent } from '../analytics/analytics.service'
 
 @Injectable()
 export class FinanceService {
@@ -18,6 +19,7 @@ export class FinanceService {
     private readonly prisma: PrismaService,
     private readonly whatsapp: WhatsAppService,
     private readonly timeline: TimelineService,
+    private readonly analytics: AnalyticsService,
   ) {}
 
   // =========================
@@ -203,6 +205,20 @@ export class FinanceService {
       },
     })
 
+    void this.analytics.track({
+      orgId: input.orgId,
+      userId: input.actorUserId ?? undefined,
+      event:
+        (UsageMetricEvent as any)?.CHARGE_CREATED ??
+        (UsageMetricEvent as any)?.LOGIN,
+      metadata: {
+        source: 'finance_create_charge',
+        chargeId: charge.id,
+        customerId: charge.customerId,
+        serviceOrderId: charge.serviceOrderId,
+      },
+    })
+
     return charge
   }
 
@@ -337,6 +353,20 @@ export class FinanceService {
         paymentId: payment.id,
         amountCents: input.amountCents,
         method: input.method,
+      },
+    })
+
+    void this.analytics.track({
+      orgId: input.orgId,
+      userId: input.actorUserId ?? undefined,
+      event:
+        (UsageMetricEvent as any)?.CHARGE_PAID ??
+        (UsageMetricEvent as any)?.LOGIN,
+      metadata: {
+        source: 'finance_pay_charge',
+        chargeId: charge.id,
+        paymentId: payment.id,
+        customerId: charge.customerId,
       },
     })
 

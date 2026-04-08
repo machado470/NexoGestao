@@ -19,6 +19,7 @@ import { AutomationService } from '../automation/automation.service'
 import { NotificationsService } from '../notifications/notifications.service'
 import { OnboardingService } from '../onboarding/onboarding.service'
 import { WhatsAppService } from '../whatsapp/whatsapp.service'
+import { AnalyticsService, UsageMetricEvent } from '../analytics/analytics.service'
 
 function normalizeText(v?: string): string | null {
   const s = (v ?? '').trim()
@@ -113,6 +114,7 @@ export class ServiceOrdersService {
     private readonly notificationsService: NotificationsService,
     private readonly onboardingService: OnboardingService,
     private readonly whatsApp: WhatsAppService,
+    private readonly analytics: AnalyticsService,
   ) {}
 
   private async enqueueServiceOrderCreatedMessage(params: {
@@ -551,6 +553,19 @@ export class ServiceOrdersService {
       'createService' as any,
     )
 
+    void this.analytics.track({
+      orgId: params.orgId,
+      userId: params.createdBy ?? undefined,
+      event:
+        (UsageMetricEvent as any)?.SERVICE_ORDER_CREATED ??
+        (UsageMetricEvent as any)?.LOGIN,
+      metadata: {
+        source: 'service_order_create',
+        serviceOrderId: created.id,
+        customerId: created.customerId,
+      },
+    })
+
     await this.syncOperationalForPeople(params.orgId, [
       params.personId,
       params.assignedToPersonId,
@@ -658,6 +673,19 @@ export class ServiceOrdersService {
     })
 
     if (data.status === 'DONE' && before.status !== 'DONE') {
+      void this.analytics.track({
+        orgId: params.orgId,
+        userId: params.updatedBy ?? undefined,
+        event:
+          (UsageMetricEvent as any)?.SERVICE_ORDER_DONE ??
+          (UsageMetricEvent as any)?.LOGIN,
+        metadata: {
+          source: 'service_order_update',
+          serviceOrderId: updated.id,
+          customerId: updated.customerId,
+        },
+      })
+
       if (updated.amountCents && updated.amountCents > 0) {
         await this.finance.ensureChargeForServiceOrderDone({
           orgId: params.orgId,

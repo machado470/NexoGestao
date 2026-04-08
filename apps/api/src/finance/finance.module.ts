@@ -10,12 +10,13 @@ import { OnboardingModule } from '../onboarding/onboarding.module'
 import { AutomationModule } from '../automation/automation.module'
 import { QueueModule } from '../queue/queue.module'
 import { FinanceProcessor } from '../queue/processors/finance.processor'
+import { AnalyticsModule } from '../analytics/analytics.module'
 
 import { FinanceController } from './finance.controller'
 import { FinanceService } from './finance.service'
 
 @Module({
-  imports: [PrismaModule, TimelineModule, AuditModule, OperationalStateModule, NotificationsModule, WhatsAppModule, RiskModule, OnboardingModule, AutomationModule, QueueModule],
+  imports: [PrismaModule, TimelineModule, AuditModule, OperationalStateModule, NotificationsModule, WhatsAppModule, RiskModule, OnboardingModule, AutomationModule, QueueModule, AnalyticsModule],
   controllers: [FinanceController],
   providers: [FinanceService, FinanceProcessor],
   exports: [FinanceService],

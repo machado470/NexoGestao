@@ -32,6 +32,13 @@ export const PLAN_LIMITS: Record<string, QuotaLimits> = {
     users: 10,
     storage: 5000,
   },
+  SCALE: {
+    customers: 999999,
+    appointments: 999999,
+    serviceOrders: 999999,
+    users: 999999,
+    storage: 999999,
+  },
   BUSINESS: {
     customers: 999999,
     appointments: 999999,
@@ -46,6 +53,11 @@ export class QuotasService {
   private readonly logger = new Logger(QuotasService.name)
 
   constructor(private prisma: PrismaService) {}
+
+  private normalizePlan(plan: string): string {
+    if (plan === 'BUSINESS') return 'SCALE'
+    return plan
+  }
 
   async getOrgPlan(orgId: string): Promise<string> {
     try {
@@ -67,7 +79,7 @@ export class QuotasService {
         return 'FREE'
       }
 
-      return subscription.plan.name
+      return this.normalizePlan(subscription.plan.name)
     } catch (err) {
       const message =
         err instanceof Error ? err.message : 'erro desconhecido'
@@ -81,7 +93,8 @@ export class QuotasService {
   }
 
   getQuotaLimits(plan: string): QuotaLimits {
-    return PLAN_LIMITS[plan] || PLAN_LIMITS['FREE']
+    const normalizedPlan = this.normalizePlan(plan)
+    return PLAN_LIMITS[normalizedPlan] || PLAN_LIMITS['FREE']
   }
 
   async canCreateCustomer(orgId: string): Promise<boolean> {
@@ -153,8 +166,23 @@ export class QuotasService {
     const pct = (used: number, limit: number) =>
       limit >= 999999 ? 0 : Math.min(100, Math.round((used / limit) * 100))
 
+    const trialEndsAt = await this.prisma.subscription.findUnique({
+      where: { orgId },
+      select: {
+        status: true,
+        currentPeriodEnd: true,
+      },
+    })
+
     return {
       plan,
+      trial:
+        trialEndsAt?.status === SubscriptionStatus.TRIALING
+          ? {
+              isTrial: true,
+              endsAt: trialEndsAt.currentPeriodEnd,
+            }
+          : { isTrial: false, endsAt: null },
       limits,
       usage: {
         customers: {
@@ -227,7 +255,7 @@ export class QuotasService {
 
       throw new ForbiddenException(
         `Limite de ${resourceName}s atingido para o plano ${plan}. ` +
-          `Faça upgrade para continuar.`,
+          `Faça upgrade para continuar em /billing/plans.`,
       )
     }
   }
