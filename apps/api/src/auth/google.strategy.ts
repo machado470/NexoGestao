@@ -26,7 +26,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
       !config.get<string>('GOOGLE_REDIRECT_URL')
     ) {
       this.logger.warn(
-        'Google OAuth sem configuração completa. Strategy carregada em modo placeholder.',
+        'Google OAuth sem configuração completa. Endpoints serão rejeitados até configurar GOOGLE_CLIENT_ID/SECRET/REDIRECT_URL.',
       )
     }
   }
