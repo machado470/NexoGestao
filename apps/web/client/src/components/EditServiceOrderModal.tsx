@@ -25,6 +25,8 @@ import {
 import { serviceOrderEditSchema } from "@/lib/validations";
 import { useLocation } from "wouter";
 import { buildServiceOrdersDeepLink } from "@/lib/operations/operations.utils";
+import { useCriticalActionGuard } from "@/hooks/useCriticalActionGuard";
+import { invalidateOperationalGraph } from "@/lib/operationalConsistency";
 
 type ServiceOrderStatus =
   | "OPEN"
@@ -209,6 +211,10 @@ export default function EditServiceOrderModal({
   );
 
   const updateServiceOrder = trpc.nexo.serviceOrders.update.useMutation();
+  useCriticalActionGuard({
+    isPending: updateServiceOrder.isPending,
+    reason: "Atualizando O.S. com sincronização global.",
+  });
   const [loadingTimedOut, setLoadingTimedOut] = useState(false);
 
   useEffect(() => {
@@ -393,20 +399,14 @@ export default function EditServiceOrderModal({
       const resolvedCustomerId =
         String((updated as any)?.customerId ?? (serviceOrder as any)?.customerId ?? "").trim() ||
         String((serviceOrder as any)?.customer?.id ?? "").trim();
-      await Promise.all([
-        utils.nexo.serviceOrders.list.invalidate(),
-        utils.nexo.serviceOrders.getById.invalidate({ id: serviceOrderId }),
-        resolvedCustomerId
-          ? utils.nexo.customers.workspace.invalidate({ id: resolvedCustomerId })
-          : Promise.resolve(),
-        resolvedCustomerId
-          ? utils.nexo.customers.getById.invalidate({ id: resolvedCustomerId })
-          : Promise.resolve(),
-        utils.finance.charges.list.invalidate(),
-        utils.dashboard.alerts.invalidate(),
-        utils.nexo.timeline.listByOrg.invalidate(),
-      ]);
-      toast.success("Ordem de serviço atualizada com sucesso!");
+      await invalidateOperationalGraph(utils, resolvedCustomerId, serviceOrderId);
+      await utils.dashboard.alerts.invalidate();
+      toast.success(`O.S. atualizada: ${parsed.data.title}`, {
+        action: {
+          label: "Ver O.S.",
+          onClick: () => navigate(buildServiceOrdersDeepLink(serviceOrderId)),
+        },
+      });
       onSuccess();
       onClose();
     } catch (error) {

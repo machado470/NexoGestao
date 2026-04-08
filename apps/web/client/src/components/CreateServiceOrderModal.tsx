@@ -23,6 +23,8 @@ import { serviceOrderSchema } from "@/lib/validations";
 import { registerActionFlowEvent } from "@/lib/actionFlow";
 import { useLocation } from "wouter";
 import { buildServiceOrdersDeepLink } from "@/lib/operations/operations.utils";
+import { useCriticalActionGuard } from "@/hooks/useCriticalActionGuard";
+import { invalidateOperationalGraph } from "@/lib/operationalConsistency";
 
 type Props = {
   open?: boolean;
@@ -146,6 +148,10 @@ export default function CreateServiceOrderModal({
   });
 
   const createMutation = trpc.nexo.serviceOrders.create.useMutation();
+  useCriticalActionGuard({
+    isPending: createMutation.isPending,
+    reason: "Criando O.S. e atualizando cliente, cobrança e timeline.",
+  });
 
   const canSubmit = useMemo(() => {
     return (
@@ -262,13 +268,12 @@ export default function CreateServiceOrderModal({
           if (raw && Array.isArray(raw.data)) return { ...raw, data: applyReplace(raw.data) };
           return [created];
         });
-        await Promise.all([
-          utils.nexo.serviceOrders.list.invalidate(),
-          utils.nexo.customers.workspace.invalidate({ id: payload.customerId }),
-          utils.nexo.customers.getById.invalidate({ id: payload.customerId }),
-          utils.finance.charges.list.invalidate(),
-          utils.dashboard.alerts.invalidate(),
-        ]);
+        await invalidateOperationalGraph(
+          utils,
+          payload.customerId,
+          String((created as any)?.id ?? "")
+        );
+        await utils.dashboard.alerts.invalidate();
 
         setCreatedServiceOrder({
           id: String((created as any)?.id ?? ""),
@@ -280,7 +285,13 @@ export default function CreateServiceOrderModal({
           customerId: payload.customerId,
         });
         registerActionFlowEvent("service_order_created");
-        toast.success("Ordem de serviço criada com sucesso.");
+        toast.success(`O.S. criada: ${String((created as any)?.title ?? payload.title)}`, {
+          action: {
+            label: "Ver O.S.",
+            onClick: () =>
+              navigate(buildServiceOrdersDeepLink(String((created as any)?.id ?? ""))),
+          },
+        });
       },
       onError: (error) => {
         utils.nexo.serviceOrders.list.setData(

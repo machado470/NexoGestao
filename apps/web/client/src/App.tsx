@@ -4,6 +4,7 @@ import { Loader } from "lucide-react";
 
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { CriticalActionOverlay } from "@/components/CriticalActionOverlay";
 
 import ErrorBoundary from "./components/ErrorBoundary";
 import { MainLayout } from "./components/MainLayout";
@@ -492,6 +493,7 @@ function App() {
             <Toaster />
             <Router />
             <NotificationCenter />
+            <CriticalActionOverlay />
           </TooltipProvider>
         </ThemeProvider>
       </AuthProvider>

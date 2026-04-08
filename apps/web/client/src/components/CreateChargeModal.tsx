@@ -20,6 +20,8 @@ import {
 import { toast } from "sonner";
 import { chargeSchema } from "@/lib/validations";
 import { registerActionFlowEvent } from "@/lib/actionFlow";
+import { useCriticalActionGuard } from "@/hooks/useCriticalActionGuard";
+import { invalidateOperationalGraph } from "@/lib/operationalConsistency";
 
 interface CreateChargeModalProps {
   isOpen: boolean;
@@ -107,6 +109,10 @@ export function CreateChargeModal({
   const [formData, setFormData] = useState<FormState>(INITIAL_FORM);
   const utils = trpc.useUtils();
   const createCharge = trpc.finance.charges.create.useMutation();
+  useCriticalActionGuard({
+    isPending: createCharge.isPending,
+    reason: "Criando cobrança e sincronizando financeiro + cliente.",
+  });
 
   const { data: customersResponse } = trpc.nexo.customers.list.useQuery(undefined, {
     retry: false,
@@ -183,7 +189,7 @@ export function CreateChargeModal({
     });
 
     createCharge.mutate(payload, {
-      onSuccess: (created) => {
+      onSuccess: async (created) => {
         utils.finance.charges.list.setData(undefined, (old: any) => {
           const raw = old as { data: any[]; pagination: any } | undefined;
           const applyReplace = (items: any[]) =>
@@ -192,7 +198,14 @@ export function CreateChargeModal({
           return { ...raw, data: applyReplace(raw.data) };
         });
 
-        toast.success("Cobrança criada com sucesso!");
+        const customerId = String((created as any)?.customerId ?? payload.customerId ?? "");
+        await invalidateOperationalGraph(utils, customerId || undefined);
+        toast.success("Cobrança criada com contexto sincronizado.", {
+          action: {
+            label: "Ver cobrança",
+            onClick: () => window.location.assign(`/finances?chargeId=${String((created as any)?.id ?? "")}`),
+          },
+        });
         registerActionFlowEvent("charge_created");
         setFormData(INITIAL_FORM);
         onSuccess();
