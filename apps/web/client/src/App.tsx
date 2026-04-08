@@ -4,6 +4,7 @@ import {
   useEffect,
   type ComponentType,
   type LazyExoticComponent,
+  type ReactNode,
 } from "react";
 import { Route, Switch, useLocation } from "wouter";
 import { Loader } from "lucide-react";
@@ -41,6 +42,7 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 const About = lazy(() => import("./pages/About"));
 const ProductPage = lazy(() => import("./pages/ProductPage"));
 const PricingPage = lazy(() => import("./pages/PricingPage"));
+const FunctionalitiesPage = lazy(() => import("./pages/FunctionalitiesPage"));
 const ContactPage = lazy(() => import("./pages/ContactPage"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const TermsOfService = lazy(() => import("./pages/TermsOfService"));
@@ -116,14 +118,12 @@ function FullScreenMessage({
 
 function LazyPage({
   component: Component,
+  fallback = <FullScreenLoader />,
 }: {
   component: LazyExoticComponent<ComponentType>;
+  fallback?: ReactNode;
 }) {
-  return (
-    <Suspense fallback={<FullScreenLoader />}>
-      <Component />
-    </Suspense>
-  );
+  return <Suspense fallback={fallback}><Component /></Suspense>;
 }
 
 function RedirectingScreen({ message }: { message: string }) {
@@ -301,7 +301,9 @@ function protectedPage(
 
 function publicPage(Page: LazyExoticComponent<ComponentType>) {
   return function PublicPageRoute() {
-    return <MarketingRoute component={() => <LazyPage component={Page} />} />;
+    return (
+      <MarketingRoute component={() => <LazyPage component={Page} fallback={null} />} />
+    );
   };
 }
 
@@ -505,36 +507,19 @@ function Router() {
         )}
       />
 
-      <Route path="/about" component={() => <LazyPage component={About} />} />
-      <Route path="/sobre" component={() => <LazyPage component={About} />} />
+      <Route path="/about" component={publicPage(About)} />
+      <Route path="/sobre" component={publicPage(About)} />
+      <Route path="/produto" component={publicPage(ProductPage)} />
+      <Route path="/precos" component={publicPage(PricingPage)} />
       <Route
-        path="/produto"
-        component={() => <LazyPage component={ProductPage} />}
+        path="/funcionalidades"
+        component={publicPage(FunctionalitiesPage)}
       />
-      <Route
-        path="/precos"
-        component={() => <LazyPage component={PricingPage} />}
-      />
-      <Route
-        path="/contato"
-        component={() => <LazyPage component={ContactPage} />}
-      />
-      <Route
-        path="/privacy"
-        component={() => <LazyPage component={PrivacyPolicy} />}
-      />
-      <Route
-        path="/privacidade"
-        component={() => <LazyPage component={PrivacyPolicy} />}
-      />
-      <Route
-        path="/terms"
-        component={() => <LazyPage component={TermsOfService} />}
-      />
-      <Route
-        path="/termos"
-        component={() => <LazyPage component={TermsOfService} />}
-      />
+      <Route path="/contato" component={publicPage(ContactPage)} />
+      <Route path="/privacy" component={publicPage(PrivacyPolicy)} />
+      <Route path="/privacidade" component={publicPage(PrivacyPolicy)} />
+      <Route path="/terms" component={publicPage(TermsOfService)} />
+      <Route path="/termos" component={publicPage(TermsOfService)} />
       <Route path="/404" component={() => <LazyPage component={NotFound} />} />
       <Route component={() => <LazyPage component={NotFound} />} />
     </Switch>

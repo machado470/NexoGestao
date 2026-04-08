@@ -1,3 +1,4 @@
+import { useCallback, useState, type FormEvent } from "react";
 import { Mail, MessageCircleMore, PhoneCall } from "lucide-react";
 
 import { MarketingLayout } from "@/components/MarketingLayout";
@@ -5,7 +6,42 @@ import { usePageMeta } from "@/hooks/usePageMeta";
 
 import "./landing.css";
 
+
 export default function ContactPage() {
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+
+  const handleRequestDemo = useCallback((event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+
+    const name = String(form.get("name") ?? "").trim();
+    const company = String(form.get("company") ?? "").trim();
+    const email = String(form.get("email") ?? "").trim();
+    const phone = String(form.get("phone") ?? "").trim();
+    const goals = String(form.get("goals") ?? "").trim();
+
+    if (!name || !company || !email || !goals) {
+      setStatusMessage("Preencha nome, empresa, email e objetivo para enviar.");
+      return;
+    }
+
+    const subject = encodeURIComponent(`Solicitação de demonstração - ${company}`);
+    const body = encodeURIComponent(
+      [
+        `Nome: ${name}`,
+        `Empresa: ${company}`,
+        `Email: ${email}`,
+        `WhatsApp: ${phone || "Não informado"}`,
+        "",
+        "Objetivo operacional:",
+        goals,
+      ].join("\n")
+    );
+
+    window.location.href = `mailto:contato@nexogestao.com.br?subject=${subject}&body=${body}`;
+    setStatusMessage("Abrimos seu cliente de e-mail para concluir o envio da solicitação.");
+  }, []);
+
   usePageMeta({
     title: "NexoGestão | Contato",
     description:
@@ -92,11 +128,13 @@ export default function ContactPage() {
             configuração para sua operação.
           </p>
 
-          <form className="mt-6 grid gap-4 md:grid-cols-2">
+          <form className="mt-6 grid gap-4 md:grid-cols-2" onSubmit={handleRequestDemo}>
             <label className="text-sm font-medium text-slate-700">
               Nome
               <input
                 type="text"
+                name="name"
+                required
                 className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-slate-900 outline-none ring-orange-500/20 transition focus:ring-4"
                 placeholder="Seu nome"
               />
@@ -105,6 +143,8 @@ export default function ContactPage() {
               Empresa
               <input
                 type="text"
+                name="company"
+                required
                 className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-slate-900 outline-none ring-orange-500/20 transition focus:ring-4"
                 placeholder="Nome da empresa"
               />
@@ -113,6 +153,8 @@ export default function ContactPage() {
               Email
               <input
                 type="email"
+                name="email"
+                required
                 className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-slate-900 outline-none ring-orange-500/20 transition focus:ring-4"
                 placeholder="voce@empresa.com"
               />
@@ -121,6 +163,7 @@ export default function ContactPage() {
               WhatsApp
               <input
                 type="tel"
+                name="phone"
                 className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-slate-900 outline-none ring-orange-500/20 transition focus:ring-4"
                 placeholder="(11) 99999-9999"
               />
@@ -129,6 +172,8 @@ export default function ContactPage() {
               O que você quer organizar primeiro?
               <textarea
                 rows={4}
+                name="goals"
+                required
                 className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-slate-900 outline-none ring-orange-500/20 transition focus:ring-4"
                 placeholder="Ex.: atendimento + ordens de serviço + cobrança"
               />
@@ -140,6 +185,9 @@ export default function ContactPage() {
               >
                 Quero falar com a equipe
               </button>
+              {statusMessage ? (
+                <p className="mt-3 text-sm text-slate-600">{statusMessage}</p>
+              ) : null}
             </div>
           </form>
         </article>
