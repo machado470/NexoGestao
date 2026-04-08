@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
-import { normalizeArrayPayload } from "@/lib/query-helpers";
+import {
+  getErrorMessage,
+  getQueryUiState,
+  normalizeArrayPayload,
+} from "@/lib/query-helpers";
 import { Button } from "@/components/ui/button";
 import {
   History,
@@ -24,7 +28,8 @@ import {
   Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { PageHero, PageShell, SurfaceSection } from "@/components/PagePattern";
+import { EmptyState } from "@/components/EmptyState";
+import { PageHero, PageShell, SmartPage, SurfaceSection } from "@/components/PagePattern";
 import { DemoEnvironmentCta } from "@/components/DemoEnvironmentCta";
 import {
   formatDateTime,
@@ -335,13 +340,64 @@ export default function TimelinePage() {
   const hasFatalError =
     customersQuery.isError || (Boolean(customerId) && timelineQuery.isError);
 
+  const hasRenderableData =
+    customersQuery.data !== undefined || timelineQuery.data !== undefined;
+  const queryState = getQueryUiState(
+    [customersQuery, ...(customerId ? [timelineQuery] : [])],
+    hasRenderableData
+  );
   const fatalErrorMessage =
-    customersQuery.error?.message ||
-    timelineQuery.error?.message ||
+    getErrorMessage(customersQuery.error, "") ||
+    getErrorMessage(timelineQuery.error, "") ||
     "Não foi possível carregar a timeline agora.";
+  const smartPriorities = [
+    {
+      id: "timeline-events",
+      type: "operational_risk" as const,
+      title: "Eventos com leitura pendente",
+      count: filteredEvents.length,
+      impactCents: filteredEvents.length * 1500,
+      ctaLabel: "Abrir histórico",
+      ctaPath: "/timeline",
+      helperText: "Sem leitura cronológica, o time perde contexto de decisão.",
+    },
+    {
+      id: "timeline-financial",
+      type: "overdue_charges" as const,
+      title: "Eventos financeiros no recorte",
+      count: stats.financial,
+      impactCents: stats.financial * 3000,
+      ctaLabel: "Ir para financeiro",
+      ctaPath: "/finances",
+      helperText: "Eventos financeiros exigem ação rápida para preservar caixa.",
+    },
+    {
+      id: "timeline-execution",
+      type: "stalled_service_orders" as const,
+      title: "Eventos de execução",
+      count: stats.serviceOrders,
+      impactCents: stats.serviceOrders * 2500,
+      ctaLabel: "Ir para execução",
+      ctaPath: "/service-orders",
+      helperText: "Execução sem leitura vira gargalo oculto.",
+    },
+  ];
 
-  const isInitialLoading =
-    customersQuery.isLoading || (Boolean(customerId) && timelineQuery.isLoading);
+  if (queryState.isInitialLoading) {
+    return (
+      <PageShell>
+        <PageHero
+          eyebrow="Auditoria operacional com leitura humana"
+          title="Timeline"
+          description="Carregando rastreabilidade operacional para sugerir a próxima ação."
+        />
+        <SurfaceSection className="flex min-h-[180px] items-center justify-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Carregando timeline...
+        </SurfaceSection>
+      </PageShell>
+    );
+  }
 
   return (
     <PageShell>
@@ -376,10 +432,36 @@ export default function TimelinePage() {
         </>}
       />
 
-      {hasFatalError ? (
+      <SmartPage
+        pageContext="dashboard"
+        headline="Leitura cronológica orientada por ação"
+        dominantProblem={
+          selectedCustomer
+            ? `Cliente em foco: ${selectedCustomer.name}`
+            : "Selecione um cliente para iniciar a leitura"
+        }
+        dominantImpact={`${stats.total} eventos no recorte atual`}
+        dominantCta={{
+          label: customerId ? "Atualizar timeline" : "Selecionar cliente",
+          onClick: () => {
+            if (customerId) void timelineQuery.refetch();
+            else if (customers[0]) setCustomerId(customers[0].id);
+          },
+          path: "/timeline",
+        }}
+        priorities={smartPriorities}
+      />
+
+      {hasFatalError || queryState.shouldBlockForError ? (
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300">
           {fatalErrorMessage}
         </div>
+      ) : null}
+
+      {queryState.hasBackgroundUpdate ? (
+        <SurfaceSection className="border-blue-500/30 bg-blue-500/10 text-sm text-blue-200">
+          Atualizando timeline em segundo plano...
+        </SurfaceSection>
       ) : null}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
@@ -564,27 +646,24 @@ export default function TimelinePage() {
             <div className="py-10 text-center text-sm text-gray-500 dark:text-gray-400">
               Selecione um cliente para ver a timeline.
             </div>
-          ) : isInitialLoading ? (
-            <div className="flex items-center justify-center gap-2 py-10 text-sm text-gray-500 dark:text-gray-400">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Carregando eventos...
-            </div>
           ) : filteredEvents.length === 0 ? (
-            <div className="space-y-4 py-10 text-center text-sm text-gray-500 dark:text-gray-400">
-              <p>
-                Ainda não há eventos para este recorte. A timeline nasce quando o
-                fluxo roda: Agendamentos → O.S. → Financeiro → WhatsApp →
-                Governança.
-              </p>
+            <div className="space-y-4 py-6">
+              <EmptyState
+                icon={<History className="h-7 w-7" />}
+                title="Ainda não há eventos para este recorte"
+                description="A timeline nasce quando o fluxo roda: Agendamentos → O.S. → Financeiro → WhatsApp → Governança."
+                action={{
+                  label: "Abrir agenda",
+                  onClick: () => navigate("/appointments"),
+                }}
+                secondaryAction={{
+                  label: "Abrir financeiro",
+                  onClick: () => navigate("/finances"),
+                }}
+              />
               <div className="mx-auto flex max-w-xl flex-wrap justify-center gap-2">
-                <Button size="sm" variant="outline" onClick={() => navigate("/appointments")}>
-                  Abrir agenda
-                </Button>
                 <Button size="sm" variant="outline" onClick={() => navigate("/service-orders")}>
                   Abrir O.S.
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => navigate("/finances")}>
-                  Abrir financeiro
                 </Button>
               </div>
               <DemoEnvironmentCta className="mx-auto max-w-xl text-left" />

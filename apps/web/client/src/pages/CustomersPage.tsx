@@ -47,6 +47,8 @@ import {
   buildServiceOrdersDeepLink,
 } from "@/lib/operations/operations.utils";
 import {
+  getErrorMessage,
+  getQueryUiState,
   normalizeArrayPayload,
   normalizeObjectPayload,
 } from "@/lib/query-helpers";
@@ -832,7 +834,14 @@ export default function CustomersPage() {
         ? "attention"
         : workspacePendingCharges > 0
           ? "critical"
-          : "healthy";
+        : "healthy";
+  const hasRenderableData =
+    listCustomers.data !== undefined || workspaceQuery.data !== undefined;
+  const queryState = getQueryUiState([listCustomers, workspaceQuery], hasRenderableData);
+  const blockingErrorMessage =
+    getErrorMessage(listCustomers.error, "") ||
+    getErrorMessage(workspaceQuery.error, "") ||
+    "Não foi possível carregar clientes.";
 
   return (
     <PageShell>
@@ -904,6 +913,12 @@ export default function CustomersPage() {
         }}
         priorities={smartPriorities}
       />
+
+      {queryState.hasBackgroundUpdate ? (
+        <SurfaceSection className="border-blue-500/30 bg-blue-500/10 text-sm text-blue-200">
+          Atualizando clientes e workspace em segundo plano...
+        </SurfaceSection>
+      ) : null}
 
       <SurfaceSection className="space-y-6">
         <div className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs font-medium text-orange-700 dark:border-orange-900/40 dark:bg-orange-950/20 dark:text-orange-300">
@@ -1008,15 +1023,14 @@ export default function CustomersPage() {
             </div>
           </div>
 
-          {listCustomers.isLoading && customers.length === 0 ? (
+          {queryState.isInitialLoading && customers.length === 0 ? (
             <SurfaceSection className="m-4 flex min-h-[140px] items-center justify-center text-sm text-gray-600 dark:text-gray-400">
               Carregando clientes...
             </SurfaceSection>
-          ) : listCustomers.error ? (
+          ) : queryState.shouldBlockForError ? (
             <SurfaceSection className="m-4 space-y-3 rounded-xl border border-red-200 bg-red-50/70 dark:border-red-900/40 dark:bg-red-950/20">
               <p className="text-sm text-red-700 dark:text-red-200">
-                Não foi possível carregar clientes. Estado de erro persistente
-                ativo.
+                {blockingErrorMessage}
               </p>
               <Button
                 type="button"
