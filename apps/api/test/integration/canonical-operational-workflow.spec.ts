@@ -17,7 +17,8 @@ if (!RUN_REAL_INTEGRATION) {
 }
 
 describeRealIntegration('Canonical Operational Workflow (e2e)', () => {
-  jest.setTimeout(30000)
+  // Real infra startup (Postgres/Redis + Prisma retries) can exceed 30s on cold boots.
+  jest.setTimeout(90000)
   let app: INestApplication
   let prisma: WorkflowPrisma
 
