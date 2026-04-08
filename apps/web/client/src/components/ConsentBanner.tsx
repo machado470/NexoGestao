@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
+import { saveConsent, type ConsentPreferences } from './ConsentBanner.logic';
 
 /**
  * Banner de consentimento de dados (LGPD)
@@ -8,7 +9,8 @@ import { X } from 'lucide-react';
  */
 export function ConsentBanner() {
   const [isVisible, setIsVisible] = useState(false);
-  const [preferences, setPreferences] = useState({
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [preferences, setPreferences] = useState<ConsentPreferences>({
     marketing: false,
     analytics: false,
     cookies: true, // Essencial
@@ -23,41 +25,43 @@ export function ConsentBanner() {
   }, []);
 
   const handleAcceptAll = async () => {
-    await recordConsents({
+    const ok = await recordConsents({
       marketing: true,
       analytics: true,
       cookies: true,
     });
-    setIsVisible(false);
-    sessionStorage.setItem('consent-banner-shown', 'true');
+    if (!ok) return;
+    closeBanner();
   };
 
   const handleRejectAll = async () => {
-    await recordConsents({
+    const ok = await recordConsents({
       marketing: false,
       analytics: false,
       cookies: true, // Essencial
     });
-    setIsVisible(false);
-    sessionStorage.setItem('consent-banner-shown', 'true');
+    if (!ok) return;
+    closeBanner();
   };
 
   const handleCustomize = async () => {
-    await recordConsents(preferences);
+    const ok = await recordConsents(preferences);
+    if (!ok) return;
+    closeBanner();
+  };
+
+  const closeBanner = () => {
     setIsVisible(false);
     sessionStorage.setItem('consent-banner-shown', 'true');
   };
 
-  const recordConsents = async (prefs: typeof preferences) => {
+  const recordConsents = async (prefs: ConsentPreferences) => {
+    setIsSubmitting(true);
+
     try {
-      // Enviar para backend
-      await fetch('/api/consent', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(prefs),
-      });
-    } catch (error) {
-      console.error('Erro ao registrar consentimento:', error);
+      return await saveConsent(prefs);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -125,6 +129,7 @@ export function ConsentBanner() {
 
           <button
             onClick={() => setIsVisible(false)}
+            disabled={isSubmitting}
             className="flex-shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
           >
             <X className="w-5 h-5" />
@@ -132,13 +137,15 @@ export function ConsentBanner() {
         </div>
 
         <div className="flex gap-2 justify-end">
-          <Button variant="outline" onClick={handleRejectAll}>
+          <Button variant="outline" onClick={handleRejectAll} disabled={isSubmitting}>
             Rejeitar Tudo
           </Button>
-          <Button variant="outline" onClick={handleCustomize}>
+          <Button variant="outline" onClick={handleCustomize} disabled={isSubmitting}>
             Personalizar
           </Button>
-          <Button onClick={handleAcceptAll}>Aceitar Tudo</Button>
+          <Button onClick={handleAcceptAll} disabled={isSubmitting}>
+            {isSubmitting ? 'Salvando...' : 'Aceitar Tudo'}
+          </Button>
         </div>
       </div>
     </div>
