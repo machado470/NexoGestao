@@ -1,150 +1,154 @@
-import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { X } from 'lucide-react';
-import { saveConsent, type ConsentPreferences } from './ConsentBanner.logic';
+import { useEffect, useState } from "react";
+import { X } from "lucide-react";
 
-/**
- * Banner de consentimento de dados (LGPD)
- * Exibe uma vez por sessão
- */
+import { Button } from "@/components/ui/button";
+import { saveConsent, type ConsentPreferences } from "./ConsentBanner.logic";
+
+type ConsentStorage = {
+  timestamp: string;
+  preferences: ConsentPreferences;
+};
+
+const CONSENT_KEY = "nexo:privacy-consent:v1";
+
+function readStoredConsent(): ConsentStorage | null {
+  if (typeof window === "undefined") return null;
+
+  const raw = window.localStorage.getItem(CONSENT_KEY);
+  if (!raw) return null;
+
+  try {
+    return JSON.parse(raw) as ConsentStorage;
+  } catch {
+    return null;
+  }
+}
+
 export function ConsentBanner() {
   const [isVisible, setIsVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCustomizing, setIsCustomizing] = useState(false);
   const [preferences, setPreferences] = useState<ConsentPreferences>({
     marketing: false,
     analytics: false,
-    cookies: true, // Essencial
+    cookies: true,
   });
 
   useEffect(() => {
-    // Verificar se já consentiu nesta sessão
-    const hasConsented = sessionStorage.getItem('consent-banner-shown');
-    if (!hasConsented) {
-      setIsVisible(true);
-    }
+    const stored = readStoredConsent();
+    setIsVisible(!stored);
   }, []);
-
-  const handleAcceptAll = async () => {
-    const ok = await recordConsents({
-      marketing: true,
-      analytics: true,
-      cookies: true,
-    });
-    if (!ok) return;
-    closeBanner();
-  };
-
-  const handleRejectAll = async () => {
-    const ok = await recordConsents({
-      marketing: false,
-      analytics: false,
-      cookies: true, // Essencial
-    });
-    if (!ok) return;
-    closeBanner();
-  };
-
-  const handleCustomize = async () => {
-    const ok = await recordConsents(preferences);
-    if (!ok) return;
-    closeBanner();
-  };
 
   const closeBanner = () => {
     setIsVisible(false);
-    sessionStorage.setItem('consent-banner-shown', 'true');
+    setIsCustomizing(false);
+  };
+
+  const persistLocalConsent = (prefs: ConsentPreferences) => {
+    if (typeof window === "undefined") return;
+
+    window.localStorage.setItem(
+      CONSENT_KEY,
+      JSON.stringify({
+        timestamp: new Date().toISOString(),
+        preferences: prefs,
+      }),
+    );
   };
 
   const recordConsents = async (prefs: ConsentPreferences) => {
     setIsSubmitting(true);
 
     try {
-      return await saveConsent(prefs);
+      const ok = await saveConsent(prefs);
+      if (ok) {
+        persistLocalConsent(prefs);
+      }
+      return ok;
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const handleAcceptAll = async () => {
+    const ok = await recordConsents({ marketing: true, analytics: true, cookies: true });
+    if (ok) closeBanner();
+  };
+
+  const handleCustomize = async () => {
+    if (!isCustomizing) {
+      setIsCustomizing(true);
+      return;
+    }
+
+    const ok = await recordConsents(preferences);
+    if (ok) closeBanner();
+  };
+
+  const handleRejectOptional = async () => {
+    const ok = await recordConsents({ marketing: false, analytics: false, cookies: true });
+    if (ok) closeBanner();
+  };
+
   if (!isVisible) return null;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 shadow-lg z-50">
-      <div className="max-w-7xl mx-auto px-4 py-6">
+    <div className="pointer-events-none fixed inset-x-0 bottom-4 z-50 px-3 sm:px-5">
+      <div className="pointer-events-auto mx-auto max-w-5xl rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-[0_18px_42px_rgba(15,23,42,0.14)] backdrop-blur-xl sm:p-5">
         <div className="flex items-start justify-between gap-4">
-          <div className="flex-1">
-            <h3 className="font-semibold text-gray-900 dark:text-white mb-2">
-              Sua Privacidade
-            </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-              Usamos cookies e tecnologias similares para melhorar sua experiência. Você pode
-              personalizar suas preferências ou aceitar todas. Leia nossa{' '}
-              <a href="/privacy" className="text-primary hover:underline">
-                Política de Privacidade
-              </a>
-              .
+          <div>
+            <p className="text-sm font-semibold text-slate-900">Privacidade e cookies</p>
+            <p className="mt-1 text-xs leading-5 text-slate-600 sm:text-sm">
+              Usamos cookies essenciais para funcionamento da plataforma. Você pode aceitar categorias opcionais ou personalizar.
+              Leia a nossa <a href="/privacidade" className="font-medium text-orange-600 hover:text-orange-700">Política de Privacidade</a>.
             </p>
-
-            <div className="space-y-2 mb-4">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={true}
-                  disabled
-                  className="rounded border-gray-300"
-                />
-                <span className="text-sm text-gray-700 dark:text-gray-300">
-                  Cookies Essenciais (obrigatório)
-                </span>
-              </label>
-
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={preferences.analytics}
-                  onChange={(e) =>
-                    setPreferences({ ...preferences, analytics: e.target.checked })
-                  }
-                  className="rounded border-gray-300"
-                />
-                <span className="text-sm text-gray-700 dark:text-gray-300">
-                  Análise e Performance
-                </span>
-              </label>
-
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={preferences.marketing}
-                  onChange={(e) =>
-                    setPreferences({ ...preferences, marketing: e.target.checked })
-                  }
-                  className="rounded border-gray-300"
-                />
-                <span className="text-sm text-gray-700 dark:text-gray-300">
-                  Marketing e Publicidade
-                </span>
-              </label>
-            </div>
           </div>
 
           <button
-            onClick={() => setIsVisible(false)}
+            type="button"
+            onClick={handleRejectOptional}
             disabled={isSubmitting}
-            className="flex-shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+            aria-label="Fechar banner de cookies"
           >
-            <X className="w-5 h-5" />
+            <X className="size-4" />
           </button>
         </div>
 
-        <div className="flex gap-2 justify-end">
-          <Button variant="outline" onClick={handleRejectAll} disabled={isSubmitting}>
-            Rejeitar Tudo
-          </Button>
+        {isCustomizing ? (
+          <div className="mt-4 grid gap-2 sm:grid-cols-3">
+            <label className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+              <input type="checkbox" checked disabled className="mr-2 align-middle" />
+              Essenciais (obrigatório)
+            </label>
+            <label className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={preferences.analytics}
+                onChange={(e) => setPreferences({ ...preferences, analytics: e.target.checked })}
+                className="mr-2 align-middle"
+              />
+              Analytics e performance
+            </label>
+            <label className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={preferences.marketing}
+                onChange={(e) => setPreferences({ ...preferences, marketing: e.target.checked })}
+                className="mr-2 align-middle"
+              />
+              Marketing
+            </label>
+          </div>
+        ) : null}
+
+        <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
+          <Button variant="outline" onClick={handleRejectOptional} disabled={isSubmitting}>Somente essenciais</Button>
           <Button variant="outline" onClick={handleCustomize} disabled={isSubmitting}>
-            Personalizar
+            {isCustomizing ? "Salvar preferências" : "Personalizar"}
           </Button>
-          <Button onClick={handleAcceptAll} disabled={isSubmitting}>
-            {isSubmitting ? 'Salvando...' : 'Aceitar Tudo'}
+          <Button onClick={handleAcceptAll} disabled={isSubmitting} className="bg-orange-500 hover:bg-orange-600">
+            {isSubmitting ? "Salvando..." : "Aceitar tudo"}
           </Button>
         </div>
       </div>
