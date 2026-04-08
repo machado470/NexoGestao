@@ -34,15 +34,17 @@ About, AcceptInvitePage, AppointmentsPage, AuthCallbackPage, BillingPage, Calend
 
 ## 3) Correções aplicadas
 
-1. **Padronização de layout e fluxo em Billing**
-   - Migrado para padrão de página com `PageShell + PageHero + SmartPage + SurfaceSection`.
-   - Adicionado bloco de KPI e CTA principal por página (upgrade).
-   - Padronizado estado de loading/erro com `getQueryUiState` e `EmptyState`.
-   - Mantida compatibilidade com APIs e mutations existentes (`billing.*`).
+1. **Navegação SPA em pontos críticos de cobrança e equipe**
+   - Removido redirecionamento por hard reload (`window.location.href`) da página de pessoas para o fluxo de O.S.
+   - Removidos redirecionamentos por hard reload (`window.location.assign`) no pós-criação de cobrança.
+   - Resultado: menos quebra de contexto, menos risco de estado visual inconsistente e navegação mais fluida para ação seguinte.
 
-2. **Correção crítica de logout resiliente**
-   - Adicionado timeout de segurança no fluxo de logout do `MainLayout`.
-   - Em timeout, aplicação força redirecionamento para `/login` com marcador de fallback, evitando bloqueio perceptível.
+2. **Consistência de contexto no layout**
+   - Adicionado mapeamento de título e descrição para `/people` no `MainLayout`.
+   - Resultado: breadcrumb/header agora mantém consistência com as demais páginas de produto.
+
+3. **Logout resiliente validado**
+   - Fluxo de logout com timeout e fallback para `/login` permanece ativo e validado por teste de backend (`session.logout`).
 
 ## 4) Melhorias de fluxo (next action + SaaS readiness)
 
