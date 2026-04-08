@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { trpc } from "@/lib/trpc";
 import { GoogleOAuthButton } from "@/components/GoogleOAuthButton";
 import { AuthMarketingShell } from "@/components/AuthMarketingShell";
+import { usePageMeta } from "@/hooks/usePageMeta";
 
 function normalizeErrorMessage(error: unknown): string {
   const message =
@@ -65,9 +66,15 @@ function getSafeRedirectParam(): string | null {
 }
 
 export default function Login() {
+  usePageMeta({
+    title: "NexoGestão | Entrar",
+    description:
+      "Acesse sua conta NexoGestão com segurança e retome sua operação sem interrupções.",
+  });
   const { login, isSubmitting, error, redirectTo } = useAuth();
   const [, navigate] = useLocation();
-  const resendVerificationMutation = trpc.nexo.auth.resendEmailVerification.useMutation();
+  const resendVerificationMutation =
+    trpc.nexo.auth.resendEmailVerification.useMutation();
 
   const searchParams = useMemo(() => {
     if (typeof window === "undefined") return new URLSearchParams();
@@ -81,7 +88,9 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
   const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
-  const [resendSuccessMessage, setResendSuccessMessage] = useState<string | null>(null);
+  const [resendSuccessMessage, setResendSuccessMessage] = useState<
+    string | null
+  >(null);
 
   const errorText = useMemo(() => {
     if (localError) return localError;
@@ -142,7 +151,9 @@ export default function Login() {
 
     setLocalError(null);
     await resendVerificationMutation.mutateAsync({ email: normalizedEmail });
-    setResendSuccessMessage("Se o e-mail existir, um novo link de confirmação será enviado.");
+    setResendSuccessMessage(
+      "Se o e-mail existir, um novo link de confirmação será enviado."
+    );
   };
 
   return (
@@ -159,8 +170,16 @@ export default function Login() {
       ]}
       bottomPanelTitle="Fluxo recomendado"
       bottomPanelSteps={[
-        { label: "01", value: "Entrar", description: "Acesse com email e senha." },
-        { label: "02", value: "Validar sessão", description: "Carregamos seu contexto." },
+        {
+          label: "01",
+          value: "Entrar",
+          description: "Acesse com email e senha.",
+        },
+        {
+          label: "02",
+          value: "Validar sessão",
+          description: "Carregamos seu contexto.",
+        },
         { label: "03", value: "Operar", description: "Siga para dashboard." },
       ]}
       backTo="/"
@@ -174,7 +193,9 @@ export default function Login() {
             <span className="w-full border-t border-slate-200" />
           </div>
           <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-white px-2 text-slate-500">ou continue com e-mail</span>
+            <span className="bg-white px-2 text-slate-500">
+              ou continue com e-mail
+            </span>
           </div>
         </div>
 
@@ -188,7 +209,13 @@ export default function Login() {
           <Label htmlFor="email">Email</Label>
           <div className="relative">
             <Mail className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-            <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="pl-9" />
+            <Input
+              id="email"
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              className="pl-9"
+            />
           </div>
         </div>
 
@@ -200,7 +227,7 @@ export default function Login() {
               id="password"
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={e => setPassword(e.target.value)}
               autoComplete="current-password"
               className="pl-9"
             />
@@ -208,7 +235,9 @@ export default function Login() {
         </div>
 
         {errorText ? (
-          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{errorText}</div>
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {errorText}
+          </div>
         ) : null}
 
         {resendSuccessMessage ? (
@@ -236,7 +265,12 @@ export default function Login() {
           </Button>
         ) : null}
 
-        <Button type="submit" disabled={isSubmitting} className="w-full gap-2 bg-orange-500 hover:bg-orange-600" size="lg">
+        <Button
+          type="submit"
+          disabled={isSubmitting}
+          className="w-full gap-2 bg-orange-500 hover:bg-orange-600"
+          size="lg"
+        >
           {isSubmitting ? (
             <>
               <Loader2 className="size-4 animate-spin" />
@@ -248,8 +282,15 @@ export default function Login() {
         </Button>
 
         <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-          <a href="/register" className="text-slate-600 hover:text-slate-900">Criar conta</a>
-          <a href="/forgot-password" className="text-slate-600 hover:text-slate-900">Esqueci minha senha</a>
+          <a href="/register" className="text-slate-600 hover:text-slate-900">
+            Criar conta
+          </a>
+          <a
+            href="/forgot-password"
+            className="text-slate-600 hover:text-slate-900"
+          >
+            Esqueci minha senha
+          </a>
         </div>
       </form>
     </AuthMarketingShell>

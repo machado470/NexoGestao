@@ -1,13 +1,20 @@
-import { lazy, Suspense, useEffect, type ComponentType, type LazyExoticComponent } from "react";
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  type ComponentType,
+  type LazyExoticComponent,
+} from "react";
 import { Route, Switch, useLocation } from "wouter";
 import { Loader } from "lucide-react";
 
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { CriticalActionOverlay } from "@/components/CriticalActionOverlay";
+import { ConsentBanner } from "@/components/ConsentBanner";
 
 import ErrorBoundary from "./components/ErrorBoundary";
-import { MainLayout } from "./components/MainLayout";
+import { AppLayout } from "./components/AppLayout";
 import { NotificationCenter } from "./components/NotificationCenter";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -228,7 +235,7 @@ function ProtectedRoute({
   return <Component />;
 }
 
-function PublicRoute({ component: Component }: { component: ComponentType }) {
+function AuthRoute({ component: Component }: { component: ComponentType }) {
   const { isAuthenticated, isInitializing, redirectTo } = useAuth();
   const [location, navigate] = useLocation();
   const redirectParam = readSafeRedirectFromPath(location);
@@ -252,12 +259,20 @@ function PublicRoute({ component: Component }: { component: ComponentType }) {
   return <Component />;
 }
 
+function MarketingRoute({
+  component: Component,
+}: {
+  component: ComponentType;
+}) {
+  return <Component />;
+}
+
 function withMainLayout(Page: ComponentType) {
   return function LayoutWrappedPage() {
     return (
-      <MainLayout>
+      <AppLayout>
         <Page />
-      </MainLayout>
+      </AppLayout>
     );
   };
 }
@@ -286,7 +301,13 @@ function protectedPage(
 
 function publicPage(Page: LazyExoticComponent<ComponentType>) {
   return function PublicPageRoute() {
-    return <PublicRoute component={() => <LazyPage component={Page} />} />;
+    return <MarketingRoute component={() => <LazyPage component={Page} />} />;
+  };
+}
+
+function authPage(Page: LazyExoticComponent<ComponentType>) {
+  return function AuthPageRoute() {
+    return <AuthRoute component={() => <LazyPage component={Page} />} />;
   };
 }
 
@@ -369,7 +390,9 @@ function LegacyAliasRoute({
   const [location, navigate] = useLocation();
 
   useEffect(() => {
-    const query = location.includes("?") ? location.slice(location.indexOf("?")) : "";
+    const query = location.includes("?")
+      ? location.slice(location.indexOf("?"))
+      : "";
     navigate(`${targetPath}${query}`, { replace: true });
   }, [location, navigate, targetPath]);
 
@@ -379,41 +402,23 @@ function LegacyAliasRoute({
 function Router() {
   return (
     <Switch>
-      <Route path="/">
-        {publicPage(Landing)()}
-      </Route>
+      <Route path="/">{publicPage(Landing)()}</Route>
 
-      <Route path="/login">
-        {publicPage(Login)()}
-      </Route>
+      <Route path="/login">{authPage(Login)()}</Route>
 
-      <Route path="/register">
-        {publicPage(Register)()}
-      </Route>
+      <Route path="/register">{authPage(Register)()}</Route>
 
-      <Route path="/forgot-password">
-        {publicPage(ForgotPasswordPage)()}
-      </Route>
+      <Route path="/forgot-password">{authPage(ForgotPasswordPage)()}</Route>
 
-      <Route path="/reset-password">
-        {publicPage(ResetPasswordPage)()}
-      </Route>
+      <Route path="/reset-password">{authPage(ResetPasswordPage)()}</Route>
 
-      <Route path="/auth/accept-invite">
-        {publicPage(AcceptInvitePage)()}
-      </Route>
+      <Route path="/auth/accept-invite">{authPage(AcceptInvitePage)()}</Route>
 
-      <Route path="/auth/callback">
-        {publicPage(AuthCallbackPage)()}
-      </Route>
+      <Route path="/auth/callback">{authPage(AuthCallbackPage)()}</Route>
 
-      <Route path="/auth/confirm-email">
-        {publicPage(ConfirmEmailPage)()}
-      </Route>
+      <Route path="/auth/confirm-email">{authPage(ConfirmEmailPage)()}</Route>
 
-      <Route path="/onboarding">
-        {onboardingPage(Onboarding)()}
-      </Route>
+      <Route path="/onboarding">{onboardingPage(Onboarding)()}</Route>
 
       <Route
         path="/dashboard"
@@ -502,13 +507,34 @@ function Router() {
 
       <Route path="/about" component={() => <LazyPage component={About} />} />
       <Route path="/sobre" component={() => <LazyPage component={About} />} />
-      <Route path="/produto" component={() => <LazyPage component={ProductPage} />} />
-      <Route path="/precos" component={() => <LazyPage component={PricingPage} />} />
-      <Route path="/contato" component={() => <LazyPage component={ContactPage} />} />
-      <Route path="/privacy" component={() => <LazyPage component={PrivacyPolicy} />} />
-      <Route path="/privacidade" component={() => <LazyPage component={PrivacyPolicy} />} />
-      <Route path="/terms" component={() => <LazyPage component={TermsOfService} />} />
-      <Route path="/termos" component={() => <LazyPage component={TermsOfService} />} />
+      <Route
+        path="/produto"
+        component={() => <LazyPage component={ProductPage} />}
+      />
+      <Route
+        path="/precos"
+        component={() => <LazyPage component={PricingPage} />}
+      />
+      <Route
+        path="/contato"
+        component={() => <LazyPage component={ContactPage} />}
+      />
+      <Route
+        path="/privacy"
+        component={() => <LazyPage component={PrivacyPolicy} />}
+      />
+      <Route
+        path="/privacidade"
+        component={() => <LazyPage component={PrivacyPolicy} />}
+      />
+      <Route
+        path="/terms"
+        component={() => <LazyPage component={TermsOfService} />}
+      />
+      <Route
+        path="/termos"
+        component={() => <LazyPage component={TermsOfService} />}
+      />
       <Route path="/404" component={() => <LazyPage component={NotFound} />} />
       <Route component={() => <LazyPage component={NotFound} />} />
     </Switch>
@@ -525,6 +551,7 @@ function App() {
             <Router />
             <NotificationCenter />
             <CriticalActionOverlay />
+            <ConsentBanner />
           </TooltipProvider>
         </ThemeProvider>
       </AuthProvider>

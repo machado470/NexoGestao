@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AuthMarketingShell } from "@/components/AuthMarketingShell";
+import { usePageMeta } from "@/hooks/usePageMeta";
 
 function normalizeErrorMessage(error: unknown): string {
   const message =
@@ -30,6 +31,11 @@ function normalizeErrorMessage(error: unknown): string {
 }
 
 export default function Register() {
+  usePageMeta({
+    title: "NexoGestão | Criar conta",
+    description:
+      "Crie sua conta no NexoGestão e configure sua empresa para começar com operação estruturada.",
+  });
   const { isSubmitting, error, register } = useAuth();
   const [, navigate] = useLocation();
 
@@ -109,9 +115,21 @@ export default function Register() {
       ]}
       bottomPanelTitle="O que acontece ao criar sua conta"
       bottomPanelSteps={[
-        { label: "Empresa", value: "Tenant inicial", description: "Base pronta para operar." },
-        { label: "Admin", value: "Acesso principal", description: "Usuário inicial criado." },
-        { label: "Sessão", value: "Validação", description: "Confirmação de e-mail." },
+        {
+          label: "Empresa",
+          value: "Tenant inicial",
+          description: "Base pronta para operar.",
+        },
+        {
+          label: "Admin",
+          value: "Acesso principal",
+          description: "Usuário inicial criado.",
+        },
+        {
+          label: "Sessão",
+          value: "Validação",
+          description: "Confirmação de e-mail.",
+        },
       ]}
       backTo="/"
       backLabel="Voltar para a página inicial"
@@ -125,7 +143,9 @@ export default function Register() {
               id="orgName"
               placeholder="Ex.: Nexo Serviços"
               value={formData.orgName}
-              onChange={(e) => setFormData((s) => ({ ...s, orgName: e.target.value }))}
+              onChange={e =>
+                setFormData(s => ({ ...s, orgName: e.target.value }))
+              }
               className="pl-9"
             />
           </div>
@@ -139,7 +159,9 @@ export default function Register() {
               id="adminName"
               placeholder="Seu nome completo"
               value={formData.adminName}
-              onChange={(e) => setFormData((s) => ({ ...s, adminName: e.target.value }))}
+              onChange={e =>
+                setFormData(s => ({ ...s, adminName: e.target.value }))
+              }
               className="pl-9"
             />
           </div>
@@ -154,7 +176,9 @@ export default function Register() {
               type="email"
               placeholder="voce@empresa.com"
               value={formData.email}
-              onChange={(e) => setFormData((s) => ({ ...s, email: e.target.value }))}
+              onChange={e =>
+                setFormData(s => ({ ...s, email: e.target.value }))
+              }
               autoComplete="email"
               className="pl-9"
             />
@@ -170,7 +194,9 @@ export default function Register() {
               type="password"
               placeholder="No mínimo 8 caracteres"
               value={formData.password}
-              onChange={(e) => setFormData((s) => ({ ...s, password: e.target.value }))}
+              onChange={e =>
+                setFormData(s => ({ ...s, password: e.target.value }))
+              }
               autoComplete="new-password"
               className="pl-9"
             />
@@ -186,7 +212,9 @@ export default function Register() {
               type="password"
               placeholder="Repita sua senha"
               value={formData.confirmPassword}
-              onChange={(e) => setFormData((s) => ({ ...s, confirmPassword: e.target.value }))}
+              onChange={e =>
+                setFormData(s => ({ ...s, confirmPassword: e.target.value }))
+              }
               autoComplete="new-password"
               className="pl-9"
             />
@@ -194,10 +222,17 @@ export default function Register() {
         </div>
 
         {errorText ? (
-          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{errorText}</div>
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {errorText}
+          </div>
         ) : null}
 
-        <Button type="submit" disabled={isSubmitting} className="w-full gap-2 bg-orange-500 hover:bg-orange-600" size="lg">
+        <Button
+          type="submit"
+          disabled={isSubmitting}
+          className="w-full gap-2 bg-orange-500 hover:bg-orange-600"
+          size="lg"
+        >
           {isSubmitting ? (
             <>
               <Loader2 className="size-4 animate-spin" />
@@ -210,7 +245,12 @@ export default function Register() {
 
         <div className="text-center text-sm">
           Já tem conta?{" "}
-          <a href="/login" className="font-semibold text-slate-700 hover:text-slate-900">Entrar</a>
+          <a
+            href="/login"
+            className="font-semibold text-slate-700 hover:text-slate-900"
+          >
+            Entrar
+          </a>
         </div>
       </form>
     </AuthMarketingShell>

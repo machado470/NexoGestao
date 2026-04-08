@@ -45,6 +45,21 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const APP_STORAGE_PREFIXES = ["nexo:", "nexogestao_", "pilot-onboarding:"];
+const AUTH_PATH_PREFIXES = [
+  "/login",
+  "/register",
+  "/forgot-password",
+  "/reset-password",
+  "/auth/",
+];
+const MARKETING_PATHS = new Set([
+  "/",
+  "/about",
+  "/sobre",
+  "/produto",
+  "/precos",
+  "/contato",
+]);
 
 /* =========================
    HELPERS
@@ -109,7 +124,7 @@ function clearAppStorage() {
   for (let i = window.localStorage.length - 1; i >= 0; i -= 1) {
     const key = window.localStorage.key(i);
     if (!key) continue;
-    if (APP_STORAGE_PREFIXES.some((prefix) => key.startsWith(prefix))) {
+    if (APP_STORAGE_PREFIXES.some(prefix => key.startsWith(prefix))) {
       window.localStorage.removeItem(key);
     }
   }
@@ -117,7 +132,7 @@ function clearAppStorage() {
   for (let i = window.sessionStorage.length - 1; i >= 0; i -= 1) {
     const key = window.sessionStorage.key(i);
     if (!key) continue;
-    if (APP_STORAGE_PREFIXES.some((prefix) => key.startsWith(prefix))) {
+    if (APP_STORAGE_PREFIXES.some(prefix => key.startsWith(prefix))) {
       window.sessionStorage.removeItem(key);
     }
   }
@@ -134,8 +149,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [forcedLoggedOut, setForcedLoggedOut] = useState(false);
   const [meBootstrapTimedOut, setMeBootstrapTimedOut] = useState(false);
   const authChannelRef = useRef<BroadcastChannel | null>(null);
+  const [pathname, setPathname] = useState(() => {
+    if (typeof window === "undefined") return "/";
+    return window.location.pathname;
+  });
+
+  const isAuthPath = AUTH_PATH_PREFIXES.some(prefix =>
+    pathname.startsWith(prefix)
+  );
+  const isMarketingPath = MARKETING_PATHS.has(pathname);
+  const shouldBootstrapSession = isAuthPath || !isMarketingPath;
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const updatePathname = () => setPathname(window.location.pathname);
+    const { history } = window;
+    const originalPushState = history.pushState.bind(history);
+    const originalReplaceState = history.replaceState.bind(history);
+
+    history.pushState = function (...args) {
+      originalPushState(...args);
+      updatePathname();
+    };
+
+    history.replaceState = function (...args) {
+      originalReplaceState(...args);
+      updatePathname();
+    };
+
+    window.addEventListener("popstate", updatePathname);
+    window.addEventListener("hashchange", updatePathname);
+
+    return () => {
+      history.pushState = originalPushState;
+      history.replaceState = originalReplaceState;
+      window.removeEventListener("popstate", updatePathname);
+      window.removeEventListener("hashchange", updatePathname);
+    };
+  }, []);
 
   const meQuery = trpc.session.me.useQuery(undefined, {
+    enabled: shouldBootstrapSession && !forcedLoggedOut,
     retry: false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
@@ -154,6 +209,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const shouldTrackTimeout =
+      shouldBootstrapSession &&
       meQuery.data === undefined &&
       meQuery.fetchStatus === "fetching" &&
       !meQuery.error &&
@@ -180,6 +236,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     meQuery.data,
     meQuery.error,
     meQuery.fetchStatus,
+    shouldBootstrapSession,
   ]);
 
   useEffect(() => {
@@ -188,7 +245,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const channel = new BroadcastChannel("nexo-auth");
     authChannelRef.current = channel;
 
-    channel.onmessage = async (event) => {
+    channel.onmessage = async event => {
       const type = String(event?.data?.type ?? "");
       if (type === "logout") {
         setForcedLoggedOut(true);
@@ -278,7 +335,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setForcedLoggedOut(false);
           queryClient.removeQueries();
           await meQuery.refetch();
-          authChannelRef.current?.postMessage({ type: "login", at: Date.now() });
+          authChannelRef.current?.postMessage({
+            type: "login",
+            at: Date.now(),
+          });
         }
 
         return result;
@@ -318,7 +378,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [logoutMutation, queryClient, utils]);
 
-  const payload = forcedLoggedOut ? null : meQuery.data ?? null;
+  const payload =
+    forcedLoggedOut || !shouldBootstrapSession ? null : (meQuery.data ?? null);
 
   const user: AuthUser = useMemo(() => {
     const raw = getUser(payload);
@@ -340,6 +401,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   /* 🔥 CORREÇÃO AQUI */
   const isInitializing =
+    shouldBootstrapSession &&
     !forcedLoggedOut &&
     meQuery.isLoading &&
     meQuery.data === undefined &&
@@ -360,7 +422,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isLoggingOut,
     error:
       localError ||
-      meQuery.error ||
+      (shouldBootstrapSession ? meQuery.error : null) ||
       loginMutation.error ||
       registerMutation.error ||
       logoutMutation.error ||
