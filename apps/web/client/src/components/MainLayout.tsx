@@ -252,10 +252,19 @@ export function MainLayout({ children }: MainLayoutProps) {
 
   const handleLogout = async () => {
     try {
-      await logout();
+      await Promise.race([
+        logout(),
+        new Promise((_, reject) =>
+          window.setTimeout(() => reject(new Error("logout-timeout")), 5000)
+        ),
+      ]);
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Não foi possível sair agora.";
+      if (error instanceof Error && error.message === "logout-timeout") {
+        window.location.replace(`/login?logoutFallback=${Date.now()}`);
+        return;
+      }
+
+      const message = error instanceof Error ? error.message : "Não foi possível sair agora.";
       toast.error(message);
     }
   };
