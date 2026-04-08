@@ -26,6 +26,7 @@ import { buildServiceOrdersDeepLink } from "@/lib/operations/operations.utils";
 import { useCriticalActionGuard } from "@/hooks/useCriticalActionGuard";
 import { invalidateOperationalGraph } from "@/lib/operationalConsistency";
 import { useProductAnalytics } from "@/hooks/useProductAnalytics";
+import { notify } from "@/stores/notificationStore";
 
 type Props = {
   open?: boolean;
@@ -300,6 +301,14 @@ export default function CreateServiceOrderModal({
               navigate(buildServiceOrdersDeepLink(String((created as any)?.id ?? ""))),
           },
         });
+        notify.successPersistent(
+          "O.S. criada com sucesso",
+          "Próximo passo: gerar a cobrança para transformar execução em receita.",
+          {
+            label: "Ir para Financeiro",
+            onClick: () => navigate(`/finances?serviceOrderId=${String((created as any)?.id ?? "")}`),
+          }
+        );
       },
       onError: (error) => {
         utils.nexo.serviceOrders.list.setData(
@@ -307,6 +316,16 @@ export default function CreateServiceOrderModal({
           previousServiceOrders as any
         );
         toast.error(error.message || "Erro ao criar ordem de serviço");
+        notify.error(
+          "Falha ao criar O.S.",
+          "Você pode revisar os dados e tentar novamente sem recarregar a tela.",
+          {
+            label: "Tentar novamente",
+            onClick: () => {
+              void submit();
+            },
+          }
+        );
       },
     });
   };

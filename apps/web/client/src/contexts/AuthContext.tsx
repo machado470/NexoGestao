@@ -1,7 +1,9 @@
 import React, {
   createContext,
   useCallback,
+  useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -98,16 +100,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [localLoading, setLocalLoading] = useState(false);
   const [localError, setLocalError] = useState<unknown | null>(null);
   const [forcedLoggedOut, setForcedLoggedOut] = useState(false);
+  const authChannelRef = useRef<BroadcastChannel | null>(null);
 
   const meQuery = trpc.session.me.useQuery(undefined, {
     retry: false,
     refetchOnWindowFocus: false,
-    staleTime: 30_000,
+    refetchOnReconnect: false,
+    staleTime: 60_000,
   });
 
   const loginMutation = trpc.nexo.auth.login.useMutation();
   const registerMutation = trpc.nexo.auth.register.useMutation();
   const logoutMutation = trpc.session.logout.useMutation();
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const channel = new BroadcastChannel("nexo-auth");
+    authChannelRef.current = channel;
+
+    channel.onmessage = async (event) => {
+      const type = String(event?.data?.type ?? "");
+      if (type === "logout") {
+        setForcedLoggedOut(true);
+        await utils.session.me.cancel();
+        utils.session.me.setData(undefined, null);
+        queryClient.clear();
+        redirectToLogin();
+      }
+
+      if (type === "login") {
+        setForcedLoggedOut(false);
+        await utils.session.me.invalidate();
+      }
+    };
+
+    const onStorage = (evt: StorageEvent) => {
+      if (evt.key !== "nexo:auth:logout-at" || !evt.newValue) return;
+      setForcedLoggedOut(true);
+      queryClient.clear();
+      redirectToLogin();
+    };
+
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      channel.close();
+    };
+  }, [queryClient, utils.session.me]);
 
   const refresh = useCallback(async () => {
     setLocalError(null);
@@ -129,6 +169,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setForcedLoggedOut(false);
         queryClient.removeQueries();
         await meQuery.refetch();
+        authChannelRef.current?.postMessage({ type: "login", at: Date.now() });
       } catch (err) {
         setLocalError(err);
         throw err;
@@ -160,6 +201,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setForcedLoggedOut(false);
         queryClient.removeQueries();
         await meQuery.refetch();
+        authChannelRef.current?.postMessage({ type: "login", at: Date.now() });
       } catch (err) {
         setLocalError(err);
         throw err;
@@ -178,10 +220,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       if (typeof window !== "undefined") {
         window.sessionStorage.clear();
-        window.localStorage.removeItem("nexo:last-action-flow");
-        window.localStorage.removeItem("onboarding-state");
-        window.localStorage.removeItem("pilot-onboarding");
+        window.localStorage.clear();
+        window.localStorage.setItem("nexo:auth:logout-at", String(Date.now()));
       }
+      authChannelRef.current?.postMessage({ type: "logout", at: Date.now() });
       await utils.session.me.cancel();
       utils.session.me.setData(undefined, null);
       await logoutMutation.mutateAsync();

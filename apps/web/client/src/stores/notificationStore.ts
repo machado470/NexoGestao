@@ -102,6 +102,16 @@ export const notify = {
     });
   },
 
+  successPersistent: (title: string, description?: string, action?: Notification['action']) => {
+    return useNotificationStore.getState().add({
+      type: 'success',
+      title,
+      description,
+      action,
+      duration: 0,
+    });
+  },
+
   error: (title: string, description?: string, action?: Notification['action']) => {
     return useNotificationStore.getState().add({
       type: 'error',

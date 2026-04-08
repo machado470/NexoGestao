@@ -12,6 +12,7 @@ import ModalFlowShell from "@/components/ModalFlowShell";
 import { useCriticalActionGuard } from "@/hooks/useCriticalActionGuard";
 import { invalidateOperationalGraph } from "@/lib/operationalConsistency";
 import { useProductAnalytics } from "@/hooks/useProductAnalytics";
+import { notify } from "@/stores/notificationStore";
 
 type Props = {
   open: boolean;
@@ -126,6 +127,16 @@ export default function CreateCustomerModal({ open, onOpenChange, onCreated }: P
           },
         },
       });
+      notify.successPersistent(
+        "Cliente criado e sincronizado",
+        "Próximo passo recomendado: abrir o workspace do cliente e criar a primeira O.S.",
+        {
+          label: "Criar O.S.",
+          onClick: () => {
+            window.location.assign(`/service-orders?customerId=${createdId}`);
+          },
+        }
+      );
 
       registerActionFlowEvent("customer_created");
       track("create_customer", {
@@ -139,6 +150,16 @@ export default function CreateCustomerModal({ open, onOpenChange, onCreated }: P
     } catch (err: any) {
       utils.nexo.customers.list.setData(undefined, previousCustomers as any);
       toast.error("Falha ao criar cliente: " + (err?.message ?? "erro"));
+      notify.error(
+        "Não foi possível criar o cliente",
+        "Confira os dados e tente novamente.",
+        {
+          label: "Tentar novamente",
+          onClick: () => {
+            void submit();
+          },
+        }
+      );
     }
   };
 

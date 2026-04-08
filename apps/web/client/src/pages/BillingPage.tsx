@@ -181,6 +181,19 @@ export default function BillingPage() {
             Plano atual: <strong>{currentPlan}</strong>
           </div>
         </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-orange-500/30 hover:bg-orange-600 disabled:opacity-60"
+            disabled={checkoutMutation.isPending}
+            onClick={() => void handleUpgrade("PRO")}
+          >
+            {checkoutMutation.isPending ? "Processando..." : "Fazer upgrade agora"}
+          </button>
+          <span className="inline-flex items-center rounded-lg border border-zinc-200 px-3 py-2 text-xs text-zinc-600 dark:border-zinc-700 dark:text-zinc-300">
+            Botão principal: desbloqueia limites e remove bloqueios operacionais.
+          </span>
+        </div>
         {isTrial ? (
           <p className="mt-3 inline-flex items-center gap-2 rounded-lg bg-amber-100 px-3 py-2 text-xs text-amber-900 dark:bg-amber-900/30 dark:text-amber-200">
             <AlertTriangle className="h-4 w-4" />
@@ -296,6 +309,15 @@ export default function BillingPage() {
             );
           })}
         </div>
+        {blockedItems.length > 0 ? (
+          <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-900 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-200">
+            <p className="font-semibold">Motivo do bloqueio atual</p>
+            <p>
+              Você atingiu: {blockedItems.map((item) => item.label).join(", ")}.
+              Upgrade libera novas criações e evita travas no fluxo cliente → O.S. → cobrança → pagamento.
+            </p>
+          </div>
+        ) : null}
 
         <div className="mt-4 flex flex-wrap gap-2">
           {hasExceededUsage ? (
