@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { trpc } from "@/lib/trpc";
 
 const trustItems = [
   "Sessão protegida por autenticação da plataforma",
@@ -78,10 +79,21 @@ function getSafeRedirectParam(): string | null {
 export default function Login() {
   const { login, isSubmitting, error, redirectTo } = useAuth();
   const [, navigate] = useLocation();
+  const resendVerificationMutation = trpc.nexo.auth.resendEmailVerification.useMutation();
 
-  const [email, setEmail] = useState("");
+  const searchParams = useMemo(() => {
+    if (typeof window === "undefined") return new URLSearchParams();
+    return new URLSearchParams(window.location.search);
+  }, []);
+  const registeredParam = searchParams.get("registered") === "1";
+  const verificationParam = (searchParams.get("verification") ?? "").trim();
+  const queryEmail = (searchParams.get("email") ?? "").trim().toLowerCase();
+
+  const [email, setEmail] = useState(queryEmail);
   const [password, setPassword] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
+  const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
+  const [resendSuccessMessage, setResendSuccessMessage] = useState<string | null>(null);
 
   const errorText = useMemo(() => {
     if (localError) return localError;
@@ -102,10 +114,47 @@ export default function Login() {
 
     try {
       await login(normalizedEmail, password);
-      navigate(getSafeRedirectParam() || redirectTo || "/dashboard");
+      navigate(getSafeRedirectParam() || redirectTo || "/executive-dashboard");
     } catch (err) {
-      setLocalError(normalizeErrorMessage(err));
+      const normalizedError = normalizeErrorMessage(err);
+      const normalizedLower = normalizedError.toLowerCase();
+      const emailNotVerified =
+        normalizedLower.includes("email ainda não verificado") ||
+        normalizedLower.includes("e-mail ainda não verificado") ||
+        normalizedLower.includes("email_not_verified");
+
+      if (emailNotVerified) {
+        setUnverifiedEmail(normalizedEmail);
+      }
+
+      setLocalError(normalizedError);
     }
+  };
+
+  const postRegisterBanner = useMemo(() => {
+    if (!registeredParam) return null;
+
+    if (verificationParam === "sent") {
+      return "Conta criada. Enviamos um link de confirmação por e-mail antes do primeiro login.";
+    }
+
+    if (verificationParam === "failed") {
+      return "Conta criada, mas houve falha no envio do e-mail de confirmação. Solicite um novo link abaixo.";
+    }
+
+    return "Conta criada. Este ambiente está sem provedor de e-mail no momento; solicite um novo link quando o serviço estiver ativo.";
+  }, [registeredParam, verificationParam]);
+
+  const resendVerification = async () => {
+    const normalizedEmail = (unverifiedEmail ?? email).trim().toLowerCase();
+    if (!normalizedEmail) {
+      setLocalError("Informe seu e-mail para reenviar a confirmação.");
+      return;
+    }
+
+    setLocalError(null);
+    await resendVerificationMutation.mutateAsync({ email: normalizedEmail });
+    setResendSuccessMessage("Se o e-mail existir, um novo link de confirmação será enviado.");
   };
 
   return (
@@ -214,6 +263,12 @@ export default function Login() {
 
               <CardContent>
                 <form onSubmit={submit} className="space-y-5">
+                  {postRegisterBanner ? (
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300">
+                      {postRegisterBanner}
+                    </div>
+                  ) : null}
+
                   <div className="space-y-2">
                     <Label htmlFor="email">Email</Label>
                     <div className="relative">
@@ -223,7 +278,11 @@ export default function Login() {
                         type="email"
                         placeholder="voce@empresa.com"
                         value={email}
-                        onChange={(e) => setEmail(e.target.value)}
+                        onChange={(e) => {
+                          setEmail(e.target.value);
+                          setUnverifiedEmail(null);
+                          setResendSuccessMessage(null);
+                        }}
                         autoComplete="email"
                         className="pl-9"
                       />
@@ -249,7 +308,10 @@ export default function Login() {
                         type="password"
                         placeholder="Sua senha"
                         value={password}
-                        onChange={(e) => setPassword(e.target.value)}
+                        onChange={(e) => {
+                          setPassword(e.target.value);
+                          setResendSuccessMessage(null);
+                        }}
                         autoComplete="current-password"
                         className="pl-9"
                       />
@@ -257,8 +319,35 @@ export default function Login() {
                   </div>
 
                   {errorText ? (
-                    <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
-                      {errorText}
+                    <div className="space-y-3">
+                      <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
+                        {errorText}
+                      </div>
+
+                      {unverifiedEmail ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={resendVerification}
+                          className="w-full gap-2"
+                          disabled={resendVerificationMutation.isPending}
+                        >
+                          {resendVerificationMutation.isPending ? (
+                            <>
+                              <Loader2 className="size-4 animate-spin" />
+                              Reenviando confirmação...
+                            </>
+                          ) : (
+                            "Reenviar e-mail de confirmação"
+                          )}
+                        </Button>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  {resendSuccessMessage ? (
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300">
+                      {resendSuccessMessage}
                     </div>
                   ) : null}
 
