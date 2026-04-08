@@ -173,7 +173,7 @@ function ProtectedRoute({
     }
 
     if (onboardingOnly && !requiresOnboarding) {
-      navigate("/dashboard", { replace: true });
+      navigate("/executive-dashboard", { replace: true });
     }
   }, [
     isAuthenticated,
@@ -212,7 +212,7 @@ function ProtectedRoute({
         title="Acesso restrito"
         description="Seu perfil não tem permissão para acessar esta área."
         actionLabel="Voltar ao dashboard"
-        onAction={() => navigate("/dashboard")}
+        onAction={() => navigate("/executive-dashboard")}
       />
     );
   }
@@ -227,7 +227,9 @@ function PublicRoute({ component: Component }: { component: ComponentType }) {
 
   useEffect(() => {
     if (!isInitializing && isAuthenticated) {
-      navigate(redirectParam || redirectTo || "/dashboard", { replace: true });
+      navigate(redirectParam || redirectTo || "/executive-dashboard", {
+        replace: true,
+      });
     }
   }, [isAuthenticated, isInitializing, navigate, redirectParam, redirectTo]);
 

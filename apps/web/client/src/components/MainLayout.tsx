@@ -223,6 +223,16 @@ export function MainLayout({ children }: MainLayoutProps) {
     }
   }, [isMobile, location]);
 
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (!isMobile) return;
+
+    document.body.style.overflow = mobileMenuOpen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isMobile, mobileMenuOpen]);
+
   const handleNavigate = (route: string) => {
     navigate(route);
     if (isMobile) {
@@ -260,7 +270,9 @@ export function MainLayout({ children }: MainLayoutProps) {
                 }`
               : "sticky top-2 h-[calc(100vh-1rem)] md:top-3 md:h-[calc(100vh-1.5rem)]"
           } flex shrink-0 flex-col overflow-hidden transition-all duration-300 ${
-            sidebarCollapsed && !isMobile ? "w-[76px]" : "w-[248px]"
+            sidebarCollapsed && !isMobile
+              ? "w-[76px]"
+              : "w-[min(248px,calc(100vw-1rem))]"
           }`}
         >
           <div className="border-b border-slate-200/70 px-3 py-3 dark:border-white/6">
