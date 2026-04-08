@@ -32,6 +32,9 @@ const Register = lazy(() => import("./pages/Register"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const About = lazy(() => import("./pages/About"));
+const ProductPage = lazy(() => import("./pages/ProductPage"));
+const PricingPage = lazy(() => import("./pages/PricingPage"));
+const ContactPage = lazy(() => import("./pages/ContactPage"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
@@ -498,8 +501,14 @@ function Router() {
       />
 
       <Route path="/about" component={() => <LazyPage component={About} />} />
+      <Route path="/sobre" component={() => <LazyPage component={About} />} />
+      <Route path="/produto" component={() => <LazyPage component={ProductPage} />} />
+      <Route path="/precos" component={() => <LazyPage component={PricingPage} />} />
+      <Route path="/contato" component={() => <LazyPage component={ContactPage} />} />
       <Route path="/privacy" component={() => <LazyPage component={PrivacyPolicy} />} />
+      <Route path="/privacidade" component={() => <LazyPage component={PrivacyPolicy} />} />
       <Route path="/terms" component={() => <LazyPage component={TermsOfService} />} />
+      <Route path="/termos" component={() => <LazyPage component={TermsOfService} />} />
       <Route path="/404" component={() => <LazyPage component={NotFound} />} />
       <Route component={() => <LazyPage component={NotFound} />} />
     </Switch>

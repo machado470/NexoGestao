@@ -27,8 +27,14 @@ const isPublicPath = (pathname: string): boolean => {
     pathname === "/auth/callback" ||
     pathname === "/auth/confirm-email" ||
     pathname === "/about" ||
+    pathname === "/sobre" ||
+    pathname === "/produto" ||
+    pathname === "/precos" ||
+    pathname === "/contato" ||
     pathname === "/privacy" ||
-    pathname === "/terms"
+    pathname === "/privacidade" ||
+    pathname === "/terms" ||
+    pathname === "/termos"
   );
 };
 
