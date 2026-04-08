@@ -197,6 +197,7 @@ export default function EditServiceOrderModal({
     cancellationReason: "",
     outcomeSummary: "",
   });
+  const [initialSnapshot, setInitialSnapshot] = useState("");
 
   const getServiceOrder = trpc.nexo.serviceOrders.getById.useQuery(
     { id: serviceOrderId || "" },
@@ -215,7 +216,7 @@ export default function EditServiceOrderModal({
 
     const serviceOrder = normalizeServiceOrderPayload(getServiceOrder.data);
 
-    setFormData({
+    const nextData = {
       title: serviceOrder?.title || "",
       description: serviceOrder?.description || "",
       priority: String(serviceOrder?.priority ?? 2),
@@ -242,7 +243,9 @@ export default function EditServiceOrderModal({
           : "OPEN",
       cancellationReason: serviceOrder?.cancellationReason || "",
       outcomeSummary: serviceOrder?.outcomeSummary || "",
-    });
+    };
+    setFormData(nextData);
+    setInitialSnapshot(JSON.stringify(nextData));
   }, [getServiceOrder.data]);
 
   useEffect(() => {
@@ -302,6 +305,10 @@ export default function EditServiceOrderModal({
 
   const isPersistedClosed =
     formData.status === "DONE" || formData.status === "CANCELED";
+  const isDirty = useMemo(() => {
+    if (!initialSnapshot) return false;
+    return initialSnapshot !== JSON.stringify(formData);
+  }, [formData, initialSnapshot]);
 
   const shouldShowCancellationReason = formData.status === "CANCELED";
   const shouldShowOutcomeSummary = formData.status === "DONE";
@@ -420,11 +427,22 @@ export default function EditServiceOrderModal({
     <Dialog
       open={isOpen}
       onOpenChange={(open) => {
-        if (!open && !updateServiceOrder.isPending) onClose();
+        if (!open && !updateServiceOrder.isPending) {
+          if (isDirty && !window.confirm("Existem alterações não salvas. Deseja descartar?")) {
+            return;
+          }
+          onClose();
+        }
       }}
     >
       <DialogContent
         showCloseButton={false}
+        onEscapeKeyDown={(event) => {
+          if (updateServiceOrder.isPending) event.preventDefault();
+        }}
+        onInteractOutside={(event) => {
+          if (updateServiceOrder.isPending) event.preventDefault();
+        }}
         className="max-h-[90vh] max-w-2xl overflow-hidden border-zinc-800/80 bg-white p-0 shadow-xl dark:bg-zinc-900"
       >
         <DialogHeader className="border-b border-gray-200 px-6 py-6 dark:border-zinc-800">
@@ -889,7 +907,7 @@ export default function EditServiceOrderModal({
           ) : null}
           <Button
             onClick={() => void submitUpdate()}
-            disabled={updateServiceOrder.isPending || getServiceOrder.isLoading}
+            disabled={updateServiceOrder.isPending || getServiceOrder.isLoading || !isDirty}
             className="flex-1 bg-orange-500 text-white hover:bg-orange-600"
             type="button"
           >
@@ -904,7 +922,12 @@ export default function EditServiceOrderModal({
           </Button>
 
           <Button
-            onClick={onClose}
+            onClick={() => {
+              if (isDirty && !window.confirm("Existem alterações não salvas. Deseja descartar?")) {
+                return;
+              }
+              onClose();
+            }}
             variant="outline"
             type="button"
             disabled={updateServiceOrder.isPending || getServiceOrder.isLoading}

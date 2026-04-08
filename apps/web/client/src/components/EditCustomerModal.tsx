@@ -49,6 +49,8 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
   const [email, setEmail] = useState("");
   const [notes, setNotes] = useState("");
   const [active, setActive] = useState(true);
+  const [initialSnapshot, setInitialSnapshot] = useState<string>("");
+  const [loadingTimedOut, setLoadingTimedOut] = useState(false);
 
   const idStr = customerId != null ? String(customerId) : undefined;
 
@@ -76,6 +78,15 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
       setEmail(customer.email ?? "");
       setNotes(customer.notes ?? "");
       setActive(Boolean(customer.active));
+      setInitialSnapshot(
+        JSON.stringify({
+          name: customer.name ?? "",
+          phone: customer.phone ?? "",
+          email: customer.email ?? "",
+          notes: customer.notes ?? "",
+          active: Boolean(customer.active),
+        })
+      );
       return;
     }
 
@@ -84,7 +95,33 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
     setEmail("");
     setNotes("");
     setActive(true);
+    setInitialSnapshot("");
   }, [open, customer]);
+
+  useEffect(() => {
+    if (!open || !customerQuery.isLoading || customer) {
+      setLoadingTimedOut(false);
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => setLoadingTimedOut(true), 9000);
+    return () => window.clearTimeout(timeoutId);
+  }, [customer, customerQuery.isLoading, open]);
+
+  const isDirty = useMemo(() => {
+    const current = JSON.stringify({
+      name: name.trim(),
+      phone: phone.trim(),
+      email: email.trim(),
+      notes: notes.trim(),
+      active,
+    });
+    return Boolean(initialSnapshot) && initialSnapshot !== current;
+  }, [active, email, initialSnapshot, name, notes, phone]);
+
+  const canSubmit = useMemo(() => {
+    return name.trim().length >= 2 && phone.trim().length >= 10 && isDirty;
+  }, [isDirty, name, phone]);
 
   const submit = async () => {
     if (!idStr) return;
@@ -146,12 +183,21 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
 
   const handleClose = () => {
     if (updateMutation.isPending) return;
+    if (isDirty && !window.confirm("Existem alterações não salvas. Deseja descartar?")) return;
     onClose();
   };
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => (!nextOpen ? handleClose() : undefined)}>
-      <DialogContent className="max-w-2xl border-zinc-800/80 bg-zinc-950/95 p-0 text-zinc-100 shadow-2xl backdrop-blur">
+      <DialogContent
+        onEscapeKeyDown={(event) => {
+          if (updateMutation.isPending) event.preventDefault();
+        }}
+        onInteractOutside={(event) => {
+          if (updateMutation.isPending) event.preventDefault();
+        }}
+        className="max-w-2xl border-zinc-800/80 bg-zinc-950/95 p-0 text-zinc-100 shadow-2xl backdrop-blur"
+      >
         <DialogHeader className="border-b border-zinc-800/90 px-6 py-5">
           <DialogTitle className="text-xl font-semibold">Editar Cliente</DialogTitle>
           <DialogDescription className="text-zinc-400">
@@ -160,10 +206,15 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
         </DialogHeader>
 
         <div className="space-y-4 px-6 py-5">
-          {customerQuery.isLoading ? (
+          {customerQuery.isLoading && !customer ? (
             <div className="flex items-center justify-center py-8 text-sm text-zinc-400">
               <Loader2 className="mr-2 h-5 w-5 animate-spin text-orange-500" />
               Carregando...
+              {loadingTimedOut ? (
+                <Button type="button" variant="outline" size="sm" onClick={() => void customerQuery.refetch()}>
+                  Recarregar
+                </Button>
+              ) : null}
             </div>
           ) : customerQuery.error ? (
             <div className="space-y-3 rounded-xl border border-red-900/40 bg-red-950/30 p-4 text-sm text-red-200">
@@ -253,7 +304,7 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
           <Button
             type="button"
             onClick={submit}
-            disabled={updateMutation.isPending || customerQuery.isLoading}
+            disabled={updateMutation.isPending || customerQuery.isLoading || !canSubmit}
             className="bg-orange-500 text-white hover:bg-orange-600"
           >
             {updateMutation.isPending ? (

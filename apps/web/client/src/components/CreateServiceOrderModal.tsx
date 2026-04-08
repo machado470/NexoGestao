@@ -149,10 +149,14 @@ export default function CreateServiceOrderModal({
 
   const canSubmit = useMemo(() => {
     return (
+      customers.length > 0 &&
       formData.customerId.trim().length > 0 &&
       formData.title.trim().length > 0
     );
-  }, [formData.customerId, formData.title]);
+  }, [customers.length, formData.customerId, formData.title]);
+  const isDirty = useMemo(() => {
+    return Object.entries(formData).some(([, value]) => value.trim().length > 0);
+  }, [formData]);
 
   const hasAmount = formData.amount.trim().length > 0;
   const hasDueDate = formData.dueDate.trim().length > 0;
@@ -175,6 +179,9 @@ export default function CreateServiceOrderModal({
 
   const handleClose = () => {
     if (createMutation.isPending) return;
+    if (!createdServiceOrder && isDirty && !window.confirm("Existem dados não salvos. Deseja fechar e descartar?")) {
+      return;
+    }
     setCreatedServiceOrder(null);
     setFormData({
       ...INITIAL_FORM,
@@ -289,6 +296,12 @@ export default function CreateServiceOrderModal({
     <Dialog open={resolvedOpen} onOpenChange={(open) => (!open ? handleClose() : null)}>
       <DialogContent
         showCloseButton={false}
+        onEscapeKeyDown={(event) => {
+          if (createMutation.isPending) event.preventDefault();
+        }}
+        onInteractOutside={(event) => {
+          if (createMutation.isPending) event.preventDefault();
+        }}
         className="max-h-[90vh] max-w-2xl overflow-hidden border-zinc-800/80 bg-white p-0 shadow-xl dark:bg-zinc-900"
       >
         <DialogHeader className="border-b border-gray-200 px-6 py-6 dark:border-zinc-800">
@@ -318,6 +331,11 @@ export default function CreateServiceOrderModal({
 
           {!createdServiceOrder ? (
           <div className="space-y-6">
+            {customers.length === 0 ? (
+              <section className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300">
+                Você precisa ter ao menos um cliente para criar uma O.S. Cadastre um cliente e volte aqui.
+              </section>
+            ) : null}
             <section className="rounded-xl border border-gray-200 p-4 dark:border-zinc-800">
               <SectionTitle
                 icon={ClipboardList}
@@ -613,6 +631,16 @@ export default function CreateServiceOrderModal({
                 className="bg-orange-500 text-white hover:bg-orange-600"
               >
                 Ver O.S.
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  navigate(`/customers?customerId=${createdServiceOrder.customerId}`);
+                  handleClose();
+                }}
+              >
+                Ver cliente
               </Button>
             </>
           ) : null}
