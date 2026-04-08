@@ -6,6 +6,7 @@ import * as bcrypt from 'bcrypt';
 import { ConfigService } from '@nestjs/config';
 import type { UserRole } from '@prisma/client';
 import type { InviteUserRole } from './dto/create-invite.dto';
+import { AuthService } from '../auth/auth.service';
 
 @Injectable()
 export class InvitesService {
@@ -13,6 +14,7 @@ export class InvitesService {
     private prisma: PrismaService,
     private emailService: EmailService,
     private configService: ConfigService,
+    private authService: AuthService,
   ) {}
 
   async createInvite(orgId: string, invitedEmail: string, inviterName: string, role: InviteUserRole) {
@@ -80,7 +82,12 @@ export class InvitesService {
       throw new UnauthorizedException('Token de convite inválido.');
     }
 
-    const hashedPassword = password ? await bcrypt.hash(password, 10) : null;
+    if (!password || password.length < 8) {
+      throw new BadRequestException('A senha deve ter no mínimo 8 caracteres.');
+    }
+
+    const safeName = (name ?? '').trim() || email.split('@')[0] || 'Usuário';
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     const updatedUser = await this.prisma.user.update({
       where: { id: user.id },
@@ -91,16 +98,23 @@ export class InvitesService {
         inviteExpiresAt: null,
         person: {
           create: {
-            name,
+            name: safeName,
             email: user.email,
             role: user.role,
             orgId: user.orgId,
           },
         },
       },
+      include: {
+        person: true,
+      },
     });
 
-    return updatedUser;
+    return {
+      success: true,
+      message: 'Convite aceito com sucesso.',
+      ...this.authService.createSessionPayload(updatedUser),
+    };
   }
 
   async getOrganizationMembers(orgId: string) {

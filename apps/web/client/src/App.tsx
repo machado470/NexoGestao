@@ -36,6 +36,9 @@ const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
 const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
+const AcceptInvitePage = lazy(() => import("./pages/AcceptInvitePage"));
+const AuthCallbackPage = lazy(() => import("./pages/AuthCallbackPage"));
+const ConfirmEmailPage = lazy(() => import("./pages/ConfirmEmailPage"));
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -391,6 +394,18 @@ function Router() {
 
       <Route path="/reset-password">
         {publicPage(ResetPasswordPage)()}
+      </Route>
+
+      <Route path="/auth/accept-invite">
+        {publicPage(AcceptInvitePage)()}
+      </Route>
+
+      <Route path="/auth/callback">
+        {publicPage(AuthCallbackPage)()}
+      </Route>
+
+      <Route path="/auth/confirm-email">
+        {publicPage(ConfirmEmailPage)()}
       </Route>
 
       <Route path="/onboarding">

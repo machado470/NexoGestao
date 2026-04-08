@@ -354,6 +354,70 @@ export const nexoProxyRouter = router({
           body: JSON.stringify(input),
         });
       }),
+
+    acceptInvite: publicProcedure
+      .input(
+        z.object({
+          email: z.string().email(),
+          token: z.string().min(1),
+          name: z.string().trim().min(2),
+          password: z.string().min(8),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const result = await nexoFetch("/auth/accept-invite", {
+          method: "POST",
+          body: JSON.stringify(input),
+        });
+
+        const token = extractToken(result);
+        if (token) {
+          setTokenCookie(ctx as CtxLike, token);
+        }
+
+        return result;
+      }),
+
+    establishSession: publicProcedure
+      .input(
+        z.object({
+          token: z.string().min(1),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const rawToken = input.token.trim();
+        const result = await nexoFetch("/me", {
+          headers: {
+            Authorization: `Bearer ${rawToken}`,
+          },
+        });
+
+        setTokenCookie(ctx as CtxLike, rawToken);
+
+        return {
+          success: true,
+          token: rawToken,
+          me: result,
+        };
+      }),
+
+    verifyEmail: publicProcedure
+      .input(z.object({ token: z.string().min(1) }))
+      .mutation(async ({ input }) => {
+        return nexoFetch("/auth/verify-email", {
+          method: "POST",
+          body: JSON.stringify(input),
+        });
+      }),
+
+    resendEmailVerification: publicProcedure
+      .input(z.object({ email: z.string().email() }))
+      .mutation(async ({ input }) => {
+        return nexoFetch("/auth/resend-email-verification", {
+          method: "POST",
+          body: JSON.stringify(input),
+        });
+      }),
   }),
 
   me: protectedProcedure.query(async ({ ctx }) => {
@@ -563,8 +627,35 @@ export const nexoProxyRouter = router({
   }),
 
   onboarding: router({
+    status: protectedProcedure.query(async ({ ctx }) => {
+      return authedGet(ctx as CtxLike, "/onboarding/status");
+    }),
+
+    completeStep: protectedProcedure
+      .input(z.object({ step: z.string().min(1), payload: z.any().optional() }))
+      .mutation(async ({ ctx, input }) => {
+        return authedPost(ctx as CtxLike, "/onboarding/complete-step", input);
+      }),
+
     complete: protectedProcedure.input(z.any()).mutation(async ({ ctx, input }) => {
       return authedPost(ctx as CtxLike, "/onboarding/complete", input);
+    }),
+  }),
+
+  invites: router({
+    invite: protectedProcedure
+      .input(
+        z.object({
+          email: z.string().email(),
+          role: z.enum(["ADMIN", "MANAGER", "STAFF", "VIEWER"]),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        return authedPost(ctx as CtxLike, "/auth/invite", input);
+      }),
+
+    members: protectedProcedure.query(async ({ ctx }) => {
+      return authedGet(ctx as CtxLike, "/auth/organization/members");
     }),
   }),
 
