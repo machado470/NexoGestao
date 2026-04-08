@@ -4,6 +4,7 @@ import { createServer } from "http";
 import type { AddressInfo } from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
+import { registerConsentRoutes } from "./consent";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { subscribeToNotificationCenterEvents } from "./notificationCenterEvents";
@@ -17,6 +18,7 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
   registerOAuthRoutes(app);
+  registerConsentRoutes(app);
 
   app.use(
     "/api/trpc",
