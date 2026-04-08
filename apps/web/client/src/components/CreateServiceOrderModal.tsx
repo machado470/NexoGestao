@@ -21,12 +21,14 @@ import {
 } from "lucide-react";
 import { serviceOrderSchema } from "@/lib/validations";
 import { registerActionFlowEvent } from "@/lib/actionFlow";
+import { useLocation } from "wouter";
+import { buildServiceOrdersDeepLink } from "@/lib/operations/operations.utils";
 
 type Props = {
   open?: boolean;
   isOpen?: boolean;
   onClose: () => void;
-  onCreated?: () => void;
+  onCreated?: (created?: { id: string; customerId: string }) => void;
   onSuccess?: () => void;
   customers: Array<{ id: string; name: string }>;
   people: Array<{ id: string; name: string }>;
@@ -130,8 +132,14 @@ export default function CreateServiceOrderModal({
   initialCustomerId,
   appointmentId,
 }: Props) {
+  const [, navigate] = useLocation();
   const utils = trpc.useUtils();
   const resolvedOpen = open ?? isOpen ?? false;
+  const [createdServiceOrder, setCreatedServiceOrder] = useState<{
+    id: string;
+    title: string;
+    customerId: string;
+  } | null>(null);
   const [formData, setFormData] = useState<FormState>({
     ...INITIAL_FORM,
     customerId: initialCustomerId ? String(initialCustomerId) : "",
@@ -167,6 +175,7 @@ export default function CreateServiceOrderModal({
 
   const handleClose = () => {
     if (createMutation.isPending) return;
+    setCreatedServiceOrder(null);
     setFormData({
       ...INITIAL_FORM,
       customerId: initialCustomerId ? String(initialCustomerId) : "",
@@ -237,7 +246,7 @@ export default function CreateServiceOrderModal({
     });
 
     createMutation.mutate(payload, {
-      onSuccess: (created) => {
+      onSuccess: async (created) => {
         utils.nexo.serviceOrders.list.setData({ page: 1, limit: 100 }, (old: any) => {
           const raw = old as any[] | { data?: any[] } | undefined;
           const applyReplace = (items: any[]) =>
@@ -246,13 +255,23 @@ export default function CreateServiceOrderModal({
           if (raw && Array.isArray(raw.data)) return { ...raw, data: applyReplace(raw.data) };
           return [created];
         });
-        setFormData({
-          ...INITIAL_FORM,
-          customerId: initialCustomerId ? String(initialCustomerId) : "",
+        await Promise.all([
+          utils.nexo.serviceOrders.list.invalidate(),
+          utils.nexo.customers.workspace.invalidate({ id: payload.customerId }),
+          utils.nexo.customers.getById.invalidate({ id: payload.customerId }),
+          utils.finance.charges.list.invalidate(),
+          utils.dashboard.alerts.invalidate(),
+        ]);
+
+        setCreatedServiceOrder({
+          id: String((created as any)?.id ?? ""),
+          title: String((created as any)?.title ?? payload.title),
+          customerId: payload.customerId,
         });
-        onCreated?.();
-        onSuccess?.();
-        onClose();
+        onCreated?.({
+          id: String((created as any)?.id ?? ""),
+          customerId: payload.customerId,
+        });
         registerActionFlowEvent("service_order_created");
         toast.success("Ordem de serviço criada com sucesso.");
       },
@@ -283,6 +302,21 @@ export default function CreateServiceOrderModal({
         </DialogHeader>
 
         <div className="max-h-[70vh] overflow-y-auto p-6">
+          {createdServiceOrder ? (
+            <section className="space-y-4 rounded-xl border border-emerald-200 bg-emerald-50 p-5 dark:border-emerald-900/40 dark:bg-emerald-950/20">
+              <h3 className="text-base font-semibold text-emerald-900 dark:text-emerald-200">
+                Ordem de serviço criada e pronta para o próximo passo
+              </h3>
+              <p className="text-sm text-emerald-800 dark:text-emerald-300">
+                <strong>{createdServiceOrder.title}</strong> já está registrada no fluxo operacional.
+              </p>
+              <p className="text-xs text-emerald-700 dark:text-emerald-400">
+                Agora você pode abrir a O.S. criada, navegar para o cliente ou criar outro item sem recarregar a página.
+              </p>
+            </section>
+          ) : null}
+
+          {!createdServiceOrder ? (
           <div className="space-y-6">
             <section className="rounded-xl border border-gray-200 p-4 dark:border-zinc-800">
               <SectionTitle
@@ -543,9 +577,47 @@ export default function CreateServiceOrderModal({
               </div>
             </section>
           </div>
+          ) : null}
         </div>
 
         <DialogFooter className="flex gap-2 border-t border-gray-200 p-6 sm:justify-start dark:border-zinc-800">
+          {createdServiceOrder ? (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleClose}
+              >
+                Fechar
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setCreatedServiceOrder(null);
+                  setFormData({
+                    ...INITIAL_FORM,
+                    customerId: initialCustomerId ? String(initialCustomerId) : "",
+                  });
+                }}
+              >
+                Criar outra O.S.
+              </Button>
+              <Button
+                type="button"
+                onClick={() => {
+                  onSuccess?.();
+                  navigate(buildServiceOrdersDeepLink(createdServiceOrder.id));
+                  handleClose();
+                }}
+                className="bg-orange-500 text-white hover:bg-orange-600"
+              >
+                Ver O.S.
+              </Button>
+            </>
+          ) : null}
+          {!createdServiceOrder ? (
+            <>
           <Button
             onClick={() => void submit()}
             disabled={createMutation.isPending || !canSubmit}
@@ -569,6 +641,8 @@ export default function CreateServiceOrderModal({
           >
             Cancelar
           </Button>
+            </>
+          ) : null}
         </DialogFooter>
       </DialogContent>
     </Dialog>

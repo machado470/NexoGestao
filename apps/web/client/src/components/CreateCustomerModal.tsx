@@ -20,7 +20,7 @@ import { registerActionFlowEvent } from "@/lib/actionFlow";
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreated?: () => Promise<void> | void;
+  onCreated?: (createdCustomer?: { id?: string | null; name?: string }) => Promise<void> | void;
 };
 
 export default function CreateCustomerModal({ open, onOpenChange, onCreated }: Props) {
@@ -112,7 +112,14 @@ export default function CreateCustomerModal({ open, onOpenChange, onCreated }: P
       registerActionFlowEvent("customer_created");
       reset();
       close();
-      void onCreated?.();
+      const createdId = String((created as any)?.id ?? "").trim();
+      await Promise.all([
+        utils.nexo.customers.list.invalidate(),
+        createdId
+          ? utils.nexo.customers.getById.invalidate({ id: createdId })
+          : Promise.resolve(),
+      ]);
+      void onCreated?.({ id: createdId || null, name: (created as any)?.name });
     } catch (err: any) {
       utils.nexo.customers.list.setData(undefined, previousCustomers as any);
       toast.error("Falha ao criar cliente: " + (err?.message ?? "erro"));

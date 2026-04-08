@@ -164,7 +164,11 @@ function buildCustomersUrl(customerId?: string | null) {
 }
 
 function normalizeWorkspacePayload(payload: unknown): CustomerWorkspace | null {
-  const raw = normalizeObjectPayload<any>(payload);
+  const root = normalizeObjectPayload<any>(payload);
+  const raw =
+    root && typeof root === "object" && root.data && typeof root.data === "object"
+      ? root.data
+      : root;
 
   if (!raw || typeof raw !== "object") {
     return null;
@@ -296,6 +300,7 @@ function getChargeStatusTone(status?: string) {
 
 export default function CustomersPage() {
   const [, navigate] = useLocation();
+  const utils = trpc.useUtils();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingCustomerId, setEditingCustomerId] = useState<string | null>(
     null
@@ -326,6 +331,20 @@ export default function CustomersPage() {
   const workspace = useMemo(() => {
     return normalizeWorkspacePayload(workspaceQuery.data);
   }, [workspaceQuery.data]);
+  const [workspaceTimedOut, setWorkspaceTimedOut] = useState(false);
+
+  useEffect(() => {
+    if (!workspaceCustomerId || !workspaceQuery.isLoading) {
+      setWorkspaceTimedOut(false);
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setWorkspaceTimedOut(true);
+    }, 9000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [workspaceCustomerId, workspaceQuery.isLoading]);
 
   useEffect(() => {
     if (listCustomers.error) {
@@ -370,6 +389,25 @@ export default function CustomersPage() {
   const closeWorkspace = () => {
     setWorkspaceCustomerId(null);
     navigate(buildCustomersUrl(null), { replace: false });
+  };
+
+  const refreshCustomerContexts = async (customerId?: string | null) => {
+    await Promise.all([
+      utils.nexo.customers.list.invalidate(),
+      customerId
+        ? utils.nexo.customers.getById.invalidate({ id: customerId })
+        : Promise.resolve(),
+      customerId
+        ? utils.nexo.customers.workspace.invalidate({ id: customerId })
+        : Promise.resolve(),
+      utils.nexo.serviceOrders.list.invalidate(),
+      utils.finance.charges.list.invalidate(),
+      utils.nexo.timeline.listByOrg.invalidate(),
+    ]);
+
+    if (workspaceCustomerId && customerId && workspaceCustomerId === customerId) {
+      await workspaceQuery.refetch();
+    }
   };
 
   const workspaceAppointmentsCount = workspace?.appointments?.length ?? 0;
@@ -734,7 +772,22 @@ export default function CustomersPage() {
           <div className="space-y-4 p-5">
               {workspaceQuery.isLoading ? (
                 <div className="rounded-xl border border-gray-200 bg-white p-5 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
-                  Carregando workspace...
+                  <p>Carregando workspace...</p>
+                  {workspaceTimedOut ? (
+                    <div className="mt-3 space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300">
+                      <p>
+                        Este carregamento está demorando além do esperado. Você pode tentar novamente agora.
+                      </p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => void workspaceQuery.refetch()}
+                      >
+                        Tentar novamente
+                      </Button>
+                    </div>
+                  ) : null}
                 </div>
               ) : !workspace ? (
                 <div className="rounded-xl border border-gray-200 bg-white p-5 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
@@ -1049,14 +1102,25 @@ export default function CustomersPage() {
       <CreateCustomerModal
         open={isCreateOpen}
         onOpenChange={setIsCreateOpen}
-        onCreated={() => undefined}
+        onCreated={async (createdCustomer) => {
+          const createdId = createdCustomer?.id ?? null;
+
+          if (createdId) {
+            setWorkspaceCustomerId(createdId);
+            navigate(buildCustomersUrl(createdId), { replace: false });
+          }
+
+          await refreshCustomerContexts(createdId);
+        }}
       />
 
       <EditCustomerModal
         open={Boolean(editingCustomerId)}
         customerId={editingCustomerId}
         onClose={() => setEditingCustomerId(null)}
-        onSaved={() => undefined}
+        onSaved={async (savedCustomer) => {
+          await refreshCustomerContexts(savedCustomer?.id ?? editingCustomerId);
+        }}
       />
     </PageShell>
   );

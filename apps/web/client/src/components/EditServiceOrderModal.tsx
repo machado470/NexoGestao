@@ -23,6 +23,8 @@ import {
   Ban,
 } from "lucide-react";
 import { serviceOrderEditSchema } from "@/lib/validations";
+import { useLocation } from "wouter";
+import { buildServiceOrdersDeepLink } from "@/lib/operations/operations.utils";
 
 type ServiceOrderStatus =
   | "OPEN"
@@ -181,6 +183,8 @@ export default function EditServiceOrderModal({
   serviceOrderId,
   people,
 }: EditServiceOrderModalProps) {
+  const [, navigate] = useLocation();
+  const utils = trpc.useUtils();
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -204,6 +208,7 @@ export default function EditServiceOrderModal({
   );
 
   const updateServiceOrder = trpc.nexo.serviceOrders.update.useMutation();
+  const [loadingTimedOut, setLoadingTimedOut] = useState(false);
 
   useEffect(() => {
     if (!getServiceOrder.data) return;
@@ -239,6 +244,16 @@ export default function EditServiceOrderModal({
       outcomeSummary: serviceOrder?.outcomeSummary || "",
     });
   }, [getServiceOrder.data]);
+
+  useEffect(() => {
+    if (!isOpen || !getServiceOrder.isLoading) {
+      setLoadingTimedOut(false);
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => setLoadingTimedOut(true), 9000);
+    return () => window.clearTimeout(timeoutId);
+  }, [getServiceOrder.isLoading, isOpen]);
 
   const selectedPersonName = useMemo(() => {
     if (!formData.assignedToPersonId) return "Ainda não atribuído";
@@ -347,7 +362,7 @@ export default function EditServiceOrderModal({
     }
 
     try {
-      await updateServiceOrder.mutateAsync({
+      const updated = await updateServiceOrder.mutateAsync({
         id: serviceOrderId,
         title: parsed.data.title,
         description: parsed.data.description || undefined,
@@ -368,6 +383,22 @@ export default function EditServiceOrderModal({
             ? parsed.data.outcomeSummary || undefined
             : undefined,
       });
+      const resolvedCustomerId =
+        String((updated as any)?.customerId ?? (serviceOrder as any)?.customerId ?? "").trim() ||
+        String((serviceOrder as any)?.customer?.id ?? "").trim();
+      await Promise.all([
+        utils.nexo.serviceOrders.list.invalidate(),
+        utils.nexo.serviceOrders.getById.invalidate({ id: serviceOrderId }),
+        resolvedCustomerId
+          ? utils.nexo.customers.workspace.invalidate({ id: resolvedCustomerId })
+          : Promise.resolve(),
+        resolvedCustomerId
+          ? utils.nexo.customers.getById.invalidate({ id: resolvedCustomerId })
+          : Promise.resolve(),
+        utils.finance.charges.list.invalidate(),
+        utils.dashboard.alerts.invalidate(),
+        utils.nexo.timeline.listByOrg.invalidate(),
+      ]);
       toast.success("Ordem de serviço atualizada com sucesso!");
       onSuccess();
       onClose();
@@ -386,7 +417,12 @@ export default function EditServiceOrderModal({
   const isPersistedCanceled = persistedStatus === "CANCELED";
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => (!open ? onClose() : undefined)}>
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open && !updateServiceOrder.isPending) onClose();
+      }}
+    >
       <DialogContent
         showCloseButton={false}
         className="max-h-[90vh] max-w-2xl overflow-hidden border-zinc-800/80 bg-white p-0 shadow-xl dark:bg-zinc-900"
@@ -401,8 +437,16 @@ export default function EditServiceOrderModal({
           </DialogDescription>
         </DialogHeader>
         {getServiceOrder.isLoading ? (
-          <div className="flex min-h-[220px] items-center justify-center">
+          <div className="flex min-h-[220px] flex-col items-center justify-center gap-3">
             <Loader2 className="h-6 w-6 animate-spin text-orange-500" />
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Carregando dados da ordem de serviço...
+            </p>
+            {loadingTimedOut ? (
+              <Button type="button" variant="outline" onClick={() => void getServiceOrder.refetch()}>
+                Recarregar dados
+              </Button>
+            ) : null}
           </div>
         ) : getServiceOrder.error ? (
           <div className="m-6 space-y-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-200">
@@ -830,6 +874,19 @@ export default function EditServiceOrderModal({
         </div>
         )}
         <DialogFooter className="flex gap-2 border-t border-gray-200 p-6 sm:justify-start dark:border-zinc-800">
+          {serviceOrderId ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                navigate(buildServiceOrdersDeepLink(serviceOrderId));
+                onClose();
+              }}
+              disabled={updateServiceOrder.isPending || getServiceOrder.isLoading}
+            >
+              Ver O.S.
+            </Button>
+          ) : null}
           <Button
             onClick={() => void submitUpdate()}
             disabled={updateServiceOrder.isPending || getServiceOrder.isLoading}
