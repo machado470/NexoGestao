@@ -3,6 +3,7 @@ import { ArrowRight, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { rankPriorityProblems, type PriorityPageContext, type PriorityProblem } from "@/lib/priorityEngine";
 import { getNextActionSuggestion, registerActionFlowEvent } from "@/lib/actionFlow";
+import { sortSmartActions, type SmartActionWithExecution } from "@/lib/smartActions";
 
 export function PageShell({ children }: { children: ReactNode }) {
   return <div className="space-y-8 p-6 pb-24 md:pb-6">{children}</div>;
@@ -56,6 +57,7 @@ export function SmartPage({
   dominantImpact,
   dominantCta,
   priorities,
+  operationalActions = [],
 }: {
   pageContext: PriorityPageContext;
   headline: string;
@@ -63,9 +65,16 @@ export function SmartPage({
   dominantImpact: string;
   dominantCta: { label: string; onClick: () => void; path?: string };
   priorities: PriorityProblem[];
+  operationalActions?: SmartActionWithExecution[];
 }) {
   const topPriorities = rankPriorityProblems(priorities, { pageContext, limit: 3 });
   const nextActionSuggestion = getNextActionSuggestion(pageContext);
+  const orderedActions = sortSmartActions(operationalActions);
+  const primaryAction = orderedActions[0];
+  const resolvedDominantProblem = primaryAction?.label ?? dominantProblem;
+  const resolvedDominantImpact = primaryAction
+    ? `Impacto ${primaryAction.impact} • prioridade ${primaryAction.priority}`
+    : dominantImpact;
 
   return (
     <section className="space-y-4 rounded-2xl border border-orange-200 bg-orange-50/70 p-4 dark:border-orange-900/40 dark:bg-orange-950/20">
@@ -74,9 +83,46 @@ export function SmartPage({
           SmartPage
         </p>
         <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">{headline}</h2>
-        <p className="text-sm text-zinc-700 dark:text-zinc-300">{dominantProblem}</p>
-        <p className="text-sm font-medium text-red-700 dark:text-red-300">Impacto: {dominantImpact}</p>
+        <p className="text-sm text-zinc-700 dark:text-zinc-300">{resolvedDominantProblem}</p>
+        <p className="text-sm font-medium text-red-700 dark:text-red-300">Impacto: {resolvedDominantImpact}</p>
       </div>
+
+      {primaryAction ? (
+        <div className="rounded-xl border border-orange-300 bg-white/90 p-3 dark:border-orange-800/60 dark:bg-zinc-900/70">
+          <p className="text-xs font-semibold uppercase tracking-wide text-orange-700 dark:text-orange-300">Ação principal</p>
+          <p className="mt-1 text-sm font-semibold text-zinc-900 dark:text-zinc-100">{primaryAction.label}</p>
+          <p className="text-xs text-zinc-600 dark:text-zinc-300">{primaryAction.reason}</p>
+          <div className="mt-3">
+            <Button type="button" size="sm" className="bg-orange-500 text-white" onClick={primaryAction.onExecute}>
+              Executar agora
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
+      {orderedActions.length > 0 ? (
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-300">Ações ordenadas</p>
+          <div className="grid gap-2">
+            {orderedActions.map((action) => (
+              <div key={action.id} className="rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-900/60">
+                <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{action.label}</p>
+                    <p className="text-xs text-zinc-600 dark:text-zinc-400">{action.reason}</p>
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
+                      {action.impact} • prioridade {action.priority}{action.auto ? " • auto" : ""}
+                    </p>
+                  </div>
+                  <Button type="button" size="sm" variant="outline" onClick={action.onExecute}>
+                    Executar
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <div className="rounded-xl border border-zinc-200/80 bg-white/90 p-3 dark:border-white/10 dark:bg-zinc-900/70">
         <p className="text-xs font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-300">Próxima ação automática</p>
@@ -105,10 +151,14 @@ export function SmartPage({
               pageContext,
               ctaPath: dominantCta.path,
             });
+            if (primaryAction) {
+              primaryAction.onExecute();
+              return;
+            }
             dominantCta.onClick();
           }}
         >
-          {dominantCta.label}
+          {primaryAction ? "Executar ação principal" : dominantCta.label}
           <ArrowRight className="h-4 w-4" />
         </Button>
       </div>

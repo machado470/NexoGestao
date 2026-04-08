@@ -63,6 +63,7 @@ import { DemoEnvironmentCta } from "@/components/DemoEnvironmentCta";
 import { useCriticalActionStore } from "@/stores/criticalActionStore";
 import { invalidateOperationalGraph } from "@/lib/operationalConsistency";
 import { useProductAnalytics } from "@/hooks/useProductAnalytics";
+import { generateCustomerActions } from "@/lib/smartActions";
 
 type Customer = {
   id: string;
@@ -835,6 +836,18 @@ export default function CustomersPage() {
         : workspacePendingCharges > 0
           ? "critical"
         : "healthy";
+  const smartOperationalActions = useMemo(
+    () =>
+      generateCustomerActions({
+        customerId: workspace?.customer.id,
+        appointmentsCount: workspaceAppointmentsCount,
+        onSuggestAppointment: () => {
+          if (!workspace) return;
+          navigate(`/appointments?customerId=${workspace.customer.id}`);
+        },
+      }),
+    [navigate, workspace, workspaceAppointmentsCount]
+  );
   const hasRenderableData =
     listCustomers.data !== undefined || workspaceQuery.data !== undefined;
   const queryState = getQueryUiState([listCustomers, workspaceQuery], hasRenderableData);
@@ -912,6 +925,7 @@ export default function CustomersPage() {
             : "/customers",
         }}
         priorities={smartPriorities}
+        operationalActions={smartOperationalActions}
       />
 
       {queryState.hasBackgroundUpdate ? (
