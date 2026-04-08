@@ -9,7 +9,6 @@ import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 
 import App from "./App";
-import { getLoginUrl } from "./const";
 import "./index.css";
 import { initSentry } from "./lib/sentry";
 
@@ -24,6 +23,9 @@ const isPublicPath = (pathname: string): boolean => {
     pathname === "/register" ||
     pathname === "/forgot-password" ||
     pathname === "/reset-password" ||
+    pathname === "/auth/accept-invite" ||
+    pathname === "/auth/callback" ||
+    pathname === "/auth/confirm-email" ||
     pathname === "/about" ||
     pathname === "/privacy" ||
     pathname === "/terms"
@@ -73,7 +75,13 @@ const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (isPublicPath(window.location.pathname)) return;
 
   isRedirectingToLogin = true;
-  window.location.assign(getLoginUrl());
+  const params = new URLSearchParams();
+  const redirect = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  if (redirect && redirect.startsWith("/")) {
+    params.set("redirect", redirect);
+  }
+  const next = params.toString() ? `/login?${params.toString()}` : "/login";
+  window.location.assign(next);
 };
 
 queryClient.getQueryCache().subscribe((event) => {

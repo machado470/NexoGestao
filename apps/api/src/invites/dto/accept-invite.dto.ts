@@ -15,6 +15,6 @@ export class AcceptInviteDto {
 
   @IsOptional()
   @IsString()
-  @MinLength(6, { message: 'A senha deve ter no mínimo 6 caracteres.' })
+  @MinLength(8, { message: 'A senha deve ter no mínimo 8 caracteres.' })
   password?: string;
 }

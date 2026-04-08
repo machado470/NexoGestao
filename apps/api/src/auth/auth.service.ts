@@ -9,6 +9,7 @@ import {
 import { ConfigService } from '@nestjs/config'
 import { JwtService } from '@nestjs/jwt'
 import * as bcrypt from 'bcrypt'
+import { createHash } from 'crypto'
 import { Resend } from 'resend'
 import { v4 as uuidv4 } from 'uuid'
 
@@ -67,7 +68,11 @@ export class AuthService {
     }
   }
 
-  private generateToken(user: any) {
+  private hashToken(rawToken: string) {
+    return createHash('sha256').update(rawToken).digest('hex')
+  }
+
+  createSessionPayload(user: any) {
     const token = this.jwt.sign({
       sub: user.id,
       role: user.role,
@@ -141,6 +146,7 @@ export class AuthService {
           password: passwordHash,
           role: 'ADMIN',
           active: true,
+          emailVerifiedAt: null,
           orgId: org.id,
           person: {
             create: {
@@ -158,10 +164,20 @@ export class AuthService {
       })
     })
 
+    try {
+      await this.sendVerificationEmail(createdUser.id, email)
+    } catch (error) {
+      this.logger.warn(
+        `Falha ao enviar verificação de e-mail: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      )
+    }
+
     return {
       success: true,
       message: 'Conta criada com sucesso.',
-      ...this.generateToken(createdUser),
+      ...this.createSessionPayload(createdUser),
     }
   }
 
@@ -206,7 +222,7 @@ export class AuthService {
       })
     }
 
-    return this.generateToken(user)
+    return this.createSessionPayload(user)
   }
 
   async forgotPassword(email: string) {
@@ -233,18 +249,19 @@ export class AuthService {
       )
     }
 
-    const token = uuidv4()
+    const rawToken = uuidv4()
+    const tokenHash = this.hashToken(rawToken)
     const expiresAt = new Date()
     expiresAt.setHours(expiresAt.getHours() + 1)
 
     const frontendUrl =
       this.config.get<string>('FRONTEND_URL') || 'http://localhost:3010'
-    const resetLink = `${frontendUrl}/reset-password?token=${token}`
+    const resetLink = `${frontendUrl}/reset-password?token=${rawToken}`
 
     await this.prisma.user.update({
       where: { id: user.id },
       data: {
-        resetToken: token,
+        resetToken: tokenHash,
         resetTokenExpiresAt: expiresAt,
       },
     })
@@ -287,7 +304,7 @@ export class AuthService {
 
     const user = await this.prisma.user.findFirst({
       where: {
-        resetToken: normalizedToken,
+        resetToken: this.hashToken(normalizedToken),
         resetTokenExpiresAt: {
           gt: new Date(),
         },
@@ -349,7 +366,7 @@ export class AuthService {
       throw new UnauthorizedException('Senha inválida')
     }
 
-    const result = this.generateToken(user)
+    const result = this.createSessionPayload(user)
 
     try {
       const loginEvent = (UsageMetricEvent as any)?.LOGIN ?? 'LOGIN'
@@ -373,5 +390,99 @@ export class AuthService {
       message: 'Login efetuado com sucesso.',
       ...result,
     }
+  }
+
+  async verifyEmail(rawToken: string) {
+    const token = (rawToken ?? '').trim()
+    if (!token) {
+      throw new BadRequestException('Token é obrigatório')
+    }
+
+    const tokenHash = this.hashToken(token)
+    const user = await this.prisma.user.findFirst({
+      where: {
+        emailVerifyTokenHash: tokenHash,
+        emailVerifyTokenExpiresAt: {
+          gt: new Date(),
+        },
+      },
+    })
+
+    if (!user) {
+      throw new UnauthorizedException('Token inválido ou expirado')
+    }
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerifiedAt: new Date(),
+        emailVerifyTokenHash: null,
+        emailVerifyTokenExpiresAt: null,
+      },
+    })
+
+    return {
+      success: true,
+      message: 'E-mail confirmado com sucesso.',
+    }
+  }
+
+  async resendEmailVerification(email: string) {
+    const normalizedEmail = (email ?? '').trim().toLowerCase()
+    if (!normalizedEmail) {
+      throw new BadRequestException('Email é obrigatório')
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { email: normalizedEmail },
+      select: { id: true, email: true, emailVerifiedAt: true },
+    })
+
+    if (!user || user.emailVerifiedAt) {
+      return {
+        success: true,
+        message: 'Se o e-mail existir, um novo link de verificação será enviado.',
+      }
+    }
+
+    await this.sendVerificationEmail(user.id, normalizedEmail)
+
+    return {
+      success: true,
+      message: 'Se o e-mail existir, um novo link de verificação será enviado.',
+    }
+  }
+
+  async sendVerificationEmail(userId: string, email: string) {
+    if (!this.resend) {
+      this.logger.warn(
+        `RESEND_API_KEY ausente. Verificação de e-mail não enviada para ${email}.`,
+      )
+      return
+    }
+
+    const rawToken = uuidv4()
+    const tokenHash = this.hashToken(rawToken)
+    const expiresAt = new Date()
+    expiresAt.setHours(expiresAt.getHours() + 24)
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        emailVerifyTokenHash: tokenHash,
+        emailVerifyTokenExpiresAt: expiresAt,
+      },
+    })
+
+    const frontendUrl =
+      this.config.get<string>('FRONTEND_URL') || 'http://localhost:3010'
+    const verifyLink = `${frontendUrl}/auth/confirm-email?token=${rawToken}`
+
+    await this.resend.emails.send({
+      from: this.config.get<string>('EMAIL_FROM') || 'onboarding@resend.dev',
+      to: email,
+      subject: 'Confirme seu e-mail - NexoGestao',
+      html: `<p>Confirme seu e-mail para proteger sua conta:</p><a href="${verifyLink}">${verifyLink}</a><p>Este link expira em 24 horas.</p>`,
+    })
   }
 }
