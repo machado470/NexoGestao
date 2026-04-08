@@ -43,14 +43,14 @@ export class WhatsAppDispatcherJob {
             continue
           }
 
-          await this.whatsApp.markFailed({
+          await this.whatsApp.markFailedAndRequeue({
             id: message.id,
             provider: result.provider,
             errorCode: result.errorCode,
             errorMessage: result.errorMessage,
           })
         } catch (error: any) {
-          await this.whatsApp.markFailed({
+          await this.whatsApp.markFailedAndRequeue({
             id: message.id,
             provider: 'internal',
             errorCode: 'UNEXPECTED',

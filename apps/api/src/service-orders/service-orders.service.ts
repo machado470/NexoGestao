@@ -36,6 +36,10 @@ function isStatus(v: any): v is ServiceOrderStatus {
   )
 }
 
+function isTerminalStatus(status: ServiceOrderStatus): boolean {
+  return status === 'DONE' || status === 'CANCELED'
+}
+
 function statusToAction(status: ServiceOrderStatus): string {
   switch (status) {
     case 'ASSIGNED':
@@ -642,6 +646,11 @@ export class ServiceOrdersService {
       where: { id: params.id, orgId: params.orgId },
     })
     if (!before) throw new NotFoundException('Ordem de serviço não encontrada')
+    if (isTerminalStatus(before.status)) {
+      throw new BadRequestException(
+        `Ordem de serviço em estado terminal (${before.status}) não pode ser alterada`,
+      )
+    }
 
     const data: any = {}
 

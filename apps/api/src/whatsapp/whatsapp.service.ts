@@ -7,6 +7,8 @@ import {
 import { PrismaService } from '../prisma/prisma.service'
 import { QueueService } from '../queue/queue.service'
 import { QUEUE_NAMES } from '../queue/queue.constants'
+import { TimelineService } from '../timeline/timeline.service'
+import { RequestContextService } from '../common/context/request-context.service'
 
 type QueueMessageInput = {
   orgId: string
@@ -41,7 +43,35 @@ export class WhatsAppService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly queueService: QueueService,
+    private readonly timeline: TimelineService,
+    private readonly requestContext: RequestContextService,
   ) {}
+
+  private logStructured(params: {
+    level: 'log' | 'warn' | 'error'
+    action: string
+    entityId?: string | null
+    message: string
+    extra?: Record<string, unknown>
+  }) {
+    const line = JSON.stringify({
+      requestId: this.requestContext.requestId,
+      action: params.action,
+      entityId: params.entityId ?? null,
+      message: params.message,
+      ...params.extra,
+    })
+
+    if (params.level === 'error') {
+      this.logger.error(line)
+      return
+    }
+    if (params.level === 'warn') {
+      this.logger.warn(line)
+      return
+    }
+    this.logger.log(line)
+  }
 
   async enqueueMessage(input: QueueMessageInput) {
     const result = await this.queueMessage(input)
@@ -107,9 +137,17 @@ export class WhatsAppService {
         },
       })
 
-      this.logger.log(
-        `queued whatsapp message key=${messageKey} to=${toPhone} type=${messageType}`,
-      )
+      this.logStructured({
+        level: 'log',
+        action: 'WHATSAPP_MESSAGE_QUEUED',
+        entityId: created.id,
+        message: 'Mensagem WhatsApp enfileirada',
+        extra: {
+          messageKey,
+          messageType,
+          toPhone,
+        },
+      })
 
       return { created: true, message: created }
     } catch (err: any) {
@@ -201,7 +239,7 @@ export class WhatsAppService {
       `whatsapp sent id=${id} provider=${provider} providerMessageId=${providerMessageId}`,
     )
 
-    return this.prisma.whatsAppMessage.update({
+    const updated = await this.prisma.whatsAppMessage.update({
       where: { id },
       data: {
         status: WhatsAppMessageStatus.SENT,
@@ -211,9 +249,46 @@ export class WhatsAppService {
         errorMessage: null,
       },
     })
+
+    await this.timeline
+      .log({
+        orgId: updated.orgId,
+        action: 'WHATSAPP_MESSAGE_SENT',
+        description: `Mensagem WhatsApp enviada (${updated.messageType})`,
+        customerId: updated.customerId,
+        serviceOrderId:
+          updated.entityType === WhatsAppEntityType.SERVICE_ORDER
+            ? updated.entityId
+            : null,
+        appointmentId:
+          updated.entityType === WhatsAppEntityType.APPOINTMENT
+            ? updated.entityId
+            : null,
+        chargeId:
+          updated.entityType === WhatsAppEntityType.CHARGE ? updated.entityId : null,
+        metadata: {
+          messageId: updated.id,
+          entityId: updated.entityId,
+          entityType: updated.entityType,
+          messageType: updated.messageType,
+          provider,
+          providerMessageId,
+        },
+      })
+      .catch((error) => {
+        this.logStructured({
+          level: 'error',
+          action: 'WHATSAPP_TIMELINE_LOG_FAILED',
+          entityId: updated.id,
+          message: 'Falha ao registrar envio de WhatsApp na timeline',
+          extra: { error: error instanceof Error ? error.message : String(error) },
+        })
+      })
+
+    return updated
   }
 
-  async markFailed(params: {
+  async markFailedAndRequeue(params: {
     id: string
     provider: string
     errorCode: string
@@ -221,14 +296,18 @@ export class WhatsAppService {
   }) {
     const { id, provider, errorCode, errorMessage } = params
 
-    this.logger.warn(
-      `whatsapp failed id=${id} provider=${provider} errorCode=${errorCode} errorMessage=${errorMessage}`,
-    )
+    this.logStructured({
+      level: 'warn',
+      action: 'WHATSAPP_SEND_FAILED_REQUEUED',
+      entityId: id,
+      message: 'Falha de envio WhatsApp. Mensagem voltou para fila (modo degradado)',
+      extra: { provider, errorCode, errorMessage },
+    })
 
     return this.prisma.whatsAppMessage.update({
       where: { id },
       data: {
-        status: WhatsAppMessageStatus.FAILED,
+        status: WhatsAppMessageStatus.QUEUED,
         provider,
         errorCode,
         errorMessage,
