@@ -382,13 +382,14 @@ export default function CustomersPage() {
   const totalInactive = total - totalActive;
 
   const openWorkspace = (customerId: string) => {
+    if (workspaceCustomerId === customerId) return;
     setWorkspaceCustomerId(customerId);
     navigate(buildCustomersUrl(customerId), { replace: false });
   };
 
   const closeWorkspace = () => {
     setWorkspaceCustomerId(null);
-    navigate(buildCustomersUrl(null), { replace: false });
+    navigate(buildCustomersUrl(null), { replace: true });
   };
 
   const refreshCustomerContexts = async (customerId?: string | null) => {
@@ -610,7 +611,7 @@ export default function CustomersPage() {
             </div>
           </div>
 
-          {listCustomers.isLoading ? (
+          {listCustomers.isLoading && customers.length === 0 ? (
             <SurfaceSection className="m-4 flex min-h-[140px] items-center justify-center text-sm text-gray-600 dark:text-gray-400">
               Carregando clientes...
             </SurfaceSection>
@@ -770,7 +771,7 @@ export default function CustomersPage() {
           </DialogHeader>
 
           <div className="space-y-4 p-5">
-              {workspaceQuery.isLoading ? (
+              {workspaceQuery.isLoading && !workspace ? (
                 <div className="rounded-xl border border-gray-200 bg-white p-5 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
                   <p>Carregando workspace...</p>
                   {workspaceTimedOut ? (
@@ -790,8 +791,16 @@ export default function CustomersPage() {
                   ) : null}
                 </div>
               ) : !workspace ? (
-                <div className="rounded-xl border border-gray-200 bg-white p-5 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
-                  Não foi possível carregar o workspace deste cliente.
+                <div className="space-y-3 rounded-xl border border-gray-200 bg-white p-5 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
+                  <p>Não foi possível carregar o workspace deste cliente.</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="button" variant="outline" size="sm" onClick={() => void workspaceQuery.refetch()}>
+                      Tentar novamente
+                    </Button>
+                    <Button type="button" variant="outline" size="sm" onClick={closeWorkspace}>
+                      Fechar workspace
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <>
