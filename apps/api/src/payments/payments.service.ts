@@ -283,15 +283,21 @@ export class PaymentsService {
    * Marca uma cobrança como paga manualmente
    */
   async markChargeAsPaid(
+    orgId: string,
     chargeId: string,
     _paymentMethod: string = 'manual',
   ): Promise<void> {
     try {
-      const charge = await this.prisma.charge.findFirst({ where: { id: chargeId } })
+      const charge = await this.prisma.charge.findFirst({
+        where: {
+          id: chargeId,
+          orgId,
+        },
+      })
       if (!charge) return
 
       await this.finance.payCharge({
-        orgId: charge.orgId,
+        orgId,
         chargeId,
         actorUserId: null,
         method: 'OTHER',

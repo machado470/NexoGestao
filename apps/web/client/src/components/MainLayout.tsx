@@ -22,6 +22,7 @@ import {
   Settings,
   History,
   MessageCircle,
+  CreditCard,
   Menu,
   X,
 } from "lucide-react";
@@ -60,6 +61,7 @@ function getPageTitle(location: string) {
     "/governance": "Governança",
     "/whatsapp": "WhatsApp",
     "/settings": "Configurações",
+    "/billing": "Billing",
     "/onboarding": "Jornada de Demonstração",
   };
 
@@ -87,6 +89,7 @@ function getPageDescription(location: string) {
     "/governance": "Regras, risco e leitura institucional.",
     "/whatsapp": "Conversa contextual vinculada à operação.",
     "/settings": "Parâmetros e ajustes do sistema.",
+    "/billing": "Assinatura, quotas e monetização da organização.",
     "/onboarding": "Fluxo guiado para mostrar valor: operação, receita e governança.",
   };
 
@@ -180,6 +183,13 @@ export function MainLayout({ children }: MainLayoutProps) {
           icon: Users,
           route: "/people",
           permissions: ["people:manage"],
+        },
+        {
+          id: "billing",
+          label: "Billing",
+          icon: CreditCard,
+          route: "/billing",
+          permissions: ["settings:manage"],
         },
         {
           id: "settings",

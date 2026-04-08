@@ -77,7 +77,7 @@ export class PaymentsController {
    */
   @Get('charges')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'MANAGER')
   async listCharges(@Org() orgId: string) {
     const charges = await this.payments.listCharges(orgId)
     return { ok: true, data: charges }
@@ -88,12 +88,17 @@ export class PaymentsController {
    */
   @Post('charges/:chargeId/pay')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'MANAGER')
   async payCharge(
+    @Org() orgId: string,
     @Param('chargeId') chargeId: string,
     @Body() body: { paymentMethod?: string },
   ) {
-    await this.payments.markChargeAsPaid(chargeId, body.paymentMethod || 'manual')
+    await this.payments.markChargeAsPaid(
+      orgId,
+      chargeId,
+      body.paymentMethod || 'manual',
+    )
     return { ok: true, message: 'Cobrança marcada como paga' }
   }
 }

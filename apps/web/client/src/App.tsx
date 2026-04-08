@@ -24,6 +24,7 @@ import WhatsAppPage from "./pages/WhatsAppPage";
 import CalendarPage from "./pages/CalendarPage";
 import SettingsPage from "./pages/SettingsPage";
 import TimelinePage from "./pages/TimelinePage";
+import BillingPage from "./pages/BillingPage";
 
 const Landing = lazy(() => import("./pages/Landing"));
 const Login = lazy(() => import("./pages/Login"));
@@ -347,6 +348,11 @@ const TimelineRoute = protectedPage(TimelinePage, {
   requireCompletedOnboarding: true,
 });
 
+const BillingRoute = protectedPage(BillingPage, {
+  permissions: ["settings:manage"],
+  requireCompletedOnboarding: true,
+});
+
 function LegacyAliasRoute({
   targetPath,
   message,
@@ -456,6 +462,7 @@ function Router() {
       <Route path="/calendar" component={CalendarRoute} />
       <Route path="/settings" component={SettingsRoute} />
       <Route path="/timeline" component={TimelineRoute} />
+      <Route path="/billing" component={BillingRoute} />
       <Route
         path="/operations"
         component={() => (
