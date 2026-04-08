@@ -23,6 +23,7 @@ import { registerActionFlowEvent } from "@/lib/actionFlow";
 import { useCriticalActionGuard } from "@/hooks/useCriticalActionGuard";
 import { invalidateOperationalGraph } from "@/lib/operationalConsistency";
 import { useProductAnalytics } from "@/hooks/useProductAnalytics";
+import { notify } from "@/stores/notificationStore";
 
 interface CreateChargeModalProps {
   isOpen: boolean;
@@ -208,6 +209,14 @@ export function CreateChargeModal({
             onClick: () => window.location.assign(`/finances?chargeId=${String((created as any)?.id ?? "")}`),
           },
         });
+        notify.successPersistent(
+          "Cobrança criada",
+          "Próximo passo recomendado: enviar cobrança no WhatsApp para acelerar recebimento.",
+          {
+            label: "Enviar WhatsApp",
+            onClick: () => window.location.assign("/whatsapp"),
+          }
+        );
         registerActionFlowEvent("charge_created");
         track("generate_charge", {
           screen: "finances",
@@ -223,6 +232,16 @@ export function CreateChargeModal({
       onError: (error) => {
         utils.finance.charges.list.setData(undefined, previousCharges as any);
         toast.error(error.message || "Erro ao criar cobrança");
+        notify.error(
+          "Não foi possível criar a cobrança",
+          "Revise cliente, valor e vencimento e tente novamente.",
+          {
+            label: "Tentar novamente",
+            onClick: () => {
+              void submitCharge();
+            },
+          }
+        );
       },
     });
   };

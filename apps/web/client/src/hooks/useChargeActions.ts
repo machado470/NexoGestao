@@ -3,6 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { buildFinanceChargeUrl } from "@/lib/operations/operations.utils";
 import { toast } from "sonner";
 import { useProductAnalytics } from "@/hooks/useProductAnalytics";
+import { notify } from "@/stores/notificationStore";
 
 type NavigateFn = (path: string) => void;
 
@@ -51,8 +52,11 @@ export function useChargeActions(options?: UseChargeActionsOptions) {
     for (const action of refreshActions) {
       try {
         await action();
-      } catch (error) {
-        console.error("[useChargeActions] refresh action failed", error);
+      } catch {
+        notify.warning(
+          "Atualização parcial",
+          "Pagamento salvo, mas parte da tela ainda está sincronizando."
+        );
       }
     }
   };
@@ -78,6 +82,16 @@ export function useChargeActions(options?: UseChargeActionsOptions) {
       });
 
       toast.success("Pagamento registrado com sucesso");
+      notify.successPersistent(
+        "Receita confirmada no caixa",
+        "Próximo passo: validar a O.S. relacionada e concluir o ciclo operacional.",
+        {
+          label: "Ir para O.S.",
+          onClick: () => {
+            navigate("/service-orders");
+          },
+        }
+      );
       track("payment_registered", {
         screen: "finances",
         chargeId: variables.chargeId,
