@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useLocation } from "wouter";
 import {
   ArrowRight,
@@ -22,7 +22,6 @@ import {
 } from "lucide-react";
 
 import { ConsentBanner } from "@/components/ConsentBanner";
-import { TermsModal } from "@/components/TermsModal";
 
 import "./landing.css";
 
@@ -76,7 +75,6 @@ const benefits = [
 
 export default function Landing() {
   const [, navigate] = useLocation();
-  const [termsModal, setTermsModal] = useState<"terms" | "privacy" | null>(null);
   const year = useMemo(() => new Date().getFullYear(), []);
 
   return (
@@ -96,9 +94,14 @@ export default function Landing() {
           </button>
 
           <nav className="hidden items-center gap-8 md:flex">
-            {["Produto", "Funcionalidades", "Preços", "Contato"].map((item) => (
-              <a key={item} href="#" className="text-sm font-medium text-slate-600 transition hover:text-slate-900">
-                {item}
+            {[
+              { label: "Produto", href: "/produto" },
+              { label: "Funcionalidades", href: "/produto#funcionalidades" },
+              { label: "Preços", href: "/precos" },
+              { label: "Contato", href: "/contato" },
+            ].map((item) => (
+              <a key={item.label} href={item.href} className="text-sm font-medium text-slate-600 transition hover:text-slate-900">
+                {item.label}
               </a>
             ))}
           </nav>
@@ -408,18 +411,25 @@ export default function Landing() {
               <p className="mt-2 text-sm text-slate-600">Plataforma operacional para empresas de serviço.</p>
             </div>
             <div>
-              <p className="font-semibold text-slate-900">Produto</p>
-              <ul className="mt-3 space-y-2 text-sm text-slate-600"><li>Fluxo operacional</li><li>Cobrança</li><li>Governança</li></ul>
+              <p className="font-semibold text-slate-900">Navegação</p>
+              <ul className="mt-3 space-y-2 text-sm text-slate-600">
+                <li><a href="/produto" className="transition hover:text-slate-900">Produto</a></li>
+                <li><a href="/precos" className="transition hover:text-slate-900">Preços</a></li>
+                <li><a href="/login" className="transition hover:text-slate-900">Entrar</a></li>
+              </ul>
             </div>
             <div>
               <p className="font-semibold text-slate-900">Empresa</p>
-              <ul className="mt-3 space-y-2 text-sm text-slate-600"><li>Sobre</li><li>Contato</li><li>Carreiras</li></ul>
+              <ul className="mt-3 space-y-2 text-sm text-slate-600">
+                <li><a href="/sobre" className="transition hover:text-slate-900">Sobre</a></li>
+                <li><a href="/contato" className="transition hover:text-slate-900">Contato</a></li>
+              </ul>
             </div>
             <div>
               <p className="font-semibold text-slate-900">Legal</p>
               <ul className="mt-3 space-y-2 text-sm text-slate-600">
-                <li><button type="button" onClick={() => setTermsModal("terms")}>Termos</button></li>
-                <li><button type="button" onClick={() => setTermsModal("privacy")}>Privacidade</button></li>
+                <li><a href="/privacidade" className="transition hover:text-slate-900">Privacidade</a></li>
+                <li><a href="/termos" className="transition hover:text-slate-900">Termos</a></li>
               </ul>
             </div>
           </div>
@@ -436,11 +446,6 @@ export default function Landing() {
       </footer>
 
       <ConsentBanner />
-      <TermsModal
-        isOpen={termsModal !== null}
-        type={termsModal === "privacy" ? "privacy" : "terms"}
-        onClose={() => setTermsModal(null)}
-      />
     </div>
   );
 }

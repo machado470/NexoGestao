@@ -1,0 +1,109 @@
+import { Check } from "lucide-react";
+
+import { MarketingLayout } from "@/components/MarketingLayout";
+
+import "./landing.css";
+
+const plans = [
+  {
+    name: "Free",
+    price: "R$ 0",
+    subtitle: "Para testar o fluxo inicial",
+    limits: ["Até 50 clientes", "Até 120 agendamentos/mês", "Até 300 mensagens/mês", "1 usuário"],
+    cta: "Criar conta grátis",
+    href: "/register",
+  },
+  {
+    name: "Starter",
+    price: "R$ 149",
+    subtitle: "Para operação em crescimento",
+    limits: ["Até 300 clientes", "Até 600 agendamentos/mês", "Até 2.500 mensagens/mês", "Até 3 usuários"],
+    cta: "Começar Starter",
+    href: "/register",
+  },
+  {
+    name: "Pro",
+    price: "R$ 349",
+    subtitle: "Mais controle e governança",
+    limits: ["Até 1.500 clientes", "Até 2.000 agendamentos/mês", "Até 10.000 mensagens/mês", "Até 10 usuários"],
+    cta: "Escolher Pro",
+    href: "/register",
+    featured: true,
+  },
+  {
+    name: "Business",
+    price: "Sob consulta",
+    subtitle: "Escala operacional multiunidade",
+    limits: ["Clientes ilimitados", "Agendamentos ilimitados", "Mensagens sob volume contratado", "Usuários ilimitados"],
+    cta: "Falar com time comercial",
+    href: "/contato",
+  },
+];
+
+const faqs = [
+  ["Posso trocar de plano depois?", "Sim. Você pode fazer upgrade conforme o volume operacional crescer, sem migrar dados."],
+  ["Existe fidelidade?", "Não há fidelidade para planos mensais. Você evolui no ritmo da sua operação."],
+  ["O que muda no Business?", "No Business, ajustamos limites, onboarding e suporte conforme a complexidade da sua empresa."],
+];
+
+export default function PricingPage() {
+  return (
+    <MarketingLayout>
+      <section className="container py-14 md:py-20">
+        <div className="mx-auto max-w-3xl text-center">
+          <p className="text-xs font-semibold tracking-[0.14em] text-orange-600">PREÇOS</p>
+          <h1 className="mt-4 text-4xl font-semibold text-slate-900 md:text-5xl">Planos para cada estágio da sua operação</h1>
+          <p className="mt-5 text-lg text-slate-600">Escolha um plano simples para começar e faça upgrade quando precisar de mais volume e governança.</p>
+        </div>
+      </section>
+
+      <section className="container pb-16 md:pb-20">
+        <div className="grid gap-5 lg:grid-cols-4">
+          {plans.map((plan) => (
+            <article
+              key={plan.name}
+              className={`rounded-3xl border p-6 ${
+                plan.featured
+                  ? "border-orange-300 bg-orange-50/50 shadow-[0_20px_40px_rgba(249,115,22,0.2)]"
+                  : "border-slate-200 bg-white shadow-[0_12px_30px_rgba(15,23,42,0.05)]"
+              }`}
+            >
+              {plan.featured ? (
+                <p className="mb-3 inline-flex rounded-full bg-orange-500 px-3 py-1 text-xs font-semibold text-white">Recomendado</p>
+              ) : null}
+              <h2 className="text-2xl font-semibold text-slate-900">{plan.name}</h2>
+              <p className="mt-2 text-3xl font-semibold text-slate-900">{plan.price}<span className="text-base font-medium text-slate-500">{plan.price.includes("R$") ? "/mês" : ""}</span></p>
+              <p className="mt-2 text-sm text-slate-600">{plan.subtitle}</p>
+
+              <ul className="mt-6 space-y-3 text-sm text-slate-700">
+                {plan.limits.map((limit) => (
+                  <li key={limit} className="flex items-start gap-2">
+                    <Check className="mt-0.5 size-4 text-emerald-500" /> {limit}
+                  </li>
+                ))}
+              </ul>
+
+              <a href={plan.href} className={`mt-6 inline-flex w-full justify-center rounded-xl px-4 py-2.5 text-sm font-semibold transition ${plan.featured ? "bg-orange-500 text-white hover:bg-orange-600" : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"}`}>
+                {plan.cta}
+              </a>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="container pb-16 md:pb-20">
+        <article className="rounded-3xl border border-slate-200 bg-white p-8 shadow-[0_20px_45px_rgba(15,23,42,0.08)] md:p-10">
+          <h2 className="text-2xl font-semibold text-slate-900">Perguntas frequentes</h2>
+          <div className="mt-6 space-y-5">
+            {faqs.map(([question, answer]) => (
+              <div key={question} className="border-b border-slate-100 pb-4 last:border-none last:pb-0">
+                <h3 className="font-semibold text-slate-900">{question}</h3>
+                <p className="mt-1 text-sm text-slate-600">{answer}</p>
+              </div>
+            ))}
+          </div>
+        </article>
+      </section>
+    </MarketingLayout>
+  );
+}
