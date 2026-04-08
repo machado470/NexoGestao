@@ -4,18 +4,13 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { customerSchema } from "@/lib/validations";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { registerActionFlowEvent } from "@/lib/actionFlow";
+import ModalFlowShell from "@/components/ModalFlowShell";
+import { useCriticalActionGuard } from "@/hooks/useCriticalActionGuard";
+import { invalidateOperationalGraph } from "@/lib/operationalConsistency";
 
 type Props = {
   open: boolean;
@@ -32,6 +27,11 @@ export default function CreateCustomerModal({ open, onOpenChange, onCreated }: P
 
   const utils = trpc.useUtils();
   const createCustomer = trpc.nexo.customers.create.useMutation();
+
+  useCriticalActionGuard({
+    isPending: createCustomer.isPending,
+    reason: "Salvando cliente e sincronizando contexto operacional.",
+  });
 
   const canSubmit = useMemo(() => {
     return name.trim().length >= 2 && phone.trim().length >= 10;
@@ -90,12 +90,8 @@ export default function CreateCustomerModal({ open, onOpenChange, onCreated }: P
 
       utils.nexo.customers.list.setData(undefined, (old: any) => {
         const raw = old as { data?: any[] } | any[] | undefined;
-        if (Array.isArray(raw)) {
-          return [optimisticCustomer, ...raw];
-        }
-        if (raw && Array.isArray(raw.data)) {
-          return { ...raw, data: [optimisticCustomer, ...raw.data] };
-        }
+        if (Array.isArray(raw)) return [optimisticCustomer, ...raw];
+        if (raw && Array.isArray(raw.data)) return { ...raw, data: [optimisticCustomer, ...raw.data] };
         return [optimisticCustomer];
       });
 
@@ -111,29 +107,28 @@ export default function CreateCustomerModal({ open, onOpenChange, onCreated }: P
         const applyReplace = (items: any[]) =>
           items.map((item) => (String(item?.id) === tempId ? created : item));
 
-        if (Array.isArray(raw)) {
-          return applyReplace(raw);
-        }
-        if (raw && Array.isArray(raw.data)) {
-          return { ...raw, data: applyReplace(raw.data) };
-        }
+        if (Array.isArray(raw)) return applyReplace(raw);
+        if (raw && Array.isArray(raw.data)) return { ...raw, data: applyReplace(raw.data) };
         return [created];
       });
 
-      toast.success("Cliente criado com sucesso!");
-      registerActionFlowEvent("customer_created");
       const createdId = String((created as any)?.id ?? "").trim();
-      setCreatedCustomer({
-        id: createdId,
-        name: String((created as any)?.name ?? parsed.data.name),
+      const createdName = String((created as any)?.name ?? parsed.data.name);
+
+      toast.success(`Cliente criado: ${createdName}`, {
+        action: {
+          label: "Ver cliente",
+          onClick: async () => {
+            await onCreated?.({ id: createdId, name: createdName });
+            close();
+          },
+        },
       });
+
+      registerActionFlowEvent("customer_created");
+      setCreatedCustomer({ id: createdId, name: createdName });
       reset();
-      await Promise.all([
-        utils.nexo.customers.list.invalidate(),
-        createdId
-          ? utils.nexo.customers.getById.invalidate({ id: createdId })
-          : Promise.resolve(),
-      ]);
+      await invalidateOperationalGraph(utils, createdId);
     } catch (err: any) {
       utils.nexo.customers.list.setData(undefined, previousCustomers as any);
       toast.error("Falha ao criar cliente: " + (err?.message ?? "erro"));
@@ -141,137 +136,107 @@ export default function CreateCustomerModal({ open, onOpenChange, onCreated }: P
   };
 
   return (
-    <Dialog open={open} onOpenChange={(nextOpen) => (nextOpen ? onOpenChange(nextOpen) : close())}>
-      <DialogContent
-        onEscapeKeyDown={(event) => {
-          if (createCustomer.isPending) event.preventDefault();
-        }}
-        onInteractOutside={(event) => {
-          if (createCustomer.isPending) event.preventDefault();
-        }}
-        className="max-w-2xl border-zinc-800/80 bg-zinc-950/95 p-0 text-zinc-100 shadow-2xl backdrop-blur"
-      >
-        <DialogHeader className="border-b border-zinc-800/90 px-6 py-5">
-          <DialogTitle className="text-xl font-semibold">Novo Cliente</DialogTitle>
-          <DialogDescription className="text-zinc-400">
-            Cadastre um cliente para liberar agenda, execução, cobrança e comunicação sem perder contexto.
-          </DialogDescription>
-        </DialogHeader>
+    <ModalFlowShell
+      open={open}
+      onOpenChange={(nextOpen) => (nextOpen ? onOpenChange(nextOpen) : close())}
+      title="Novo Cliente"
+      description="Cadastre um cliente para liberar agenda, execução, cobrança e comunicação sem perder contexto."
+      isSubmitting={createCustomer.isPending}
+      closeBlocked={createCustomer.isPending}
+      hasDirtyState={hasDraft}
+      footer={
+        createdCustomer ? (
+          <>
+            <Button type="button" variant="outline" onClick={close}>
+              Fechar
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setCreatedCustomer(null)}>
+              Criar outro
+            </Button>
+            <Button
+              type="button"
+              className="bg-orange-500 text-white hover:bg-orange-600"
+              onClick={async () => {
+                await onCreated?.({ id: createdCustomer.id, name: createdCustomer.name });
+                close();
+              }}
+            >
+              Ver cliente
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={async () => {
+                await onCreated?.({ id: createdCustomer.id, name: createdCustomer.name });
+                window.location.assign(`/service-orders?customerId=${createdCustomer.id}&source=customer_created`);
+              }}
+            >
+              Criar O.S.
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button type="button" variant="outline" onClick={close} disabled={createCustomer.isPending}>
+              Cancelar
+            </Button>
 
-        <div className="space-y-4 px-6 py-5">
-          {createdCustomer ? (
-            <section className="space-y-3 rounded-xl border border-emerald-900/40 bg-emerald-950/20 p-4">
-              <p className="text-sm font-semibold text-emerald-200">Cliente criado com sucesso</p>
-              <p className="text-sm text-emerald-300">
-                <strong>{createdCustomer.name}</strong> já está pronto para seguir no fluxo operacional.
-              </p>
-              <p className="text-xs text-emerald-400">
-                Próximo passo recomendado: abrir o workspace para criar agendamento ou ordem de serviço.
-              </p>
-            </section>
-          ) : null}
+            <Button
+              type="button"
+              onClick={submit}
+              disabled={createCustomer.isPending || !canSubmit}
+              className="bg-orange-500 text-white hover:bg-orange-600"
+            >
+              {createCustomer.isPending ? (
+                <span className="inline-flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Salvando...
+                </span>
+              ) : (
+                "Criar"
+              )}
+            </Button>
+          </>
+        )
+      }
+    >
+      <div className="space-y-4">
+        {createdCustomer ? (
+          <section className="space-y-3 rounded-xl border border-emerald-900/40 bg-emerald-950/20 p-4">
+            <p className="text-sm font-semibold text-emerald-200">Cliente criado com sucesso</p>
+            <p className="text-sm text-emerald-300">
+              <strong>{createdCustomer.name}</strong> já está pronto para seguir no fluxo operacional.
+            </p>
+            <p className="text-xs text-emerald-400">
+              Próximo passo recomendado: abrir o workspace ou iniciar uma O.S.
+            </p>
+          </section>
+        ) : null}
 
-          {!createdCustomer ? (
-            <>
-          <div className="space-y-2">
-            <Label htmlFor="customer-name">Nome *</Label>
-            <Input
-              id="customer-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="border-zinc-700 bg-zinc-900/80"
-              placeholder="Ex: Cliente Demo"
-            />
-          </div>
+        {!createdCustomer ? (
+          <>
+            <div className="space-y-2">
+              <Label htmlFor="customer-name">Nome *</Label>
+              <Input id="customer-name" value={name} onChange={(e) => setName(e.target.value)} className="border-zinc-700 bg-zinc-900/80" placeholder="Ex: Cliente Demo" />
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="customer-phone">Telefone / WhatsApp *</Label>
-            <Input
-              id="customer-phone"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              className="border-zinc-700 bg-zinc-900/80"
-              placeholder="Ex: +5547999999999"
-            />
-            <p className="text-xs text-zinc-500">Pode mandar com +55 ou só números. O backend normaliza.</p>
-          </div>
+            <div className="space-y-2">
+              <Label htmlFor="customer-phone">Telefone / WhatsApp *</Label>
+              <Input id="customer-phone" value={phone} onChange={(e) => setPhone(e.target.value)} className="border-zinc-700 bg-zinc-900/80" placeholder="Ex: +5547999999999" />
+              <p className="text-xs text-zinc-500">Pode mandar com +55 ou só números. O backend normaliza.</p>
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="customer-email">Email</Label>
-            <Input
-              id="customer-email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="border-zinc-700 bg-zinc-900/80"
-              placeholder="cliente@demo.com"
-              type="email"
-            />
-          </div>
+            <div className="space-y-2">
+              <Label htmlFor="customer-email">Email</Label>
+              <Input id="customer-email" value={email} onChange={(e) => setEmail(e.target.value)} className="border-zinc-700 bg-zinc-900/80" placeholder="cliente@demo.com" type="email" />
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="customer-notes">Observações</Label>
-            <Textarea
-              id="customer-notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className="border-zinc-700 bg-zinc-900/80"
-              placeholder="Informações úteis sobre o cliente"
-              rows={4}
-            />
-          </div>
-            </>
-          ) : null}
-        </div>
-
-        <DialogFooter className="border-t border-zinc-800/90 px-6 py-4">
-          {createdCustomer ? (
-            <>
-              <Button type="button" variant="outline" onClick={close}>
-                Fechar
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setCreatedCustomer(null)}
-              >
-                Criar outro
-              </Button>
-              <Button
-                type="button"
-                className="bg-orange-500 text-white hover:bg-orange-600"
-                onClick={async () => {
-                  await onCreated?.({ id: createdCustomer.id, name: createdCustomer.name });
-                  close();
-                }}
-              >
-                Ver cliente
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button type="button" variant="outline" onClick={close} disabled={createCustomer.isPending}>
-                Cancelar
-              </Button>
-
-              <Button
-                type="button"
-                onClick={submit}
-                disabled={createCustomer.isPending || !canSubmit}
-                className="bg-orange-500 text-white hover:bg-orange-600"
-              >
-                {createCustomer.isPending ? (
-                  <span className="inline-flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Salvando...
-                  </span>
-                ) : (
-                  "Criar"
-                )}
-              </Button>
-            </>
-          )}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+            <div className="space-y-2">
+              <Label htmlFor="customer-notes">Observações</Label>
+              <Textarea id="customer-notes" value={notes} onChange={(e) => setNotes(e.target.value)} className="border-zinc-700 bg-zinc-900/80" placeholder="Informações úteis sobre o cliente" rows={4} />
+            </div>
+          </>
+        ) : null}
+      </div>
+    </ModalFlowShell>
   );
 }

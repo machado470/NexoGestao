@@ -19,6 +19,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { chargeEditSchema } from "@/lib/validations";
+import { useCriticalActionGuard } from "@/hooks/useCriticalActionGuard";
+import { invalidateOperationalGraph } from "@/lib/operationalConsistency";
 
 interface EditChargeModalProps {
   isOpen: boolean;
@@ -121,6 +123,7 @@ export function EditChargeModal({
   onSuccess,
   chargeId,
 }: EditChargeModalProps) {
+  const utils = trpc.useUtils();
   const [formData, setFormData] = useState({
     amount: "",
     dueDate: "",
@@ -138,14 +141,22 @@ export function EditChargeModal({
   );
 
   const updateCharge = trpc.finance.charges.update.useMutation({
-    onSuccess: () => {
-      toast.success("Cobrança atualizada com sucesso!");
+    onSuccess: async () => {
+      const payload = getCharge.data as any;
+      const charge = payload?.data ?? payload ?? null;
+      const customerId = String(charge?.customerId ?? "");
+      await invalidateOperationalGraph(utils, customerId || undefined);
+      toast.success("Cobrança atualizada com sincronização completa.");
       onSuccess();
       onClose();
     },
     onError: (error) => {
       toast.error(error.message || "Erro ao atualizar cobrança");
     },
+  });
+  useCriticalActionGuard({
+    isPending: updateCharge.isPending,
+    reason: "Atualizando cobrança crítica.",
   });
 
   useEffect(() => {

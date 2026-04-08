@@ -16,6 +16,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { normalizeObjectPayload } from "@/lib/query-helpers";
+import { useCriticalActionGuard } from "@/hooks/useCriticalActionGuard";
+import { invalidateOperationalGraph } from "@/lib/operationalConsistency";
 
 type Props = {
   open: boolean;
@@ -64,6 +66,10 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
   );
 
   const updateMutation = trpc.nexo.customers.update.useMutation();
+  useCriticalActionGuard({
+    isPending: updateMutation.isPending,
+    reason: "Atualizando cliente e sincronizando dependências.",
+  });
 
   const customer = useMemo(() => {
     return normalizeCustomerPayload(customerQuery.data);
@@ -164,13 +170,15 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
       });
 
       await updateMutation.mutateAsync(updatedPayload);
-      await Promise.all([
-        utils.nexo.customers.list.invalidate(),
-        utils.nexo.customers.getById.invalidate({ id: idStr }),
-        utils.nexo.customers.workspace.invalidate({ id: idStr }),
-        utils.nexo.serviceOrders.list.invalidate(),
-      ]);
-      toast.success("Cliente atualizado com sucesso!");
+      await invalidateOperationalGraph(utils, idStr);
+      toast.success(`Cliente atualizado: ${parsed.data.name}`, {
+        action: {
+          label: "Ver cliente",
+          onClick: () => {
+            window.location.assign(`/customers?customerId=${idStr}`);
+          },
+        },
+      });
       await onSaved?.({ id: idStr });
       onClose();
     } catch (error) {

@@ -1,6 +1,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ComponentType,
   type ReactNode,
@@ -46,6 +47,8 @@ import {
 import { PageHero, PageShell, SmartPage, SurfaceSection } from "@/components/PagePattern";
 import { EmptyState } from "@/components/EmptyState";
 import { DemoEnvironmentCta } from "@/components/DemoEnvironmentCta";
+import { useCriticalActionStore } from "@/stores/criticalActionStore";
+import { invalidateOperationalGraph } from "@/lib/operationalConsistency";
 
 type Customer = {
   id: string;
@@ -309,6 +312,9 @@ export default function CustomersPage() {
     () => getCustomerIdFromUrl()
   );
   const [nextActionRouting, setNextActionRouting] = useState(false);
+  const [highlightedCustomerId, setHighlightedCustomerId] = useState<string | null>(null);
+  const highlightedRowRef = useRef<HTMLTableRowElement | null>(null);
+  const interactionBlocked = useCriticalActionStore((state) => state.isBlocked());
 
   const listCustomers = trpc.nexo.customers.list.useQuery(undefined, {
     retry: false,
@@ -329,8 +335,11 @@ export default function CustomersPage() {
   }, [listCustomers.data]);
 
   const workspace = useMemo(() => {
-    return normalizeWorkspacePayload(workspaceQuery.data);
-  }, [workspaceQuery.data]);
+    const next = normalizeWorkspacePayload(workspaceQuery.data);
+    if (!workspaceCustomerId || !next) return next;
+    if (String(next.customer?.id ?? "") !== String(workspaceCustomerId)) return null;
+    return next;
+  }, [workspaceCustomerId, workspaceQuery.data]);
   const [workspaceTimedOut, setWorkspaceTimedOut] = useState(false);
 
   useEffect(() => {
@@ -377,34 +386,33 @@ export default function CustomersPage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!highlightedCustomerId || !highlightedRowRef.current) return;
+    highlightedRowRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    highlightedRowRef.current.focus();
+    const timer = window.setTimeout(() => setHighlightedCustomerId(null), 2800);
+    return () => window.clearTimeout(timer);
+  }, [highlightedCustomerId]);
+
   const total = customers.length;
   const totalActive = customers.filter(c => c.active).length;
   const totalInactive = total - totalActive;
 
   const openWorkspace = (customerId: string) => {
+    if (interactionBlocked) return;
     if (workspaceCustomerId === customerId) return;
     setWorkspaceCustomerId(customerId);
     navigate(buildCustomersUrl(customerId), { replace: false });
   };
 
   const closeWorkspace = () => {
+    if (interactionBlocked) return;
     setWorkspaceCustomerId(null);
     navigate(buildCustomersUrl(null), { replace: true });
   };
 
   const refreshCustomerContexts = async (customerId?: string | null) => {
-    await Promise.all([
-      utils.nexo.customers.list.invalidate(),
-      customerId
-        ? utils.nexo.customers.getById.invalidate({ id: customerId })
-        : Promise.resolve(),
-      customerId
-        ? utils.nexo.customers.workspace.invalidate({ id: customerId })
-        : Promise.resolve(),
-      utils.nexo.serviceOrders.list.invalidate(),
-      utils.finance.charges.list.invalidate(),
-      utils.nexo.timeline.listByOrg.invalidate(),
-    ]);
+    await invalidateOperationalGraph(utils, customerId);
 
     if (workspaceCustomerId && customerId && workspaceCustomerId === customerId) {
       await workspaceQuery.refetch();
@@ -485,6 +493,7 @@ export default function CustomersPage() {
               variant="outline"
               onClick={() => void listCustomers.refetch()}
               className="flex items-center gap-2"
+              disabled={interactionBlocked}
             >
               <RefreshCcw className="h-4 w-4" />
               Atualizar
@@ -494,6 +503,7 @@ export default function CustomersPage() {
               type="button"
               onClick={() => setIsCreateOpen(true)}
               className="min-h-12 flex items-center gap-2 bg-orange-500 text-white"
+              disabled={interactionBlocked}
             >
               <Plus className="h-4 w-4" />
               Novo Cliente
@@ -615,6 +625,15 @@ export default function CustomersPage() {
             <SurfaceSection className="m-4 flex min-h-[140px] items-center justify-center text-sm text-gray-600 dark:text-gray-400">
               Carregando clientes...
             </SurfaceSection>
+          ) : listCustomers.error ? (
+            <SurfaceSection className="m-4 space-y-3 rounded-xl border border-red-200 bg-red-50/70 dark:border-red-900/40 dark:bg-red-950/20">
+              <p className="text-sm text-red-700 dark:text-red-200">
+                Não foi possível carregar clientes. Estado de erro persistente ativo.
+              </p>
+              <Button type="button" variant="outline" onClick={() => void listCustomers.refetch()}>
+                Tentar novamente
+              </Button>
+            </SurfaceSection>
           ) : customers.length === 0 ? (
             <SurfaceSection className="m-4 space-y-3">
               <EmptyState
@@ -668,9 +687,11 @@ export default function CustomersPage() {
                     return (
                       <tr
                         key={customer.id}
+                        ref={highlightedCustomerId === customer.id ? highlightedRowRef : null}
+                        tabIndex={highlightedCustomerId === customer.id ? -1 : undefined}
                         className={`hover:bg-gray-50 dark:hover:bg-gray-900/30 ${
                           isOpen ? "bg-orange-50/60 dark:bg-orange-950/10" : ""
-                        }`}
+                        } ${highlightedCustomerId === customer.id ? "ring-2 ring-orange-400" : ""}`}
                       >
                         <td className="px-4 py-3 text-gray-900 dark:text-white">
                           <div className="flex items-center gap-2">
@@ -1116,6 +1137,7 @@ export default function CustomersPage() {
 
           if (createdId) {
             setWorkspaceCustomerId(createdId);
+            setHighlightedCustomerId(createdId);
             navigate(buildCustomersUrl(createdId), { replace: false });
           }
 
@@ -1128,6 +1150,7 @@ export default function CustomersPage() {
         customerId={editingCustomerId}
         onClose={() => setEditingCustomerId(null)}
         onSaved={async (savedCustomer) => {
+          if (savedCustomer?.id) setHighlightedCustomerId(savedCustomer.id);
           await refreshCustomerContexts(savedCustomer?.id ?? editingCustomerId);
         }}
       />
