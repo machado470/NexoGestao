@@ -44,6 +44,9 @@ while [ "$i" -lt "$DB_WAIT_SECONDS" ]; do
 done
 
 # ---- migrations
+log "running prisma generate"
+pnpm run prisma:generate
+
 if [ "${AUTO_MIGRATE:-0}" = "1" ]; then
   log "AUTO_MIGRATE=1 -> running prisma:migrate:deploy"
   pnpm run prisma:migrate:deploy

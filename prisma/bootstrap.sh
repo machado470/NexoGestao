@@ -9,6 +9,9 @@ done
 
 echo "✅ Postgres disponível"
 
+echo "🧠 Gerando Prisma Client..."
+npx prisma generate
+
 echo "🧱 Aplicando migrations Prisma..."
 npx prisma migrate deploy
 

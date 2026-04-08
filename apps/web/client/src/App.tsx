@@ -238,7 +238,7 @@ function PublicRoute({ component: Component }: { component: ComponentType }) {
     }
   }, [isAuthenticated, isInitializing, navigate, redirectParam, redirectTo]);
 
-  if (isInitializing) return <FullScreenLoader />;
+  if (isInitializing) return <Component />;
 
   if (isAuthenticated) {
     return (

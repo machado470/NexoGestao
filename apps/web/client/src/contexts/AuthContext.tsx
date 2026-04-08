@@ -12,8 +12,8 @@ import { normalizeRole, type Role } from "@/lib/rbac";
 
 type AuthUser = {
   token?: string;
-  id?: number;
-  organizationId?: number;
+  id?: string;
+  organizationId?: string;
   role?: string;
   email?: string;
   name?: string;
@@ -72,10 +72,21 @@ function getUser(payload: unknown) {
 
   if (!isObject(raw)) return null;
 
+  const normalizeIdentifier = (value: unknown): string | undefined => {
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      return trimmed || undefined;
+    }
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return String(value);
+    }
+    return undefined;
+  };
+
   return {
     token: raw.token as string | undefined,
-    id: raw.id as number | undefined,
-    organizationId: (raw.organizationId ?? raw.orgId) as number | undefined,
+    id: normalizeIdentifier(raw.id),
+    organizationId: normalizeIdentifier(raw.organizationId ?? raw.orgId),
     role: raw.role as string | undefined,
     email: raw.email as string | undefined,
     name: raw.name as string | undefined,
@@ -121,6 +132,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [localLoading, setLocalLoading] = useState(false);
   const [localError, setLocalError] = useState<unknown | null>(null);
   const [forcedLoggedOut, setForcedLoggedOut] = useState(false);
+  const [meBootstrapTimedOut, setMeBootstrapTimedOut] = useState(false);
   const authChannelRef = useRef<BroadcastChannel | null>(null);
 
   const meQuery = trpc.session.me.useQuery(undefined, {
@@ -133,6 +145,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loginMutation = trpc.nexo.auth.login.useMutation();
   const registerMutation = trpc.nexo.auth.register.useMutation();
   const logoutMutation = trpc.session.logout.useMutation();
+  const isLoggingOut = logoutMutation.isPending;
+
+  useEffect(() => {
+    if (forcedLoggedOut) {
+      setMeBootstrapTimedOut(false);
+      return;
+    }
+
+    const shouldTrackTimeout =
+      meQuery.data === undefined &&
+      meQuery.fetchStatus === "fetching" &&
+      !meQuery.error &&
+      !isLoggingOut;
+
+    if (!shouldTrackTimeout) {
+      setMeBootstrapTimedOut(false);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setMeBootstrapTimedOut(true);
+      if (process.env.NODE_ENV !== "production") {
+        console.warn(
+          "[auth] session.me timeout exceeded. Public routes will continue rendering."
+        );
+      }
+    }, 4500);
+
+    return () => window.clearTimeout(timer);
+  }, [
+    forcedLoggedOut,
+    isLoggingOut,
+    meQuery.data,
+    meQuery.error,
+    meQuery.fetchStatus,
+  ]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -288,7 +336,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const isAuthenticating =
     localLoading || loginMutation.isPending || registerMutation.isPending;
 
-  const isLoggingOut = logoutMutation.isPending;
   const isSubmitting = isAuthenticating;
 
   /* 🔥 CORREÇÃO AQUI */
@@ -296,6 +343,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     !forcedLoggedOut &&
     meQuery.isLoading &&
     meQuery.data === undefined &&
+    !meBootstrapTimedOut &&
     !isLoggingOut;
 
   const loading = isInitializing || isSubmitting;

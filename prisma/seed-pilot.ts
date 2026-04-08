@@ -84,6 +84,9 @@ async function upsertUser(orgId: string, user: PilotUser) {
       role: user.role,
       active: true,
       password: passwordHash,
+      emailVerifiedAt: new Date(),
+      emailVerifyTokenHash: null,
+      emailVerifyTokenExpiresAt: null,
     },
     create: {
       orgId,
@@ -91,6 +94,7 @@ async function upsertUser(orgId: string, user: PilotUser) {
       active: true,
       email: user.email.toLowerCase(),
       password: passwordHash,
+      emailVerifiedAt: new Date(),
     },
   })
 

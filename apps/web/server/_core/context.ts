@@ -129,10 +129,14 @@ export async function fetchNexoMe(req: any) {
   if (!token) return null;
 
   const NEXO_API_URL = process.env.NEXO_API_URL || "http://127.0.0.1:3000";
+  const timeoutMs = Number(process.env.NEXO_ME_TIMEOUT_MS || 3500);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const response = await fetch(`${NEXO_API_URL}/me`, {
       method: "GET",
+      signal: controller.signal,
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -180,6 +184,8 @@ export async function fetchNexoMe(req: any) {
       });
     }
     return null;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -201,6 +207,6 @@ export async function createContext(
   return {
     req: opts.req,
     res: opts.res,
-    user: me ?? { token },
+    user: me ?? null,
   };
 }
