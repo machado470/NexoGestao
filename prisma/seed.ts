@@ -33,7 +33,7 @@ async function ensureDefaultAdmin() {
 
   const existingUser = await prisma.user.findUnique({
     where: { email },
-    select: { id: true },
+    select: { id: true, person: { select: { id: true } } },
   })
 
   if (!existingUser) {
@@ -45,6 +45,7 @@ async function ensureDefaultAdmin() {
         password: passwordHash,
         role: 'ADMIN',
         active: true,
+        emailVerifiedAt: new Date(),
         orgId: org.id,
       },
     })
@@ -57,6 +58,37 @@ async function ensureDefaultAdmin() {
         active: true,
         orgId: org.id,
         userId: user.id,
+      },
+    })
+  } else {
+    const passwordHash = await bcrypt.hash(password, 10)
+    await prisma.user.update({
+      where: { id: existingUser.id },
+      data: {
+        orgId: org.id,
+        role: 'ADMIN',
+        active: true,
+        password: passwordHash,
+        emailVerifiedAt: { set: new Date() },
+      },
+    })
+
+    await prisma.person.upsert({
+      where: { userId: existingUser.id },
+      update: {
+        orgId: org.id,
+        name,
+        email,
+        role: 'ADMIN',
+        active: true,
+      },
+      create: {
+        name,
+        email,
+        role: 'ADMIN',
+        active: true,
+        orgId: org.id,
+        userId: existingUser.id,
       },
     })
   }

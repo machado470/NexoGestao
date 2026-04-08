@@ -157,6 +157,7 @@ until docker exec "$REDIS_CONTAINER" redis-cli ping 2>/dev/null | grep -q PONG; 
 done
 
 echo "🗃️ Executando migrations..."
+pnpm --filter ./apps/api run prisma:generate
 pnpm --filter ./apps/api run prisma:migrate:deploy
 
 echo "🌱 Executando seed..."
