@@ -129,6 +129,7 @@ function normalizeMetrics(payload: unknown) {
 
   return {
     totalCustomers: Number((raw as any)?.totalCustomers ?? 0),
+    createdCustomers: Number((raw as any)?.createdCustomers ?? 0),
     totalServiceOrders: Number((raw as any)?.totalServiceOrders ?? 0),
     openServiceOrders: Number((raw as any)?.openServiceOrders ?? (raw as any)?.openOrders ?? 0),
     inProgressOrders: Number(
@@ -141,6 +142,8 @@ function normalizeMetrics(payload: unknown) {
     ),
     weeklyRevenueInCents: Number((raw as any)?.weeklyRevenueInCents ?? 0),
     completedOrders: Number((raw as any)?.completedOrders ?? (raw as any)?.doneServiceOrders ?? 0),
+    completedServices: Number((raw as any)?.completedServices ?? (raw as any)?.completedOrders ?? 0),
+    chargesGenerated: Number((raw as any)?.chargesGenerated ?? 0),
     riskTickets: Number((raw as any)?.riskTickets ?? 0),
     delayedOrders: Number((raw as any)?.delayedOrders ?? 0),
   };
@@ -214,6 +217,7 @@ export default function ExecutiveDashboardNew() {
   const revenueQuery = trpc.dashboard.revenueTrend.useQuery(undefined, queryOptions);
   const serviceOrdersStatusQuery = trpc.dashboard.serviceOrdersStatus.useQuery(undefined, queryOptions);
   const chargesStatusQuery = trpc.dashboard.chargeDistribution.useQuery(undefined, queryOptions);
+  const billingLimitsQuery = trpc.billing.limits.useQuery(undefined, queryOptions);
   const [isSlowLoading, setIsSlowLoading] = useState(false);
   const [optimisticTick, setOptimisticTick] = useState(false);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
@@ -260,6 +264,19 @@ export default function ExecutiveDashboardNew() {
   const displayServiceOrdersStatus =
     serviceOrdersStatusQuery.data !== undefined ? serviceOrdersStatus : stableServiceOrdersStatus;
   const displayChargesStatus = chargesStatusQuery.data !== undefined ? chargesStatus : stableChargesStatus;
+  const quotaWarnings = useMemo(() => {
+    const usage = (billingLimitsQuery.data as any)?.usage;
+    if (!usage || typeof usage !== "object") return [];
+
+    return Object.entries(usage)
+      .filter(([, value]: any) => {
+        if (value?.unlimited) return false;
+        const used = Number(value?.used ?? 0);
+        const limit = Number(value?.limit ?? 0);
+        return Number.isFinite(limit) && limit > 0 && used >= limit;
+      })
+      .map(([key]) => key);
+  }, [billingLimitsQuery.data]);
 
   const lineChartData = useMemo(
     () =>
@@ -271,9 +288,6 @@ export default function ExecutiveDashboardNew() {
   );
 
   const paidCharges = displayChargesStatus.find((item) => item.key.toLowerCase() === "paid")?.value ?? 0;
-  const conversionRate = displayMetrics.totalServiceOrders > 0
-    ? Math.round((paidCharges / Math.max(displayMetrics.totalServiceOrders, 1)) * 100)
-    : 0;
   const funnelData = [
     { value: Math.max(displayMetrics.totalCustomers, 0), name: "Clientes" },
     { value: Math.max(displayMetrics.totalServiceOrders + displayMetrics.openServiceOrders, 0), name: "Agendamentos" },
@@ -489,7 +503,7 @@ export default function ExecutiveDashboardNew() {
               Dashboard Executivo
             </h1>
             <p className="mt-3 max-w-xl text-sm leading-6 text-zinc-600 dark:text-zinc-400">
-              Leitura para decisão rápida no funil oficial: Cliente → Agendamento → O.S. → Pagamento.
+              Organize sua operação, evite erros e mantenha controle financeiro no funil Cliente → Agendamento → O.S. → Pagamento.
             </p>
           </div>
 
@@ -517,13 +531,18 @@ export default function ExecutiveDashboardNew() {
             <strong>{formatCurrency(nonBilledServicesImpact)}</strong> em serviços ainda não faturados.
           </p>
         </div>
+        {quotaWarnings.length > 0 ? (
+          <div className="mt-3 rounded-xl border border-amber-300/60 bg-amber-50/80 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+            Limite do plano atingido em {quotaWarnings.join(", ")}. Faça upgrade para continuar crescendo sem bloqueios.
+          </div>
+        ) : null}
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard icon={Users} label="Clientes ativos" value={displayMetrics.totalCustomers} loading={metricsQuery.isLoading && metricsQuery.data === undefined} description="Base ativa acompanhada pela operação." />
-        <MetricCard icon={DollarSign} label="Faturamento total" value={formatCurrency(displayMetrics.totalRevenueInCents)} loading={metricsQuery.isLoading && metricsQuery.data === undefined} description={`Recebido: ${formatCurrency(displayMetrics.paidRevenueInCents)}`} />
+        <MetricCard icon={Users} label="Clientes criados" value={displayMetrics.createdCustomers} loading={metricsQuery.isLoading && metricsQuery.data === undefined} description="Base total de clientes cadastrados." />
+        <MetricCard icon={Briefcase} label="Serviços concluídos" value={displayMetrics.completedServices} loading={metricsQuery.isLoading && metricsQuery.data === undefined} description="Total de O.S. finalizadas com sucesso." />
+        <MetricCard icon={DollarSign} label="Cobranças geradas" value={displayMetrics.chargesGenerated} loading={metricsQuery.isLoading && metricsQuery.data === undefined} description={`${formatCurrency(displayMetrics.paidRevenueInCents)} já recebido`} />
         <MetricCard icon={AlertTriangle} label="Pendente + atrasado" value={formatCurrency(totalPausedRevenue)} loading={metricsQuery.isLoading && metricsQuery.data === undefined} description={`${overdueCharges} cobranças vencidas em foco`} />
-        <MetricCard icon={Briefcase} label="Conversão O.S. → pagamento" value={`${conversionRate}%`} loading={metricsQuery.isLoading && metricsQuery.data === undefined} description={`${paidCharges} pagamentos para ${displayMetrics.totalServiceOrders} O.S.`} />
       </section>
 
       {displayMetrics.totalCustomers === 0 ? (

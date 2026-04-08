@@ -19,6 +19,7 @@ import { Roles } from '../auth/decorators/roles.decorator'
 import { Org } from '../auth/decorators/org.decorator'
 import { WhatsAppService, buildDeterministicMessageKey } from './whatsapp.service'
 import { PrismaService } from '../prisma/prisma.service'
+import { QuotasService } from '../quotas/quotas.service'
 
 @Controller('whatsapp')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -26,6 +27,7 @@ export class WhatsAppController {
   constructor(
     private readonly whatsapp: WhatsAppService,
     private readonly prisma: PrismaService,
+    private readonly quotas: QuotasService,
   ) {}
 
   @Get('messages/:customerId')
@@ -43,6 +45,8 @@ export class WhatsAppController {
   @Post('messages')
   @Roles('ADMIN')
   async sendMessage(@Org() orgId: string, @Body() body: any) {
+    await this.quotas.validateQuota(orgId, 'SEND_MESSAGE')
+
     if (!body?.customerId) {
       throw new BadRequestException('customerId é obrigatório')
     }

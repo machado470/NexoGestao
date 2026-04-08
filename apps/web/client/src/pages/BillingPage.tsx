@@ -114,6 +114,7 @@ export default function BillingPage() {
   const usageItems = [
     { label: "Clientes", usage: limits?.usage?.customers },
     { label: "Agendamentos", usage: limits?.usage?.appointments },
+    { label: "Mensagens", usage: limits?.usage?.messages },
     { label: "Ordens de serviço", usage: limits?.usage?.serviceOrders },
     { label: "Usuários", usage: limits?.usage?.users },
   ];
@@ -277,6 +278,7 @@ export default function BillingPage() {
                 <div className="mt-4 space-y-2 text-xs">
                   <p>Clientes: {limits?.limits?.customers ?? "—"}</p>
                   <p>Agendamentos: {limits?.limits?.appointments ?? "—"}</p>
+                  <p>Mensagens: {limits?.limits?.messages ?? "—"}</p>
                   <p>Ordens de serviço: {limits?.limits?.serviceOrders ?? "—"}</p>
                   <p>Usuários: {limits?.limits?.users ?? "—"}</p>
                 </div>

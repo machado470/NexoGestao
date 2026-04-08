@@ -30,6 +30,7 @@ export const PLAN_LIMITS: Record<
     users: number
     serviceOrders: number
     appointments: number
+    messages: number
     label: string
   }
 > = {
@@ -38,6 +39,7 @@ export const PLAN_LIMITS: Record<
     users: 2,
     serviceOrders: 10,
     appointments: 20,
+    messages: 50,
     label: 'Free',
   },
   STARTER: {
@@ -45,6 +47,7 @@ export const PLAN_LIMITS: Record<
     users: 5,
     serviceOrders: 100,
     appointments: 200,
+    messages: 500,
     label: 'Starter',
   },
   PRO: {
@@ -52,6 +55,7 @@ export const PLAN_LIMITS: Record<
     users: 10,
     serviceOrders: 1000,
     appointments: 2000,
+    messages: 5000,
     label: 'Pro',
   },
   SCALE: {
@@ -59,6 +63,7 @@ export const PLAN_LIMITS: Record<
     users: 999999,
     serviceOrders: 999999,
     appointments: 999999,
+    messages: 999999,
     label: 'Scale',
   },
   BUSINESS: {
@@ -66,6 +71,7 @@ export const PLAN_LIMITS: Record<
     users: 999999,
     serviceOrders: 999999,
     appointments: 999999,
+    messages: 999999,
     label: 'Scale',
   },
 }
