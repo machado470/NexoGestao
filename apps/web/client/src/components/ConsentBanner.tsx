@@ -26,7 +26,6 @@ function readStoredConsent(): ConsentStorage | null {
 
 export function ConsentBanner() {
   const [isVisible, setIsVisible] = useState(false);
-  const [hasStoredConsent, setHasStoredConsent] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCustomizing, setIsCustomizing] = useState(false);
   const [preferences, setPreferences] = useState<ConsentPreferences>({
@@ -37,7 +36,6 @@ export function ConsentBanner() {
 
   useEffect(() => {
     const stored = readStoredConsent();
-    setHasStoredConsent(Boolean(stored));
     if (stored?.preferences) {
       setPreferences(stored.preferences);
     }
@@ -68,7 +66,6 @@ export function ConsentBanner() {
       const ok = await saveConsent(prefs);
       if (ok) {
         persistLocalConsent(prefs);
-        setHasStoredConsent(true);
       }
       return ok;
     } finally {
@@ -104,33 +101,11 @@ export function ConsentBanner() {
     if (ok) closeBanner();
   };
 
-  if (!isVisible) {
-    if (!hasStoredConsent) return null;
-
-    return (
-      <div className="fixed bottom-4 right-4 z-50">
-        <Button
-          type="button"
-          variant="outline"
-          className="rounded-full border-slate-300 bg-white/95 shadow-[0_12px_24px_rgba(15,23,42,0.12)] backdrop-blur"
-          onClick={() => {
-            const stored = readStoredConsent();
-            if (stored?.preferences) {
-              setPreferences(stored.preferences);
-            }
-            setIsCustomizing(true);
-            setIsVisible(true);
-          }}
-        >
-          Configurar privacidade
-        </Button>
-      </div>
-    );
-  }
+  if (!isVisible) return null;
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-4 z-50 px-3 sm:px-5">
-      <div className="pointer-events-auto mx-auto max-w-5xl rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-[0_18px_42px_rgba(15,23,42,0.14)] backdrop-blur-xl sm:p-5">
+    <div className="pointer-events-none fixed inset-x-0 bottom-3 z-50 px-3 sm:bottom-4 sm:px-5">
+      <div className="pointer-events-auto mx-auto max-w-4xl rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-[0_18px_42px_rgba(15,23,42,0.14)] backdrop-blur-xl sm:p-5">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-sm font-semibold text-slate-900">
