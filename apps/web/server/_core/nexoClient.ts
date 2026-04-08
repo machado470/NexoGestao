@@ -3,6 +3,7 @@ import cookie from "cookie";
 
 const NEXO_API_URL = process.env.NEXO_API_URL || "http://127.0.0.1:3000";
 const NEXO_TOKEN_COOKIE = "nexo_token";
+const NEXO_FETCH_TIMEOUT_MS = Number(process.env.NEXO_FETCH_TIMEOUT_MS || 12000);
 
 type CtxLike = {
   req?: any;
@@ -121,15 +122,53 @@ export async function nexoFetch<T>(
     if (init?.allowAnonymous) return null;
     throw new TRPCError({ code: "UNAUTHORIZED", message: "Não autenticado" });
   }
+  const timeoutMs =
+    Number.isFinite(NEXO_FETCH_TIMEOUT_MS) && NEXO_FETCH_TIMEOUT_MS > 0
+      ? NEXO_FETCH_TIMEOUT_MS
+      : 12000;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort("timeout"), timeoutMs);
+  const upstreamSignal = init?.signal;
 
-  const res = await fetch(`${NEXO_API_URL}${path}`, {
-    ...init,
-    headers: {
-      ...(init?.headers || {}),
-      Authorization: `Bearer ${token}`,
-      "content-type": "application/json",
-    },
-  });
+  if (upstreamSignal) {
+    if (upstreamSignal.aborted) {
+      controller.abort(upstreamSignal.reason ?? "aborted");
+    } else {
+      upstreamSignal.addEventListener(
+        "abort",
+        () => controller.abort(upstreamSignal.reason ?? "aborted"),
+        { once: true }
+      );
+    }
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(`${NEXO_API_URL}${path}`, {
+      ...init,
+      signal: controller.signal,
+      headers: {
+        ...(init?.headers || {}),
+        Authorization: `Bearer ${token}`,
+        "content-type": "application/json",
+      },
+    });
+  } catch (error: any) {
+    if (error?.name === "AbortError") {
+      throw new TRPCError({
+        code: "TIMEOUT",
+        message: `Timeout ao chamar Nexo API (${timeoutMs}ms) em ${path}`,
+      });
+    }
+
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: `Falha ao conectar no backend Nexo API (${NEXO_API_URL}) em ${path}: ${error?.message || "erro desconhecido"}`,
+      cause: error,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
 
   const text = await res.text();
 
