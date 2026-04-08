@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import {
@@ -108,6 +109,7 @@ export function CreateChargeModal({
   onClose,
   onSuccess,
 }: CreateChargeModalProps) {
+  const [, navigate] = useLocation();
   const [formData, setFormData] = useState<FormState>(INITIAL_FORM);
   const utils = trpc.useUtils();
   const { track } = useProductAnalytics();
@@ -206,7 +208,8 @@ export function CreateChargeModal({
         toast.success("Cobrança criada com contexto sincronizado.", {
           action: {
             label: "Ver cobrança",
-            onClick: () => window.location.assign(`/finances?chargeId=${String((created as any)?.id ?? "")}`),
+            onClick: () =>
+              navigate(`/finances?chargeId=${String((created as any)?.id ?? "")}`),
           },
         });
         notify.successPersistent(
@@ -214,7 +217,7 @@ export function CreateChargeModal({
           "Próximo passo recomendado: enviar cobrança no WhatsApp para acelerar recebimento.",
           {
             label: "Enviar WhatsApp",
-            onClick: () => window.location.assign("/whatsapp"),
+            onClick: () => navigate("/whatsapp"),
           }
         );
         registerActionFlowEvent("charge_created");

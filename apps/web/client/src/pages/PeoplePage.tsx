@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/contexts/AuthContext";
 import { Loader2, Users, Plus, Pencil } from "lucide-react";
@@ -58,6 +59,7 @@ function getStateLabel(value?: string | null) {
 /* ================= PAGE ================= */
 
 export default function PeoplePage() {
+  const [, navigate] = useLocation();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingPersonId, setEditingPersonId] = useState<string | null>(null);
   const { isAuthenticated, isInitializing } = useAuth();
@@ -225,7 +227,7 @@ export default function PeoplePage() {
           label: unassignedOrders > 0 ? "Distribuir ordens agora" : "Nova pessoa",
           onClick: () => {
             if (unassignedOrders > 0) {
-              window.location.href = "/service-orders";
+              navigate("/service-orders");
               return;
             }
             setIsCreateOpen(true);
