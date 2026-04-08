@@ -3,26 +3,7 @@ import { X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { saveConsent, type ConsentPreferences } from "./ConsentBanner.logic";
-
-type ConsentStorage = {
-  timestamp: string;
-  preferences: ConsentPreferences;
-};
-
-const CONSENT_KEY = "nexo:privacy-consent:v1";
-
-function readStoredConsent(): ConsentStorage | null {
-  if (typeof window === "undefined") return null;
-
-  const raw = window.localStorage.getItem(CONSENT_KEY);
-  if (!raw) return null;
-
-  try {
-    return JSON.parse(raw) as ConsentStorage;
-  } catch {
-    return null;
-  }
-}
+import { persistLocalConsent, readStoredConsent } from "./ConsentBanner.storage";
 
 export function ConsentBanner() {
   const [isVisible, setIsVisible] = useState(false);
@@ -45,18 +26,6 @@ export function ConsentBanner() {
   const closeBanner = () => {
     setIsVisible(false);
     setIsCustomizing(false);
-  };
-
-  const persistLocalConsent = (prefs: ConsentPreferences) => {
-    if (typeof window === "undefined") return;
-
-    window.localStorage.setItem(
-      CONSENT_KEY,
-      JSON.stringify({
-        timestamp: new Date().toISOString(),
-        preferences: prefs,
-      })
-    );
   };
 
   const recordConsents = async (prefs: ConsentPreferences) => {
