@@ -122,6 +122,10 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
       });
 
       await updateMutation.mutateAsync(updatedPayload);
+      await Promise.all([
+        utils.nexo.customers.list.invalidate(),
+        utils.nexo.customers.getById.invalidate({ id: idStr }),
+      ]);
       toast.success("Cliente atualizado com sucesso!");
       onSaved?.();
       onClose();
