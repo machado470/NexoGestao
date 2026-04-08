@@ -22,6 +22,10 @@ function normalizePhone(v?: string): string {
   return digits
 }
 
+function isUniqueConflict(err: any): boolean {
+  return err?.code === 'P2002'
+}
+
 @Injectable()
 export class CustomersService {
   constructor(
@@ -161,27 +165,42 @@ export class CustomersService {
       throw new BadRequestException('Telefone (WhatsApp) é obrigatório')
     }
 
-    if (email) {
-      const exists = await this.prisma.customer.findFirst({
-        where: { email, orgId: params.orgId },
-        select: { id: true },
-      })
-
-      if (exists) {
-        throw new BadRequestException('Já existe um cliente com este e-mail')
-      }
+    const byEmail = email
+      ? await this.prisma.customer.findFirst({
+          where: { email, orgId: params.orgId },
+          select: { id: true },
+        })
+      : null
+    if (byEmail) {
+      throw new BadRequestException('Já existe um cliente com este e-mail')
     }
 
-    const created = await this.prisma.customer.create({
-      data: {
-        orgId: params.orgId,
-        name,
-        phone,
-        email,
-        notes,
-        active: true,
-      },
+    const byPhone = await this.prisma.customer.findFirst({
+      where: { phone, orgId: params.orgId },
+      select: { id: true },
     })
+    if (byPhone) {
+      throw new BadRequestException('Já existe um cliente com este telefone')
+    }
+
+    let created: any
+    try {
+      created = await this.prisma.customer.create({
+        data: {
+          orgId: params.orgId,
+          name,
+          phone,
+          email,
+          notes,
+          active: true,
+        },
+      })
+    } catch (err) {
+      if (!isUniqueConflict(err)) throw err
+      throw new BadRequestException(
+        'Cliente já existe com o mesmo e-mail ou telefone nesta organização',
+      )
+    }
 
     const context = `Cliente criado: ${created.name}`
 

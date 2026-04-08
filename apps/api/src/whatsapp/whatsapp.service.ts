@@ -19,6 +19,14 @@ type QueueMessageInput = {
   renderedText: string
 }
 
+export function buildDeterministicMessageKey(input: {
+  entityType: WhatsAppEntityType
+  entityId: string
+  messageType: WhatsAppMessageType
+}): string {
+  return `${input.entityType}:${input.entityId}:${input.messageType}`
+}
+
 function isPrismaP1017(err: any): boolean {
   return (
     err?.code === 'P1017' ||

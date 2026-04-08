@@ -6,7 +6,10 @@ import {
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { $Enums, Prisma, WhatsAppEntityType, WhatsAppMessageType } from '@prisma/client'
-import { WhatsAppService } from '../whatsapp/whatsapp.service'
+import {
+  WhatsAppService,
+  buildDeterministicMessageKey,
+} from '../whatsapp/whatsapp.service'
 import { TimelineService } from '../timeline/timeline.service'
 import { ChargesQueryDto } from './dto/charges-query.dto'
 import { AnalyticsService, UsageMetricEvent } from '../analytics/analytics.service'
@@ -30,6 +33,25 @@ export class FinanceService {
     private readonly timeline: TimelineService,
     private readonly analytics: AnalyticsService,
   ) {}
+
+  private buildChargeCreateIdempotencyKey(input: {
+    orgId: string
+    customerId: string
+    serviceOrderId?: string | null
+    amountCents: number
+    dueDate: Date
+    notes?: string | null
+  }): string {
+    return [
+      'charge-create',
+      input.orgId,
+      input.customerId,
+      input.serviceOrderId ?? '-',
+      String(input.amountCents),
+      input.dueDate.toISOString(),
+      (input.notes ?? '').trim().toLowerCase() || '-',
+    ].join(':')
+  }
 
   private async assertServiceOrderEligibleForCharge(params: {
     orgId: string
@@ -218,18 +240,32 @@ export class FinanceService {
       }
     }
 
-    const charge = await this.prisma.charge.create({
-      data: {
-        orgId: input.orgId,
-        customerId: input.customerId,
-        amountCents: input.amountCents,
-        dueDate: input.dueDate,
-        status: 'PENDING',
-        notes: input.notes ?? null,
-        serviceOrderId: input.serviceOrderId ?? null,
-      },
-      include: { customer: true },
-    })
+    const idempotencyKey = this.buildChargeCreateIdempotencyKey(input)
+
+    let charge: any
+    try {
+      charge = await this.prisma.charge.create({
+        data: {
+          orgId: input.orgId,
+          customerId: input.customerId,
+          idempotencyKey,
+          amountCents: input.amountCents,
+          dueDate: input.dueDate,
+          status: 'PENDING',
+          notes: input.notes ?? null,
+          serviceOrderId: input.serviceOrderId ?? null,
+        },
+        include: { customer: true },
+      })
+    } catch (err: any) {
+      if (err?.code !== 'P2002') throw err
+      const existing = await this.prisma.charge.findFirst({
+        where: { orgId: input.orgId, idempotencyKey },
+        include: { customer: true },
+      })
+      if (!existing) throw err
+      return existing
+    }
 
     if (charge.customer?.phone) {
       await this.sendChargeWhatsApp(charge.id).catch((err) =>
@@ -333,15 +369,13 @@ export class FinanceService {
     method: $Enums.PaymentMethod
     actorUserId?: string | null
   }) {
-    const { charge, payment } = await this.prisma.$transaction(async (tx) => {
+    const { charge, payment, idempotent } = await this.prisma.$transaction(
+      async (tx) => {
       const charge = await tx.charge.findFirst({
         where: { id: input.chargeId, orgId: input.orgId },
       })
 
       if (!charge) throw new NotFoundException('Charge não encontrada')
-      if (charge.status === 'PAID') {
-        throw new BadRequestException('Charge já está paga')
-      }
       if (charge.status === 'CANCELED') {
         throw new BadRequestException('Charge cancelada não pode ser paga')
       }
@@ -360,7 +394,26 @@ export class FinanceService {
       })
 
       if (mutation.count !== 1) {
-        throw new BadRequestException('Charge já foi processada por outra operação')
+        const alreadyPaid = await tx.charge.findFirst({
+          where: { id: charge.id, orgId: input.orgId, status: 'PAID' },
+        })
+
+        if (!alreadyPaid) {
+          throw new BadRequestException(
+            'Charge já foi processada por outra operação',
+          )
+        }
+
+        const latestPayment = await tx.payment.findFirst({
+          where: { orgId: input.orgId, chargeId: charge.id },
+          orderBy: { createdAt: 'desc' },
+        })
+
+        if (!latestPayment) {
+          throw new BadRequestException('Charge já está paga')
+        }
+
+        return { charge: alreadyPaid, payment: latestPayment, idempotent: true }
       }
 
       const payment = await tx.payment.create({
@@ -373,8 +426,17 @@ export class FinanceService {
         },
       })
 
-      return { charge, payment }
-    })
+      return { charge, payment, idempotent: false }
+      },
+    )
+
+    if (payment == null) {
+      throw new BadRequestException('Pagamento não registrado')
+    }
+
+    if (idempotent) {
+      return { ok: true, paymentId: payment.id, idempotent: true }
+    }
 
     await this.sendPaymentConfirmationWhatsApp(charge.id).catch((err) =>
       this.logger.error(`Erro ao enviar confirmação WhatsApp: ${err.message}`),
@@ -648,7 +710,11 @@ export class FinanceService {
       entityType: WhatsAppEntityType.CHARGE,
       entityId: charge.id,
       messageType: WhatsAppMessageType.PAYMENT_LINK,
-      messageKey: `charge_${charge.id}`,
+      messageKey: buildDeterministicMessageKey({
+        entityType: WhatsAppEntityType.CHARGE,
+        entityId: charge.id,
+        messageType: WhatsAppMessageType.PAYMENT_LINK,
+      }),
       renderedText: text,
     })
   }
@@ -671,7 +737,11 @@ export class FinanceService {
       entityType: WhatsAppEntityType.CHARGE,
       entityId: charge.id,
       messageType: WhatsAppMessageType.RECEIPT,
-      messageKey: `receipt_${charge.id}`,
+      messageKey: buildDeterministicMessageKey({
+        entityType: WhatsAppEntityType.CHARGE,
+        entityId: charge.id,
+        messageType: WhatsAppMessageType.RECEIPT,
+      }),
       renderedText: text,
     })
   }
@@ -695,7 +765,11 @@ export class FinanceService {
       entityType: WhatsAppEntityType.CHARGE,
       entityId: charge.id,
       messageType: WhatsAppMessageType.PAYMENT_REMINDER,
-      messageKey: `reminder_${charge.id}_${new Date().toISOString().split('T')[0]}`,
+      messageKey: buildDeterministicMessageKey({
+        entityType: WhatsAppEntityType.CHARGE,
+        entityId: charge.id,
+        messageType: WhatsAppMessageType.PAYMENT_REMINDER,
+      }),
       renderedText: text,
     })
   }

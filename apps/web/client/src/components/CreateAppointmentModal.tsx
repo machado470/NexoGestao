@@ -66,6 +66,7 @@ export function CreateAppointmentModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (createAppointment.isPending) return;
 
     if (!formData.customerId || !formData.startsAt) {
       toast.error("Cliente e data/hora de início são obrigatórios");

@@ -311,12 +311,15 @@ model Customer {
   @@index([orgId, createdAt])
   @@index([orgId, active, createdAt])
   @@index([orgId, email])
+  @@unique([orgId, phone])
+  @@unique([orgId, email])
 }
 
 model Appointment {
   id             String            @id @default(uuid())
   orgId          String
   customerId     String
+  idempotencyKey String?           @unique
   startsAt       DateTime
   endsAt         DateTime
   status         AppointmentStatus @default(SCHEDULED)
@@ -338,6 +341,7 @@ model ServiceOrder {
   id                 String                   @id @default(uuid())
   orgId              String
   customerId         String
+  idempotencyKey     String?                  @unique
   appointmentId      String?                  @unique
   assignedToPersonId String?
   title              String
@@ -389,6 +393,7 @@ model Charge {
   id             String          @id @default(uuid())
   orgId          String
   customerId     String
+  idempotencyKey String?         @unique
   serviceOrderId String?
   amountCents    Int
   currency       String          @default("BRL")
