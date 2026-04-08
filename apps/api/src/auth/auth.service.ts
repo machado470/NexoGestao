@@ -276,6 +276,28 @@ export class AuthService {
       })
     }
 
+    if (!user.person) {
+      const displayName =
+        `${googleUser.firstName ?? ''} ${googleUser.lastName ?? ''}`.trim() ||
+        googleUser.email
+
+      user = await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          person: {
+            create: {
+              name: displayName,
+              email: googleUser.email,
+              role: 'ADMIN',
+              active: true,
+              orgId: user.orgId,
+            },
+          },
+        },
+        include: { person: true },
+      })
+    }
+
     if (!user.emailVerifiedAt) {
       user = await this.prisma.user.update({
         where: { id: user.id },
