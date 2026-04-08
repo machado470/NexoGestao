@@ -13,6 +13,7 @@ import {
 import { TimelineService } from '../timeline/timeline.service'
 import { ChargesQueryDto } from './dto/charges-query.dto'
 import { AnalyticsService, UsageMetricEvent } from '../analytics/analytics.service'
+import { RequestContextService } from '../common/context/request-context.service'
 
 @Injectable()
 export class FinanceService {
@@ -32,7 +33,56 @@ export class FinanceService {
     private readonly whatsapp: WhatsAppService,
     private readonly timeline: TimelineService,
     private readonly analytics: AnalyticsService,
+    private readonly requestContext: RequestContextService,
   ) {}
+
+  private logCritical(params: {
+    level: 'log' | 'warn' | 'error'
+    action: string
+    entityId?: string | null
+    message: string
+    extra?: Record<string, unknown>
+  }) {
+    const payload = {
+      requestId: this.requestContext.requestId,
+      action: params.action,
+      entityId: params.entityId ?? null,
+      ...params.extra,
+      message: params.message,
+    }
+
+    const line = JSON.stringify(payload)
+    if (params.level === 'error') {
+      this.logger.error(line)
+      return
+    }
+    if (params.level === 'warn') {
+      this.logger.warn(line)
+      return
+    }
+    this.logger.log(line)
+  }
+
+  private async safeTimelineLog(input: Parameters<TimelineService['log']>[0]) {
+    try {
+      await this.timeline.log(input)
+    } catch (error) {
+      this.logCritical({
+        level: 'error',
+        action: input.action,
+        entityId:
+          input.chargeId ??
+          input.serviceOrderId ??
+          input.customerId ??
+          null,
+        message: 'Falha ao registrar timeline',
+        extra: {
+          orgId: input.orgId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      })
+    }
+  }
 
   private buildChargeCreateIdempotencyKey(input: {
     orgId: string
@@ -221,6 +271,14 @@ export class FinanceService {
     notes?: string | null
     serviceOrderId?: string | null
   }) {
+    this.logCritical({
+      level: 'log',
+      action: 'CREATE_CHARGE_START',
+      entityId: input.serviceOrderId ?? input.customerId,
+      message: 'Iniciando createCharge',
+      extra: { orgId: input.orgId, customerId: input.customerId },
+    })
+
     const customer = await this.prisma.customer.findFirst({
       where: { id: input.customerId, orgId: input.orgId },
       select: { id: true },
@@ -267,13 +325,21 @@ export class FinanceService {
       return existing
     }
 
+    let whatsappFallbackUsed = false
     if (charge.customer?.phone) {
-      await this.sendChargeWhatsApp(charge.id).catch((err) =>
-        this.logger.error(`Erro ao enviar cobrança WhatsApp: ${err.message}`),
-      )
+      await this.sendChargeWhatsApp(charge.id).catch((err) => {
+        whatsappFallbackUsed = true
+        this.logCritical({
+          level: 'warn',
+          action: 'WHATSAPP_SEND_CHARGE',
+          entityId: charge.id,
+          message: 'Falha de integração no envio de cobrança. Fluxo seguirá em modo degradado',
+          extra: { error: err?.message ?? String(err) },
+        })
+      })
     }
 
-    await this.timeline.log({
+    await this.safeTimelineLog({
       orgId: input.orgId,
       action: 'CHARGE_CREATED',
       description: `Cobrança criada para ${charge.customer?.name ?? 'cliente'}`,
@@ -290,6 +356,16 @@ export class FinanceService {
       },
     })
 
+    this.logCritical({
+      level: whatsappFallbackUsed ? 'warn' : 'log',
+      action: 'CREATE_CHARGE_RESULT',
+      entityId: charge.id,
+      message: whatsappFallbackUsed
+        ? 'Cobrança criada com fallback de WhatsApp (mensagem em fila/pendente)'
+        : 'Cobrança criada com sucesso',
+      extra: { chargeId: charge.id, orgId: input.orgId },
+    })
+
     void this.analytics.track({
       orgId: input.orgId,
       userId: input.actorUserId ?? undefined,
@@ -304,7 +380,16 @@ export class FinanceService {
       },
     })
 
-    return charge
+    return {
+      ...charge,
+      degraded: whatsappFallbackUsed
+        ? {
+            channel: 'whatsapp',
+            reason: 'whatsapp_send_failed',
+            fallback: 'message_queued',
+          }
+        : null,
+    }
   }
 
   async updateCharge(input: {
@@ -369,6 +454,14 @@ export class FinanceService {
     method: $Enums.PaymentMethod
     actorUserId?: string | null
   }) {
+    this.logCritical({
+      level: 'log',
+      action: 'PAY_CHARGE_START',
+      entityId: input.chargeId,
+      message: 'Iniciando payCharge',
+      extra: { orgId: input.orgId, amountCents: input.amountCents, method: input.method },
+    })
+
     const { charge, payment, idempotent } = await this.prisma.$transaction(
       async (tx) => {
       const charge = await tx.charge.findFirst({
@@ -438,11 +531,19 @@ export class FinanceService {
       return { ok: true, paymentId: payment.id, idempotent: true }
     }
 
-    await this.sendPaymentConfirmationWhatsApp(charge.id).catch((err) =>
-      this.logger.error(`Erro ao enviar confirmação WhatsApp: ${err.message}`),
-    )
+    let whatsappFallbackUsed = false
+    await this.sendPaymentConfirmationWhatsApp(charge.id).catch((err) => {
+      whatsappFallbackUsed = true
+      this.logCritical({
+        level: 'warn',
+        action: 'WHATSAPP_SEND_PAYMENT_CONFIRMATION',
+        entityId: charge.id,
+        message: 'Falha de integração no envio do recibo. Fluxo principal seguirá',
+        extra: { error: err?.message ?? String(err) },
+      })
+    })
 
-    await this.timeline.log({
+    await this.safeTimelineLog({
       orgId: input.orgId,
       action: 'CHARGE_PAID',
       description: `Pagamento confirmado para cobrança ${charge.id}`,
@@ -459,7 +560,7 @@ export class FinanceService {
         method: input.method,
       },
     })
-    await this.timeline.log({
+    await this.safeTimelineLog({
       orgId: input.orgId,
       action: 'PAYMENT_RECEIVED',
       description: `Pagamento recebido para cobrança ${charge.id}`,
@@ -477,6 +578,16 @@ export class FinanceService {
       },
     })
 
+    this.logCritical({
+      level: whatsappFallbackUsed ? 'warn' : 'log',
+      action: 'PAY_CHARGE_RESULT',
+      entityId: charge.id,
+      message: whatsappFallbackUsed
+        ? 'Pagamento registrado com fallback de notificação WhatsApp'
+        : 'Pagamento registrado com sucesso',
+      extra: { paymentId: payment.id, orgId: input.orgId },
+    })
+
     void this.analytics.track({
       orgId: input.orgId,
       userId: input.actorUserId ?? undefined,
@@ -491,7 +602,17 @@ export class FinanceService {
       },
     })
 
-    return { ok: true, paymentId: payment.id }
+    return {
+      ok: true,
+      paymentId: payment.id,
+      degraded: whatsappFallbackUsed
+        ? {
+            channel: 'whatsapp',
+            reason: 'whatsapp_send_failed',
+            fallback: 'message_queued',
+          }
+        : null,
+    }
   }
 
   // =========================

@@ -40,6 +40,10 @@ function isStatus(v: any): v is AppointmentStatus {
   )
 }
 
+function isTerminalStatus(status: AppointmentStatus): boolean {
+  return status === 'CANCELED' || status === 'DONE' || status === 'NO_SHOW'
+}
+
 function statusToAction(status: AppointmentStatus): string {
   switch (status) {
     case 'CONFIRMED':
@@ -263,6 +267,11 @@ export class AppointmentsService {
     let status: AppointmentStatus = 'SCHEDULED'
     if (params.status != null) {
       if (!isStatus(params.status)) throw new BadRequestException('status inválido')
+      if (isTerminalStatus(params.status)) {
+        throw new BadRequestException(
+          `Não é permitido criar agendamento em estado terminal (${params.status})`,
+        )
+      }
       status = params.status
     }
 
@@ -421,6 +430,11 @@ export class AppointmentsService {
       },
     })
     if (!before) throw new NotFoundException('Agendamento não encontrado')
+    if (isTerminalStatus(before.status)) {
+      throw new BadRequestException(
+        `Agendamento em estado terminal (${before.status}) não pode ser alterado`,
+      )
+    }
 
     const data: any = {}
 

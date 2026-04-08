@@ -61,7 +61,7 @@ export class WhatsAppProcessor implements OnModuleInit, OnModuleDestroy {
             return
           }
 
-          await this.whatsApp.markFailed({
+          await this.whatsApp.markFailedAndRequeue({
             id: message.id,
             provider: result.provider,
             errorCode: result.errorCode,
