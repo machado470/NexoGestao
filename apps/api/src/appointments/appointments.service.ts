@@ -71,6 +71,27 @@ function isOverlapDbViolation(err: any): boolean {
   )
 }
 
+function isUniqueConflict(err: any): boolean {
+  return err?.code === 'P2002'
+}
+
+function buildAppointmentIdempotencyKey(input: {
+  orgId: string
+  customerId: string
+  startsAt: Date
+  endsAt: Date
+  status: AppointmentStatus
+}): string {
+  return [
+    'appointment-create',
+    input.orgId,
+    input.customerId,
+    input.startsAt.toISOString(),
+    input.endsAt.toISOString(),
+    input.status,
+  ].join(':')
+}
+
 @Injectable()
 export class AppointmentsService {
   constructor(
@@ -253,11 +274,20 @@ export class AppointmentsService {
     })
     if (!customer) throw new BadRequestException('Cliente inválido para este org')
 
+    const idempotencyKey = buildAppointmentIdempotencyKey({
+      orgId: params.orgId,
+      customerId: params.customerId,
+      startsAt,
+      endsAt,
+      status,
+    })
+
     try {
       const created = await this.prisma.appointment.create({
         data: {
           orgId: params.orgId,
           customerId: params.customerId,
+          idempotencyKey,
           startsAt,
           endsAt,
           status,
@@ -321,6 +351,16 @@ export class AppointmentsService {
 
       return created
     } catch (e: any) {
+      if (isUniqueConflict(e)) {
+        const existing = await this.prisma.appointment.findFirst({
+          where: { orgId: params.orgId, idempotencyKey },
+          include: {
+            customer: { select: { id: true, name: true, phone: true } },
+          },
+        })
+        if (existing) return existing as any
+      }
+
       if (isOverlapDbViolation(e)) {
         const context = `Conflito de horário bloqueado (DB) (cliente: ${customer.name})`
 

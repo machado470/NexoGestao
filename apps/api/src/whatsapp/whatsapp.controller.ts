@@ -17,7 +17,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
 import { Roles } from '../auth/decorators/roles.decorator'
 import { Org } from '../auth/decorators/org.decorator'
-import { WhatsAppService } from './whatsapp.service'
+import { WhatsAppService, buildDeterministicMessageKey } from './whatsapp.service'
 import { PrismaService } from '../prisma/prisma.service'
 
 @Controller('whatsapp')
@@ -77,15 +77,24 @@ export class WhatsAppController {
       )
     }
 
+    const entityType =
+      (body.entityType || 'SERVICE_ORDER') as WhatsAppEntityType
+    const entityId = body.entityId || body.customerId
+    const messageType =
+      (body.messageType || 'EXECUTION_CONFIRMATION') as WhatsAppMessageType
+
     return this.whatsapp.enqueueMessage({
       orgId,
       customerId: body.customerId,
       toPhone,
-      entityType: (body.entityType || 'SERVICE_ORDER') as WhatsAppEntityType,
-      entityId: body.entityId || body.customerId,
-      messageType: (body.messageType ||
-        'EXECUTION_CONFIRMATION') as WhatsAppMessageType,
-      messageKey: `manual-${Date.now()}`,
+      entityType,
+      entityId,
+      messageType,
+      messageKey: buildDeterministicMessageKey({
+        entityType,
+        entityId,
+        messageType,
+      }),
       renderedText: String(body.content).trim(),
     })
   }

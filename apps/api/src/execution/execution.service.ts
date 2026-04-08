@@ -142,13 +142,23 @@ export class ExecutionService {
       }
     }
 
-    await this.prisma.serviceOrder.updateMany({
-      where: { id: input.serviceOrderId, orgId: input.orgId },
+    const startMutation = await this.prisma.serviceOrder.updateMany({
+      where: {
+        id: input.serviceOrderId,
+        orgId: input.orgId,
+        status: { in: ['OPEN', 'ASSIGNED', 'IN_PROGRESS'] },
+      },
       data: {
         status: 'IN_PROGRESS',
         startedAt: so.startedAt ?? new Date(),
       },
     })
+
+    if (startMutation.count === 0) {
+      throw new BadRequestException(
+        'Não foi possível iniciar execução: estado alterado por operação concorrente',
+      )
+    }
 
     const updated = await this.prisma.serviceOrder.findFirst({
       where: { id: input.serviceOrderId, orgId: input.orgId },

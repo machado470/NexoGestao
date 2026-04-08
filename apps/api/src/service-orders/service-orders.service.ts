@@ -93,6 +93,29 @@ function resolveDueDateForServiceOrder(params: {
   return addDays(base, 3)
 }
 
+function isUniqueConflict(err: any): boolean {
+  return err?.code === 'P2002'
+}
+
+function buildServiceOrderIdempotencyKey(input: {
+  orgId: string
+  customerId: string
+  title: string
+  appointmentId?: string
+  scheduledFor?: Date | null
+  amountCents?: number | null
+}): string {
+  return [
+    'service-order-create',
+    input.orgId,
+    input.customerId,
+    input.title.trim().toLowerCase(),
+    input.appointmentId ?? '-',
+    input.scheduledFor?.toISOString() ?? '-',
+    String(input.amountCents ?? '-'),
+  ].join(':')
+}
+
 type FinancialSummary = {
   hasCharge: boolean
   chargeId: string | null
@@ -475,25 +498,49 @@ export class ServiceOrdersService {
       if (!appt) throw new BadRequestException('Agendamento inválido')
     }
 
-    const created = await this.prisma.serviceOrder.create({
-      data: {
-        orgId: params.orgId,
-        customerId: params.customerId,
-        title,
-        description,
-        priority,
-        assignedToPersonId: params.assignedToPersonId ?? null,
-        appointmentId: params.appointmentId ?? null,
-        scheduledFor,
-        amountCents,
-        dueDate,
-        status: params.assignedToPersonId ? 'ASSIGNED' : 'OPEN',
-      },
-      include: {
-        customer: { select: { id: true, name: true, phone: true } },
-        assignedTo: { select: { id: true, name: true } },
-      },
+    const idempotencyKey = buildServiceOrderIdempotencyKey({
+      orgId: params.orgId,
+      customerId: params.customerId,
+      title,
+      appointmentId: params.appointmentId,
+      scheduledFor,
+      amountCents,
     })
+
+    let created: any
+    try {
+      created = await this.prisma.serviceOrder.create({
+        data: {
+          orgId: params.orgId,
+          customerId: params.customerId,
+          idempotencyKey,
+          title,
+          description,
+          priority,
+          assignedToPersonId: params.assignedToPersonId ?? null,
+          appointmentId: params.appointmentId ?? null,
+          scheduledFor,
+          amountCents,
+          dueDate,
+          status: params.assignedToPersonId ? 'ASSIGNED' : 'OPEN',
+        },
+        include: {
+          customer: { select: { id: true, name: true, phone: true } },
+          assignedTo: { select: { id: true, name: true } },
+        },
+      })
+    } catch (err) {
+      if (!isUniqueConflict(err)) throw err
+      const existing = await this.prisma.serviceOrder.findFirst({
+        where: { orgId: params.orgId, idempotencyKey },
+        include: {
+          customer: { select: { id: true, name: true, phone: true } },
+          assignedTo: { select: { id: true, name: true } },
+        },
+      })
+      if (!existing) throw err
+      return existing
+    }
 
     const context = `Ordem de serviço criada: ${created.title} (cliente: ${created.customer.name})`
 
