@@ -3,6 +3,10 @@ import { AlertTriangle, CheckCircle2, CreditCard, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { useProductAnalytics } from "@/hooks/useProductAnalytics";
+import { PageHero, PageShell, SmartPage, SurfaceSection } from "@/components/PagePattern";
+import { EmptyState } from "@/components/EmptyState";
+import { Button } from "@/components/ui/button";
+import { getQueryUiState, normalizeArrayPayload } from "@/lib/query-helpers";
 
 type PlanName = "STARTER" | "PRO" | "SCALE" | "FREE";
 
@@ -96,33 +100,22 @@ export default function BillingPage() {
 
   const status = statusQuery.data;
   const limits = limitsQuery.data;
-  const plans = useMemo(() => {
-    if (Array.isArray(plansQuery.data)) return plansQuery.data;
-    return [];
-  }, [plansQuery.data]);
+  const plans = useMemo(
+    () => normalizeArrayPayload<any>(plansQuery.data),
+    [plansQuery.data]
+  );
 
   const hasAnyData = plans.length > 0 || Boolean(status) || Boolean(limits);
-  const isLoading =
-    (plansQuery.isLoading || statusQuery.isLoading || limitsQuery.isLoading) &&
-    !hasAnyData;
-  const isError = plansQuery.isError || statusQuery.isError || limitsQuery.isError;
+  const queryState = getQueryUiState(
+    [plansQuery, statusQuery, limitsQuery],
+    hasAnyData
+  );
+
   const usageItems = [
-    {
-      label: "Clientes",
-      usage: limits?.usage?.customers,
-    },
-    {
-      label: "Agendamentos",
-      usage: limits?.usage?.appointments,
-    },
-    {
-      label: "Ordens de serviço",
-      usage: limits?.usage?.serviceOrders,
-    },
-    {
-      label: "Usuários",
-      usage: limits?.usage?.users,
-    },
+    { label: "Clientes", usage: limits?.usage?.customers },
+    { label: "Agendamentos", usage: limits?.usage?.appointments },
+    { label: "Ordens de serviço", usage: limits?.usage?.serviceOrders },
+    { label: "Usuários", usage: limits?.usage?.users },
   ];
 
   const hasExceededUsage = usageItems.some((item) => {
@@ -164,78 +157,107 @@ export default function BillingPage() {
     });
   };
 
+  const heroPrimaryAction: PlanName = blockedItems.length > 0 ? "PRO" : "STARTER";
+
   return (
-    <div className="space-y-4">
-      <section className="nexo-app-panel-strong p-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h1 className="text-lg font-semibold">Plano e faturamento</h1>
-            <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-              Controle trial, limites e upgrade sem sair do fluxo operacional.
-            </p>
-            <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-300">
-              Seu upgrade libera mais execução, mais cobranças e mais receita confirmada sem bloqueio.
-            </p>
-          </div>
-          <div className="rounded-xl border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-700">
-            Plano atual: <strong>{currentPlan}</strong>
-          </div>
-        </div>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <button
+    <PageShell>
+      <PageHero
+        eyebrow="Billing"
+        title="Plano e faturamento"
+        description="Controle trial, limites e upgrade com fluxo orientado a receita e sem sair da operação."
+        actions={
+          <Button
             type="button"
-            className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-orange-500/30 hover:bg-orange-600 disabled:opacity-60"
             disabled={checkoutMutation.isPending}
-            onClick={() => void handleUpgrade("PRO")}
+            onClick={() => void handleUpgrade(heroPrimaryAction)}
           >
             {checkoutMutation.isPending ? "Processando..." : "Fazer upgrade agora"}
-          </button>
-          <span className="inline-flex items-center rounded-lg border border-zinc-200 px-3 py-2 text-xs text-zinc-600 dark:border-zinc-700 dark:text-zinc-300">
-            Botão principal: desbloqueia limites e remove bloqueios operacionais.
-          </span>
-        </div>
-        {isTrial ? (
-          <p className="mt-3 inline-flex items-center gap-2 rounded-lg bg-amber-100 px-3 py-2 text-xs text-amber-900 dark:bg-amber-900/30 dark:text-amber-200">
-            <AlertTriangle className="h-4 w-4" />
-            Trial ativo até {new Date(limits?.trial?.endsAt).toLocaleDateString("pt-BR")}.
-          </p>
-        ) : null}
-        {blockedItems.length > 0 ? (
-          <p className="mt-3 inline-flex items-center gap-2 rounded-lg bg-red-100 px-3 py-2 text-xs text-red-900 dark:bg-red-900/30 dark:text-red-200">
-            <AlertTriangle className="h-4 w-4" />
-            Você atingiu o limite de {blockedItems.map((item) => item.label).join(", ")}.
-            Isso está bloqueando novas operações. Faça upgrade para continuar vendendo sem fricção.
-          </p>
-        ) : null}
-      </section>
+          </Button>
+        }
+      />
 
-      {isError ? (
-        <section className="nexo-app-panel space-y-3 p-4 text-sm">
-          <p>Falha ao carregar billing. Tente novamente em alguns segundos.</p>
-          <button
-            type="button"
-            className="rounded-lg border border-zinc-300 px-3 py-2 text-xs hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-900"
-            onClick={() => {
-              void Promise.all([
-                plansQuery.refetch(),
-                statusQuery.refetch(),
-                limitsQuery.refetch(),
-              ]);
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+        <div className="nexo-kpi-card p-4"><p className="text-xs text-zinc-500">Plano atual</p><p className="text-lg font-semibold">{currentPlan}</p></div>
+        <div className="nexo-kpi-card p-4"><p className="text-xs text-zinc-500">Limites em risco</p><p className="text-lg font-semibold">{blockedItems.length}</p></div>
+        <div className="nexo-kpi-card p-4"><p className="text-xs text-zinc-500">Modo</p><p className="text-lg font-semibold">{isTrial ? "Trial" : "Ativo"}</p></div>
+        <div className="nexo-kpi-card p-4"><p className="text-xs text-zinc-500">Próxima ação</p><p className="text-lg font-semibold">{blockedItems.length > 0 ? "Upgrade urgente" : "Revisar limites"}</p></div>
+      </div>
+
+      <SmartPage
+        pageContext="finances"
+        headline="Centro de monetização"
+        dominantProblem={blockedItems.length > 0 ? "Limite atingido bloqueando vendas" : "Plano pode limitar escala"}
+        dominantImpact={blockedItems.length > 0 ? `Bloqueio em ${blockedItems.map((item) => item.label).join(", ")}` : "Fluxo operacional disponível"}
+        dominantCta={{
+          label: blockedItems.length > 0 ? "Desbloquear com upgrade" : "Atualizar plano",
+          path: "/billing",
+          onClick: () => void handleUpgrade(heroPrimaryAction),
+        }}
+        priorities={[
+          {
+            id: "billing-upgrade",
+            type: "idle_cash",
+            title: blockedItems.length > 0 ? "Upgrade imediato" : "Revisar plano atual",
+            helperText:
+              blockedItems.length > 0
+                ? "Evita bloqueio de criação em recursos críticos."
+                : "Garante escala sem fricção comercial.",
+            count: blockedItems.length > 0 ? blockedItems.length : 1,
+            impactCents: blockedItems.length > 0 ? 100000 : 50000,
+            ctaLabel: "Atualizar plano",
+            ctaPath: "/billing",
+          },
+          {
+            id: "billing-usage",
+            type: "overdue_charges",
+            title: "Monitorar limites",
+            helperText: "Acompanhe consumo para não travar o funil.",
+            count: hasExceededUsage ? blockedItems.length : 1,
+            impactCents: hasExceededUsage ? 80000 : 10000,
+            ctaLabel: "Ver limites",
+            ctaPath: "/billing",
+          },
+          {
+            id: "billing-trial",
+            type: "operational_risk",
+            title: isTrial ? "Converter trial em assinatura" : "Plano recorrente validado",
+            helperText: isTrial ? "Defina plano antes do fim do período de avaliação." : "Operação monetizada sem risco imediato.",
+            count: 1,
+            impactCents: isTrial ? 65000 : 1000,
+            ctaLabel: "Revisar cobrança",
+            ctaPath: "/billing",
+          },
+        ]}
+      />
+
+      {queryState.shouldBlockForError ? (
+        <SurfaceSection>
+          <EmptyState
+            icon={<AlertTriangle className="h-7 w-7" />}
+            title="Falha ao carregar billing"
+            description="Não foi possível carregar planos e status agora. Tente novamente para restaurar a leitura."
+            action={{
+              label: "Tentar novamente",
+              onClick: () => {
+                void Promise.all([
+                  plansQuery.refetch(),
+                  statusQuery.refetch(),
+                  limitsQuery.refetch(),
+                ]);
+              },
             }}
-          >
-            Tentar novamente
-          </button>
-        </section>
+          />
+        </SurfaceSection>
       ) : null}
 
-      {isLoading ? (
-        <section className="nexo-app-panel p-8 text-sm text-zinc-500 dark:text-zinc-400">
+      {queryState.isInitialLoading ? (
+        <SurfaceSection className="p-8 text-sm text-zinc-500 dark:text-zinc-400">
           <Loader2 className="mr-2 inline h-4 w-4 animate-spin" />
           Carregando status de assinatura...
-        </section>
+        </SurfaceSection>
       ) : null}
 
-      {!isLoading ? (
+      {!queryState.isInitialLoading ? (
         <section className="grid gap-3 md:grid-cols-3">
           {plans.map((plan: any) => {
             const name = String(plan.name ?? "FREE").toUpperCase();
@@ -281,8 +303,23 @@ export default function BillingPage() {
         </section>
       ) : null}
 
-      <section className="nexo-app-panel p-4">
-        <h3 className="text-sm font-semibold">Uso atual da organização</h3>
+      <SurfaceSection className="space-y-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-300">
+              Seu upgrade libera mais execução, mais cobranças e mais receita confirmada sem bloqueio.
+            </p>
+          </div>
+          <div className="rounded-xl border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-700">
+            Plano atual: <strong>{currentPlan}</strong>
+          </div>
+        </div>
+        {isTrial ? (
+          <p className="mt-3 inline-flex items-center gap-2 rounded-lg bg-amber-100 px-3 py-2 text-xs text-amber-900 dark:bg-amber-900/30 dark:text-amber-200">
+            <AlertTriangle className="h-4 w-4" />
+            Trial ativo até {new Date(limits?.trial?.endsAt).toLocaleDateString("pt-BR")}.
+          </p>
+        ) : null}
         {hasExceededUsage ? (
           <p className="mt-2 inline-flex items-center gap-2 rounded-lg bg-amber-100 px-3 py-2 text-xs text-amber-900 dark:bg-amber-900/30 dark:text-amber-200">
             <AlertTriangle className="h-4 w-4" />
@@ -318,28 +355,17 @@ export default function BillingPage() {
             </p>
           </div>
         ) : null}
-
-        <div className="mt-4 flex flex-wrap gap-2">
-          {hasExceededUsage ? (
-            <button
-              type="button"
-              className="rounded-lg bg-orange-500 px-3 py-2 text-sm font-semibold text-white shadow-lg shadow-orange-500/30 hover:bg-orange-600 disabled:opacity-60"
-              disabled={checkoutMutation.isPending}
-              onClick={() => void handleUpgrade("PRO")}
-            >
-              {checkoutMutation.isPending ? "Processando..." : "Continuar crescendo"}
-            </button>
-          ) : null}
-          <button
+        {currentPlan !== "FREE" ? (
+          <Button
             type="button"
-            className="rounded-lg border border-zinc-300 px-3 py-2 text-sm hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-900 disabled:opacity-60"
+            variant="outline"
             disabled={cancelMutation.isPending}
-            onClick={() => void cancelMutation.mutateAsync()}
+            onClick={() => cancelMutation.mutate()}
           >
             {cancelMutation.isPending ? "Cancelando..." : "Cancelar assinatura"}
-          </button>
-        </div>
-      </section>
-    </div>
+          </Button>
+        ) : null}
+      </SurfaceSection>
+    </PageShell>
   );
 }
