@@ -39,6 +39,7 @@ import type {
 } from "@/components/service-orders/service-order.types";
 import { getErrorMessage, getQueryUiState, normalizeArrayPayload } from "@/lib/query-helpers";
 import { useProductAnalytics } from "@/hooks/useProductAnalytics";
+import { generateServiceOrderActions } from "@/lib/smartActions";
 
 const FINANCIAL_FILTERS: Array<{
   value: FinancialFilter;
@@ -379,6 +380,15 @@ export default function ServiceOrdersPage() {
     },
   ], [activeId, totalOperational, totalWithUrgency]);
 
+  const smartOperationalActions = useMemo(
+    () =>
+      generateServiceOrderActions({
+        orders: sorted,
+        onGenerateCharge: (serviceOrderId) => navigate(`/finances?serviceOrderId=${serviceOrderId}`),
+      }),
+    [navigate, sorted]
+  );
+
   async function refreshAll() {
     await Promise.all([
       utils.nexo.serviceOrders.list.invalidate(),
@@ -462,6 +472,7 @@ export default function ServiceOrdersPage() {
           path: "/service-orders",
         }}
         priorities={smartPriorities}
+        operationalActions={smartOperationalActions}
       />
 
       {activeId && (

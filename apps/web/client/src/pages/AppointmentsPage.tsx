@@ -39,6 +39,7 @@ import {
 import { EmptyState } from "@/components/EmptyState";
 import { PageHero, PageShell, SmartPage, SurfaceSection } from "@/components/PagePattern";
 import { DemoEnvironmentCta } from "@/components/DemoEnvironmentCta";
+import { generateAppointmentActions } from "@/lib/smartActions";
 
 type CustomerRef = {
   id: string;
@@ -630,6 +631,15 @@ export default function AppointmentsPage() {
     },
   ], [appointmentsWithoutOperations, totalDone, totalScheduled]);
 
+  const smartOperationalActions = useMemo(
+    () =>
+      generateAppointmentActions({
+        appointments: filteredAppointments,
+        onConfirmAppointment: (appointmentId) => handleOpenDeepLink(appointmentId),
+      }),
+    [filteredAppointments]
+  );
+
   const handleCreateSuccess = () => {
     return;
   };
@@ -770,6 +780,7 @@ export default function AppointmentsPage() {
           path: "/appointments",
         }}
         priorities={smartPriorities}
+        operationalActions={smartOperationalActions}
       />
 
       <div className="grid gap-3 md:grid-cols-[1fr_auto_auto]">

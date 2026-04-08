@@ -22,6 +22,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { DemoEnvironmentCta } from "@/components/DemoEnvironmentCta";
 import { useChargeActions } from "@/hooks/useChargeActions";
 import { useProductAnalytics } from "@/hooks/useProductAnalytics";
+import { generateFinanceActions } from "@/lib/smartActions";
 
 type FinanceCharge = {
   id: string;
@@ -372,6 +373,26 @@ export default function FinancesPage() {
     };
   }, [billingQueue, isPaymentScoped, navigate, paymentById?.id, paymentScopedCharge?.serviceOrderId]);
 
+  const smartOperationalActions = useMemo(
+    () =>
+      generateFinanceActions({
+        billingQueue,
+        onSendWhatsApp: (chargeId, phone) => {
+          track("send_whatsapp", {
+            screen: "finances",
+            chargeId,
+            source: "smartpage_operational_action",
+          });
+          if (phone) {
+            window.open(`https://wa.me/${phone}`, "_blank");
+            return;
+          }
+          navigate("/whatsapp");
+        },
+      }),
+    [billingQueue, navigate, track]
+  );
+
   function getSeverityClass(severity: "critical" | "attention" | "healthy") {
     if (severity === "critical") return "border-red-200 bg-red-50/80 dark:border-red-900/40 dark:bg-red-950/20";
     if (severity === "healthy") return "border-emerald-200 bg-emerald-50/80 dark:border-emerald-900/40 dark:bg-emerald-950/20";
@@ -509,6 +530,7 @@ export default function FinancesPage() {
           path: "/finances",
         }}
         priorities={smartPriorities}
+        operationalActions={smartOperationalActions}
       />
 
       {queryState.hasBackgroundUpdate ? (
