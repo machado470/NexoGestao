@@ -109,6 +109,7 @@ type WorkspaceSuggestion = {
   description: string;
   ctaLabel: string;
   ctaPath: string;
+  urgencyLabel?: string;
 };
 
 type TimelineEvent = {
@@ -633,6 +634,26 @@ export default function CustomersPage() {
       .sort((a, b) => toTimestamp(b.createdAt) - toTimestamp(a.createdAt))
       .slice(0, 12);
   }, [localTimeline, workspace?.timeline]);
+  const latestWorkspaceActivityAt = useMemo(() => {
+    if (!workspace) return null;
+    const timestamps = [
+      workspace.customer.updatedAt,
+      ...workspace.timeline.map(item => item.createdAt),
+      ...workspace.serviceOrders.map(item => item.updatedAt ?? item.createdAt),
+      ...workspace.charges.map(item => item.createdAt ?? item.dueDate),
+    ]
+      .map(value => toTimestamp(value))
+      .filter(value => value > 0);
+
+    if (timestamps.length === 0) return null;
+    return Math.max(...timestamps);
+  }, [workspace]);
+  const stalledCustomerDays = latestWorkspaceActivityAt
+    ? Math.max(
+        0,
+        Math.floor((Date.now() - latestWorkspaceActivityAt) / (1000 * 60 * 60 * 24))
+      )
+    : 0;
   const riskScore = useMemo(() => {
     let score = 0;
     if (!workspace) return 0;
@@ -660,26 +681,45 @@ export default function CustomersPage() {
         description: "Crie a primeira O.S. para iniciar execução e receita.",
         ctaLabel: "Criar O.S.",
         ctaPath: `/service-orders?customerId=${workspace.customer.id}`,
+        urgencyLabel: "Início do fluxo",
+      });
+    }
+    if (doneServiceOrdersWithoutCharge > 0) {
+      suggestions.push({
+        id: "customer-done-no-charge",
+        tone: "critical",
+        title: "O.S. pronta sem cobrança",
+        description: `${doneServiceOrdersWithoutCharge} O.S. concluídas aguardando faturamento.`,
+        ctaLabel: "Gerar cobrança",
+        ctaPath: `/finances?customerId=${workspace.customer.id}`,
+        urgencyLabel: "Receita travada",
+      });
+    }
+    if (workspacePendingCharges > 0) {
+      suggestions.push({
+        id: "finance-pending",
+        tone: workspaceOverdueCharges > 0 ? "critical" : "attention",
+        title:
+          workspaceOverdueCharges > 0
+            ? "Cobrança atrasada exige contato"
+            : "Cobrança pendente sem follow-up",
+        description:
+          workspaceOverdueCharges > 0
+            ? `${workspaceOverdueCharges} vencidas • ${formatCurrency(workspaceOverdueAmount)} em risco.`
+            : `${workspacePendingCharges} pendentes • ${formatCurrency(workspacePendingAmount)} aguardando envio.`,
+        ctaLabel: "Enviar WhatsApp",
+        ctaPath: `/whatsapp?customerId=${workspace.customer.id}`,
+        urgencyLabel: workspaceOverdueCharges > 0 ? "Urgente" : "Hoje",
       });
     }
     if (serviceOrdersWithoutCharge > 0) {
       suggestions.push({
         id: "customer-no-charge",
-        tone: "critical",
-        title: "O.S. sem cobrança vinculada",
-        description: `${serviceOrdersWithoutCharge} O.S. sem conexão financeira.`,
+        tone: "attention",
+        title: "Existem O.S. sem cobrança vinculada",
+        description: `${serviceOrdersWithoutCharge} ordens já têm execução e precisam de financeiro.`,
         ctaLabel: "Gerar cobrança",
         ctaPath: `/finances?customerId=${workspace.customer.id}`,
-      });
-    }
-    if (!workspace.customer.active) {
-      suggestions.push({
-        id: "customer-inactive",
-        tone: "attention",
-        title: "Cliente inativo",
-        description: "Reative o relacionamento com contato direto.",
-        ctaLabel: "Enviar WhatsApp",
-        ctaPath: `/whatsapp?customerId=${workspace.customer.id}`,
       });
     }
     if (serviceOrdersWithoutValue > 0) {
@@ -692,16 +732,6 @@ export default function CustomersPage() {
         ctaPath: `/service-orders?customerId=${workspace.customer.id}`,
       });
     }
-    if (doneServiceOrdersWithoutCharge > 0) {
-      suggestions.push({
-        id: "os-ready-charge",
-        tone: "critical",
-        title: "O.S. pronta para cobrança",
-        description: "Execução concluída sem faturamento imediato.",
-        ctaLabel: "Cobrar agora",
-        ctaPath: `/finances?customerId=${workspace.customer.id}`,
-      });
-    }
     if (delayedServiceOrders > 0) {
       suggestions.push({
         id: "os-delayed",
@@ -710,29 +740,38 @@ export default function CustomersPage() {
         description: `${delayedServiceOrders} ordens em atraso exigem reação imediata.`,
         ctaLabel: "Ver O.S.",
         ctaPath: `/service-orders?customerId=${workspace.customer.id}`,
+        urgencyLabel: "Urgente",
       });
     }
-    if (workspacePendingCharges > 0) {
+    if (!workspace.customer.active || stalledCustomerDays >= 14) {
       suggestions.push({
-        id: "finance-pending",
-        tone: workspaceOverdueCharges > 0 ? "critical" : "attention",
-        title: "Cobranças pendentes",
+        id: "customer-stalled",
+        tone: "attention",
+        title: "Cliente parado",
         description:
-          workspaceOverdueCharges > 0
-            ? `${workspaceOverdueCharges} vencidas e ${workspacePendingCharges} pendentes.`
-            : `${workspacePendingCharges} cobranças aguardando ação.`,
-        ctaLabel: "Ver financeiro",
-        ctaPath: `/finances?customerId=${workspace.customer.id}`,
+          stalledCustomerDays >= 14
+            ? `Sem avanço há ${stalledCustomerDays} dias. Reative com uma ação comercial.`
+            : "Sem operação recente. Reative o relacionamento com contato direto.",
+        ctaLabel: "Sugerir próxima ação",
+        ctaPath: `/service-orders?customerId=${workspace.customer.id}&create=1`,
+        urgencyLabel: "Reativação",
       });
     }
-    return suggestions.slice(0, 5);
+
+    const tonePriority = { critical: 0, attention: 1, healthy: 2 } as const;
+    return suggestions
+      .sort((a, b) => tonePriority[a.tone] - tonePriority[b.tone])
+      .slice(0, 5);
   }, [
     delayedServiceOrders,
     doneServiceOrdersWithoutCharge,
     serviceOrdersWithoutCharge,
     serviceOrdersWithoutValue,
+    stalledCustomerDays,
     workspace,
+    workspaceOverdueAmount,
     workspaceOverdueCharges,
+    workspacePendingAmount,
     workspacePendingCharges,
   ]);
 
@@ -1272,6 +1311,11 @@ export default function CustomersPage() {
                               {suggestion.description}
                             </p>
                           </div>
+                          {suggestion.urgencyLabel ? (
+                            <span className="rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-700 dark:bg-gray-900/60 dark:text-gray-200">
+                              {suggestion.urgencyLabel}
+                            </span>
+                          ) : null}
                           <Button
                             type="button"
                             size="sm"

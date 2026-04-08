@@ -257,11 +257,29 @@ export default function FinancesPage() {
       })
       .sort((a, b) => {
         if (a.priority !== b.priority) return a.priority - b.priority;
+        const impactDiff =
+          Math.max(b.charge.amountCents || 0, 0) - Math.max(a.charge.amountCents || 0, 0);
+        if (impactDiff !== 0) return impactDiff;
         return a.dueTime - b.dueTime;
       });
 
     return ranked.slice(0, 8);
   }, [finalVisibleCharges]);
+  const overdueAmountInQueue = useMemo(
+    () =>
+      billingQueue
+        .filter((item) => item.normalized === "OVERDUE")
+        .reduce((acc, item) => acc + Math.max(item.charge.amountCents || 0, 0), 0),
+    [billingQueue]
+  );
+  const pendingAmountInQueue = useMemo(
+    () =>
+      billingQueue
+        .filter((item) => item.normalized === "PENDING")
+        .reduce((acc, item) => acc + Math.max(item.charge.amountCents || 0, 0), 0),
+    [billingQueue]
+  );
+  const totalOpenAmountInQueue = overdueAmountInQueue + pendingAmountInQueue;
 
   const stats = useMemo(
     () => normalizeObjectPayload<FinanceStats>(statsQuery.data),
@@ -516,6 +534,46 @@ export default function FinancesPage() {
         </div>
       </SurfaceSection>
 
+      {totalOpenAmountInQueue > 0 ? (
+        <SurfaceSection className="border-2 border-orange-300 bg-gradient-to-r from-orange-50 via-white to-red-50 dark:border-orange-800/60 dark:from-orange-950/30 dark:via-zinc-900 dark:to-red-950/20">
+          <div className="grid gap-4 md:grid-cols-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-300">
+                Você tem em aberto
+              </p>
+              <p className="mt-1 text-2xl font-extrabold text-zinc-950 dark:text-white">
+                {formatCurrencyFromCents(totalOpenAmountInQueue)}
+              </p>
+              <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-300">
+                Cada dia sem ação aumenta risco de perda e tempo de recebimento.
+              </p>
+            </div>
+            <div className="rounded-xl border border-red-200 bg-red-50/80 p-3 dark:border-red-900/40 dark:bg-red-950/20">
+              <p className="text-xs font-semibold uppercase tracking-wide text-red-700 dark:text-red-300">
+                Valores atrasados
+              </p>
+              <p className="mt-1 text-lg font-bold text-red-700 dark:text-red-200">
+                {formatCurrencyFromCents(overdueAmountInQueue)}
+              </p>
+              <p className="text-xs text-red-700/80 dark:text-red-300/90">
+                Risco de perda: {formatCurrencyFromCents(overdueAmountInQueue)}
+              </p>
+            </div>
+            <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3 dark:border-amber-900/40 dark:bg-amber-950/20">
+              <p className="text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                Valores pendentes
+              </p>
+              <p className="mt-1 text-lg font-bold text-amber-700 dark:text-amber-200">
+                {formatCurrencyFromCents(pendingAmountInQueue)}
+              </p>
+              <p className="text-xs text-amber-700/80 dark:text-amber-300/90">
+                Impacto financeiro imediato no caixa da semana.
+              </p>
+            </div>
+          </div>
+        </SurfaceSection>
+      ) : null}
+
       {billingQueue.length > 0 && (
         <SurfaceSection className="space-y-3">
           <div>
@@ -685,8 +743,22 @@ export default function FinancesPage() {
                           : "Marcar pago"}
                     </Button>
                   )}
+                  {normalizeStatus(c.status) === "PAID" ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => navigate(buildWhatsAppUrlFromCharge(c) ?? "/whatsapp")}
+                    >
+                      Enviar comprovante
+                    </Button>
+                  ) : null}
                 </div>
               </CardContent>
+              {paymentDoneId === c.id ? (
+                <div className="border-t border-emerald-200 bg-emerald-50 px-5 py-3 text-xs text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-300">
+                  Pagamento registrado com sucesso. Próximo passo: enviar confirmação ao cliente e fechar a O.S.
+                </div>
+              ) : null}
             </Card>
           ))}
         </div>

@@ -271,6 +271,9 @@ export default function ExecutiveDashboardNew() {
   );
 
   const paidCharges = displayChargesStatus.find((item) => item.key.toLowerCase() === "paid")?.value ?? 0;
+  const conversionRate = displayMetrics.totalServiceOrders > 0
+    ? Math.round((paidCharges / Math.max(displayMetrics.totalServiceOrders, 1)) * 100)
+    : 0;
   const funnelData = [
     { value: Math.max(displayMetrics.totalCustomers, 0), name: "Clientes" },
     { value: Math.max(displayMetrics.totalServiceOrders + displayMetrics.openServiceOrders, 0), name: "Agendamentos" },
@@ -518,9 +521,9 @@ export default function ExecutiveDashboardNew() {
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard icon={Users} label="Clientes ativos" value={displayMetrics.totalCustomers} loading={metricsQuery.isLoading && metricsQuery.data === undefined} description="Base ativa acompanhada pela operação." />
-        <MetricCard icon={Briefcase} label="Ordens de serviço" value={displayMetrics.totalServiceOrders} loading={metricsQuery.isLoading && metricsQuery.data === undefined} description={`${displayMetrics.openServiceOrders} abertas • ${displayMetrics.inProgressOrders} em andamento`} />
-        <MetricCard icon={DollarSign} label="Receita total" value={formatCurrency(displayMetrics.totalRevenueInCents)} loading={metricsQuery.isLoading && metricsQuery.data === undefined} description={`Recebido: ${formatCurrency(displayMetrics.paidRevenueInCents)}`} />
-        <MetricCard icon={AlertTriangle} label="Risco / atrasos" value={Number(displayMetrics.riskTickets) + Number(displayMetrics.delayedOrders)} loading={metricsQuery.isLoading && metricsQuery.data === undefined} description={`Tickets: ${displayMetrics.riskTickets} • atrasadas: ${displayMetrics.delayedOrders}`} />
+        <MetricCard icon={DollarSign} label="Faturamento total" value={formatCurrency(displayMetrics.totalRevenueInCents)} loading={metricsQuery.isLoading && metricsQuery.data === undefined} description={`Recebido: ${formatCurrency(displayMetrics.paidRevenueInCents)}`} />
+        <MetricCard icon={AlertTriangle} label="Pendente + atrasado" value={formatCurrency(totalPausedRevenue)} loading={metricsQuery.isLoading && metricsQuery.data === undefined} description={`${overdueCharges} cobranças vencidas em foco`} />
+        <MetricCard icon={Briefcase} label="Conversão O.S. → pagamento" value={`${conversionRate}%`} loading={metricsQuery.isLoading && metricsQuery.data === undefined} description={`${paidCharges} pagamentos para ${displayMetrics.totalServiceOrders} O.S.`} />
       </section>
 
       <section className="grid gap-6 xl:grid-cols-3">
