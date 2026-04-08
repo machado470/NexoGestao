@@ -81,12 +81,12 @@ function getUser(payload: unknown) {
 
 function getRedirect(payload: unknown): string {
   const env = getEnvelope(payload);
-  return (env?.redirect as string) || "/dashboard";
+  return (env?.redirect as string) || "/executive-dashboard";
 }
 
 function redirectToLogin() {
   if (typeof window === "undefined") return;
-  window.location.assign("/login");
+  window.location.replace("/login");
 }
 
 /* ========================= */
@@ -176,6 +176,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setForcedLoggedOut(true);
 
     try {
+      if (typeof window !== "undefined") {
+        window.sessionStorage.clear();
+        window.localStorage.removeItem("nexo:last-action-flow");
+        window.localStorage.removeItem("onboarding-state");
+      }
       await utils.session.me.cancel();
       utils.session.me.setData(undefined, null);
       await utils.session.me.invalidate();

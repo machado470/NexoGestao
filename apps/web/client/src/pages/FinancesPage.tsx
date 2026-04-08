@@ -8,7 +8,10 @@ import {
   normalizeArrayPayload,
   normalizeObjectPayload,
 } from "@/lib/query-helpers";
-import { normalizeStatus } from "@/lib/operations/operations.utils";
+import {
+  buildWhatsAppUrlFromCharge,
+  normalizeStatus,
+} from "@/lib/operations/operations.utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -73,6 +76,7 @@ export default function FinancesPage() {
   const isPaymentScoped = Boolean(paymentIdFromUrl);
   const [whatsAppOpeningId, setWhatsAppOpeningId] = useState<string | null>(null);
   const [paymentDoneId, setPaymentDoneId] = useState<string | null>(null);
+  const [paymentSubmittingId, setPaymentSubmittingId] = useState<string | null>(null);
 
   const chargesQuery = trpc.finance.charges.list.useQuery(
     {
@@ -351,7 +355,8 @@ export default function FinancesPage() {
 
   const hasRenderableData =
     chargesQuery.data !== undefined ||
-    isServiceOrderScoped ||
+    chargeByIdQuery.data !== undefined ||
+    paymentByIdQuery.data !== undefined ||
     statsQuery.data !== undefined;
 
   const queryState = getQueryUiState(
@@ -535,7 +540,12 @@ export default function FinancesPage() {
                         : "text-gray-500"
                     }`}
                   >
-                    {formatCurrencyFromCents(charge.amountCents)} • {normalized}
+                    {formatCurrencyFromCents(charge.amountCents)} •{" "}
+                    {normalized === "OVERDUE"
+                      ? "Vencida"
+                      : normalized === "PENDING"
+                        ? "Pendente"
+                        : normalized}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -544,14 +554,10 @@ export default function FinancesPage() {
                     variant="outline"
                     onClick={() => {
                       setWhatsAppOpeningId(charge.id);
-                      const customerPhone = String(
-                        charge.customerPhone ?? charge.phone ?? ""
-                      ).trim();
-                      if (customerPhone) {
-                        window.open(`https://wa.me/${customerPhone}`, "_blank");
-                      } else {
-                        navigate("/whatsapp");
-                      }
+                      const nextPath =
+                        buildWhatsAppUrlFromCharge(charge) ??
+                        `/whatsapp?returnTo=${encodeURIComponent("/finances")}`;
+                      navigate(nextPath);
                       setTimeout(() => setWhatsAppOpeningId(null), 1300);
                     }}
                   >
@@ -559,19 +565,22 @@ export default function FinancesPage() {
                   </Button>
                   <Button
                     size="sm"
-                    disabled={isSubmitting}
+                    disabled={isSubmitting && paymentSubmittingId === charge.id}
                     onClick={async () => {
                       try {
+                        setPaymentSubmittingId(charge.id);
                         await registerPayment(charge, "CASH");
                         setPaymentDoneId(charge.id);
                         setTimeout(() => setPaymentDoneId(null), 1500);
                         void chargesQuery.refetch();
                       } catch {
                         // handled by hook
+                      } finally {
+                        setPaymentSubmittingId(null);
                       }
                     }}
                   >
-                    {isSubmitting
+                    {isSubmitting && paymentSubmittingId === charge.id
                       ? "Processando..."
                       : paymentDoneId === charge.id
                         ? "Pago registrado"
@@ -645,9 +654,10 @@ export default function FinancesPage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      disabled={isSubmitting}
+                      disabled={isSubmitting && paymentSubmittingId === c.id}
                       onClick={async () => {
                         try {
+                          setPaymentSubmittingId(c.id);
                           const result = (await registerPayment(c, "CASH")) as
                             | { paymentId?: string }
                             | undefined;
@@ -663,10 +673,12 @@ export default function FinancesPage() {
                           navigate(`/finances?${params.toString()}`);
                         } catch {
                           // feedback handled in useChargeActions
+                        } finally {
+                          setPaymentSubmittingId(null);
                         }
                       }}
                     >
-                      {isSubmitting
+                      {isSubmitting && paymentSubmittingId === c.id
                         ? "Processando..."
                         : paymentDoneId === c.id
                           ? "Pago registrado"
