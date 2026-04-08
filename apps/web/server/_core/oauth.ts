@@ -1,16 +1,68 @@
-/**
- * OAuth module (placeholder).
- * Antiga versão dependia do DB local.
- *
- * O boot do server espera: registerOAuthRoutes()
- * Então a gente fornece uma versão neutra que não registra nada.
- */
+import type { Express, Request, Response } from "express";
 
-export function registerOAuthRoutes(_app?: any) {
-  console.log("[OAuth] registerOAuthRoutes placeholder (nenhuma rota registrada)");
+const NEXO_API_URL = (process.env.NEXO_API_URL || "http://127.0.0.1:3000").replace(/\/+$/, "");
+
+function readSafeRedirect(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+
+  const value = raw.trim();
+  if (!value.startsWith("/")) return null;
+  if (value.startsWith("//")) return null;
+  if (value.startsWith("/login")) return null;
+  if (value.startsWith("/register")) return null;
+  if (value.startsWith("/forgot-password")) return null;
+  if (value.startsWith("/reset-password")) return null;
+
+  return value;
 }
 
-// opcional: mantém compatibilidade se algum lugar ainda chamar initOAuth
-export function initOAuth() {
-  console.log("[OAuth] initOAuth placeholder");
+function encodeState(payload: Record<string, string>) {
+  return Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
 }
+
+function buildGoogleAuthUrl(req: Request) {
+  const url = new URL(`${NEXO_API_URL}/auth/google`);
+  const safeRedirect = readSafeRedirect(req.query?.redirect);
+
+  if (safeRedirect) {
+    url.searchParams.set("state", encodeState({ redirect: safeRedirect }));
+  }
+
+  return url.toString();
+}
+
+function redirectToApiGoogleCallback(req: Request, res: Response) {
+  const url = new URL(`${NEXO_API_URL}/auth/google/callback`);
+
+  const query = req.query ?? {};
+  for (const [key, value] of Object.entries(query)) {
+    if (typeof value === "string") {
+      url.searchParams.append(key, value);
+      continue;
+    }
+
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        if (typeof item === "string") {
+          url.searchParams.append(key, item);
+        }
+      }
+    }
+  }
+
+  return res.redirect(url.toString());
+}
+
+export function registerOAuthRoutes(app?: Express) {
+  if (!app) return;
+
+  app.get("/api/oauth/google/login", (req, res) => {
+    return res.redirect(buildGoogleAuthUrl(req));
+  });
+
+  app.get("/api/oauth/google/callback", (req, res) => {
+    return redirectToApiGoogleCallback(req, res);
+  });
+}
+
+export function initOAuth() {}

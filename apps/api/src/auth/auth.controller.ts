@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Post, Request, Res, UseGuards } from '@nestjs/common'
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Request,
+  Res,
+  ServiceUnavailableException,
+  UseGuards,
+} from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import { AuthGuard } from '@nestjs/passport'
 import { Throttle } from '@nestjs/throttler'
 
@@ -7,7 +17,49 @@ import { Public } from './decorators/public.decorator'
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly auth: AuthService) {}
+  constructor(
+    private readonly auth: AuthService,
+    private readonly config: ConfigService,
+  ) {}
+
+  private ensureGoogleOAuthEnabled() {
+    const clientId = this.config.get<string>('GOOGLE_CLIENT_ID')?.trim()
+    const clientSecret = this.config.get<string>('GOOGLE_CLIENT_SECRET')?.trim()
+    const redirectUrl = this.config.get<string>('GOOGLE_REDIRECT_URL')?.trim()
+
+    if (!clientId || !clientSecret || !redirectUrl) {
+      throw new ServiceUnavailableException(
+        'Login com Google não está configurado neste ambiente.',
+      )
+    }
+  }
+
+  private readSafeRedirect(redirect: unknown) {
+    if (typeof redirect !== 'string') return null
+    const value = redirect.trim()
+    if (!value.startsWith('/')) return null
+    if (value.startsWith('//')) return null
+    if (value.startsWith('/login')) return null
+    if (value.startsWith('/register')) return null
+    if (value.startsWith('/forgot-password')) return null
+    if (value.startsWith('/reset-password')) return null
+    return value
+  }
+
+  private decodeOAuthState(state: unknown): { redirect: string } | null {
+    if (typeof state !== 'string' || !state.trim()) return null
+    try {
+      const parsed = JSON.parse(
+        Buffer.from(state.trim(), 'base64url').toString('utf8'),
+      ) as { redirect?: unknown }
+
+      const redirect = this.readSafeRedirect(parsed?.redirect)
+      if (!redirect) return null
+      return { redirect }
+    } catch {
+      return null
+    }
+  }
 
   @Public()
   @Post('register')
@@ -35,6 +87,7 @@ export class AuthController {
   @Get('google')
   @UseGuards(AuthGuard('google'))
   async googleAuth(@Request() _req: any) {
+    this.ensureGoogleOAuthEnabled()
     return
   }
 
@@ -42,9 +95,19 @@ export class AuthController {
   @Get('google/callback')
   @UseGuards(AuthGuard('google'))
   async googleAuthRedirect(@Request() req: any, @Res() res: any) {
+    this.ensureGoogleOAuthEnabled()
     const result = await this.auth.validateGoogleUser(req.user)
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3010'
-    return res.redirect(`${frontendUrl}/auth/callback?token=${result.token}`)
+    const frontendUrl =
+      this.config.get<string>('FRONTEND_URL') || 'http://localhost:3010'
+    const callbackUrl = new URL('/auth/callback', frontendUrl)
+    callbackUrl.searchParams.set('token', result.token)
+
+    const decodedState = this.decodeOAuthState(req.query?.state)
+    if (decodedState?.redirect) {
+      callbackUrl.searchParams.set('redirect', decodedState.redirect)
+    }
+
+    return res.redirect(callbackUrl.toString())
   }
 
   @Public()

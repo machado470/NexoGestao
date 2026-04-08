@@ -6,8 +6,25 @@ import { Chrome } from "lucide-react";
  * Redireciona para /api/oauth/google/login
  */
 export function GoogleOAuthButton() {
+  const search =
+    typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+  const redirectParam = (search?.get("redirect") ?? "").trim();
+  const safeRedirect =
+    redirectParam.startsWith("/") &&
+    !redirectParam.startsWith("//") &&
+    !redirectParam.startsWith("/login") &&
+    !redirectParam.startsWith("/register") &&
+    !redirectParam.startsWith("/forgot-password") &&
+    !redirectParam.startsWith("/reset-password")
+      ? redirectParam
+      : "";
+
   const handleGoogleLogin = () => {
-    window.location.href = "/api/oauth/google/login";
+    const target = new URL("/api/oauth/google/login", window.location.origin);
+    if (safeRedirect) {
+      target.searchParams.set("redirect", safeRedirect);
+    }
+    window.location.href = target.toString();
   };
 
   return (

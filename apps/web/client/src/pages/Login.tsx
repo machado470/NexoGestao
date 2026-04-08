@@ -15,6 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { trpc } from "@/lib/trpc";
+import { GoogleOAuthButton } from "@/components/GoogleOAuthButton";
 
 const trustItems = [
   "Sessão protegida por autenticação da plataforma",
@@ -263,6 +264,17 @@ export default function Login() {
 
               <CardContent>
                 <form onSubmit={submit} className="space-y-5">
+                  <GoogleOAuthButton />
+
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <span className="w-full border-t" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-card px-2 text-muted-foreground">ou continue com e-mail</span>
+                    </div>
+                  </div>
+
                   {postRegisterBanner ? (
                     <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300">
                       {postRegisterBanner}

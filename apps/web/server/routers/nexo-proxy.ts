@@ -326,11 +326,9 @@ export const nexoProxyRouter = router({
 
         const token = extractToken(result);
 
-        if (!token) {
-          throw new Error("Cadastro não retornou token.");
+        if (token) {
+          setTokenCookie(ctx as CtxLike, token);
         }
-
-        setTokenCookie(ctx as CtxLike, token);
 
         return result;
       }),

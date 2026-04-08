@@ -19,9 +19,23 @@ function extractToken() {
   return (hashParams.get("token") ?? "").trim();
 }
 
+function extractRedirect() {
+  if (typeof window === "undefined") return "";
+  const search = new URLSearchParams(window.location.search);
+  const raw = (search.get("redirect") ?? "").trim();
+  if (!raw.startsWith("/")) return "";
+  if (raw.startsWith("//")) return "";
+  if (raw.startsWith("/login")) return "";
+  if (raw.startsWith("/register")) return "";
+  if (raw.startsWith("/forgot-password")) return "";
+  if (raw.startsWith("/reset-password")) return "";
+  return raw;
+}
+
 export default function AuthCallbackPage() {
   const [, navigate] = useLocation();
   const token = useMemo(() => extractToken(), []);
+  const requestedRedirect = useMemo(() => extractRedirect(), []);
 
   const establishSessionMutation = trpc.nexo.auth.establishSession.useMutation();
 
@@ -37,10 +51,11 @@ export default function AuthCallbackPage() {
       try {
         const result = await establishSessionMutation.mutateAsync({ token });
         if (!active) return;
+        const meRedirect = result?.me?.data?.redirect || result?.me?.redirect || "";
         const redirect =
-          result?.me?.data?.redirect ||
-          result?.me?.redirect ||
-          "/executive-dashboard";
+          meRedirect === "/onboarding"
+            ? "/onboarding"
+            : requestedRedirect || meRedirect || "/executive-dashboard";
         navigate(redirect, { replace: true });
       } catch {
         if (!active) return;
@@ -53,7 +68,7 @@ export default function AuthCallbackPage() {
     return () => {
       active = false;
     };
-  }, [establishSessionMutation, navigate, token]);
+  }, [establishSessionMutation, navigate, requestedRedirect, token]);
 
   return (
     <div className="nexo-app-shell flex min-h-screen items-center justify-center px-6">
