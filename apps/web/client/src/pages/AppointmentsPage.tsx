@@ -31,8 +31,13 @@ import {
   buildWhatsAppConversationUrl,
   normalizeOrders,
 } from "@/lib/operations/operations.utils";
-import { normalizeArrayPayload } from "@/lib/query-helpers";
-import { PageHero, PageShell, SmartPage } from "@/components/PagePattern";
+import {
+  getErrorMessage,
+  getQueryUiState,
+  normalizeArrayPayload,
+} from "@/lib/query-helpers";
+import { EmptyState } from "@/components/EmptyState";
+import { PageHero, PageShell, SmartPage, SurfaceSection } from "@/components/PagePattern";
 import { DemoEnvironmentCta } from "@/components/DemoEnvironmentCta";
 
 type CustomerRef = {
@@ -672,6 +677,50 @@ export default function AppointmentsPage() {
   };
 
   const hasLocalFilters = Boolean(searchQuery);
+  const hasRenderableData =
+    listAppointments.data !== undefined ||
+    listServiceOrders.data !== undefined ||
+    listCustomers.data !== undefined;
+  const queryState = getQueryUiState(
+    [listAppointments, listServiceOrders, listCustomers],
+    hasRenderableData
+  );
+  const errorMessage =
+    getErrorMessage(listAppointments.error, "") ||
+    getErrorMessage(listServiceOrders.error, "") ||
+    getErrorMessage(listCustomers.error, "") ||
+    "Não foi possível carregar os agendamentos.";
+
+  if (queryState.isInitialLoading) {
+    return (
+      <PageShell>
+        <PageHero
+          eyebrow="Porta de entrada da operação"
+          title="Agendamentos"
+          description="Preparando agenda, execução e clientes para sugerir a próxima ação."
+        />
+        <SurfaceSection className="flex min-h-[180px] items-center justify-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
+          <Loader className="h-4 w-4 animate-spin text-orange-500" />
+          Carregando painel de agendamentos...
+        </SurfaceSection>
+      </PageShell>
+    );
+  }
+
+  if (queryState.shouldBlockForError) {
+    return (
+      <PageShell>
+        <PageHero
+          eyebrow="Porta de entrada da operação"
+          title="Agendamentos"
+          description="Não foi possível carregar os dados de agenda."
+        />
+        <SurfaceSection className="border-red-200 text-red-700 dark:border-red-900/40 dark:text-red-300">
+          {errorMessage}
+        </SurfaceSection>
+      </PageShell>
+    );
+  }
 
   return (
     <PageShell>
@@ -826,11 +875,13 @@ export default function AppointmentsPage() {
         )}
       </div>
 
-      {listAppointments.isLoading ? (
-        <div className="flex h-64 items-center justify-center">
-          <Loader className="h-8 w-8 animate-spin text-orange-500" />
-        </div>
-      ) : filteredAppointments.length > 0 ? (
+      {queryState.hasBackgroundUpdate ? (
+        <SurfaceSection className="border-blue-500/30 bg-blue-500/10 text-sm text-blue-200">
+          Atualizando agenda em segundo plano...
+        </SurfaceSection>
+      ) : null}
+
+      {filteredAppointments.length > 0 ? (
         <div className="space-y-4">
           {filteredAppointments.map((appointment) => {
             const isProcessing = processingId === appointment.id;
@@ -1203,16 +1254,26 @@ export default function AppointmentsPage() {
           })}
         </div>
       ) : (
-        <div className="space-y-4">
-          <div className="flex h-40 items-center justify-center rounded-xl border border-dashed text-gray-500 dark:border-gray-700 dark:text-gray-400">
-            <p>
-              {appointments.length === 0
-                ? "Ainda não há agendamentos. Crie o primeiro para evidenciar o caminho até O.S., financeiro e WhatsApp."
-                : "Nenhum agendamento bate com os filtros atuais. Limpe os filtros para retomar a leitura do fluxo."}
-            </p>
-          </div>
+        <SurfaceSection className="space-y-4">
+          <EmptyState
+            icon={<Calendar className="h-7 w-7" />}
+            title="Nenhum agendamento encontrado"
+            description={
+              appointments.length === 0
+                ? "Crie o primeiro agendamento para ativar o fluxo Cliente → Agenda → O.S. → Financeiro."
+                : "Nenhum agendamento bate com os filtros atuais. Limpe os filtros para retomar a leitura do fluxo."
+            }
+            action={{
+              label: "Novo Agendamento",
+              onClick: () => setShowCreateModal(true),
+            }}
+            secondaryAction={{
+              label: "Limpar filtros",
+              onClick: handleClearLocalFilters,
+            }}
+          />
           {appointments.length === 0 ? <DemoEnvironmentCta /> : null}
-        </div>
+        </SurfaceSection>
       )}
 
       <CreateAppointmentModal

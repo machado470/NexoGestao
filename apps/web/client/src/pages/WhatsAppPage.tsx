@@ -23,7 +23,7 @@ import {
 } from "@/lib/operations/operations.utils";
 import { DemoEnvironmentCta } from "@/components/DemoEnvironmentCta";
 import { EmptyState } from "@/components/EmptyState";
-import { PageHero, PageShell, SurfaceSection } from "@/components/PagePattern";
+import { PageHero, PageShell, SmartPage, SurfaceSection } from "@/components/PagePattern";
 import { getQueryUiState } from "@/lib/query-helpers";
 
 function getMessageTypeFromContext(context: string) {
@@ -110,6 +110,39 @@ export default function WhatsAppPage() {
     route.amountCents !== null ? formatCurrency(route.amountCents) : null;
 
   const dueDateLabel = route.dueDate ? formatDate(route.dueDate) : null;
+  const unresolvedMessages = messages.filter((msg) => !msg.content?.trim()).length;
+  const smartPriorities = [
+    {
+      id: "wa-contact",
+      type: "operational_risk" as const,
+      title: "Contato com contexto pronto",
+      count: hasCustomer ? 1 : 0,
+      impactCents: 1500,
+      ctaLabel: "Enviar mensagem",
+      ctaPath: "/whatsapp",
+      helperText: "Sem contato no momento certo, a conversão cai.",
+    },
+    {
+      id: "wa-history",
+      type: "stalled_service_orders" as const,
+      title: "Mensagens no histórico",
+      count: messages.length,
+      impactCents: messages.length * 300,
+      ctaLabel: "Revisar conversa",
+      ctaPath: "/whatsapp",
+      helperText: "Histórico recente evita retrabalho comercial.",
+    },
+    {
+      id: "wa-finance",
+      type: "overdue_charges" as const,
+      title: "Cobrança em contexto",
+      count: route.chargeId ? 1 : 0,
+      impactCents: route.amountCents ?? 0,
+      ctaLabel: "Abrir financeiro",
+      ctaPath: "/finances",
+      helperText: "Quando há cobrança, a mensagem precisa ser objetiva.",
+    },
+  ];
 
   const nonBlockingErrorMessage =
     customerQuery.error?.message ||
@@ -119,7 +152,7 @@ export default function WhatsAppPage() {
   if (!route.customerId) {
     return (
       <PageShell>
-        <PageHero
+      <PageHero
           eyebrow="WhatsApp"
           title="WhatsApp"
           description="Comunique com contexto comercial: veja o cenário, entenda o impacto e execute a mensagem certa agora."
@@ -182,6 +215,28 @@ export default function WhatsAppPage() {
           </Button>
         }
       />
+      <SmartPage
+        pageContext="customers"
+        headline="Conversa orientada por próxima ação"
+        dominantProblem={getWhatsAppContextDescription(route)}
+        dominantImpact={messages.length > 0 ? `${messages.length} mensagens no histórico` : "Sem histórico prévio"}
+        dominantCta={{
+          label: "Enviar mensagem agora",
+          onClick: () => {
+            const button = document.querySelector("button[data-whatsapp-send='true']") as HTMLButtonElement | null;
+            button?.focus();
+          },
+          path: "/whatsapp",
+        }}
+        priorities={smartPriorities}
+      />
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="nexo-kpi-card p-4"><p className="text-xs text-gray-500">Mensagens</p><p className="text-xl font-semibold">{messages.length}</p></div>
+        <div className="nexo-kpi-card p-4"><p className="text-xs text-gray-500">Sem conteúdo</p><p className="text-xl font-semibold">{unresolvedMessages}</p></div>
+        <div className="nexo-kpi-card p-4"><p className="text-xs text-gray-500">Cobrança vinculada</p><p className="text-xl font-semibold">{route.chargeId ? "Sim" : "Não"}</p></div>
+        <div className="nexo-kpi-card p-4"><p className="text-xs text-gray-500">Valor em contexto</p><p className="text-xl font-semibold">{amountLabel ?? "—"}</p></div>
+      </div>
 
       {queryState.hasBackgroundUpdate ? (
         <SurfaceSection className="border-blue-500/30 bg-blue-500/10 text-sm text-blue-200">
@@ -270,6 +325,7 @@ export default function WhatsAppPage() {
         />
 
         <Button
+          data-whatsapp-send="true"
           onClick={async () => {
             if (!hasCustomer) {
               toast.error("Cliente inválido para envio de mensagem");
