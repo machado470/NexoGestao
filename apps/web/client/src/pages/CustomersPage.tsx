@@ -25,6 +25,12 @@ import {
   ArrowRightLeft,
   Link2,
   MessageCircle,
+  AlertTriangle,
+  CheckCircle2,
+  Clock3,
+  ShieldAlert,
+  BadgeDollarSign,
+  WifiOff,
 } from "lucide-react";
 import CreateCustomerModal from "@/components/CreateCustomerModal";
 import EditCustomerModal from "@/components/EditCustomerModal";
@@ -44,7 +50,12 @@ import {
   normalizeArrayPayload,
   normalizeObjectPayload,
 } from "@/lib/query-helpers";
-import { PageHero, PageShell, SmartPage, SurfaceSection } from "@/components/PagePattern";
+import {
+  PageHero,
+  PageShell,
+  SmartPage,
+  SurfaceSection,
+} from "@/components/PagePattern";
 import { EmptyState } from "@/components/EmptyState";
 import { DemoEnvironmentCta } from "@/components/DemoEnvironmentCta";
 import { useCriticalActionStore } from "@/stores/criticalActionStore";
@@ -75,6 +86,12 @@ type ServiceOrder = {
   status?: string;
   createdAt?: string;
   scheduledFor?: string | null;
+  updatedAt?: string;
+  amountCents?: number | null;
+  financialSummary?: {
+    hasCharge?: boolean;
+    chargeStatus?: string;
+  } | null;
 };
 
 type Charge = {
@@ -83,6 +100,15 @@ type Charge = {
   status?: string;
   dueDate?: string | null;
   createdAt?: string;
+};
+
+type WorkspaceSuggestion = {
+  id: string;
+  tone: "critical" | "attention" | "healthy";
+  title: string;
+  description: string;
+  ctaLabel: string;
+  ctaPath: string;
 };
 
 type TimelineEvent = {
@@ -169,7 +195,10 @@ function buildCustomersUrl(customerId?: string | null) {
 function normalizeWorkspacePayload(payload: unknown): CustomerWorkspace | null {
   const root = normalizeObjectPayload<any>(payload);
   const raw =
-    root && typeof root === "object" && root.data && typeof root.data === "object"
+    root &&
+    typeof root === "object" &&
+    root.data &&
+    typeof root.data === "object"
       ? root.data
       : root;
 
@@ -301,6 +330,19 @@ function getChargeStatusTone(status?: string) {
   }
 }
 
+function toTimestamp(value?: string | null) {
+  if (!value) return 0;
+  const parsed = new Date(value).getTime();
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function getRiskLevel(score: number) {
+  if (score >= 75) return { label: "Risco alto", tone: "critical" as const };
+  if (score >= 40)
+    return { label: "Risco moderado", tone: "attention" as const };
+  return { label: "Risco controlado", tone: "healthy" as const };
+}
+
 export default function CustomersPage() {
   const [, navigate] = useLocation();
   const utils = trpc.useUtils();
@@ -312,9 +354,23 @@ export default function CustomersPage() {
     () => getCustomerIdFromUrl()
   );
   const [nextActionRouting, setNextActionRouting] = useState(false);
-  const [highlightedCustomerId, setHighlightedCustomerId] = useState<string | null>(null);
+  const [highlightedCustomerId, setHighlightedCustomerId] = useState<
+    string | null
+  >(null);
+  const [workspaceLastUpdatedAt, setWorkspaceLastUpdatedAt] = useState<
+    string | null
+  >(null);
+  const [workspaceFeedback, setWorkspaceFeedback] = useState<string | null>(
+    null
+  );
+  const [localTimeline, setLocalTimeline] = useState<TimelineEvent[]>([]);
+  const [crossTabMessage, setCrossTabMessage] = useState<string | null>(null);
+  const [isDegradedMode, setIsDegradedMode] = useState(false);
+  const retryCountRef = useRef(0);
+  const retryTimerRef = useRef<number | null>(null);
+  const channelRef = useRef<BroadcastChannel | null>(null);
   const highlightedRowRef = useRef<HTMLTableRowElement | null>(null);
-  const interactionBlocked = useCriticalActionStore((state) => state.isBlocked());
+  const interactionBlocked = useCriticalActionStore(state => state.isBlocked());
 
   const listCustomers = trpc.nexo.customers.list.useQuery(undefined, {
     retry: false,
@@ -337,7 +393,8 @@ export default function CustomersPage() {
   const workspace = useMemo(() => {
     const next = normalizeWorkspacePayload(workspaceQuery.data);
     if (!workspaceCustomerId || !next) return next;
-    if (String(next.customer?.id ?? "") !== String(workspaceCustomerId)) return null;
+    if (String(next.customer?.id ?? "") !== String(workspaceCustomerId))
+      return null;
     return next;
   }, [workspaceCustomerId, workspaceQuery.data]);
   const [workspaceTimedOut, setWorkspaceTimedOut] = useState(false);
@@ -363,11 +420,19 @@ export default function CustomersPage() {
 
   useEffect(() => {
     if (workspaceQuery.error) {
+      setIsDegradedMode(true);
       toast.error(
         "Erro ao carregar workspace do cliente: " + workspaceQuery.error.message
       );
     }
   }, [workspaceQuery.error]);
+
+  useEffect(() => {
+    return () => {
+      if (retryTimerRef.current) window.clearTimeout(retryTimerRef.current);
+      channelRef.current?.close();
+    };
+  }, []);
 
   useEffect(() => {
     const syncFromUrl = () => {
@@ -388,15 +453,65 @@ export default function CustomersPage() {
 
   useEffect(() => {
     if (!highlightedCustomerId || !highlightedRowRef.current) return;
-    highlightedRowRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    highlightedRowRef.current.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
     highlightedRowRef.current.focus();
     const timer = window.setTimeout(() => setHighlightedCustomerId(null), 2800);
     return () => window.clearTimeout(timer);
   }, [highlightedCustomerId]);
 
+  useEffect(() => {
+    if (!workspace) return;
+    const latestFromWorkspace = [
+      workspace.customer.updatedAt,
+      ...workspace.appointments.map(item => item.endsAt ?? item.startsAt),
+      ...workspace.serviceOrders.map(item => item.updatedAt ?? item.createdAt),
+      ...workspace.charges.map(item => item.createdAt ?? item.dueDate),
+      ...workspace.timeline.map(item => item.createdAt),
+    ].sort((a, b) => toTimestamp(b) - toTimestamp(a))[0];
+    setWorkspaceLastUpdatedAt(latestFromWorkspace ?? new Date().toISOString());
+    setIsDegradedMode(false);
+    retryCountRef.current = 0;
+  }, [workspace]);
+
+  useEffect(() => {
+    if (!workspaceCustomerId || typeof window === "undefined") return;
+
+    const channelName = `nexo-workspace-${workspaceCustomerId}`;
+    const channel = new BroadcastChannel(channelName);
+    channelRef.current = channel;
+    channel.onmessage = event => {
+      if (event.data?.type === "workspace-updated") {
+        setCrossTabMessage(
+          "Outra aba atualizou este cliente. Contexto sincronizado agora."
+        );
+        setWorkspaceFeedback("Workspace sincronizado entre abas.");
+        void workspaceQuery.refetch();
+      }
+    };
+
+    const storageKey = `nexo_workspace_touch_${workspaceCustomerId}`;
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== storageKey || !event.newValue) return;
+      setCrossTabMessage("Atualização detectada em outra aba.");
+      void workspaceQuery.refetch();
+    };
+
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      channel.close();
+    };
+  }, [workspaceCustomerId, workspaceQuery]);
+
   const total = customers.length;
   const totalActive = customers.filter(c => c.active).length;
   const totalInactive = total - totalActive;
+  const stressLabEnabled =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("stress") === "1";
 
   const openWorkspace = (customerId: string) => {
     if (interactionBlocked) return;
@@ -414,66 +529,269 @@ export default function CustomersPage() {
   const refreshCustomerContexts = async (customerId?: string | null) => {
     await invalidateOperationalGraph(utils, customerId);
 
-    if (workspaceCustomerId && customerId && workspaceCustomerId === customerId) {
+    if (
+      workspaceCustomerId &&
+      customerId &&
+      workspaceCustomerId === customerId
+    ) {
       await workspaceQuery.refetch();
     }
   };
 
+  const announceWorkspaceUpdate = (
+    customerId?: string | null,
+    message?: string
+  ) => {
+    if (!customerId || typeof window === "undefined") return;
+    const storageKey = `nexo_workspace_touch_${customerId}`;
+    localStorage.setItem(storageKey, String(Date.now()));
+    channelRef.current?.postMessage({
+      type: "workspace-updated",
+      at: Date.now(),
+    });
+    if (message) {
+      setWorkspaceFeedback(message);
+    }
+  };
+
+  const retryWorkspaceWithContext = async (reason: string) => {
+    retryCountRef.current += 1;
+    const backoffMs = Math.min(1200 * retryCountRef.current, 5000);
+    setWorkspaceFeedback(`Tentando recuperar workspace (${reason})...`);
+    if (retryTimerRef.current) window.clearTimeout(retryTimerRef.current);
+    retryTimerRef.current = window.setTimeout(() => {
+      void workspaceQuery.refetch();
+    }, backoffMs);
+  };
+
+  const registerWorkspaceAction = (action: string, description: string) => {
+    const now = new Date().toISOString();
+    setLocalTimeline(current => [
+      {
+        id: `local-${now}-${action}`,
+        action,
+        description,
+        createdAt: now,
+      },
+      ...current,
+    ]);
+    setWorkspaceFeedback(description);
+    setWorkspaceLastUpdatedAt(now);
+    if (workspaceCustomerId)
+      announceWorkspaceUpdate(workspaceCustomerId, description);
+  };
+
   const workspaceAppointmentsCount = workspace?.appointments?.length ?? 0;
   const workspaceServiceOrdersCount = workspace?.serviceOrders?.length ?? 0;
-  const workspaceChargesCount = workspace?.charges?.length ?? 0;
   const workspacePendingCharges = (workspace?.charges ?? []).filter(
     item => item.status === "PENDING" || item.status === "OVERDUE"
   ).length;
+  const workspaceOverdueCharges = (workspace?.charges ?? []).filter(
+    item => item.status === "OVERDUE"
+  ).length;
+  const workspacePaidCharges = (workspace?.charges ?? []).filter(
+    item => item.status === "PAID"
+  ).length;
+  const workspaceTotalFinancial = (workspace?.charges ?? []).reduce(
+    (acc, charge) => acc + (charge.amountCents ?? 0),
+    0
+  );
+  const workspacePendingAmount = (workspace?.charges ?? [])
+    .filter(item => item.status === "PENDING" || item.status === "OVERDUE")
+    .reduce((acc, charge) => acc + (charge.amountCents ?? 0), 0);
+  const workspacePaidAmount = (workspace?.charges ?? [])
+    .filter(item => item.status === "PAID")
+    .reduce((acc, charge) => acc + (charge.amountCents ?? 0), 0);
+  const workspaceOverdueAmount = (workspace?.charges ?? [])
+    .filter(item => item.status === "OVERDUE")
+    .reduce((acc, charge) => acc + (charge.amountCents ?? 0), 0);
+  const serviceOrdersWithoutCharge = (workspace?.serviceOrders ?? []).filter(
+    item =>
+      item.financialSummary?.hasCharge === false ||
+      item.financialSummary?.chargeStatus === "NONE"
+  ).length;
+  const doneServiceOrdersWithoutCharge = (
+    workspace?.serviceOrders ?? []
+  ).filter(
+    item =>
+      item.status === "DONE" &&
+      (item.financialSummary?.hasCharge === false ||
+        item.financialSummary?.chargeStatus === "NONE")
+  ).length;
+  const serviceOrdersWithoutValue = (workspace?.serviceOrders ?? []).filter(
+    item => !item.amountCents || item.amountCents <= 0
+  ).length;
+  const delayedServiceOrders = (workspace?.serviceOrders ?? []).filter(item => {
+    if (!item.scheduledFor) return false;
+    if (item.status === "DONE" || item.status === "CANCELED") return false;
+    return toTimestamp(item.scheduledFor) < Date.now();
+  }).length;
+  const workspaceTimeline = useMemo(() => {
+    const server = workspace?.timeline ?? [];
+    const merged = [...localTimeline, ...server];
+    return merged
+      .sort((a, b) => toTimestamp(b.createdAt) - toTimestamp(a.createdAt))
+      .slice(0, 12);
+  }, [localTimeline, workspace?.timeline]);
+  const riskScore = useMemo(() => {
+    let score = 0;
+    if (!workspace) return 0;
+    score += Math.min(workspacePendingCharges * 12, 40);
+    score += Math.min(delayedServiceOrders * 18, 36);
+    score += workspace.customer.active ? 0 : 18;
+    score += Math.min(doneServiceOrdersWithoutCharge * 10, 30);
+    return Math.min(score, 100);
+  }, [
+    delayedServiceOrders,
+    doneServiceOrdersWithoutCharge,
+    workspace,
+    workspacePendingCharges,
+  ]);
+  const riskLevel = getRiskLevel(riskScore);
 
+  const workspaceSuggestions = useMemo<WorkspaceSuggestion[]>(() => {
+    if (!workspace) return [];
+    const suggestions: WorkspaceSuggestion[] = [];
+    if (workspace.serviceOrders.length === 0) {
+      suggestions.push({
+        id: "customer-no-os",
+        tone: "attention",
+        title: "Cliente sem O.S. ativa",
+        description: "Crie a primeira O.S. para iniciar execução e receita.",
+        ctaLabel: "Criar O.S.",
+        ctaPath: `/service-orders?customerId=${workspace.customer.id}`,
+      });
+    }
+    if (serviceOrdersWithoutCharge > 0) {
+      suggestions.push({
+        id: "customer-no-charge",
+        tone: "critical",
+        title: "O.S. sem cobrança vinculada",
+        description: `${serviceOrdersWithoutCharge} O.S. sem conexão financeira.`,
+        ctaLabel: "Gerar cobrança",
+        ctaPath: `/finances?customerId=${workspace.customer.id}`,
+      });
+    }
+    if (!workspace.customer.active) {
+      suggestions.push({
+        id: "customer-inactive",
+        tone: "attention",
+        title: "Cliente inativo",
+        description: "Reative o relacionamento com contato direto.",
+        ctaLabel: "Enviar WhatsApp",
+        ctaPath: `/whatsapp?customerId=${workspace.customer.id}`,
+      });
+    }
+    if (serviceOrdersWithoutValue > 0) {
+      suggestions.push({
+        id: "os-no-value",
+        tone: "attention",
+        title: "O.S. sem valor definido",
+        description: `${serviceOrdersWithoutValue} ordens precisam de valor para previsibilidade.`,
+        ctaLabel: "Definir valor",
+        ctaPath: `/service-orders?customerId=${workspace.customer.id}`,
+      });
+    }
+    if (doneServiceOrdersWithoutCharge > 0) {
+      suggestions.push({
+        id: "os-ready-charge",
+        tone: "critical",
+        title: "O.S. pronta para cobrança",
+        description: "Execução concluída sem faturamento imediato.",
+        ctaLabel: "Cobrar agora",
+        ctaPath: `/finances?customerId=${workspace.customer.id}`,
+      });
+    }
+    if (delayedServiceOrders > 0) {
+      suggestions.push({
+        id: "os-delayed",
+        tone: "critical",
+        title: "O.S. atrasada",
+        description: `${delayedServiceOrders} ordens em atraso exigem reação imediata.`,
+        ctaLabel: "Ver O.S.",
+        ctaPath: `/service-orders?customerId=${workspace.customer.id}`,
+      });
+    }
+    if (workspacePendingCharges > 0) {
+      suggestions.push({
+        id: "finance-pending",
+        tone: workspaceOverdueCharges > 0 ? "critical" : "attention",
+        title: "Cobranças pendentes",
+        description:
+          workspaceOverdueCharges > 0
+            ? `${workspaceOverdueCharges} vencidas e ${workspacePendingCharges} pendentes.`
+            : `${workspacePendingCharges} cobranças aguardando ação.`,
+        ctaLabel: "Ver financeiro",
+        ctaPath: `/finances?customerId=${workspace.customer.id}`,
+      });
+    }
+    return suggestions.slice(0, 5);
+  }, [
+    delayedServiceOrders,
+    doneServiceOrdersWithoutCharge,
+    serviceOrdersWithoutCharge,
+    serviceOrdersWithoutValue,
+    workspace,
+    workspaceOverdueCharges,
+    workspacePendingCharges,
+  ]);
 
-  const smartPriorities = useMemo(() => [
-    {
-      id: "cust-overdue",
-      type: "overdue_charges" as const,
-      title: "Clientes com cobrança pendente",
-      count: workspacePendingCharges,
-      impactCents: workspacePendingCharges * 30000,
-      ctaLabel: "Cobrar cliente",
-      ctaPath: "/finances",
-      helperText: "Cobrança atrasada compromete relacionamento e caixa.",
-    },
-    {
-      id: "cust-ops",
-      type: "stalled_service_orders" as const,
-      title: "Clientes com execução aberta",
-      count: workspaceServiceOrdersCount,
-      impactCents: workspaceServiceOrdersCount * 25000,
-      ctaLabel: "Acompanhar execução",
-      ctaPath: "/service-orders",
-      helperText: "Execução sem fechamento reduz previsibilidade de receita.",
-    },
-    {
-      id: "cust-risk",
-      type: "operational_risk" as const,
-      title: "Clientes sem próxima ação",
-      count: workspace ? 0 : 1,
-      impactCents: 10000,
-      ctaLabel: "Abrir workspace",
-      ctaPath: "/customers",
-      helperText: "Sem foco por cliente o time opera no escuro.",
-    },
-  ], [workspace, workspacePendingCharges, workspaceServiceOrdersCount]);
+  const smartPriorities = useMemo(
+    () => [
+      {
+        id: "cust-overdue",
+        type: "overdue_charges" as const,
+        title: "Clientes com cobrança pendente",
+        count: workspacePendingCharges,
+        impactCents: workspacePendingCharges * 30000,
+        ctaLabel: "Cobrar cliente",
+        ctaPath: "/finances",
+        helperText: "Cobrança atrasada compromete relacionamento e caixa.",
+      },
+      {
+        id: "cust-ops",
+        type: "stalled_service_orders" as const,
+        title: "Clientes com execução aberta",
+        count: workspaceServiceOrdersCount,
+        impactCents: workspaceServiceOrdersCount * 25000,
+        ctaLabel: "Acompanhar execução",
+        ctaPath: "/service-orders",
+        helperText: "Execução sem fechamento reduz previsibilidade de receita.",
+      },
+      {
+        id: "cust-risk",
+        type: "operational_risk" as const,
+        title: "Clientes sem próxima ação",
+        count: workspace ? 0 : 1,
+        impactCents: 10000,
+        ctaLabel: "Abrir workspace",
+        ctaPath: "/customers",
+        helperText: "Sem foco por cliente o time opera no escuro.",
+      },
+    ],
+    [workspace, workspacePendingCharges, workspaceServiceOrdersCount]
+  );
 
   const nextActionLabel = !workspace
     ? "Selecione um cliente para abrir o workspace."
-    : workspacePendingCharges > 0
-      ? "Cobrar cliente imediatamente"
-      : workspaceServiceOrdersCount > 0
-        ? "Acompanhar execução das ordens"
-        : workspaceAppointmentsCount > 0
-          ? "Preparar atendimento agendado"
-          : "Iniciar relacionamento com este cliente";
+    : workspaceSuggestions.length > 0
+      ? workspaceSuggestions[0].title
+      : workspacePendingCharges > 0
+        ? "Cobrar cliente imediatamente"
+        : workspaceServiceOrdersCount > 0
+          ? "Acompanhar execução das ordens"
+          : workspaceAppointmentsCount > 0
+            ? "Preparar atendimento agendado"
+            : "Iniciar relacionamento com este cliente";
   const nextActionSeverity = !workspace
     ? "attention"
-    : workspacePendingCharges > 0
+    : workspaceSuggestions[0]?.tone === "critical"
       ? "critical"
-      : "healthy";
+      : workspaceSuggestions[0]?.tone === "attention"
+        ? "attention"
+        : workspacePendingCharges > 0
+          ? "critical"
+          : "healthy";
 
   return (
     <PageShell>
@@ -512,19 +830,25 @@ export default function CustomersPage() {
         }
       />
 
-
       <SmartPage
         pageContext="customers"
         headline="Cliente nunca fica sem próximo passo"
         dominantProblem={nextActionLabel}
-        dominantImpact={workspace ? `${workspacePendingCharges} pendências financeiras` : "Sem cliente em foco"}
+        dominantImpact={
+          workspace
+            ? `${workspacePendingCharges} pendências financeiras`
+            : "Sem cliente em foco"
+        }
         dominantCta={{
           label: workspace ? "Executar próxima ação" : "Novo cliente",
           onClick: () => {
-            if (workspace) navigate(`/service-orders?customerId=${workspace.customer.id}`);
+            if (workspace)
+              navigate(`/service-orders?customerId=${workspace.customer.id}`);
             else setIsCreateOpen(true);
           },
-          path: workspace ? `/service-orders?customerId=${workspace?.customer.id}` : "/customers",
+          path: workspace
+            ? `/service-orders?customerId=${workspace?.customer.id}`
+            : "/customers",
         }}
         priorities={smartPriorities}
       />
@@ -583,7 +907,10 @@ export default function CustomersPage() {
                 type="button"
                 onClick={() => {
                   setNextActionRouting(true);
-                  if (workspace) navigate(`/service-orders?customerId=${workspace.customer.id}`);
+                  if (workspace)
+                    navigate(
+                      `/service-orders?customerId=${workspace.customer.id}`
+                    );
                   else setIsCreateOpen(true);
                   setTimeout(() => setNextActionRouting(false), 1200);
                 }}
@@ -598,7 +925,9 @@ export default function CustomersPage() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => navigate(`/whatsapp?customerId=${workspace.customer.id}`)}
+                  onClick={() =>
+                    navigate(`/whatsapp?customerId=${workspace.customer.id}`)
+                  }
                 >
                   WhatsApp
                 </Button>
@@ -615,7 +944,8 @@ export default function CustomersPage() {
                   Base que gera receita
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Abra um workspace para entender o contexto, o impacto e a ação imediata por cliente.
+                  Abra um workspace para entender o contexto, o impacto e a ação
+                  imediata por cliente.
                 </p>
               </div>
             </div>
@@ -628,9 +958,14 @@ export default function CustomersPage() {
           ) : listCustomers.error ? (
             <SurfaceSection className="m-4 space-y-3 rounded-xl border border-red-200 bg-red-50/70 dark:border-red-900/40 dark:bg-red-950/20">
               <p className="text-sm text-red-700 dark:text-red-200">
-                Não foi possível carregar clientes. Estado de erro persistente ativo.
+                Não foi possível carregar clientes. Estado de erro persistente
+                ativo.
               </p>
-              <Button type="button" variant="outline" onClick={() => void listCustomers.refetch()}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void listCustomers.refetch()}
+              >
                 Tentar novamente
               </Button>
             </SurfaceSection>
@@ -687,8 +1022,14 @@ export default function CustomersPage() {
                     return (
                       <tr
                         key={customer.id}
-                        ref={highlightedCustomerId === customer.id ? highlightedRowRef : null}
-                        tabIndex={highlightedCustomerId === customer.id ? -1 : undefined}
+                        ref={
+                          highlightedCustomerId === customer.id
+                            ? highlightedRowRef
+                            : null
+                        }
+                        tabIndex={
+                          highlightedCustomerId === customer.id ? -1 : undefined
+                        }
                         className={`hover:bg-gray-50 dark:hover:bg-gray-900/30 ${
                           isOpen ? "bg-orange-50/60 dark:bg-orange-950/10" : ""
                         } ${highlightedCustomerId === customer.id ? "ring-2 ring-orange-400" : ""}`}
@@ -772,11 +1113,9 @@ export default function CustomersPage() {
 
       <Dialog
         open={Boolean(workspaceCustomerId)}
-        onOpenChange={(open) => (!open ? closeWorkspace() : undefined)}
+        onOpenChange={open => (!open ? closeWorkspace() : undefined)}
       >
-        <DialogContent
-          className="left-auto right-0 top-0 h-screen w-full max-h-screen max-w-2xl translate-x-0 translate-y-0 overflow-y-auto rounded-none border-l border-gray-200 bg-gray-50 p-0 shadow-2xl dark:border-gray-700 dark:bg-gray-900"
-        >
+        <DialogContent className="left-auto right-0 top-0 h-screen w-full max-h-screen max-w-2xl translate-x-0 translate-y-0 overflow-y-auto rounded-none border-l border-gray-200 bg-gray-50 p-0 shadow-2xl dark:border-gray-700 dark:bg-gray-900">
           <DialogHeader className="sticky top-0 z-10 border-b border-gray-200 bg-white/95 px-5 py-4 backdrop-blur dark:border-gray-700 dark:bg-gray-800/95">
             <div>
               <p className="text-xs font-medium uppercase tracking-wide text-orange-500">
@@ -788,351 +1127,590 @@ export default function CustomersPage() {
               <DialogDescription className="mt-1 text-left text-sm text-gray-600 dark:text-gray-400">
                 Hub lateral de contexto, histórico e próxima ação.
               </DialogDescription>
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                <Clock3 className="h-3.5 w-3.5" />
+                Última atualização: {formatDateTime(workspaceLastUpdatedAt)}
+                {isDegradedMode ? (
+                  <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-red-700 dark:bg-red-900/30 dark:text-red-300">
+                    <WifiOff className="mr-1 h-3 w-3" />
+                    Modo degradado
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                    <CheckCircle2 className="mr-1 h-3 w-3" />
+                    Sincronizado
+                  </span>
+                )}
+              </div>
             </div>
           </DialogHeader>
 
           <div className="space-y-4 p-5">
-              {workspaceQuery.isLoading && !workspace ? (
-                <div className="rounded-xl border border-gray-200 bg-white p-5 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
-                  <p>Carregando workspace...</p>
-                  {workspaceTimedOut ? (
-                    <div className="mt-3 space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300">
-                      <p>
-                        Este carregamento está demorando além do esperado. Você pode tentar novamente agora.
-                      </p>
+            {workspaceQuery.isLoading && !workspace ? (
+              <div className="rounded-xl border border-gray-200 bg-white p-5 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
+                <p>Carregando workspace...</p>
+                {workspaceTimedOut ? (
+                  <div className="mt-3 space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300">
+                    <p>
+                      Este carregamento está demorando além do esperado. Você
+                      pode tentar novamente agora.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        void retryWorkspaceWithContext(
+                          "timeout de carregamento"
+                        )
+                      }
+                    >
+                      Recarregar com retry inteligente
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
+            ) : !workspace ? (
+              <div className="space-y-3 rounded-xl border border-gray-200 bg-white p-5 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
+                <p>Não foi possível carregar o workspace deste cliente.</p>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      void retryWorkspaceWithContext("erro de API")
+                    }
+                  >
+                    Retry inteligente
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate("/customers")}
+                  >
+                    Fallback: voltar à lista
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={closeWorkspace}
+                  >
+                    Fechar workspace
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <>
+                {workspaceFeedback ? (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-300">
+                    {workspaceFeedback}
+                  </div>
+                ) : null}
+                {crossTabMessage ? (
+                  <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-xs text-blue-700 dark:border-blue-900/40 dark:bg-blue-950/20 dark:text-blue-300">
+                    {crossTabMessage}
+                  </div>
+                ) : null}
+
+                <div className="rounded-xl border border-orange-300 bg-orange-100 p-4 dark:border-orange-900 dark:bg-orange-950/20">
+                  <p className="text-sm font-semibold text-orange-800 dark:text-orange-300">
+                    Próxima ação recomendada
+                  </p>
+
+                  <p className="mt-1 text-sm text-orange-700 dark:text-orange-400">
+                    {nextActionLabel}
+                  </p>
+                </div>
+
+                <div
+                  className={`rounded-xl border p-4 ${
+                    riskLevel.tone === "critical"
+                      ? "border-red-200 bg-red-50 dark:border-red-900/40 dark:bg-red-950/20"
+                      : riskLevel.tone === "attention"
+                        ? "border-amber-200 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-950/20"
+                        : "border-emerald-200 bg-emerald-50 dark:border-emerald-900/40 dark:bg-emerald-950/20"
+                  }`}
+                >
+                  <p className="flex items-center gap-2 text-sm font-semibold">
+                    <ShieldAlert className="h-4 w-4" />
+                    Risk Engine do cliente
+                  </p>
+                  <p className="mt-1 text-sm">
+                    {riskLevel.label} · Score {riskScore}/100
+                  </p>
+                  <p className="mt-1 text-xs opacity-80">
+                    Priorização automática baseada em atraso, pendências
+                    financeiras e execução sem cobrança.
+                  </p>
+                </div>
+
+                {workspaceSuggestions.length > 0 ? (
+                  <div className="space-y-2 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                      CTAs dinâmicos do workspace
+                    </p>
+                    {workspaceSuggestions.map(suggestion => (
+                      <div
+                        key={suggestion.id}
+                        className={`rounded-lg border p-3 ${
+                          suggestion.tone === "critical"
+                            ? "border-red-200 bg-red-50/70 dark:border-red-900/40 dark:bg-red-950/20"
+                            : suggestion.tone === "attention"
+                              ? "border-amber-200 bg-amber-50/70 dark:border-amber-900/40 dark:bg-amber-950/20"
+                              : "border-emerald-200 bg-emerald-50/70 dark:border-emerald-900/40 dark:bg-emerald-950/20"
+                        }`}
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-gray-900 dark:text-white">
+                              {suggestion.title}
+                            </p>
+                            <p className="text-xs text-gray-600 dark:text-gray-300">
+                              {suggestion.description}
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => {
+                              registerWorkspaceAction(
+                                "WORKSPACE_CTA",
+                                `${suggestion.title}: ${suggestion.ctaLabel}`
+                              );
+                              navigate(suggestion.ctaPath);
+                            }}
+                          >
+                            {suggestion.ctaLabel}
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+
+                <div className="rounded-xl border border-orange-200 bg-orange-50 p-4 dark:border-orange-900/40 dark:bg-orange-950/20">
+                  <div className="flex flex-col gap-3">
+                    <div className="flex flex-wrap gap-2">
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => void workspaceQuery.refetch()}
+                        onClick={() => {
+                          registerWorkspaceAction(
+                            "OPEN_APPOINTMENTS",
+                            "Navegação para agenda do cliente."
+                          );
+                          navigate(
+                            `/appointments?customerId=${workspace.customer.id}`
+                          );
+                        }}
+                        className="gap-2"
                       >
-                        Tentar novamente
+                        <CalendarDays className="h-4 w-4" />
+                        Abrir agenda do cliente
+                      </Button>
+
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          registerWorkspaceAction(
+                            "VIEW_SERVICE_ORDERS",
+                            "Visualização de O.S. do cliente."
+                          );
+                          navigate(
+                            `/service-orders?customerId=${workspace.customer.id}`
+                          );
+                        }}
+                        className="gap-2"
+                      >
+                        <Briefcase className="h-4 w-4" />
+                        Ver O.S.
+                      </Button>
+
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          registerWorkspaceAction(
+                            "CREATE_SERVICE_ORDER",
+                            "Ação direta para criar nova O.S."
+                          );
+                          navigate(
+                            `/service-orders?customerId=${workspace.customer.id}&create=1`
+                          );
+                        }}
+                        className="gap-2"
+                      >
+                        <Plus className="h-4 w-4" />
+                        Criar O.S.
+                      </Button>
+
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          registerWorkspaceAction(
+                            "VIEW_FINANCE",
+                            "Consulta de financeiro do cliente."
+                          );
+                          navigate(
+                            `/finances?customerId=${workspace.customer.id}`
+                          );
+                        }}
+                        className="gap-2"
+                      >
+                        <Wallet className="h-4 w-4" />
+                        Ver cobranças
+                      </Button>
+
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          registerWorkspaceAction(
+                            "GENERATE_CHARGE",
+                            "Ação direta para gerar cobrança."
+                          );
+                          navigate(
+                            `/finances?customerId=${workspace.customer.id}&createCharge=1`
+                          );
+                        }}
+                        className="gap-2"
+                      >
+                        <BadgeDollarSign className="h-4 w-4" />
+                        Gerar cobrança
+                      </Button>
+
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          registerWorkspaceAction(
+                            "SEND_WHATSAPP",
+                            "Contato no WhatsApp iniciado."
+                          );
+                          navigate(
+                            `/whatsapp?customerId=${workspace.customer.id}`
+                          );
+                        }}
+                        className="gap-2"
+                      >
+                        <MessageCircle className="h-4 w-4" />
+                        Falar com cliente
+                      </Button>
+
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          navigate(buildCustomersUrl(workspace.customer.id))
+                        }
+                        className="gap-2"
+                      >
+                        <Link2 className="h-4 w-4" />
+                        Deep-link
                       </Button>
                     </div>
-                  ) : null}
-                </div>
-              ) : !workspace ? (
-                <div className="space-y-3 rounded-xl border border-gray-200 bg-white p-5 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
-                  <p>Não foi possível carregar o workspace deste cliente.</p>
-                  <div className="flex flex-wrap gap-2">
-                    <Button type="button" variant="outline" size="sm" onClick={() => void workspaceQuery.refetch()}>
-                      Tentar novamente
-                    </Button>
-                    <Button type="button" variant="outline" size="sm" onClick={closeWorkspace}>
-                      Fechar workspace
-                    </Button>
+
+                    <p className="text-xs text-orange-800 dark:text-orange-300">
+                      Use este cliente como ponto de partida para navegar pelo
+                      resto do fluxo.
+                    </p>
                   </div>
                 </div>
-              ) : (
-                <>
-                  <div className="rounded-xl border border-orange-300 bg-orange-100 p-4 dark:border-orange-900 dark:bg-orange-950/20">
-                    <p className="text-sm font-semibold text-orange-800 dark:text-orange-300">
-                      Próxima ação recomendada
-                    </p>
 
-                    <p className="mt-1 text-sm text-orange-700 dark:text-orange-400">
-                      {nextActionLabel}
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+                    <p className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                      <Phone className="h-4 w-4" />
+                      Telefone
+                    </p>
+                    <p className="mt-1 font-medium text-gray-900 dark:text-white">
+                      {workspace.customer.phone ?? "—"}
                     </p>
                   </div>
 
-                  <div className="rounded-xl border border-orange-200 bg-orange-50 p-4 dark:border-orange-900/40 dark:bg-orange-950/20">
-                    <div className="flex flex-col gap-3">
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() =>
-                            navigate(
-                              `/appointments?customerId=${workspace.customer.id}`
-                            )
-                          }
-                          className="gap-2"
-                        >
-                          <CalendarDays className="h-4 w-4" />
-                          Abrir agenda do cliente
-                        </Button>
-
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() =>
-                            navigate(
-                              `/service-orders?customerId=${workspace.customer.id}`
-                            )
-                          }
-                          className="gap-2"
-                        >
-                          <Briefcase className="h-4 w-4" />
-                          Ver execuções
-                        </Button>
-
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() =>
-                            navigate(`/finances?customerId=${workspace.customer.id}`)
-                          }
-                          className="gap-2"
-                        >
-                          <Wallet className="h-4 w-4" />
-                          Ver cobranças
-                        </Button>
-
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() =>
-                            navigate(
-                              `/whatsapp?customerId=${workspace.customer.id}`
-                            )
-                          }
-                          className="gap-2"
-                        >
-                          <MessageCircle className="h-4 w-4" />
-                          Falar com cliente
-                        </Button>
-
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() =>
-                            navigate(buildCustomersUrl(workspace.customer.id))
-                          }
-                          className="gap-2"
-                        >
-                          <Link2 className="h-4 w-4" />
-                          Deep-link
-                        </Button>
-                      </div>
-
-                      <p className="text-xs text-orange-800 dark:text-orange-300">
-                        Use este cliente como ponto de partida para navegar pelo
-                        resto do fluxo.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-                      <p className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-                        <Phone className="h-4 w-4" />
-                        Telefone
-                      </p>
-                      <p className="mt-1 font-medium text-gray-900 dark:text-white">
-                        {workspace.customer.phone ?? "—"}
-                      </p>
-                    </div>
-
-                    <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-                      <p className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-                        <Mail className="h-4 w-4" />
-                        Email
-                      </p>
-                      <p className="mt-1 font-medium text-gray-900 dark:text-white">
-                        {workspace.customer.email ?? "—"}
-                      </p>
-                    </div>
-
-                    <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                        Status
-                      </p>
-                      <p className="mt-1 font-medium text-gray-900 dark:text-white">
-                        {workspace.customer.active ? "Ativo" : "Inativo"}
-                      </p>
-                    </div>
-
-                    <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                        Criado em
-                      </p>
-                      <p className="mt-1 font-medium text-gray-900 dark:text-white">
-                        {formatDate(workspace.customer.createdAt)}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                    <SummaryCard
-                      title="Agendamentos"
-                      value={workspaceAppointmentsCount}
-                      subtitle="Histórico no workspace"
-                    />
-                    <SummaryCard
-                      title="Ordens de serviço"
-                      value={workspaceServiceOrdersCount}
-                      subtitle="Execuções vinculadas"
-                    />
-                    <SummaryCard
-                      title="Cobranças"
-                      value={workspaceChargesCount}
-                      subtitle="Eventos financeiros do cliente"
-                    />
-                    <SummaryCard
-                      title="Pendências"
-                      value={workspacePendingCharges}
-                      subtitle="Cobranças que ainda pedem ação"
-                      tone={workspacePendingCharges > 0 ? "default" : "muted"}
-                    />
+                  <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+                    <p className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                      <Mail className="h-4 w-4" />
+                      Email
+                    </p>
+                    <p className="mt-1 font-medium text-gray-900 dark:text-white">
+                      {workspace.customer.email ?? "—"}
+                    </p>
                   </div>
 
                   <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                      Observações
+                      Status
                     </p>
-                    <p className="mt-1 text-sm text-gray-900 dark:text-white">
-                      {workspace.customer.notes?.trim() || "Sem observações."}
+                    <p className="mt-1 font-medium text-gray-900 dark:text-white">
+                      {workspace.customer.active ? "Ativo" : "Inativo"}
                     </p>
                   </div>
 
-                  <SectionCard
-                    title="Agendamentos recentes"
-                    icon={CalendarDays}
-                    emptyText="Sem agendamentos recentes. Programe um novo horário para manter a operação em movimento."
-                  >
-                    {workspace.appointments.slice(0, 5).map(item => (
-                      <div
-                        key={item.id}
-                        className="rounded-lg border border-gray-200 p-3 dark:border-gray-700"
-                      >
-                        <p className="text-sm font-medium text-gray-900 dark:text-white">
-                          {formatDateTime(item.startsAt)}
-                        </p>
-                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                          Status: {item.status ?? "—"}
-                        </p>
-                        <p className="mt-1 text-sm text-gray-700 dark:text-gray-300">
-                          {truncateText(item.notes, 120)}
-                        </p>
-                      </div>
-                    ))}
-                  </SectionCard>
+                  <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      Criado em
+                    </p>
+                    <p className="mt-1 font-medium text-gray-900 dark:text-white">
+                      {formatDate(workspace.customer.createdAt)}
+                    </p>
+                  </div>
+                </div>
 
-                  <SectionCard
-                    title="Ordens de serviço recentes"
-                    icon={Briefcase}
-                    emptyText="Nenhuma O.S. vinculada ainda. Crie uma ordem para iniciar execução e rastreabilidade."
-                  >
-                    {workspace.serviceOrders.slice(0, 5).map(item => (
-                      <div
-                        key={item.id}
-                        className="rounded-lg border border-gray-200 p-3 dark:border-gray-700"
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium text-gray-900 dark:text-white">
-                              {item.title ?? "Ordem de serviço"}
-                            </p>
-                            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                              Status: {item.status ?? "—"}
-                            </p>
-                            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                              Criada em: {formatDate(item.createdAt)}
-                            </p>
-                          </div>
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  <SummaryCard
+                    title="Total financeiro"
+                    value={formatCurrency(workspaceTotalFinancial)}
+                    subtitle="Toda receita mapeada no cliente"
+                  />
+                  <SummaryCard
+                    title="Pendente"
+                    value={formatCurrency(workspacePendingAmount)}
+                    subtitle={`${workspacePendingCharges} cobranças esperando ação`}
+                  />
+                  <SummaryCard
+                    title="Pago"
+                    value={formatCurrency(workspacePaidAmount)}
+                    subtitle={`${workspacePaidCharges} cobranças já recebidas`}
+                    tone="success"
+                  />
+                  <SummaryCard
+                    title="Atrasado"
+                    value={formatCurrency(workspaceOverdueAmount)}
+                    subtitle={`${workspaceOverdueCharges} cobranças vencidas`}
+                    tone={workspaceOverdueCharges > 0 ? "default" : "muted"}
+                  />
+                </div>
 
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() =>
-                              navigate(buildServiceOrdersDeepLink(item.id))
-                            }
-                          >
-                            <ArrowRightLeft className="mr-1 h-4 w-4" />
-                            Abrir ordem
-                          </Button>
+                <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Observações
+                  </p>
+                  <p className="mt-1 text-sm text-gray-900 dark:text-white">
+                    {workspace.customer.notes?.trim() || "Sem observações."}
+                  </p>
+                </div>
+
+                <SectionCard
+                  title="Agendamentos recentes"
+                  icon={CalendarDays}
+                  emptyText="Sem agendamentos recentes. Programe um novo horário para manter a operação em movimento."
+                >
+                  {workspace.appointments.slice(0, 5).map(item => (
+                    <div
+                      key={item.id}
+                      className="rounded-lg border border-gray-200 p-3 dark:border-gray-700"
+                    >
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">
+                        {formatDateTime(item.startsAt)}
+                      </p>
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        Status: {item.status ?? "—"}
+                      </p>
+                      <p className="mt-1 text-sm text-gray-700 dark:text-gray-300">
+                        {truncateText(item.notes, 120)}
+                      </p>
+                    </div>
+                  ))}
+                </SectionCard>
+
+                <SectionCard
+                  title="Ordens de serviço recentes"
+                  icon={Briefcase}
+                  emptyText="Nenhuma O.S. vinculada ainda. Crie uma ordem para iniciar execução e rastreabilidade."
+                >
+                  {workspace.serviceOrders.slice(0, 5).map(item => (
+                    <div
+                      key={item.id}
+                      className="rounded-lg border border-gray-200 p-3 dark:border-gray-700"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-900 dark:text-white">
+                            {item.title ?? "Ordem de serviço"}
+                          </p>
+                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            Status: {item.status ?? "—"}
+                          </p>
+                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            Criada em: {formatDate(item.createdAt)}
+                          </p>
                         </div>
+
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            navigate(buildServiceOrdersDeepLink(item.id))
+                          }
+                        >
+                          <ArrowRightLeft className="mr-1 h-4 w-4" />
+                          Abrir ordem
+                        </Button>
                       </div>
-                    ))}
-                  </SectionCard>
+                    </div>
+                  ))}
+                </SectionCard>
 
-                  <SectionCard
-                    title="Cobranças recentes"
-                    icon={Wallet}
-                    emptyText="Sem cobranças registradas. Gere uma cobrança para acompanhar pendências e recebimentos."
-                  >
-                    {workspace.charges.slice(0, 5).map(item => (
-                      <div
-                        key={item.id}
-                        className={`rounded-lg border p-3 ${
-                          item.status === "OVERDUE"
-                            ? "border-red-200 bg-red-50/70 dark:border-red-900/40 dark:bg-red-950/20"
-                            : item.status === "PENDING"
-                              ? "border-amber-200 bg-amber-50/70 dark:border-amber-900/40 dark:bg-amber-950/20"
-                              : "border-gray-200 dark:border-gray-700"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium text-gray-900 dark:text-white">
-                              {formatCurrency(item.amountCents)}
-                            </p>
-                            <p className="mt-1">
-                              <span
-                                className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${getChargeStatusTone(item.status)}`}
-                              >
-                                {getChargeStatusLabel(item.status)}
-                              </span>
-                            </p>
-                            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                              Vencimento: {formatDate(item.dueDate)}
-                            </p>
-                          </div>
-
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() =>
-                              navigate(buildFinanceChargeUrl(item.id))
-                            }
-                          >
-                            <ArrowRightLeft className="mr-1 h-4 w-4" />
-                            Abrir cobrança
-                          </Button>
+                <SectionCard
+                  title="Cobranças recentes"
+                  icon={Wallet}
+                  emptyText="Sem cobranças registradas. Gere uma cobrança para acompanhar pendências e recebimentos."
+                >
+                  {workspace.charges.slice(0, 5).map(item => (
+                    <div
+                      key={item.id}
+                      className={`rounded-lg border p-3 ${
+                        item.status === "OVERDUE"
+                          ? "border-red-200 bg-red-50/70 dark:border-red-900/40 dark:bg-red-950/20"
+                          : item.status === "PENDING"
+                            ? "border-amber-200 bg-amber-50/70 dark:border-amber-900/40 dark:bg-amber-950/20"
+                            : "border-gray-200 dark:border-gray-700"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-900 dark:text-white">
+                            {formatCurrency(item.amountCents)}
+                          </p>
+                          <p className="mt-1">
+                            <span
+                              className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${getChargeStatusTone(item.status)}`}
+                            >
+                              {getChargeStatusLabel(item.status)}
+                            </span>
+                          </p>
+                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            Vencimento: {formatDate(item.dueDate)}
+                          </p>
                         </div>
-                      </div>
-                    ))}
-                  </SectionCard>
 
-                  <SectionCard
-                    title="Timeline recente"
-                    icon={History}
-                    emptyText="Sem eventos recentes no histórico. Novas interações aparecerão aqui automaticamente."
-                  >
-                    {workspace.timeline.slice(0, 8).map(item => (
-                      <div
-                        key={item.id}
-                        className="rounded-lg border border-gray-200 p-3 dark:border-gray-700"
-                      >
-                        <p className="text-sm font-medium text-gray-900 dark:text-white">
-                          {item.action ?? "EVENT"}
-                        </p>
-                        <p className="mt-1 text-sm text-gray-700 dark:text-gray-300">
-                          {item.description?.trim() || "Sem descrição."}
-                        </p>
-                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                          {formatDateTime(item.createdAt)}
-                        </p>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            navigate(buildFinanceChargeUrl(item.id))
+                          }
+                        >
+                          <ArrowRightLeft className="mr-1 h-4 w-4" />
+                          Abrir cobrança
+                        </Button>
                       </div>
-                    ))}
+                    </div>
+                  ))}
+                </SectionCard>
+
+                {stressLabEnabled ? (
+                  <SectionCard
+                    title="Stress lab (simulação real)"
+                    icon={AlertTriangle}
+                    emptyText=""
+                  >
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          for (let i = 0; i < 4; i += 1) {
+                            window.setTimeout(() => {
+                              registerWorkspaceAction(
+                                "STRESS_MULTI_CLICK",
+                                `Clique múltiplo simulado #${i + 1}`
+                              );
+                            }, i * 120);
+                          }
+                        }}
+                      >
+                        Simular múltiplos cliques
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          registerWorkspaceAction(
+                            "STRESS_NAV_LOADING",
+                            "Navegação durante loading simulada."
+                          );
+                          setWorkspaceFeedback(
+                            "Latência artificial de 1.5s aplicada."
+                          );
+                          window.setTimeout(
+                            () =>
+                              navigate(
+                                `/service-orders?customerId=${workspace.customer.id}`
+                              ),
+                            1500
+                          );
+                        }}
+                      >
+                        Navegar com latência
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          registerWorkspaceAction(
+                            "STRESS_PARALLEL_ACTION",
+                            "Duas ações paralelas iniciadas."
+                          );
+                          void Promise.allSettled([
+                            workspaceQuery.refetch(),
+                            listCustomers.refetch(),
+                          ]);
+                        }}
+                      >
+                        Duas ações simultâneas
+                      </Button>
+                    </div>
                   </SectionCard>
-                </>
-              )}
-            </div>
+                ) : null}
+
+                <SectionCard
+                  title="Timeline recente"
+                  icon={History}
+                  emptyText="Sem eventos recentes no histórico. Novas interações aparecerão aqui automaticamente."
+                >
+                  {workspaceTimeline.map(item => (
+                    <div
+                      key={item.id}
+                      className="rounded-lg border border-gray-200 p-3 dark:border-gray-700"
+                    >
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">
+                        {item.action ?? "EVENT"}
+                      </p>
+                      <p className="mt-1 text-sm text-gray-700 dark:text-gray-300">
+                        {item.description?.trim() || "Sem descrição."}
+                      </p>
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        {formatDateTime(item.createdAt)}
+                      </p>
+                    </div>
+                  ))}
+                </SectionCard>
+              </>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 
       <CreateCustomerModal
         open={isCreateOpen}
         onOpenChange={setIsCreateOpen}
-        onCreated={async (createdCustomer) => {
+        onCreated={async createdCustomer => {
           const createdId = createdCustomer?.id ?? null;
 
           if (createdId) {
@@ -1149,7 +1727,7 @@ export default function CustomersPage() {
         open={Boolean(editingCustomerId)}
         customerId={editingCustomerId}
         onClose={() => setEditingCustomerId(null)}
-        onSaved={async (savedCustomer) => {
+        onSaved={async savedCustomer => {
           if (savedCustomer?.id) setHighlightedCustomerId(savedCustomer.id);
           await refreshCustomerContexts(savedCustomer?.id ?? editingCustomerId);
         }}
