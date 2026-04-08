@@ -25,6 +25,7 @@ import { useLocation } from "wouter";
 import { buildServiceOrdersDeepLink } from "@/lib/operations/operations.utils";
 import { useCriticalActionGuard } from "@/hooks/useCriticalActionGuard";
 import { invalidateOperationalGraph } from "@/lib/operationalConsistency";
+import { useProductAnalytics } from "@/hooks/useProductAnalytics";
 
 type Props = {
   open?: boolean;
@@ -136,6 +137,7 @@ export default function CreateServiceOrderModal({
 }: Props) {
   const [, navigate] = useLocation();
   const utils = trpc.useUtils();
+  const { track } = useProductAnalytics();
   const resolvedOpen = open ?? isOpen ?? false;
   const [createdServiceOrder, setCreatedServiceOrder] = useState<{
     id: string;
@@ -285,6 +287,12 @@ export default function CreateServiceOrderModal({
           customerId: payload.customerId,
         });
         registerActionFlowEvent("service_order_created");
+        track("create_service_order", {
+          screen: "service-orders",
+          serviceOrderId: String((created as any)?.id ?? ""),
+          customerId: payload.customerId,
+          hasAmount: Boolean(payload.amountCents),
+        });
         toast.success(`O.S. criada: ${String((created as any)?.title ?? payload.title)}`, {
           action: {
             label: "Ver O.S.",

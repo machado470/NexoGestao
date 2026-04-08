@@ -11,6 +11,7 @@ import { registerActionFlowEvent } from "@/lib/actionFlow";
 import ModalFlowShell from "@/components/ModalFlowShell";
 import { useCriticalActionGuard } from "@/hooks/useCriticalActionGuard";
 import { invalidateOperationalGraph } from "@/lib/operationalConsistency";
+import { useProductAnalytics } from "@/hooks/useProductAnalytics";
 
 type Props = {
   open: boolean;
@@ -26,6 +27,7 @@ export default function CreateCustomerModal({ open, onOpenChange, onCreated }: P
   const [createdCustomer, setCreatedCustomer] = useState<{ id: string; name: string } | null>(null);
 
   const utils = trpc.useUtils();
+  const { track } = useProductAnalytics();
   const createCustomer = trpc.nexo.customers.create.useMutation();
 
   useCriticalActionGuard({
@@ -126,6 +128,11 @@ export default function CreateCustomerModal({ open, onOpenChange, onCreated }: P
       });
 
       registerActionFlowEvent("customer_created");
+      track("create_customer", {
+        screen: "customers",
+        customerId: createdId,
+        nextStep: "create_service_order",
+      });
       setCreatedCustomer({ id: createdId, name: createdName });
       reset();
       await invalidateOperationalGraph(utils, createdId);
@@ -157,6 +164,11 @@ export default function CreateCustomerModal({ open, onOpenChange, onCreated }: P
               type="button"
               className="bg-orange-500 text-white hover:bg-orange-600"
               onClick={async () => {
+                track("cta_click", {
+                  screen: "customers",
+                  ctaId: "customer_created_view_customer",
+                  target: "customer_workspace",
+                });
                 await onCreated?.({ id: createdCustomer.id, name: createdCustomer.name });
                 close();
               }}
@@ -167,6 +179,11 @@ export default function CreateCustomerModal({ open, onOpenChange, onCreated }: P
               type="button"
               variant="outline"
               onClick={async () => {
+                track("cta_click", {
+                  screen: "customers",
+                  ctaId: "customer_created_go_service_order",
+                  target: "service-orders",
+                });
                 await onCreated?.({ id: createdCustomer.id, name: createdCustomer.name });
                 window.location.assign(`/service-orders?customerId=${createdCustomer.id}&source=customer_created`);
               }}

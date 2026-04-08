@@ -11,6 +11,13 @@ export interface TrackEventParams {
   metadata?: Record<string, unknown>
 }
 
+export interface TrackProductEventParams {
+  orgId: string
+  userId?: string
+  eventName: string
+  metadata?: Record<string, unknown>
+}
+
 export interface UsageQueryParams {
   orgId: string
   from?: Date
@@ -22,6 +29,17 @@ export interface UsageQueryParams {
 @Injectable()
 export class AnalyticsService {
   private readonly logger = new Logger(AnalyticsService.name)
+  private readonly allowedProductEvents = new Set([
+    'cta_click',
+    'create_customer',
+    'create_service_order',
+    'generate_charge',
+    'send_whatsapp',
+    'payment_registered',
+    'upgrade_click',
+    'checkout_started',
+    'checkout_completed',
+  ])
 
   constructor(private readonly prisma: PrismaService) {}
 
@@ -41,6 +59,29 @@ export class AnalyticsService {
         `Falha ao registrar evento ${params.event}: ${message}`,
       )
     }
+  }
+
+  async trackProductEvent(params: TrackProductEventParams): Promise<void> {
+    const normalizedEvent = String(params.eventName ?? '')
+      .trim()
+      .toLowerCase()
+
+    if (!this.allowedProductEvents.has(normalizedEvent)) {
+      this.logger.warn(`Evento de produto ignorado: ${params.eventName}`)
+      return
+    }
+
+    await this.track({
+      orgId: params.orgId,
+      userId: params.userId,
+      event: ((UsageMetricEvent as any)?.PRODUCT_EVENT ??
+        (UsageMetricEvent as any)?.LOGIN) as UsageMetricEvent,
+      metadata: {
+        category: 'product_conversion',
+        eventName: normalizedEvent,
+        ...(params.metadata ?? {}),
+      },
+    })
   }
 
   async getUsageSummary(orgId: string, from?: Date, to?: Date) {

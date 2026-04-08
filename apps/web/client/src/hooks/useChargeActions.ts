@@ -2,6 +2,7 @@ import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { buildFinanceChargeUrl } from "@/lib/operations/operations.utils";
 import { toast } from "sonner";
+import { useProductAnalytics } from "@/hooks/useProductAnalytics";
 
 type NavigateFn = (path: string) => void;
 
@@ -44,6 +45,7 @@ export function useChargeActions(options?: UseChargeActionsOptions) {
   const refreshActions = options?.refreshActions ?? [];
 
   const utils = trpc.useUtils();
+  const { track } = useProductAnalytics();
 
   const runRefreshActions = async () => {
     for (const action of refreshActions) {
@@ -76,6 +78,12 @@ export function useChargeActions(options?: UseChargeActionsOptions) {
       });
 
       toast.success("Pagamento registrado com sucesso");
+      track("payment_registered", {
+        screen: "finances",
+        chargeId: variables.chargeId,
+        method: variables.method,
+        amountCents: variables.amountCents,
+      });
       await Promise.all([
         utils.finance.charges.stats.invalidate(),
         utils.dashboard.alerts.invalidate(),
@@ -112,6 +120,11 @@ export function useChargeActions(options?: UseChargeActionsOptions) {
       return;
     }
 
+    track("checkout_started", {
+      screen: "finances",
+      chargeId: String(charge.id),
+      source: "charge_action",
+    });
     navigate(buildChargeFinancePath(String(charge.id), returnPath));
   };
 

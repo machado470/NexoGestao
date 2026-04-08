@@ -60,6 +60,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { DemoEnvironmentCta } from "@/components/DemoEnvironmentCta";
 import { useCriticalActionStore } from "@/stores/criticalActionStore";
 import { invalidateOperationalGraph } from "@/lib/operationalConsistency";
+import { useProductAnalytics } from "@/hooks/useProductAnalytics";
 
 type Customer = {
   id: string;
@@ -345,6 +346,7 @@ function getRiskLevel(score: number) {
 }
 
 export default function CustomersPage() {
+  const { track } = useProductAnalytics();
   const [, navigate] = useLocation();
   const utils = trpc.useUtils();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -858,7 +860,13 @@ export default function CustomersPage() {
 
             <Button
               type="button"
-              onClick={() => setIsCreateOpen(true)}
+              onClick={() => {
+                track("cta_click", {
+                  screen: "customers",
+                  ctaId: "hero_new_customer",
+                });
+                setIsCreateOpen(true);
+              }}
               className="min-h-12 flex items-center gap-2 bg-orange-500 text-white"
               disabled={interactionBlocked}
             >
@@ -881,6 +889,11 @@ export default function CustomersPage() {
         dominantCta={{
           label: workspace ? "Executar próxima ação" : "Novo cliente",
           onClick: () => {
+            track("cta_click", {
+              screen: "customers",
+              ctaId: "smartpage_primary",
+              hasWorkspace: Boolean(workspace),
+            });
             if (workspace)
               navigate(`/service-orders?customerId=${workspace.customer.id}`);
             else setIsCreateOpen(true);
@@ -945,6 +958,11 @@ export default function CustomersPage() {
               <Button
                 type="button"
                 onClick={() => {
+                  track("cta_click", {
+                    screen: "customers",
+                    ctaId: "next_action_primary",
+                    hasWorkspace: Boolean(workspace),
+                  });
                   setNextActionRouting(true);
                   if (workspace)
                     navigate(

@@ -8,23 +8,40 @@ export class OnboardingService {
   constructor(private prisma: PrismaService) {}
 
   async getOnboardingStatus(orgId: string) {
-    const organization = await this.prisma.organization.findUnique({
-      where: { id: orgId },
-      select: { requiresOnboarding: true },
-    })
+    const [organization, customerCount, serviceOrderCount, chargeCount] =
+      await Promise.all([
+        this.prisma.organization.findUnique({
+          where: { id: orgId },
+          select: { requiresOnboarding: true },
+        }),
+        this.prisma.customer.count({ where: { orgId } }),
+        this.prisma.serviceOrder.count({ where: { orgId } }),
+        this.prisma.charge.count({ where: { orgId } }),
+      ])
 
     if (!organization) {
       return null
     }
 
-    const completed = organization.requiresOnboarding === false
+    const createCustomer = customerCount > 0
+    const createService = serviceOrderCount > 0
+    const createCharge = chargeCount > 0
+    const shouldComplete = createCustomer && createService && createCharge
+
+    if (organization.requiresOnboarding && shouldComplete) {
+      await this.prisma.organization.update({
+        where: { id: orgId },
+        data: { requiresOnboarding: false },
+      })
+      organization.requiresOnboarding = false
+    }
 
     return {
       requiresOnboarding: organization.requiresOnboarding,
       steps: {
-        createCustomer: completed,
-        createService: completed,
-        createCharge: completed,
+        createCustomer,
+        createService,
+        createCharge,
       },
     }
   }
@@ -37,8 +54,6 @@ export class OnboardingService {
 
     if (!org) return null
 
-    // Sem coluna onboardingStep no schema atual.
-    // Então só concluímos o onboarding de verdade no passo final.
     if (step === 'createCharge' && org.requiresOnboarding) {
       await this.prisma.organization.update({
         where: { id: orgId },

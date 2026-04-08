@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { AlertTriangle, CheckCircle2, CreditCard, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
+import { useProductAnalytics } from "@/hooks/useProductAnalytics";
 
 type PlanName = "STARTER" | "PRO" | "SCALE" | "FREE";
 
@@ -40,6 +41,7 @@ const PLAN_GAIN: Record<PlanName, string> = {
 };
 
 export default function BillingPage() {
+  const { track } = useProductAnalytics();
   const plansQuery = trpc.billing.plans.useQuery(undefined, {
     retry: 1,
     staleTime: 60_000,
@@ -60,6 +62,10 @@ export default function BillingPage() {
   const checkoutMutation = trpc.billing.checkout.useMutation({
     onSuccess: (payload) => {
       const checkoutUrl = payload?.url ?? payload?.checkoutUrl;
+      track("checkout_completed", {
+        screen: "billing",
+        hasRedirect: Boolean(checkoutUrl),
+      });
       if (checkoutUrl) {
         window.location.assign(checkoutUrl);
         return;
@@ -140,6 +146,17 @@ export default function BillingPage() {
   const handleUpgrade = async (planName: PlanName) => {
     const priceId = PLAN_PRICE_ID[planName];
     if (!priceId) return;
+    track("upgrade_click", {
+      screen: "billing",
+      targetPlan: planName,
+      currentPlan,
+      blockedByLimit: blockedItems.map((item) => item.label),
+    });
+    track("checkout_started", {
+      screen: "billing",
+      entryPoint: "plan_card",
+      targetPlan: planName,
+    });
     await checkoutMutation.mutateAsync({
       priceId,
       successUrl: `${window.location.origin}/billing`,
@@ -156,6 +173,9 @@ export default function BillingPage() {
             <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
               Controle trial, limites e upgrade sem sair do fluxo operacional.
             </p>
+            <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-300">
+              Seu upgrade libera mais execução, mais cobranças e mais receita confirmada sem bloqueio.
+            </p>
           </div>
           <div className="rounded-xl border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-700">
             Plano atual: <strong>{currentPlan}</strong>
@@ -171,7 +191,7 @@ export default function BillingPage() {
           <p className="mt-3 inline-flex items-center gap-2 rounded-lg bg-red-100 px-3 py-2 text-xs text-red-900 dark:bg-red-900/30 dark:text-red-200">
             <AlertTriangle className="h-4 w-4" />
             Você atingiu o limite de {blockedItems.map((item) => item.label).join(", ")}.
-            Continue crescendo com upgrade.
+            Isso está bloqueando novas operações. Faça upgrade para continuar vendendo sem fricção.
           </p>
         ) : null}
       </section>
@@ -223,6 +243,7 @@ export default function BillingPage() {
                   <p>Clientes: {limits?.limits?.customers ?? "—"}</p>
                   <p>Agendamentos: {limits?.limits?.appointments ?? "—"}</p>
                   <p>Ordens de serviço: {limits?.limits?.serviceOrders ?? "—"}</p>
+                  <p>Usuários: {limits?.limits?.users ?? "—"}</p>
                 </div>
                 <div className="mt-4">
                   {isCurrent ? (
