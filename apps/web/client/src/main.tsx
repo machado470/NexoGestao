@@ -11,8 +11,6 @@ import { initSentry } from "./lib/sentry";
 
 initSentry();
 
-const queryClient = new QueryClient();
-
 let isRedirectingToLogin = false;
 
 const isPublicPath = (pathname: string): boolean => {
@@ -41,6 +39,27 @@ const shouldRedirectToLogin = (error: unknown): boolean => {
   );
 };
 
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000,
+      gcTime: 5 * 60_000,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: true,
+      retry(failureCount, error) {
+        if (shouldRedirectToLogin(error)) return false;
+        return failureCount < 2;
+      },
+    },
+    mutations: {
+      retry(failureCount, error) {
+        if (shouldRedirectToLogin(error)) return false;
+        return failureCount < 1;
+      },
+    },
+  },
+});
+
 const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (typeof window === "undefined") return;
   if (isRedirectingToLogin) return;
@@ -57,7 +76,6 @@ queryClient.getQueryCache().subscribe((event) => {
 
   const error = event.query.state.error;
   redirectToLoginIfUnauthorized(error);
-  console.error("[API Query Error]", error);
 });
 
 queryClient.getMutationCache().subscribe((event) => {
@@ -66,7 +84,6 @@ queryClient.getMutationCache().subscribe((event) => {
 
   const error = event.mutation.state.error;
   redirectToLoginIfUnauthorized(error);
-  console.error("[API Mutation Error]", error);
 });
 
 const trpcClient = trpc.createClient({

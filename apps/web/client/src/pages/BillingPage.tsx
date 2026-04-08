@@ -33,9 +33,21 @@ function planTone(currentPlan: string, plan: string) {
 }
 
 export default function BillingPage() {
-  const plansQuery = trpc.billing.plans.useQuery(undefined, { retry: 1 });
-  const statusQuery = trpc.billing.status.useQuery(undefined, { retry: 1 });
-  const limitsQuery = trpc.billing.limits.useQuery(undefined, { retry: 1 });
+  const plansQuery = trpc.billing.plans.useQuery(undefined, {
+    retry: 1,
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  });
+  const statusQuery = trpc.billing.status.useQuery(undefined, {
+    retry: 1,
+    staleTime: 45_000,
+    refetchOnWindowFocus: false,
+  });
+  const limitsQuery = trpc.billing.limits.useQuery(undefined, {
+    retry: 1,
+    staleTime: 45_000,
+    refetchOnWindowFocus: false,
+  });
   const utils = trpc.useUtils();
 
   const checkoutMutation = trpc.billing.checkout.useMutation({
@@ -76,8 +88,37 @@ export default function BillingPage() {
     return [];
   }, [plansQuery.data]);
 
-  const isLoading = plansQuery.isLoading || statusQuery.isLoading || limitsQuery.isLoading;
+  const hasAnyData = plans.length > 0 || Boolean(status) || Boolean(limits);
+  const isLoading =
+    (plansQuery.isLoading || statusQuery.isLoading || limitsQuery.isLoading) &&
+    !hasAnyData;
   const isError = plansQuery.isError || statusQuery.isError || limitsQuery.isError;
+  const usageItems = [
+    {
+      label: "Clientes",
+      usage: limits?.usage?.customers,
+    },
+    {
+      label: "Agendamentos",
+      usage: limits?.usage?.appointments,
+    },
+    {
+      label: "Ordens de serviço",
+      usage: limits?.usage?.serviceOrders,
+    },
+    {
+      label: "Usuários",
+      usage: limits?.usage?.users,
+    },
+  ];
+
+  const hasExceededUsage = usageItems.some((item) => {
+    const used = Number(item.usage?.used ?? 0);
+    const limit = Number(item.usage?.limit ?? 0);
+    if (item.usage?.unlimited) return false;
+    if (!Number.isFinite(used) || !Number.isFinite(limit) || limit <= 0) return false;
+    return used >= limit;
+  });
 
   const currentPlan = String(status?.plan ?? limits?.plan ?? "FREE").toUpperCase();
   const isTrial = Boolean(limits?.trial?.isTrial);
@@ -115,8 +156,21 @@ export default function BillingPage() {
       </section>
 
       {isError ? (
-        <section className="nexo-app-panel p-4 text-sm">
-          Falha ao carregar billing. Tente novamente em alguns segundos.
+        <section className="nexo-app-panel space-y-3 p-4 text-sm">
+          <p>Falha ao carregar billing. Tente novamente em alguns segundos.</p>
+          <button
+            type="button"
+            className="rounded-lg border border-zinc-300 px-3 py-2 text-xs hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-900"
+            onClick={() => {
+              void Promise.all([
+                plansQuery.refetch(),
+                statusQuery.refetch(),
+                limitsQuery.refetch(),
+              ]);
+            }}
+          >
+            Tentar novamente
+          </button>
         </section>
       ) : null}
 
@@ -173,30 +227,44 @@ export default function BillingPage() {
 
       <section className="nexo-app-panel p-4">
         <h3 className="text-sm font-semibold">Uso atual da organização</h3>
+        {hasExceededUsage ? (
+          <p className="mt-2 inline-flex items-center gap-2 rounded-lg bg-amber-100 px-3 py-2 text-xs text-amber-900 dark:bg-amber-900/30 dark:text-amber-200">
+            <AlertTriangle className="h-4 w-4" />
+            Limite do plano atingido em pelo menos um recurso. Faça upgrade para continuar sem bloqueios.
+          </p>
+        ) : null}
         <div className="mt-2 grid gap-2 text-sm md:grid-cols-2">
-          <p>
-            Clientes: {limits?.usage?.customers?.used ?? "—"} /{" "}
-            {limits?.usage?.customers?.unlimited ? "∞" : limits?.usage?.customers?.limit ?? "—"}
-          </p>
-          <p>
-            Agendamentos: {limits?.usage?.appointments?.used ?? "—"} /{" "}
-            {limits?.usage?.appointments?.unlimited
-              ? "∞"
-              : limits?.usage?.appointments?.limit ?? "—"}
-          </p>
-          <p>
-            O.S.: {limits?.usage?.serviceOrders?.used ?? "—"} /{" "}
-            {limits?.usage?.serviceOrders?.unlimited
-              ? "∞"
-              : limits?.usage?.serviceOrders?.limit ?? "—"}
-          </p>
-          <p>
-            Usuários: {limits?.usage?.users?.used ?? "—"} /{" "}
-            {limits?.usage?.users?.unlimited ? "∞" : limits?.usage?.users?.limit ?? "—"}
-          </p>
+          {usageItems.map((item) => {
+            const used = item.usage?.used ?? "—";
+            const limit = item.usage?.unlimited ? "∞" : item.usage?.limit ?? "—";
+            const limitNumber = Number(item.usage?.limit ?? 0);
+            const usedNumber = Number(item.usage?.used ?? 0);
+            const atLimit =
+              !item.usage?.unlimited &&
+              Number.isFinite(limitNumber) &&
+              limitNumber > 0 &&
+              Number.isFinite(usedNumber) &&
+              usedNumber >= limitNumber;
+
+            return (
+              <p key={item.label} className={atLimit ? "font-medium text-amber-600 dark:text-amber-300" : ""}>
+                {item.label}: {used} / {limit}
+              </p>
+            );
+          })}
         </div>
 
-        <div className="mt-4">
+        <div className="mt-4 flex flex-wrap gap-2">
+          {hasExceededUsage ? (
+            <button
+              type="button"
+              className="rounded-lg bg-orange-500 px-3 py-2 text-sm font-medium text-white hover:bg-orange-600 disabled:opacity-60"
+              disabled={checkoutMutation.isPending}
+              onClick={() => void handleUpgrade("PRO")}
+            >
+              {checkoutMutation.isPending ? "Processando..." : "Fazer upgrade agora"}
+            </button>
+          ) : null}
           <button
             type="button"
             className="rounded-lg border border-zinc-300 px-3 py-2 text-sm hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-900 disabled:opacity-60"
