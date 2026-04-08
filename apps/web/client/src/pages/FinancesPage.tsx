@@ -23,6 +23,11 @@ import { DemoEnvironmentCta } from "@/components/DemoEnvironmentCta";
 import { useChargeActions } from "@/hooks/useChargeActions";
 import { useProductAnalytics } from "@/hooks/useProductAnalytics";
 import { generateFinanceActions } from "@/lib/smartActions";
+import {
+  ChargeStatus,
+  CHARGE_STATUS_BADGE,
+  CHARGE_STATUS_LABEL,
+} from "@shared/types/api";
 
 type FinanceCharge = {
   id: string;
@@ -30,7 +35,7 @@ type FinanceCharge = {
   serviceOrderId?: string | null;
   customer?: { name?: string | null } | null;
   amountCents: number;
-  status: string;
+  status: string | null;
   dueDate?: string | Date | null;
   createdAt?: string | Date | null;
   updatedAt?: string | Date | null;
@@ -51,6 +56,33 @@ type FinanceStats = {
   pending?: { amountCents?: number };
   overdue?: { amountCents?: number };
 };
+
+type FinanceNormalizedStatus = ChargeStatus | "NONE";
+type FinanceQueueStatus = Exclude<FinanceNormalizedStatus, ChargeStatus.CANCELED>;
+
+function normalizeChargeStatus(status?: string | null): FinanceNormalizedStatus {
+  const normalized = normalizeStatus(status);
+  if (normalized === ChargeStatus.PAID) return ChargeStatus.PAID;
+  if (normalized === ChargeStatus.PENDING) return ChargeStatus.PENDING;
+  if (normalized === ChargeStatus.OVERDUE) return ChargeStatus.OVERDUE;
+  if (normalized === ChargeStatus.CANCELED) return ChargeStatus.CANCELED;
+  return "NONE";
+}
+
+function getChargeStatusBadge(status: FinanceNormalizedStatus) {
+  if (status === "NONE") return "";
+  return CHARGE_STATUS_BADGE[status];
+}
+
+function getChargeStatusLabel(status: FinanceNormalizedStatus) {
+  if (status === "NONE") return "Sem status";
+  return CHARGE_STATUS_LABEL[status];
+}
+
+function toQueueStatus(status: FinanceNormalizedStatus): FinanceQueueStatus {
+  if (status === ChargeStatus.CANCELED) return "NONE";
+  return status;
+}
 
 function formatCurrencyFromCents(cents?: number) {
   return new Intl.NumberFormat("pt-BR", {
@@ -224,7 +256,7 @@ export default function FinancesPage() {
               month: "2-digit",
             });
 
-        const normalized = normalizeStatus(charge.status);
+        const normalized = toQueueStatus(normalizeChargeStatus(charge.status));
 
         return {
           day,
@@ -244,9 +276,8 @@ export default function FinancesPage() {
 
   const billingQueue = useMemo(() => {
     const ranked = finalVisibleCharges
-      .filter((charge) => normalizeStatus(charge.status) !== "PAID")
       .map((charge) => {
-        const normalized = normalizeStatus(charge.status);
+        const normalized = toQueueStatus(normalizeChargeStatus(charge.status));
         const dueDateRaw = charge.dueDate ?? charge.updatedAt ?? charge.createdAt ?? null;
         const dueDate = dueDateRaw ? new Date(dueDateRaw) : null;
         const dueTime = dueDate && !Number.isNaN(dueDate.getTime()) ? dueDate.getTime() : Number.MAX_SAFE_INTEGER;
@@ -254,10 +285,11 @@ export default function FinancesPage() {
         return {
           charge,
           normalized,
-          priority: normalized === "OVERDUE" ? 0 : 1,
+          priority: normalized === ChargeStatus.OVERDUE ? 0 : 1,
           dueTime,
         };
       })
+      .filter((item) => item.normalized !== ChargeStatus.PAID && item.normalized !== "NONE")
       .sort((a, b) => {
         if (a.priority !== b.priority) return a.priority - b.priority;
         const impactDiff =
@@ -271,14 +303,14 @@ export default function FinancesPage() {
   const overdueAmountInQueue = useMemo(
     () =>
       billingQueue
-        .filter((item) => item.normalized === "OVERDUE")
+        .filter((item) => item.normalized === ChargeStatus.OVERDUE)
         .reduce((acc, item) => acc + Math.max(item.charge.amountCents || 0, 0), 0),
     [billingQueue]
   );
   const pendingAmountInQueue = useMemo(
     () =>
       billingQueue
-        .filter((item) => item.normalized === "PENDING")
+        .filter((item) => item.normalized === ChargeStatus.PENDING)
         .reduce((acc, item) => acc + Math.max(item.charge.amountCents || 0, 0), 0),
     [billingQueue]
   );
@@ -295,9 +327,9 @@ export default function FinancesPage() {
       id: "fin-overdue",
       type: "overdue_charges" as const,
       title: "Cobranças vencidas",
-      count: billingQueue.filter((item) => item.normalized === "OVERDUE").length,
+      count: billingQueue.filter((item) => item.normalized === ChargeStatus.OVERDUE).length,
       impactCents: billingQueue
-        .filter((item) => item.normalized === "OVERDUE")
+        .filter((item) => item.normalized === ChargeStatus.OVERDUE)
         .reduce((acc, item) => acc + Math.max(item.charge.amountCents || 0, 0), 0),
       ctaLabel: "Recuperar cobrança",
       ctaPath: "/finances",
@@ -307,9 +339,9 @@ export default function FinancesPage() {
       id: "fin-pending",
       type: "idle_cash" as const,
       title: "Cobranças pendentes",
-      count: billingQueue.filter((item) => item.normalized === "PENDING").length,
+      count: billingQueue.filter((item) => item.normalized === ChargeStatus.PENDING).length,
       impactCents: billingQueue
-        .filter((item) => item.normalized === "PENDING")
+        .filter((item) => item.normalized === ChargeStatus.PENDING)
         .reduce((acc, item) => acc + Math.max(item.charge.amountCents || 0, 0), 0),
       ctaLabel: "Seguir fila",
       ctaPath: "/finances",
@@ -328,7 +360,7 @@ export default function FinancesPage() {
   ], [billingQueue, isPaymentScoped, paymentScopedCharge?.amountCents]);
 
   const nextAction = useMemo(() => {
-    const overdue = billingQueue.find((item) => item.normalized === "OVERDUE");
+    const overdue = billingQueue.find((item) => item.normalized === ChargeStatus.OVERDUE);
     if (overdue) {
       return {
         severity: "critical" as const,
@@ -636,15 +668,15 @@ export default function FinancesPage() {
                   <p>{charge.customer?.name || "Cliente sem nome"}</p>
                   <p
                     className={`text-sm ${
-                      normalized === "OVERDUE"
+                      normalized === ChargeStatus.OVERDUE
                         ? "text-red-600 dark:text-red-300"
                         : "text-gray-500"
                     }`}
                   >
                     {formatCurrencyFromCents(charge.amountCents)} •{" "}
-                    {normalized === "OVERDUE"
+                    {normalized === ChargeStatus.OVERDUE
                       ? "Vencida"
-                      : normalized === "PENDING"
+                      : normalized === ChargeStatus.PENDING
                         ? "Pendente"
                         : normalized}
                   </p>
@@ -730,7 +762,9 @@ export default function FinancesPage() {
         </SurfaceSection>
       ) : (
         <div className="space-y-3">
-          {finalVisibleCharges.map((c) => (
+          {finalVisibleCharges.map((c) => {
+            const normalizedStatus = normalizeChargeStatus(c.status);
+            return (
             <Card
               key={c.id}
               className="nexo-surface border-slate-200/70 bg-white/90 dark:border-white/8"
@@ -744,19 +778,11 @@ export default function FinancesPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge
-                    className={
-                      normalizeStatus(c.status) === "OVERDUE"
-                        ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300"
-                        : normalizeStatus(c.status) === "PENDING"
-                          ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
-                          : normalizeStatus(c.status) === "PAID"
-                            ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300"
-                            : ""
-                    }
+                    className={getChargeStatusBadge(normalizedStatus)}
                   >
-                    {c.status}
+                    {getChargeStatusLabel(normalizedStatus)}
                   </Badge>
-                  {normalizeStatus(c.status) !== "PAID" && (
+                  {normalizedStatus !== ChargeStatus.PAID && (
                     <Button
                       size="sm"
                       variant="outline"
@@ -791,7 +817,7 @@ export default function FinancesPage() {
                           : "Marcar pago"}
                     </Button>
                   )}
-                  {normalizeStatus(c.status) === "PAID" ? (
+                  {normalizedStatus === ChargeStatus.PAID ? (
                     <Button
                       size="sm"
                       variant="outline"
@@ -808,7 +834,8 @@ export default function FinancesPage() {
                 </div>
               ) : null}
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
     </PageShell>
