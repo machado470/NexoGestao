@@ -34,7 +34,7 @@ interface AuthContextType {
     adminName: string;
     email: string;
     password: string;
-  }) => Promise<void>;
+  }) => Promise<any>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
   refresh: () => Promise<void>;
@@ -212,17 +212,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLocalError(null);
 
       try {
-        await registerMutation.mutateAsync({
+        const result = await registerMutation.mutateAsync({
           orgName: payload.orgName.trim(),
           adminName: payload.adminName.trim(),
           email: payload.email.trim().toLowerCase(),
           password: payload.password,
         });
 
-        setForcedLoggedOut(false);
-        queryClient.removeQueries();
-        await meQuery.refetch();
-        authChannelRef.current?.postMessage({ type: "login", at: Date.now() });
+        const token =
+          result?.data?.data?.token ??
+          result?.data?.token ??
+          result?.token ??
+          result?.accessToken ??
+          null;
+
+        if (typeof token === "string" && token.trim().length > 0) {
+          setForcedLoggedOut(false);
+          queryClient.removeQueries();
+          await meQuery.refetch();
+          authChannelRef.current?.postMessage({ type: "login", at: Date.now() });
+        }
+
+        return result;
       } catch (err) {
         setLocalError(err);
         throw err;

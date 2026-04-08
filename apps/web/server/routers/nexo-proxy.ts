@@ -136,24 +136,31 @@ async function nexoFetch(path: string, options: RequestInit = {}) {
       `API error: ${response.status}`;
 
     const normalizedMessage = String(message);
+    const errorCode =
+      typeof body?.code === "string" && body.code.trim().length > 0
+        ? body.code.trim()
+        : null;
+    const contextualMessage = errorCode
+      ? `${normalizedMessage} [${errorCode}]`
+      : normalizedMessage;
 
     if (response.status === 401) {
-      throw new TRPCError({ code: "UNAUTHORIZED", message: normalizedMessage });
+      throw new TRPCError({ code: "UNAUTHORIZED", message: contextualMessage });
     }
 
     if (response.status === 403) {
-      throw new TRPCError({ code: "FORBIDDEN", message: normalizedMessage });
+      throw new TRPCError({ code: "FORBIDDEN", message: contextualMessage });
     }
 
     if (response.status === 404) {
-      throw new TRPCError({ code: "NOT_FOUND", message: normalizedMessage });
+      throw new TRPCError({ code: "NOT_FOUND", message: contextualMessage });
     }
 
     if (response.status === 400) {
-      throw new TRPCError({ code: "BAD_REQUEST", message: normalizedMessage });
+      throw new TRPCError({ code: "BAD_REQUEST", message: contextualMessage });
     }
 
-    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: normalizedMessage });
+    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: contextualMessage });
   }
 
   return body;

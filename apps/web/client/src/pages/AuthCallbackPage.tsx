@@ -35,9 +35,13 @@ export default function AuthCallbackPage() {
       }
 
       try {
-        await establishSessionMutation.mutateAsync({ token });
+        const result = await establishSessionMutation.mutateAsync({ token });
         if (!active) return;
-        navigate("/executive-dashboard", { replace: true });
+        const redirect =
+          result?.me?.data?.redirect ||
+          result?.me?.redirect ||
+          "/executive-dashboard";
+        navigate(redirect, { replace: true });
       } catch {
         if (!active) return;
         navigate("/login?error=oauth_callback_failed", { replace: true });

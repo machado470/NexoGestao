@@ -20,6 +20,8 @@ import { PrismaService } from '../prisma/prisma.service'
 export class AuthService {
   private readonly logger = new Logger(AuthService.name)
   private readonly resend: Resend | null = null
+  private readonly enforceEmailVerification: boolean
+  private readonly emailVerificationBypass = new Set<string>()
 
   constructor(
     private readonly prisma: PrismaService,
@@ -36,6 +38,31 @@ export class AuthService {
         'RESEND_API_KEY ausente. Recuperação por e-mail ficará desabilitada.',
       )
     }
+
+    this.enforceEmailVerification = this.parseBooleanEnv(
+      this.config.get<string>('AUTH_ENFORCE_EMAIL_VERIFICATION'),
+      false,
+    )
+
+    const bypassEmailsRaw = this.config.get<string>(
+      'AUTH_EMAIL_VERIFICATION_BYPASS_EMAILS',
+    )
+
+    if (bypassEmailsRaw) {
+      for (const email of bypassEmailsRaw.split(',')) {
+        const normalized = email.trim().toLowerCase()
+        if (normalized) {
+          this.emailVerificationBypass.add(normalized)
+        }
+      }
+    }
+  }
+
+  private parseBooleanEnv(value: string | undefined, fallback: boolean) {
+    if (typeof value !== 'string') return fallback
+    const normalized = value.trim().toLowerCase()
+    if (!normalized) return fallback
+    return ['1', 'true', 'yes', 'y', 'on'].includes(normalized)
   }
 
   private slugify(input: string) {
@@ -164,9 +191,14 @@ export class AuthService {
       })
     })
 
+    let verificationEmailStatus: 'sent' | 'failed' | 'provider_unavailable' =
+      'provider_unavailable'
+
     try {
       await this.sendVerificationEmail(createdUser.id, email)
+      verificationEmailStatus = this.resend ? 'sent' : 'provider_unavailable'
     } catch (error) {
+      verificationEmailStatus = 'failed'
       this.logger.warn(
         `Falha ao enviar verificação de e-mail: ${
           error instanceof Error ? error.message : String(error)
@@ -174,10 +206,31 @@ export class AuthService {
       )
     }
 
+    const canAutoLogin = !this.enforceEmailVerification
+    const sessionPayload = canAutoLogin
+      ? this.createSessionPayload(createdUser)
+      : undefined
+
+    const verificationMessageByStatus = {
+      sent: 'Enviamos um link de confirmação para seu e-mail. Verifique sua caixa de entrada para liberar o login.',
+      failed:
+        'Conta criada, mas houve falha ao enviar o e-mail de confirmação. Use o login para solicitar um novo link.',
+      provider_unavailable:
+        'Conta criada. Este ambiente está sem provedor de e-mail; no login você poderá solicitar novo link quando o serviço estiver ativo.',
+    } as const
+
     return {
       success: true,
-      message: 'Conta criada com sucesso.',
-      ...this.createSessionPayload(createdUser),
+      message: canAutoLogin
+        ? 'Conta criada com sucesso.'
+        : verificationMessageByStatus[verificationEmailStatus],
+      requiresEmailVerification: true,
+      emailVerificationStatus: verificationEmailStatus,
+      rollout: {
+        emailVerificationEnforced: this.enforceEmailVerification,
+        canAutoLogin,
+      },
+      ...(sessionPayload ? sessionPayload : {}),
     }
   }
 
@@ -207,6 +260,7 @@ export class AuthService {
           email: googleUser.email,
           role: 'ADMIN',
           active: true,
+          emailVerifiedAt: new Date(),
           orgId: org.id,
           person: {
             create: {
@@ -217,6 +271,18 @@ export class AuthService {
               orgId: org.id,
             },
           },
+        },
+        include: { person: true },
+      })
+    }
+
+    if (!user.emailVerifiedAt) {
+      user = await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          emailVerifiedAt: new Date(),
+          emailVerifyTokenHash: null,
+          emailVerifyTokenExpiresAt: null,
         },
         include: { person: true },
       })
@@ -366,6 +432,20 @@ export class AuthService {
       throw new UnauthorizedException('Senha inválida')
     }
 
+    const bypassEmailVerification =
+      !this.enforceEmailVerification ||
+      this.emailVerificationBypass.has(normalizedEmail)
+
+    if (!user.emailVerifiedAt && !bypassEmailVerification) {
+      throw new UnauthorizedException({
+        message:
+          'E-mail ainda não verificado. Confirme seu e-mail para concluir o login.',
+        code: 'EMAIL_NOT_VERIFIED',
+        canResendVerification: true,
+        email: normalizedEmail,
+      })
+    }
+
     const result = this.createSessionPayload(user)
 
     try {
@@ -388,6 +468,9 @@ export class AuthService {
     return {
       success: true,
       message: 'Login efetuado com sucesso.',
+      requiresEmailVerification: !user.emailVerifiedAt,
+      emailVerificationBypassApplied:
+        !user.emailVerifiedAt && bypassEmailVerification,
       ...result,
     }
   }

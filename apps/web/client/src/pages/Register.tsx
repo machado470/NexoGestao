@@ -26,7 +26,7 @@ import { Label } from "@/components/ui/label";
 const creationSteps = [
   "Cria a empresa no ambiente da plataforma",
   "Configura o usuário administrador inicial",
-  "Autentica a sessão para seguir ao onboarding",
+  "Orienta confirmação de e-mail antes do primeiro login",
 ];
 
 function normalizeErrorMessage(error: unknown): string {
@@ -51,7 +51,7 @@ function normalizeErrorMessage(error: unknown): string {
 }
 
 export default function Register() {
-  const { isSubmitting, error, register, redirectTo } = useAuth();
+  const { isSubmitting, error, register } = useAuth();
   const [, navigate] = useLocation();
 
   const [formData, setFormData] = useState({
@@ -93,14 +93,24 @@ export default function Register() {
     }
 
     try {
-      await register({
+      const result = await register({
         orgName,
         adminName,
         email,
         password: formData.password,
       });
 
-      navigate(redirectTo || "/onboarding");
+      const emailVerificationStatus =
+        result?.emailVerificationStatus ??
+        result?.data?.emailVerificationStatus ??
+        "provider_unavailable";
+
+      const params = new URLSearchParams();
+      params.set("email", email);
+      params.set("registered", "1");
+      params.set("verification", String(emailVerificationStatus));
+
+      navigate(`/login?${params.toString()}`);
     } catch (err) {
       setLocalError(normalizeErrorMessage(err));
     }
@@ -184,9 +194,9 @@ export default function Register() {
 
                 <div className="rounded-xl border bg-background p-4">
                   <div className="text-xs text-muted-foreground">Sessão</div>
-                  <div className="mt-2 font-semibold">Entrada imediata</div>
+                  <div className="mt-2 font-semibold">Validação de e-mail</div>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Login automático para seguir ao onboarding.
+                    Login liberado após confirmação (rollout seguro por ambiente).
                   </p>
                 </div>
               </div>

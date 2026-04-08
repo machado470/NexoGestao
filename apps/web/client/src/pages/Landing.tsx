@@ -6,12 +6,13 @@ import {
   CheckCircle2,
   ChevronRight,
   ClipboardList,
-  MessageSquare,
+  Coins,
+  CreditCard,
+  HelpCircle,
   ShieldCheck,
-  Users,
-  Wallet,
-  BarChart3,
   Sparkles,
+  Timer,
+  Users,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -26,85 +27,78 @@ import {
 import { ConsentBanner } from "@/components/ConsentBanner";
 import { TermsModal } from "@/components/TermsModal";
 
-const modules = [
+const coreFlow = [
+  { icon: Users, title: "Cliente", subtitle: "Cadastro vivo com histórico e contexto" },
+  { icon: Calendar, title: "Agendamento", subtitle: "Compromisso registrado com dono e status" },
+  { icon: ClipboardList, title: "O.S.", subtitle: "Execução operacional sem perder o fio" },
+  { icon: Coins, title: "Cobrança", subtitle: "Receita gerada já conectada à operação" },
+  { icon: CreditCard, title: "Pagamento", subtitle: "Baixa financeira com rastreabilidade" },
+  { icon: Timer, title: "Timeline", subtitle: "Linha do tempo auditável da jornada" },
+  { icon: ShieldCheck, title: "Governança", subtitle: "Risco, pendências e alçadas com clareza" },
+];
+
+const benefits = [
   {
-    icon: Users,
-    title: "Clientes",
+    title: "Menos retrabalho administrativo",
     description:
-      "Cadastre clientes, acompanhe histórico e mantenha contexto operacional em um único lugar.",
+      "Sem caça a informação no WhatsApp, planilha e caderno. O time trabalha com um fluxo único.",
   },
   {
-    icon: Calendar,
-    title: "Agenda",
+    title: "Decisão com contexto real",
     description:
-      "Organize agendamentos, acompanhe compromissos e reduza desencontro no dia a dia.",
+      "Painel executivo, timeline e governança ajudam a agir antes da operação virar incêndio.",
   },
   {
-    icon: ClipboardList,
-    title: "Ordens de serviço",
+    title: "Receita mais previsível",
     description:
-      "Controle execução, status e andamento das demandas sem planilha espalhada.",
+      "Cobrança e pagamento conectados ao serviço executado melhoram visibilidade de caixa e follow-up.",
   },
   {
-    icon: Wallet,
-    title: "Financeiro",
+    title: "Pronto para crescimento",
     description:
-      "Visualize cobranças, lançamentos e fluxo financeiro com mais clareza operacional.",
-  },
-  {
-    icon: MessageSquare,
-    title: "Comunicação",
-    description:
-      "Estruture contatos e notificações para não depender só de memória, improviso e boa vontade.",
-  },
-  {
-    icon: BarChart3,
-    title: "Visão executiva",
-    description:
-      "Acompanhe indicadores, gargalos e sinais da operação para decidir sem adivinhar.",
+      "Estrutura preparada para equipe, papéis, trilhas de onboarding e evolução sem improviso eterno.",
   },
 ];
 
-const steps = [
-  {
-    title: "Centralize a base",
-    description:
-      "Clientes, agenda, ordens e financeiro passam a viver no mesmo ambiente.",
-  },
-  {
-    title: "Execute com contexto",
-    description:
-      "A equipe trabalha com histórico, status e informação organizada.",
-  },
-  {
-    title: "Acompanhe a operação",
-    description:
-      "Você enxerga andamento, pendências e pontos de atenção sem caçar dado em vários lugares.",
-  },
-  {
-    title: "Ganhe consistência",
-    description:
-      "Menos retrabalho, menos improviso e mais previsibilidade na rotina do negócio.",
-  },
+const differentials = [
+  "Produto orientado para empresa de serviço (não é ERP genérico com mil módulos vazios)",
+  "Fluxo ponta a ponta: cliente → agenda → O.S. → financeiro → governança",
+  "Onboarding operacional guiado para acelerar primeiros resultados",
+  "Base com trilha de auditoria e visão executiva para gestão madura",
 ];
 
-const highlights = [
-  "Operação, financeiro e execução em um só lugar",
-  "Base pronta para crescer sem virar caos administrativo",
-  "Histórico organizado por cliente e processo",
-  "Estrutura compatível com automações e governança futura",
+const faqItems = [
+  {
+    question: "Para quem o NexoGestão foi desenhado?",
+    answer:
+      "Para operações de serviço que cresceram no improviso e agora precisam de rotina previsível, controle de execução e visão financeira conectada.",
+  },
+  {
+    question: "Preciso trocar toda a operação de uma vez?",
+    answer:
+      "Não. Você pode começar com o fluxo principal (cliente, agenda, O.S. e cobrança) e expandir para governança conforme o time ganha tração.",
+  },
+  {
+    question: "Como fica o onboarding da equipe?",
+    answer:
+      "O produto já possui etapas de onboarding e status por organização para guiar a adoção e evitar que usuários caiam no dashboard sem contexto.",
+  },
+  {
+    question: "O produto já está pronto para uso comercial?",
+    answer:
+      "Sim. O foco atual é consolidar funil público/auth, onboarding e experiência mobile para suportar entrada de clientes pagantes com segurança.",
+  },
 ];
 
 export default function Landing() {
   const [, navigate] = useLocation();
   const [termsModal, setTermsModal] = useState<"terms" | "privacy" | null>(null);
-
   const year = useMemo(() => new Date().getFullYear(), []);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
       <nav className="sticky top-0 z-50 border-b border-border/70 bg-background/90 backdrop-blur">
-        <div className="container flex h-16 items-center justify-between">
+        <div className="container flex h-16 items-center justify-between gap-4">
           <button
             type="button"
             onClick={() => navigate("/")}
@@ -114,78 +108,67 @@ export default function Landing() {
               <span className="text-lg font-bold">N</span>
             </div>
             <div className="text-left">
-              <div className="text-sm font-semibold leading-none sm:text-base">
-                NexoGestão
-              </div>
-              <div className="text-xs text-muted-foreground">
-                operação centralizada de verdade
-              </div>
+              <div className="text-sm font-semibold leading-none sm:text-base">NexoGestão</div>
+              <div className="text-xs text-muted-foreground">produto de gestão operacional</div>
             </div>
           </button>
 
           <div className="hidden items-center gap-6 md:flex">
-            <a href="#como-funciona" className="text-sm text-muted-foreground hover:text-foreground">
-              Como funciona
+            <a href="#fluxo" className="text-sm text-muted-foreground hover:text-foreground">
+              Fluxo
             </a>
-            <a href="#modulos" className="text-sm text-muted-foreground hover:text-foreground">
-              Módulos
+            <a href="#beneficios" className="text-sm text-muted-foreground hover:text-foreground">
+              Benefícios
             </a>
-            <a href="#diferenciais" className="text-sm text-muted-foreground hover:text-foreground">
-              Diferenciais
+            <a href="#faq" className="text-sm text-muted-foreground hover:text-foreground">
+              FAQ
             </a>
           </div>
 
           <div className="flex items-center gap-2">
-            <Button variant="ghost" onClick={() => navigate("/login")}>
-              Entrar
-            </Button>
-            <Button onClick={() => navigate("/register")}>Começar agora</Button>
+            <Button variant="ghost" onClick={() => navigate("/login")}>Entrar</Button>
+            <Button onClick={() => navigate("/register")}>Começar avaliação</Button>
           </div>
         </div>
       </nav>
 
       <main>
-        <section className="relative overflow-hidden">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.14),transparent_35%),radial-gradient(circle_at_bottom_right,rgba(59,130,246,0.12),transparent_30%)]" />
-          <div className="container relative py-20 sm:py-24 lg:py-28">
-            <div className="grid items-center gap-12 lg:grid-cols-[1.15fr_0.85fr]">
+        <section className="relative overflow-hidden border-b">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.16),transparent_35%),radial-gradient(circle_at_bottom_right,rgba(59,130,246,0.12),transparent_30%)]" />
+          <div className="container relative py-16 sm:py-20 lg:py-24">
+            <div className="grid items-center gap-10 lg:grid-cols-[1.1fr_0.9fr]">
               <div className="max-w-3xl">
                 <Badge variant="outline" className="mb-5 rounded-full px-3 py-1">
                   <Sparkles className="size-3.5" />
-                  Gestão operacional para empresas de serviço
+                  Gestão operacional + financeira para empresas de serviço
                 </Badge>
 
-                <h1 className="max-w-4xl text-4xl font-bold leading-tight tracking-tight sm:text-5xl lg:text-6xl">
-                  Centralize clientes, agenda, ordens e financeiro em um só lugar
+                <h1 className="text-4xl font-bold leading-tight tracking-tight sm:text-5xl lg:text-6xl">
+                  Transforme operação dispersa em um fluxo confiável e vendável
                 </h1>
 
                 <p className="mt-6 max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg">
-                  O NexoGestão organiza a operação do dia a dia com uma base única para
-                  atendimento, execução, acompanhamento e visão gerencial. Menos planilha
-                  espalhada, menos improviso, mais controle.
+                  O NexoGestão organiza atendimento, execução, cobrança e governança com uma trilha única.
+                  É o caminho para sair do improviso e operar com padrão de produto real.
                 </p>
 
                 <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                  <Button
-                    size="lg"
-                    className="gap-2"
-                    onClick={() => navigate("/register")}
-                  >
+                  <Button size="lg" className="gap-2" onClick={() => navigate("/register")}>
                     Começar agora
                     <ArrowRight className="size-4" />
                   </Button>
-
-                  <Button
-                    size="lg"
-                    variant="outline"
-                    onClick={() => navigate("/login")}
-                  >
-                    Acessar plataforma
+                  <Button size="lg" variant="outline" onClick={() => navigate("/login")}>
+                    Já tenho conta
                   </Button>
                 </div>
 
                 <div className="mt-8 grid gap-3 sm:grid-cols-2">
-                  {highlights.map((item) => (
+                  {[
+                    "Autenticação com fluxo de verificação por e-mail",
+                    "Onboarding guiado para primeira experiência",
+                    "Visão executiva e governança operacional",
+                    "Experiência otimizada para desktop e mobile",
+                  ].map((item) => (
                     <div key={item} className="flex items-start gap-3 rounded-xl border bg-card/70 p-4">
                       <CheckCircle2 className="mt-0.5 size-5 text-primary" />
                       <p className="text-sm text-muted-foreground">{item}</p>
@@ -194,125 +177,63 @@ export default function Landing() {
                 </div>
               </div>
 
-              <div className="relative">
-                <Card className="overflow-hidden border-border/80 bg-card/90 shadow-xl">
-                  <CardHeader className="border-b border-border/70">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <CardTitle className="text-xl">Visão operacional</CardTitle>
-                        <CardDescription>
-                          Uma estrutura simples para organizar a rotina sem virar refém do caos.
-                        </CardDescription>
-                      </div>
-                      <Badge>Ativo</Badge>
-                    </div>
-                  </CardHeader>
-
-                  <CardContent className="space-y-5">
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <div className="rounded-xl border bg-background p-4">
-                        <div className="text-sm text-muted-foreground">Clientes ativos</div>
-                        <div className="mt-2 text-3xl font-semibold">128</div>
-                        <div className="mt-2 text-xs text-emerald-600">Base centralizada</div>
-                      </div>
-
-                      <div className="rounded-xl border bg-background p-4">
-                        <div className="text-sm text-muted-foreground">Ordens em andamento</div>
-                        <div className="mt-2 text-3xl font-semibold">24</div>
-                        <div className="mt-2 text-xs text-primary">Acompanhamento contínuo</div>
-                      </div>
-
-                      <div className="rounded-xl border bg-background p-4">
-                        <div className="text-sm text-muted-foreground">Cobranças do período</div>
-                        <div className="mt-2 text-3xl font-semibold">R$ 18,4k</div>
-                        <div className="mt-2 text-xs text-primary">Mais clareza financeira</div>
-                      </div>
-
-                      <div className="rounded-xl border bg-background p-4">
-                        <div className="text-sm text-muted-foreground">Status operacional</div>
-                        <div className="mt-2 text-3xl font-semibold">Estável</div>
-                        <div className="mt-2 text-xs text-violet-600">Rotina com contexto</div>
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl border bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 p-5 text-slate-100">
-                      <div className="mb-3 flex items-center gap-2 text-sm text-slate-300">
-                        <ShieldCheck className="size-4 text-emerald-400" />
-                        Organização operacional com base pronta para evoluir
-                      </div>
-                      <p className="text-sm leading-6 text-slate-300">
-                        Estruture o presente sem bloquear o futuro. O produto já nasce com
-                        espaço para automação, histórico, acompanhamento e governança.
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+              <Card className="border-border/80 bg-card/95 shadow-xl">
+                <CardHeader>
+                  <CardTitle className="text-xl">Painel de execução da operação</CardTitle>
+                  <CardDescription>
+                    Dados de exemplo para visualizar rotina, receita e risco em um único ambiente.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-xl border bg-background p-4">
+                    <p className="text-xs text-muted-foreground">Clientes ativos</p>
+                    <p className="mt-2 text-2xl font-semibold">148</p>
+                  </div>
+                  <div className="rounded-xl border bg-background p-4">
+                    <p className="text-xs text-muted-foreground">O.S. em andamento</p>
+                    <p className="mt-2 text-2xl font-semibold">29</p>
+                  </div>
+                  <div className="rounded-xl border bg-background p-4">
+                    <p className="text-xs text-muted-foreground">Cobranças abertas</p>
+                    <p className="mt-2 text-2xl font-semibold">R$ 26,3k</p>
+                  </div>
+                  <div className="rounded-xl border bg-background p-4">
+                    <p className="text-xs text-muted-foreground">Risco operacional</p>
+                    <p className="mt-2 text-2xl font-semibold">Controlado</p>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           </div>
         </section>
 
-        <section id="como-funciona" className="border-y bg-muted/30 py-20">
+        <section id="fluxo" className="py-16 sm:py-20">
           <div className="container">
-            <div className="mx-auto max-w-2xl text-center">
-              <Badge variant="outline" className="mb-4">
-                Como funciona
-              </Badge>
+            <div className="max-w-3xl">
+              <Badge variant="outline" className="mb-4">Fluxo operacional do produto</Badge>
               <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-                Um fluxo simples para organizar a operação
+                Cliente → Agendamento → O.S. → Cobrança → Pagamento → Timeline → Governança
               </h2>
               <p className="mt-4 text-muted-foreground">
-                Nada de teatro corporativo. A ideia é tirar a rotina do improviso e colocar
-                tudo dentro de um processo mais legível.
+                Esse fluxo conecta ponta a ponta da operação. Cada etapa alimenta a próxima e fortalece a visão gerencial.
               </p>
             </div>
 
-            <div className="mt-12 grid gap-6 lg:grid-cols-4">
-              {steps.map((step, index) => (
-                <Card key={step.title} className="border-border/80 bg-card/80 shadow-sm">
-                  <CardHeader>
-                    <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
-                      0{index + 1}
-                    </div>
-                    <CardTitle>{step.title}</CardTitle>
-                    <CardDescription>{step.description}</CardDescription>
-                  </CardHeader>
-                </Card>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section id="modulos" className="py-20">
-          <div className="container">
-            <div className="max-w-2xl">
-              <Badge variant="outline" className="mb-4">
-                Módulos principais
-              </Badge>
-              <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-                As áreas centrais da operação no mesmo ambiente
-              </h2>
-              <p className="mt-4 text-muted-foreground">
-                O foco não é empilhar tela bonita. É fazer a rotina caber em uma estrutura
-                que dê contexto, continuidade e visibilidade.
-              </p>
-            </div>
-
-            <div className="mt-12 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-              {modules.map((module) => {
-                const Icon = module.icon;
-
+            <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              {coreFlow.map((step, index) => {
+                const Icon = step.icon;
+                const isLast = index === coreFlow.length - 1;
                 return (
-                  <Card
-                    key={module.title}
-                    className="border-border/80 bg-card/90 transition-transform duration-200 hover:-translate-y-1 hover:shadow-md"
-                  >
+                  <Card key={step.title} className="border-border/80 bg-card/90 shadow-sm">
                     <CardHeader>
-                      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                        <Icon className="size-5" />
+                      <div className="flex items-center justify-between">
+                        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                          <Icon className="size-5" />
+                        </div>
+                        {!isLast ? <ChevronRight className="size-4 text-muted-foreground" /> : null}
                       </div>
-                      <CardTitle>{module.title}</CardTitle>
-                      <CardDescription>{module.description}</CardDescription>
+                      <CardTitle>{step.title}</CardTitle>
+                      <CardDescription>{step.subtitle}</CardDescription>
                     </CardHeader>
                   </Card>
                 );
@@ -321,148 +242,122 @@ export default function Landing() {
           </div>
         </section>
 
-        <section id="diferenciais" className="bg-muted/30 py-20">
+        <section id="beneficios" className="border-y bg-muted/30 py-16 sm:py-20">
           <div className="container">
-            <div className="grid gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
-              <div>
-                <Badge variant="outline" className="mb-4">
-                  Diferenciais
-                </Badge>
-                <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-                  Mais clareza operacional. Menos gambiarra administrativa.
-                </h2>
-                <p className="mt-4 text-muted-foreground">
-                  O NexoGestão foi pensado para negócios que precisam organizar a execução
-                  sem depender de memória, conversa solta e planilha com vida própria.
-                </p>
+            <div className="max-w-2xl">
+              <Badge variant="outline" className="mb-4">Benefícios reais</Badge>
+              <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
+                Não é só software bonito: é ganho operacional no dia a dia
+              </h2>
+            </div>
 
-                <div className="mt-8 space-y-4">
-                  {[
-                    "Centralização de contexto por cliente, agendamento e execução.",
-                    "Base operacional mais preparada para cobrança, acompanhamento e histórico.",
-                    "Estrutura útil para crescer com mais consistência antes do caos virar cultura.",
-                  ].map((text) => (
-                    <div key={text} className="flex items-start gap-3">
-                      <ChevronRight className="mt-0.5 size-5 text-primary" />
-                      <p className="text-muted-foreground">{text}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <Card className="border-border/80 bg-card/90 shadow-lg">
-                <CardHeader>
-                  <CardTitle>O que melhora na prática</CardTitle>
-                  <CardDescription>
-                    Menos perda de contexto, mais continuidade operacional.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="grid gap-4 sm:grid-cols-2">
-                  {[
-                    "Clientes melhor organizados",
-                    "Agenda mais legível",
-                    "Ordens com acompanhamento",
-                    "Financeiro menos disperso",
-                    "Comunicação mais estruturada",
-                    "Visão executiva mais confiável",
-                  ].map((item) => (
-                    <div key={item} className="rounded-xl border bg-background p-4">
-                      <div className="flex items-center gap-3">
-                        <CheckCircle2 className="size-5 text-primary" />
-                        <span className="text-sm font-medium">{item}</span>
-                      </div>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
+            <div className="mt-10 grid gap-4 md:grid-cols-2">
+              {benefits.map((benefit) => (
+                <Card key={benefit.title} className="border-border/80 bg-card/95">
+                  <CardHeader>
+                    <CardTitle className="text-xl">{benefit.title}</CardTitle>
+                    <CardDescription>{benefit.description}</CardDescription>
+                  </CardHeader>
+                </Card>
+              ))}
             </div>
           </div>
         </section>
 
-        <section className="py-20">
-          <div className="container">
-            <Card className="overflow-hidden border-primary/20 bg-gradient-to-r from-primary/10 via-background to-primary/5 shadow-lg">
-              <CardContent className="flex flex-col gap-8 px-6 py-10 lg:flex-row lg:items-center lg:justify-between">
-                <div className="max-w-2xl">
-                  <Badge className="mb-4">Comece com estrutura</Badge>
-                  <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-                    Organize a base operacional antes que a bagunça vire método
-                  </h2>
-                  <p className="mt-4 text-muted-foreground">
-                    Entre na plataforma, crie sua conta e comece com uma estrutura clara para
-                    clientes, agenda, execução e financeiro.
-                  </p>
-                </div>
+        <section className="py-16 sm:py-20">
+          <div className="container grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
+            <div>
+              <Badge variant="outline" className="mb-4">Diferenciais</Badge>
+              <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
+                Posicionamento premium com foco em confiança operacional
+              </h2>
+              <div className="mt-6 space-y-3">
+                {differentials.map((item) => (
+                  <div key={item} className="flex items-start gap-3 rounded-xl border bg-card/80 p-4">
+                    <CheckCircle2 className="mt-0.5 size-5 text-primary" />
+                    <p className="text-sm text-muted-foreground">{item}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
 
-                <div className="flex flex-col gap-3 sm:flex-row">
-                  <Button size="lg" onClick={() => navigate("/register")}>
-                    Criar conta
-                  </Button>
-                  <Button size="lg" variant="outline" onClick={() => navigate("/login")}>
-                    Já tenho acesso
-                  </Button>
+            <Card className="border-border/80 bg-slate-950 text-slate-100 shadow-xl">
+              <CardHeader>
+                <CardTitle>Pronto para vender com confiança</CardTitle>
+                <CardDescription className="text-slate-300">
+                  Funil público, autenticação e onboarding alinhados para converter sem quebrar experiência.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3 text-sm text-slate-300">
+                  <p>• Verificação de e-mail com regras de rollout seguro.</p>
+                  <p>• Fluxos públicos padronizados com mensagens claras.</p>
+                  <p>• Jornada inicial orientada por onboarding.status.</p>
+                  <p>• Camada BFF alinhada com API para evitar comportamento divergente.</p>
                 </div>
+                <Button className="mt-6 w-full" onClick={() => navigate("/register")}>
+                  Iniciar onboarding comercial
+                </Button>
               </CardContent>
             </Card>
           </div>
         </section>
+
+        <section id="faq" className="border-t py-16 sm:py-20">
+          <div className="container">
+            <div className="max-w-2xl">
+              <Badge variant="outline" className="mb-4">
+                <HelpCircle className="size-3.5" />
+                FAQ
+              </Badge>
+              <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Perguntas frequentes</h2>
+            </div>
+
+            <div className="mt-8 grid gap-4 md:grid-cols-2">
+              {faqItems.map((item) => (
+                <Card key={item.question} className="border-border/80 bg-card/95">
+                  <CardHeader>
+                    <CardTitle className="text-lg">{item.question}</CardTitle>
+                    <CardDescription>{item.answer}</CardDescription>
+                  </CardHeader>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="border-t bg-muted/40 py-14">
+          <div className="container text-center">
+            <h3 className="text-2xl font-bold">Sua operação merece processo, previsibilidade e governança.</h3>
+            <p className="mx-auto mt-3 max-w-2xl text-muted-foreground">
+              Comece agora e veja o NexoGestão funcionar como plataforma operacional completa, não como mais uma ferramenta isolada.
+            </p>
+            <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
+              <Button size="lg" onClick={() => navigate("/register")}>Criar conta</Button>
+              <Button size="lg" variant="outline" onClick={() => navigate("/login")}>
+                Entrar na plataforma
+              </Button>
+            </div>
+          </div>
+        </section>
       </main>
 
-      <footer className="border-t bg-background">
-        <div className="container flex flex-col gap-6 py-10 md:flex-row md:items-center md:justify-between">
-          <div>
-            <div className="text-sm font-semibold">NexoGestão</div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Centralização operacional para empresas de serviço.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-            <button
-              type="button"
-              onClick={() => navigate("/login")}
-              className="hover:text-foreground"
-            >
-              Entrar
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate("/register")}
-              className="hover:text-foreground"
-            >
-              Criar conta
-            </button>
-            <button
-              type="button"
-              onClick={() => setTermsModal("terms")}
-              className="hover:text-foreground"
-            >
-              Termos
-            </button>
-            <button
-              type="button"
-              onClick={() => setTermsModal("privacy")}
-              className="hover:text-foreground"
-            >
-              Privacidade
-            </button>
-          </div>
-        </div>
-
-        <div className="border-t">
-          <div className="container py-4 text-sm text-muted-foreground">
-            © {year} NexoGestão. Todos os direitos reservados.
+      <footer className="border-t py-8">
+        <div className="container flex flex-col items-center justify-between gap-3 text-sm text-muted-foreground sm:flex-row">
+          <p>© {year} NexoGestão. Todos os direitos reservados.</p>
+          <div className="flex items-center gap-4">
+            <button type="button" className="hover:text-foreground" onClick={() => setTermsModal("terms")}>Termos</button>
+            <button type="button" className="hover:text-foreground" onClick={() => setTermsModal("privacy")}>Privacidade</button>
           </div>
         </div>
       </footer>
 
+      <ConsentBanner />
       <TermsModal
         isOpen={termsModal !== null}
-        type={termsModal ?? "terms"}
+        type={termsModal === "privacy" ? "privacy" : "terms"}
         onClose={() => setTermsModal(null)}
       />
-
-      <ConsentBanner />
     </div>
   );
 }
