@@ -32,6 +32,13 @@ function planTone(currentPlan: string, plan: string) {
     : "border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950/60";
 }
 
+const PLAN_GAIN: Record<PlanName, string> = {
+  FREE: "Para começar a testar o fluxo.",
+  STARTER: "Estrutura inicial para operar sem perder cobranças.",
+  PRO: "Escala comercial com mais capacidade e previsibilidade.",
+  SCALE: "Máxima escala para operação com múltiplos times.",
+};
+
 export default function BillingPage() {
   const plansQuery = trpc.billing.plans.useQuery(undefined, {
     retry: 1,
@@ -122,6 +129,13 @@ export default function BillingPage() {
 
   const currentPlan = String(status?.plan ?? limits?.plan ?? "FREE").toUpperCase();
   const isTrial = Boolean(limits?.trial?.isTrial);
+  const blockedItems = usageItems.filter((item) => {
+    const used = Number(item.usage?.used ?? 0);
+    const limit = Number(item.usage?.limit ?? 0);
+    if (item.usage?.unlimited) return false;
+    if (!Number.isFinite(used) || !Number.isFinite(limit) || limit <= 0) return false;
+    return used >= limit;
+  });
 
   const handleUpgrade = async (planName: PlanName) => {
     const priceId = PLAN_PRICE_ID[planName];
@@ -151,6 +165,13 @@ export default function BillingPage() {
           <p className="mt-3 inline-flex items-center gap-2 rounded-lg bg-amber-100 px-3 py-2 text-xs text-amber-900 dark:bg-amber-900/30 dark:text-amber-200">
             <AlertTriangle className="h-4 w-4" />
             Trial ativo até {new Date(limits?.trial?.endsAt).toLocaleDateString("pt-BR")}.
+          </p>
+        ) : null}
+        {blockedItems.length > 0 ? (
+          <p className="mt-3 inline-flex items-center gap-2 rounded-lg bg-red-100 px-3 py-2 text-xs text-red-900 dark:bg-red-900/30 dark:text-red-200">
+            <AlertTriangle className="h-4 w-4" />
+            Você atingiu o limite de {blockedItems.map((item) => item.label).join(", ")}.
+            Continue crescendo com upgrade.
           </p>
         ) : null}
       </section>
@@ -197,6 +218,7 @@ export default function BillingPage() {
                 <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
                   {formatCurrency(PLAN_BASE_PRICE_CENTS[name as PlanName] ?? 0)} / mês
                 </p>
+                <p className="mt-2 text-xs text-zinc-600 dark:text-zinc-300">{PLAN_GAIN[name as PlanName]}</p>
                 <div className="mt-4 space-y-2 text-xs">
                   <p>Clientes: {limits?.limits?.customers ?? "—"}</p>
                   <p>Agendamentos: {limits?.limits?.appointments ?? "—"}</p>
@@ -215,7 +237,7 @@ export default function BillingPage() {
                       onClick={() => void handleUpgrade(name as PlanName)}
                     >
                       <CreditCard className="h-4 w-4" />
-                      {checkoutMutation.isPending ? "Processando..." : "Fazer upgrade"}
+                      {checkoutMutation.isPending ? "Processando..." : "Continuar crescendo"}
                     </button>
                   )}
                 </div>
@@ -230,7 +252,7 @@ export default function BillingPage() {
         {hasExceededUsage ? (
           <p className="mt-2 inline-flex items-center gap-2 rounded-lg bg-amber-100 px-3 py-2 text-xs text-amber-900 dark:bg-amber-900/30 dark:text-amber-200">
             <AlertTriangle className="h-4 w-4" />
-            Limite do plano atingido em pelo menos um recurso. Faça upgrade para continuar sem bloqueios.
+            Limite do plano atingido em pelo menos um recurso. Motivo do bloqueio: {blockedItems.map((item) => item.label).join(", ")}.
           </p>
         ) : null}
         <div className="mt-2 grid gap-2 text-sm md:grid-cols-2">
@@ -258,11 +280,11 @@ export default function BillingPage() {
           {hasExceededUsage ? (
             <button
               type="button"
-              className="rounded-lg bg-orange-500 px-3 py-2 text-sm font-medium text-white hover:bg-orange-600 disabled:opacity-60"
+              className="rounded-lg bg-orange-500 px-3 py-2 text-sm font-semibold text-white shadow-lg shadow-orange-500/30 hover:bg-orange-600 disabled:opacity-60"
               disabled={checkoutMutation.isPending}
               onClick={() => void handleUpgrade("PRO")}
             >
-              {checkoutMutation.isPending ? "Processando..." : "Fazer upgrade agora"}
+              {checkoutMutation.isPending ? "Processando..." : "Continuar crescendo"}
             </button>
           ) : null}
           <button

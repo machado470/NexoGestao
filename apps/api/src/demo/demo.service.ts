@@ -120,6 +120,70 @@ export class DemoService {
       actorUserId: params.actorUserId,
     })
 
+    const readyOrderAmountCents = 27900
+    const readyOrderDueDate = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000)
+    const readyServiceOrder = await this.serviceOrders.create({
+      orgId: params.orgId,
+      createdBy: params.actorUserId,
+      personId: params.actorPersonId,
+      customerId: customer.id,
+      title: 'Instalação concluída aguardando cobrança (demo)',
+      description: 'Ordem concluída e pronta para cobrança pendente no fluxo de demonstração.',
+      priority: 3,
+      amountCents: readyOrderAmountCents,
+      dueDate: readyOrderDueDate.toISOString(),
+    })
+
+    await this.serviceOrders.update({
+      orgId: params.orgId,
+      updatedBy: params.actorUserId,
+      personId: params.actorPersonId,
+      id: readyServiceOrder.id,
+      data: {
+        status: 'DONE',
+      },
+    })
+
+    const pendingCharge = await this.serviceOrders.generateCharge({
+      orgId: params.orgId,
+      actorUserId: params.actorUserId,
+      serviceOrderId: readyServiceOrder.id,
+      amountCents: readyOrderAmountCents,
+      dueDate: readyOrderDueDate.toISOString(),
+    })
+
+    const debtAmountCents = 34900
+    const debtDueDate = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000)
+    const debtServiceOrder = await this.serviceOrders.create({
+      orgId: params.orgId,
+      createdBy: params.actorUserId,
+      personId: params.actorPersonId,
+      customerId: customer.id,
+      title: 'Manutenção com dívida em aberto (demo)',
+      description: 'Ordem finalizada para simular cliente com dívida e cobrança vencida.',
+      priority: 5,
+      amountCents: debtAmountCents,
+      dueDate: debtDueDate.toISOString(),
+    })
+
+    await this.serviceOrders.update({
+      orgId: params.orgId,
+      updatedBy: params.actorUserId,
+      personId: params.actorPersonId,
+      id: debtServiceOrder.id,
+      data: {
+        status: 'DONE',
+      },
+    })
+
+    const overdueCharge = await this.serviceOrders.generateCharge({
+      orgId: params.orgId,
+      actorUserId: params.actorUserId,
+      serviceOrderId: debtServiceOrder.id,
+      amountCents: debtAmountCents,
+      dueDate: debtDueDate.toISOString(),
+    })
+
     await this.whatsapp.enqueueMessage({
       orgId: params.orgId,
       customerId: customer.id,
@@ -184,6 +248,8 @@ export class DemoService {
       appointmentId: appointment.id,
       serviceOrderId: serviceOrder.id,
       chargeId,
+      pendingChargeId: pendingCharge.chargeId ?? null,
+      overdueChargeId: overdueCharge.chargeId ?? null,
       chain: {
         serviceOrderStatus: 'DONE',
         chargeStatus: persistedCharge?.status ?? 'PAID',
@@ -194,6 +260,13 @@ export class DemoService {
           (personState?.operationalState as OperationalStateValue | undefined) ??
           OperationalStateValue.NORMAL,
         operationalRiskScore: Number(personState?.operationalRiskScore ?? 0),
+      },
+      showcase: {
+        customerWithDebt: customer.id,
+        serviceOrderReadyId: readyServiceOrder.id,
+        pendingChargeId: pendingCharge.chargeId ?? null,
+        overdueChargeId: overdueCharge.chargeId ?? null,
+        paidChargeId: chargeId,
       },
     }
   }
