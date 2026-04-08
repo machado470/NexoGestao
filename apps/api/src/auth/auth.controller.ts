@@ -60,4 +60,18 @@ export class AuthController {
   async resetPassword(@Body() body: { token: string; password: string }) {
     return this.auth.resetPassword(body.token, body.password)
   }
+
+  @Public()
+  @Post('verify-email')
+  @Throttle({ short: { limit: 10, ttl: 60000 } })
+  async verifyEmail(@Body() body: { token: string }) {
+    return this.auth.verifyEmail(body.token)
+  }
+
+  @Public()
+  @Post('resend-email-verification')
+  @Throttle({ short: { limit: 5, ttl: 60000 } })
+  async resendEmailVerification(@Body() body: { email: string }) {
+    return this.auth.resendEmailVerification(body.email)
+  }
 }
