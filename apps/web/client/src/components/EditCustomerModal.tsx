@@ -38,6 +38,7 @@ function normalizeCustomerPayload(payload: unknown): CustomerDetails | null {
 }
 
 export default function EditCustomerModal({ open, customerId, onClose, onSaved }: Props) {
+  const utils = trpc.useUtils();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -258,4 +259,3 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
     </Dialog>
   );
 }
-  const utils = trpc.useUtils();
