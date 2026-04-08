@@ -6,6 +6,7 @@ import { getSessionCookieOptions } from "../_core/cookies";
 
 const NEXO_API_URL = process.env.NEXO_API_URL || "http://127.0.0.1:3000";
 const NEXO_TOKEN_COOKIE = "nexo_token";
+const NEXO_FETCH_TIMEOUT_MS = Number(process.env.NEXO_FETCH_TIMEOUT_MS || 12000);
 
 type CtxLike = {
   req: any;
@@ -100,22 +101,52 @@ function toQueryString(input?: Record<string, unknown> | null): string {
 
 async function nexoFetch(path: string, options: RequestInit = {}) {
   const url = `${NEXO_API_URL}${path}`;
+  const timeoutMs = Number.isFinite(NEXO_FETCH_TIMEOUT_MS) && NEXO_FETCH_TIMEOUT_MS > 0
+    ? NEXO_FETCH_TIMEOUT_MS
+    : 12000;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort("timeout"), timeoutMs);
+  const upstreamSignal = options.signal;
+
+  if (upstreamSignal) {
+    if (upstreamSignal.aborted) {
+      controller.abort(
+        upstreamSignal.reason ?? "aborted",
+      );
+    } else {
+      upstreamSignal.addEventListener(
+        "abort",
+        () => controller.abort(upstreamSignal.reason ?? "aborted"),
+        { once: true },
+      );
+    }
+  }
 
   let response: Response;
   try {
     response = await fetch(url, {
       ...options,
+      signal: controller.signal,
       headers: {
         "Content-Type": "application/json",
         ...(options.headers || {}),
       },
     });
   } catch (error: any) {
+    if (error?.name === "AbortError") {
+      throw new TRPCError({
+        code: "TIMEOUT",
+        message: `Timeout ao chamar Nexo API (${timeoutMs}ms) em ${path}`,
+      });
+    }
+
     const reason = error?.message || "Falha de conexão";
     throw new TRPCError({
       code: "INTERNAL_SERVER_ERROR",
       message: `Falha ao conectar no backend Nexo API (${NEXO_API_URL}) para ${path}. Verifique NEXO_API_URL e disponibilidade da API. Motivo: ${reason}`,
     });
+  } finally {
+    clearTimeout(timeout);
   }
 
   const text = await response.text();

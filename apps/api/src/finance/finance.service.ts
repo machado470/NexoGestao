@@ -14,6 +14,15 @@ import { AnalyticsService, UsageMetricEvent } from '../analytics/analytics.servi
 @Injectable()
 export class FinanceService {
   private readonly logger = new Logger(FinanceService.name)
+  private readonly allowedChargeTransitions: Record<
+    $Enums.ChargeStatus,
+    $Enums.ChargeStatus[]
+  > = {
+    PENDING: ['OVERDUE', 'PAID', 'CANCELED'],
+    OVERDUE: ['PAID', 'CANCELED'],
+    PAID: [],
+    CANCELED: [],
+  }
 
   constructor(
     private readonly prisma: PrismaService,
@@ -21,6 +30,48 @@ export class FinanceService {
     private readonly timeline: TimelineService,
     private readonly analytics: AnalyticsService,
   ) {}
+
+  private async assertServiceOrderEligibleForCharge(params: {
+    orgId: string
+    serviceOrderId: string
+    customerId?: string
+  }) {
+    const serviceOrder = await this.prisma.serviceOrder.findFirst({
+      where: { id: params.serviceOrderId, orgId: params.orgId },
+      select: { id: true, customerId: true, status: true },
+    })
+
+    if (!serviceOrder) {
+      throw new NotFoundException('Ordem de serviço não encontrada para a organização')
+    }
+
+    if (params.customerId && serviceOrder.customerId !== params.customerId) {
+      throw new BadRequestException('Ordem de serviço não pertence ao cliente informado')
+    }
+
+    if (serviceOrder.status === 'CANCELED') {
+      throw new BadRequestException('Não é permitido gerar cobrança para O.S. cancelada')
+    }
+
+    if (serviceOrder.status !== 'DONE') {
+      throw new BadRequestException(
+        `Cobrança só pode ser gerada para O.S. finalizada (status atual: ${serviceOrder.status})`,
+      )
+    }
+
+    return serviceOrder
+  }
+
+  private assertChargeStatusTransition(
+    from: $Enums.ChargeStatus,
+    to: $Enums.ChargeStatus,
+  ) {
+    if (from === to) return
+
+    if (!this.allowedChargeTransitions[from]?.includes(to)) {
+      throw new BadRequestException(`Transição de status inválida: ${from} -> ${to}`)
+    }
+  }
 
   // =========================
   // OVERVIEW
@@ -157,13 +208,11 @@ export class FinanceService {
     }
 
     if (input.serviceOrderId) {
-      const serviceOrder = await this.prisma.serviceOrder.findFirst({
-        where: { id: input.serviceOrderId, orgId: input.orgId },
-        select: { id: true, customerId: true },
+      const serviceOrder = await this.assertServiceOrderEligibleForCharge({
+        orgId: input.orgId,
+        serviceOrderId: input.serviceOrderId,
+        customerId: input.customerId,
       })
-      if (!serviceOrder) {
-        throw new NotFoundException('Ordem de serviço não encontrada para a organização')
-      }
       if (serviceOrder.customerId !== input.customerId) {
         throw new BadRequestException('serviceOrderId deve pertencer ao mesmo customerId')
       }
@@ -233,10 +282,14 @@ export class FinanceService {
   }) {
     const charge = await this.prisma.charge.findFirst({
       where: { id: input.id, orgId: input.orgId },
-      select: { id: true },
+      select: { id: true, status: true, paidAt: true },
     })
 
     if (!charge) throw new NotFoundException('Charge não encontrada')
+
+    if (input.status) {
+      this.assertChargeStatusTransition(charge.status, input.status)
+    }
 
     return this.prisma.charge.update({
       where: { id: charge.id },
@@ -244,6 +297,12 @@ export class FinanceService {
         amountCents: input.amountCents,
         dueDate: input.dueDate,
         status: input.status,
+        paidAt:
+          input.status === 'PAID'
+            ? (charge.paidAt ?? new Date())
+            : input.status === 'PENDING' || input.status === 'OVERDUE'
+              ? null
+              : undefined,
         notes: input.notes,
       },
     })
@@ -388,16 +447,15 @@ export class FinanceService {
       throw new BadRequestException('serviceOrderId é obrigatório para vincular cobrança')
     }
 
-    const serviceOrder = await this.prisma.serviceOrder.findFirst({
-      where: { id: input.serviceOrderId, orgId: input.orgId },
-      select: { id: true, customerId: true },
+    if (!input.amountCents || input.amountCents <= 0) {
+      throw new BadRequestException('Valor da cobrança inválido para a O.S.')
+    }
+
+    const serviceOrder = await this.assertServiceOrderEligibleForCharge({
+      orgId: input.orgId,
+      serviceOrderId: input.serviceOrderId,
+      customerId: input.customerId,
     })
-    if (!serviceOrder) {
-      throw new NotFoundException('Ordem de serviço não encontrada para a organização')
-    }
-    if (serviceOrder.customerId !== input.customerId) {
-      throw new BadRequestException('Ordem de serviço não pertence ao cliente informado')
-    }
 
     const existing = await this.prisma.charge.findFirst({
       where: {
