@@ -5,6 +5,7 @@ import { SubscriptionStatus } from '@prisma/client'
 export interface QuotaLimits {
   customers: number
   appointments: number
+  messages: number
   serviceOrders: number
   users: number
   storage: number
@@ -14,6 +15,7 @@ export const PLAN_LIMITS: Record<string, QuotaLimits> = {
   FREE: {
     customers: 5,
     appointments: 20,
+    messages: 50,
     serviceOrders: 10,
     users: 2,
     storage: 100,
@@ -21,6 +23,7 @@ export const PLAN_LIMITS: Record<string, QuotaLimits> = {
   STARTER: {
     customers: 30,
     appointments: 200,
+    messages: 500,
     serviceOrders: 100,
     users: 5,
     storage: 500,
@@ -28,6 +31,7 @@ export const PLAN_LIMITS: Record<string, QuotaLimits> = {
   PRO: {
     customers: 100,
     appointments: 2000,
+    messages: 5000,
     serviceOrders: 1000,
     users: 10,
     storage: 5000,
@@ -35,6 +39,7 @@ export const PLAN_LIMITS: Record<string, QuotaLimits> = {
   SCALE: {
     customers: 999999,
     appointments: 999999,
+    messages: 999999,
     serviceOrders: 999999,
     users: 999999,
     storage: 999999,
@@ -42,6 +47,7 @@ export const PLAN_LIMITS: Record<string, QuotaLimits> = {
   BUSINESS: {
     customers: 999999,
     appointments: 999999,
+    messages: 999999,
     serviceOrders: 999999,
     users: 999999,
     storage: 999999,
@@ -134,6 +140,19 @@ export class QuotasService {
     return count < limits.serviceOrders
   }
 
+  async canSendMessage(orgId: string): Promise<boolean> {
+    const plan = await this.getOrgPlan(orgId)
+    const limits = this.getQuotaLimits(plan)
+
+    if (limits.messages >= 999999) return true
+
+    const count = await this.prisma.whatsAppMessage.count({
+      where: { orgId },
+    })
+
+    return count < limits.messages
+  }
+
   async canAddStaffMember(orgId: string): Promise<boolean> {
     const plan = await this.getOrgPlan(orgId)
     const limits = this.getQuotaLimits(plan)
@@ -154,11 +173,13 @@ export class QuotasService {
     const [
       customerCount,
       appointmentCount,
+      messageCount,
       serviceOrderCount,
       userCount,
     ] = await Promise.all([
       this.prisma.customer.count({ where: { orgId } }),
       this.prisma.appointment.count({ where: { orgId } }),
+      this.prisma.whatsAppMessage.count({ where: { orgId } }),
       this.prisma.serviceOrder.count({ where: { orgId } }),
       this.prisma.user.count({ where: { orgId } }),
     ])
@@ -197,6 +218,12 @@ export class QuotasService {
           percentage: pct(appointmentCount, limits.appointments),
           unlimited: limits.appointments >= 999999,
         },
+        messages: {
+          used: messageCount,
+          limit: limits.messages,
+          percentage: pct(messageCount, limits.messages),
+          unlimited: limits.messages >= 999999,
+        },
         serviceOrders: {
           used: serviceOrderCount,
           limit: limits.serviceOrders,
@@ -218,6 +245,7 @@ export class QuotasService {
     action:
       | 'CREATE_CUSTOMER'
       | 'CREATE_APPOINTMENT'
+      | 'SEND_MESSAGE'
       | 'CREATE_SERVICE_ORDER'
       | 'ADD_STAFF_MEMBER',
   ): Promise<void> {
@@ -235,6 +263,11 @@ export class QuotasService {
       case 'CREATE_APPOINTMENT':
         canProceed = await this.canCreateAppointment(orgId)
         resourceName = 'agendamento'
+        break
+
+      case 'SEND_MESSAGE':
+        canProceed = await this.canSendMessage(orgId)
+        resourceName = 'mensagem'
         break
 
       case 'CREATE_SERVICE_ORDER':

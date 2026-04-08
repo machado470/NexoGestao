@@ -31,6 +31,7 @@ export class DashboardService {
     // Executa as consultas em lotes menores para não sobrecarregar a conexão com o banco
     const batch1 = await Promise.all([
       this.prisma.customer.count({ where: { orgId, active: true } }),
+      this.prisma.customer.count({ where: { orgId } }),
       this.prisma.serviceOrder.count({ where: { orgId } }),
       this.prisma.serviceOrder.count({
         where: { orgId, status: { in: ['OPEN', 'ASSIGNED'] } },
@@ -62,6 +63,7 @@ export class DashboardService {
       this.prisma.correctiveAction.count({
         where: { person: { orgId }, status: 'OPEN' },
       }),
+      this.prisma.charge.count({ where: { orgId } }),
     ])
 
     const batch3 = await Promise.all([
@@ -76,8 +78,8 @@ export class DashboardService {
       this.governanceRead.getAutoScore(orgId),
     ])
 
-    const [totalCustomers, totalServiceOrders, openServiceOrders, overdueServiceOrders, weeklyRevenueAgg] = batch1
-    const [pendingPaymentsAgg, inProgressOrders, completedOrders, riskTickets] = batch2
+    const [totalCustomers, createdCustomers, totalServiceOrders, openServiceOrders, overdueServiceOrders, weeklyRevenueAgg] = batch1
+    const [pendingPaymentsAgg, inProgressOrders, completedOrders, riskTickets, chargesGenerated] = batch2
     const [totalRevenue, paidRevenue, autoScore] = batch3
 
     // Reutiliza valores já calculados para evitar redundância
@@ -86,6 +88,7 @@ export class DashboardService {
 
     return {
       totalCustomers,
+      createdCustomers,
       totalServiceOrders,
       openServiceOrders,
       overdueServiceOrders,
@@ -93,6 +96,8 @@ export class DashboardService {
       pendingPaymentsInCents: pendingPaymentsAgg._sum.amountCents ?? 0,
       inProgressOrders,
       completedOrders,
+      completedServices: completedOrders,
+      chargesGenerated,
       delayedOrders,
       riskTickets,
       totalRevenueInCents: totalRevenue._sum.amountCents ?? 0,

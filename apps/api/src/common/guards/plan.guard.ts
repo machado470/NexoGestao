@@ -13,6 +13,7 @@ export const PLAN_QUOTA_KEY = 'plan_quota'
 export type QuotaActionKey =
   | 'CREATE_CUSTOMER'
   | 'CREATE_APPOINTMENT'
+  | 'SEND_MESSAGE'
   | 'CREATE_SERVICE_ORDER'
   | 'ADD_STAFF_MEMBER'
 
