@@ -1275,7 +1275,7 @@ export default function AppointmentsPage() {
                 : "Nenhum agendamento bate com os filtros atuais. Limpe os filtros para retomar a leitura do fluxo."
             }
             action={{
-              label: "Novo Agendamento",
+              label: "Agende seu primeiro serviço",
               onClick: () => setShowCreateModal(true),
             }}
             secondaryAction={{

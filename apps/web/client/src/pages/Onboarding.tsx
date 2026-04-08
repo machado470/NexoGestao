@@ -6,8 +6,8 @@ import {
   CheckCircle2,
   ClipboardList,
   Coins,
+  AlertTriangle,
   Loader2,
-  ShieldCheck,
   Sparkles,
   UserRound,
 } from "lucide-react";
@@ -22,9 +22,7 @@ type StepKey =
   | "customer"
   | "appointment"
   | "serviceOrder"
-  | "charge"
-  | "payment"
-  | "governance";
+  | "charge";
 
 type Progress = Record<StepKey, boolean>;
 
@@ -40,8 +38,6 @@ const BASE_PROGRESS: Progress = {
   appointment: false,
   serviceOrder: false,
   charge: false,
-  payment: false,
-  governance: false,
 };
 
 const BASE_IDS: JourneyIds = {
@@ -74,9 +70,9 @@ const STEP_META: Array<{
   },
   {
     key: "serviceOrder",
-    title: "Criar O.S.",
-    description: "Formalize a entrega para deixar o faturamento pronto.",
-    cta: "Criar O.S.",
+    title: "Concluir serviço",
+    description: "Registre e conclua a execução para liberar a cobrança.",
+    cta: "Concluir serviço",
     icon: ClipboardList,
   },
   {
@@ -85,20 +81,6 @@ const STEP_META: Array<{
     description: "Converta a execução em valor financeiro rastreável.",
     cta: "Gerar cobrança",
     icon: Coins,
-  },
-  {
-    key: "payment",
-    title: "Simular pagamento",
-    description: "Mostre caixa entrando e ciclo financeiro fechado.",
-    cta: "Simular pagamento",
-    icon: Coins,
-  },
-  {
-    key: "governance",
-    title: "Mostrar impacto na governança",
-    description: "Evidencie como operação + financeiro mudam o score institucional.",
-    cta: "Atualizar governança",
-    icon: ShieldCheck,
   },
 ];
 
@@ -140,26 +122,6 @@ function extractEntityId(payload: unknown, keys: string[] = ["id"]): string | nu
   return null;
 }
 
-function extractChargeAmountCents(payload: unknown): number | null {
-  if (!payload || Array.isArray(payload) || !isRecord(payload)) return null;
-
-  const direct = payload.amountCents;
-  if (typeof direct === "number" && Number.isFinite(direct)) {
-    return direct;
-  }
-
-  const amount = payload.amount;
-  if (typeof amount === "number" && Number.isFinite(amount)) {
-    return Math.round(amount * 100);
-  }
-
-  return (
-    extractChargeAmountCents(payload.data) ??
-    extractChargeAmountCents(payload.result) ??
-    extractChargeAmountCents(payload.item)
-  );
-}
-
 export default function Onboarding() {
   const [, navigate] = useLocation();
   const { track } = useProductAnalytics();
@@ -173,9 +135,8 @@ export default function Onboarding() {
   const [journeyIds, setJourneyIds] = useState<JourneyIds>(BASE_IDS);
   const [error, setError] = useState<string | null>(null);
   const [flowMessage, setFlowMessage] = useState<string | null>(null);
+  const [degradedMessage, setDegradedMessage] = useState<string | null>(null);
   const [seedFallback, setSeedFallback] = useState<string | null>(null);
-  const [chargeAmountCents, setChargeAmountCents] = useState(15000);
-  const [governanceSnapshot, setGovernanceSnapshot] = useState<number | null>(null);
 
   const [customerName, setCustomerName] = useState("Cliente Demo NexoGestão");
   const [customerPhone, setCustomerPhone] = useState("11999990000");
@@ -213,17 +174,11 @@ export default function Onboarding() {
     { enabled: canQuery, retry: false, refetchOnWindowFocus: false }
   );
 
-  const governanceSummaryQuery = trpc.governance.summary.useQuery(undefined, {
-    enabled: canQuery,
-    retry: false,
-    refetchOnWindowFocus: false,
-  });
-
   const customerMutation = trpc.nexo.customers.create.useMutation();
   const appointmentMutation = trpc.nexo.appointments.create.useMutation();
   const serviceOrderMutation = trpc.nexo.serviceOrders.create.useMutation();
+  const serviceOrderUpdateMutation = trpc.nexo.serviceOrders.update.useMutation();
   const chargeMutation = trpc.finance.charges.create.useMutation();
-  const payChargeMutation = trpc.finance.charges.pay.useMutation();
   const completeOnboardingMutation = trpc.nexo.onboarding.complete.useMutation();
 
   useEffect(() => {
@@ -240,25 +195,6 @@ export default function Onboarding() {
   useEffect(() => {
     localStorage.setItem(storageKey, JSON.stringify(progress));
   }, [progress, storageKey]);
-
-  const governanceScore = useMemo(() => {
-    const payload = (governanceSummaryQuery.data as any)?.data ?? governanceSummaryQuery.data;
-    if (!payload || typeof payload !== "object") return null;
-
-    const score = Number(
-      (payload as any).institutionalRiskScore ??
-        (payload as any).score ??
-        (payload as any).overallScore
-    );
-
-    return Number.isFinite(score) ? Math.round(score) : null;
-  }, [governanceSummaryQuery.data]);
-
-  useEffect(() => {
-    if (governanceScore !== null && governanceSnapshot === null) {
-      setGovernanceSnapshot(governanceScore);
-    }
-  }, [governanceScore, governanceSnapshot]);
 
   useEffect(() => {
     if (!canQuery) return;
@@ -282,17 +218,12 @@ export default function Onboarding() {
     const hasAppointment = Array.isArray(appointmentsPayload) && appointmentsPayload.length > 0;
     const hasServiceOrder = Array.isArray(serviceOrdersPayload) && serviceOrdersPayload.length > 0;
     const hasCharge = Array.isArray(chargesPayload) && chargesPayload.length > 0;
-    const hasPaidCharge =
-      Array.isArray(chargesPayload) &&
-      chargesPayload.some((charge: any) => String(charge?.status ?? "").toUpperCase() === "PAID");
-
     setProgress((prev) => ({
       ...prev,
       customer: prev.customer || hasCustomer,
       appointment: prev.appointment || hasAppointment,
       serviceOrder: prev.serviceOrder || hasServiceOrder,
       charge: prev.charge || hasCharge,
-      payment: prev.payment || hasPaidCharge,
     }));
   }, [
     canQuery,
@@ -305,37 +236,11 @@ export default function Onboarding() {
   const firstCustomer = ((customersQuery.data as any)?.data ?? customersQuery.data ?? [])[0];
   const activeCustomerId = journeyIds.customerId ?? firstCustomer?.id ?? null;
 
-  const firstCharge = useMemo(() => {
-    const payload =
-      (chargesQuery.data as any)?.data ?? (chargesQuery.data as any)?.items ?? chargesQuery.data ?? [];
-
-    if (!Array.isArray(payload) || payload.length === 0) {
-      return null;
-    }
-
-    const pending = payload.find((charge: any) => {
-      const status = String(charge?.status ?? "").toUpperCase();
-      return status === "PENDING" || status === "OVERDUE";
-    });
-
-    return pending ?? payload[0] ?? null;
-  }, [chargesQuery.data]);
-
-  const activeChargeId = journeyIds.chargeId ?? extractId(firstCharge?.id) ?? null;
-  const activeChargeAmountCents =
-    chargeAmountCents > 0
-      ? chargeAmountCents
-      : Number(firstCharge?.amountCents) > 0
-        ? Number(firstCharge?.amountCents)
-        : 15000;
-
   const canRun = {
     customer: true,
     appointment: progress.customer,
     serviceOrder: progress.appointment,
     charge: progress.serviceOrder,
-    payment: progress.charge,
-    governance: progress.payment,
   } as const;
 
   const completedCount = useMemo(
@@ -359,11 +264,6 @@ export default function Onboarding() {
       setError((e as Error).message);
     }
   };
-
-  const scoreDelta =
-    governanceSnapshot !== null && governanceScore !== null
-      ? governanceScore - governanceSnapshot
-      : null;
 
   if (isInitializing) {
     return (
@@ -396,12 +296,12 @@ export default function Onboarding() {
             </div>
 
             <h1 className="text-3xl font-semibold tracking-tight text-zinc-950 dark:text-white md:text-4xl">
-              Venda valor em 6 passos sem explicação técnica
+              Entregue o primeiro valor em 4 passos guiados
             </h1>
 
             <p className="mt-3 max-w-xl text-sm leading-6 text-zinc-600 dark:text-zinc-400">
-              Este fluxo mostra cliente criado, operação executada, receita gerada,
-              pagamento recebido e impacto real na governança.
+              O produto conduz automaticamente o caminho oficial: cliente → agendamento
+              → serviço concluído → cobrança gerada.
             </p>
           </div>
 
@@ -440,6 +340,15 @@ export default function Onboarding() {
         </div>
       ) : null}
 
+      {degradedMessage ? (
+        <div className="rounded-xl border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-yellow-700 dark:border-yellow-900/60 dark:bg-yellow-950/40 dark:text-yellow-300">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{degradedMessage}</span>
+          </div>
+        </div>
+      ) : null}
+
       <section className="rounded-2xl border border-orange-200 bg-orange-50/70 p-4 dark:border-orange-900/40 dark:bg-orange-950/20">
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-orange-700 dark:text-orange-300">
           Quer impressionar em 30 segundos?
@@ -451,6 +360,7 @@ export default function Onboarding() {
           track("cta_click", { screen: "onboarding", ctaId: "generate_demo_data" });
           setError(null);
           setFlowMessage("Preparando dados da demonstração...");
+          setDegradedMessage(null);
           setSeedFallback(null);
           try {
             const payload = await generateDemoEnvironment();
@@ -462,9 +372,9 @@ export default function Onboarding() {
               appointmentsQuery.refetch(),
               serviceOrdersQuery.refetch(),
               chargesQuery.refetch(),
-              governanceSummaryQuery.refetch(),
             ]);
             setFlowMessage("Ambiente de demonstração pronto. Você já pode avançar pelas etapas sem bloqueios.");
+            setDegradedMessage("Se o WhatsApp estiver em fila, continue o onboarding normalmente: o envio será processado em background.");
           } catch (e) {
             setError((e as Error).message);
             setSeedFallback("A geração automática de dados falhou. Continue pela jornada manual abaixo: ela possui fallback completo e não quebra o fluxo da demo.");
@@ -559,18 +469,27 @@ export default function Onboarding() {
           </section>
 
           <section className="rounded-2xl border bg-card p-6 shadow-sm dark:border-zinc-800">
-            <h2 className="text-lg font-semibold">3. Criar O.S.</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Deixe explícito que a execução está pronta para faturar.</p>
+            <h2 className="text-lg font-semibold">3. Concluir serviço</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Crie a O.S. e já conclua a execução para liberar cobrança sem etapas extras.</p>
             <input className="mt-4 w-full rounded-md border bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-zinc-800" value={serviceOrderTitle} onChange={(e) => setServiceOrderTitle(e.target.value)} placeholder="Título da ordem de serviço" />
-            <Button className="mt-4" disabled={!canRun.serviceOrder || progress.serviceOrder || serviceOrderMutation.isPending} onClick={async () => {
+            <Button className="mt-4" disabled={!canRun.serviceOrder || progress.serviceOrder || serviceOrderMutation.isPending || serviceOrderUpdateMutation.isPending} onClick={async () => {
               track("cta_click", { screen: "onboarding", ctaId: "step_create_service_order" });
               setError(null);
-              setFlowMessage("Criando ordem de serviço...");
+              setFlowMessage("Registrando e concluindo serviço...");
               try {
                 if (!activeCustomerId) throw new Error("Crie um cliente primeiro.");
                 if (!serviceOrderTitle.trim()) throw new Error("Informe o título da ordem de serviço.");
                 const result = await serviceOrderMutation.mutateAsync({ customerId: String(activeCustomerId), title: serviceOrderTitle.trim(), priority: 2 });
-                setJourneyIds((prev) => ({ ...prev, serviceOrderId: extractEntityId(result, ["serviceOrderId", "id"]) ?? prev.serviceOrderId }));
+                const createdServiceOrderId = extractEntityId(result, ["serviceOrderId", "id"]);
+                if (!createdServiceOrderId) {
+                  throw new Error("Não foi possível identificar a O.S. criada.");
+                }
+                await serviceOrderUpdateMutation.mutateAsync({
+                  id: createdServiceOrderId,
+                  status: "DONE",
+                  outcomeSummary: "Serviço concluído durante onboarding guiado.",
+                });
+                setJourneyIds((prev) => ({ ...prev, serviceOrderId: createdServiceOrderId }));
                 await utils.nexo.serviceOrders.list.invalidate();
                 completeStep("serviceOrder");
                 setFlowMessage("Execução registrada. Próximo passo: gerar cobrança para evidenciar valor financeiro.");
@@ -578,7 +497,7 @@ export default function Onboarding() {
                 setError((e as Error).message);
                 setFlowMessage(null);
               }
-            }}>{serviceOrderMutation.isPending ? "Criando..." : progress.serviceOrder ? "Concluído" : STEP_META[2].cta}</Button>
+            }}>{serviceOrderMutation.isPending || serviceOrderUpdateMutation.isPending ? "Concluindo..." : progress.serviceOrder ? "Concluído" : STEP_META[2].cta}</Button>
           </section>
 
           <section className="rounded-2xl border bg-card p-6 shadow-sm dark:border-zinc-800">
@@ -595,10 +514,10 @@ export default function Onboarding() {
                 if (!amount || amount <= 0) throw new Error("Informe um valor válido.");
                 const result = await chargeMutation.mutateAsync({ customerId: String(activeCustomerId), amount, dueDate: new Date(), notes: "Cobrança demo pronta para receber" });
                 setJourneyIds((prev) => ({ ...prev, chargeId: extractEntityId(result, ["chargeId", "id"]) ?? prev.chargeId }));
-                setChargeAmountCents(extractChargeAmountCents(result) ?? Math.round(amount * 100));
                 await utils.finance.charges.list.invalidate();
                 completeStep("charge");
-                setFlowMessage("Cobrança criada. Agora simule pagamento para mostrar dinheiro entrando.");
+                setFlowMessage("Cobrança criada. Você já comprovou o primeiro valor gerado para o cliente.");
+                setDegradedMessage("Se houver envio WhatsApp em fila, o status é processado em segundo plano sem bloquear o fluxo.");
               } catch (e) {
                 setError((e as Error).message);
                 setFlowMessage(null);
@@ -607,99 +526,15 @@ export default function Onboarding() {
           </section>
 
           <section className="rounded-2xl border bg-card p-6 shadow-sm dark:border-zinc-800">
-            <h2 className="text-lg font-semibold">5. Simular pagamento</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Comprove recuperação de receita em tempo real.</p>
-            <Button className="mt-4" disabled={!canRun.payment || progress.payment || payChargeMutation.isPending || !activeChargeId} onClick={async () => {
-              track("cta_click", { screen: "onboarding", ctaId: "step_register_payment" });
-              setError(null);
-              setFlowMessage("Registrando pagamento...");
-              try {
-                if (!activeChargeId) throw new Error("Gere uma cobrança primeiro.");
-                await payChargeMutation.mutateAsync({
-                  chargeId: String(activeChargeId),
-                  method: "PIX",
-                  amountCents: activeChargeAmountCents,
-                });
-                await Promise.all([
-                  utils.finance.charges.list.invalidate(),
-                  utils.finance.charges.stats.invalidate(),
-                  utils.nexo.timeline.listByOrg.invalidate(),
-                  utils.governance.summary.invalidate(),
-                ]);
-                completeStep("payment");
-                setFlowMessage("Pagamento confirmado. Atualize governança para fechar o argumento executivo da demo.");
-              } catch (e) {
-                setError((e as Error).message);
-                setFlowMessage(null);
-              }
-            }}>{payChargeMutation.isPending ? "Processando..." : progress.payment ? "Concluído" : STEP_META[4].cta}</Button>
-          </section>
-
-          <section className="rounded-2xl border bg-card p-6 shadow-sm dark:border-zinc-800">
-            <h2 className="text-lg font-semibold">6. Mostrar impacto na governança</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Transforme dados operacionais em argumento executivo de venda.</p>
-            <div className="mt-4 grid gap-3 rounded-xl border border-zinc-200 p-4 text-sm dark:border-zinc-800">
-              <p>
-                Score anterior: <strong>{governanceSnapshot ?? "—"}</strong>
-              </p>
-              <p>
-                Score atual: <strong>{governanceScore ?? "—"}</strong>
-              </p>
-              <p className="text-zinc-600 dark:text-zinc-400">
-                {governanceScore !== null && governanceSnapshot !== null
-                  ? governanceScore >= governanceSnapshot
-                    ? "Impacto positivo: governança respondeu ao ciclo completo de operação + caixa."
-                    : "Score ainda pressionado: destaque onde o cliente ganha com próximas ações."
-                  : "Atualize para registrar o novo estado da governança."}
-              </p>
-            </div>
-            <Button className="mt-4" disabled={!canRun.governance || progress.governance || governanceSummaryQuery.isFetching} onClick={async () => {
-              setError(null);
-              setFlowMessage("Atualizando score institucional...");
-              try {
-                await governanceSummaryQuery.refetch();
-                completeStep("governance");
-                setFlowMessage("Jornada concluída. Use o resumo abaixo para fechar a demonstração com impacto.");
-              } catch (e) {
-                setError((e as Error).message);
-                setFlowMessage(null);
-              }
-            }}>{governanceSummaryQuery.isFetching ? "Atualizando..." : progress.governance ? "Concluído" : STEP_META[5].cta}</Button>
-          </section>
-
-          <section className="rounded-2xl border border-emerald-200 bg-emerald-50/80 p-6 shadow-sm dark:border-emerald-900/40 dark:bg-emerald-950/20">
-            <h2 className="text-lg font-semibold">WOW moment: antes vs depois</h2>
-            <p className="mt-2 text-sm text-zinc-700 dark:text-zinc-300">
-              Antes: operação desorganizada e receita sem previsibilidade. Agora: fluxo completo, cobrança ativa e controle institucional.
-            </p>
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              <div className="rounded-xl border border-emerald-200 bg-white/80 p-3 text-sm dark:border-emerald-900/40 dark:bg-emerald-950/10">
-                <p className="text-xs uppercase tracking-wide text-zinc-500">Score antes</p>
-                <p className="mt-1 text-xl font-semibold">{governanceSnapshot ?? "—"}</p>
-              </div>
-              <div className="rounded-xl border border-emerald-200 bg-white/80 p-3 text-sm dark:border-emerald-900/40 dark:bg-emerald-950/10">
-                <p className="text-xs uppercase tracking-wide text-zinc-500">Score agora</p>
-                <p className="mt-1 text-xl font-semibold">{governanceScore ?? "—"}</p>
-              </div>
-              <div className="rounded-xl border border-emerald-200 bg-white/80 p-3 text-sm dark:border-emerald-900/40 dark:bg-emerald-950/10">
-                <p className="text-xs uppercase tracking-wide text-zinc-500">Mudança</p>
-                <p className="mt-1 text-xl font-semibold">
-                  {scoreDelta === null ? "—" : scoreDelta > 0 ? `+${scoreDelta}` : scoreDelta}
-                </p>
-              </div>
-            </div>
-          </section>
-
-          <section className="rounded-2xl border bg-card p-6 shadow-sm dark:border-zinc-800">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 className="text-lg font-semibold">Demo pronta para venda</h2>
+                <h2 className="text-lg font-semibold">Primeiro valor entregue</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Finalize e continue no Dashboard Executivo para apresentar valor em 5 minutos.
+                  Finalize e siga para o Dashboard Executivo com o fluxo operacional completo.
                 </p>
               </div>
 
-              <Button disabled={!progress.governance || completeOnboardingMutation.isPending} onClick={() => void finish()} className="gap-2">
+              <Button disabled={!progress.charge || completeOnboardingMutation.isPending} onClick={() => void finish()} className="gap-2">
                 {completeOnboardingMutation.isPending ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
