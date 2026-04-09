@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import type { ExecutionLog } from "@/lib/execution/types";
 
 const STORAGE_KEY = "nexo.execution.logs.v1";
@@ -8,9 +8,23 @@ const RECENT_WINDOW_MS = 1000 * 60 * 60 * 6;
 let logsCache: ExecutionLog[] = [];
 const listeners = new Set<() => void>();
 let loaded = false;
+let hydratedFromBackend = false;
 
 function canUseStorage() {
   return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
+}
+
+function mergeLogs(logs: ExecutionLog[]) {
+  const uniqueById = new Map<string, ExecutionLog>();
+
+  logs.forEach((log) => {
+    if (!log?.id) return;
+    uniqueById.set(log.id, log);
+  });
+
+  return [...uniqueById.values()]
+    .sort((a, b) => b.executedAt - a.executedAt)
+    .slice(0, MAX_LOGS);
 }
 
 function loadLogs() {
@@ -47,22 +61,76 @@ export function getExecutionLogs() {
 
 export function appendExecutionLog(log: ExecutionLog) {
   loadLogs();
-  logsCache = [log, ...logsCache].slice(0, MAX_LOGS);
+  logsCache = mergeLogs([log, ...logsCache]);
   persistLogs();
   emit();
+}
+
+export function replaceExecutionLogs(logs: ExecutionLog[]) {
+  loadLogs();
+  logsCache = mergeLogs(logs);
+  persistLogs();
+  emit();
+}
+
+export async function syncExecutionLogAsync(log: ExecutionLog) {
+  try {
+    await fetch("/execution/log", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify({
+        actionId: log.actionId,
+        decisionId: log.decisionId,
+        status: log.status,
+        executedAt: log.executedAt,
+        entityType: log.entityType,
+        entityId: log.entityId,
+        executionKey: log.executionKey,
+      }),
+    });
+  } catch {
+    // fallback silencioso: mantém persistência local
+  }
+}
+
+export async function hydrateExecutionLogsFromBackend() {
+  if (hydratedFromBackend || typeof window === "undefined") return;
+  hydratedFromBackend = true;
+
+  try {
+    const response = await fetch("/execution/logs", {
+      method: "GET",
+      credentials: "include",
+    });
+
+    if (!response.ok) return;
+
+    const payload = (await response.json()) as { logs?: ExecutionLog[] };
+    const backendLogs = Array.isArray(payload.logs) ? payload.logs : [];
+
+    replaceExecutionLogs([...backendLogs, ...getExecutionLogs()]);
+  } catch {
+    // fallback silencioso: mantém persistência local
+  }
 }
 
 export function wasRecentlyExecuted(input: {
   actionId: string;
   decisionId: string;
+  executionKey?: string;
   withinMs?: number;
 }) {
-  const { actionId, decisionId, withinMs = RECENT_WINDOW_MS } = input;
+  const { actionId, decisionId, executionKey, withinMs = RECENT_WINDOW_MS } = input;
   const now = Date.now();
 
   return getExecutionLogs().some(log => {
     if (log.status !== "success") return false;
-    if (log.actionId !== actionId || log.decisionId !== decisionId) return false;
+    const sameAction = log.actionId === actionId && log.decisionId === decisionId;
+    const sameExecution = executionKey ? log.executionKey === executionKey : false;
+    if (!sameAction && !sameExecution) return false;
     return now - log.executedAt <= withinMs;
   });
 }
@@ -75,9 +143,14 @@ function subscribe(listener: () => void) {
 export function useExecutionMemory() {
   const logs = useSyncExternalStore(subscribe, getExecutionLogs, getExecutionLogs);
 
+  useEffect(() => {
+    void hydrateExecutionLogsFromBackend();
+  }, []);
+
   return {
     logs,
     appendExecutionLog,
     wasRecentlyExecuted,
+    syncExecutionLogAsync,
   };
 }

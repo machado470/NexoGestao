@@ -8,6 +8,7 @@ import { registerConsentRoutes } from "./consent";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { subscribeToNotificationCenterEvents } from "./notificationCenterEvents";
+import { registerExecutionLogRoutes } from "./executionLog";
 import { serveStatic, setupVite } from "./vite";
 
 async function startServer() {
@@ -19,6 +20,7 @@ async function startServer() {
 
   registerOAuthRoutes(app);
   registerConsentRoutes(app);
+  registerExecutionLogRoutes(app);
 
   app.use(
     "/api/trpc",

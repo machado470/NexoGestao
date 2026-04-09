@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useExecutionHandler } from "@/hooks/useExecutionHandler";
 import { useExecutionMemory } from "@/lib/execution/execution-memory";
+import { trackExecutionEvent } from "@/lib/execution/telemetry";
 import type {
   ExecutionAction,
   ExecutionSource,
@@ -57,6 +58,12 @@ function getActionButtonClass(action: ExecutionAction, suggestedActionId?: strin
   return "nexo-cta-secondary !h-9 !rounded-lg !px-3 !text-xs";
 }
 
+function getModeLabel(mode: ExecutionAction["mode"]) {
+  if (mode === "automatic") return "Automática";
+  if (mode === "semi_automatic") return "Semi";
+  return "Manual";
+}
+
 export function OperationalCard({ decision, source }: OperationalCardProps) {
   const { execute } = useExecutionHandler();
   const { logs } = useExecutionMemory();
@@ -72,7 +79,7 @@ export function OperationalCard({ decision, source }: OperationalCardProps) {
 
   useEffect(() => {
     decision.actions.forEach(action => {
-      console.info("[execution.telemetry]", {
+      trackExecutionEvent({
         event: "action_shown",
         decisionId: decision.id,
         actionId: action.id,
@@ -88,6 +95,8 @@ export function OperationalCard({ decision, source }: OperationalCardProps) {
     const result = await execute(action, {
       source,
       decisionId: decision.id,
+      entityType: decision.entityType,
+      entityId: decision.entityId,
     });
 
     if (!result.ok && result.message) {
@@ -153,6 +162,7 @@ export function OperationalCard({ decision, source }: OperationalCardProps) {
               {isLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
               {action.label}
               {isSuggested ? " • recomendado" : ""}
+              {` • ${getModeLabel(action.mode)}`}
             </button>
           );
         })}

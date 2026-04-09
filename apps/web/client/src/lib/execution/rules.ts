@@ -18,6 +18,7 @@ export type DashboardExecutionFacts = {
     serviceOrderId: string;
     customerName?: string | null;
     amountCents?: number | null;
+    daysOverdue?: number | null;
   } | null;
   overdueChargeCandidate?: {
     chargeId: string;
@@ -44,7 +45,7 @@ export function sortDecisions(decisions: OperationalDecision[]) {
   });
 }
 
-export function buildDashboardRules(facts: DashboardExecutionFacts) {
+export function buildDashboardRules(facts: DashboardExecutionFacts): OperationalDecision[] {
   const decisions: OperationalDecision[] = [];
   const executed = new Set(
     (facts.executionLogs ?? [])
@@ -61,6 +62,9 @@ export function buildDashboardRules(facts: DashboardExecutionFacts) {
   );
 
   if (doneWithoutCharge > 0) {
+    const candidateCustomer = facts.doneWithoutChargeCandidate?.customerName?.trim();
+    const candidateValue = Number(facts.doneWithoutChargeCandidate?.amountCents ?? 0) / 100;
+
     decisions.push({
       id: "decision-done-without-charge",
       entityType: "serviceOrder",
@@ -68,7 +72,12 @@ export function buildDashboardRules(facts: DashboardExecutionFacts) {
       severity: "critical",
       state: "invalid",
       title: "O.S. concluída sem cobrança",
-      summary: `${doneWithoutCharge} serviço(s) concluído(s) sem cobrança vinculada, bloqueando entrada de caixa.`,
+      summary: candidateCustomer
+        ? `${candidateCustomer} tem ${new Intl.NumberFormat("pt-BR", {
+            style: "currency",
+            currency: "BRL",
+          }).format(candidateValue)} pendente por serviço concluído sem cobrança. Impacto direto no caixa.`
+        : `${doneWithoutCharge} serviço(s) concluído(s) sem cobrança vinculada, bloqueando entrada de caixa.`,
       reasonCodes: ["service_order_done_without_charge", "revenue_blocked"],
       suggestedActionId: "action-generate-charge",
       priority: 100,
@@ -95,6 +104,7 @@ export function buildDashboardRules(facts: DashboardExecutionFacts) {
             ? { serviceOrderId: facts.doneWithoutChargeCandidate.serviceOrderId }
             : undefined,
           telemetryKey: "execution.generate_charge_from_dashboard",
+          mode: "semi_automatic",
         },
         {
           id: "action-open-service-orders",
@@ -104,6 +114,7 @@ export function buildDashboardRules(facts: DashboardExecutionFacts) {
           enabled: true,
           target: "/service-orders",
           telemetryKey: "execution.open_service_orders_from_dashboard",
+          mode: "manual",
         },
       ],
     });
@@ -118,13 +129,13 @@ export function buildDashboardRules(facts: DashboardExecutionFacts) {
       state: "ready",
       title: "Cobranças vencidas exigem recuperação",
       summary: facts.overdueChargeCandidate?.customerName
-        ? `Cliente ${facts.overdueChargeCandidate.customerName} com cobrança de ${new Intl.NumberFormat(
+        ? `${facts.overdueChargeCandidate.customerName} tem ${new Intl.NumberFormat(
             "pt-BR",
             { style: "currency", currency: "BRL" }
-          ).format(Number(facts.overdueChargeCandidate.amountCents ?? 0) / 100)} vencida há ${Math.max(
+          ).format(Number(facts.overdueChargeCandidate.amountCents ?? 0) / 100)} em aberto há ${Math.max(
             Number(facts.overdueChargeCandidate.daysOverdue ?? 0),
             0
-          )} dia(s).`
+          )} dia(s), com impacto direto no caixa.`
         : `${facts.overdueCharges} cobrança(s) vencida(s) com impacto direto no caixa.`,
       reasonCodes: ["charge_overdue", "cashflow_risk"],
       suggestedActionId: "action-open-finance-overdue",
@@ -139,6 +150,7 @@ export function buildDashboardRules(facts: DashboardExecutionFacts) {
           enabled: true,
           target: "/finances?filter=overdue",
           telemetryKey: "execution.open_finance_overdue",
+          mode: "manual",
         },
         {
           id: "action-charge-on-whatsapp",
@@ -153,6 +165,7 @@ export function buildDashboardRules(facts: DashboardExecutionFacts) {
           externalUrl:
             buildWhatsAppUrlFromCharge(facts.overdueChargeCandidate) ?? undefined,
           telemetryKey: "execution.open_whatsapp_for_charge",
+          mode: "manual",
         },
         {
           id: "action-mark-charge-paid",
@@ -171,6 +184,7 @@ export function buildDashboardRules(facts: DashboardExecutionFacts) {
               }
             : undefined,
           telemetryKey: "execution.mark_charge_paid",
+          mode: "semi_automatic",
         },
       ],
     });
@@ -198,6 +212,7 @@ export function buildDashboardRules(facts: DashboardExecutionFacts) {
           enabled: true,
           target: "/service-orders",
           telemetryKey: "execution.start_whatsapp_from_service_order",
+          mode: "manual",
         },
         {
           id: "action-start-from-charge",
@@ -207,6 +222,7 @@ export function buildDashboardRules(facts: DashboardExecutionFacts) {
           enabled: true,
           target: "/finances",
           telemetryKey: "execution.start_whatsapp_from_finance",
+          mode: "manual",
         },
       ],
     });
@@ -220,7 +236,7 @@ export function buildDashboardRules(facts: DashboardExecutionFacts) {
       severity: "warning",
       state: "ready",
       title: "Agendamentos de hoje aguardam execução",
-      summary: `${facts.todayAppointments} agendamento(s) com janela de execução ativa hoje.`,
+      summary: `${facts.todayAppointments} agendamento(s) com janela de execução ativa hoje e impacto na experiência do cliente.`,
       reasonCodes: ["today_appointments"],
       suggestedActionId: "action-open-appointments",
       priority: 65,
@@ -233,6 +249,7 @@ export function buildDashboardRules(facts: DashboardExecutionFacts) {
           enabled: true,
           target: "/appointments",
           telemetryKey: "execution.open_today_appointments",
+          mode: "manual",
         },
       ],
     });
@@ -261,6 +278,7 @@ export function buildDashboardRules(facts: DashboardExecutionFacts) {
           enabled: true,
           target: "/customers",
           telemetryKey: "execution.create_customer_first",
+          mode: "manual",
         },
         {
           id: "action-create-appointment",
@@ -270,75 +288,57 @@ export function buildDashboardRules(facts: DashboardExecutionFacts) {
           enabled: true,
           target: "/appointments",
           telemetryKey: "execution.create_first_appointment",
+          mode: "manual",
         },
       ],
     });
   }
+
+  const healthyDecision: OperationalDecision = {
+    id: "decision-operational-healthy",
+    entityType: "system",
+    entityId: "operational-healthy",
+    severity: "normal",
+    state: "completed",
+    title: "Fluxo operacional estável",
+    summary: "Sem bloqueios imediatos na execução operacional agora.",
+    reasonCodes: ["healthy_flow"],
+    suggestedActionId: "action-review-dashboard",
+    priority: 1,
+    actions: [
+      {
+        id: "action-review-dashboard",
+        kind: "future",
+        intent: "secondary",
+        label: "Manter monitoramento",
+        enabled: true,
+        telemetryKey: "execution.keep_monitoring",
+        mode: "automatic",
+      },
+    ],
+  };
 
   if (decisions.length === 0) {
-    decisions.push({
-      id: "decision-operational-healthy",
-      entityType: "system",
-      entityId: "operational-healthy",
-      severity: "normal",
-      state: "completed",
-      title: "Fluxo operacional estável",
-      summary: "Sem bloqueios imediatos na execução operacional agora.",
-      reasonCodes: ["healthy_flow"],
-      suggestedActionId: "action-review-dashboard",
-      priority: 1,
-      actions: [
-        {
-          id: "action-review-dashboard",
-          kind: "future",
-          intent: "secondary",
-          label: "Manter monitoramento",
-          enabled: true,
-          telemetryKey: "execution.keep_monitoring",
-        },
-      ],
-    });
+    decisions.push(healthyDecision);
   }
 
-  const filtered = decisions
-    .map(decision => {
-      const actions = decision.actions.filter(action => !wasExecuted(decision.id, action.id));
-      if (actions.length === 0) return null;
-      return {
-        ...decision,
-        actions,
-        suggestedActionId: actions.some(action => action.id === decision.suggestedActionId)
-          ? decision.suggestedActionId
-          : actions[0]?.id,
-      };
-    })
-    .filter((decision): decision is OperationalDecision => Boolean(decision));
+  const filtered = decisions.reduce<OperationalDecision[]>((acc, decision) => {
+    const actions = decision.actions.filter(action => !wasExecuted(decision.id, action.id));
+    if (actions.length === 0) return acc;
+
+    acc.push({
+      ...decision,
+      actions,
+      suggestedActionId: actions.some(action => action.id === decision.suggestedActionId)
+        ? decision.suggestedActionId
+        : actions[0]?.id,
+    });
+
+    return acc;
+  }, []);
 
   if (filtered.length === 0) {
-    return [
-      {
-        id: "decision-operational-healthy",
-        entityType: "system",
-        entityId: "operational-healthy",
-        severity: "normal",
-        state: "completed",
-        title: "Fluxo operacional estável",
-        summary: "Sem bloqueios imediatos na execução operacional agora.",
-        reasonCodes: ["healthy_flow"],
-        suggestedActionId: "action-review-dashboard",
-        priority: 1,
-        actions: [
-          {
-            id: "action-review-dashboard",
-            kind: "future",
-            intent: "secondary",
-            label: "Manter monitoramento",
-            enabled: true,
-            telemetryKey: "execution.keep_monitoring",
-          },
-        ],
-      },
-    ];
+    return [healthyDecision];
   }
 
   return sortDecisions(filtered);

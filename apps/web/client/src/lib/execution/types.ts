@@ -6,6 +6,8 @@ export type ExecutionSeverity = "normal" | "warning" | "critical";
 
 export type ExecutionState = "ready" | "blocked" | "invalid" | "completed";
 
+export type ExecutionActionMode = "manual" | "semi_automatic" | "automatic";
+
 export type OperationalEntityType =
   | "customer"
   | "appointment"
@@ -34,6 +36,7 @@ export type ExecutionAction = {
   mutationKey?: string;
   payload?: Record<string, unknown>;
   telemetryKey: string;
+  mode: ExecutionActionMode;
 };
 
 export type OperationalDecision = {
@@ -62,12 +65,17 @@ export type ExecuteActionResult = {
   message?: string;
 };
 
+export type ExecutionLogStatus = "success" | "failed" | "pending";
+
 export type ExecutionLog = {
   id: string;
   actionId: string;
   decisionId: string;
+  executionKey?: string;
   executedAt: number;
-  status: "success" | "failed";
+  status: ExecutionLogStatus;
+  entityType?: OperationalEntityType;
+  entityId?: string;
 };
 
 export type ExecuteActionContext = {
