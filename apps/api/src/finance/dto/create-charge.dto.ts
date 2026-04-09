@@ -20,4 +20,8 @@ export class CreateChargeDto {
   @IsUUID()
   @IsOptional()
   serviceOrderId?: string
+
+  @IsString()
+  @IsOptional()
+  idempotencyKey?: string
 }

@@ -21,9 +21,14 @@ export class RequestContextService {
     return this.cls.get('personId') ?? null
   }
 
+  get correlationId(): string | null {
+    return this.cls.get('correlationId') ?? this.requestId
+  }
+
   getAll() {
     return {
       requestId: this.requestId,
+      correlationId: this.correlationId,
       userId: this.userId,
       orgId: this.orgId,
       personId: this.personId,

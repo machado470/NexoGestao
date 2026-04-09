@@ -61,6 +61,11 @@ export default function BillingPage() {
     staleTime: 45_000,
     refetchOnWindowFocus: false,
   });
+  const readinessQuery = trpc.integrations.readiness.useQuery(undefined, {
+    retry: 1,
+    staleTime: 45_000,
+    refetchOnWindowFocus: false,
+  });
   const utils = trpc.useUtils();
 
   const checkoutMutation = trpc.billing.checkout.useMutation({
@@ -138,6 +143,7 @@ export default function BillingPage() {
   });
 
   const currentPlan = String(status?.plan ?? limits?.plan ?? "FREE").toUpperCase();
+  const stripeConfigured = readinessQuery.data?.integrations?.stripe === "configured";
   const isTrial = Boolean(limits?.trial?.isTrial);
   const blockedItems = usageItems.filter((item) => {
     const used = Number(item.usage?.used ?? 0);
@@ -150,6 +156,10 @@ export default function BillingPage() {
   const handleUpgrade = async (planName: PlanName) => {
     const priceId = PLAN_PRICE_ID[planName];
     if (!priceId) return;
+    if (!stripeConfigured) {
+      toast.error("Stripe indisponível neste ambiente. Use cobrança manual em Finanças.");
+      return;
+    }
     track("upgrade_click", {
       screen: "billing",
       targetPlan: planName,
@@ -179,7 +189,7 @@ export default function BillingPage() {
         actions={
           <Button
             type="button"
-            disabled={checkoutMutation.isPending}
+            disabled={checkoutMutation.isPending || !stripeConfigured}
             onClick={() => void handleUpgrade(heroPrimaryAction)}
           >
             {checkoutMutation.isPending ? "Processando..." : "Fazer upgrade agora"}
@@ -193,6 +203,11 @@ export default function BillingPage() {
         <div className="nexo-kpi-card p-4"><p className="text-xs text-zinc-500">Modo</p><p className="text-lg font-semibold">{isTrial ? "Trial" : "Ativo"}</p></div>
         <div className="nexo-kpi-card p-4"><p className="text-xs text-zinc-500">Próxima ação</p><p className="text-lg font-semibold">{blockedItems.length > 0 ? "Upgrade urgente" : "Revisar limites"}</p></div>
       </div>
+      {!stripeConfigured ? (
+        <SurfaceSection className="border-amber-300/60 bg-amber-50 text-amber-900 dark:border-amber-600/50 dark:bg-amber-900/20 dark:text-amber-200">
+          Checkout online indisponível: Stripe não configurado. Alternativa segura: registre cobranças e pagamentos manualmente na tela de Finanças.
+        </SurfaceSection>
+      ) : null}
 
       <SmartPage
         pageContext="finances"
@@ -301,7 +316,7 @@ export default function BillingPage() {
                     <button
                       type="button"
                       className="inline-flex items-center gap-2 rounded-lg bg-orange-500 px-3 py-2 text-sm font-medium text-white hover:bg-orange-600 disabled:opacity-60"
-                      disabled={!canUpgrade || checkoutMutation.isPending}
+                      disabled={!canUpgrade || checkoutMutation.isPending || !stripeConfigured}
                       onClick={() => void handleUpgrade(name as PlanName)}
                     >
                       <CreditCard className="h-4 w-4" />

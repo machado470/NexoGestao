@@ -25,6 +25,7 @@ import { useCriticalActionGuard } from "@/hooks/useCriticalActionGuard";
 import { invalidateOperationalGraph } from "@/lib/operationalConsistency";
 import { useProductAnalytics } from "@/hooks/useProductAnalytics";
 import { notify } from "@/stores/notificationStore";
+import { buildIdempotencyKey } from "@/lib/idempotency";
 
 interface CreateChargeModalProps {
   isOpen: boolean;
@@ -177,6 +178,7 @@ export function CreateChargeModal({
       amountCents: parsed.data.amountCents,
       dueDate: new Date(`${parsed.data.dueDate}T12:00:00`).toISOString(),
       notes: parsed.data.notes || undefined,
+      idempotencyKey: buildIdempotencyKey("finance.create_charge", parsed.data.customerId),
     };
 
     const previousCharges = utils.finance.charges.list.getData(undefined);

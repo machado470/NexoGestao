@@ -1,4 +1,4 @@
-import { IsIn, IsInt, Min, Max } from 'class-validator'
+import { IsIn, IsInt, Min, Max, IsOptional, IsString } from 'class-validator'
 
 const PAYMENT_METHODS = ['PIX', 'CASH', 'CARD', 'TRANSFER', 'OTHER'] as const
 
@@ -10,4 +10,8 @@ export class CreatePaymentDto {
   @Min(1)
   @Max(1_000_000_000)
   amountCents!: number
+
+  @IsString()
+  @IsOptional()
+  idempotencyKey?: string
 }

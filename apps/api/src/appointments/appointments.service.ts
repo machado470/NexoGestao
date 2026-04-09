@@ -12,6 +12,10 @@ import { AppointmentStatus, Prisma } from '@prisma/client'
 import { WhatsAppService } from '../whatsapp/whatsapp.service'
 import { RiskService } from '../risk/risk.service'
 import { AutomationService } from '../automation/automation.service'
+import {
+  appointmentTransitions,
+  ensureTransition,
+} from '../common/domain/state-transitions'
 
 const DEFAULT_DURATION_MIN = 30
 
@@ -108,14 +112,7 @@ export class AppointmentsService {
   ) {}
 
   private canTransition(from: AppointmentStatus, to: AppointmentStatus): boolean {
-    const allowed: Record<AppointmentStatus, AppointmentStatus[]> = {
-      SCHEDULED: ['CONFIRMED', 'CANCELED', 'NO_SHOW', 'DONE'],
-      CONFIRMED: ['CANCELED', 'NO_SHOW', 'DONE'],
-      CANCELED: [],
-      NO_SHOW: [],
-      DONE: [],
-    }
-    return from === to || allowed[from].includes(to)
+    return from === to || appointmentTransitions[from].includes(to)
   }
 
   private async enqueueAppointmentWorkflow(params: {
@@ -447,8 +444,11 @@ export class AppointmentsService {
     if (params.data.status) {
       if (!isStatus(params.data.status)) throw new BadRequestException('status inválido')
       if (!this.canTransition(before.status, params.data.status)) {
-        throw new BadRequestException(
-          `Transição de status inválida: ${before.status} -> ${params.data.status}`,
+        ensureTransition(
+          before.status,
+          params.data.status,
+          appointmentTransitions,
+          'appointment',
         )
       }
       data.status = params.data.status

@@ -12,8 +12,12 @@ export class RequestLoggerMiddleware implements NestMiddleware {
 
     // ✅ Gera ou propaga requestId para rastreabilidade
     const requestId = (req.headers['x-request-id'] as string) || randomUUID()
+    const correlationId =
+      (req.headers['x-correlation-id'] as string) || requestId
     ;(req as any).requestId = requestId
+    ;(req as any).correlationId = correlationId
     res.setHeader('X-Request-ID', requestId)
+    res.setHeader('X-Correlation-ID', correlationId)
 
     res.on('finish', () => {
       const { statusCode } = res
@@ -27,6 +31,7 @@ export class RequestLoggerMiddleware implements NestMiddleware {
       const logData = {
         event: 'http_request',
         requestId,
+        correlationId,
         userId,
         orgId,
         route: `${method} ${originalUrl}`,

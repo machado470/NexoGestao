@@ -17,6 +17,7 @@ import { financeAdvancedRouter } from "./routers/finance-advanced";
 import { paymentsRouter } from "./routers/payments";
 import { billingRouter } from "./routers/billing";
 import { analyticsRouter } from "./routers/analytics";
+import { integrationsRouter } from "./routers/integrations";
 
 const SESSION_COOKIES = ["nexo_token", "token", "auth_token"] as const;
 
@@ -39,6 +40,7 @@ export const appRouter = router({
   payments: paymentsRouter,
   billing: billingRouter,
   analytics: analyticsRouter,
+  integrations: integrationsRouter,
   audit: nexoProxyRouter.audit,
   risk: nexoProxyRouter.risk,
 

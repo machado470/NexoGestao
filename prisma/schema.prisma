@@ -446,6 +446,22 @@ model Payment {
   @@index([orgId, paidAt])
 }
 
+model IdempotencyRecord {
+  id          String   @id @default(uuid())
+  orgId       String
+  scope       String
+  key         String
+  payloadHash String
+  status      String   @default("PROCESSING")
+  response    Json?
+  errorCode   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([orgId, scope, key])
+  @@index([orgId, createdAt])
+}
+
 model Expense {
   id              String   @id @default(dbgenerated("gen_random_uuid()"))
   orgId           String

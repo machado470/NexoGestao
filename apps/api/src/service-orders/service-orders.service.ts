@@ -20,6 +20,10 @@ import { NotificationsService } from '../notifications/notifications.service'
 import { OnboardingService } from '../onboarding/onboarding.service'
 import { WhatsAppService } from '../whatsapp/whatsapp.service'
 import { AnalyticsService, UsageMetricEvent } from '../analytics/analytics.service'
+import {
+  ensureTransition,
+  serviceOrderTransitions,
+} from '../common/domain/state-transitions'
 
 function normalizeText(v?: string): string | null {
   const s = (v ?? '').trim()
@@ -189,15 +193,7 @@ export class ServiceOrdersService {
   }
 
   private canTransition(from: ServiceOrderStatus, to: ServiceOrderStatus): boolean {
-    const allowed: Record<ServiceOrderStatus, ServiceOrderStatus[]> = {
-      OPEN: ['ASSIGNED', 'CANCELED'],
-      ASSIGNED: ['IN_PROGRESS', 'CANCELED'],
-      IN_PROGRESS: ['DONE', 'CANCELED'],
-      DONE: [],
-      CANCELED: [],
-    }
-
-    return from === to || allowed[from].includes(to)
+    return from === to || serviceOrderTransitions[from].includes(to)
   }
 
   private async syncOperationalForPeople(
@@ -682,8 +678,11 @@ export class ServiceOrdersService {
         throw new BadRequestException('status inválido')
       }
       if (!this.canTransition(before.status, params.data.status)) {
-        throw new BadRequestException(
-          `Transição de status inválida: ${before.status} -> ${params.data.status}`,
+        ensureTransition(
+          before.status,
+          params.data.status,
+          serviceOrderTransitions,
+          'serviceOrder',
         )
       }
       data.status = params.data.status

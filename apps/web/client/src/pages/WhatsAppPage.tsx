@@ -27,6 +27,7 @@ import { DemoEnvironmentCta } from "@/components/DemoEnvironmentCta";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHero, PageShell, SmartPage, SurfaceSection } from "@/components/PagePattern";
 import { getQueryUiState } from "@/lib/query-helpers";
+import { buildIdempotencyKey } from "@/lib/idempotency";
 
 function getMessageTypeFromContext(context: string) {
   if (context === "overdue_charge") return "PAYMENT_REMINDER";
@@ -83,6 +84,11 @@ export default function WhatsAppPage() {
   );
 
   const sendMutation = trpc.nexo.whatsapp.send.useMutation();
+  const readinessQuery = trpc.integrations.readiness.useQuery(undefined, {
+    retry: 1,
+    staleTime: 45_000,
+    refetchOnWindowFocus: false,
+  });
 
   const customer = customerQuery.data?.data || customerQuery.data;
   const hasCustomer = Boolean(customer && typeof customer === "object");
@@ -106,7 +112,8 @@ export default function WhatsAppPage() {
     Boolean(route.customerId) &&
     hasCustomer &&
     messageInput.trim().length > 0 &&
-    !sendMutation.isPending;
+    !sendMutation.isPending &&
+    readinessQuery.data?.integrations?.whatsapp === "configured";
 
   const amountLabel =
     route.amountCents !== null ? formatCurrency(route.amountCents) : null;
@@ -332,6 +339,11 @@ export default function WhatsAppPage() {
       </SurfaceSection>
 
       <SurfaceSection className="space-y-3">
+        {readinessQuery.data?.integrations?.whatsapp !== "configured" ? (
+          <div className="rounded-lg border border-amber-300/70 bg-amber-50/80 p-3 text-xs text-amber-900 dark:border-amber-700/60 dark:bg-amber-900/20 dark:text-amber-200">
+            Integração WhatsApp indisponível. Fallback: copie a mensagem contextual e envie manualmente.
+          </div>
+        ) : null}
         <Input
           value={messageInput}
           onChange={(e) => setMessageInput(e.target.value)}
@@ -355,6 +367,10 @@ export default function WhatsAppPage() {
                 messageType: getMessageTypeFromContext(route.context),
                 chargeId: route.chargeId ?? undefined,
                 serviceOrderId: route.serviceOrderId ?? undefined,
+                idempotencyKey: buildIdempotencyKey(
+                  "whatsapp.send_message",
+                  getEntityId(route) ?? route.customerId
+                ),
               });
               await messagesQuery.refetch();
               setMessageInput("");
@@ -369,6 +385,21 @@ export default function WhatsAppPage() {
         >
           <Send className="mr-2 h-4 w-4" />
           {sendMutation.isPending ? "Enviando..." : "Enviar"}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(messageInput.trim());
+              toast.success("Mensagem copiada para envio manual.");
+            } catch {
+              toast.error("Não foi possível copiar automaticamente.");
+            }
+          }}
+          disabled={messageInput.trim().length === 0}
+        >
+          Copiar mensagem
         </Button>
       </SurfaceSection>
 

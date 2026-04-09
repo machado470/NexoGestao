@@ -6,6 +6,8 @@ import {
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { $Enums, Prisma, WhatsAppEntityType, WhatsAppMessageType } from '@prisma/client'
+import { IdempotencyService } from '../common/idempotency/idempotency.service'
+import { chargeTransitions, ensureTransition } from '../common/domain/state-transitions'
 import {
   WhatsAppService,
   buildDeterministicMessageKey,
@@ -18,22 +20,13 @@ import { RequestContextService } from '../common/context/request-context.service
 @Injectable()
 export class FinanceService {
   private readonly logger = new Logger(FinanceService.name)
-  private readonly allowedChargeTransitions: Record<
-    $Enums.ChargeStatus,
-    $Enums.ChargeStatus[]
-  > = {
-    PENDING: ['OVERDUE', 'PAID', 'CANCELED'],
-    OVERDUE: ['PAID', 'CANCELED'],
-    PAID: [],
-    CANCELED: [],
-  }
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly whatsapp: WhatsAppService,
     private readonly timeline: TimelineService,
     private readonly analytics: AnalyticsService,
     private readonly requestContext: RequestContextService,
+    private readonly idempotency: IdempotencyService,
   ) {}
 
   private logCritical(params: {
@@ -140,9 +133,7 @@ export class FinanceService {
   ) {
     if (from === to) return
 
-    if (!this.allowedChargeTransitions[from]?.includes(to)) {
-      throw new BadRequestException(`Transição de status inválida: ${from} -> ${to}`)
-    }
+    ensureTransition(from, to, chargeTransitions, 'charge')
   }
 
   // =========================
@@ -270,6 +261,7 @@ export class FinanceService {
     actorUserId?: string | null
     notes?: string | null
     serviceOrderId?: string | null
+    idempotencyKey?: string | null
   }) {
     this.logCritical({
       level: 'log',
@@ -298,97 +290,125 @@ export class FinanceService {
       }
     }
 
-    const idempotencyKey = this.buildChargeCreateIdempotencyKey(input)
-
-    let charge: any
+    const idempotencyKey =
+      input.idempotencyKey?.trim() ||
+      this.buildChargeCreateIdempotencyKey(input)
+    const idemScope = 'finance.create_charge'
+    const idemPayload = {
+      customerId: input.customerId,
+      amountCents: input.amountCents,
+      dueDate: input.dueDate.toISOString(),
+      notes: input.notes ?? null,
+      serviceOrderId: input.serviceOrderId ?? null,
+    }
+    const idem = await this.idempotency.begin({
+      orgId: input.orgId,
+      scope: idemScope,
+      idempotencyKey,
+      payload: idemPayload,
+    })
+    if (idem.mode === 'replay') {
+      return idem.response as any
+    }
+    const idemRecordId = idem.recordId
     try {
-      charge = await this.prisma.charge.create({
-        data: {
-          orgId: input.orgId,
-          customerId: input.customerId,
-          idempotencyKey,
-          amountCents: input.amountCents,
-          dueDate: input.dueDate,
-          status: 'PENDING',
-          notes: input.notes ?? null,
-          serviceOrderId: input.serviceOrderId ?? null,
-        },
-        include: { customer: true },
-      })
-    } catch (err: any) {
-      if (err?.code !== 'P2002') throw err
-      const existing = await this.prisma.charge.findFirst({
-        where: { orgId: input.orgId, idempotencyKey },
-        include: { customer: true },
-      })
-      if (!existing) throw err
-      return existing
-    }
-
-    let whatsappFallbackUsed = false
-    if (charge.customer?.phone) {
-      await this.sendChargeWhatsApp(charge.id).catch((err) => {
-        whatsappFallbackUsed = true
-        this.logCritical({
-          level: 'warn',
-          action: 'WHATSAPP_SEND_CHARGE',
-          entityId: charge.id,
-          message: 'Falha de integração no envio de cobrança. Fluxo seguirá em modo degradado',
-          extra: { error: err?.message ?? String(err) },
+      let charge: any = null
+      try {
+        charge = await this.prisma.charge.create({
+          data: {
+            orgId: input.orgId,
+            customerId: input.customerId,
+            idempotencyKey,
+            amountCents: input.amountCents,
+            dueDate: input.dueDate,
+            status: 'PENDING',
+            notes: input.notes ?? null,
+            serviceOrderId: input.serviceOrderId ?? null,
+          },
+          include: { customer: true },
         })
+      } catch (err: any) {
+        if (err?.code !== 'P2002') throw err
+        const existing = await this.prisma.charge.findFirst({
+          where: { orgId: input.orgId, idempotencyKey },
+          include: { customer: true },
+        })
+        if (!existing) throw err
+        const replayPayload = { ...existing, idempotent: true }
+        await this.idempotency.complete(idemRecordId, replayPayload)
+        return replayPayload
+      }
+
+      let whatsappFallbackUsed = false
+      if (charge.customer?.phone) {
+        await this.sendChargeWhatsApp(charge.id).catch((err) => {
+          whatsappFallbackUsed = true
+          this.logCritical({
+            level: 'warn',
+            action: 'WHATSAPP_SEND_CHARGE',
+            entityId: charge.id,
+            message: 'Falha de integração no envio de cobrança. Fluxo seguirá em modo degradado',
+            extra: { error: err?.message ?? String(err) },
+          })
+        })
+      }
+
+      await this.safeTimelineLog({
+        orgId: input.orgId,
+        action: 'CHARGE_CREATED',
+        description: `Cobrança criada para ${charge.customer?.name ?? 'cliente'}`,
+        customerId: charge.customerId,
+        serviceOrderId: charge.serviceOrderId,
+        chargeId: charge.id,
+        metadata: {
+          actorUserId: input.actorUserId ?? null,
+          customerId: charge.customerId,
+          serviceOrderId: charge.serviceOrderId,
+          chargeId: charge.id,
+          amountCents: charge.amountCents,
+          dueDate: charge.dueDate.toISOString(),
+        },
       })
-    }
 
-    await this.safeTimelineLog({
-      orgId: input.orgId,
-      action: 'CHARGE_CREATED',
-      description: `Cobrança criada para ${charge.customer?.name ?? 'cliente'}`,
-      customerId: charge.customerId,
-      serviceOrderId: charge.serviceOrderId,
-      chargeId: charge.id,
-      metadata: {
-        actorUserId: input.actorUserId ?? null,
-        customerId: charge.customerId,
-        serviceOrderId: charge.serviceOrderId,
-        chargeId: charge.id,
-        amountCents: charge.amountCents,
-        dueDate: charge.dueDate.toISOString(),
-      },
-    })
+      this.logCritical({
+        level: whatsappFallbackUsed ? 'warn' : 'log',
+        action: 'CREATE_CHARGE_RESULT',
+        entityId: charge.id,
+        message: whatsappFallbackUsed
+          ? 'Cobrança criada com fallback de WhatsApp (mensagem em fila/pendente)'
+          : 'Cobrança criada com sucesso',
+        extra: { chargeId: charge.id, orgId: input.orgId },
+      })
 
-    this.logCritical({
-      level: whatsappFallbackUsed ? 'warn' : 'log',
-      action: 'CREATE_CHARGE_RESULT',
-      entityId: charge.id,
-      message: whatsappFallbackUsed
-        ? 'Cobrança criada com fallback de WhatsApp (mensagem em fila/pendente)'
-        : 'Cobrança criada com sucesso',
-      extra: { chargeId: charge.id, orgId: input.orgId },
-    })
-
-    void this.analytics.track({
-      orgId: input.orgId,
-      userId: input.actorUserId ?? undefined,
-      event:
-        (UsageMetricEvent as any)?.CHARGE_CREATED ??
-        (UsageMetricEvent as any)?.LOGIN,
-      metadata: {
-        source: 'finance_create_charge',
-        chargeId: charge.id,
-        customerId: charge.customerId,
-        serviceOrderId: charge.serviceOrderId,
-      },
-    })
-
-    return {
-      ...charge,
-      degraded: whatsappFallbackUsed
-        ? {
-            channel: 'whatsapp',
-            reason: 'whatsapp_send_failed',
-            fallback: 'message_queued',
-          }
-        : null,
+      void this.analytics.track({
+        orgId: input.orgId,
+        userId: input.actorUserId ?? undefined,
+        event:
+          (UsageMetricEvent as any)?.CHARGE_CREATED ??
+          (UsageMetricEvent as any)?.LOGIN,
+        metadata: {
+          source: 'finance_create_charge',
+          chargeId: charge.id,
+          customerId: charge.customerId,
+          serviceOrderId: charge.serviceOrderId,
+        },
+      })
+      const result = {
+        ...charge,
+        idempotent: false,
+        degraded: whatsappFallbackUsed
+          ? {
+              channel: 'whatsapp',
+              reason: 'whatsapp_send_failed',
+              fallback: 'message_queued',
+            }
+          : null,
+      }
+      await this.idempotency.complete(idemRecordId, result)
+      return result
+    } catch (error: any) {
+      await this.idempotency.fail(idemRecordId, error?.code)
+      throw error
     }
   }
 
@@ -453,6 +473,7 @@ export class FinanceService {
     amountCents: number
     method: $Enums.PaymentMethod
     actorUserId?: string | null
+    idempotencyKey?: string | null
   }) {
     this.logCritical({
       level: 'log',
@@ -462,15 +483,39 @@ export class FinanceService {
       extra: { orgId: input.orgId, amountCents: input.amountCents, method: input.method },
     })
 
-    const { charge, payment, idempotent } = await this.prisma.$transaction(
-      async (tx) => {
+    const idempotencyKey =
+      input.idempotencyKey?.trim() ||
+      ['charge-pay', input.orgId, input.chargeId, input.method, String(input.amountCents)].join(':')
+    const idem = await this.idempotency.begin({
+      orgId: input.orgId,
+      scope: 'finance.pay_charge',
+      idempotencyKey,
+      payload: {
+        chargeId: input.chargeId,
+        amountCents: input.amountCents,
+        method: input.method,
+      },
+    })
+    if (idem.mode === 'replay') {
+      return idem.response as any
+    }
+
+    const idemRecordId = idem.recordId
+
+    try {
+      const { charge, payment, idempotent } = await this.prisma.$transaction(
+        async (tx) => {
       const charge = await tx.charge.findFirst({
         where: { id: input.chargeId, orgId: input.orgId },
       })
 
       if (!charge) throw new NotFoundException('Charge não encontrada')
       if (charge.status === 'CANCELED') {
-        throw new BadRequestException('Charge cancelada não pode ser paga')
+        throw new BadRequestException({
+          code: 'CHARGE_STATE_INVALID_FOR_PAYMENT',
+          message: 'Cobrança cancelada não pode receber novo pagamento.',
+          details: { chargeId: input.chargeId, status: charge.status },
+        })
       }
       if (input.amountCents <= 0) {
         throw new BadRequestException('amountCents deve ser maior que zero')
@@ -503,7 +548,11 @@ export class FinanceService {
         })
 
         if (!latestPayment) {
-          throw new BadRequestException('Charge já está paga')
+          throw new BadRequestException({
+            code: 'CHARGE_ALREADY_PAID',
+            message: 'Cobrança já está paga.',
+            details: { chargeId: charge.id },
+          })
         }
 
         return { charge: alreadyPaid, payment: latestPayment, idempotent: true }
@@ -519,17 +568,19 @@ export class FinanceService {
         },
       })
 
-      return { charge, payment, idempotent: false }
+          return { charge, payment, idempotent: false }
       },
-    )
+      )
 
-    if (payment == null) {
-      throw new BadRequestException('Pagamento não registrado')
-    }
+      if (payment == null) {
+        throw new BadRequestException('Pagamento não registrado')
+      }
 
-    if (idempotent) {
-      return { ok: true, paymentId: payment.id, idempotent: true }
-    }
+      if (idempotent) {
+        const replayed = { ok: true, paymentId: payment.id, idempotent: true }
+        await this.idempotency.complete(idemRecordId, replayed)
+        return replayed
+      }
 
     let whatsappFallbackUsed = false
     await this.sendPaymentConfirmationWhatsApp(charge.id).catch((err) => {
@@ -602,16 +653,23 @@ export class FinanceService {
       },
     })
 
-    return {
-      ok: true,
-      paymentId: payment.id,
-      degraded: whatsappFallbackUsed
-        ? {
-            channel: 'whatsapp',
-            reason: 'whatsapp_send_failed',
-            fallback: 'message_queued',
-          }
-        : null,
+      const result = {
+        ok: true,
+        paymentId: payment.id,
+        idempotent: false,
+        degraded: whatsappFallbackUsed
+          ? {
+              channel: 'whatsapp',
+              reason: 'whatsapp_send_failed',
+              fallback: 'message_queued',
+            }
+          : null,
+      }
+      await this.idempotency.complete(idemRecordId, result)
+      return result
+    } catch (error: any) {
+      await this.idempotency.fail(idemRecordId, error?.code)
+      throw error
     }
   }
 

@@ -47,6 +47,7 @@ export const financeRouter = router({
           dueDate: z.coerce.date(),
           notes: z.string().optional(),
           serviceOrderId: z.string().optional(),
+          idempotencyKey: z.string().min(8).optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
@@ -66,7 +67,11 @@ export const financeRouter = router({
             dueDate: input.dueDate.toISOString(),
             notes: input.notes,
             serviceOrderId: input.serviceOrderId,
+            idempotencyKey: input.idempotencyKey,
           }),
+          headers: input.idempotencyKey
+            ? { "Idempotency-Key": input.idempotencyKey }
+            : undefined,
         });
 
         return wrappedDataSchema.parse(raw).data;
@@ -189,6 +194,7 @@ export const financeRouter = router({
           chargeId: z.union([z.string(), z.number()]).transform((v) => String(v)),
           method: z.enum(["PIX", "CASH", "CARD", "TRANSFER", "OTHER"]).default("PIX"),
           amountCents: z.number().int().min(1),
+          idempotencyKey: z.string().min(8).optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
@@ -200,7 +206,11 @@ export const financeRouter = router({
             body: JSON.stringify({
               method: input.method,
               amountCents: input.amountCents,
+              idempotencyKey: input.idempotencyKey,
             }),
+            headers: input.idempotencyKey
+              ? { "Idempotency-Key": input.idempotencyKey }
+              : undefined,
           }
         );
 
