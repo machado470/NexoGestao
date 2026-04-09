@@ -4,6 +4,7 @@ import {
   Controller,
   Delete,
   Get,
+  Headers,
   Param,
   Patch,
   Post,
@@ -107,6 +108,7 @@ export class FinanceController {
   async createCharge(
     @Org() orgId: string,
     @User() user: AuthUser,
+    @Headers('idempotency-key') idempotencyKeyHeader: string | undefined,
     @Body() body: CreateChargeDto,
   ) {
     const actorUserId = user?.userId ?? user?.sub ?? null
@@ -120,6 +122,7 @@ export class FinanceController {
       dueDate,
       notes: body.notes,
       serviceOrderId: body.serviceOrderId,
+      idempotencyKey: body.idempotencyKey ?? idempotencyKeyHeader,
       actorUserId,
     })
 
@@ -173,6 +176,7 @@ export class FinanceController {
   async payCharge(
     @Org() orgId: string,
     @User() user: AuthUser,
+    @Headers('idempotency-key') idempotencyKeyHeader: string | undefined,
     @Param('chargeId') chargeId: string,
     @Body() body: CreatePaymentDto,
   ) {
@@ -184,6 +188,7 @@ export class FinanceController {
       actorUserId,
       method: body.method,
       amountCents: body.amountCents,
+      idempotencyKey: body.idempotencyKey ?? idempotencyKeyHeader,
     })
 
     return { ok: true, data }

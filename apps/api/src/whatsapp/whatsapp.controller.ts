@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   Param,
   Patch,
   Post,
@@ -20,6 +21,7 @@ import { Org } from '../auth/decorators/org.decorator'
 import { WhatsAppService, buildDeterministicMessageKey } from './whatsapp.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { QuotasService } from '../quotas/quotas.service'
+import { IdempotencyService } from '../common/idempotency/idempotency.service'
 
 @Controller('whatsapp')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -28,6 +30,7 @@ export class WhatsAppController {
     private readonly whatsapp: WhatsAppService,
     private readonly prisma: PrismaService,
     private readonly quotas: QuotasService,
+    private readonly idempotency: IdempotencyService,
   ) {}
 
   @Get('messages/:customerId')
@@ -44,7 +47,11 @@ export class WhatsAppController {
 
   @Post('messages')
   @Roles('ADMIN')
-  async sendMessage(@Org() orgId: string, @Body() body: any) {
+  async sendMessage(
+    @Org() orgId: string,
+    @Headers('idempotency-key') idempotencyKeyHeader: string | undefined,
+    @Body() body: any,
+  ) {
     await this.quotas.validateQuota(orgId, 'SEND_MESSAGE')
 
     if (!body?.customerId) {
@@ -87,7 +94,33 @@ export class WhatsAppController {
     const messageType =
       (body.messageType || 'EXECUTION_CONFIRMATION') as WhatsAppMessageType
 
-    return this.whatsapp.enqueueMessage({
+    const requestPayload = {
+      customerId: body.customerId,
+      toPhone,
+      entityType,
+      entityId,
+      messageType,
+      content: String(body.content).trim(),
+    }
+    const idempotencyKey =
+      String(body?.idempotencyKey ?? idempotencyKeyHeader ?? '').trim() ||
+      buildDeterministicMessageKey({
+        entityType,
+        entityId,
+        messageType,
+      })
+    const idem = await this.idempotency.begin({
+      orgId,
+      scope: 'whatsapp.send_message',
+      idempotencyKey,
+      payload: requestPayload,
+    })
+    if (idem.mode === 'replay') {
+      return idem.response
+    }
+
+    try {
+      const result = await this.whatsapp.enqueueMessage({
       orgId,
       customerId: body.customerId,
       toPhone,
@@ -101,6 +134,12 @@ export class WhatsAppController {
       }),
       renderedText: String(body.content).trim(),
     })
+      await this.idempotency.complete(idem.recordId, result)
+      return result
+    } catch (error: any) {
+      await this.idempotency.fail(idem.recordId, error?.code)
+      throw error
+    }
   }
 
   @Patch('messages/:id/status')

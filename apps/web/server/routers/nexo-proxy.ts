@@ -221,10 +221,16 @@ async function authedGet(
   return authedFetch(ctx, `${path}${toQueryString(query)}`);
 }
 
-async function authedPost(ctx: CtxLike, path: string, body?: unknown) {
+async function authedPost(
+  ctx: CtxLike,
+  path: string,
+  body?: unknown,
+  headers?: Record<string, string>
+) {
   return authedFetch(ctx, path, {
     method: "POST",
     body: body !== undefined ? JSON.stringify(body) : undefined,
+    headers,
   });
 }
 
@@ -310,6 +316,7 @@ const whatsappSendInput = z.object({
       "CUSTOMER_NOTIFICATION",
     ])
     .optional(),
+  idempotencyKey: z.string().min(8).optional(),
   chargeId: z.string().optional(),
   serviceOrderId: z.string().optional(),
 });
@@ -689,7 +696,12 @@ export const nexoProxyRouter = router({
       }),
 
     send: protectedProcedure.input(whatsappSendInput).mutation(async ({ ctx, input }) => {
-      return authedPost(ctx as CtxLike, "/whatsapp/messages", input);
+      return authedPost(
+        ctx as CtxLike,
+        "/whatsapp/messages",
+        input,
+        input.idempotencyKey ? { "Idempotency-Key": input.idempotencyKey } : undefined
+      );
     }),
   }),
 

@@ -144,13 +144,24 @@ export async function nexoFetch<T>(
 
   let res: Response;
   try {
+    const requestId =
+      source?.req?.headers?.["x-request-id"] ??
+      source?.headers?.["x-request-id"] ??
+      undefined;
+    const correlationId =
+      source?.req?.headers?.["x-correlation-id"] ??
+      source?.headers?.["x-correlation-id"] ??
+      requestId ??
+      undefined;
     res = await fetch(`${NEXO_API_URL}${path}`, {
       ...init,
       signal: controller.signal,
       headers: {
-        ...(init?.headers || {}),
         Authorization: `Bearer ${token}`,
         "content-type": "application/json",
+        ...(requestId ? { "x-request-id": String(requestId) } : {}),
+        ...(correlationId ? { "x-correlation-id": String(correlationId) } : {}),
+        ...(init?.headers || {}),
       },
     });
   } catch (error: any) {

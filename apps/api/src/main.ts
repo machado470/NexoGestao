@@ -47,8 +47,15 @@ async function bootstrap() {
       origin: origins,
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization', 'X-Org-Id'],
-      exposedHeaders: ['X-RateLimit-Limit', 'X-RateLimit-Remaining'],
+      allowedHeaders: [
+        'Content-Type',
+        'Authorization',
+        'X-Org-Id',
+        'X-Request-Id',
+        'X-Correlation-Id',
+        'Idempotency-Key',
+      ],
+      exposedHeaders: ['X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-Request-Id', 'X-Correlation-Id'],
     })
 
     const portRaw = process.env.API_PORT || process.env.PORT || '3000'

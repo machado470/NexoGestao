@@ -4,6 +4,7 @@ import { buildFinanceChargeUrl } from "@/lib/operations/operations.utils";
 import { toast } from "sonner";
 import { useProductAnalytics } from "@/hooks/useProductAnalytics";
 import { notify } from "@/stores/notificationStore";
+import { buildIdempotencyKey } from "@/lib/idempotency";
 
 type NavigateFn = (path: string) => void;
 
@@ -126,6 +127,7 @@ export function useChargeActions(options?: UseChargeActionsOptions) {
       chargeId: charge.id,
       method,
       amountCents: charge.amountCents,
+      idempotencyKey: buildIdempotencyKey("finance.pay_charge", charge.id),
     });
   };
 
