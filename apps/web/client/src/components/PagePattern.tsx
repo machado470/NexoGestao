@@ -1,8 +1,10 @@
 import type { ReactNode } from "react";
 import { ArrowRight, Sparkles } from "lucide-react";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { rankPriorityProblems, type PriorityPageContext, type PriorityProblem } from "@/lib/priorityEngine";
 import { getNextActionSuggestion, registerActionFlowEvent } from "@/lib/actionFlow";
+import { getActionIntentClasses, getActionIntentLabel } from "@/lib/operations/action-intent";
 import { sortSmartActions, type SmartActionWithExecution } from "@/lib/smartActions";
 
 export function PageShell({ children }: { children: ReactNode }) {
@@ -67,6 +69,7 @@ export function SmartPage({
   priorities: PriorityProblem[];
   operationalActions?: SmartActionWithExecution[];
 }) {
+  const [, navigate] = useLocation();
   const topPriorities = rankPriorityProblems(priorities, { pageContext, limit: 3 });
   const nextActionSuggestion = getNextActionSuggestion(pageContext);
   const orderedActions = sortSmartActions(operationalActions);
@@ -128,6 +131,19 @@ export function SmartPage({
         <p className="text-xs font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-300">Próxima ação automática</p>
         <p className="mt-1 text-sm font-medium text-zinc-900 dark:text-zinc-100">{nextActionSuggestion.title}</p>
         <p className="text-xs text-zinc-600 dark:text-zinc-400">{nextActionSuggestion.description}</p>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+          <span className={`inline-flex rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide ${getActionIntentClasses(nextActionSuggestion.intent)}`}>
+            Intent: {getActionIntentLabel(nextActionSuggestion.intent)}
+          </span>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => navigate(nextActionSuggestion.ctaPath)}
+          >
+            {nextActionSuggestion.ctaLabel}
+          </Button>
+        </div>
       </div>
 
       <div className="space-y-2">

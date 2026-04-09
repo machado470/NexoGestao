@@ -6,6 +6,12 @@ import { EmptyState } from "@/components/EmptyState";
 import { getLatestActionFlowSuggestion } from "@/lib/actionFlow";
 import { rankPriorityProblems } from "@/lib/priorityEngine";
 import {
+  getActionIntentClasses,
+  getActionIntentLabel,
+  type ActionBucket,
+  type ActionIntent,
+} from "@/lib/operations/action-intent";
+import {
   compareOperationalSeverity,
   getOperationalSeverityClasses,
   type OperationalSeverity,
@@ -473,6 +479,8 @@ export default function ExecutiveDashboardNew() {
       title: string;
       description: string;
       severity: OperationalSeverity;
+      bucket: ActionBucket;
+      intent: ActionIntent;
       ctaLabel: string;
       onClick: () => void;
     }> = [];
@@ -483,6 +491,8 @@ export default function ExecutiveDashboardNew() {
         title: "Cobranças vencidas",
         description: `${overdueCharges} cobranças vencidas exigem recuperação imediata.`,
         severity: "overdue",
+        bucket: "critical",
+        intent: "resolve",
         ctaLabel: "Cobrar cliente",
         onClick: () => navigate("/finances"),
       });
@@ -494,6 +504,8 @@ export default function ExecutiveDashboardNew() {
         title: "O.S. atrasadas",
         description: `${displayMetrics.delayedOrders} ordens paradas bloqueando entrega e caixa.`,
         severity: "critical",
+        bucket: "critical",
+        intent: "resolve",
         ctaLabel: "Destravar O.S.",
         onClick: () => navigate("/service-orders"),
       });
@@ -505,6 +517,8 @@ export default function ExecutiveDashboardNew() {
         title: "Tarefas do dia",
         description: `${todayAppointments} agendamentos de hoje aguardam execução.`,
         severity: "pending",
+        bucket: "today",
+        intent: "follow_up",
         ctaLabel: "Executar serviços",
         onClick: () => navigate("/appointments"),
       });
@@ -516,6 +530,8 @@ export default function ExecutiveDashboardNew() {
         title: "Fluxo operacional saudável",
         description: "Sem pendências críticas no momento.",
         severity: "healthy",
+        bucket: "pending",
+        intent: "notify",
         ctaLabel: "Revisar painel",
         onClick: () => navigate("/"),
       });
@@ -530,6 +546,14 @@ export default function ExecutiveDashboardNew() {
     overdueCharges,
     todayAppointments,
   ]);
+  const groupedActionFeed = useMemo(
+    () => ({
+      critical: globalActionFeed.filter(item => item.bucket === "critical"),
+      today: globalActionFeed.filter(item => item.bucket === "today"),
+      pending: globalActionFeed.filter(item => item.bucket === "pending"),
+    }),
+    [globalActionFeed]
+  );
 
   const bottlenecks = [
     {
@@ -994,33 +1018,56 @@ export default function ExecutiveDashboardNew() {
         <article className="nexo-surface nexo-fade-in p-5 lg:col-span-2">
           <h2 className="nexo-section-title">Action Feed Global</h2>
           <p className="mt-1 nexo-section-description">
-            Ações prioritárias ordenadas por severidade operacional.
+            Ações executáveis agrupadas por criticidade operacional.
           </p>
-          <div className="mt-4 space-y-3">
-            {globalActionFeed.map(item => (
-              <div
-                key={item.id}
-                className={`rounded-xl border p-4 ${getOperationalSeverityClasses(item.severity)}`}
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="font-semibold text-zinc-900 dark:text-zinc-100">
-                      {item.title}
-                    </p>
-                    <p className="text-xs text-zinc-700 dark:text-zinc-300">
-                      {item.description}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={item.onClick}
-                    className="nexo-cta-secondary !h-9 !rounded-lg !px-3 !text-xs"
-                  >
-                    {item.ctaLabel}
-                  </button>
+          <div className="mt-4 space-y-4">
+            {(
+              [
+                ["critical", "Crítico"],
+                ["today", "Hoje"],
+                ["pending", "Pendente"],
+              ] as const
+            ).map(([bucket, label]) => {
+              const items = groupedActionFeed[bucket];
+              if (items.length === 0) return null;
+
+              return (
+                <div key={bucket} className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-300">
+                    {label}
+                  </p>
+                  {items.map(item => (
+                    <div
+                      key={item.id}
+                      className={`rounded-xl border p-4 ${getOperationalSeverityClasses(item.severity)}`}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="font-semibold text-zinc-900 dark:text-zinc-100">
+                            {item.title}
+                          </p>
+                          <p className="text-xs text-zinc-700 dark:text-zinc-300">
+                            {item.description}
+                          </p>
+                          <span
+                            className={`mt-2 inline-flex rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide ${getActionIntentClasses(item.intent)}`}
+                          >
+                            {getActionIntentLabel(item.intent)}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={item.onClick}
+                          className="nexo-cta-secondary !h-9 !rounded-lg !px-3 !text-xs"
+                        >
+                          {item.ctaLabel}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </article>
 

@@ -93,6 +93,32 @@ type ServiceOrder = {
   } | null;
 };
 
+type AppointmentTransition = {
+  id: string;
+  label: string;
+  to: AppointmentStatus;
+};
+
+const APPOINTMENT_TRANSITIONS: Record<
+  AppointmentStatus,
+  AppointmentTransition[]
+> = {
+  SCHEDULED: [
+    { id: "confirm", label: "Confirmar", to: "CONFIRMED" },
+    { id: "done", label: "Concluir", to: "DONE" },
+    { id: "no-show", label: "No-show", to: "NO_SHOW" },
+    { id: "cancel", label: "Cancelar", to: "CANCELED" },
+  ],
+  CONFIRMED: [
+    { id: "done", label: "Concluir", to: "DONE" },
+    { id: "no-show", label: "No-show", to: "NO_SHOW" },
+    { id: "cancel", label: "Cancelar", to: "CANCELED" },
+  ],
+  DONE: [],
+  CANCELED: [],
+  NO_SHOW: [],
+};
+
 function formatDateTime(value?: string | null) {
   if (!value) return "—";
 
@@ -1010,6 +1036,71 @@ export default function AppointmentsPage() {
                     : "general",
               serviceOrderId: latestOrder?.id ?? null,
             });
+            const nextActionCta = (() => {
+              if (appointment.status === "SCHEDULED") {
+                return {
+                  label: "Iniciar fluxo",
+                  onClick: () =>
+                    void handleUpdateStatus(appointment.id, "CONFIRMED"),
+                };
+              }
+
+              if (appointment.status === "CONFIRMED" && !hasOperation) {
+                return {
+                  label: "Criar O.S.",
+                  onClick: () =>
+                    navigate(
+                      `/service-orders?customerId=${appointment.customerId}&appointmentId=${appointment.id}`
+                    ),
+                };
+              }
+
+              if (appointment.status === "CONFIRMED" && hasOperation) {
+                return {
+                  label: "Abrir execução",
+                  onClick: () =>
+                    navigate(
+                      latestOrder
+                        ? buildServiceOrdersDeepLink(latestOrder.id)
+                        : `/service-orders?customerId=${appointment.customerId}`
+                    ),
+                };
+              }
+
+              if (appointment.status === "DONE" && hasPendingFinancial) {
+                return {
+                  label: "Cobrar agora",
+                  onClick: () =>
+                    navigate(
+                      latestOrder
+                        ? `/finances?serviceOrderId=${latestOrder.id}`
+                        : "/finances"
+                    ),
+                };
+              }
+
+              if (appointment.status === "DONE" && hasOperation) {
+                return {
+                  label: "Concluir fluxo",
+                  onClick: () =>
+                    navigate(
+                      latestOrder
+                        ? buildServiceOrdersDeepLink(latestOrder.id)
+                        : "/service-orders"
+                    ),
+                };
+              }
+
+              return whatsappUrl
+                ? {
+                    label: "Retomar no WhatsApp",
+                    onClick: () => navigate(whatsappUrl),
+                  }
+                : null;
+            })();
+            const availableTransitions = APPOINTMENT_TRANSITIONS[
+              appointment.status
+            ].filter(item => item.to !== appointment.status);
 
             return (
               <div
@@ -1130,65 +1221,34 @@ export default function AppointmentsPage() {
                             : "WhatsApp"}
                       </Button>
 
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="gap-2"
-                        onClick={() =>
-                          void handleUpdateStatus(appointment.id, "DONE")
-                        }
-                        disabled={
-                          isProcessing ||
-                          updateAppointment.isPending ||
-                          !["SCHEDULED", "CONFIRMED"].includes(
-                            appointment.status
-                          )
-                        }
-                      >
-                        <CheckCircle2 className="h-4 w-4" />
-                        Concluir
-                      </Button>
-
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="gap-2"
-                        onClick={() =>
-                          void handleUpdateStatus(appointment.id, "NO_SHOW")
-                        }
-                        disabled={
-                          isProcessing ||
-                          updateAppointment.isPending ||
-                          !["SCHEDULED", "CONFIRMED"].includes(
-                            appointment.status
-                          )
-                        }
-                      >
-                        <Clock3 className="h-4 w-4" />
-                        No-show
-                      </Button>
-
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="gap-2 text-red-600 hover:text-red-700"
-                        onClick={() =>
-                          void handleUpdateStatus(appointment.id, "CANCELED")
-                        }
-                        disabled={
-                          isProcessing ||
-                          updateAppointment.isPending ||
-                          !["SCHEDULED", "CONFIRMED"].includes(
-                            appointment.status
-                          )
-                        }
-                      >
-                        <Ban className="h-4 w-4" />
-                        Cancelar
-                      </Button>
+                      {availableTransitions.map(transition => (
+                        <Button
+                          key={transition.id}
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className={`gap-2 ${
+                            transition.to === "CANCELED"
+                              ? "text-red-600 hover:text-red-700"
+                              : ""
+                          }`}
+                          onClick={() =>
+                            void handleUpdateStatus(appointment.id, transition.to)
+                          }
+                          disabled={isProcessing || updateAppointment.isPending}
+                        >
+                          {transition.to === "DONE" ? (
+                            <CheckCircle2 className="h-4 w-4" />
+                          ) : transition.to === "NO_SHOW" ? (
+                            <Clock3 className="h-4 w-4" />
+                          ) : transition.to === "CANCELED" ? (
+                            <Ban className="h-4 w-4" />
+                          ) : (
+                            <CheckCheck className="h-4 w-4" />
+                          )}
+                          {transition.label}
+                        </Button>
+                      ))}
                     </div>
                   </div>
 
@@ -1221,6 +1281,16 @@ export default function AppointmentsPage() {
                         <p className="mt-1 text-xs opacity-90">
                           {nextAction.description}
                         </p>
+                        {nextActionCta ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="mt-3"
+                            onClick={nextActionCta.onClick}
+                          >
+                            {nextActionCta.label}
+                          </Button>
+                        ) : null}
                       </div>
                     </div>
                   </div>

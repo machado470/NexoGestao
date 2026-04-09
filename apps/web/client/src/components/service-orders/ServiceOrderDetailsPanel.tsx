@@ -171,6 +171,7 @@ export default function ServiceOrderDetailsPanel({ os }: { os: ServiceOrder }) {
       toast.success("Cobrança gerada");
       await invalidateOperationalData();
       await timelineQuery.refetch();
+      navigate(`/finances?serviceOrderId=${os.id}`);
     },
     onError: (error) => {
       toast.error(error.message || "Erro ao gerar cobrança");
