@@ -6,9 +6,14 @@ type MutationRuntime = {
     method: "PIX" | "CASH" | "CARD" | "TRANSFER" | "OTHER";
   }) => Promise<unknown>;
   invalidateOperationalData: () => Promise<void>;
+  checkIdempotency?: (executionKey: string) => boolean;
 };
 
 type MutationPayload = Record<string, unknown> | undefined;
+
+type MutationOptions = {
+  executionKey?: string;
+};
 
 function readString(payload: MutationPayload, key: string) {
   const value = payload?.[key];
@@ -24,8 +29,13 @@ function readNumber(payload: MutationPayload, key: string) {
 export async function runExecutionMutation(
   mutationKey: string,
   payload: MutationPayload,
-  runtime: MutationRuntime
+  runtime: MutationRuntime,
+  options?: MutationOptions
 ) {
+  if (options?.executionKey && runtime.checkIdempotency?.(options.executionKey)) {
+    return { message: "Ação já executada recentemente. Mantendo estado atual." };
+  }
+
   if (mutationKey === "service_order.generate_charge") {
     const serviceOrderId = readString(payload, "serviceOrderId");
     if (!serviceOrderId) {
