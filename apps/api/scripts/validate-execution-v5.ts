@@ -47,6 +47,28 @@ function getStringValue(input: unknown): string {
   return typeof input === 'string' ? input : ''
 }
 
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
+
+function explainPrismaError(error: unknown): string | null {
+  if (error instanceof Prisma.PrismaClientInitializationError) {
+    if (error.errorCode === 'P1001') {
+      return 'Banco indisponível (P1001). Verifique se o Postgres está ativo e acessível na DATABASE_URL.'
+    }
+    return `Falha de inicialização do Prisma (${error.errorCode ?? 'sem código'}): ${error.message}`
+  }
+
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    if (error.code === 'P2021') {
+      return 'Schema/tabelas não encontradas (P2021). Execute migrations antes da validação.'
+    }
+    return `Falha Prisma (${error.code}): ${error.message}`
+  }
+
+  return null
+}
+
 class ScriptExecutionEventsAdapter {
   constructor(private readonly prisma: PrismaClient) {}
 
@@ -274,170 +296,181 @@ async function main() {
   }
 
   const prisma = new PrismaClient()
-  await prisma.$connect()
+  try {
+    await prisma.$connect()
+    await prisma.$queryRaw`SELECT 1`
 
-  const unique = `e2e-v5-${Date.now()}`
-  const startedAt = new Date().toISOString()
+    const unique = `e2e-v5-${Date.now()}`
+    const startedAt = new Date().toISOString()
 
-  const executionConfig = new ExecutionConfigService(prisma as never)
-  const governance = new ExecutionGovernanceService()
-  const eventsAdapter = new ScriptExecutionEventsAdapter(prisma)
-  const financeStub = new ScriptFinanceStub(prisma)
+    const executionConfig = new ExecutionConfigService(prisma as never)
+    const governance = new ExecutionGovernanceService()
+    const eventsAdapter = new ScriptExecutionEventsAdapter(prisma)
+    const financeStub = new ScriptFinanceStub(prisma)
 
-  const runner = new ExecutionRunner(
-    prisma as never,
-    financeStub as never,
-    executionConfig,
-    governance,
-    eventsAdapter as never,
-  )
+    const runner = new ExecutionRunner(
+      prisma as never,
+      financeStub as never,
+      executionConfig,
+      governance,
+      eventsAdapter as never,
+    )
 
-  const org = await prisma.organization.create({
-    data: {
-      name: `Execution E2E ${unique}`,
-      slug: unique,
-      executionConfig: {
-        create: {
-          mode: 'automatic',
-          policy: {
-            allowAutomaticCharge: false,
-            allowWhatsAppAuto: false,
-            allowOverdueReminderAuto: true,
-            allowFinanceTeamNotifications: true,
-            allowGovernanceFollowup: true,
-            allowChargeFollowupCreation: true,
-            allowRiskReviewEscalation: true,
-            maxRetries: 3,
-            throttleWindowMs: 30 * 60 * 1000,
+    const org = await prisma.organization.create({
+      data: {
+        name: `Execution E2E ${unique}`,
+        slug: unique,
+        executionConfig: {
+          create: {
+            mode: 'automatic',
+            policy: {
+              allowAutomaticCharge: false,
+              allowWhatsAppAuto: false,
+              allowOverdueReminderAuto: true,
+              allowFinanceTeamNotifications: true,
+              allowGovernanceFollowup: true,
+              allowChargeFollowupCreation: true,
+              allowRiskReviewEscalation: true,
+              maxRetries: 3,
+              throttleWindowMs: 30 * 60 * 1000,
+            },
           },
         },
       },
-    },
-    select: { id: true, slug: true },
-  })
+      select: { id: true, slug: true },
+    })
 
-  const customer = await prisma.customer.create({
-    data: {
+    const customer = await prisma.customer.create({
+      data: {
+        orgId: org.id,
+        name: 'Cliente E2E Execution v5',
+        phone: `+5511999${String(Date.now()).slice(-6)}`,
+        email: `${unique}@example.com`,
+      },
+      select: { id: true },
+    })
+
+    await prisma.charge.createMany({
+      data: Array.from({ length: 8 }).map((_, idx) => ({
+        orgId: org.id,
+        customerId: customer.id,
+        amountCents: 10000 + idx * 1000,
+        status: 'OVERDUE',
+        dueDate: new Date(Date.now() - 1000 * 60 * 60 * 24 * (9 + idx)),
+        notes: `execution-v5-overdue-${idx}`,
+      })),
+    })
+
+    await prisma.serviceOrder.createMany({
+      data: Array.from({ length: 12 }).map((_, idx) => ({
+        orgId: org.id,
+        customerId: customer.id,
+        title: `OS travada ${idx + 1}`,
+        status: idx % 2 === 0 ? 'OPEN' : 'IN_PROGRESS',
+        amountCents: 20000,
+      })),
+    })
+
+    const firstRun = await runner.runOnce()
+    const secondRun = await runner.runOnce()
+
+    await executionConfig.recordConfigHistory({
       orgId: org.id,
-      name: 'Cliente E2E Execution v5',
-      phone: `+5511999${String(Date.now()).slice(-6)}`,
-      email: `${unique}@example.com`,
-    },
-    select: { id: true },
-  })
+      actorUserId: 'script-user',
+      actorEmail: 'script-user@nexo.test',
+      source: 'validate-execution-v5-script',
+      context: 'e2e-real-validation',
+      before: { mode: 'automatic' },
+      after: { mode: 'semi_automatic' },
+    })
 
-  await prisma.charge.createMany({
-    data: Array.from({ length: 8 }).map((_, idx) => ({
+    const allEvents = await loadExecutionEvents(prisma, org.id)
+    const scenarioAssertions = assertScenario(allEvents)
+
+    const idempotencyBlockedCount = allEvents.filter((event) => event.reasonCode === 'idempotency_recent_execution').length
+    const configHistoryCount = await prisma.timelineEvent.count({
+      where: { orgId: org.id, action: 'EXECUTION_CONFIG_CHANGED' },
+    })
+
+    const timelineActionCounts = await prisma.timelineEvent.groupBy({
+      by: ['action'],
+      where: { orgId: org.id },
+      _count: { action: true },
+    })
+
+    const result = {
+      startedAt,
+      finishedAt: new Date().toISOString(),
       orgId: org.id,
-      customerId: customer.id,
-      amountCents: 10000 + idx * 1000,
-      status: 'OVERDUE',
-      dueDate: new Date(Date.now() - 1000 * 60 * 60 * 24 * (9 + idx)),
-      notes: `execution-v5-overdue-${idx}`,
-    })),
-  })
+      orgSlug: org.slug,
+      runSummary: {
+        firstRun,
+        secondRun,
+      },
+      events: {
+        total: allEvents.length,
+        executed: allEvents.filter((event) => event.status === 'executed').length,
+        blocked: allEvents.filter((event) => event.status === 'blocked' || event.status === 'requires_confirmation').length,
+        failed: allEvents.filter((event) => event.status === 'failed').length,
+        throttled: allEvents.filter((event) => event.status === 'throttled').length,
+        idempotencyBlockedCount,
+      },
+      scenarioAssertions,
+      scenarioSummary: {
+        requiredTotal: scenarioAssertions.filter((scenario) => scenario.required).length,
+        requiredPassing: scenarioAssertions.filter((scenario) => scenario.required && scenario.ok).length,
+        optionalTotal: scenarioAssertions.filter((scenario) => !scenario.required).length,
+        optionalObserved: scenarioAssertions.filter((scenario) => !scenario.required && scenario.matchedEventId).length,
+      },
+      policyEvidence: {
+        whatsappAutoDisabledBlocked: allEvents.some(
+          (event) => event.actionId === 'action-send-whatsapp-payment-link'
+            && event.reasonCode === 'policy_whatsapp_automatic_disabled',
+        ),
+        automaticChargeDisabledBlocked: allEvents.some(
+          (event) => event.actionId === 'action-generate-charge'
+            && event.reasonCode === 'policy_automatic_charge_disabled',
+        ),
+      },
+      timelineActionCounts: timelineActionCounts.map((item) => ({ action: item.action, count: item._count.action })),
+      configHistoryCount,
+      sampleEvents: allEvents.slice(-20),
+    }
 
-  await prisma.serviceOrder.createMany({
-    data: Array.from({ length: 12 }).map((_, idx) => ({
-      orgId: org.id,
-      customerId: customer.id,
-      title: `OS travada ${idx + 1}`,
-      status: idx % 2 === 0 ? 'OPEN' : 'IN_PROGRESS',
-      amountCents: 20000,
-    })),
-  })
+    console.log(JSON.stringify(result, null, 2))
 
-  const firstRun = await runner.runOnce()
-  const secondRun = await runner.runOnce()
+    if (args.outputPath) {
+      await fs.mkdir(path.dirname(args.outputPath), { recursive: true })
+      await fs.writeFile(args.outputPath, `${JSON.stringify(result, null, 2)}\n`, 'utf8')
+      console.log(`validate-execution-v5: relatório salvo em ${args.outputPath}`)
+    }
 
-  await executionConfig.recordConfigHistory({
-    orgId: org.id,
-    actorUserId: 'script-user',
-    actorEmail: 'script-user@nexo.test',
-    source: 'validate-execution-v5-script',
-    context: 'e2e-real-validation',
-    before: { mode: 'automatic' },
-    after: { mode: 'semi_automatic' },
-  })
+    const failingScenario = scenarioAssertions.find((scenario) => scenario.required && !scenario.ok)
+    if (failingScenario) {
+      throw new Error(`Cenário obrigatório inválido: ${failingScenario.id} - ${failingScenario.details}`)
+    }
 
-  const allEvents = await loadExecutionEvents(prisma, org.id)
-  const scenarioAssertions = assertScenario(allEvents)
+    if (idempotencyBlockedCount === 0) {
+      throw new Error('Validação de idempotência falhou: nenhum bloqueio por idempotency_recent_execution foi registrado.')
+    }
 
-  const idempotencyBlockedCount = allEvents.filter((event) => event.reasonCode === 'idempotency_recent_execution').length
-  const configHistoryCount = await prisma.timelineEvent.count({
-    where: { orgId: org.id, action: 'EXECUTION_CONFIG_CHANGED' },
-  })
-
-  const timelineActionCounts = await prisma.timelineEvent.groupBy({
-    by: ['action'],
-    where: { orgId: org.id },
-    _count: { action: true },
-  })
-
-  const result = {
-    startedAt,
-    finishedAt: new Date().toISOString(),
-    orgId: org.id,
-    orgSlug: org.slug,
-    runSummary: {
-      firstRun,
-      secondRun,
-    },
-    events: {
-      total: allEvents.length,
-      executed: allEvents.filter((event) => event.status === 'executed').length,
-      blocked: allEvents.filter((event) => event.status === 'blocked' || event.status === 'requires_confirmation').length,
-      failed: allEvents.filter((event) => event.status === 'failed').length,
-      throttled: allEvents.filter((event) => event.status === 'throttled').length,
-      idempotencyBlockedCount,
-    },
-    scenarioAssertions,
-    scenarioSummary: {
-      requiredTotal: scenarioAssertions.filter((scenario) => scenario.required).length,
-      requiredPassing: scenarioAssertions.filter((scenario) => scenario.required && scenario.ok).length,
-      optionalTotal: scenarioAssertions.filter((scenario) => !scenario.required).length,
-      optionalObserved: scenarioAssertions.filter((scenario) => !scenario.required && scenario.matchedEventId).length,
-    },
-    policyEvidence: {
-      whatsappAutoDisabledBlocked: allEvents.some(
-        (event) => event.actionId === 'action-send-whatsapp-payment-link'
-          && event.reasonCode === 'policy_whatsapp_automatic_disabled',
-      ),
-      automaticChargeDisabledBlocked: allEvents.some(
-        (event) => event.actionId === 'action-generate-charge'
-          && event.reasonCode === 'policy_automatic_charge_disabled',
-      ),
-    },
-    timelineActionCounts: timelineActionCounts.map((item) => ({ action: item.action, count: item._count.action })),
-    configHistoryCount,
-    sampleEvents: allEvents.slice(-20),
+    if (configHistoryCount === 0) {
+      throw new Error('Validação de histórico de config falhou: nenhum evento EXECUTION_CONFIG_CHANGED encontrado.')
+    }
+  } catch (error) {
+    const explainedError = explainPrismaError(error)
+    if (explainedError) {
+      throw new Error(
+        `${explainedError}\nChecklist rápido:\n- Confirme DATABASE_URL.\n- Rode migrations: pnpm --filter ./apps/api prisma migrate deploy.\n- Se necessário, confira status: pnpm --filter ./apps/api prisma migrate status.`,
+      )
+    }
+    throw error
+  } finally {
+    await prisma.$disconnect()
   }
-
-  console.log(JSON.stringify(result, null, 2))
-
-  if (args.outputPath) {
-    await fs.mkdir(path.dirname(args.outputPath), { recursive: true })
-    await fs.writeFile(args.outputPath, `${JSON.stringify(result, null, 2)}\n`, 'utf8')
-    console.log(`validate-execution-v5: relatório salvo em ${args.outputPath}`)
-  }
-
-  const failingScenario = scenarioAssertions.find((scenario) => scenario.required && !scenario.ok)
-  if (failingScenario) {
-    throw new Error(`Cenário obrigatório inválido: ${failingScenario.id} - ${failingScenario.details}`)
-  }
-
-  if (idempotencyBlockedCount === 0) {
-    throw new Error('Validação de idempotência falhou: nenhum bloqueio por idempotency_recent_execution foi registrado.')
-  }
-
-  if (configHistoryCount === 0) {
-    throw new Error('Validação de histórico de config falhou: nenhum evento EXECUTION_CONFIG_CHANGED encontrado.')
-  }
-
-  await prisma.$disconnect()
 }
 
 main().catch(async (error) => {
-  console.error('[validate-execution-v5] falha:', error instanceof Error ? error.message : String(error))
+  console.error('[validate-execution-v5] falha:', getErrorMessage(error))
   process.exit(1)
 })
