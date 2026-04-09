@@ -234,6 +234,72 @@ export class AuthService {
     }
   }
 
+  async loginWithGoogleProfile(googleUser: {
+    email: string
+    firstName?: string
+    lastName?: string
+    sub?: string
+    picture?: string
+    emailVerified?: boolean
+  }) {
+    const email = (googleUser.email ?? '').trim().toLowerCase()
+
+    if (!email) {
+      throw new BadRequestException('Email Google é obrigatório')
+    }
+
+    if (googleUser.emailVerified === false) {
+      throw new UnauthorizedException('Conta Google sem e-mail verificado')
+    }
+
+    let user = await this.prisma.user.findUnique({
+      where: { email },
+      include: { person: true },
+    })
+
+    if (!user) {
+      throw new UnauthorizedException(
+        'Nenhuma conta encontrada para este e-mail. Solicite acesso ao administrador.',
+      )
+    }
+
+    if (!user.person) {
+      const displayName =
+        `${googleUser.firstName ?? ''} ${googleUser.lastName ?? ''}`.trim() ||
+        email
+
+      user = await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          person: {
+            create: {
+              name: displayName,
+              email,
+              role: user.role,
+              active: true,
+              orgId: user.orgId,
+            },
+          },
+        },
+        include: { person: true },
+      })
+    }
+
+    if (!user.emailVerifiedAt) {
+      user = await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          emailVerifiedAt: new Date(),
+          emailVerifyTokenHash: null,
+          emailVerifyTokenExpiresAt: null,
+        },
+        include: { person: true },
+      })
+    }
+
+    return this.createSessionPayload(user)
+  }
+
   async validateGoogleUser(googleUser: any) {
     let user = await this.prisma.user.findUnique({
       where: { email: googleUser.email },
