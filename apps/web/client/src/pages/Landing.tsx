@@ -172,7 +172,7 @@ export default function Landing() {
                 <div className="mt-3 grid grid-cols-2 gap-2 text-sm text-slate-600">
                   <p>
                     Status:{" "}
-                    <span className="font-medium text-blue-600">
+                    <span className="font-medium text-violet-600">
                       Em execução
                     </span>
                   </p>
@@ -224,8 +224,8 @@ export default function Landing() {
                     <p className="font-semibold text-violet-600">97%</p>
                     <p className="text-slate-500">SLA</p>
                   </div>
-                  <div className="rounded-lg bg-blue-50 p-2">
-                    <p className="font-semibold text-blue-600">74</p>
+                  <div className="rounded-lg bg-violet-50 p-2">
+                    <p className="font-semibold text-violet-600">74</p>
                     <p className="text-slate-500">NPS</p>
                   </div>
                   <div className="rounded-lg bg-emerald-50 p-2">

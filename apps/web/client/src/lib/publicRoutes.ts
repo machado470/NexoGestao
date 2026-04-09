@@ -10,6 +10,7 @@ const PUBLIC_PATHS = new Set<string>([
   "/about",
   "/sobre",
   "/produto",
+  "/funcionalidades",
   "/precos",
   "/contato",
   "/privacy",
