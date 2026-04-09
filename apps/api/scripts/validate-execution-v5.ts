@@ -7,7 +7,7 @@ import { ExecutionConfigService } from '../src/execution/execution.config'
 import { ExecutionGovernanceService } from '../src/execution/execution.governance'
 
 type ScriptArgs = {
-  outputPath: string | null
+  outputPath: string
 }
 
 type ExecutionEventRow = {
@@ -36,11 +36,12 @@ type ScenarioAssertion = {
 }
 
 function parseArgs(argv: string[]): ScriptArgs {
+  const defaultOutputPath = path.resolve(process.cwd(), 'artifacts/execution-v5-e2e.json')
   const outputArg = argv.find((arg) => arg.startsWith('--output='))
-  if (!outputArg) return { outputPath: null }
+  if (!outputArg) return { outputPath: defaultOutputPath }
 
   const outputPath = outputArg.split('=')[1]?.trim()
-  return { outputPath: outputPath ? path.resolve(process.cwd(), outputPath) : null }
+  return { outputPath: outputPath ? path.resolve(process.cwd(), outputPath) : defaultOutputPath }
 }
 
 function getStringValue(input: unknown): string {
@@ -52,9 +53,10 @@ function getErrorMessage(error: unknown): string {
 }
 
 function explainPrismaError(error: unknown): string | null {
+  const dbTarget = getDatabaseTargetLabel(process.env.DATABASE_URL)
   if (error instanceof Prisma.PrismaClientInitializationError) {
     if (error.errorCode === 'P1001') {
-      return 'Banco indisponível (P1001). Verifique se o Postgres está ativo e acessível na DATABASE_URL.'
+      return `Banco indisponível (P1001). Verifique se o Postgres está ativo e acessível em ${dbTarget}.`
     }
     return `Falha de inicialização do Prisma (${error.errorCode ?? 'sem código'}): ${error.message}`
   }
@@ -67,6 +69,17 @@ function explainPrismaError(error: unknown): string | null {
   }
 
   return null
+}
+
+function getDatabaseTargetLabel(databaseUrl: string | undefined): string {
+  if (!databaseUrl) return 'DATABASE_URL não informada'
+
+  try {
+    const parsed = new URL(databaseUrl)
+    return `${parsed.hostname}:${parsed.port || '5432'}`
+  } catch {
+    return 'DATABASE_URL inválida'
+  }
 }
 
 class ScriptExecutionEventsAdapter {
@@ -291,7 +304,7 @@ async function main() {
 
   if (!process.env.DATABASE_URL) {
     throw new Error(
-      'DATABASE_URL não definido. Configure o banco Postgres e execute novamente. Exemplo: DATABASE_URL=postgresql://postgres:postgres@localhost:5432/nexogestao?schema=public',
+      'DATABASE_URL não definido. Configure o banco Postgres e execute novamente. Exemplo: DATABASE_URL=postgresql://postgres:postgres@localhost:5433/nexogestao?schema=public',
     )
   }
 
@@ -439,11 +452,9 @@ async function main() {
 
     console.log(JSON.stringify(result, null, 2))
 
-    if (args.outputPath) {
-      await fs.mkdir(path.dirname(args.outputPath), { recursive: true })
-      await fs.writeFile(args.outputPath, `${JSON.stringify(result, null, 2)}\n`, 'utf8')
-      console.log(`validate-execution-v5: relatório salvo em ${args.outputPath}`)
-    }
+    await fs.mkdir(path.dirname(args.outputPath), { recursive: true })
+    await fs.writeFile(args.outputPath, `${JSON.stringify(result, null, 2)}\n`, 'utf8')
+    console.log(`validate-execution-v5: relatório salvo em ${args.outputPath}`)
 
     const failingScenario = scenarioAssertions.find((scenario) => scenario.required && !scenario.ok)
     if (failingScenario) {
