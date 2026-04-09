@@ -428,16 +428,15 @@ export default function FinancesPage() {
           "Essa cobrança já venceu e está travando seu caixa. Acione o cliente agora e recupere receita.",
         ctaLabel: "Recuperar no WhatsApp",
         onClick: () => {
-          const phone = String(
-            overdue.charge.customerPhone ?? overdue.charge.phone ?? ""
-          ).trim();
           track("send_whatsapp", {
             screen: "finances",
             chargeId: overdue.charge.id,
             source: "next_action_overdue",
           });
-          if (phone) window.open(`https://wa.me/${phone}`, "_blank");
-          else navigate("/whatsapp");
+          navigate(
+            buildWhatsAppUrlFromCharge(overdue.charge) ??
+              `/whatsapp?returnTo=${encodeURIComponent("/finances")}`
+          );
         },
       };
     }
