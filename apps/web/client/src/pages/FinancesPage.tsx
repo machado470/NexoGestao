@@ -25,6 +25,13 @@ import { useChargeActions } from "@/hooks/useChargeActions";
 import { useProductAnalytics } from "@/hooks/useProductAnalytics";
 import { generateFinanceActions } from "@/lib/smartActions";
 import {
+  compareOperationalSeverity,
+  getChargeSeverity,
+  getNextActionCharge,
+  getOperationalSeverityClasses,
+  getOperationalSeverityLabel,
+} from "@/lib/operations/operational-intelligence";
+import {
   ChargeStatus,
   CHARGE_STATUS_BADGE,
   CHARGE_STATUS_LABEL,
@@ -62,9 +69,14 @@ type FinanceStats = {
 };
 
 type FinanceNormalizedStatus = ChargeStatus | "NONE";
-type FinanceQueueStatus = Exclude<FinanceNormalizedStatus, ChargeStatus.CANCELED>;
+type FinanceQueueStatus = Exclude<
+  FinanceNormalizedStatus,
+  ChargeStatus.CANCELED
+>;
 
-function normalizeChargeStatus(status?: string | null): FinanceNormalizedStatus {
+function normalizeChargeStatus(
+  status?: string | null
+): FinanceNormalizedStatus {
   const normalized = normalizeStatus(status);
   if (normalized === ChargeStatus.PAID) return ChargeStatus.PAID;
   if (normalized === ChargeStatus.PENDING) return ChargeStatus.PENDING;
@@ -108,9 +120,13 @@ export default function FinancesPage() {
   const paymentIdFromUrl = searchParams.get("paymentId") || "";
   const isServiceOrderScoped = Boolean(serviceOrderIdFromUrl);
   const isPaymentScoped = Boolean(paymentIdFromUrl);
-  const [whatsAppOpeningId, setWhatsAppOpeningId] = useState<string | null>(null);
+  const [whatsAppOpeningId, setWhatsAppOpeningId] = useState<string | null>(
+    null
+  );
   const [paymentDoneId, setPaymentDoneId] = useState<string | null>(null);
-  const [paymentSubmittingId, setPaymentSubmittingId] = useState<string | null>(null);
+  const [paymentSubmittingId, setPaymentSubmittingId] = useState<string | null>(
+    null
+  );
 
   const chargesQuery = trpc.finance.charges.list.useQuery(
     {
@@ -148,7 +164,8 @@ export default function FinancesPage() {
     return fromPayment || null;
   }, [paymentById]);
 
-  const effectiveChargeId = chargeIdFromUrl || resolvedChargeIdFromPayment || "";
+  const effectiveChargeId =
+    chargeIdFromUrl || resolvedChargeIdFromPayment || "";
 
   const chargeByIdQuery = trpc.finance.charges.getById.useQuery(
     { id: effectiveChargeId },
@@ -192,7 +209,7 @@ export default function FinancesPage() {
   const visibleCharges = useMemo(() => {
     if (scopedCharge) return [scopedCharge];
     if (effectiveChargeId) return [];
-    return charges.filter((charge) => {
+    return charges.filter(charge => {
       if (
         customerIdFromUrl &&
         String(charge.customerId ?? "") !== String(customerIdFromUrl)
@@ -207,20 +224,23 @@ export default function FinancesPage() {
     if (!paymentIdFromUrl) return null;
 
     if (resolvedChargeIdFromPayment) {
-      if (scopedCharge && String(scopedCharge.id) === resolvedChargeIdFromPayment) {
+      if (
+        scopedCharge &&
+        String(scopedCharge.id) === resolvedChargeIdFromPayment
+      ) {
         return scopedCharge;
       }
 
       const directMatch = charges.find(
-        (charge) => String(charge.id) === resolvedChargeIdFromPayment
+        charge => String(charge.id) === resolvedChargeIdFromPayment
       );
       if (directMatch) return directMatch;
     }
 
     return (
-      visibleCharges.find((charge) =>
+      visibleCharges.find(charge =>
         (charge.payments ?? []).some(
-          (payment) => String(payment?.id ?? "") === paymentIdFromUrl
+          payment => String(payment?.id ?? "") === paymentIdFromUrl
         )
       ) ?? null
     );
@@ -233,8 +253,18 @@ export default function FinancesPage() {
   ]);
 
   const finalVisibleCharges = useMemo(() => {
-    if (paymentScopedCharge) return [paymentScopedCharge];
-    return visibleCharges;
+    const base = paymentScopedCharge ? [paymentScopedCharge] : visibleCharges;
+    return [...base].sort((a, b) => {
+      const severityDiff = compareOperationalSeverity(
+        getChargeSeverity(a),
+        getChargeSeverity(b)
+      );
+      if (severityDiff !== 0) return severityDiff;
+      return (
+        Math.max(Number(b.amountCents || 0), 0) -
+        Math.max(Number(a.amountCents || 0), 0)
+      );
+    });
   }, [paymentScopedCharge, visibleCharges]);
 
   const timelineData = useMemo(() => {
@@ -259,7 +289,8 @@ export default function FinancesPage() {
 
         return {
           day,
-          paid: normalized === "PAID" ? Math.max(charge.amountCents || 0, 0) : 0,
+          paid:
+            normalized === "PAID" ? Math.max(charge.amountCents || 0, 0) : 0,
           pending:
             normalized !== "PAID" && normalized !== "OVERDUE"
               ? Math.max(charge.amountCents || 0, 0)
@@ -275,11 +306,15 @@ export default function FinancesPage() {
 
   const billingQueue = useMemo(() => {
     const ranked = finalVisibleCharges
-      .map((charge) => {
+      .map(charge => {
         const normalized = toQueueStatus(normalizeChargeStatus(charge.status));
-        const dueDateRaw = charge.dueDate ?? charge.updatedAt ?? charge.createdAt ?? null;
+        const dueDateRaw =
+          charge.dueDate ?? charge.updatedAt ?? charge.createdAt ?? null;
         const dueDate = dueDateRaw ? new Date(dueDateRaw) : null;
-        const dueTime = dueDate && !Number.isNaN(dueDate.getTime()) ? dueDate.getTime() : Number.MAX_SAFE_INTEGER;
+        const dueTime =
+          dueDate && !Number.isNaN(dueDate.getTime())
+            ? dueDate.getTime()
+            : Number.MAX_SAFE_INTEGER;
 
         return {
           charge,
@@ -288,11 +323,15 @@ export default function FinancesPage() {
           dueTime,
         };
       })
-      .filter((item) => item.normalized !== ChargeStatus.PAID && item.normalized !== "NONE")
+      .filter(
+        item =>
+          item.normalized !== ChargeStatus.PAID && item.normalized !== "NONE"
+      )
       .sort((a, b) => {
         if (a.priority !== b.priority) return a.priority - b.priority;
         const impactDiff =
-          Math.max(b.charge.amountCents || 0, 0) - Math.max(a.charge.amountCents || 0, 0);
+          Math.max(b.charge.amountCents || 0, 0) -
+          Math.max(a.charge.amountCents || 0, 0);
         if (impactDiff !== 0) return impactDiff;
         return a.dueTime - b.dueTime;
       });
@@ -302,15 +341,21 @@ export default function FinancesPage() {
   const overdueAmountInQueue = useMemo(
     () =>
       billingQueue
-        .filter((item) => item.normalized === ChargeStatus.OVERDUE)
-        .reduce((acc, item) => acc + Math.max(item.charge.amountCents || 0, 0), 0),
+        .filter(item => item.normalized === ChargeStatus.OVERDUE)
+        .reduce(
+          (acc, item) => acc + Math.max(item.charge.amountCents || 0, 0),
+          0
+        ),
     [billingQueue]
   );
   const pendingAmountInQueue = useMemo(
     () =>
       billingQueue
-        .filter((item) => item.normalized === ChargeStatus.PENDING)
-        .reduce((acc, item) => acc + Math.max(item.charge.amountCents || 0, 0), 0),
+        .filter(item => item.normalized === ChargeStatus.PENDING)
+        .reduce(
+          (acc, item) => acc + Math.max(item.charge.amountCents || 0, 0),
+          0
+        ),
     [billingQueue]
   );
   const totalOpenAmountInQueue = overdueAmountInQueue + pendingAmountInQueue;
@@ -320,51 +365,67 @@ export default function FinancesPage() {
     [statsQuery.data]
   );
 
-
-  const smartPriorities = useMemo(() => [
-    {
-      id: "fin-overdue",
-      type: "overdue_charges" as const,
-      title: "Cobranças vencidas",
-      count: billingQueue.filter((item) => item.normalized === ChargeStatus.OVERDUE).length,
-      impactCents: billingQueue
-        .filter((item) => item.normalized === ChargeStatus.OVERDUE)
-        .reduce((acc, item) => acc + Math.max(item.charge.amountCents || 0, 0), 0),
-      ctaLabel: "Recuperar cobrança",
-      ctaPath: "/finances",
-      helperText: "Receita presa no caixa precisa de contato imediato.",
-    },
-    {
-      id: "fin-pending",
-      type: "idle_cash" as const,
-      title: "Cobranças pendentes",
-      count: billingQueue.filter((item) => item.normalized === ChargeStatus.PENDING).length,
-      impactCents: billingQueue
-        .filter((item) => item.normalized === ChargeStatus.PENDING)
-        .reduce((acc, item) => acc + Math.max(item.charge.amountCents || 0, 0), 0),
-      ctaLabel: "Seguir fila",
-      ctaPath: "/finances",
-      helperText: "Pendências de hoje viram vencimento amanhã.",
-    },
-    {
-      id: "fin-risk",
-      type: "operational_risk" as const,
-      title: "Pagamentos sem fechamento operacional",
-      count: isPaymentScoped ? 1 : 0,
-      impactCents: paymentScopedCharge?.amountCents ?? 0,
-      ctaLabel: "Fechar O.S.",
-      ctaPath: "/service-orders",
-      helperText: "Pagamento sem conclusão operacional reduz previsibilidade.",
-    },
-  ], [billingQueue, isPaymentScoped, paymentScopedCharge?.amountCents]);
+  const smartPriorities = useMemo(
+    () => [
+      {
+        id: "fin-overdue",
+        type: "overdue_charges" as const,
+        title: "Cobranças vencidas",
+        count: billingQueue.filter(
+          item => item.normalized === ChargeStatus.OVERDUE
+        ).length,
+        impactCents: billingQueue
+          .filter(item => item.normalized === ChargeStatus.OVERDUE)
+          .reduce(
+            (acc, item) => acc + Math.max(item.charge.amountCents || 0, 0),
+            0
+          ),
+        ctaLabel: "Recuperar cobrança",
+        ctaPath: "/finances",
+        helperText: "Receita presa no caixa precisa de contato imediato.",
+      },
+      {
+        id: "fin-pending",
+        type: "idle_cash" as const,
+        title: "Cobranças pendentes",
+        count: billingQueue.filter(
+          item => item.normalized === ChargeStatus.PENDING
+        ).length,
+        impactCents: billingQueue
+          .filter(item => item.normalized === ChargeStatus.PENDING)
+          .reduce(
+            (acc, item) => acc + Math.max(item.charge.amountCents || 0, 0),
+            0
+          ),
+        ctaLabel: "Seguir fila",
+        ctaPath: "/finances",
+        helperText: "Pendências de hoje viram vencimento amanhã.",
+      },
+      {
+        id: "fin-risk",
+        type: "operational_risk" as const,
+        title: "Pagamentos sem fechamento operacional",
+        count: isPaymentScoped ? 1 : 0,
+        impactCents: paymentScopedCharge?.amountCents ?? 0,
+        ctaLabel: "Fechar O.S.",
+        ctaPath: "/service-orders",
+        helperText:
+          "Pagamento sem conclusão operacional reduz previsibilidade.",
+      },
+    ],
+    [billingQueue, isPaymentScoped, paymentScopedCharge?.amountCents]
+  );
 
   const nextAction = useMemo(() => {
-    const overdue = billingQueue.find((item) => item.normalized === ChargeStatus.OVERDUE);
+    const overdue = billingQueue.find(
+      item => item.normalized === ChargeStatus.OVERDUE
+    );
     if (overdue) {
       return {
-        severity: "critical" as const,
+        severity: "overdue" as const,
         title: "Você tem dinheiro parado aqui",
-        description: "Essa cobrança já venceu e está travando seu caixa. Acione o cliente agora e recupere receita.",
+        description:
+          "Essa cobrança já venceu e está travando seu caixa. Acione o cliente agora e recupere receita.",
         ctaLabel: "Recuperar no WhatsApp",
         onClick: () => {
           const phone = String(
@@ -385,10 +446,13 @@ export default function FinancesPage() {
       return {
         severity: "healthy" as const,
         title: "Pagamento registrado",
-        description: "Feche o ciclo operacional marcando a O.S. como concluída e com resultado.",
+        description:
+          "Feche o ciclo operacional marcando a O.S. como concluída e com resultado.",
         ctaLabel: "Ir para O.S.",
         onClick: () => {
-          const serviceOrderId = String(paymentScopedCharge?.serviceOrderId ?? "").trim();
+          const serviceOrderId = String(
+            paymentScopedCharge?.serviceOrderId ?? ""
+          ).trim();
           if (serviceOrderId) navigate(`/service-orders?os=${serviceOrderId}`);
           else navigate("/service-orders");
         },
@@ -396,13 +460,20 @@ export default function FinancesPage() {
     }
 
     return {
-      severity: "attention" as const,
+      severity: "pending" as const,
       title: "Seu caixa está em ritmo saudável",
-      description: "Sem urgência crítica agora. Continue pela fila priorizada para manter previsibilidade de receita.",
+      description:
+        "Sem urgência crítica agora. Continue pela fila priorizada para manter previsibilidade de receita.",
       ctaLabel: "Seguir fila",
       onClick: () => navigate("/finances"),
     };
-  }, [billingQueue, isPaymentScoped, navigate, paymentById?.id, paymentScopedCharge?.serviceOrderId]);
+  }, [
+    billingQueue,
+    isPaymentScoped,
+    navigate,
+    paymentById?.id,
+    paymentScopedCharge?.serviceOrderId,
+  ]);
 
   const smartOperationalActions = useMemo(
     () =>
@@ -423,12 +494,6 @@ export default function FinancesPage() {
       }),
     [billingQueue, navigate, track]
   );
-
-  function getSeverityClass(severity: "critical" | "attention" | "healthy") {
-    if (severity === "critical") return "border-red-200 bg-red-50/80 dark:border-red-900/40 dark:bg-red-950/20";
-    if (severity === "healthy") return "border-emerald-200 bg-emerald-50/80 dark:border-emerald-900/40 dark:bg-emerald-950/20";
-    return "border-amber-200 bg-amber-50/80 dark:border-amber-900/40 dark:bg-amber-950/20";
-  }
 
   const hasRenderableData =
     chargesQuery.data !== undefined ||
@@ -480,7 +545,9 @@ export default function FinancesPage() {
         subtitle="Sua sessão não está ativa."
         breadcrumb={[{ label: "Operação" }, { label: "Financeiro" }]}
       >
-        <SurfaceSection className="text-sm text-zinc-500 dark:text-zinc-400">Faça login para acessar o módulo financeiro.</SurfaceSection>
+        <SurfaceSection className="text-sm text-zinc-500 dark:text-zinc-400">
+          Faça login para acessar o módulo financeiro.
+        </SurfaceSection>
       </PageWrapper>
     );
   }
@@ -508,7 +575,11 @@ export default function FinancesPage() {
       >
         <SurfaceSection className="space-y-3 border-red-200 text-red-700 dark:border-red-900/40 dark:text-red-300">
           <p>{errorMessage}</p>
-          <Button type="button" variant="outline" onClick={() => void chargesQuery.refetch()}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => void chargesQuery.refetch()}
+          >
             Tentar novamente
           </Button>
         </SurfaceSection>
@@ -523,7 +594,7 @@ export default function FinancesPage() {
       breadcrumb={[{ label: "Operação" }, { label: "Financeiro" }]}
     >
       <ActionBarWrapper
-        secondaryActions={(
+        secondaryActions={
           <Button
             type="button"
             variant="outline"
@@ -531,27 +602,31 @@ export default function FinancesPage() {
           >
             Ir para Ordens de Serviço
           </Button>
-        )}
-        primaryAction={(
-          <Button
-            type="button"
-            className="bg-orange-500 text-white"
+        }
+        primaryAction={
+          <ActionFeedbackButton
+            state="idle"
+            idleLabel="Priorizar cobranças"
             onClick={() => {
-              track("cta_click", { screen: "finances", ctaId: "hero_prioritize_charges" });
+              track("cta_click", {
+                screen: "finances",
+                ctaId: "hero_prioritize_charges",
+              });
               navigate("/finances");
             }}
-          >
-            Priorizar cobranças
-          </Button>
-        )}
+          />
+        }
       />
-
 
       <SmartPage
         pageContext="finances"
         headline="Caixa orientado por prioridade"
         dominantProblem={nextAction.title}
-        dominantImpact={billingQueue.length > 0 ? `${billingQueue.length} cobranças na fila` : "Sem pressão crítica agora"}
+        dominantImpact={
+          billingQueue.length > 0
+            ? `${billingQueue.length} cobranças na fila`
+            : "Sem pressão crítica agora"
+        }
         dominantCta={{
           label: nextAction.ctaLabel,
           onClick: nextAction.onClick,
@@ -577,11 +652,13 @@ export default function FinancesPage() {
         <FinanceOverviewAreaChart timeline={timelineData} />
       )}
 
-      <SurfaceSection className={getSeverityClass(nextAction.severity)}>
+      <SurfaceSection
+        className={getOperationalSeverityClasses(nextAction.severity)}
+      >
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-zinc-700 dark:text-zinc-200">
-              Próxima ação
+              Próxima ação • {getOperationalSeverityLabel(nextAction.severity)}
             </p>
             <p className="mt-1 font-medium text-zinc-900 dark:text-zinc-100">
               {nextAction.title}
@@ -590,7 +667,9 @@ export default function FinancesPage() {
               {nextAction.description}
             </p>
           </div>
-          <Button
+          <ActionFeedbackButton
+            state="idle"
+            idleLabel={nextAction.ctaLabel}
             onClick={() => {
               track("cta_click", {
                 screen: "finances",
@@ -599,9 +678,7 @@ export default function FinancesPage() {
               });
               nextAction.onClick();
             }}
-          >
-            {nextAction.ctaLabel}
-          </Button>
+          />
         </div>
       </SurfaceSection>
 
@@ -650,84 +727,95 @@ export default function FinancesPage() {
           <div>
             <h2 className="nexo-section-title">O que gera caixa agora</h2>
             <p className="nexo-section-description">
-              A fila já vem pronta com o que está vencido primeiro para você recuperar receita sem perder tempo.
+              A fila já vem pronta com o que está vencido primeiro para você
+              recuperar receita sem perder tempo.
             </p>
           </div>
 
-          {billingQueue.map(({ charge, normalized }) => (
-            <Card
-              key={`queue-${charge.id}`}
-              className="nexo-surface border-slate-200/70 bg-white/90 dark:border-white/8"
-            >
-              <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-4">
-                <div className="min-w-0">
-                  <p>{charge.customer?.name || "Cliente sem nome"}</p>
-                  <p
-                    className={`text-sm ${
-                      normalized === ChargeStatus.OVERDUE
-                        ? "text-red-600 dark:text-red-300"
-                        : "text-gray-500"
-                    }`}
-                  >
-                    {formatCurrencyFromCents(charge.amountCents)} •{" "}
-                    {normalized === ChargeStatus.OVERDUE
-                      ? "Vencida"
-                      : normalized === ChargeStatus.PENDING
-                        ? "Pendente"
-                        : normalized}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      track("send_whatsapp", {
-                        screen: "finances",
-                        chargeId: charge.id,
-                        source: "billing_queue",
-                      });
-                      setWhatsAppOpeningId(charge.id);
-                      const nextPath =
-                        buildWhatsAppUrlFromCharge(charge) ??
-                        `/whatsapp?returnTo=${encodeURIComponent("/finances")}`;
-                      navigate(nextPath);
-                      setTimeout(() => setWhatsAppOpeningId(null), 1300);
-                    }}
-                  >
-                    {whatsAppOpeningId === charge.id ? "WhatsApp aberto" : "WhatsApp"}
-                  </Button>
-                  <ActionFeedbackButton
-                    state={
-                      isSubmitting && paymentSubmittingId === charge.id
-                        ? "loading"
-                        : paymentDoneId === charge.id
-                          ? "success"
-                          : "idle"
-                    }
-                    idleLabel="Marcar pago"
-                    loadingLabel="Processando..."
-                    successLabel="Pago registrado"
-                    onClick={() => {
-                      void (async () => {
-                        try {
-                          setPaymentSubmittingId(charge.id);
-                          await registerPayment(charge, "CASH");
-                          setPaymentDoneId(charge.id);
-                          setTimeout(() => setPaymentDoneId(null), 1500);
-                          void chargesQuery.refetch();
-                        } catch {
-                          // handled by hook
-                        } finally {
-                          setPaymentSubmittingId(null);
-                        }
-                      })();
-                    }}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+          {billingQueue.map(({ charge, normalized }) => {
+            const chargeSeverity = getChargeSeverity(charge);
+            const chargeNextAction = getNextActionCharge(charge);
+            return (
+              <Card
+                key={`queue-${charge.id}`}
+                className={`nexo-surface ${getOperationalSeverityClasses(chargeSeverity)}`}
+              >
+                <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-4">
+                  <div className="w-full text-xs font-medium text-zinc-600 dark:text-zinc-300">
+                    Severidade: {getOperationalSeverityLabel(chargeSeverity)} •
+                    Próxima ação: {chargeNextAction.label}
+                  </div>
+                  <div className="min-w-0">
+                    <p>{charge.customer?.name || "Cliente sem nome"}</p>
+                    <p
+                      className={`text-sm ${
+                        normalized === ChargeStatus.OVERDUE
+                          ? "text-red-600 dark:text-red-300"
+                          : "text-gray-500"
+                      }`}
+                    >
+                      {formatCurrencyFromCents(charge.amountCents)} •{" "}
+                      {normalized === ChargeStatus.OVERDUE
+                        ? "Vencida"
+                        : normalized === ChargeStatus.PENDING
+                          ? "Pendente"
+                          : normalized}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        track("send_whatsapp", {
+                          screen: "finances",
+                          chargeId: charge.id,
+                          source: "billing_queue",
+                        });
+                        setWhatsAppOpeningId(charge.id);
+                        const nextPath =
+                          buildWhatsAppUrlFromCharge(charge) ??
+                          `/whatsapp?returnTo=${encodeURIComponent("/finances")}`;
+                        navigate(nextPath);
+                        setTimeout(() => setWhatsAppOpeningId(null), 1300);
+                      }}
+                    >
+                      {whatsAppOpeningId === charge.id
+                        ? "WhatsApp aberto"
+                        : "WhatsApp"}
+                    </Button>
+                    <ActionFeedbackButton
+                      state={
+                        isSubmitting && paymentSubmittingId === charge.id
+                          ? "loading"
+                          : paymentDoneId === charge.id
+                            ? "success"
+                            : "idle"
+                      }
+                      idleLabel="Marcar pago"
+                      loadingLabel="Processando..."
+                      successLabel="Pago registrado"
+                      onClick={() => {
+                        void (async () => {
+                          try {
+                            setPaymentSubmittingId(charge.id);
+                            await registerPayment(charge, "CASH");
+                            setPaymentDoneId(charge.id);
+                            setTimeout(() => setPaymentDoneId(null), 1500);
+                            void chargesQuery.refetch();
+                          } catch {
+                            // handled by hook
+                          } finally {
+                            setPaymentSubmittingId(null);
+                          }
+                        })();
+                      }}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </SurfaceSection>
       )}
 
@@ -762,81 +850,93 @@ export default function FinancesPage() {
         </SurfaceSection>
       ) : (
         <div className="space-y-3">
-          {finalVisibleCharges.map((c) => {
+          {finalVisibleCharges.map(c => {
             const normalizedStatus = normalizeChargeStatus(c.status);
+            const chargeSeverity = getChargeSeverity(c);
+            const chargeNextAction = getNextActionCharge(c);
             return (
-            <Card
-              key={c.id}
-              className="nexo-surface border-slate-200/70 bg-white/90 dark:border-white/8"
-            >
-              <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-4">
-                <div className="min-w-0">
-                  <p>{c.customer?.name}</p>
-                  <p className="text-sm text-gray-500">
-                    {formatCurrencyFromCents(c.amountCents)}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <StatusBadge
-                    {...mapFinanceStatus(normalizedStatus)}
-                    label={getChargeStatusLabel(normalizedStatus)}
-                  />
-                  {normalizedStatus !== ChargeStatus.PAID && (
-                    <ActionFeedbackButton
-                      state={
-                        isSubmitting && paymentSubmittingId === c.id
-                          ? "loading"
-                          : paymentDoneId === c.id
-                            ? "success"
-                            : "idle"
-                      }
-                      idleLabel="Marcar pago"
-                      loadingLabel="Processando..."
-                      successLabel="Pago registrado"
-                      variant="outline"
-                      onClick={() => {
-                        void (async () => {
-                          try {
-                            setPaymentSubmittingId(c.id);
-                            const result = (await registerPayment(c, "CASH")) as
-                              | { paymentId?: string }
-                              | undefined;
-                            setPaymentDoneId(c.id);
-                            setTimeout(() => setPaymentDoneId(null), 1500);
-                            const paymentId = String(result?.paymentId ?? "").trim();
-                            const params = new URLSearchParams();
-                            params.set("chargeId", c.id);
-                            if (paymentId) params.set("paymentId", paymentId);
-                            if (customerIdFromUrl) {
-                              params.set("customerId", customerIdFromUrl);
-                            }
-                            navigate(`/finances?${params.toString()}`);
-                          } catch {
-                            // feedback handled in useChargeActions
-                          } finally {
-                            setPaymentSubmittingId(null);
-                          }
-                        })();
-                      }}
+              <Card
+                key={c.id}
+                className={`nexo-surface ${getOperationalSeverityClasses(chargeSeverity)}`}
+              >
+                <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-4">
+                  <div className="w-full text-xs font-medium text-zinc-600 dark:text-zinc-300">
+                    Severidade: {getOperationalSeverityLabel(chargeSeverity)} •
+                    Próxima ação: {chargeNextAction.label}
+                  </div>
+                  <div className="min-w-0">
+                    <p>{c.customer?.name}</p>
+                    <p className="text-sm text-gray-500">
+                      {formatCurrencyFromCents(c.amountCents)}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <StatusBadge
+                      {...mapFinanceStatus(normalizedStatus)}
+                      label={getChargeStatusLabel(normalizedStatus)}
                     />
-                  )}
-                  {normalizedStatus === ChargeStatus.PAID ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => navigate(buildWhatsAppUrlFromCharge(c) ?? "/whatsapp")}
-                    >
-                      Enviar comprovante
-                    </Button>
-                  ) : null}
-                </div>
-              </CardContent>
-              {paymentDoneId === c.id ? (
-                <div className="border-t border-emerald-200 bg-emerald-50 px-5 py-3 text-xs text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-300">
-                  Pagamento registrado com sucesso. Próximo passo: enviar confirmação ao cliente e fechar a O.S.
-                </div>
-              ) : null}
-            </Card>
+                    {normalizedStatus !== ChargeStatus.PAID && (
+                      <ActionFeedbackButton
+                        state={
+                          isSubmitting && paymentSubmittingId === c.id
+                            ? "loading"
+                            : paymentDoneId === c.id
+                              ? "success"
+                              : "idle"
+                        }
+                        idleLabel="Marcar pago"
+                        loadingLabel="Processando..."
+                        successLabel="Pago registrado"
+                        variant="outline"
+                        onClick={() => {
+                          void (async () => {
+                            try {
+                              setPaymentSubmittingId(c.id);
+                              const result = (await registerPayment(
+                                c,
+                                "CASH"
+                              )) as { paymentId?: string } | undefined;
+                              setPaymentDoneId(c.id);
+                              setTimeout(() => setPaymentDoneId(null), 1500);
+                              const paymentId = String(
+                                result?.paymentId ?? ""
+                              ).trim();
+                              const params = new URLSearchParams();
+                              params.set("chargeId", c.id);
+                              if (paymentId) params.set("paymentId", paymentId);
+                              if (customerIdFromUrl) {
+                                params.set("customerId", customerIdFromUrl);
+                              }
+                              navigate(`/finances?${params.toString()}`);
+                            } catch {
+                              // feedback handled in useChargeActions
+                            } finally {
+                              setPaymentSubmittingId(null);
+                            }
+                          })();
+                        }}
+                      />
+                    )}
+                    {normalizedStatus === ChargeStatus.PAID ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                          navigate(buildWhatsAppUrlFromCharge(c) ?? "/whatsapp")
+                        }
+                      >
+                        Enviar comprovante
+                      </Button>
+                    ) : null}
+                  </div>
+                </CardContent>
+                {paymentDoneId === c.id ? (
+                  <div className="border-t border-emerald-200 bg-emerald-50 px-5 py-3 text-xs text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-300">
+                    Pagamento registrado com sucesso. Próximo passo: enviar
+                    confirmação ao cliente e fechar a O.S.
+                  </div>
+                ) : null}
+              </Card>
             );
           })}
         </div>
