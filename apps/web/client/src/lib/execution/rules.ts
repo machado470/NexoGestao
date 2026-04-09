@@ -1,0 +1,243 @@
+import type {
+  ExecutionPlan,
+  ExecutionSeverity,
+  OperationalDecision,
+} from "@/lib/execution/types";
+
+export type DashboardExecutionFacts = {
+  totalCustomers: number;
+  totalServiceOrders: number;
+  completedOrders: number;
+  chargesGenerated: number;
+  overdueCharges: number;
+  todayAppointments: number;
+  hasWhatsappContext: boolean;
+};
+
+function severityWeight(severity: ExecutionSeverity) {
+  if (severity === "critical") return 0;
+  if (severity === "warning") return 1;
+  return 2;
+}
+
+export function sortDecisions(decisions: OperationalDecision[]) {
+  return [...decisions].sort((a, b) => {
+    const severityDiff = severityWeight(a.severity) - severityWeight(b.severity);
+    if (severityDiff !== 0) return severityDiff;
+    return (b.priority ?? 0) - (a.priority ?? 0);
+  });
+}
+
+export function buildDashboardRules(facts: DashboardExecutionFacts) {
+  const decisions: OperationalDecision[] = [];
+
+  const doneWithoutCharge = Math.max(
+    facts.completedOrders - facts.chargesGenerated,
+    0
+  );
+
+  if (doneWithoutCharge > 0) {
+    decisions.push({
+      id: "decision-done-without-charge",
+      entityType: "serviceOrder",
+      entityId: "batch-done-without-charge",
+      severity: "critical",
+      state: "invalid",
+      title: "O.S. concluída sem cobrança",
+      summary: `${doneWithoutCharge} serviço(s) concluído(s) sem cobrança vinculada, bloqueando entrada de caixa.`,
+      reasonCodes: ["service_order_done_without_charge", "revenue_blocked"],
+      suggestedActionId: "action-generate-charge",
+      priority: 100,
+      actions: [
+        {
+          id: "action-generate-charge",
+          kind: "navigate",
+          intent: "primary",
+          label: "Gerar cobrança",
+          description: "Abrir financeiro com foco em cobrança.",
+          enabled: true,
+          target: "/finances?filter=ready_to_charge",
+          telemetryKey: "execution.generate_charge_from_dashboard",
+        },
+        {
+          id: "action-open-service-orders",
+          kind: "navigate",
+          intent: "secondary",
+          label: "Revisar O.S.",
+          enabled: true,
+          target: "/service-orders",
+          telemetryKey: "execution.open_service_orders_from_dashboard",
+        },
+      ],
+    });
+  }
+
+  if (facts.overdueCharges > 0) {
+    decisions.push({
+      id: "decision-overdue-charge",
+      entityType: "charge",
+      entityId: "batch-overdue-charge",
+      severity: "critical",
+      state: "ready",
+      title: "Cobranças vencidas exigem recuperação",
+      summary: `${facts.overdueCharges} cobrança(s) vencida(s) com impacto direto no caixa.`,
+      reasonCodes: ["charge_overdue", "cashflow_risk"],
+      suggestedActionId: "action-open-finance-overdue",
+      priority: 95,
+      actions: [
+        {
+          id: "action-open-finance-overdue",
+          kind: "navigate",
+          intent: "primary",
+          label: "Abrir financeiro",
+          description: "Filtrar cobranças vencidas para recuperação.",
+          enabled: true,
+          target: "/finances?filter=overdue",
+          telemetryKey: "execution.open_finance_overdue",
+        },
+        {
+          id: "action-charge-on-whatsapp",
+          kind: "navigate",
+          intent: "secondary",
+          label: "Cobrar no WhatsApp",
+          enabled: true,
+          target: "/whatsapp",
+          telemetryKey: "execution.open_whatsapp_for_charge",
+        },
+      ],
+    });
+  }
+
+  if (!facts.hasWhatsappContext) {
+    decisions.push({
+      id: "decision-whatsapp-without-context",
+      entityType: "system",
+      entityId: "whatsapp-context",
+      severity: "warning",
+      state: "blocked",
+      title: "WhatsApp sem contexto operacional",
+      summary:
+        "Para evitar mensagens genéricas, inicie por uma O.S. ou cobrança antes de abrir a conversa.",
+      reasonCodes: ["whatsapp_context_missing"],
+      suggestedActionId: "action-start-from-service-order",
+      priority: 70,
+      actions: [
+        {
+          id: "action-start-from-service-order",
+          kind: "navigate",
+          intent: "primary",
+          label: "Começar por O.S.",
+          enabled: true,
+          target: "/service-orders",
+          telemetryKey: "execution.start_whatsapp_from_service_order",
+        },
+        {
+          id: "action-start-from-charge",
+          kind: "navigate",
+          intent: "secondary",
+          label: "Começar por cobrança",
+          enabled: true,
+          target: "/finances",
+          telemetryKey: "execution.start_whatsapp_from_finance",
+        },
+      ],
+    });
+  }
+
+  if (facts.todayAppointments > 0) {
+    decisions.push({
+      id: "decision-today-appointments",
+      entityType: "appointment",
+      entityId: "today-appointments",
+      severity: "warning",
+      state: "ready",
+      title: "Agendamentos de hoje aguardam execução",
+      summary: `${facts.todayAppointments} agendamento(s) com janela de execução ativa hoje.`,
+      reasonCodes: ["today_appointments"],
+      suggestedActionId: "action-open-appointments",
+      priority: 65,
+      actions: [
+        {
+          id: "action-open-appointments",
+          kind: "navigate",
+          intent: "primary",
+          label: "Executar agenda",
+          enabled: true,
+          target: "/appointments",
+          telemetryKey: "execution.open_today_appointments",
+        },
+      ],
+    });
+  }
+
+  const hasOperations = facts.totalCustomers > 0 || facts.totalServiceOrders > 0;
+  if (!hasOperations) {
+    decisions.push({
+      id: "decision-empty-dashboard",
+      entityType: "system",
+      entityId: "onboarding-start",
+      severity: "normal",
+      state: "ready",
+      title: "Operação ainda não iniciada",
+      summary:
+        "Comece criando cliente e primeiro agendamento para iniciar o ciclo Cliente → O.S. → Cobrança.",
+      reasonCodes: ["empty_dashboard"],
+      suggestedActionId: "action-create-customer",
+      priority: 30,
+      actions: [
+        {
+          id: "action-create-customer",
+          kind: "navigate",
+          intent: "primary",
+          label: "Criar cliente",
+          enabled: true,
+          target: "/customers",
+          telemetryKey: "execution.create_customer_first",
+        },
+        {
+          id: "action-create-appointment",
+          kind: "navigate",
+          intent: "secondary",
+          label: "Agendar primeiro serviço",
+          enabled: true,
+          target: "/appointments",
+          telemetryKey: "execution.create_first_appointment",
+        },
+      ],
+    });
+  }
+
+  if (decisions.length === 0) {
+    decisions.push({
+      id: "decision-operational-healthy",
+      entityType: "system",
+      entityId: "operational-healthy",
+      severity: "normal",
+      state: "completed",
+      title: "Fluxo operacional estável",
+      summary: "Sem bloqueios imediatos na execução operacional agora.",
+      reasonCodes: ["healthy_flow"],
+      suggestedActionId: "action-review-dashboard",
+      priority: 1,
+      actions: [
+        {
+          id: "action-review-dashboard",
+          kind: "future",
+          intent: "secondary",
+          label: "Manter monitoramento",
+          enabled: true,
+          telemetryKey: "execution.keep_monitoring",
+        },
+      ],
+    });
+  }
+
+  return sortDecisions(decisions);
+}
+
+export function withSortedDecisions(plan: ExecutionPlan): ExecutionPlan {
+  return {
+    ...plan,
+    decisions: sortDecisions(plan.decisions),
+  };
+}
