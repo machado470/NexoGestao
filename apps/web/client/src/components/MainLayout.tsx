@@ -228,6 +228,27 @@ export function MainLayout({ children }: MainLayoutProps) {
     () => getPageDescription(location),
     [location]
   );
+  const compactContextRoutes = useMemo(
+    () =>
+      new Set([
+        "/executive-dashboard",
+        "/customers",
+        "/appointments",
+        "/calendar",
+        "/service-orders",
+        "/timeline",
+        "/finances",
+        "/people",
+        "/governance",
+        "/whatsapp",
+        "/settings",
+        "/billing",
+      ]),
+    []
+  );
+  const pathname = location.split("?")[0];
+  const useCompactHeader =
+    Array.from(compactContextRoutes).some(route => isRouteActive(pathname, route));
 
   useEffect(() => {
     if (isMobile) {
@@ -331,7 +352,7 @@ export function MainLayout({ children }: MainLayoutProps) {
           </div>
 
           <nav className="min-h-0 flex-1 overflow-y-auto px-2 py-3">
-            <div className="space-y-4">
+            <div className="flex min-h-full flex-col gap-4">
               {visibleSections.map(section => (
                 <div key={section.id}>
                   {!sidebarCollapsed && (
@@ -371,31 +392,52 @@ export function MainLayout({ children }: MainLayoutProps) {
                   </div>
                 </div>
               ))}
+
+              <div className="mt-2 border-t border-slate-200/70 pt-3 dark:border-white/10">
+                {!sidebarCollapsed && (
+                  <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-400 dark:text-zinc-500">
+                    Interface
+                  </p>
+                )}
+
+                <button
+                  type="button"
+                  onClick={toggleTheme}
+                  className={`flex w-full items-center rounded-xl px-2.5 py-2 text-[13px] text-zinc-600 transition-colors hover:bg-zinc-100/80 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-white/[0.05] dark:hover:text-white ${
+                    sidebarCollapsed ? "justify-center" : "gap-2.5"
+                  }`}
+                >
+                  {theme === "dark" ? (
+                    <Sun className="h-4 w-4 shrink-0" />
+                  ) : (
+                    <Moon className="h-4 w-4 shrink-0" />
+                  )}
+
+                  {!sidebarCollapsed && (
+                    <>
+                      <span className="truncate font-medium">
+                        {theme === "dark" ? "Tema claro" : "Tema escuro"}
+                      </span>
+                      <span
+                        className={`ml-auto inline-flex h-5 w-9 items-center rounded-full p-0.5 transition-colors ${
+                          theme === "dark" ? "bg-orange-500/80" : "bg-zinc-300"
+                        }`}
+                      >
+                        <span
+                          className={`h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
+                            theme === "dark" ? "translate-x-4" : "translate-x-0"
+                          }`}
+                        />
+                      </span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </nav>
 
           <div className="border-t border-slate-200/70 p-2 dark:border-white/6">
             <div className="space-y-1">
-              <button
-                type="button"
-                onClick={toggleTheme}
-                className={`flex w-full items-center rounded-xl px-2.5 py-2 text-[13px] text-zinc-600 transition-colors hover:bg-zinc-100/80 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-white/[0.05] dark:hover:text-white ${
-                  sidebarCollapsed ? "justify-center" : "gap-2.5"
-                }`}
-              >
-                {theme === "dark" ? (
-                  <Sun className="h-4 w-4 shrink-0" />
-                ) : (
-                  <Moon className="h-4 w-4 shrink-0" />
-                )}
-
-                {!sidebarCollapsed && (
-                  <span className="truncate font-medium">
-                    {theme === "dark" ? "Tema claro" : "Tema escuro"}
-                  </span>
-                )}
-              </button>
-
               <button
                 type="button"
                 onClick={() => void handleLogout()}
@@ -416,8 +458,8 @@ export function MainLayout({ children }: MainLayoutProps) {
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col gap-3 md:gap-4">
-          <header className="nexo-app-panel-strong px-4 py-3 md:px-5 md:py-4">
-            <div className="flex flex-col gap-3">
+          <header className="nexo-app-panel-strong px-4 py-2.5 md:px-5 md:py-3">
+            <div className="flex flex-col gap-2">
               {isMobile ? (
                 <div className="flex items-center justify-between gap-3">
                   <button
@@ -443,18 +485,27 @@ export function MainLayout({ children }: MainLayoutProps) {
 
               <Breadcrumbs />
 
-              <div className="flex flex-col gap-1">
-                <h1 className="text-[1.8rem] font-semibold tracking-tight text-zinc-950 dark:text-white">
-                  {pageTitle}
-                </h1>
-                <p className="max-w-2xl text-sm leading-6 text-zinc-500 dark:text-zinc-400">
+              <div className="flex flex-col gap-0.5">
+                {useCompactHeader ? (
+                  <p className="text-xs font-semibold uppercase tracking-[0.08em] text-zinc-500 dark:text-zinc-400">
+                    {pageTitle}
+                  </p>
+                ) : (
+                  <h1 className="text-xl font-semibold tracking-tight text-zinc-950 dark:text-white md:text-2xl">
+                    {pageTitle}
+                  </h1>
+                )}
+                <p className="max-w-2xl text-xs leading-5 text-zinc-500 dark:text-zinc-400 md:text-sm">
                   {pageDescription}
                 </p>
               </div>
             </div>
           </header>
 
-          <main className="nexo-app-content min-h-0 flex-1 overflow-auto p-2 md:p-3">
+          <main
+            data-scrollbar="nexo"
+            className="nexo-app-content min-h-0 flex-1 overflow-auto p-2 md:p-3"
+          >
             {children}
           </main>
         </div>

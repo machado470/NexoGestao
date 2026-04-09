@@ -220,7 +220,7 @@
     font-family: var(--nexo-body-font);
     background: var(--background);
     scrollbar-width: thin;
-    scrollbar-color: #cbd5e1 #f8fafc;
+    scrollbar-color: rgba(249, 115, 22, 0.6) transparent;
   }
 
   .dark body {
@@ -240,27 +240,31 @@
   }
 }
 
-html::-webkit-scrollbar,
-body::-webkit-scrollbar {
+:where(html, body, [data-scrollbar="nexo"])::-webkit-scrollbar {
   width: 12px;
   height: 12px;
 }
 
-html::-webkit-scrollbar-track,
-body::-webkit-scrollbar-track {
-  background: #f8fafc;
+:where(html, body, [data-scrollbar="nexo"])::-webkit-scrollbar-track {
+  background: transparent;
 }
 
-html::-webkit-scrollbar-thumb,
-body::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #cbd5e1, #94a3b8);
-  border: 3px solid #f8fafc;
+:where(html, body, [data-scrollbar="nexo"])::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #fb923c, #f97316);
+  border: 3px solid transparent;
+  background-clip: padding-box;
   border-radius: 999px;
+  min-height: 28px;
 }
 
-html::-webkit-scrollbar-thumb:hover,
-body::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #94a3b8, #64748b);
+:where(html, body, [data-scrollbar="nexo"])::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #fdba74, #fb923c);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+
+.dark :where(html, body, [data-scrollbar="nexo"]) {
+  scrollbar-color: rgba(251, 146, 60, 0.62) transparent;
 }
 
 @layer components {

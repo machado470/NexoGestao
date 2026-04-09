@@ -126,20 +126,30 @@ export function Breadcrumbs() {
   const all = [{ label: "Início", href: "/executive-dashboard" }, ...breadcrumbs];
 
   return (
-    <nav className="flex items-center gap-2 text-xs">
+    <nav className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
       {all.map((crumb, index) => {
         const isLast = index === all.length - 1;
 
         return (
           <div key={`${crumb.label}-${index}`} className="flex items-center gap-2">
-            {index > 0 && <ChevronRight className="h-3.5 w-3.5" />}
+            {index > 0 && <ChevronRight className="h-3.5 w-3.5 opacity-70" />}
 
             {crumb.href && !isLast ? (
-              <button onClick={() => navigate(crumb.href!)}>
+              <button
+                type="button"
+                onClick={() => navigate(crumb.href!)}
+                className="transition-colors hover:text-zinc-800 dark:hover:text-zinc-100"
+              >
                 {index === 0 ? <Home className="h-3.5 w-3.5" /> : crumb.label}
               </button>
             ) : (
-              <span>{crumb.label}</span>
+              <span
+                className={
+                  isLast ? "font-medium text-zinc-700 dark:text-zinc-200" : undefined
+                }
+              >
+                {crumb.label}
+              </span>
             )}
           </div>
         );
