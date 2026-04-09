@@ -41,6 +41,10 @@ export class ExecutionEventsService {
           path: ['executionKey'],
           equals: params.executionKey,
         },
+        OR: [
+          { metadata: { path: ['status'], equals: 'executed' as ExecutionRunnerStatus } },
+          { metadata: { path: ['eventType'], equals: 'EXECUTION_ACTION_REQUESTED' } },
+        ],
       },
       select: { id: true },
     })
@@ -106,5 +110,42 @@ export class ExecutionEventsService {
     }
 
     return summary
+  }
+
+  async listRecentEvents(orgId: string, limit = 100) {
+    const normalizedLimit = Math.max(1, Math.min(500, Number(limit) || 100))
+    const rows = await this.prisma.timelineEvent.findMany({
+      where: {
+        orgId,
+        action: EXECUTION_EVENT_ACTION,
+      },
+      select: {
+        id: true,
+        createdAt: true,
+        metadata: true,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: normalizedLimit,
+    })
+
+    return rows.map((row) => {
+      const meta = (row.metadata ?? {}) as Record<string, unknown>
+      return {
+        id: row.id,
+        actionId: String(meta.actionId ?? ''),
+        decisionId: String(meta.decisionId ?? ''),
+        entityType: String(meta.entityType ?? ''),
+        entityId: String(meta.entityId ?? ''),
+        eventType: String(meta.eventType ?? ''),
+        status: String(meta.status ?? ''),
+        reasonCode: typeof meta.reasonCode === 'string' ? meta.reasonCode : null,
+        mode: typeof meta.mode === 'string' ? meta.mode : null,
+        timestamp:
+          typeof meta.timestamp === 'string' && meta.timestamp
+            ? meta.timestamp
+            : row.createdAt.toISOString(),
+        metadata: typeof meta.metadata === 'object' && meta.metadata ? meta.metadata : null,
+      }
+    })
   }
 }

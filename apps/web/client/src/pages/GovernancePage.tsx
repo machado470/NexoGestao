@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { DemoEnvironmentCta } from "@/components/DemoEnvironmentCta";
 import { ActionBarWrapper, PageWrapper } from "@/components/operating-system/Wrappers";
 import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedbackButton";
+import { ExecutionOperationsPanel } from "@/components/operations/ExecutionOperationsPanel";
 
 function clamp(value: number) {
   return Math.max(0, Math.min(100, Math.round(value)));
@@ -239,6 +240,8 @@ export default function GovernancePage() {
           ))}
         </div>
       </SurfaceSection>
+
+      <ExecutionOperationsPanel />
 
       <div
         className={`nexo-surface p-6 text-center ${
