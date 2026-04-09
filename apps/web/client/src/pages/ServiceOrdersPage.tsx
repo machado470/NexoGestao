@@ -48,6 +48,7 @@ import { useProductAnalytics } from "@/hooks/useProductAnalytics";
 import { generateServiceOrderActions } from "@/lib/smartActions";
 import {
   compareOperationalSeverity,
+  getServiceOrderDecision,
   getNextActionServiceOrder,
   getOperationalSeverityClasses,
   getOperationalSeverityLabel,
@@ -258,44 +259,8 @@ export default function ServiceOrdersPage() {
   }, [sorted]);
 
   const nextAction = useMemo(() => {
-    if (
-      activeOrder?.status === "DONE" &&
-      !activeOrder.financialSummary?.hasCharge
-    ) {
-      return {
-        severity: "critical" as const,
-        title: "Gerar cobrança desta O.S.",
-        description:
-          "A execução foi concluída e o próximo passo ideal é faturar imediatamente.",
-        ctaLabel: "Gerar cobrança",
-        onClick: () => navigate(`/finances?serviceOrderId=${activeOrder.id}`),
-      };
-    }
-
-    if (activeOrder?.financialSummary?.chargeStatus === "OVERDUE") {
-      const url = buildWhatsAppUrlFromServiceOrder(activeOrder);
-      return {
-        severity: "critical" as const,
-        title: "Cobrança vencida: acionar WhatsApp",
-        description:
-          "A cobrança está vencida. Conduza recuperação com contato direto.",
-        ctaLabel: "Enviar WhatsApp",
-        onClick: () => {
-          if (url) openWhatsApp(url);
-          else navigate("/whatsapp");
-        },
-      };
-    }
-
-    if (activeOrder?.financialSummary?.chargeStatus === "PAID") {
-      return {
-        severity: "healthy" as const,
-        title: "Pagamento confirmado: fechar execução",
-        description:
-          "Finalize a O.S. com resultado registrado para encerrar o ciclo.",
-        ctaLabel: "Revisar e concluir",
-        onClick: () => openAsActive(activeOrder.id),
-      };
+    if (activeOrder) {
+      return getServiceOrderDecision(activeOrder);
     }
 
     const queueOrder = operationalQueue[0];
@@ -304,8 +269,8 @@ export default function ServiceOrdersPage() {
         severity: "pending" as const,
         title: "Retomar fila operacional",
         description: "Sem foco definido: abra a próxima O.S. prioritária.",
-        ctaLabel: "Abrir próxima O.S.",
-        onClick: () => openAsActive(queueOrder.id),
+        primaryAction: { key: "open_service_order" as const, label: "Abrir próxima O.S." },
+        secondaryActions: [{ key: "open_queue" as const, label: "Abrir fila" }],
       };
     }
 
@@ -314,10 +279,46 @@ export default function ServiceOrdersPage() {
       title: "Criar nova ordem de serviço",
       description:
         "Não há itens pendentes. Gere uma nova O.S. para manter o fluxo ativo.",
-      ctaLabel: "Nova O.S.",
-      onClick: () => setIsCreateOpen(true),
+      primaryAction: { key: "open_queue" as const, label: "Nova O.S." },
+      secondaryActions: [],
     };
-  }, [activeOrder, navigate, operationalQueue]);
+  }, [activeOrder, operationalQueue]);
+
+  const nextActionButtons = useMemo(() => {
+    const resolve = (key: string) => {
+      if (key === "generate_charge") {
+        if (!activeOrder?.id) return null;
+        return () => navigate(`/finances?serviceOrderId=${activeOrder.id}`);
+      }
+      if (key === "open_whatsapp") {
+        const url = activeOrder ? buildWhatsAppUrlFromServiceOrder(activeOrder) : null;
+        return () => (url ? openWhatsApp(url) : navigate("/whatsapp"));
+      }
+      if (key === "open_service_order" || key === "review_execution") {
+        return () => {
+          if (activeOrder?.id) openAsActive(activeOrder.id);
+          else if (operationalQueue[0]?.id) openAsActive(operationalQueue[0].id);
+        };
+      }
+      if (key === "open_queue") {
+        if (!activeOrder) return () => setIsCreateOpen(true);
+        return () => navigate("/service-orders");
+      }
+      if (key === "open_finances") return () => navigate("/finances");
+      return null;
+    };
+
+    return [nextAction.primaryAction, ...nextAction.secondaryActions]
+      .map((action, index) => ({
+        ...action,
+        index,
+        onClick: resolve(action.key),
+      }))
+      .filter(
+        (action): action is typeof action & { onClick: () => void } =>
+          Boolean(action.onClick)
+      );
+  }, [activeOrder, navigate, nextAction, operationalQueue]);
 
   useEffect(() => {
     if (!activeId || !activeRef.current) return;
@@ -494,8 +495,8 @@ export default function ServiceOrdersPage() {
         dominantProblem={nextAction.title}
         dominantImpact={`${totalWithUrgency} itens com impacto imediato`}
         dominantCta={{
-          label: nextAction.ctaLabel,
-          onClick: nextAction.onClick,
+          label: nextAction.primaryAction.label,
+          onClick: nextActionButtons[0]?.onClick ?? (() => undefined),
           path: "/service-orders",
         }}
         priorities={smartPriorities}
@@ -616,22 +617,44 @@ export default function ServiceOrdersPage() {
                   ? "success"
                   : "idle"
             }
-            idleLabel={nextAction.ctaLabel}
+            idleLabel={nextAction.primaryAction.label}
             loadingLabel="Abrindo..."
             successLabel="Ação iniciada"
             onClick={() => {
               track("cta_click", {
                 screen: "service-orders",
                 ctaId: "next_action_primary",
-                label: nextAction.ctaLabel,
+                label: nextAction.primaryAction.label,
               });
               setNextActionState("running");
-              nextAction.onClick();
+              nextActionButtons[0]?.onClick?.();
               setTimeout(() => setNextActionState("done"), 220);
               setTimeout(() => setNextActionState("idle"), 1400);
             }}
           />
         </div>
+        {nextActionButtons.length > 1 ? (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {nextActionButtons.slice(1).map(action => (
+              <Button
+                key={action.key}
+                type="button"
+                size="sm"
+                variant="outline"
+                className="opacity-80"
+                onClick={action.onClick}
+              >
+                {action.label}
+              </Button>
+            ))}
+          </div>
+        ) : null}
+        {nextAction.invalidState ? (
+          <div className="mt-3 rounded-md border border-red-300/70 bg-red-50 p-2 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200">
+            <p className="font-semibold">{nextAction.invalidState.title}</p>
+            <p className="mt-1">{nextAction.invalidState.description}</p>
+          </div>
+        ) : null}
       </SurfaceSection>
 
       {queryState.hasBackgroundUpdate ? (

@@ -1016,9 +1016,9 @@ export default function ExecutiveDashboardNew() {
 
       <section className="grid gap-6 lg:grid-cols-2">
         <article className="nexo-surface nexo-fade-in p-5 lg:col-span-2">
-          <h2 className="nexo-section-title">Action Feed Global</h2>
+          <h2 className="nexo-section-title">Action Feed • Painel de execução diária</h2>
           <p className="mt-1 nexo-section-description">
-            Ações executáveis agrupadas por criticidade operacional.
+            Ações executáveis com contadores por grupo para atacar o dia em ordem de impacto.
           </p>
           <div className="mt-4 space-y-4">
             {(
@@ -1034,7 +1034,7 @@ export default function ExecutiveDashboardNew() {
               return (
                 <div key={bucket} className="space-y-2">
                   <p className="text-xs font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-300">
-                    {label}
+                    {label} • {items.length}
                   </p>
                   {items.map(item => (
                     <div
@@ -1058,7 +1058,11 @@ export default function ExecutiveDashboardNew() {
                         <button
                           type="button"
                           onClick={item.onClick}
-                          className="nexo-cta-secondary !h-9 !rounded-lg !px-3 !text-xs"
+                          className={
+                            item.severity === "critical"
+                              ? "nexo-cta-primary !h-9 !rounded-lg !px-3 !text-xs"
+                              : "nexo-cta-secondary !h-9 !rounded-lg !px-3 !text-xs opacity-75"
+                          }
                         >
                           {item.ctaLabel}
                         </button>
