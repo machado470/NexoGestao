@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common'
+import { BadRequestException, Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
 import { Roles } from '../auth/decorators/roles.decorator'
@@ -10,6 +10,73 @@ import { ExecutionRunner } from './execution.runner'
 import { ExecutionEventsService } from './execution.events'
 import { ExecutionConfigService } from './execution.config'
 import type { ExecutionMode, ExecutionPolicyConfig } from './execution.types'
+
+const VALID_MODES = new Set<ExecutionMode>(['manual', 'semi_automatic', 'automatic'])
+
+function sanitizePolicyPatch(policy: unknown): Partial<ExecutionPolicyConfig> {
+  if (!policy || typeof policy !== 'object') {
+    throw new BadRequestException('Policy inválida')
+  }
+
+  const input = policy as Record<string, unknown>
+  const result: Partial<ExecutionPolicyConfig> = {}
+
+  if (input.allowAutomaticCharge !== undefined) {
+    if (typeof input.allowAutomaticCharge !== 'boolean') {
+      throw new BadRequestException('allowAutomaticCharge deve ser boolean')
+    }
+    result.allowAutomaticCharge = input.allowAutomaticCharge
+  }
+
+  if (input.allowWhatsAppAuto !== undefined) {
+    if (typeof input.allowWhatsAppAuto !== 'boolean') {
+      throw new BadRequestException('allowWhatsAppAuto deve ser boolean')
+    }
+    result.allowWhatsAppAuto = input.allowWhatsAppAuto
+  }
+
+  if (input.allowOverdueReminderAuto !== undefined) {
+    if (typeof input.allowOverdueReminderAuto !== 'boolean') {
+      throw new BadRequestException('allowOverdueReminderAuto deve ser boolean')
+    }
+    result.allowOverdueReminderAuto = input.allowOverdueReminderAuto
+  }
+
+  if (input.allowFinanceTeamNotifications !== undefined) {
+    if (typeof input.allowFinanceTeamNotifications !== 'boolean') {
+      throw new BadRequestException('allowFinanceTeamNotifications deve ser boolean')
+    }
+    result.allowFinanceTeamNotifications = input.allowFinanceTeamNotifications
+  }
+
+  if (input.allowGovernanceFollowup !== undefined) {
+    if (typeof input.allowGovernanceFollowup !== 'boolean') {
+      throw new BadRequestException('allowGovernanceFollowup deve ser boolean')
+    }
+    result.allowGovernanceFollowup = input.allowGovernanceFollowup
+  }
+
+  if (input.maxRetries !== undefined) {
+    if (!Number.isInteger(input.maxRetries) || Number(input.maxRetries) < 0 || Number(input.maxRetries) > 20) {
+      throw new BadRequestException('maxRetries deve ser inteiro entre 0 e 20')
+    }
+    result.maxRetries = Number(input.maxRetries)
+  }
+
+  if (input.throttleWindowMs !== undefined) {
+    const numeric = Number(input.throttleWindowMs)
+    if (!Number.isInteger(numeric) || numeric < 5_000 || numeric > 1000 * 60 * 60 * 24) {
+      throw new BadRequestException('throttleWindowMs deve ser inteiro entre 5000 e 86400000')
+    }
+    result.throttleWindowMs = numeric
+  }
+
+  if (Object.keys(result).length === 0) {
+    throw new BadRequestException('Nenhum campo válido enviado para policy')
+  }
+
+  return result
+}
 
 @Controller('executions')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -60,14 +127,27 @@ export class ExecutionController {
   @Roles('ADMIN', 'MANAGER')
   async updateMode(
     @Org() orgId: string,
-    @Body() body: { mode?: ExecutionMode; policy?: Partial<ExecutionPolicyConfig> },
+    @Body() body: { mode?: ExecutionMode; policy?: Partial<ExecutionPolicyConfig>; resetToDefault?: boolean },
   ) {
+    if (!body || typeof body !== 'object') {
+      throw new BadRequestException('Payload inválido para atualização de execution mode/policy')
+    }
+
+    if (body.mode !== undefined && !VALID_MODES.has(body.mode)) {
+      throw new BadRequestException('mode inválido')
+    }
+
     if (body?.mode) {
       await this.config.setExecutionModeForOrg(orgId, body.mode)
+    } else if (body?.resetToDefault) {
+      await this.config.setExecutionModeForOrg(orgId, this.config.getDefaultMode())
     }
-    if (body?.policy && typeof body.policy === 'object') {
-      await this.config.setPolicyOverrideForOrg(orgId, body.policy)
+
+    if (body?.policy !== undefined) {
+      const sanitized = sanitizePolicyPatch(body.policy)
+      await this.config.setPolicyOverrideForOrg(orgId, sanitized)
     }
+
     return {
       ok: true,
       mode: await this.config.getExecutionMode({ orgId }),
@@ -77,9 +157,19 @@ export class ExecutionController {
 
   @Get('events')
   @Roles('ADMIN', 'MANAGER', 'STAFF', 'VIEWER')
-  listEvents(@Org() orgId: string, @Query('limit') limit?: string) {
+  listEvents(
+    @Org() orgId: string,
+    @Query('limit') limit?: string,
+    @Query('status') status?: string,
+    @Query('actionId') actionId?: string,
+    @Query('entityType') entityType?: string,
+  ) {
     const normalizedLimit = Number(limit ?? 100)
-    return this.executionEvents.listRecentEvents(orgId, normalizedLimit)
+    return this.executionEvents.listRecentEvents(orgId, normalizedLimit, {
+      status,
+      actionId,
+      entityType,
+    })
   }
 
   @Post('runner/run-once')

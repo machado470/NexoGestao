@@ -112,8 +112,18 @@ export class ExecutionEventsService {
     return summary
   }
 
-  async listRecentEvents(orgId: string, limit = 100) {
+  async listRecentEvents(
+    orgId: string,
+    limit = 100,
+    filters?: { status?: string; actionId?: string; entityType?: string },
+  ) {
     const normalizedLimit = Math.max(1, Math.min(500, Number(limit) || 100))
+    const normalizedStatus = typeof filters?.status === 'string' && filters.status.trim() ? filters.status.trim() : null
+    const normalizedActionId =
+      typeof filters?.actionId === 'string' && filters.actionId.trim() ? filters.actionId.trim() : null
+    const normalizedEntityType =
+      typeof filters?.entityType === 'string' && filters.entityType.trim() ? filters.entityType.trim() : null
+
     const rows = await this.prisma.timelineEvent.findMany({
       where: {
         orgId,
@@ -125,10 +135,11 @@ export class ExecutionEventsService {
         metadata: true,
       },
       orderBy: { createdAt: 'desc' },
-      take: normalizedLimit,
+      take: Math.max(normalizedLimit * 4, 100),
     })
 
-    return rows.map((row) => {
+    return rows
+      .map((row) => {
       const meta = (row.metadata ?? {}) as Record<string, unknown>
       return {
         id: row.id,
@@ -145,7 +156,19 @@ export class ExecutionEventsService {
             ? meta.timestamp
             : row.createdAt.toISOString(),
         metadata: typeof meta.metadata === 'object' && meta.metadata ? meta.metadata : null,
+        diagnostics: {
+          executionKey: typeof meta.executionKey === 'string' ? meta.executionKey : null,
+          policySignal: typeof meta.policySignal === 'string' ? meta.policySignal : null,
+          governanceSignal: typeof meta.governanceSignal === 'string' ? meta.governanceSignal : null,
+        },
       }
-    })
+      })
+      .filter((event) => {
+        if (normalizedStatus && event.status !== normalizedStatus) return false
+        if (normalizedActionId && event.actionId !== normalizedActionId) return false
+        if (normalizedEntityType && event.entityType !== normalizedEntityType) return false
+        return true
+      })
+      .slice(0, normalizedLimit)
   }
 }

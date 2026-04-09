@@ -41,6 +41,16 @@ export class ExecutionGovernanceService {
       }
     }
 
+    if (
+      candidate.actionId === 'action-mark-operational-attention' &&
+      stalledServiceOrders < 10
+    ) {
+      return {
+        status: 'blocked',
+        reasonCode: 'governance_operational_attention_threshold_not_reached',
+      }
+    }
+
     return { status: 'allowed' }
   }
 
