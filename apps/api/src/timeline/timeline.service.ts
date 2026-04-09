@@ -105,6 +105,21 @@ export class TimelineService {
       pickString(input.metadata ?? null, 'customerId') ??
       pickString(input.metadata ?? null, 'entityId')
 
+    if (!customerId) {
+      console.warn('[Timeline] Skipped event due to invalid customerId')
+      return null
+    }
+
+    const customerExists = await this.prisma.customer.findFirst({
+      where: { id: customerId, orgId: input.orgId },
+      select: { id: true },
+    })
+
+    if (!customerExists?.id) {
+      console.warn('[Timeline] Skipped event due to invalid customerId')
+      return null
+    }
+
     const serviceOrderId =
       input.serviceOrderId ??
       pickString(input.metadata ?? null, 'serviceOrderId') ??
@@ -127,19 +142,32 @@ export class TimelineService {
       }),
     ) as Prisma.InputJsonValue
 
-    const event = await this.prisma.timelineEvent.create({
-      data: {
-        orgId: input.orgId,
-        action: input.action,
-        personId,
-        description: input.description ?? null,
-        customerId,
-        serviceOrderId,
-        appointmentId,
-        chargeId,
-        metadata,
-      },
-    })
+    let event: { id: string } | null = null
+
+    try {
+      event = await this.prisma.timelineEvent.create({
+        data: {
+          orgId: input.orgId,
+          action: input.action,
+          personId,
+          description: input.description ?? null,
+          customerId,
+          serviceOrderId,
+          appointmentId,
+          chargeId,
+          metadata,
+        },
+      })
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2003'
+      ) {
+        console.warn('[Timeline] Skipped event due to invalid customerId')
+        return null
+      }
+      throw error
+    }
 
     try {
       await this.webhookDispatcher.dispatchTimelineEvent({
