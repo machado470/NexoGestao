@@ -56,7 +56,16 @@ export class ExecutionRunner {
   }
 
   private async loadActionCandidates(orgId: string): Promise<ExecutionActionCandidate[]> {
-    const [chargeCandidates, linkCandidates, overdueReminderCandidates, operationalAlerts, financeTeamCandidates, operationalAttentionCandidates] =
+    const [
+      chargeCandidates,
+      linkCandidates,
+      overdueReminderCandidates,
+      operationalAlerts,
+      financeTeamCandidates,
+      operationalAttentionCandidates,
+      chargeFollowupCandidates,
+      riskEscalationCandidates,
+    ] =
       await Promise.all([
       this.loadGenerateChargeCandidates(orgId),
       this.loadSendPaymentLinkCandidates(orgId),
@@ -64,9 +73,20 @@ export class ExecutionRunner {
       this.loadOperationalAlertCandidates(orgId),
       this.loadNotifyFinanceTeamCandidates(orgId),
       this.loadOperationalAttentionCandidates(orgId),
+      this.loadCreateChargeFollowupCandidates(orgId),
+      this.loadEscalateRiskReviewCandidates(orgId),
     ])
 
-    return [...chargeCandidates, ...linkCandidates, ...overdueReminderCandidates, ...operationalAlerts, ...financeTeamCandidates, ...operationalAttentionCandidates]
+    return [
+      ...chargeCandidates,
+      ...linkCandidates,
+      ...overdueReminderCandidates,
+      ...operationalAlerts,
+      ...financeTeamCandidates,
+      ...operationalAttentionCandidates,
+      ...chargeFollowupCandidates,
+      ...riskEscalationCandidates,
+    ]
   }
 
   private async loadGenerateChargeCandidates(orgId: string): Promise<ExecutionActionCandidate[]> {
@@ -254,6 +274,63 @@ export class ExecutionRunner {
       },
     ]
   }
+  private async loadCreateChargeFollowupCandidates(orgId: string): Promise<ExecutionActionCandidate[]> {
+    const thresholdDate = new Date(Date.now() - 1000 * 60 * 60 * 24 * 7)
+    const charges = await this.prisma.charge.findMany({
+      where: {
+        orgId,
+        status: 'OVERDUE',
+        dueDate: { lte: thresholdDate },
+      },
+      select: {
+        id: true,
+        customerId: true,
+        amountCents: true,
+        dueDate: true,
+      },
+      take: 20,
+      orderBy: { updatedAt: 'desc' },
+    })
+
+    return charges.map((item) => ({
+      actionId: 'action-create-charge-followup',
+      decisionId: 'decision-overdue-charge-followup-threshold',
+      entityType: 'charge',
+      entityId: item.id,
+      orgId,
+      metadata: {
+        customerId: item.customerId,
+        amountCents: item.amountCents,
+        dueDate: item.dueDate?.toISOString() ?? null,
+        overdueDaysThreshold: 7,
+      },
+    }))
+  }
+
+  private async loadEscalateRiskReviewCandidates(orgId: string): Promise<ExecutionActionCandidate[]> {
+    const [overdueCount, stalledServiceOrders] = await Promise.all([
+      this.prisma.charge.count({ where: { orgId, status: 'OVERDUE' } }),
+      this.prisma.serviceOrder.count({ where: { orgId, status: { in: ['OPEN', 'ASSIGNED', 'IN_PROGRESS'] } } }),
+    ])
+
+    if (overdueCount < 8 || stalledServiceOrders < 12) return []
+
+    return [
+      {
+        actionId: 'action-escalate-risk-review',
+        decisionId: 'decision-escalate-risk-review-threshold',
+        entityType: 'system',
+        entityId: `org:${orgId}`,
+        orgId,
+        metadata: {
+          overdueCount,
+          stalledServiceOrders,
+          thresholdOverdue: 8,
+          thresholdStalledServiceOrders: 12,
+        },
+      },
+    ]
+  }
 
   private async processCandidate(candidate: ExecutionActionCandidate) {
     const mode = await this.config.getExecutionMode({ orgId: candidate.orgId })
@@ -270,7 +347,11 @@ export class ExecutionRunner {
     })
 
     if (mode === 'manual') {
-      await this.recordBlocked(candidate, executionKey, mode, 'mode_manual_runner_skip', 'blocked')
+      await this.recordBlocked(candidate, executionKey, mode, 'mode_manual_runner_skip', 'blocked', {
+        ruleId: candidate.decisionId,
+        ruleReason: 'runner mode em manual',
+        eligibility: 'blocked',
+      })
       return 'blocked'
     }
 
@@ -281,29 +362,70 @@ export class ExecutionRunner {
         mode,
         'mode_semi_automatic_requires_confirmation',
         'requires_confirmation',
+        {
+          ruleId: candidate.decisionId,
+          ruleReason: 'runner mode em semi_automatic',
+          eligibility: 'requires_confirmation',
+        },
       )
       return 'requires_confirmation'
     }
 
     if (candidate.actionId === 'action-generate-charge' && !policy.allowAutomaticCharge) {
-      await this.recordBlocked(candidate, executionKey, mode, 'policy_automatic_charge_disabled', 'blocked')
+      await this.recordBlocked(candidate, executionKey, mode, 'policy_automatic_charge_disabled', 'blocked', {
+        ruleId: candidate.decisionId,
+        policyKey: 'allowAutomaticCharge',
+        policyValue: policy.allowAutomaticCharge,
+      })
       return 'blocked'
     }
 
     if (candidate.actionId === 'action-send-whatsapp-payment-link' && !policy.allowWhatsAppAuto) {
-      await this.recordBlocked(candidate, executionKey, mode, 'policy_whatsapp_automatic_disabled', 'blocked')
+      await this.recordBlocked(candidate, executionKey, mode, 'policy_whatsapp_automatic_disabled', 'blocked', {
+        ruleId: candidate.decisionId,
+        policyKey: 'allowWhatsAppAuto',
+        policyValue: policy.allowWhatsAppAuto,
+      })
       return 'blocked'
     }
     if (candidate.actionId === 'action-send-overdue-charge-reminder' && !policy.allowOverdueReminderAuto) {
-      await this.recordBlocked(candidate, executionKey, mode, 'policy_overdue_reminder_disabled', 'blocked')
+      await this.recordBlocked(candidate, executionKey, mode, 'policy_overdue_reminder_disabled', 'blocked', {
+        ruleId: candidate.decisionId,
+        policyKey: 'allowOverdueReminderAuto',
+        policyValue: policy.allowOverdueReminderAuto,
+      })
       return 'blocked'
     }
     if (candidate.actionId === 'action-notify-finance-team' && !policy.allowFinanceTeamNotifications) {
-      await this.recordBlocked(candidate, executionKey, mode, 'policy_finance_team_notification_disabled', 'blocked')
+      await this.recordBlocked(candidate, executionKey, mode, 'policy_finance_team_notification_disabled', 'blocked', {
+        ruleId: candidate.decisionId,
+        policyKey: 'allowFinanceTeamNotifications',
+        policyValue: policy.allowFinanceTeamNotifications,
+      })
       return 'blocked'
     }
     if (candidate.actionId === 'action-mark-operational-attention' && !policy.allowGovernanceFollowup) {
-      await this.recordBlocked(candidate, executionKey, mode, 'policy_operational_attention_disabled', 'blocked')
+      await this.recordBlocked(candidate, executionKey, mode, 'policy_operational_attention_disabled', 'blocked', {
+        ruleId: candidate.decisionId,
+        policyKey: 'allowGovernanceFollowup',
+        policyValue: policy.allowGovernanceFollowup,
+      })
+      return 'blocked'
+    }
+    if (candidate.actionId === 'action-create-charge-followup' && !policy.allowChargeFollowupCreation) {
+      await this.recordBlocked(candidate, executionKey, mode, 'policy_charge_followup_creation_disabled', 'blocked', {
+        ruleId: candidate.decisionId,
+        policyKey: 'allowChargeFollowupCreation',
+        policyValue: policy.allowChargeFollowupCreation,
+      })
+      return 'blocked'
+    }
+    if (candidate.actionId === 'action-escalate-risk-review' && !policy.allowRiskReviewEscalation) {
+      await this.recordBlocked(candidate, executionKey, mode, 'policy_risk_review_escalation_disabled', 'blocked', {
+        ruleId: candidate.decisionId,
+        policyKey: 'allowRiskReviewEscalation',
+        policyValue: policy.allowRiskReviewEscalation,
+      })
       return 'blocked'
     }
 
@@ -315,6 +437,10 @@ export class ExecutionRunner {
         mode,
         governance.reasonCode ?? 'governance_blocked',
         governance.status === 'blocked' ? 'blocked' : 'requires_confirmation',
+        {
+          ruleId: candidate.decisionId,
+          governanceReason: governance.reasonCode ?? 'governance_blocked',
+        },
       )
       return governance.status
     }
@@ -326,7 +452,10 @@ export class ExecutionRunner {
     })
 
     if (alreadyExecuted) {
-      await this.recordBlocked(candidate, executionKey, mode, 'idempotency_recent_execution', 'blocked')
+      await this.recordBlocked(candidate, executionKey, mode, 'idempotency_recent_execution', 'blocked', {
+        ruleId: candidate.decisionId,
+        ruleReason: 'idempotency',
+      })
       return 'blocked'
     }
 
@@ -337,7 +466,10 @@ export class ExecutionRunner {
     })
 
     if (failureCount >= policy.maxRetries) {
-      await this.recordBlocked(candidate, executionKey, mode, 'retry_limit_reached', 'throttled')
+      await this.recordBlocked(candidate, executionKey, mode, 'retry_limit_reached', 'throttled', {
+        ruleId: candidate.decisionId,
+        ruleReason: 'retry limit reached',
+      })
       return 'throttled'
     }
 
@@ -354,6 +486,12 @@ export class ExecutionRunner {
       timestamp: new Date().toISOString(),
       metadata: {
         policySnapshot: policy,
+        trigger: candidate.metadata ?? {},
+      },
+      explanation: {
+        ruleId: candidate.decisionId,
+        eligibility: 'eligible',
+        trigger: candidate.metadata ?? {},
       },
     })
 
@@ -371,6 +509,11 @@ export class ExecutionRunner {
         status: 'executed',
         reasonCode: 'runner_executed',
         timestamp: new Date().toISOString(),
+        explanation: {
+          ruleId: candidate.decisionId,
+          eligibility: 'executed',
+          trigger: candidate.metadata ?? {},
+        },
       })
 
       this.logger.log(
@@ -400,6 +543,12 @@ export class ExecutionRunner {
         timestamp: new Date().toISOString(),
         metadata: {
           error: error instanceof Error ? error.message : String(error),
+          trigger: candidate.metadata ?? {},
+        },
+        explanation: {
+          ruleId: candidate.decisionId,
+          eligibility: 'failed',
+          trigger: candidate.metadata ?? {},
         },
       })
 
@@ -426,6 +575,14 @@ export class ExecutionRunner {
     mode: 'manual' | 'semi_automatic' | 'automatic',
     reasonCode: string,
     status: 'blocked' | 'requires_confirmation' | 'throttled',
+    explanation?: {
+      ruleId?: string
+      ruleReason?: string
+      eligibility?: string
+      policyKey?: string
+      policyValue?: unknown
+      governanceReason?: string
+    },
   ) {
     await this.events.recordEvent(candidate.orgId, {
       eventType: 'EXECUTION_ACTION_BLOCKED',
@@ -438,6 +595,7 @@ export class ExecutionRunner {
       status,
       reasonCode,
       timestamp: new Date().toISOString(),
+      explanation,
     })
 
     this.logger.warn(
@@ -547,6 +705,75 @@ export class ExecutionRunner {
           orgId: candidate.orgId,
           action: 'OPERATIONAL_ATTENTION_MARKED',
           description: 'Sinal operacional de atenção marcado automaticamente',
+          metadata: {
+            source: 'execution_runner_v5',
+            decisionId: candidate.decisionId,
+            ...candidate.metadata,
+          },
+        },
+      })
+      return
+    }
+    if (candidate.actionId === 'action-create-charge-followup') {
+      const charge = await this.prisma.charge.findFirst({
+        where: {
+          id: candidate.entityId,
+          orgId: candidate.orgId,
+          status: 'OVERDUE',
+        },
+        select: {
+          id: true,
+          dueDate: true,
+        },
+      })
+      if (!charge?.dueDate) throw new Error('charge_not_eligible_for_followup')
+
+      const overdueDays = Math.floor((Date.now() - charge.dueDate.getTime()) / (1000 * 60 * 60 * 24))
+      if (overdueDays < 7) throw new Error('charge_not_overdue_enough_for_followup')
+
+      const existing = await this.prisma.timelineEvent.findFirst({
+        where: {
+          orgId: candidate.orgId,
+          action: 'CHARGE_FOLLOWUP_CREATED',
+          chargeId: charge.id,
+          createdAt: { gte: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7) },
+        },
+        select: { id: true },
+      })
+      if (existing?.id) throw new Error('charge_followup_already_exists')
+
+      await this.prisma.timelineEvent.create({
+        data: {
+          orgId: candidate.orgId,
+          action: 'CHARGE_FOLLOWUP_CREATED',
+          chargeId: charge.id,
+          description: 'Follow-up de cobrança criado automaticamente',
+          metadata: {
+            source: 'execution_runner_v5',
+            decisionId: candidate.decisionId,
+            ...candidate.metadata,
+          },
+        },
+      })
+      return
+    }
+
+    if (candidate.actionId === 'action-escalate-risk-review') {
+      const existing = await this.prisma.timelineEvent.findFirst({
+        where: {
+          orgId: candidate.orgId,
+          action: 'RISK_REVIEW_ESCALATED',
+          createdAt: { gte: new Date(Date.now() - 1000 * 60 * 60 * 24) },
+        },
+        select: { id: true },
+      })
+      if (existing?.id) throw new Error('risk_review_already_escalated_recently')
+
+      await this.prisma.timelineEvent.create({
+        data: {
+          orgId: candidate.orgId,
+          action: 'RISK_REVIEW_ESCALATED',
+          description: 'Escalada automática para revisão de risco operacional/financeiro',
           metadata: {
             source: 'execution_runner_v5',
             decisionId: candidate.decisionId,

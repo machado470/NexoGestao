@@ -160,6 +160,10 @@ export class ExecutionEventsService {
           executionKey: typeof meta.executionKey === 'string' ? meta.executionKey : null,
           policySignal: typeof meta.policySignal === 'string' ? meta.policySignal : null,
           governanceSignal: typeof meta.governanceSignal === 'string' ? meta.governanceSignal : null,
+          explanation:
+            typeof meta.explanation === 'object' && meta.explanation
+              ? (meta.explanation as Record<string, unknown>)
+              : null,
         },
       }
       })

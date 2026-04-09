@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common'
+import type { Prisma } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
 import type { ExecutionMode, ExecutionPolicyConfig } from './execution.types'
 
@@ -8,6 +9,8 @@ const DEFAULT_POLICY: ExecutionPolicyConfig = {
   allowOverdueReminderAuto: true,
   allowFinanceTeamNotifications: true,
   allowGovernanceFollowup: true,
+  allowChargeFollowupCreation: true,
+  allowRiskReviewEscalation: true,
   maxRetries: 3,
   throttleWindowMs: 1000 * 60 * 30,
 }
@@ -49,6 +52,12 @@ export class ExecutionConfigService {
     }
     if (typeof input.allowGovernanceFollowup === 'boolean') {
       output.allowGovernanceFollowup = input.allowGovernanceFollowup
+    }
+    if (typeof input.allowChargeFollowupCreation === 'boolean') {
+      output.allowChargeFollowupCreation = input.allowChargeFollowupCreation
+    }
+    if (typeof input.allowRiskReviewEscalation === 'boolean') {
+      output.allowRiskReviewEscalation = input.allowRiskReviewEscalation
     }
     if (Number.isFinite(input.maxRetries)) {
       output.maxRetries = Math.max(0, Number(input.maxRetries))
@@ -98,16 +107,20 @@ export class ExecutionConfigService {
 
   async setExecutionModeForOrg(orgId: string, mode: ExecutionMode) {
     const nextMode = normalizeMode(mode)
+    const before = await this.getExecutionMode({ orgId })
     await (this.prisma as any).organizationExecutionConfig.upsert({
       where: { orgId },
       update: { mode: nextMode },
       create: { orgId, mode: nextMode },
     })
     this.modeCache.set(orgId, nextMode)
+    return { before, after: nextMode }
   }
 
   async setPolicyOverrideForOrg(orgId: string, policy: Partial<ExecutionPolicyConfig>) {
     const sanitized = this.sanitizePolicy(policy)
+    const before = await this.getPolicyConfig({ orgId })
+    const after = { ...before, ...sanitized }
     await (this.prisma as any).organizationExecutionConfig.upsert({
       where: { orgId },
       update: { policy: sanitized },
@@ -118,5 +131,68 @@ export class ExecutionConfigService {
       },
     })
     this.policyCache.set(orgId, sanitized)
+    return { before, after, persistedOverride: sanitized }
+  }
+
+  async recordConfigHistory(input: {
+    orgId: string
+    actorUserId?: string | null
+    actorEmail?: string | null
+    source?: string | null
+    context?: string | null
+    before: Record<string, unknown>
+    after: Record<string, unknown>
+  }) {
+    await this.prisma.timelineEvent.create({
+      data: {
+        orgId: input.orgId,
+        action: 'EXECUTION_CONFIG_CHANGED',
+        description: 'Configuração de execution atualizada',
+        metadata: {
+          orgId: input.orgId,
+          actorUserId: input.actorUserId ?? null,
+          actorEmail: input.actorEmail ?? null,
+          source: input.source ?? 'execution_api',
+          context: input.context ?? null,
+          changedAt: new Date().toISOString(),
+          before: input.before,
+          after: input.after,
+        } as Prisma.InputJsonObject,
+      },
+    })
+  }
+
+  async listConfigHistory(orgId: string, limit = 20) {
+    const rows = await this.prisma.timelineEvent.findMany({
+      where: {
+        orgId,
+        action: 'EXECUTION_CONFIG_CHANGED',
+      },
+      orderBy: { createdAt: 'desc' },
+      take: Math.max(1, Math.min(100, Number(limit) || 20)),
+      select: {
+        id: true,
+        createdAt: true,
+        metadata: true,
+      },
+    })
+
+    return rows.map((row) => {
+      const metadata = (row.metadata ?? {}) as Record<string, unknown>
+      return {
+        id: row.id,
+        orgId,
+        actorUserId: typeof metadata.actorUserId === 'string' ? metadata.actorUserId : null,
+        actorEmail: typeof metadata.actorEmail === 'string' ? metadata.actorEmail : null,
+        source: typeof metadata.source === 'string' ? metadata.source : null,
+        context: typeof metadata.context === 'string' ? metadata.context : null,
+        changedAt:
+          typeof metadata.changedAt === 'string' && metadata.changedAt
+            ? metadata.changedAt
+            : row.createdAt.toISOString(),
+        before: typeof metadata.before === 'object' && metadata.before ? metadata.before : {},
+        after: typeof metadata.after === 'object' && metadata.after ? metadata.after : {},
+      }
+    })
   }
 }

@@ -6,6 +6,8 @@ export type ExecutionPolicyConfig = {
   allowOverdueReminderAuto: boolean
   allowFinanceTeamNotifications: boolean
   allowGovernanceFollowup: boolean
+  allowChargeFollowupCreation: boolean
+  allowRiskReviewEscalation: boolean
   maxRetries: number
   throttleWindowMs: number
 }
@@ -52,5 +54,14 @@ export type ExecutionEventPayload = {
   status: ExecutionRunnerStatus
   reasonCode?: string
   timestamp: string
+  explanation?: {
+    ruleId?: string
+    ruleReason?: string
+    eligibility?: string
+    trigger?: Record<string, unknown>
+    policyKey?: string
+    policyValue?: unknown
+    governanceReason?: string
+  }
   metadata?: Record<string, unknown>
 }
