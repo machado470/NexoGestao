@@ -336,36 +336,13 @@ export function MainLayout({ children }: MainLayoutProps) {
                   </p>
                 )}
               </div>
-              <div className="flex shrink-0 items-center gap-1">
-                <button
-                  type="button"
-                  onClick={toggleTheme}
-                  className="flex h-8 w-8 items-center justify-center rounded-xl text-zinc-500 transition-colors hover:bg-zinc-100/80 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-white/[0.05] dark:hover:text-white"
-                  title={theme === "dark" ? "Ativar tema claro" : "Ativar tema escuro"}
-                  aria-label={theme === "dark" ? "Ativar tema claro" : "Ativar tema escuro"}
-                >
-                  {theme === "dark" ? (
-                    <Sun className="h-4 w-4" />
-                  ) : (
-                    <Moon className="h-4 w-4" />
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void handleLogout()}
-                  disabled={isLoggingOut}
-                  className="flex h-8 w-8 items-center justify-center rounded-xl text-red-600 transition-colors hover:bg-red-50/90 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-60 dark:text-red-400 dark:hover:bg-red-500/10 dark:hover:text-red-300"
-                  title="Sair"
-                  aria-label="Sair"
-                >
-                  <LogOut className="h-4 w-4" />
-                </button>
+              {!isMobile ? (
                 <button
                   type="button"
                   onClick={() => setSidebarCollapsed(prev => !prev)}
-                  disabled={isMobile}
-                  className="flex h-8 w-8 items-center justify-center rounded-xl text-zinc-500 transition-colors hover:bg-zinc-100/80 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-white/[0.05] dark:hover:text-white"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-zinc-500 transition-colors hover:bg-zinc-100/80 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-white/[0.05] dark:hover:text-white"
                   title={sidebarCollapsed ? "Expandir barra lateral" : "Recolher barra lateral"}
+                  aria-label={sidebarCollapsed ? "Expandir barra lateral" : "Recolher barra lateral"}
                 >
                   {sidebarCollapsed ? (
                     <ChevronRight className="h-4 w-4" />
@@ -373,11 +350,11 @@ export function MainLayout({ children }: MainLayoutProps) {
                     <ChevronLeft className="h-4 w-4" />
                   )}
                 </button>
-              </div>
+              ) : null}
             </div>
             {!sidebarCollapsed ? (
               <p className="mt-2 truncate text-[11px] text-zinc-500 dark:text-zinc-400">
-                Utilitários rápidos: tema e sessão
+                Navegação principal da operação
               </p>
             ) : null}
           </div>
@@ -423,9 +400,55 @@ export function MainLayout({ children }: MainLayoutProps) {
                   </div>
                 </div>
               ))}
-
             </div>
           </nav>
+
+          <div className="border-t border-slate-200/70 p-2 dark:border-white/10">
+            {!sidebarCollapsed ? (
+              <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-400 dark:text-zinc-500">
+                Ações globais
+              </p>
+            ) : null}
+
+            <div className="space-y-1">
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className={`flex w-full items-center rounded-xl px-2.5 py-2 text-[13px] text-zinc-600 transition-colors hover:bg-zinc-100/80 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-white/[0.05] dark:hover:text-white ${
+                  sidebarCollapsed ? "justify-center" : "gap-2.5"
+                }`}
+                title={theme === "dark" ? "Ativar tema claro" : "Ativar tema escuro"}
+                aria-label={theme === "dark" ? "Ativar tema claro" : "Ativar tema escuro"}
+              >
+                {theme === "dark" ? (
+                  <Sun className="h-4 w-4 shrink-0" />
+                ) : (
+                  <Moon className="h-4 w-4 shrink-0" />
+                )}
+                {!sidebarCollapsed ? (
+                  <span className="truncate font-medium">
+                    {theme === "dark" ? "Tema claro" : "Tema escuro"}
+                  </span>
+                ) : null}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => void handleLogout()}
+                disabled={isLoggingOut}
+                className={`flex w-full items-center rounded-xl px-2.5 py-2 text-[13px] text-red-600 transition-colors hover:bg-red-50/90 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-60 dark:text-red-400 dark:hover:bg-red-500/10 dark:hover:text-red-300 ${
+                  sidebarCollapsed ? "justify-center" : "gap-2.5"
+                }`}
+                title="Sair"
+                aria-label="Sair"
+              >
+                <LogOut className="h-4 w-4 shrink-0" />
+                {!sidebarCollapsed ? (
+                  <span className="truncate font-medium">Encerrar sessão</span>
+                ) : null}
+              </button>
+            </div>
+          </div>
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col gap-3 md:gap-4">
