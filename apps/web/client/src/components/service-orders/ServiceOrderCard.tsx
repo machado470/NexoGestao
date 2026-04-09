@@ -9,6 +9,7 @@ import {
 } from "@/lib/operations/operations.utils";
 
 import { getServiceOrderNextAction } from "@/lib/operations/operations.selectors";
+import { StatusBadge, mapFinanceStatus, mapServiceOrderStatus } from "@/components/StatusBadge";
 
 interface Props {
   os: ServiceOrder;
@@ -37,12 +38,13 @@ function formatTimeAgo(date?: string | Date | null) {
   return `${Math.floor(h / 24)}d`;
 }
 
-function getStatusLabel(status: string) {
-  if (status === "DONE") return "Concluído";
-  if (status === "IN_PROGRESS") return "Em execução";
-  if (status === "OPEN") return "Aberto";
-  if (status === "ASSIGNED") return "Atribuído";
-  return status;
+function normalizeFinanceBadgeLabel(label: string): string {
+  const normalized = label.trim().toLowerCase();
+  if (normalized === "pago") return "PAID";
+  if (normalized === "pendente") return "PENDING";
+  if (normalized === "vencido") return "OVERDUE";
+  if (normalized === "cancelado") return "CANCELED";
+  return "NONE";
 }
 
 function getCardToneClass(tone: string) {
@@ -86,13 +88,9 @@ export default function ServiceOrderCard({
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="font-semibold">{os.title}</h3>
 
-          <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-700">
-            {getStatusLabel(status)}
-          </span>
+          <StatusBadge {...mapServiceOrderStatus(status)} />
 
-          <span className={`rounded px-2 py-0.5 text-xs ${chargeBadge.className}`}>
-            {chargeBadge.label}
-          </span>
+          <StatusBadge {...mapFinanceStatus(normalizeFinanceBadgeLabel(chargeBadge.label))} label={chargeBadge.label} />
 
           <span className="text-xs text-gray-400">{timeAgo}</span>
 

@@ -1,292 +1,184 @@
-import { useMemo, useState } from "react";
-import { ChevronUp, ChevronDown, Search, Trash2, Edit2, ChevronRight } from "lucide-react";
+import { useMemo, useState, type ReactNode } from "react";
+import { ChevronDown, ChevronRight, ChevronUp, Search } from "lucide-react";
+import { EmptyState } from "@/components/EmptyState";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export interface Column<T> {
   key: keyof T;
   label: string;
   width?: string;
   sortable?: boolean;
-  render?: (value: any, row: T) => React.ReactNode;
-  hidden?: boolean; // Ocultar em mobile
+  render?: (value: T[keyof T], row: T) => ReactNode;
+  hidden?: boolean;
 }
 
 export interface DataTableProps<T> {
   columns: Column<T>[];
   data: T[];
   loading?: boolean;
-  onEdit?: (row: T) => void;
-  onDelete?: (row: T) => void;
   searchable?: boolean;
   searchFields?: (keyof T)[];
   emptyMessage?: string;
+  rowActions?: (row: T) => ReactNode;
+  topActions?: ReactNode;
 }
 
 export function DataTable<T extends { id?: number | string }>({
   columns,
   data,
   loading = false,
-  onEdit,
-  onDelete,
   searchable = true,
   searchFields = [],
   emptyMessage = "Nenhum registro encontrado",
+  rowActions,
+  topActions,
 }: DataTableProps<T>) {
-  const [sortConfig, setSortConfig] = useState<{
-    key: keyof T;
-    direction: "asc" | "desc";
-  } | null>(null);
+  const [sortConfig, setSortConfig] = useState<{ key: keyof T; direction: "asc" | "desc" } | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [expandedRow, setExpandedRow] = useState<number | string | null | undefined>(null);
 
-  // Filtrar dados baseado na busca
+  const visibleColumns = useMemo(() => columns.filter((col) => !col.hidden), [columns]);
+  const primaryColumn = visibleColumns[0];
+
   const filteredData = useMemo(() => {
     if (!searchTerm || searchFields.length === 0) return data;
 
     return data.filter((row) =>
       searchFields.some((field) => {
         const value = row[field];
-        return String(value).toLowerCase().includes(searchTerm.toLowerCase());
+        return String(value ?? "").toLowerCase().includes(searchTerm.toLowerCase());
       })
     );
-  }, [data, searchTerm, searchFields]);
+  }, [data, searchFields, searchTerm]);
 
-  // Ordenar dados
   const sortedData = useMemo(() => {
     if (!sortConfig) return filteredData;
 
-    const sorted = [...filteredData].sort((a, b) => {
+    return [...filteredData].sort((a, b) => {
       const aValue = a[sortConfig.key];
       const bValue = b[sortConfig.key];
 
-      if (aValue < bValue) return sortConfig.direction === "asc" ? -1 : 1;
-      if (aValue > bValue) return sortConfig.direction === "asc" ? 1 : -1;
-      return 0;
-    });
+      if (aValue === bValue) return 0;
+      if (aValue == null) return 1;
+      if (bValue == null) return -1;
 
-    return sorted;
+      return (aValue < bValue ? -1 : 1) * (sortConfig.direction === "asc" ? 1 : -1);
+    });
   }, [filteredData, sortConfig]);
 
   const handleSort = (key: keyof T) => {
     setSortConfig((current) => {
       if (current?.key === key) {
-        return {
-          key,
-          direction: current.direction === "asc" ? "desc" : "asc",
-        };
+        return { key, direction: current.direction === "asc" ? "desc" : "asc" };
       }
       return { key, direction: "asc" };
     });
   };
 
-  // Colunas visíveis (não ocultas)
-  const visibleColumns = useMemo(
-    () => columns.filter((col) => !col.hidden),
-    [columns]
-  );
-
-  // Coluna primária (primeira coluna visível)
-  const primaryColumn = visibleColumns[0];
-
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4">
-      {/* Search Bar */}
-      {searchable && searchFields.length > 0 && (
-        <div className="relative">
-          <Search className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Buscar..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-          />
-        </div>
-      )}
-
-      {/* Desktop Table */}
-      <div className="hidden md:block overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
-        <table className="w-full">
-          <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-            <tr>
-              {visibleColumns.map((column) => (
-                <th
-                  key={String(column.key)}
-                  className={`px-4 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white ${
-                    column.width || ""
-                  }`}
-                >
-                  {column.sortable ? (
-                    <button
-                      onClick={() => handleSort(column.key)}
-                      className="flex items-center gap-2 hover:text-orange-500 transition-colors"
-                    >
-                      {column.label}
-                      {sortConfig?.key === column.key && (
-                        sortConfig.direction === "asc" ? (
-                          <ChevronUp className="w-4 h-4" />
-                        ) : (
-                          <ChevronDown className="w-4 h-4" />
-                        )
-                      )}
-                    </button>
-                  ) : (
-                    column.label
-                  )}
-                </th>
-              ))}
-              {(onEdit || onDelete) && (
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">
-                  Ações
-                </th>
-              )}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-            {sortedData.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={visibleColumns.length + (onEdit || onDelete ? 1 : 0)}
-                  className="px-4 py-8 text-center text-gray-600 dark:text-gray-400"
-                >
-                  {emptyMessage}
-                </td>
-              </tr>
-            ) : (
-              sortedData.map((row, rowIndex) => (
-                <tr
-                  key={row.id || rowIndex}
-                  className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-                >
-                  {visibleColumns.map((column) => (
-                    <td
-                      key={String(column.key)}
-                      className={`px-4 py-3 text-sm text-gray-900 dark:text-gray-100 ${
-                        column.width || ""
-                      }`}
-                    >
-                      {column.render
-                        ? column.render(row[column.key], row)
-                        : String(row[column.key] || "-")}
-                    </td>
-                  ))}
-                  {(onEdit || onDelete) && (
-                    <td className="px-4 py-3 text-sm">
-                      <div className="flex gap-2">
-                        {onEdit && (
-                          <button
-                            onClick={() => onEdit(row)}
-                            className="p-1 hover:bg-orange-100 dark:hover:bg-orange-500/20 rounded transition-colors"
-                            title="Editar"
-                          >
-                            <Edit2 className="w-4 h-4 text-orange-600 dark:text-orange-300" />
-                          </button>
-                        )}
-                        {onDelete && (
-                          <button
-                            onClick={() => onDelete(row)}
-                            className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
-                            title="Deletar"
-                          >
-                            <Trash2 className="w-4 h-4 text-red-600 dark:text-red-400" />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  )}
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Mobile Card View */}
-      <div className="md:hidden space-y-4">
-        {sortedData.length === 0 ? (
-          <div className="text-center py-8 text-gray-600 dark:text-gray-400">
-            {emptyMessage}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {searchable && searchFields.length > 0 ? (
+          <div className="relative w-full max-w-md">
+            <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Buscar..." className="pl-9" />
           </div>
         ) : (
-          sortedData.map((row, rowIndex) => (
-            <div
-              key={row.id || rowIndex}
-              className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden"
-            >
-              {/* Card Header - Primary Column */}
-              <button
-                onClick={() =>
-                  setExpandedRow(expandedRow === row.id ? null : (row.id || null))
-                }
-                className="w-full px-4 py-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-              >
-                <div className="flex-1 text-left min-w-0">
-                  <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+          <div />
+        )}
+        {topActions}
+      </div>
+
+      {loading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <Skeleton key={index} className="h-10 w-full" />
+          ))}
+        </div>
+      ) : sortedData.length === 0 ? (
+        <EmptyState
+          icon={<Search className="h-6 w-6" />}
+          title="Sem resultados"
+          description={emptyMessage}
+        />
+      ) : (
+        <>
+          <div className="hidden md:block">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  {visibleColumns.map((column) => (
+                    <TableHead key={String(column.key)} className={column.width || ""}>
+                      {column.sortable ? (
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1"
+                          onClick={() => handleSort(column.key)}
+                        >
+                          {column.label}
+                          {sortConfig?.key === column.key ? (
+                            sortConfig.direction === "asc" ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />
+                          ) : null}
+                        </button>
+                      ) : (
+                        column.label
+                      )}
+                    </TableHead>
+                  ))}
+                  {rowActions ? <TableHead>Ações</TableHead> : null}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sortedData.map((row, rowIndex) => (
+                  <TableRow key={row.id || rowIndex}>
+                    {visibleColumns.map((column) => (
+                      <TableCell key={String(column.key)} className={column.width || ""}>
+                        {column.render ? column.render(row[column.key], row) : String(row[column.key] ?? "—")}
+                      </TableCell>
+                    ))}
+                    {rowActions ? <TableCell>{rowActions(row)}</TableCell> : null}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          <div className="space-y-3 md:hidden">
+            {sortedData.map((row, rowIndex) => (
+              <div key={row.id || rowIndex} className="nexo-surface-operational overflow-hidden p-0">
+                <button
+                  type="button"
+                  onClick={() => setExpandedRow(expandedRow === row.id ? null : (row.id ?? null))}
+                  className="flex w-full items-center justify-between px-4 py-3"
+                >
+                  <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
                     {primaryColumn?.render
                       ? primaryColumn.render(row[primaryColumn.key], row)
-                      : String(row[primaryColumn.key] || "-")}
-                  </p>
-                </div>
-                <ChevronRight
-                  className={`w-5 h-5 text-gray-400 transition-transform flex-shrink-0 ml-2 ${
-                    expandedRow === row.id ? "rotate-90" : ""
-                  }`}
-                />
-              </button>
-
-              {/* Card Content - Expanded */}
-              {expandedRow === row.id && (
-                <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-4 bg-gray-50 dark:bg-gray-700/50 space-y-3">
-                  {visibleColumns.slice(1).map((column) => (
-                    <div key={String(column.key)} className="flex justify-between items-start gap-2">
-                      <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
-                        {column.label}
-                      </span>
-                      <span className="text-sm text-gray-900 dark:text-white text-right">
-                        {column.render
-                          ? column.render(row[column.key], row)
-                          : String(row[column.key] || "-")}
-                      </span>
-                    </div>
-                  ))}
-
-                  {/* Actions */}
-                  {(onEdit || onDelete) && (
-                    <div className="flex gap-2 pt-3 border-t border-gray-200 dark:border-gray-600">
-                      {onEdit && (
-                        <button
-                          onClick={() => onEdit(row)}
-                          className="flex-1 px-3 py-2 bg-orange-50 dark:bg-orange-500/20 text-orange-700 dark:text-orange-200 rounded text-sm font-medium hover:bg-orange-100 dark:hover:bg-orange-500/30 transition-colors flex items-center justify-center gap-2"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                          Editar
-                        </button>
-                      )}
-                      {onDelete && (
-                        <button
-                          onClick={() => onDelete(row)}
-                          className="flex-1 px-3 py-2 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded text-sm font-medium hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors flex items-center justify-center gap-2"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                          Deletar
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          ))
-        )}
-      </div>
+                      : String(row[primaryColumn?.key as keyof T] ?? "—")}
+                  </span>
+                  <ChevronRight className={`h-4 w-4 transition-transform ${expandedRow === row.id ? "rotate-90" : ""}`} />
+                </button>
+                {expandedRow === row.id ? (
+                  <div className="space-y-2 border-t border-slate-200/70 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/[0.02]">
+                    {visibleColumns.slice(1).map((column) => (
+                      <div key={String(column.key)} className="flex items-start justify-between gap-2">
+                        <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">{column.label}</span>
+                        <span className="text-sm text-right text-zinc-800 dark:text-zinc-200">
+                          {column.render ? column.render(row[column.key], row) : String(row[column.key] ?? "—")}
+                        </span>
+                      </div>
+                    ))}
+                    {rowActions ? <div className="pt-1">{rowActions(row)}</div> : null}
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }

@@ -59,6 +59,8 @@ import {
   SurfaceSection,
 } from "@/components/PagePattern";
 import { EmptyState } from "@/components/EmptyState";
+import { TableSkeleton } from "@/components/QueryStateBoundary";
+import { StatusBadge } from "@/components/StatusBadge";
 import { DemoEnvironmentCta } from "@/components/DemoEnvironmentCta";
 import { useCriticalActionStore } from "@/stores/criticalActionStore";
 import { invalidateOperationalGraph } from "@/lib/operationalConsistency";
@@ -1038,8 +1040,8 @@ export default function CustomersPage() {
           </div>
 
           {queryState.isInitialLoading && customers.length === 0 ? (
-            <SurfaceSection className="m-4 flex min-h-[140px] items-center justify-center text-sm text-gray-600 dark:text-gray-400">
-              Carregando clientes...
+            <SurfaceSection className="m-4">
+              <TableSkeleton rows={6} columns={7} />
             </SurfaceSection>
           ) : queryState.shouldBlockForError ? (
             <SurfaceSection className="m-4 space-y-3 rounded-xl border border-red-200 bg-red-50/70 dark:border-red-900/40 dark:bg-red-950/20">
@@ -1150,15 +1152,10 @@ export default function CustomersPage() {
                         </td>
 
                         <td className="px-4 py-3">
-                          <span
-                            className={
-                              customer.active
-                                ? "inline-flex items-center rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-300"
-                                : "inline-flex items-center rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-800 dark:bg-gray-900/30 dark:text-gray-300"
-                            }
-                          >
-                            {customer.active ? "Ativo" : "Inativo"}
-                          </span>
+                          <StatusBadge
+                            label={customer.active ? "Ativo" : "Inativo"}
+                            tone={customer.active ? "success" : "neutral"}
+                          />
                         </td>
 
                         <td className="px-4 py-3">
