@@ -5,6 +5,9 @@ import type { ExecutionMode, ExecutionPolicyConfig } from './execution.types'
 const DEFAULT_POLICY: ExecutionPolicyConfig = {
   allowAutomaticCharge: true,
   allowWhatsAppAuto: false,
+  allowOverdueReminderAuto: true,
+  allowFinanceTeamNotifications: true,
+  allowGovernanceFollowup: true,
   maxRetries: 3,
   throttleWindowMs: 1000 * 60 * 30,
 }
@@ -23,6 +26,10 @@ export class ExecutionConfigService {
 
   constructor(private readonly prisma: PrismaService) {}
 
+  getDefaultMode(): ExecutionMode {
+    return normalizeMode(process.env.EXECUTION_MODE_DEFAULT)
+  }
+
   private sanitizePolicy(value: unknown): Partial<ExecutionPolicyConfig> {
     if (!value || typeof value !== 'object') return {}
     const input = value as Record<string, unknown>
@@ -33,6 +40,15 @@ export class ExecutionConfigService {
     }
     if (typeof input.allowWhatsAppAuto === 'boolean') {
       output.allowWhatsAppAuto = input.allowWhatsAppAuto
+    }
+    if (typeof input.allowOverdueReminderAuto === 'boolean') {
+      output.allowOverdueReminderAuto = input.allowOverdueReminderAuto
+    }
+    if (typeof input.allowFinanceTeamNotifications === 'boolean') {
+      output.allowFinanceTeamNotifications = input.allowFinanceTeamNotifications
+    }
+    if (typeof input.allowGovernanceFollowup === 'boolean') {
+      output.allowGovernanceFollowup = input.allowGovernanceFollowup
     }
     if (Number.isFinite(input.maxRetries)) {
       output.maxRetries = Math.max(0, Number(input.maxRetries))
@@ -47,12 +63,12 @@ export class ExecutionConfigService {
     const cached = this.modeCache.get(context.orgId)
     if (cached) return cached
 
-    const config = await this.prisma.organizationExecutionConfig.findUnique({
+    const config = await (this.prisma as any).organizationExecutionConfig.findUnique({
       where: { orgId: context.orgId },
       select: { mode: true, policy: true },
     })
 
-    const mode = config?.mode ?? normalizeMode(process.env.EXECUTION_MODE_DEFAULT)
+    const mode = config?.mode ?? this.getDefaultMode()
     this.modeCache.set(context.orgId, mode)
     if (config?.policy) {
       this.policyCache.set(context.orgId, this.sanitizePolicy(config.policy))
@@ -66,7 +82,7 @@ export class ExecutionConfigService {
       return { ...DEFAULT_POLICY, ...cached }
     }
 
-    const config = await this.prisma.organizationExecutionConfig.findUnique({
+    const config = await (this.prisma as any).organizationExecutionConfig.findUnique({
       where: { orgId: context.orgId },
       select: { policy: true },
     })
@@ -82,7 +98,7 @@ export class ExecutionConfigService {
 
   async setExecutionModeForOrg(orgId: string, mode: ExecutionMode) {
     const nextMode = normalizeMode(mode)
-    await this.prisma.organizationExecutionConfig.upsert({
+    await (this.prisma as any).organizationExecutionConfig.upsert({
       where: { orgId },
       update: { mode: nextMode },
       create: { orgId, mode: nextMode },
@@ -92,12 +108,12 @@ export class ExecutionConfigService {
 
   async setPolicyOverrideForOrg(orgId: string, policy: Partial<ExecutionPolicyConfig>) {
     const sanitized = this.sanitizePolicy(policy)
-    await this.prisma.organizationExecutionConfig.upsert({
+    await (this.prisma as any).organizationExecutionConfig.upsert({
       where: { orgId },
       update: { policy: sanitized },
       create: {
         orgId,
-        mode: normalizeMode(process.env.EXECUTION_MODE_DEFAULT),
+        mode: this.getDefaultMode(),
         policy: sanitized,
       },
     })

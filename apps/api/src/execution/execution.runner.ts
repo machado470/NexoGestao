@@ -56,13 +56,17 @@ export class ExecutionRunner {
   }
 
   private async loadActionCandidates(orgId: string): Promise<ExecutionActionCandidate[]> {
-    const [chargeCandidates, linkCandidates, operationalAlerts] = await Promise.all([
+    const [chargeCandidates, linkCandidates, overdueReminderCandidates, operationalAlerts, financeTeamCandidates, operationalAttentionCandidates] =
+      await Promise.all([
       this.loadGenerateChargeCandidates(orgId),
       this.loadSendPaymentLinkCandidates(orgId),
+      this.loadOverdueReminderCandidates(orgId),
       this.loadOperationalAlertCandidates(orgId),
+      this.loadNotifyFinanceTeamCandidates(orgId),
+      this.loadOperationalAttentionCandidates(orgId),
     ])
 
-    return [...chargeCandidates, ...linkCandidates, ...operationalAlerts]
+    return [...chargeCandidates, ...linkCandidates, ...overdueReminderCandidates, ...operationalAlerts, ...financeTeamCandidates, ...operationalAttentionCandidates]
   }
 
   private async loadGenerateChargeCandidates(orgId: string): Promise<ExecutionActionCandidate[]> {
@@ -175,6 +179,82 @@ export class ExecutionRunner {
     ]
   }
 
+  private async loadOverdueReminderCandidates(orgId: string): Promise<ExecutionActionCandidate[]> {
+    const overdueCharges = await this.prisma.charge.findMany({
+      where: {
+        orgId,
+        status: 'OVERDUE',
+        customer: { phone: { not: null } },
+      },
+      select: {
+        id: true,
+        customerId: true,
+        amountCents: true,
+        dueDate: true,
+      },
+      take: 20,
+      orderBy: { updatedAt: 'desc' },
+    })
+
+    return overdueCharges.map((item) => ({
+      actionId: 'action-send-overdue-charge-reminder',
+      decisionId: 'decision-overdue-charge-reminder',
+      entityType: 'charge',
+      entityId: item.id,
+      orgId,
+      metadata: {
+        customerId: item.customerId,
+        amountCents: item.amountCents,
+        dueDate: item.dueDate?.toISOString() ?? null,
+        chargeStatus: 'OVERDUE',
+      },
+    }))
+  }
+
+  private async loadNotifyFinanceTeamCandidates(orgId: string): Promise<ExecutionActionCandidate[]> {
+    const overdueCount = await this.prisma.charge.count({
+      where: { orgId, status: 'OVERDUE' },
+    })
+
+    if (overdueCount < 5) return []
+
+    return [
+      {
+        actionId: 'action-notify-finance-team',
+        decisionId: 'decision-finance-overdue-threshold',
+        entityType: 'system',
+        entityId: `org:${orgId}`,
+        orgId,
+        metadata: {
+          overdueCount,
+          thresholdOverdue: 5,
+        },
+      },
+    ]
+  }
+
+  private async loadOperationalAttentionCandidates(orgId: string): Promise<ExecutionActionCandidate[]> {
+    const stalledServiceOrders = await this.prisma.serviceOrder.count({
+      where: { orgId, status: { in: ['OPEN', 'ASSIGNED', 'IN_PROGRESS'] } },
+    })
+
+    if (stalledServiceOrders < 10) return []
+
+    return [
+      {
+        actionId: 'action-mark-operational-attention',
+        decisionId: 'decision-stalled-service-orders-attention-threshold',
+        entityType: 'system',
+        entityId: `org:${orgId}`,
+        orgId,
+        metadata: {
+          stalledServiceOrders,
+          thresholdStalledServiceOrders: 10,
+        },
+      },
+    ]
+  }
+
   private async processCandidate(candidate: ExecutionActionCandidate) {
     const mode = await this.config.getExecutionMode({ orgId: candidate.orgId })
     const policy = await this.config.getPolicyConfig({ orgId: candidate.orgId })
@@ -212,6 +292,18 @@ export class ExecutionRunner {
 
     if (candidate.actionId === 'action-send-whatsapp-payment-link' && !policy.allowWhatsAppAuto) {
       await this.recordBlocked(candidate, executionKey, mode, 'policy_whatsapp_automatic_disabled', 'blocked')
+      return 'blocked'
+    }
+    if (candidate.actionId === 'action-send-overdue-charge-reminder' && !policy.allowOverdueReminderAuto) {
+      await this.recordBlocked(candidate, executionKey, mode, 'policy_overdue_reminder_disabled', 'blocked')
+      return 'blocked'
+    }
+    if (candidate.actionId === 'action-notify-finance-team' && !policy.allowFinanceTeamNotifications) {
+      await this.recordBlocked(candidate, executionKey, mode, 'policy_finance_team_notification_disabled', 'blocked')
+      return 'blocked'
+    }
+    if (candidate.actionId === 'action-mark-operational-attention' && !policy.allowGovernanceFollowup) {
+      await this.recordBlocked(candidate, executionKey, mode, 'policy_operational_attention_disabled', 'blocked')
       return 'blocked'
     }
 
@@ -260,6 +352,9 @@ export class ExecutionRunner {
       status: 'pending',
       reasonCode: 'runner_execution_requested',
       timestamp: new Date().toISOString(),
+      metadata: {
+        policySnapshot: policy,
+      },
     })
 
     try {
@@ -401,6 +496,57 @@ export class ExecutionRunner {
           orgId: candidate.orgId,
           action: 'OPERATIONAL_ALERT',
           description: 'Alerta operacional automático da execution v5',
+          metadata: {
+            source: 'execution_runner_v5',
+            decisionId: candidate.decisionId,
+            ...candidate.metadata,
+          },
+        },
+      })
+      return
+    }
+
+    if (candidate.actionId === 'action-send-overdue-charge-reminder') {
+      const charge = await this.prisma.charge.findFirst({
+        where: {
+          id: candidate.entityId,
+          orgId: candidate.orgId,
+          status: 'OVERDUE',
+          customer: { phone: { not: null } },
+        },
+        select: { id: true },
+      })
+
+      if (!charge) {
+        throw new Error('charge_not_eligible_for_overdue_reminder')
+      }
+
+      await this.finance.sendPaymentReminderWhatsApp(charge.id)
+      return
+    }
+
+    if (candidate.actionId === 'action-notify-finance-team') {
+      await this.prisma.timelineEvent.create({
+        data: {
+          orgId: candidate.orgId,
+          action: 'FINANCE_TEAM_NOTIFICATION',
+          description: 'Notificação para equipe financeira criada automaticamente',
+          metadata: {
+            source: 'execution_runner_v5',
+            decisionId: candidate.decisionId,
+            ...candidate.metadata,
+          },
+        },
+      })
+      return
+    }
+
+    if (candidate.actionId === 'action-mark-operational-attention') {
+      await this.prisma.timelineEvent.create({
+        data: {
+          orgId: candidate.orgId,
+          action: 'OPERATIONAL_ATTENTION_MARKED',
+          description: 'Sinal operacional de atenção marcado automaticamente',
           metadata: {
             source: 'execution_runner_v5',
             decisionId: candidate.decisionId,

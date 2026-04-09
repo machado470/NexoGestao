@@ -3,6 +3,9 @@ export type ExecutionMode = 'manual' | 'semi_automatic' | 'automatic'
 export type ExecutionPolicyConfig = {
   allowAutomaticCharge: boolean
   allowWhatsAppAuto: boolean
+  allowOverdueReminderAuto: boolean
+  allowFinanceTeamNotifications: boolean
+  allowGovernanceFollowup: boolean
   maxRetries: number
   throttleWindowMs: number
 }
