@@ -6,6 +6,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { OperationalActionFeed } from "@/components/operations/OperationalActionFeed";
 import { getLatestActionFlowSuggestion } from "@/lib/actionFlow";
 import { buildDashboardExecutionPlan } from "@/lib/execution/decision-engine";
+import { useExecutionMemory } from "@/lib/execution/execution-memory";
 import { rankPriorityProblems } from "@/lib/priorityEngine";
 import {
   AlertTriangle,
@@ -264,10 +265,19 @@ export default function ExecutiveDashboardNew() {
     undefined,
     queryOptions
   );
+  const serviceOrdersQuery = trpc.nexo.serviceOrders.list.useQuery(
+    { page: 1, limit: 100 },
+    queryOptions
+  );
+  const chargesQuery = trpc.finance.charges.list.useQuery(
+    { page: 1, limit: 100 },
+    queryOptions
+  );
   const billingLimitsQuery = trpc.billing.limits.useQuery(
     undefined,
     queryOptions
   );
+  const { logs } = useExecutionMemory();
   const [isSlowLoading, setIsSlowLoading] = useState(false);
   const [optimisticTick, setOptimisticTick] = useState(false);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
@@ -465,8 +475,33 @@ export default function ExecutiveDashboardNew() {
   }, [appointmentsQuery.data]);
 
   const executionPlan = useMemo(
-    () =>
-      buildDashboardExecutionPlan({
+    () => {
+      const serviceOrdersRaw = (serviceOrdersQuery.data as any)?.data ?? [];
+      const serviceOrders = Array.isArray(serviceOrdersRaw) ? serviceOrdersRaw : [];
+      const doneWithoutChargeCandidate =
+        serviceOrders.find((item: any) => {
+          const status = String(item?.status ?? "").toUpperCase();
+          return status === "DONE" && !item?.financialSummary?.hasCharge;
+        }) ?? null;
+
+      const chargesRaw = (chargesQuery.data as any)?.data ?? [];
+      const charges = Array.isArray(chargesRaw) ? chargesRaw : [];
+      const overdueChargeCandidate =
+        charges
+          .filter((item: any) => String(item?.status ?? "").toUpperCase() === "OVERDUE")
+          .sort(
+            (a: any, b: any) =>
+              Number(b?.amountCents ?? 0) - Number(a?.amountCents ?? 0)
+          )[0] ?? null;
+
+      const daysOverdue = overdueChargeCandidate?.dueDate
+        ? Math.floor(
+            (Date.now() - new Date(overdueChargeCandidate.dueDate).getTime()) /
+              (1000 * 60 * 60 * 24)
+          )
+        : null;
+
+      return buildDashboardExecutionPlan({
         totalCustomers: displayMetrics.totalCustomers,
         totalServiceOrders: displayMetrics.totalServiceOrders,
         completedOrders: displayMetrics.completedOrders,
@@ -474,14 +509,36 @@ export default function ExecutiveDashboardNew() {
         overdueCharges,
         todayAppointments,
         hasWhatsappContext: location.includes("customerId="),
-      }),
+        doneWithoutChargeCandidate: doneWithoutChargeCandidate
+          ? {
+              serviceOrderId: String(doneWithoutChargeCandidate.id),
+              customerName: String(doneWithoutChargeCandidate?.customer?.name ?? ""),
+              amountCents: Number(doneWithoutChargeCandidate?.amountCents ?? 0),
+            }
+          : null,
+        overdueChargeCandidate: overdueChargeCandidate
+          ? {
+              chargeId: String(overdueChargeCandidate.id),
+              customerId: String(overdueChargeCandidate.customerId ?? ""),
+              customerName: String(overdueChargeCandidate?.customer?.name ?? ""),
+              amountCents: Number(overdueChargeCandidate.amountCents ?? 0),
+              dueDate: String(overdueChargeCandidate.dueDate ?? ""),
+              daysOverdue,
+            }
+          : null,
+        executionLogs: logs,
+      });
+    },
     [
+      chargesQuery.data,
       displayMetrics.chargesGenerated,
       displayMetrics.completedOrders,
       displayMetrics.totalCustomers,
       displayMetrics.totalServiceOrders,
+      logs,
       location,
       overdueCharges,
+      serviceOrdersQuery.data,
       todayAppointments,
     ]
   );

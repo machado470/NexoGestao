@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useExecutionHandler } from "@/hooks/useExecutionHandler";
+import { useExecutionMemory } from "@/lib/execution/execution-memory";
 import type {
   ExecutionAction,
   ExecutionSource,
@@ -58,7 +59,28 @@ function getActionButtonClass(action: ExecutionAction, suggestedActionId?: strin
 
 export function OperationalCard({ decision, source }: OperationalCardProps) {
   const { execute } = useExecutionHandler();
+  const { logs } = useExecutionMemory();
   const [executingActionId, setExecutingActionId] = useState<string | null>(null);
+  const [lastExecutionStatus, setLastExecutionStatus] = useState<"executed" | "failed" | null>(
+    null
+  );
+
+  const latestDecisionLog = useMemo(
+    () => logs.find(log => log.decisionId === decision.id),
+    [logs, decision.id]
+  );
+
+  useEffect(() => {
+    decision.actions.forEach(action => {
+      console.info("[execution.telemetry]", {
+        event: "action_shown",
+        decisionId: decision.id,
+        actionId: action.id,
+        source,
+        telemetryKey: action.telemetryKey,
+      });
+    });
+  }, [decision.actions, decision.id, source]);
 
   async function handleExecute(action: ExecutionAction) {
     setExecutingActionId(action.id);
@@ -71,6 +93,7 @@ export function OperationalCard({ decision, source }: OperationalCardProps) {
     if (!result.ok && result.message) {
       toast.warning(result.message);
     }
+    setLastExecutionStatus(result.ok ? "executed" : "failed");
 
     setExecutingActionId(null);
   }
@@ -102,6 +125,16 @@ export function OperationalCard({ decision, source }: OperationalCardProps) {
         {decision.title}
       </h3>
       <p className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">{decision.summary}</p>
+      {lastExecutionStatus === "executed" || latestDecisionLog?.status === "success" ? (
+        <p className="mt-2 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+          Ação executada com sucesso.
+        </p>
+      ) : null}
+      {lastExecutionStatus === "failed" || latestDecisionLog?.status === "failed" ? (
+        <p className="mt-2 text-xs font-semibold text-red-700 dark:text-red-300">
+          Última execução falhou. Revise os dados e tente novamente.
+        </p>
+      ) : null}
 
       <div className="mt-4 flex flex-wrap gap-2">
         {decision.actions.map((action) => {
