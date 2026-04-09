@@ -133,6 +133,8 @@ export default function ResetPasswordPage() {
                 type="password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
+                autoComplete="new-password"
+                placeholder="Mínimo de 8 caracteres"
                 className="pl-9"
               />
             </div>
@@ -146,6 +148,8 @@ export default function ResetPasswordPage() {
                 type="password"
                 value={confirmPassword}
                 onChange={e => setConfirmPassword(e.target.value)}
+                autoComplete="new-password"
+                placeholder="Repita a nova senha"
                 className="pl-9"
               />
             </div>
@@ -158,6 +162,7 @@ export default function ResetPasswordPage() {
           <Button
             type="submit"
             disabled={resetPasswordMutation.isPending}
+            aria-busy={resetPasswordMutation.isPending}
             className="w-full gap-2 bg-orange-500 hover:bg-orange-600"
             size="lg"
           >

@@ -1,34 +1,89 @@
 import { MarketingLayout } from "@/components/MarketingLayout";
+import { usePageMeta } from "@/hooks/usePageMeta";
 
 import "./landing.css";
 
+const sections = [
+  {
+    title: "1. Visão geral do serviço",
+    text: "O NexoGestão é uma plataforma SaaS para gestão operacional de empresas de serviço. Estes termos descrevem regras de acesso, responsabilidades e limites de uso para preservar segurança, continuidade e conformidade contratual.",
+  },
+  {
+    title: "2. Uso da plataforma",
+    text: "O cliente deve utilizar o sistema apenas para finalidades empresariais legítimas. É proibido uso para fraude, tentativa de acesso indevido, coleta abusiva de dados, violação de propriedade intelectual ou qualquer atividade em desacordo com a legislação aplicável.",
+  },
+  {
+    title: "3. Conta, credenciais e permissões",
+    text: "A organização contratante é responsável pela gestão dos usuários internos, pela definição de perfis de acesso e pela guarda das credenciais. Compartilhamento indevido de senha, uso não autorizado ou cadastro com informações falsas viola estes termos.",
+  },
+  {
+    title: "4. Responsabilidades do cliente",
+    text: "Cabe ao cliente manter dados atualizados, validar informações operacionais registradas na plataforma e observar obrigações legais sobre atendimento, faturamento e relação com seus próprios consumidores. O conteúdo inserido no ambiente é de responsabilidade da organização usuária.",
+  },
+  {
+    title: "5. Privacidade e tratamento de dados",
+    text: "As práticas de tratamento de dados pessoais seguem a Política de Privacidade vigente. O cliente deve garantir base legal adequada para inserir dados de terceiros na plataforma e adotar controles internos compatíveis com sua operação.",
+  },
+  {
+    title: "6. Disponibilidade e manutenção",
+    text: "O serviço pode passar por manutenções evolutivas, preventivas ou corretivas. Sempre que possível, janelas programadas são comunicadas previamente. Eventos externos de infraestrutura, rede ou terceiros podem impactar disponibilidade sem caracterizar inadimplemento automático.",
+  },
+  {
+    title: "7. Propriedade intelectual",
+    text: "Código, interface, identidade visual, fluxos e conteúdos institucionais do NexoGestão permanecem sob titularidade da plataforma e seus licenciadores. Não é permitido copiar, descompilar, revender ou explorar comercialmente o produto sem autorização formal.",
+  },
+  {
+    title: "8. Limitações de responsabilidade",
+    text: "O NexoGestão não responde por danos indiretos, lucros cessantes, perda de oportunidade ou prejuízos decorrentes de uso inadequado da ferramenta, indisponibilidade de serviços externos ou falhas de operação interna do próprio cliente.",
+  },
+  {
+    title: "9. Encerramento e suspensão",
+    text: "Contas podem ser suspensas ou encerradas em caso de violação destes termos, risco de segurança, suspeita de fraude ou exigência legal. O cliente também pode solicitar encerramento conforme canal de atendimento contratual.",
+  },
+  {
+    title: "10. Atualizações destes termos",
+    text: "Estes termos podem ser atualizados para refletir evolução do produto, ajustes legais e melhorias operacionais. A versão vigente será sempre publicada nesta página com data de última atualização.",
+  },
+];
+
 export default function TermsOfService() {
+  usePageMeta({
+    title: "NexoGestão | Termos de Uso",
+    description:
+      "Leia os termos de uso do NexoGestão para entender regras de acesso, responsabilidades e condições gerais da plataforma.",
+  });
+
   return (
     <MarketingLayout>
       <section className="container py-14 md:py-20">
-        <div className="mx-auto max-w-3xl">
-          <p className="text-xs font-semibold tracking-[0.14em] text-orange-600">TERMOS</p>
+        <div className="mx-auto max-w-4xl">
+          <p className="text-xs font-semibold tracking-[0.14em] text-orange-600">BASE LEGAL</p>
           <h1 className="mt-4 text-4xl font-semibold text-slate-900 md:text-5xl">Termos de Uso</h1>
-          <p className="mt-4 text-slate-600">Versão inicial para uso responsável da plataforma NexoGestão.</p>
+          <p className="mt-4 text-base text-slate-600 md:text-lg">
+            Documento institucional com as diretrizes de uso do NexoGestão. Recomendamos leitura completa antes
+            da utilização contínua da plataforma.
+          </p>
 
-          <article className="mt-8 rounded-3xl border border-slate-200 bg-white p-8 shadow-[0_18px_40px_rgba(15,23,42,0.08)] space-y-8">
-            <section>
-              <h2 className="text-xl font-semibold text-slate-900">Uso da plataforma</h2>
-              <p className="mt-2 text-sm text-slate-600">O NexoGestão é destinado à gestão operacional e financeira de empresas de serviço. O uso deve respeitar a legislação vigente e estes termos.</p>
+          <article className="mt-8 space-y-7 rounded-3xl border border-slate-200 bg-white p-8 shadow-[0_18px_40px_rgba(15,23,42,0.08)] md:p-10">
+            {sections.map(section => (
+              <section key={section.title}>
+                <h2 className="text-xl font-semibold text-slate-900">{section.title}</h2>
+                <p className="mt-2 text-sm leading-7 text-slate-600 md:text-[15px]">{section.text}</p>
+              </section>
+            ))}
+
+            <section className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+              <h2 className="text-lg font-semibold text-slate-900">Contato institucional</h2>
+              <p className="mt-2 text-sm text-slate-600">
+                Dúvidas sobre estes termos podem ser encaminhadas para{" "}
+                <a className="font-semibold text-slate-900" href="mailto:juridico@nexogestao.com.br">
+                  juridico@nexogestao.com.br
+                </a>{" "}
+                ou via página de contato.
+              </p>
             </section>
-            <section>
-              <h2 className="text-xl font-semibold text-slate-900">Acesso e conta</h2>
-              <p className="mt-2 text-sm text-slate-600">Cada conta é responsável pela guarda de credenciais, pela definição de permissões internas e pela veracidade das informações cadastradas.</p>
-            </section>
-            <section>
-              <h2 className="text-xl font-semibold text-slate-900">Responsabilidades gerais</h2>
-              <p className="mt-2 text-sm text-slate-600">Você se compromete a não usar a plataforma para fins ilícitos, violação de direitos de terceiros ou tentativa de acesso indevido ao ambiente de outros clientes.</p>
-            </section>
-            <section>
-              <h2 className="text-xl font-semibold text-slate-900">Limitações gerais</h2>
-              <p className="mt-2 text-sm text-slate-600">A disponibilidade da plataforma pode variar por manutenção programada ou fatores externos. O NexoGestão não se responsabiliza por danos indiretos decorrentes de uso indevido ou fora das orientações do produto.</p>
-            </section>
-            <p className="border-t border-slate-200 pt-6 text-xs text-slate-500">Última atualização: 8 de abril de 2026.</p>
+
+            <p className="border-t border-slate-200 pt-6 text-xs text-slate-500">Última atualização: 9 de abril de 2026.</p>
           </article>
         </div>
       </section>

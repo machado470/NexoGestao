@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Instagram, Linkedin, Menu, Twitter, X } from "lucide-react";
 
 type MarketingLayoutProps = {
@@ -39,6 +39,12 @@ const footerGroups = [
   },
 ];
 
+const institutionalNotes = [
+  "CNPJ em processo de formalização comercial nesta fase de lançamento assistido.",
+  "Políticas públicas de privacidade e termos atualizadas para referência contratual.",
+  "Atendimento comercial e suporte institucional em dias úteis, horário BRT.",
+];
+
 export function MarketingLayout({ children }: MarketingLayoutProps) {
   const [location, navigate] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -72,23 +78,23 @@ export function MarketingLayout({ children }: MarketingLayoutProps) {
 
           <nav className="hidden items-center gap-8 md:flex" aria-label="Menu principal">
             {headerLinks.map(item => (
-              <a
+              <Link
                 key={item.label}
                 href={item.href}
                 className={`text-sm font-medium transition hover:text-slate-900 ${location === item.href ? "text-slate-900" : "text-slate-600"}`}
               >
                 {item.label}
-              </a>
+              </Link>
             ))}
           </nav>
 
           <div className="hidden items-center gap-3 md:flex">
-            <a href="/login" className="rounded-xl px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100">
+            <Link href="/login" className="rounded-xl px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100">
               Entrar
-            </a>
-            <a href="/register" className="rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_8px_24px_rgba(249,115,22,0.35)] transition hover:bg-orange-600">
+            </Link>
+            <Link href="/register" className="rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_8px_24px_rgba(249,115,22,0.35)] transition hover:bg-orange-600">
               Começar agora
-            </a>
+            </Link>
           </div>
 
           <button
@@ -106,29 +112,29 @@ export function MarketingLayout({ children }: MarketingLayoutProps) {
           <div className="border-t border-slate-200 bg-white md:hidden">
             <nav className="container flex flex-col gap-1 py-3" aria-label="Menu mobile">
               {headerLinks.map(item => (
-                <a
+                <Link
                   key={item.label}
                   href={item.href}
                   onClick={closeMobileMenu}
                   className="rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
                 >
                   {item.label}
-                </a>
+                </Link>
               ))}
-              <a
+              <Link
                 href="/login"
                 onClick={closeMobileMenu}
                 className="mt-2 rounded-lg border border-slate-200 px-3 py-2 text-center text-sm font-medium text-slate-700"
               >
                 Entrar
-              </a>
-              <a
+              </Link>
+              <Link
                 href="/register"
                 onClick={closeMobileMenu}
                 className="rounded-lg bg-orange-500 px-3 py-2 text-center text-sm font-semibold text-white"
               >
                 Começar agora
-              </a>
+              </Link>
             </nav>
           </div>
         ) : null}
@@ -138,10 +144,15 @@ export function MarketingLayout({ children }: MarketingLayoutProps) {
 
       <footer className="bg-white py-12">
         <div className="container">
-          <div className="grid gap-8 border-b border-slate-200 pb-8 md:grid-cols-4">
-            <div>
+          <div className="grid gap-8 border-b border-slate-200 pb-8 lg:grid-cols-[1.3fr_1fr_1fr_1fr]">
+            <div className="space-y-4">
               <p className="text-lg font-semibold text-slate-900">NexoGestão</p>
-              <p className="mt-2 text-sm text-slate-600">Plataforma operacional para empresas de serviço.</p>
+              <p className="text-sm text-slate-600">Plataforma operacional para empresas de serviço com foco em execução, rastreabilidade e governança.</p>
+              <ul className="space-y-2 text-xs text-slate-500">
+                {institutionalNotes.map(note => (
+                  <li key={note}>• {note}</li>
+                ))}
+              </ul>
             </div>
 
             {footerGroups.map(group => (
@@ -150,9 +161,9 @@ export function MarketingLayout({ children }: MarketingLayoutProps) {
                 <ul className="mt-3 space-y-2 text-sm text-slate-600">
                   {group.links.map(link => (
                     <li key={link.label}>
-                      <a href={link.href} className="transition hover:text-slate-900">
+                      <Link href={link.href} className="transition hover:text-slate-900">
                         {link.label}
-                      </a>
+                      </Link>
                     </li>
                   ))}
                 </ul>

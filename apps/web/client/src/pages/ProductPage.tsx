@@ -8,6 +8,7 @@ import {
   Users,
   Wrench,
 } from "lucide-react";
+import { Link } from "wouter";
 
 import { MarketingLayout } from "@/components/MarketingLayout";
 import { usePageMeta } from "@/hooks/usePageMeta";
@@ -80,6 +81,21 @@ const benefits = [
   "Escalabilidade sem perder controle operacional e padrão de execução.",
 ];
 
+const trustPillars = [
+  {
+    title: "Fluxo único com responsabilidade clara",
+    text: "Cada etapa operacional possui dono, status e histórico. Isso reduz ruído entre comercial, operação e financeiro.",
+  },
+  {
+    title: "Rastreabilidade para decisão executiva",
+    text: "Eventos críticos ficam documentados para auditoria interna, indicadores e revisões de processo.",
+  },
+  {
+    title: "Base escalável sem improviso",
+    text: "Adoção progressiva por times e unidades com padrão visual e operacional consistente.",
+  },
+];
+
 export default function ProductPage() {
   usePageMeta({
     title: "NexoGestão | Produto",
@@ -101,18 +117,18 @@ export default function ProductPage() {
             governança em um fluxo único para operação estruturada de verdade.
           </p>
           <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-            <a
+            <Link
               href="/register"
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-orange-500 px-6 py-3 font-semibold text-white shadow-[0_12px_28px_rgba(249,115,22,0.35)] transition hover:bg-orange-600"
             >
               Começar agora <ArrowRight className="size-4" />
-            </a>
-            <a
+            </Link>
+            <Link
               href="/funcionalidades"
               className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-6 py-3 font-semibold text-slate-700 transition hover:bg-slate-50"
             >
               Explorar funcionalidades
-            </a>
+            </Link>
           </div>
         </div>
       </section>
@@ -186,20 +202,45 @@ export default function ProductPage() {
             ))}
           </div>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <a
+            <Link
               href="/contato"
               className="inline-flex items-center justify-center rounded-xl bg-slate-900 px-6 py-3 font-semibold text-white transition hover:bg-black"
             >
               Solicitar demonstração
-            </a>
-            <a
+            </Link>
+            <Link
               href="/register"
               className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-6 py-3 font-semibold text-slate-700 transition hover:bg-slate-50"
             >
               Começar avaliação
-            </a>
+            </Link>
           </div>
         </article>
+      </section>
+
+      <section className="border-t border-slate-200/70 bg-white/80 py-16 md:py-20">
+        <div className="container">
+          <h2 className="text-3xl font-semibold text-slate-900 md:text-4xl">
+            Estrutura para operação com padrão institucional
+          </h2>
+          <p className="mt-3 max-w-3xl text-slate-600">
+            O produto foi desenhado para empresas que precisam transmitir
+            previsibilidade para equipe, liderança e clientes finais.
+          </p>
+          <div className="mt-8 grid gap-4 md:grid-cols-3">
+            {trustPillars.map(item => (
+              <article
+                key={item.title}
+                className="rounded-2xl border border-slate-200 bg-white p-5"
+              >
+                <h3 className="text-base font-semibold text-slate-900">
+                  {item.title}
+                </h3>
+                <p className="mt-2 text-sm text-slate-600">{item.text}</p>
+              </article>
+            ))}
+          </div>
+        </div>
       </section>
     </MarketingLayout>
   );

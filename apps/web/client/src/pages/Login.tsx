@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Loader2, LockKeyhole, Mail } from "lucide-react";
 
 import { useAuth } from "@/contexts/AuthContext";
@@ -214,6 +214,8 @@ export default function Login() {
               type="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
+              autoComplete="email"
+              placeholder="voce@empresa.com"
               className="pl-9"
             />
           </div>
@@ -229,9 +231,14 @@ export default function Login() {
               value={password}
               onChange={e => setPassword(e.target.value)}
               autoComplete="current-password"
+              placeholder="Sua senha"
               className="pl-9"
             />
           </div>
+          <p className="text-xs text-slate-500">
+            Use o acesso corporativo da sua empresa para manter o histórico
+            operacional centralizado.
+          </p>
         </div>
 
         {errorText ? (
@@ -268,6 +275,7 @@ export default function Login() {
         <Button
           type="submit"
           disabled={isSubmitting}
+          aria-busy={isSubmitting}
           className="w-full gap-2 bg-orange-500 hover:bg-orange-600"
           size="lg"
         >
@@ -282,15 +290,15 @@ export default function Login() {
         </Button>
 
         <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-          <a href="/register" className="text-slate-600 hover:text-slate-900">
+          <Link href="/register" className="text-slate-600 hover:text-slate-900">
             Criar conta
-          </a>
-          <a
+          </Link>
+          <Link
             href="/forgot-password"
             className="text-slate-600 hover:text-slate-900"
           >
             Esqueci minha senha
-          </a>
+          </Link>
         </div>
       </form>
     </AuthMarketingShell>

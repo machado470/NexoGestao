@@ -192,6 +192,25 @@ export default function ContactPage() {
           </form>
         </article>
       </section>
+
+      <section className="container pb-16 md:pb-20">
+        <article className="rounded-3xl border border-slate-200 bg-slate-50 p-8 md:p-10">
+          <h2 className="text-2xl font-semibold text-slate-900">
+            Contexto institucional
+          </h2>
+          <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
+            O NexoGestão atende empresas de serviço em fase de estruturação e
+            crescimento operacional. Conversas comerciais priorizam diagnóstico
+            de fluxo, clareza de implantação e aderência ao momento da sua
+            operação.
+          </p>
+          <ul className="mt-5 space-y-2 text-sm text-slate-600">
+            <li>• Primeiro retorno em até 1 dia útil (BRT).</li>
+            <li>• Alinhamento de escopo antes de qualquer proposta.</li>
+            <li>• Encaminhamento para canais legais e privacidade quando necessário.</li>
+          </ul>
+        </article>
+      </section>
     </MarketingLayout>
   );
 }
