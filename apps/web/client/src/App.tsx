@@ -74,8 +74,24 @@ function getRequiresOnboarding(payload: unknown): boolean {
 function FullScreenLoader() {
   return (
     <div className="nexo-app-shell flex min-h-screen items-center justify-center px-6">
-      <div className="nexo-app-panel-strong flex w-full max-w-md items-center justify-center p-10">
-        <Loader className="h-8 w-8 animate-spin text-orange-500" />
+      <div className="nexo-app-panel-strong flex w-full max-w-md items-center gap-3 p-6">
+        <Loader className="h-5 w-5 animate-spin text-orange-500" />
+        <p className="text-sm text-zinc-600 dark:text-zinc-300">
+          Carregando ambiente...
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function AuthRouteLoader() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-6 text-slate-900">
+      <div className="w-full max-w-sm rounded-2xl border border-slate-200/80 bg-white/90 p-5 shadow-[0_18px_44px_rgba(15,23,42,0.1)]">
+        <div className="flex items-center gap-3">
+          <Loader className="h-4 w-4 animate-spin text-orange-500" />
+          <span className="text-sm text-slate-600">Carregando autenticação...</span>
+        </div>
       </div>
     </div>
   );
@@ -307,7 +323,11 @@ function publicPage(Page: ComponentType) {
 
 function authPage(Page: LazyExoticComponent<ComponentType>) {
   return function AuthPageRoute() {
-    return <AuthRoute component={() => <LazyPage component={Page} />} />;
+    return (
+      <AuthRoute
+        component={() => <LazyPage component={Page} fallback={<AuthRouteLoader />} />}
+      />
+    );
   };
 }
 
