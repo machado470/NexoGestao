@@ -126,9 +126,15 @@ export default function ForgotPasswordPage() {
                 type="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
+                autoComplete="email"
+                placeholder="voce@empresa.com"
                 className="pl-9"
               />
             </div>
+            <p className="text-xs text-slate-500">
+              Enviaremos as instruções para o e-mail informado, se houver conta
+              válida.
+            </p>
           </div>
 
           {errorText ? (
@@ -140,6 +146,7 @@ export default function ForgotPasswordPage() {
           <Button
             type="submit"
             disabled={forgotPasswordMutation.isPending}
+            aria-busy={forgotPasswordMutation.isPending}
             className="w-full gap-2 bg-orange-500 hover:bg-orange-600"
             size="lg"
           >

@@ -10,6 +10,7 @@ import {
   Users,
   Wrench,
 } from "lucide-react";
+import { Link } from "wouter";
 
 import { MarketingLayout } from "@/components/MarketingLayout";
 import { usePageMeta } from "@/hooks/usePageMeta";
@@ -62,6 +63,13 @@ const features = [
     title: "Automações futuras",
     text: "Base preparada para automações operacionais com regras e gatilhos por etapa.",
   },
+];
+
+const operatingOutcomes = [
+  "Redução de retrabalho na abertura e execução de ordens.",
+  "Maior previsibilidade de agenda e alocação técnica.",
+  "Cobrança mais disciplinada após serviço concluído.",
+  "Visão gerencial com dados mais confiáveis para priorização.",
 ];
 
 export default function FunctionalitiesPage() {
@@ -120,18 +128,40 @@ export default function FunctionalitiesPage() {
             configurar um plano de adoção com foco em resultado operacional.
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <a
+            <Link
               href="/contato"
               className="inline-flex items-center justify-center rounded-xl bg-slate-900 px-6 py-3 font-semibold text-white transition hover:bg-black"
             >
               Agendar demonstração
-            </a>
-            <a
+            </Link>
+            <Link
               href="/register"
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-orange-500 px-6 py-3 font-semibold text-white shadow-[0_12px_28px_rgba(249,115,22,0.35)] transition hover:bg-orange-600"
             >
               Começar avaliação <ArrowRight className="size-4" />
-            </a>
+            </Link>
+          </div>
+        </article>
+      </section>
+
+      <section className="container pb-16 md:pb-20">
+        <article className="rounded-3xl border border-slate-200 bg-slate-50 p-8 md:p-10">
+          <h2 className="text-2xl font-semibold text-slate-900 md:text-3xl">
+            Resultado esperado com adoção consistente
+          </h2>
+          <p className="mt-3 max-w-3xl text-slate-600">
+            As funcionalidades entregam valor real quando usadas em conjunto,
+            dentro do fluxo operacional da empresa.
+          </p>
+          <div className="mt-6 grid gap-3 md:grid-cols-2">
+            {operatingOutcomes.map(item => (
+              <div
+                key={item}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700"
+              >
+                • {item}
+              </div>
+            ))}
           </div>
         </article>
       </section>

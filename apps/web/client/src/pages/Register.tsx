@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Building2, Loader2, LockKeyhole, Mail, UserRound } from "lucide-react";
 
 import { useAuth } from "@/contexts/AuthContext";
@@ -219,6 +219,10 @@ export default function Register() {
               className="pl-9"
             />
           </div>
+          <p className="text-xs text-slate-500">
+            Recomendamos uma senha forte com letras maiúsculas, minúsculas,
+            números e símbolo.
+          </p>
         </div>
 
         {errorText ? (
@@ -230,6 +234,7 @@ export default function Register() {
         <Button
           type="submit"
           disabled={isSubmitting}
+          aria-busy={isSubmitting}
           className="w-full gap-2 bg-orange-500 hover:bg-orange-600"
           size="lg"
         >
@@ -245,12 +250,12 @@ export default function Register() {
 
         <div className="text-center text-sm">
           Já tem conta?{" "}
-          <a
+          <Link
             href="/login"
             className="font-semibold text-slate-700 hover:text-slate-900"
           >
             Entrar
-          </a>
+          </Link>
         </div>
       </form>
     </AuthMarketingShell>

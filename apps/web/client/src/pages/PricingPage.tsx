@@ -1,4 +1,5 @@
 import { Check } from "lucide-react";
+import { Link } from "wouter";
 
 import { MarketingLayout } from "@/components/MarketingLayout";
 import { usePageMeta } from "@/hooks/usePageMeta";
@@ -76,6 +77,12 @@ const faqs = [
   ],
 ];
 
+const billingNotes = [
+  "Todos os planos incluem atualizações de produto e melhorias contínuas.",
+  "Volumes servem como referência comercial e podem ser ajustados por contrato.",
+  "Ambientes com necessidade de compliance específico são avaliados no plano Business.",
+];
+
 export default function PricingPage() {
   usePageMeta({
     title: "NexoGestão | Preços",
@@ -134,12 +141,12 @@ export default function PricingPage() {
                 ))}
               </ul>
 
-              <a
+              <Link
                 href={plan.href}
                 className={`mt-6 inline-flex w-full justify-center rounded-xl px-4 py-2.5 text-sm font-semibold transition ${plan.featured ? "bg-orange-500 text-white hover:bg-orange-600" : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"}`}
               >
                 {plan.cta}
-              </a>
+              </Link>
             </article>
           ))}
         </div>
@@ -160,6 +167,33 @@ export default function PricingPage() {
                 <p className="mt-1 text-sm text-slate-600">{answer}</p>
               </div>
             ))}
+          </div>
+        </article>
+      </section>
+
+      <section className="container pb-16 md:pb-20">
+        <article className="rounded-3xl border border-slate-200 bg-slate-50 p-8 md:p-10">
+          <h2 className="text-2xl font-semibold text-slate-900">
+            Transparência comercial
+          </h2>
+          <ul className="mt-4 space-y-3 text-sm text-slate-600">
+            {billingNotes.map(note => (
+              <li key={note}>• {note}</li>
+            ))}
+          </ul>
+          <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+            <Link
+              href="/contato"
+              className="inline-flex items-center justify-center rounded-xl bg-slate-900 px-6 py-3 font-semibold text-white transition hover:bg-black"
+            >
+              Falar com comercial
+            </Link>
+            <Link
+              href="/termos"
+              className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-6 py-3 font-semibold text-slate-700 transition hover:bg-slate-100"
+            >
+              Ver termos de uso
+            </Link>
           </div>
         </article>
       </section>

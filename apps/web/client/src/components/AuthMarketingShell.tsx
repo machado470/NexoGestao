@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 import { ArrowLeft } from "lucide-react";
 
 import "@/pages/landing.css";
@@ -110,12 +110,12 @@ export function AuthMarketingShell({
               </article>
 
               <div className="mt-5 flex flex-wrap items-center gap-4 text-xs text-slate-500">
-                <a href="/" className="hover:text-slate-800">Home</a>
-                <a href="/produto" className="hover:text-slate-800">Produto</a>
-                <a href="/precos" className="hover:text-slate-800">Preços</a>
-                <a href="/contato" className="hover:text-slate-800">Contato</a>
-                <a href="/privacidade" className="hover:text-slate-800">Privacidade</a>
-                <a href="/termos" className="hover:text-slate-800">Termos</a>
+                <Link href="/" className="hover:text-slate-800">Home</Link>
+                <Link href="/produto" className="hover:text-slate-800">Produto</Link>
+                <Link href="/precos" className="hover:text-slate-800">Preços</Link>
+                <Link href="/contato" className="hover:text-slate-800">Contato</Link>
+                <Link href="/privacidade" className="hover:text-slate-800">Privacidade</Link>
+                <Link href="/termos" className="hover:text-slate-800">Termos</Link>
               </div>
             </div>
           </section>
