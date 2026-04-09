@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Controller,
   Post,
   Get,
@@ -45,7 +46,7 @@ export class BillingController {
     const planName = PRICE_PLAN_MAP[dto.priceId]
 
     if (!planName) {
-      throw new Error(`priceId desconhecido: ${dto.priceId}`)
+      throw new BadRequestException(`priceId desconhecido: ${dto.priceId}`)
     }
 
     return this.billingService.createCheckoutSession(

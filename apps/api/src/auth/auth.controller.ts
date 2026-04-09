@@ -92,6 +92,28 @@ export class AuthController {
   }
 
   @Public()
+  @Get('google/status')
+  googleStatus() {
+    const clientId = this.config.get<string>('GOOGLE_CLIENT_ID')?.trim()
+    const clientSecret = this.config.get<string>('GOOGLE_CLIENT_SECRET')?.trim()
+    const redirectUrl = this.config.get<string>('GOOGLE_REDIRECT_URL')?.trim()
+    const configured = Boolean(clientId && clientSecret && redirectUrl)
+
+    return {
+      configured,
+      status: configured ? 'configured' : 'missing',
+      missing: {
+        clientId: !clientId,
+        clientSecret: !clientSecret,
+        redirectUrl: !redirectUrl,
+      },
+      message: configured
+        ? 'Google OAuth configurado.'
+        : 'Google OAuth não configurado neste ambiente.',
+    }
+  }
+
+  @Public()
   @Get('google/callback')
   @UseGuards(AuthGuard('google'))
   async googleAuthRedirect(@Request() req: any, @Res() res: any) {

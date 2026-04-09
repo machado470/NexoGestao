@@ -3,6 +3,7 @@ import {
   Logger,
   NotFoundException,
   ServiceUnavailableException,
+  BadRequestException,
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { PrismaService } from '../prisma/prisma.service'
@@ -14,14 +15,6 @@ import {
 } from '@prisma/client'
 import Stripe from 'stripe'
 import { QuotasService } from '../quotas/quotas.service'
-
-const PLAN_PRICE_MAP: Record<string, string> = {
-  FREE: '',
-  STARTER: process.env.STRIPE_PRICE_STARTER ?? 'price_starter',
-  PRO: process.env.STRIPE_PRICE_PRO ?? 'price_pro',
-  BUSINESS: process.env.STRIPE_PRICE_BUSINESS ?? 'price_business',
-  SCALE: process.env.STRIPE_PRICE_BUSINESS ?? 'price_business',
-}
 
 export const PLAN_LIMITS: Record<
   string,
@@ -103,21 +96,56 @@ export class BillingService {
     return this.stripe !== null
   }
 
+  private getPlanPriceMap(): Record<string, string> {
+    const starter = this.config.get<string>('STRIPE_PRICE_STARTER')?.trim() ?? ''
+    const pro = this.config.get<string>('STRIPE_PRICE_PRO')?.trim() ?? ''
+    const business = this.config.get<string>('STRIPE_PRICE_BUSINESS')?.trim() ?? ''
+
+    return {
+      FREE: '',
+      STARTER: starter,
+      PRO: pro,
+      BUSINESS: business,
+      SCALE: business,
+    }
+  }
+
   private normalizePlanName(planName: string): string {
     if (planName === 'BUSINESS') return 'SCALE'
     return planName
   }
 
+  private isSimulatedCheckoutEnabled(): boolean {
+    const value = (this.config.get<string>('BILLING_ENABLE_SIMULATED_CHECKOUT') ?? '')
+      .trim()
+      .toLowerCase()
+    return value === '1' || value === 'true' || value === 'yes'
+  }
+
   private assertStripeAvailable(operation: string) {
-
     if (this.stripe) return
+    throw new ServiceUnavailableException({
+      code: 'INTEGRATION_NOT_CONFIGURED',
+      integration: 'stripe',
+      operation,
+      message:
+        'Integração Stripe não configurada. Defina STRIPE_SECRET_KEY e STRIPE_WEBHOOK_SECRET para habilitar cobrança online.',
+    })
+  }
 
-    if (this.config.get<string>('NODE_ENV') === 'production') {
-      throw new ServiceUnavailableException(
-        `Stripe não configurado (${operation})`,
-      )
+  private assertCheckoutRedirectUrl(url?: string, kind: 'successUrl' | 'cancelUrl' = 'successUrl') {
+    if (!url) return
+
+    let parsed: URL
+    try {
+      parsed = new URL(url)
+    } catch {
+      throw new BadRequestException(`${kind} inválida`)
     }
 
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      throw new BadRequestException(`${kind} deve usar http(s)`)
+    }
   }
 
   /*
@@ -132,16 +160,21 @@ export class BillingService {
     successUrl?: string,
     cancelUrl?: string,
   ) {
+    this.assertCheckoutRedirectUrl(successUrl, 'successUrl')
+    this.assertCheckoutRedirectUrl(cancelUrl, 'cancelUrl')
 
-    if (!this.stripe) {
+    if (!this.stripe && this.isSimulatedCheckoutEnabled()) {
       return this.simulateCheckoutSession(orgId, planName)
     }
+    this.assertStripeAvailable('create_checkout_session')
 
     const normalizedPlanName = this.normalizePlanName(planName)
-    const priceId = PLAN_PRICE_MAP[normalizedPlanName]
+    const priceId = this.getPlanPriceMap()[normalizedPlanName]
 
     if (!priceId) {
-      throw new Error(`Plano ${planName} não possui priceId`)
+      throw new ServiceUnavailableException(
+        `priceId do Stripe ausente para o plano ${planName}. Verifique STRIPE_PRICE_* no ambiente.`,
+      )
     }
 
     const session = await this.stripe.checkout.sessions.create({
@@ -167,11 +200,7 @@ export class BillingService {
   */
 
   async handleWebhook(rawBody: Buffer, signature: string) {
-
-    if (!this.stripe) {
-      this.logger.warn('Webhook recebido mas Stripe não configurado')
-      return { received: true, simulated: true }
-    }
+    this.assertStripeAvailable('webhook')
 
     const secret = this.config.get<string>('STRIPE_WEBHOOK_SECRET')
 

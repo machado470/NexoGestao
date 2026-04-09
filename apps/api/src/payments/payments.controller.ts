@@ -1,5 +1,7 @@
 import {
+  BadRequestException,
   Controller,
+  Logger,
   Post,
   Body,
   UseGuards,
@@ -17,6 +19,8 @@ import { PaymentsService } from './payments.service'
 
 @Controller('payments')
 export class PaymentsController {
+  private readonly logger = new Logger(PaymentsController.name)
+
   constructor(private readonly payments: PaymentsService) {}
 
   /**
@@ -59,17 +63,13 @@ export class PaymentsController {
     @Headers('stripe-signature') signature: string,
   ) {
     if (!signature) {
-      return { ok: false, error: 'Assinatura ausente' }
+      throw new BadRequestException('Assinatura Stripe ausente')
     }
 
-    try {
-      const rawBody = req.rawBody ?? Buffer.from(JSON.stringify(req.body))
-      const result = await this.payments.handleWebhook(rawBody, signature)
-      return { ok: true, data: result }
-    } catch (error) {
-      console.error('Erro ao processar webhook Stripe:', error)
-      return { ok: false, error: String(error) }
-    }
+    const rawBody = req.rawBody ?? Buffer.from(JSON.stringify(req.body))
+    const result = await this.payments.handleWebhook(rawBody, signature)
+    this.logger.log('Webhook Stripe processado com sucesso')
+    return { ok: true, data: result }
   }
 
   /**
