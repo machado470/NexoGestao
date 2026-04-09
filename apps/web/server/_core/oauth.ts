@@ -3,7 +3,7 @@ import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 import cookie from "cookie";
 import { getSessionCookieOptions } from "./cookies";
 
-const NEXO_API_URL = (process.env.NEXO_API_URL || "http://127.0.0.1:3000").replace(/\/+$/, "");
+const NEXO_API_URL = (process.env.NEXO_API_URL || "http://localhost:3000").replace(/\/+$/, "");
 const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GOOGLE_USERINFO_URL = "https://openidconnect.googleapis.com/v1/userinfo";

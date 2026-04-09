@@ -22,10 +22,20 @@ export class AuthController {
     private readonly config: ConfigService,
   ) {}
 
+  private getGoogleRedirectUrl() {
+    const redirectUrl = this.config.get<string>('GOOGLE_REDIRECT_URL')?.trim()
+    if (redirectUrl) return redirectUrl
+
+    const redirectUri = this.config.get<string>('GOOGLE_REDIRECT_URI')?.trim()
+    if (redirectUri) return redirectUri
+
+    return ''
+  }
+
   private ensureGoogleOAuthEnabled() {
     const clientId = this.config.get<string>('GOOGLE_CLIENT_ID')?.trim()
     const clientSecret = this.config.get<string>('GOOGLE_CLIENT_SECRET')?.trim()
-    const redirectUrl = this.config.get<string>('GOOGLE_REDIRECT_URL')?.trim()
+    const redirectUrl = this.getGoogleRedirectUrl()
 
     if (!clientId || !clientSecret || !redirectUrl) {
       throw new ServiceUnavailableException(
@@ -113,7 +123,7 @@ export class AuthController {
   googleStatus() {
     const clientId = this.config.get<string>('GOOGLE_CLIENT_ID')?.trim()
     const clientSecret = this.config.get<string>('GOOGLE_CLIENT_SECRET')?.trim()
-    const redirectUrl = this.config.get<string>('GOOGLE_REDIRECT_URL')?.trim()
+    const redirectUrl = this.getGoogleRedirectUrl()
     const configured = Boolean(clientId && clientSecret && redirectUrl)
 
     return {
