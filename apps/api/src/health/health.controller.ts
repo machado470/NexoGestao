@@ -17,6 +17,10 @@ export class HealthController {
     return (this.config.get<string>(name) ?? '').trim().length > 0
   }
 
+  private hasAnyValue(...names: string[]): boolean {
+    return names.some(name => this.hasValue(name))
+  }
+
   @Get()
   async health() {
     const startedAt = Date.now()
@@ -68,7 +72,7 @@ export class HealthController {
     const googleAuthConfigured =
       this.hasValue('GOOGLE_CLIENT_ID') &&
       this.hasValue('GOOGLE_CLIENT_SECRET') &&
-      this.hasValue('GOOGLE_REDIRECT_URL')
+      this.hasAnyValue('GOOGLE_REDIRECT_URL', 'GOOGLE_REDIRECT_URI')
 
     const emailConfigured = this.hasValue('RESEND_API_KEY')
     const whatsappConfigured = this.hasValue('WHATSAPP_PROVIDER')

@@ -1,4 +1,4 @@
-import "dotenv/config";
+import "./load-env";
 import express from "express";
 import { createServer } from "http";
 import type { AddressInfo } from "net";
@@ -53,7 +53,7 @@ async function startServer() {
     const finalPort = address?.port ?? port;
     console.log(`[web] Server running on http://localhost:${finalPort}/`);
     console.log(`[web] PORT=${finalPort}`);
-    console.log(`[web] NEXO_API_URL=${process.env.NEXO_API_URL || "http://127.0.0.1:3000"}`);
+    console.log(`[web] NEXO_API_URL=${process.env.NEXO_API_URL || "http://localhost:3000"}`);
   });
 }
 
