@@ -277,6 +277,7 @@ export default function ExecutiveDashboardNew() {
     undefined,
     queryOptions
   );
+  const governanceSummaryQuery = trpc.governance.summary.useQuery(undefined, queryOptions);
   const { logs } = useExecutionMemory();
   const [isSlowLoading, setIsSlowLoading] = useState(false);
   const [optimisticTick, setOptimisticTick] = useState(false);
@@ -335,6 +336,20 @@ export default function ExecutiveDashboardNew() {
       : stableServiceOrdersStatus;
   const displayChargesStatus =
     chargesStatusQuery.data !== undefined ? chargesStatus : stableChargesStatus;
+
+  const riskOperationalState = useMemo(() => {
+    const payload = (governanceSummaryQuery.data as any)?.data ?? governanceSummaryQuery.data ?? {};
+    const state = String(
+      payload?.operationalState ?? payload?.riskState ?? payload?.state ?? "UNKNOWN"
+    ).toUpperCase();
+
+    if (state === "SUSPENDED" || state === "RESTRICTED" || state === "WARNING" || state === "NORMAL") {
+      return state as "SUSPENDED" | "RESTRICTED" | "WARNING" | "NORMAL";
+    }
+
+    return "UNKNOWN" as const;
+  }, [governanceSummaryQuery.data]);
+
   const quotaWarnings = useMemo(() => {
     const usage = (billingLimitsQuery.data as any)?.usage;
     if (!usage || typeof usage !== "object") return [];
@@ -1004,7 +1019,7 @@ export default function ExecutiveDashboardNew() {
 
       <section className="grid gap-6 lg:grid-cols-2">
         <div className="lg:col-span-2">
-          <OperationalActionFeed plan={executionPlan} />
+          <OperationalActionFeed plan={executionPlan} riskOperationalState={riskOperationalState} />
         </div>
         <article className="nexo-surface nexo-fade-in p-5">
           <h2 className="nexo-section-title">Top 3 prioridades automáticas</h2>

@@ -2,12 +2,31 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import type { Express } from "express";
 
+type ExecutionLogStatus =
+  | "success"
+  | "failed"
+  | "pending"
+  | "blocked"
+  | "throttled"
+  | "restricted";
+
+type ExecutionEventType =
+  | "EXECUTION_ACTION_REQUESTED"
+  | "EXECUTION_ACTION_EXECUTED"
+  | "EXECUTION_ACTION_FAILED"
+  | "EXECUTION_ACTION_BLOCKED";
+
 type ExecutionLogRecord = {
   id: string;
   actionId: string;
   decisionId: string;
   executionKey?: string;
-  status: "success" | "failed" | "pending";
+  status: ExecutionLogStatus;
+  eventType?: ExecutionEventType;
+  mode?: "manual" | "semi_automatic" | "automatic";
+  reasonCode?: string;
+  message?: string;
+  telemetryKey?: string;
   executedAt: number;
   entityType?: string;
   entityId?: string;
@@ -19,6 +38,11 @@ type ExecutionLogPayload = {
   decisionId?: unknown;
   executionKey?: unknown;
   status?: unknown;
+  eventType?: unknown;
+  mode?: unknown;
+  reasonCode?: unknown;
+  message?: unknown;
+  telemetryKey?: unknown;
   executedAt?: unknown;
   entityType?: unknown;
   entityId?: unknown;
@@ -61,8 +85,39 @@ function asNonEmptyString(value: unknown) {
 }
 
 function asStatus(value: unknown): ExecutionLogRecord["status"] | null {
-  if (value === "success" || value === "failed" || value === "pending") return value;
+  if (
+    value === "success" ||
+    value === "failed" ||
+    value === "pending" ||
+    value === "blocked" ||
+    value === "throttled" ||
+    value === "restricted"
+  ) {
+    return value;
+  }
+
   return null;
+}
+
+function asEventType(value: unknown): ExecutionEventType | undefined {
+  if (
+    value === "EXECUTION_ACTION_REQUESTED" ||
+    value === "EXECUTION_ACTION_EXECUTED" ||
+    value === "EXECUTION_ACTION_FAILED" ||
+    value === "EXECUTION_ACTION_BLOCKED"
+  ) {
+    return value;
+  }
+
+  return undefined;
+}
+
+function asMode(value: unknown): ExecutionLogRecord["mode"] | undefined {
+  if (value === "manual" || value === "semi_automatic" || value === "automatic") {
+    return value;
+  }
+
+  return undefined;
 }
 
 function normalizePayload(payload: ExecutionLogPayload) {
@@ -82,6 +137,11 @@ function normalizePayload(payload: ExecutionLogPayload) {
     decisionId,
     executionKey: asNonEmptyString(payload.executionKey) ?? undefined,
     status,
+    eventType: asEventType(payload.eventType),
+    mode: asMode(payload.mode),
+    reasonCode: asNonEmptyString(payload.reasonCode) ?? undefined,
+    message: asNonEmptyString(payload.message) ?? undefined,
+    telemetryKey: asNonEmptyString(payload.telemetryKey) ?? undefined,
     executedAt: Number.isFinite(executedAtRaw) ? executedAtRaw : Date.now(),
     entityType: asNonEmptyString(payload.entityType) ?? undefined,
     entityId: asNonEmptyString(payload.entityId) ?? undefined,
@@ -115,6 +175,8 @@ export function registerExecutionLogRoutes(app: Express) {
     const decisionId = asNonEmptyString(req.query.decisionId);
     const actionId = asNonEmptyString(req.query.actionId);
     const executionKey = asNonEmptyString(req.query.executionKey);
+    const eventType = asEventType(req.query.eventType);
+    const status = asStatus(req.query.status);
     const sinceMs = Number(req.query.sinceMs ?? 0);
 
     const logs = await readLogs();
@@ -123,6 +185,8 @@ export function registerExecutionLogRoutes(app: Express) {
       if (decisionId && log.decisionId !== decisionId) return false;
       if (actionId && log.actionId !== actionId) return false;
       if (executionKey && log.executionKey !== executionKey) return false;
+      if (eventType && log.eventType !== eventType) return false;
+      if (status && log.status !== status) return false;
       if (Number.isFinite(sinceMs) && sinceMs > 0) {
         if (Date.now() - log.executedAt > sinceMs) return false;
       }

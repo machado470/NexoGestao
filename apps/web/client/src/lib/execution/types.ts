@@ -8,6 +8,19 @@ export type ExecutionState = "ready" | "blocked" | "invalid" | "completed";
 
 export type ExecutionActionMode = "manual" | "semi_automatic" | "automatic";
 
+export type ExecutionPolicyStatus =
+  | "allowed"
+  | "blocked"
+  | "requires_confirmation"
+  | "throttled"
+  | "restricted";
+
+export type ExecutionEventType =
+  | "EXECUTION_ACTION_REQUESTED"
+  | "EXECUTION_ACTION_EXECUTED"
+  | "EXECUTION_ACTION_FAILED"
+  | "EXECUTION_ACTION_BLOCKED";
+
 export type OperationalEntityType =
   | "customer"
   | "appointment"
@@ -61,11 +74,25 @@ export type ExecutionPlan = {
 
 export type ExecuteActionResult = {
   ok: boolean;
-  status: "executed" | "blocked" | "unsupported" | "failed";
+  status:
+    | "executed"
+    | "blocked"
+    | "requires_confirmation"
+    | "throttled"
+    | "restricted"
+    | "unsupported"
+    | "failed";
   message?: string;
+  reasonCode?: string;
 };
 
-export type ExecutionLogStatus = "success" | "failed" | "pending";
+export type ExecutionLogStatus =
+  | "success"
+  | "failed"
+  | "pending"
+  | "blocked"
+  | "throttled"
+  | "restricted";
 
 export type ExecutionLog = {
   id: string;
@@ -76,9 +103,28 @@ export type ExecutionLog = {
   status: ExecutionLogStatus;
   entityType?: OperationalEntityType;
   entityId?: string;
+  mode?: ExecutionActionMode;
+  eventType?: ExecutionEventType;
+  reasonCode?: string;
+  message?: string;
+  telemetryKey?: string;
 };
 
 export type ExecuteActionContext = {
   source: ExecutionSource;
   decisionId?: string;
+};
+
+export type RiskOperationalState =
+  | "NORMAL"
+  | "WARNING"
+  | "RESTRICTED"
+  | "SUSPENDED"
+  | "UNKNOWN";
+
+export type ExecutionPolicyResult = {
+  allowed: boolean;
+  status: ExecutionPolicyStatus;
+  reasonCode?: string;
+  message?: string;
 };
