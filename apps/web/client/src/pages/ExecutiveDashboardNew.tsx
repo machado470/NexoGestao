@@ -3,19 +3,10 @@ import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/contexts/AuthContext";
 import { EmptyState } from "@/components/EmptyState";
+import { OperationalActionFeed } from "@/components/operations/OperationalActionFeed";
 import { getLatestActionFlowSuggestion } from "@/lib/actionFlow";
+import { buildDashboardExecutionPlan } from "@/lib/execution/decision-engine";
 import { rankPriorityProblems } from "@/lib/priorityEngine";
-import {
-  getActionIntentClasses,
-  getActionIntentLabel,
-  type ActionBucket,
-  type ActionIntent,
-} from "@/lib/operations/action-intent";
-import {
-  compareOperationalSeverity,
-  getOperationalSeverityClasses,
-  type OperationalSeverity,
-} from "@/lib/operations/operational-intelligence";
 import {
   AlertTriangle,
   BarChart3,
@@ -244,7 +235,7 @@ function normalizeStatusCollection(payload: unknown) {
 
 export default function ExecutiveDashboardNew() {
   const { isAuthenticated, isInitializing } = useAuth();
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
   const canQuery = isAuthenticated && !isInitializing;
 
   const queryOptions = useMemo(
@@ -473,86 +464,26 @@ export default function ExecutiveDashboardNew() {
     }).length;
   }, [appointmentsQuery.data]);
 
-  const globalActionFeed = useMemo(() => {
-    const actions: Array<{
-      id: string;
-      title: string;
-      description: string;
-      severity: OperationalSeverity;
-      bucket: ActionBucket;
-      intent: ActionIntent;
-      ctaLabel: string;
-      onClick: () => void;
-    }> = [];
-
-    if (overdueCharges > 0) {
-      actions.push({
-        id: "feed-overdue-charges",
-        title: "Cobranças vencidas",
-        description: `${overdueCharges} cobranças vencidas exigem recuperação imediata.`,
-        severity: "overdue",
-        bucket: "critical",
-        intent: "resolve",
-        ctaLabel: "Cobrar cliente",
-        onClick: () => navigate("/finances"),
-      });
-    }
-
-    if (displayMetrics.delayedOrders > 0) {
-      actions.push({
-        id: "feed-overdue-service-orders",
-        title: "O.S. atrasadas",
-        description: `${displayMetrics.delayedOrders} ordens paradas bloqueando entrega e caixa.`,
-        severity: "critical",
-        bucket: "critical",
-        intent: "resolve",
-        ctaLabel: "Destravar O.S.",
-        onClick: () => navigate("/service-orders"),
-      });
-    }
-
-    if (todayAppointments > 0) {
-      actions.push({
-        id: "feed-today-appointments",
-        title: "Tarefas do dia",
-        description: `${todayAppointments} agendamentos de hoje aguardam execução.`,
-        severity: "pending",
-        bucket: "today",
-        intent: "follow_up",
-        ctaLabel: "Executar serviços",
-        onClick: () => navigate("/appointments"),
-      });
-    }
-
-    if (actions.length === 0) {
-      actions.push({
-        id: "feed-healthy",
-        title: "Fluxo operacional saudável",
-        description: "Sem pendências críticas no momento.",
-        severity: "healthy",
-        bucket: "pending",
-        intent: "notify",
-        ctaLabel: "Revisar painel",
-        onClick: () => navigate("/"),
-      });
-    }
-
-    return actions.sort((a, b) =>
-      compareOperationalSeverity(a.severity, b.severity)
-    );
-  }, [
-    displayMetrics.delayedOrders,
-    navigate,
-    overdueCharges,
-    todayAppointments,
-  ]);
-  const groupedActionFeed = useMemo(
-    () => ({
-      critical: globalActionFeed.filter(item => item.bucket === "critical"),
-      today: globalActionFeed.filter(item => item.bucket === "today"),
-      pending: globalActionFeed.filter(item => item.bucket === "pending"),
-    }),
-    [globalActionFeed]
+  const executionPlan = useMemo(
+    () =>
+      buildDashboardExecutionPlan({
+        totalCustomers: displayMetrics.totalCustomers,
+        totalServiceOrders: displayMetrics.totalServiceOrders,
+        completedOrders: displayMetrics.completedOrders,
+        chargesGenerated: displayMetrics.chargesGenerated,
+        overdueCharges,
+        todayAppointments,
+        hasWhatsappContext: location.includes("customerId="),
+      }),
+    [
+      displayMetrics.chargesGenerated,
+      displayMetrics.completedOrders,
+      displayMetrics.totalCustomers,
+      displayMetrics.totalServiceOrders,
+      location,
+      overdueCharges,
+      todayAppointments,
+    ]
   );
 
   const bottlenecks = [
@@ -1015,66 +946,9 @@ export default function ExecutiveDashboardNew() {
       </section>
 
       <section className="grid gap-6 lg:grid-cols-2">
-        <article className="nexo-surface nexo-fade-in p-5 lg:col-span-2">
-          <h2 className="nexo-section-title">Action Feed • Painel de execução diária</h2>
-          <p className="mt-1 nexo-section-description">
-            Ações executáveis com contadores por grupo para atacar o dia em ordem de impacto.
-          </p>
-          <div className="mt-4 space-y-4">
-            {(
-              [
-                ["critical", "Crítico"],
-                ["today", "Hoje"],
-                ["pending", "Pendente"],
-              ] as const
-            ).map(([bucket, label]) => {
-              const items = groupedActionFeed[bucket];
-              if (items.length === 0) return null;
-
-              return (
-                <div key={bucket} className="space-y-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-300">
-                    {label} • {items.length}
-                  </p>
-                  {items.map(item => (
-                    <div
-                      key={item.id}
-                      className={`rounded-xl border p-4 ${getOperationalSeverityClasses(item.severity)}`}
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="nexo-text-wrap font-semibold text-zinc-900 dark:text-zinc-100">
-                            {item.title}
-                          </p>
-                          <p className="nexo-text-wrap text-xs text-zinc-700 dark:text-zinc-300">
-                            {item.description}
-                          </p>
-                          <span
-                            className={`mt-2 inline-flex rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide ${getActionIntentClasses(item.intent)}`}
-                          >
-                            {getActionIntentLabel(item.intent)}
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={item.onClick}
-                          className={
-                            item.severity === "critical"
-                              ? "nexo-cta-primary !h-9 !rounded-lg !px-3 !text-xs"
-                              : "nexo-cta-secondary !h-9 !rounded-lg !px-3 !text-xs opacity-75"
-                          }
-                        >
-                          {item.ctaLabel}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              );
-            })}
-          </div>
-        </article>
-
+        <div className="lg:col-span-2">
+          <OperationalActionFeed plan={executionPlan} />
+        </div>
         <article className="nexo-surface nexo-fade-in p-5">
           <h2 className="nexo-section-title">Top 3 prioridades automáticas</h2>
           <p className="mt-1 nexo-section-description">
