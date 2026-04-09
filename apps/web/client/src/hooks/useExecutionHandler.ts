@@ -76,7 +76,12 @@ export function useExecutionHandler() {
       action: ExecutionAction,
       params: ExecuteParams
     ): Promise<ExecuteActionResult> => {
-      const executionKey = buildExecutionKey(action.id, action.payload);
+      const executionKey = buildExecutionKey(action, {
+        decisionId: params.decision.id,
+        entityType: params.decision.entityType,
+        entityId: params.decision.entityId,
+        source: params.source,
+      });
       const now = Date.now();
 
       const baseLogPayload = {
@@ -103,6 +108,7 @@ export function useExecutionHandler() {
         ...baseLogPayload,
         eventType: "EXECUTION_ACTION_REQUESTED",
         status: "pending",
+        timestamp: new Date(now).toISOString(),
       };
       void syncExecutionEventAsync(requestedEvent);
 
@@ -217,6 +223,7 @@ export function useExecutionHandler() {
                     decisionId: params.decision.id,
                     executionKey: key,
                   }),
+                validateExecutionKey: (key) => key.startsWith("exec_"),
               },
               { executionKey }
             );
@@ -236,6 +243,7 @@ export function useExecutionHandler() {
         eventType: result.ok ? "EXECUTION_ACTION_EXECUTED" : "EXECUTION_ACTION_FAILED",
         reasonCode: result.reasonCode,
         message: result.message,
+        timestamp: new Date().toISOString(),
       };
 
       appendExecutionLog(log);
@@ -250,6 +258,7 @@ export function useExecutionHandler() {
         status: result.status,
         ok: result.ok,
         message: result.message,
+        timestamp: new Date().toISOString(),
         reasonCode: result.reasonCode,
       });
 

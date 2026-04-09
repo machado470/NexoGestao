@@ -94,6 +94,7 @@ export async function syncExecutionLogAsync(log: ExecutionLog) {
         reasonCode: log.reasonCode,
         message: log.message,
         telemetryKey: log.telemetryKey,
+        timestamp: log.timestamp ?? new Date(log.executedAt).toISOString(),
       }),
     });
   } catch {
@@ -124,6 +125,7 @@ export async function syncExecutionEventAsync(event: ExecutionLog) {
         reasonCode: event.reasonCode,
         message: event.message,
         telemetryKey: event.telemetryKey,
+        timestamp: event.timestamp ?? new Date(event.executedAt).toISOString(),
       }),
     });
   } catch {

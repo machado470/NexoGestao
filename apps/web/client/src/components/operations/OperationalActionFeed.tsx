@@ -18,12 +18,13 @@ export function OperationalActionFeed({ plan, riskOperationalState }: Operationa
     const executed = scoped.filter(log => log.status === "success").length;
     const failed = scoped.filter(log => log.status === "failed").length;
     const blocked = scoped.filter(
-      log => log.status === "blocked" || log.status === "throttled" || log.status === "restricted"
+      log => log.status === "blocked" || log.status === "restricted" || log.status === "requires_confirmation"
     ).length;
+    const throttled = scoped.filter(log => log.status === "throttled").length;
     const totalActions = plan.decisions.reduce((acc, decision) => acc + decision.actions.length, 0);
-    const pending = Math.max(totalActions - executed - failed - blocked, 0);
+    const pending = Math.max(totalActions - executed - failed - blocked - throttled, 0);
 
-    return { executed, failed, blocked, pending };
+    return { executed, failed, blocked, throttled, pending };
   }, [logs, plan.decisions]);
 
   return (
@@ -42,6 +43,9 @@ export function OperationalActionFeed({ plan, riskOperationalState }: Operationa
         </span>
         <span className="inline-flex rounded-full border border-red-500/40 bg-red-500/10 px-2 py-1 text-red-700 dark:text-red-300">
           Falhadas: {executionState.failed}
+        </span>
+        <span className="inline-flex rounded-full border border-orange-500/40 bg-orange-500/10 px-2 py-1 text-orange-700 dark:text-orange-300">
+          Throttled: {executionState.throttled}
         </span>
         <span className="inline-flex rounded-full border border-zinc-500/30 bg-zinc-500/10 px-2 py-1 text-zinc-700 dark:text-zinc-300">
           Pendentes: {executionState.pending}

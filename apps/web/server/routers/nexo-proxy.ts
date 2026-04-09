@@ -617,6 +617,20 @@ export const nexoProxyRouter = router({
         const { executionId: _executionId, ...payload } = input ?? {};
         return authedPost(ctx as CtxLike, `/executions/${id}/complete`, payload);
       }),
+
+    mode: protectedProcedure.query(async ({ ctx }) => {
+      return authedGet(ctx as CtxLike, "/executions/mode");
+    }),
+
+    stateSummary: protectedProcedure
+      .input(z.object({ sinceMs: z.number().optional() }).optional())
+      .query(async ({ ctx, input }) => {
+        return authedGet(ctx as CtxLike, "/executions/state-summary", input ?? {});
+      }),
+
+    runOnce: protectedProcedure.mutation(async ({ ctx }) => {
+      return authedPost(ctx as CtxLike, "/executions/runner/run-once");
+    }),
   }),
 
   whatsapp: router({

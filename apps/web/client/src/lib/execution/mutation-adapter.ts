@@ -7,6 +7,7 @@ type MutationRuntime = {
   }) => Promise<unknown>;
   invalidateOperationalData: () => Promise<void>;
   checkIdempotency?: (executionKey: string) => boolean;
+  validateExecutionKey?: (executionKey: string) => boolean;
 };
 
 type MutationPayload = Record<string, unknown> | undefined;
@@ -32,6 +33,10 @@ export async function runExecutionMutation(
   runtime: MutationRuntime,
   options?: MutationOptions
 ) {
+  if (options?.executionKey && runtime.validateExecutionKey && !runtime.validateExecutionKey(options.executionKey)) {
+    throw new Error("executionKey inválida para execução de mutation.");
+  }
+
   if (options?.executionKey && runtime.checkIdempotency?.(options.executionKey)) {
     return { message: "Ação já executada recentemente. Mantendo estado atual." };
   }
