@@ -11,6 +11,7 @@ import { OnboardingService } from '../onboarding/onboarding.service'
 import { AUDIT_ACTIONS } from '../audit/audit.actions'
 import { AnalyticsService, UsageMetricEvent } from '../analytics/analytics.service'
 import { Prisma } from '@prisma/client'
+import { IdempotencyService } from '../common/idempotency/idempotency.service'
 
 function normalizeEmail(v?: string): string | null {
   const s = (v ?? '').trim().toLowerCase()
@@ -35,7 +36,23 @@ export class CustomersService {
     private readonly notificationsService: NotificationsService,
     private readonly onboardingService: OnboardingService,
     private readonly analytics: AnalyticsService,
+    private readonly idempotency: IdempotencyService,
   ) {}
+
+  private buildCreateCustomerIdempotencyKey(input: {
+    orgId: string
+    name: string
+    phone: string
+    email?: string | null
+  }): string {
+    return [
+      'customer-create',
+      input.orgId,
+      input.name.trim().toLowerCase(),
+      input.phone,
+      (input.email ?? '').trim().toLowerCase() || '-',
+    ].join(':')
+  }
 
   async list(orgId: string, query?: any) {
     if (!orgId) throw new BadRequestException('orgId é obrigatório')
@@ -153,6 +170,7 @@ export class CustomersService {
     phone: string
     email?: string
     notes?: string
+    idempotencyKey?: string | null
   }) {
     const name = params.name?.trim()
     const phone = normalizePhone(params.phone)
@@ -183,24 +201,44 @@ export class CustomersService {
       throw new BadRequestException('Já existe um cliente com este telefone')
     }
 
+    const idempotencyKey =
+      params.idempotencyKey?.trim() ||
+      this.buildCreateCustomerIdempotencyKey({
+        orgId: params.orgId,
+        name,
+        phone,
+        email,
+      })
+
+    const idem = await this.idempotency.begin({
+      orgId: params.orgId,
+      scope: 'customers.create',
+      idempotencyKey,
+      payload: { name, phone, email, notes },
+    })
+    if (idem.mode === 'replay') {
+      return idem.response as any
+    }
+
     let created: any
     try {
-      created = await this.prisma.customer.create({
-        data: {
-          orgId: params.orgId,
-          name,
-          phone,
-          email,
-          notes,
-          active: true,
-        },
-      })
-    } catch (err) {
-      if (!isUniqueConflict(err)) throw err
-      throw new BadRequestException(
-        'Cliente já existe com o mesmo e-mail ou telefone nesta organização',
-      )
-    }
+      try {
+        created = await this.prisma.customer.create({
+          data: {
+            orgId: params.orgId,
+            name,
+            phone,
+            email,
+            notes,
+            active: true,
+          },
+        })
+      } catch (err) {
+        if (!isUniqueConflict(err)) throw err
+        throw new BadRequestException(
+          'Cliente já existe com o mesmo e-mail ou telefone nesta organização',
+        )
+      }
 
     const context = `Cliente criado: ${created.name}`
 
@@ -260,7 +298,12 @@ export class CustomersService {
       },
     })
 
-    return created
+      await this.idempotency.complete(idem.recordId, created)
+      return created
+    } catch (error: any) {
+      await this.idempotency.fail(idem.recordId, error?.code)
+      throw error
+    }
   }
 
   async update(params: {

@@ -1,9 +1,27 @@
 import { Injectable, NestMiddleware } from '@nestjs/common'
 import { Request, Response, NextFunction } from 'express'
 import { randomUUID } from 'crypto'
+import { MetricsService } from '../metrics/metrics.service'
 
 @Injectable()
 export class RequestLoggerMiddleware implements NestMiddleware {
+  constructor(private readonly metrics: MetricsService) {}
+
+  private endpointKey(method: string, originalUrl: string): string {
+    const path = originalUrl.split('?')[0] ?? '/'
+    const chunks = path.split('/').filter(Boolean)
+    const normalized = chunks
+      .map((chunk) =>
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(chunk)
+          ? ':id'
+          : /^\d+$/.test(chunk)
+            ? ':id'
+            : chunk,
+      )
+      .join('/')
+
+    return `${method} /${normalized}`
+  }
 
   use(req: Request, res: Response, next: NextFunction): void {
     const { method, originalUrl, ip } = req
@@ -40,6 +58,13 @@ export class RequestLoggerMiddleware implements NestMiddleware {
         contentLength,
         ip,
         userAgent,
+      }
+
+      const endpoint = this.endpointKey(method, originalUrl)
+      this.metrics.incrementRequestByEndpoint(endpoint)
+      this.metrics.observeEndpointLatency(endpoint, duration)
+      if (statusCode >= 400) {
+        this.metrics.incrementErrorByEndpoint(endpoint)
       }
 
       const line = JSON.stringify(logData)

@@ -72,4 +72,9 @@ export class UpdateServiceOrderDto {
   @IsString()
   @MaxLength(4000)
   outcomeSummary?: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  idempotencyKey?: string
 }

@@ -16,6 +16,7 @@ import { TimelineService } from '../timeline/timeline.service'
 import { ChargesQueryDto } from './dto/charges-query.dto'
 import { AnalyticsService, UsageMetricEvent } from '../analytics/analytics.service'
 import { RequestContextService } from '../common/context/request-context.service'
+import { MetricsService } from '../common/metrics/metrics.service'
 
 @Injectable()
 export class FinanceService {
@@ -27,6 +28,7 @@ export class FinanceService {
     private readonly analytics: AnalyticsService,
     private readonly requestContext: RequestContextService,
     private readonly idempotency: IdempotencyService,
+    private readonly metrics: MetricsService,
   ) {}
 
   private logCritical(params: {
@@ -343,6 +345,7 @@ export class FinanceService {
       if (charge.customer?.phone) {
         await this.sendChargeWhatsApp(charge.id).catch((err) => {
           whatsappFallbackUsed = true
+          this.metrics.increment('integrationTemporaryFailures')
           this.logCritical({
             level: 'warn',
             action: 'WHATSAPP_SEND_CHARGE',
@@ -585,6 +588,7 @@ export class FinanceService {
     let whatsappFallbackUsed = false
     await this.sendPaymentConfirmationWhatsApp(charge.id).catch((err) => {
       whatsappFallbackUsed = true
+      this.metrics.increment('integrationTemporaryFailures')
       this.logCritical({
         level: 'warn',
         action: 'WHATSAPP_SEND_PAYMENT_CONFIRMATION',
@@ -692,7 +696,31 @@ export class FinanceService {
       throw new BadRequestException('Valor da cobrança inválido para a O.S.')
     }
 
-    const serviceOrder = await this.assertServiceOrderEligibleForCharge({
+    const idemKey = [
+      'service-order-charge-link',
+      input.orgId,
+      input.serviceOrderId,
+      String(input.amountCents),
+      input.dueDate?.toISOString() ?? '-',
+    ].join(':')
+
+    const idem = await this.idempotency.begin({
+      orgId: input.orgId,
+      scope: 'finance.ensure_charge_for_service_order_done',
+      idempotencyKey: idemKey,
+      payload: {
+        serviceOrderId: input.serviceOrderId,
+        customerId: input.customerId,
+        amountCents: input.amountCents,
+        dueDate: input.dueDate?.toISOString() ?? null,
+      },
+    })
+    if (idem.mode === 'replay') {
+      return idem.response as any
+    }
+
+    try {
+      const serviceOrder = await this.assertServiceOrderEligibleForCharge({
       orgId: input.orgId,
       serviceOrderId: input.serviceOrderId,
       customerId: input.customerId,
@@ -705,20 +733,30 @@ export class FinanceService {
       },
     })
 
-    if (existing) return { created: false, chargeId: existing.id }
+      if (existing) {
+        const result = { created: false, chargeId: existing.id }
+        await this.idempotency.complete(idem.recordId, result)
+        return result
+      }
 
-    const created = await this.prisma.charge.create({
-      data: {
-        orgId: input.orgId,
-        serviceOrderId: input.serviceOrderId,
-        customerId: input.customerId,
-        amountCents: input.amountCents,
-        status: 'PENDING',
-        dueDate: input.dueDate ?? new Date(),
-      },
-    })
+      const created = await this.prisma.charge.create({
+        data: {
+          orgId: input.orgId,
+          serviceOrderId: input.serviceOrderId,
+          customerId: input.customerId,
+          amountCents: input.amountCents,
+          status: 'PENDING',
+          dueDate: input.dueDate ?? new Date(),
+        },
+      })
 
-    return { created: true, chargeId: created.id }
+      const result = { created: true, chargeId: created.id }
+      await this.idempotency.complete(idem.recordId, result)
+      return result
+    } catch (error: any) {
+      await this.idempotency.fail(idem.recordId, error?.code)
+      throw error
+    }
   }
 
   // =========================

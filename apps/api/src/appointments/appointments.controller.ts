@@ -7,6 +7,7 @@ import {
   Post,
   Query,
   UseGuards,
+  Headers,
 } from '@nestjs/common'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
@@ -44,6 +45,7 @@ export class AppointmentsController {
   async create(
     @Org() orgId: string,
     @User() user: any,
+    @Headers('idempotency-key') idempotencyKeyHeader: string | undefined,
     @Body() body: CreateAppointmentDto,
   ) {
     await this.quotas.validateQuota(orgId, 'CREATE_APPOINTMENT')
@@ -60,6 +62,7 @@ export class AppointmentsController {
       endsAt: body.endsAt,
       status: body.status as any,
       notes: body.notes,
+      idempotencyKey: body.idempotencyKey ?? idempotencyKeyHeader,
     })
   }
 

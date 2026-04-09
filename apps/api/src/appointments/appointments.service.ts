@@ -16,6 +16,7 @@ import {
   appointmentTransitions,
   ensureTransition,
 } from '../common/domain/state-transitions'
+import { IdempotencyService } from '../common/idempotency/idempotency.service'
 
 const DEFAULT_DURATION_MIN = 30
 
@@ -109,6 +110,7 @@ export class AppointmentsService {
     private readonly whatsapp: WhatsAppService,
     private readonly risk: RiskService,
     private readonly automation: AutomationService,
+    private readonly idempotency: IdempotencyService,
   ) {}
 
   private canTransition(from: AppointmentStatus, to: AppointmentStatus): boolean {
@@ -247,6 +249,7 @@ export class AppointmentsService {
     endsAt?: string
     status?: AppointmentStatus
     notes?: string
+    idempotencyKey?: string | null
   }) {
     if (!params.orgId) throw new BadRequestException('orgId é obrigatório')
     if (!params.customerId) throw new BadRequestException('customerId é obrigatório')
@@ -280,13 +283,31 @@ export class AppointmentsService {
     })
     if (!customer) throw new BadRequestException('Cliente inválido para este org')
 
-    const idempotencyKey = buildAppointmentIdempotencyKey({
+    const idempotencyKey =
+      params.idempotencyKey?.trim() ||
+      buildAppointmentIdempotencyKey({
       orgId: params.orgId,
       customerId: params.customerId,
       startsAt,
       endsAt,
       status,
     })
+
+    const idem = await this.idempotency.begin({
+      orgId: params.orgId,
+      scope: 'appointments.create',
+      idempotencyKey,
+      payload: {
+        customerId: params.customerId,
+        startsAt: startsAt.toISOString(),
+        endsAt: endsAt.toISOString(),
+        status,
+        notes,
+      },
+    })
+    if (idem.mode === 'replay') {
+      return idem.response as any
+    }
 
     try {
       const created = await this.prisma.appointment.create({
@@ -355,6 +376,7 @@ export class AppointmentsService {
         },
       })
 
+      await this.idempotency.complete(idem.recordId, created)
       return created
     } catch (e: any) {
       if (isUniqueConflict(e)) {
@@ -364,7 +386,10 @@ export class AppointmentsService {
             customer: { select: { id: true, name: true, phone: true } },
           },
         })
-        if (existing) return existing as any
+        if (existing) {
+          await this.idempotency.complete(idem.recordId, existing)
+          return existing as any
+        }
       }
 
       if (isOverlapDbViolation(e)) {
@@ -401,6 +426,7 @@ export class AppointmentsService {
 
         throw new ConflictException('Conflito de horário: já existe um agendamento nesse intervalo')
       }
+      await this.idempotency.fail(idem.recordId, e?.code)
       throw e
     }
   }

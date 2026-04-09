@@ -8,6 +8,7 @@ import {
   Query,
   UseGuards,
   Res,
+  Headers,
 } from '@nestjs/common'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
@@ -60,6 +61,7 @@ export class CustomersController {
   async create(
     @Org() orgId: string,
     @User() user: any,
+    @Headers('idempotency-key') idempotencyKeyHeader: string | undefined,
     @Body() body: CreateCustomerDto,
   ) {
     // Validar quota antes de criar
@@ -76,6 +78,7 @@ export class CustomersController {
       phone: body.phone,
       email: body.email,
       notes: body.notes,
+      idempotencyKey: body.idempotencyKey ?? idempotencyKeyHeader,
     })
   }
 
