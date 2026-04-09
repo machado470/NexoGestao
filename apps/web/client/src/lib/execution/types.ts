@@ -92,7 +92,8 @@ export type ExecutionLogStatus =
   | "pending"
   | "blocked"
   | "throttled"
-  | "restricted";
+  | "restricted"
+  | "requires_confirmation";
 
 export type ExecutionLog = {
   id: string;
@@ -100,6 +101,7 @@ export type ExecutionLog = {
   decisionId: string;
   executionKey?: string;
   executedAt: number;
+  timestamp?: string;
   status: ExecutionLogStatus;
   entityType?: OperationalEntityType;
   entityId?: string;
@@ -108,6 +110,14 @@ export type ExecutionLog = {
   reasonCode?: string;
   message?: string;
   telemetryKey?: string;
+};
+
+export type ExecutionStateSummary = {
+  pending: number;
+  executed: number;
+  failed: number;
+  blocked: number;
+  throttled: number;
 };
 
 export type ExecuteActionContext = {

@@ -1,4 +1,4 @@
-import type { ExecutionLog } from "@/lib/execution/types";
+import type { ExecutionAction, ExecutionLog } from "@/lib/execution/types";
 
 const IDEMPOTENCY_WINDOW_MS = 1000 * 60 * 30;
 
@@ -27,8 +27,23 @@ function hashString(input: string): string {
   return `exec_${Math.abs(hash).toString(36)}`;
 }
 
-export function buildExecutionKey(actionId: string, payload?: Record<string, unknown>) {
-  return hashString(`${actionId}:${stableStringify(payload ?? {})}`);
+export function buildExecutionKey(action: ExecutionAction, context: {
+  decisionId?: string;
+  entityType?: string;
+  entityId?: string;
+  source?: string;
+}) {
+  return hashString(
+    stableStringify({
+      actionId: action.id,
+      mode: action.mode,
+      payload: action.payload ?? {},
+      decisionId: context.decisionId ?? null,
+      entityType: context.entityType ?? null,
+      entityId: context.entityId ?? null,
+      source: context.source ?? null,
+    })
+  );
 }
 
 export function hasRecentExecutionByKey(input: {

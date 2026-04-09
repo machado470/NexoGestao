@@ -8,7 +8,8 @@ type ExecutionLogStatus =
   | "pending"
   | "blocked"
   | "throttled"
-  | "restricted";
+  | "restricted"
+  | "requires_confirmation";
 
 type ExecutionEventType =
   | "EXECUTION_ACTION_REQUESTED"
@@ -22,12 +23,13 @@ type ExecutionLogRecord = {
   decisionId: string;
   executionKey?: string;
   status: ExecutionLogStatus;
-  eventType?: ExecutionEventType;
+  eventType: ExecutionEventType;
   mode?: "manual" | "semi_automatic" | "automatic";
   reasonCode?: string;
   message?: string;
   telemetryKey?: string;
   executedAt: number;
+  timestamp: string;
   entityType?: string;
   entityId?: string;
   createdAt: number;
@@ -44,6 +46,7 @@ type ExecutionLogPayload = {
   message?: unknown;
   telemetryKey?: unknown;
   executedAt?: unknown;
+  timestamp?: unknown;
   entityType?: unknown;
   entityId?: unknown;
 };
@@ -91,7 +94,8 @@ function asStatus(value: unknown): ExecutionLogRecord["status"] | null {
     value === "pending" ||
     value === "blocked" ||
     value === "throttled" ||
-    value === "restricted"
+    value === "restricted" ||
+    value === "requires_confirmation"
   ) {
     return value;
   }
@@ -120,6 +124,13 @@ function asMode(value: unknown): ExecutionLogRecord["mode"] | undefined {
   return undefined;
 }
 
+function deriveEventType(status: ExecutionLogRecord["status"]) {
+  if (status === "success") return "EXECUTION_ACTION_EXECUTED" satisfies ExecutionEventType;
+  if (status === "failed") return "EXECUTION_ACTION_FAILED" satisfies ExecutionEventType;
+  if (status === "pending") return "EXECUTION_ACTION_REQUESTED" satisfies ExecutionEventType;
+  return "EXECUTION_ACTION_BLOCKED" satisfies ExecutionEventType;
+}
+
 function normalizePayload(payload: ExecutionLogPayload) {
   const actionId = asNonEmptyString(payload.actionId);
   const decisionId = asNonEmptyString(payload.decisionId);
@@ -130,6 +141,8 @@ function normalizePayload(payload: ExecutionLogPayload) {
   }
 
   const executedAtRaw = typeof payload.executedAt === "number" ? payload.executedAt : Date.now();
+  const executedAt = Number.isFinite(executedAtRaw) ? executedAtRaw : Date.now();
+  const normalizedTimestamp = asNonEmptyString(payload.timestamp) ?? new Date(executedAt).toISOString();
 
   return {
     id: `${actionId}-${decisionId}-${Date.now()}`,
@@ -137,12 +150,13 @@ function normalizePayload(payload: ExecutionLogPayload) {
     decisionId,
     executionKey: asNonEmptyString(payload.executionKey) ?? undefined,
     status,
-    eventType: asEventType(payload.eventType),
+    eventType: asEventType(payload.eventType) ?? deriveEventType(status),
     mode: asMode(payload.mode),
     reasonCode: asNonEmptyString(payload.reasonCode) ?? undefined,
     message: asNonEmptyString(payload.message) ?? undefined,
     telemetryKey: asNonEmptyString(payload.telemetryKey) ?? undefined,
-    executedAt: Number.isFinite(executedAtRaw) ? executedAtRaw : Date.now(),
+    executedAt,
+    timestamp: normalizedTimestamp,
     entityType: asNonEmptyString(payload.entityType) ?? undefined,
     entityId: asNonEmptyString(payload.entityId) ?? undefined,
     createdAt: Date.now(),
@@ -194,5 +208,31 @@ export function registerExecutionLogRoutes(app: Express) {
     });
 
     res.json({ ok: true, logs: filtered });
+  });
+
+  app.get("/execution/state-summary", async (req, res) => {
+    const sinceMs = Number(req.query.sinceMs ?? 1000 * 60 * 60 * 24);
+    const logs = await readLogs();
+    const now = Date.now();
+
+    const scoped = logs.filter((log) => {
+      if (!Number.isFinite(sinceMs) || sinceMs <= 0) return true;
+      return now - log.executedAt <= sinceMs;
+    });
+
+    const summary = {
+      pending: scoped.filter(log => log.status === "pending").length,
+      executed: scoped.filter(log => log.status === "success").length,
+      failed: scoped.filter(log => log.status === "failed").length,
+      blocked: scoped.filter(
+        log =>
+          log.status === "blocked" ||
+          log.status === "restricted" ||
+          log.status === "requires_confirmation"
+      ).length,
+      throttled: scoped.filter(log => log.status === "throttled").length,
+    };
+
+    res.json({ ok: true, summary });
   });
 }

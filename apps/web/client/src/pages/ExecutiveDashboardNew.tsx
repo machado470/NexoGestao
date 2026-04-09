@@ -278,7 +278,9 @@ export default function ExecutiveDashboardNew() {
     queryOptions
   );
   const governanceSummaryQuery = trpc.governance.summary.useQuery(undefined, queryOptions);
+  const executionModeQuery = trpc.nexo.executions.mode.useQuery(undefined, queryOptions);
   const { logs } = useExecutionMemory();
+  const executionMode = String((executionModeQuery.data as any)?.mode ?? "manual");
   const [isSlowLoading, setIsSlowLoading] = useState(false);
   const [optimisticTick, setOptimisticTick] = useState(false);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
@@ -1019,6 +1021,9 @@ export default function ExecutiveDashboardNew() {
 
       <section className="grid gap-6 lg:grid-cols-2">
         <div className="lg:col-span-2">
+          <div className="mb-3 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-xs font-medium text-emerald-800 dark:text-emerald-300">
+            O motor operacional suporta execução híbrida: ações manuais continuam disponíveis e ações automáticas podem rodar sozinhas quando policy + modo permitirem. Modo atual do tenant: {executionMode}.
+          </div>
           <OperationalActionFeed plan={executionPlan} riskOperationalState={riskOperationalState} />
         </div>
         <article className="nexo-surface nexo-fade-in p-5">

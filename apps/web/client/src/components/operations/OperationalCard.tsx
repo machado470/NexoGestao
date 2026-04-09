@@ -92,6 +92,12 @@ export function OperationalCard({ decision, source, riskOperationalState }: Oper
     });
   }, [decision.actions, decision.id, source]);
 
+  const hasAutomaticAction = decision.actions.some(action => action.mode === "automatic");
+  const hasManualOnly = decision.actions.every(action => action.mode === "manual");
+  const recentlyExecuted = Boolean(latestDecisionLog?.status === "success" && Date.now() - latestDecisionLog.executedAt <= 1000 * 60 * 30);
+  const hasBlockedLog = latestDecisionLog?.status === "blocked" || latestDecisionLog?.status === "restricted";
+  const hasThrottledLog = latestDecisionLog?.status === "throttled";
+
   async function handleExecute(action: ExecutionAction) {
     setExecutingActionId(action.id);
 
@@ -146,6 +152,31 @@ export function OperationalCard({ decision, source, riskOperationalState }: Oper
         <span className="inline-flex rounded-full border border-black/10 bg-white/80 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-700 dark:border-white/15 dark:bg-zinc-950/60 dark:text-zinc-200">
           {getStateLabel(decision.state)}
         </span>
+        {hasAutomaticAction ? (
+          <span className="inline-flex rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+            Automático habilitado
+          </span>
+        ) : null}
+        {hasManualOnly ? (
+          <span className="inline-flex rounded-full border border-zinc-500/30 bg-zinc-500/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-700 dark:text-zinc-300">
+            Manual
+          </span>
+        ) : null}
+        {hasBlockedLog ? (
+          <span className="inline-flex rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
+            Bloqueado
+          </span>
+        ) : null}
+        {hasThrottledLog ? (
+          <span className="inline-flex rounded-full border border-orange-500/30 bg-orange-500/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-orange-700 dark:text-orange-300">
+            Throttled
+          </span>
+        ) : null}
+        {recentlyExecuted ? (
+          <span className="inline-flex rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+            Executado recentemente
+          </span>
+        ) : null}
         {decision.state === "invalid" ? (
           <span className="inline-flex items-center gap-1 rounded-full border border-red-500/30 bg-red-500/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-red-700 dark:text-red-300">
             <AlertTriangle className="h-3 w-3" />

@@ -6,6 +6,11 @@ import { FinanceModule } from '../finance/finance.module'
 
 import { ExecutionController } from './execution.controller'
 import { ExecutionService } from './execution.service'
+import { ExecutionRunner } from './execution.runner'
+import { ExecutionScheduler } from './execution.scheduler'
+import { ExecutionConfigService } from './execution.config'
+import { ExecutionGovernanceService } from './execution.governance'
+import { ExecutionEventsService } from './execution.events'
 
 @Module({
   imports: [
@@ -15,7 +20,14 @@ import { ExecutionService } from './execution.service'
     FinanceModule,
   ],
   controllers: [ExecutionController],
-  providers: [ExecutionService],
-  exports: [ExecutionService],
+  providers: [
+    ExecutionService,
+    ExecutionRunner,
+    ExecutionScheduler,
+    ExecutionConfigService,
+    ExecutionGovernanceService,
+    ExecutionEventsService,
+  ],
+  exports: [ExecutionService, ExecutionRunner, ExecutionConfigService],
 })
 export class ExecutionModule {}
