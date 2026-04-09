@@ -11,6 +11,9 @@ import type { ExecutionActionCandidate } from './execution.types'
 @Injectable()
 export class ExecutionRunner {
   private readonly logger = new Logger(ExecutionRunner.name)
+  private hasUsablePhone(phone: string | null | undefined): boolean {
+    return typeof phone === 'string' && phone.trim().length > 0
+  }
 
   constructor(
     private readonly prisma: PrismaService,
@@ -160,7 +163,7 @@ export class ExecutionRunner {
     const alreadySent = new Set(sent.map((item) => item.entityId))
 
     return charges
-      .filter((item) => item.customer.phone.trim().length > 0)
+      .filter((item) => this.hasUsablePhone(item.customer.phone))
       .filter((item) => !alreadySent.has(item.id))
       .map((item) => ({
         actionId: 'action-send-whatsapp-payment-link',
@@ -226,7 +229,7 @@ export class ExecutionRunner {
     })
 
     return overdueCharges
-      .filter((item) => item.customer.phone.trim().length > 0)
+      .filter((item) => this.hasUsablePhone(item.customer.phone))
       .map((item) => ({
         actionId: 'action-send-overdue-charge-reminder',
         decisionId: 'decision-overdue-charge-reminder',
@@ -646,12 +649,18 @@ export class ExecutionRunner {
           id: candidate.entityId,
           orgId: candidate.orgId,
           status: { in: ['PENDING', 'OVERDUE'] },
-          customer: { phone: { not: null } },
         },
-        select: { id: true },
+        select: {
+          id: true,
+          customer: {
+            select: {
+              phone: true,
+            },
+          },
+        },
       })
 
-      if (!charge) {
+      if (!charge || !this.hasUsablePhone(charge.customer.phone)) {
         throw new Error('charge_not_eligible_for_payment_link')
       }
 
@@ -681,12 +690,18 @@ export class ExecutionRunner {
           id: candidate.entityId,
           orgId: candidate.orgId,
           status: 'OVERDUE',
-          customer: { phone: { not: null } },
         },
-        select: { id: true },
+        select: {
+          id: true,
+          customer: {
+            select: {
+              phone: true,
+            },
+          },
+        },
       })
 
-      if (!charge) {
+      if (!charge || !this.hasUsablePhone(charge.customer.phone)) {
         throw new Error('charge_not_eligible_for_overdue_reminder')
       }
 
