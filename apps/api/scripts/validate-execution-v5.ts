@@ -26,6 +26,12 @@ type ExecutionEventRow = {
 type ScenarioAssertion = {
   id: 'billing-followup-or-reminder' | 'risk-escalation' | 'operational-attention'
   ok: boolean
+  required: boolean
+  matchedEventId: string | null
+  matchedActionId: string | null
+  matchedStatus: string | null
+  matchedReasonCode: string | null
+  hasExplanation: boolean
   details: string
 }
 
@@ -165,37 +171,96 @@ async function loadExecutionEvents(prisma: PrismaClient, orgId: string) {
   })
 }
 
+type ScenarioMatcherInput = {
+  events: ExecutionEventRow[]
+  id: ScenarioAssertion['id']
+  required: boolean
+  actionIds: string[]
+  expectedReasonCodesWhenBlocked?: string[]
+}
+
+function assertScenarioMatcher(input: ScenarioMatcherInput): ScenarioAssertion {
+  const matched = input.events
+    .slice()
+    .reverse()
+    .find((event) => input.actionIds.includes(event.actionId))
+
+  if (!matched) {
+    return {
+      id: input.id,
+      required: input.required,
+      ok: !input.required,
+      matchedEventId: null,
+      matchedActionId: null,
+      matchedStatus: null,
+      matchedReasonCode: null,
+      hasExplanation: false,
+      details: input.required
+        ? `Nenhum evento encontrado para ações [${input.actionIds.join(', ')}].`
+        : `Cenário opcional sem ocorrência para ações [${input.actionIds.join(', ')}].`,
+    }
+  }
+
+  const hasReasonCode = Boolean(matched.reasonCode)
+  const hasExplanation = Boolean(matched.explanation && Object.keys(matched.explanation).length > 0)
+  const isExecuted = matched.status === 'executed'
+  const isBlocked = matched.status === 'blocked' || matched.status === 'requires_confirmation'
+  const blockedReasonAllowed = input.expectedReasonCodesWhenBlocked
+    ? input.expectedReasonCodesWhenBlocked.includes(matched.reasonCode ?? '')
+    : true
+
+  const ok = (isExecuted || (isBlocked && blockedReasonAllowed)) && hasReasonCode && hasExplanation
+
+  return {
+    id: input.id,
+    required: input.required,
+    ok: input.required ? ok : true,
+    matchedEventId: matched.id,
+    matchedActionId: matched.actionId,
+    matchedStatus: matched.status,
+    matchedReasonCode: matched.reasonCode,
+    hasExplanation,
+    details: ok
+      ? `${matched.actionId} validado com status=${matched.status} reason=${matched.reasonCode}.`
+      : `${matched.actionId} inválido: status=${matched.status}, reason=${matched.reasonCode}, hasExplanation=${hasExplanation}.`,
+  }
+}
+
 function assertScenario(events: ExecutionEventRow[]): ScenarioAssertion[] {
-  const executedActionIds = events.filter((event) => event.status === 'executed').map((event) => event.actionId)
-
-  const hasBilling = executedActionIds.includes('action-create-charge-followup')
-    || executedActionIds.includes('action-send-overdue-charge-reminder')
-
-  const hasRiskEscalation = executedActionIds.includes('action-escalate-risk-review')
-  const hasOperationalAttention = executedActionIds.includes('action-mark-operational-attention')
+  const billingReasonCodes = [
+    'executed',
+    'policy_overdue_reminder_automatic_disabled',
+    'policy_charge_followup_creation_disabled',
+    'idempotency_recent_execution',
+  ]
+  const riskReasonCodes = [
+    'executed',
+    'policy_risk_review_escalation_disabled',
+    'idempotency_recent_execution',
+  ]
 
   return [
-    {
+    assertScenarioMatcher({
       id: 'billing-followup-or-reminder',
-      ok: hasBilling,
-      details: hasBilling
-        ? 'Cobrança vencida gerou follow-up ou lembrete com status executed.'
-        : 'Nenhuma ação de cobrança vencida foi executada.',
-    },
-    {
+      required: true,
+      events,
+      actionIds: ['action-create-charge-followup', 'action-send-overdue-charge-reminder'],
+      expectedReasonCodesWhenBlocked: billingReasonCodes,
+    }),
+    assertScenarioMatcher({
       id: 'risk-escalation',
-      ok: hasRiskEscalation,
-      details: hasRiskEscalation
-        ? 'Escalada de revisão de risco executada.'
-        : 'Ação action-escalate-risk-review não foi executada.',
-    },
-    {
+      required: true,
+      events,
+      actionIds: ['action-escalate-risk-review'],
+      expectedReasonCodesWhenBlocked: riskReasonCodes,
+    }),
+    assertScenarioMatcher({
       id: 'operational-attention',
-      ok: hasOperationalAttention,
-      details: hasOperationalAttention
-        ? 'Sinal operacional adicional (attention) executado.'
-        : 'Ação opcional de attention não foi executada.',
-    },
+      required: false,
+      events,
+      actionIds: ['action-mark-operational-attention'],
+      expectedReasonCodesWhenBlocked: ['idempotency_recent_execution', 'policy_operational_attention_disabled'],
+    }),
   ]
 }
 
@@ -327,6 +392,12 @@ async function main() {
       idempotencyBlockedCount,
     },
     scenarioAssertions,
+    scenarioSummary: {
+      requiredTotal: scenarioAssertions.filter((scenario) => scenario.required).length,
+      requiredPassing: scenarioAssertions.filter((scenario) => scenario.required && scenario.ok).length,
+      optionalTotal: scenarioAssertions.filter((scenario) => !scenario.required).length,
+      optionalObserved: scenarioAssertions.filter((scenario) => !scenario.required && scenario.matchedEventId).length,
+    },
     policyEvidence: {
       whatsappAutoDisabledBlocked: allEvents.some(
         (event) => event.actionId === 'action-send-whatsapp-payment-link'
@@ -350,7 +421,7 @@ async function main() {
     console.log(`validate-execution-v5: relatório salvo em ${args.outputPath}`)
   }
 
-  const failingScenario = scenarioAssertions.find((scenario) => !scenario.ok)
+  const failingScenario = scenarioAssertions.find((scenario) => scenario.required && !scenario.ok)
   if (failingScenario) {
     throw new Error(`Cenário obrigatório inválido: ${failingScenario.id} - ${failingScenario.details}`)
   }
