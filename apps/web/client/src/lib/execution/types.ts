@@ -62,6 +62,14 @@ export type ExecuteActionResult = {
   message?: string;
 };
 
+export type ExecutionLog = {
+  id: string;
+  actionId: string;
+  decisionId: string;
+  executedAt: number;
+  status: "success" | "failed";
+};
+
 export type ExecuteActionContext = {
   source: ExecutionSource;
   decisionId?: string;

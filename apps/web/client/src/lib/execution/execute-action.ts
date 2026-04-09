@@ -7,7 +7,10 @@ import type {
 export type ExecuteActionAdapters = {
   navigate: (path: string) => void;
   openExternal: (url: string) => void;
-  mutate?: (mutationKey: string, payload?: Record<string, unknown>) => Promise<void>;
+  mutate?: (
+    mutationKey: string,
+    payload?: Record<string, unknown>
+  ) => Promise<{ message?: string } | void>;
 };
 
 export async function executeExecutionAction(
@@ -67,8 +70,8 @@ export async function executeExecutionAction(
         };
       }
 
-      await adapters.mutate(action.mutationKey, action.payload);
-      return { ok: true, status: "executed" };
+      const mutationResult = await adapters.mutate(action.mutationKey, action.payload);
+      return { ok: true, status: "executed", message: mutationResult?.message };
     }
 
     if (action.kind === "future") {

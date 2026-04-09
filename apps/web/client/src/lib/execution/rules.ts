@@ -1,8 +1,10 @@
 import type {
+  ExecutionLog,
   ExecutionPlan,
   ExecutionSeverity,
   OperationalDecision,
 } from "@/lib/execution/types";
+import { buildWhatsAppUrlFromCharge } from "@/lib/operations/operations.utils";
 
 export type DashboardExecutionFacts = {
   totalCustomers: number;
@@ -12,6 +14,20 @@ export type DashboardExecutionFacts = {
   overdueCharges: number;
   todayAppointments: number;
   hasWhatsappContext: boolean;
+  doneWithoutChargeCandidate?: {
+    serviceOrderId: string;
+    customerName?: string | null;
+    amountCents?: number | null;
+  } | null;
+  overdueChargeCandidate?: {
+    chargeId: string;
+    customerId?: string | null;
+    customerName?: string | null;
+    amountCents?: number | null;
+    daysOverdue?: number | null;
+    dueDate?: string | null;
+  } | null;
+  executionLogs?: ExecutionLog[];
 };
 
 function severityWeight(severity: ExecutionSeverity) {
@@ -30,6 +46,14 @@ export function sortDecisions(decisions: OperationalDecision[]) {
 
 export function buildDashboardRules(facts: DashboardExecutionFacts) {
   const decisions: OperationalDecision[] = [];
+  const executed = new Set(
+    (facts.executionLogs ?? [])
+      .filter(log => log.status === "success")
+      .map(log => `${log.decisionId}:${log.actionId}`)
+  );
+
+  const wasExecuted = (decisionId: string, actionId: string) =>
+    executed.has(`${decisionId}:${actionId}`);
 
   const doneWithoutCharge = Math.max(
     facts.completedOrders - facts.chargesGenerated,
@@ -51,12 +75,25 @@ export function buildDashboardRules(facts: DashboardExecutionFacts) {
       actions: [
         {
           id: "action-generate-charge",
-          kind: "navigate",
+          kind:
+            facts.doneWithoutChargeCandidate?.serviceOrderId
+              ? "mutation"
+              : "navigate",
           intent: "primary",
-          label: "Gerar cobrança",
-          description: "Abrir financeiro com foco em cobrança.",
+          label: facts.doneWithoutChargeCandidate?.serviceOrderId
+            ? "Gerar cobrança agora"
+            : "Gerar cobrança",
+          description: facts.doneWithoutChargeCandidate?.serviceOrderId
+            ? "Executar geração de cobrança da O.S. crítica."
+            : "Abrir financeiro com foco em cobrança.",
           enabled: true,
           target: "/finances?filter=ready_to_charge",
+          mutationKey: facts.doneWithoutChargeCandidate?.serviceOrderId
+            ? "service_order.generate_charge"
+            : undefined,
+          payload: facts.doneWithoutChargeCandidate?.serviceOrderId
+            ? { serviceOrderId: facts.doneWithoutChargeCandidate.serviceOrderId }
+            : undefined,
           telemetryKey: "execution.generate_charge_from_dashboard",
         },
         {
@@ -80,7 +117,15 @@ export function buildDashboardRules(facts: DashboardExecutionFacts) {
       severity: "critical",
       state: "ready",
       title: "Cobranças vencidas exigem recuperação",
-      summary: `${facts.overdueCharges} cobrança(s) vencida(s) com impacto direto no caixa.`,
+      summary: facts.overdueChargeCandidate?.customerName
+        ? `Cliente ${facts.overdueChargeCandidate.customerName} com cobrança de ${new Intl.NumberFormat(
+            "pt-BR",
+            { style: "currency", currency: "BRL" }
+          ).format(Number(facts.overdueChargeCandidate.amountCents ?? 0) / 100)} vencida há ${Math.max(
+            Number(facts.overdueChargeCandidate.daysOverdue ?? 0),
+            0
+          )} dia(s).`
+        : `${facts.overdueCharges} cobrança(s) vencida(s) com impacto direto no caixa.`,
       reasonCodes: ["charge_overdue", "cashflow_risk"],
       suggestedActionId: "action-open-finance-overdue",
       priority: 95,
@@ -97,12 +142,35 @@ export function buildDashboardRules(facts: DashboardExecutionFacts) {
         },
         {
           id: "action-charge-on-whatsapp",
-          kind: "navigate",
+          kind: "external",
           intent: "secondary",
           label: "Cobrar no WhatsApp",
-          enabled: true,
-          target: "/whatsapp",
+          enabled: Boolean(
+            facts.overdueChargeCandidate && buildWhatsAppUrlFromCharge(facts.overdueChargeCandidate)
+          ),
+          disabledReason:
+            "Selecione uma cobrança com cliente identificado para abrir o WhatsApp com contexto.",
+          externalUrl:
+            buildWhatsAppUrlFromCharge(facts.overdueChargeCandidate) ?? undefined,
           telemetryKey: "execution.open_whatsapp_for_charge",
+        },
+        {
+          id: "action-mark-charge-paid",
+          kind: "mutation",
+          intent: "secondary",
+          label: "Registrar pagamento",
+          enabled: Boolean(
+            facts.overdueChargeCandidate?.chargeId &&
+              typeof facts.overdueChargeCandidate?.amountCents === "number"
+          ),
+          mutationKey: "finance.charge.mark_paid",
+          payload: facts.overdueChargeCandidate?.chargeId
+            ? {
+                chargeId: facts.overdueChargeCandidate.chargeId,
+                amountCents: facts.overdueChargeCandidate.amountCents ?? 0,
+              }
+            : undefined,
+          telemetryKey: "execution.mark_charge_paid",
         },
       ],
     });
@@ -232,7 +300,48 @@ export function buildDashboardRules(facts: DashboardExecutionFacts) {
     });
   }
 
-  return sortDecisions(decisions);
+  const filtered = decisions
+    .map(decision => {
+      const actions = decision.actions.filter(action => !wasExecuted(decision.id, action.id));
+      if (actions.length === 0) return null;
+      return {
+        ...decision,
+        actions,
+        suggestedActionId: actions.some(action => action.id === decision.suggestedActionId)
+          ? decision.suggestedActionId
+          : actions[0]?.id,
+      };
+    })
+    .filter((decision): decision is OperationalDecision => Boolean(decision));
+
+  if (filtered.length === 0) {
+    return [
+      {
+        id: "decision-operational-healthy",
+        entityType: "system",
+        entityId: "operational-healthy",
+        severity: "normal",
+        state: "completed",
+        title: "Fluxo operacional estável",
+        summary: "Sem bloqueios imediatos na execução operacional agora.",
+        reasonCodes: ["healthy_flow"],
+        suggestedActionId: "action-review-dashboard",
+        priority: 1,
+        actions: [
+          {
+            id: "action-review-dashboard",
+            kind: "future",
+            intent: "secondary",
+            label: "Manter monitoramento",
+            enabled: true,
+            telemetryKey: "execution.keep_monitoring",
+          },
+        ],
+      },
+    ];
+  }
+
+  return sortDecisions(filtered);
 }
 
 export function withSortedDecisions(plan: ExecutionPlan): ExecutionPlan {
