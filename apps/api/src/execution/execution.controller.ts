@@ -55,6 +55,18 @@ function sanitizePolicyPatch(policy: unknown): Partial<ExecutionPolicyConfig> {
     }
     result.allowGovernanceFollowup = input.allowGovernanceFollowup
   }
+  if (input.allowChargeFollowupCreation !== undefined) {
+    if (typeof input.allowChargeFollowupCreation !== 'boolean') {
+      throw new BadRequestException('allowChargeFollowupCreation deve ser boolean')
+    }
+    result.allowChargeFollowupCreation = input.allowChargeFollowupCreation
+  }
+  if (input.allowRiskReviewEscalation !== undefined) {
+    if (typeof input.allowRiskReviewEscalation !== 'boolean') {
+      throw new BadRequestException('allowRiskReviewEscalation deve ser boolean')
+    }
+    result.allowRiskReviewEscalation = input.allowRiskReviewEscalation
+  }
 
   if (input.maxRetries !== undefined) {
     if (!Number.isInteger(input.maxRetries) || Number(input.maxRetries) < 0 || Number(input.maxRetries) > 20) {
@@ -127,6 +139,7 @@ export class ExecutionController {
   @Roles('ADMIN', 'MANAGER')
   async updateMode(
     @Org() orgId: string,
+    @User() user: any,
     @Body() body: { mode?: ExecutionMode; policy?: Partial<ExecutionPolicyConfig>; resetToDefault?: boolean },
   ) {
     if (!body || typeof body !== 'object') {
@@ -137,15 +150,43 @@ export class ExecutionController {
       throw new BadRequestException('mode inválido')
     }
 
+    let modeChange: { before: ExecutionMode; after: ExecutionMode } | null = null
+    let policyChange:
+      | {
+          before: ExecutionPolicyConfig
+          after: ExecutionPolicyConfig
+          persistedOverride: Partial<ExecutionPolicyConfig>
+        }
+      | null = null
+
     if (body?.mode) {
-      await this.config.setExecutionModeForOrg(orgId, body.mode)
+      modeChange = await this.config.setExecutionModeForOrg(orgId, body.mode)
     } else if (body?.resetToDefault) {
-      await this.config.setExecutionModeForOrg(orgId, this.config.getDefaultMode())
+      modeChange = await this.config.setExecutionModeForOrg(orgId, this.config.getDefaultMode())
     }
 
     if (body?.policy !== undefined) {
       const sanitized = sanitizePolicyPatch(body.policy)
-      await this.config.setPolicyOverrideForOrg(orgId, sanitized)
+      policyChange = await this.config.setPolicyOverrideForOrg(orgId, sanitized)
+    }
+
+    if (modeChange || policyChange) {
+      await this.config.recordConfigHistory({
+        orgId,
+        actorUserId: typeof user?.id === 'string' ? user.id : null,
+        actorEmail: typeof user?.email === 'string' ? user.email : null,
+        source: 'execution.mode.update',
+        context: body?.resetToDefault ? 'reset_to_default' : 'manual_update',
+        before: {
+          mode: modeChange?.before,
+          policy: policyChange?.before,
+        },
+        after: {
+          mode: modeChange?.after,
+          policy: policyChange?.after,
+          persistedPolicyOverride: policyChange?.persistedOverride,
+        },
+      })
     }
 
     return {
@@ -153,6 +194,13 @@ export class ExecutionController {
       mode: await this.config.getExecutionMode({ orgId }),
       policy: await this.config.getPolicyConfig({ orgId }),
     }
+  }
+
+  @Get('mode-history')
+  @Roles('ADMIN', 'MANAGER', 'STAFF', 'VIEWER')
+  listModeHistory(@Org() orgId: string, @Query('limit') limit?: string) {
+    const normalizedLimit = Number(limit ?? 20)
+    return this.config.listConfigHistory(orgId, Number.isFinite(normalizedLimit) ? normalizedLimit : 20)
   }
 
   @Get('events')

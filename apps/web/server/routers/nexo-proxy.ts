@@ -634,6 +634,8 @@ export const nexoProxyRouter = router({
               allowOverdueReminderAuto: z.boolean().optional(),
               allowFinanceTeamNotifications: z.boolean().optional(),
               allowGovernanceFollowup: z.boolean().optional(),
+              allowChargeFollowupCreation: z.boolean().optional(),
+              allowRiskReviewEscalation: z.boolean().optional(),
               maxRetries: z.number().int().min(0).optional(),
               throttleWindowMs: z.number().int().min(5000).optional(),
             })
@@ -663,6 +665,12 @@ export const nexoProxyRouter = router({
       )
       .query(async ({ ctx, input }) => {
         return authedGet(ctx as CtxLike, "/executions/events", input ?? {});
+      }),
+
+    modeHistory: protectedProcedure
+      .input(z.object({ limit: z.number().int().min(1).max(100).optional() }).optional())
+      .query(async ({ ctx, input }) => {
+        return authedGet(ctx as CtxLike, "/executions/mode-history", input ?? {});
       }),
 
     runOnce: protectedProcedure.mutation(async ({ ctx }) => {

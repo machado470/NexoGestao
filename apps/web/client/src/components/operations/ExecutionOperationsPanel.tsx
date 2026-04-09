@@ -17,6 +17,8 @@ type ExecutionPolicy = {
   allowOverdueReminderAuto?: boolean;
   allowFinanceTeamNotifications?: boolean;
   allowGovernanceFollowup?: boolean;
+  allowChargeFollowupCreation?: boolean;
+  allowRiskReviewEscalation?: boolean;
   maxRetries?: number;
   throttleWindowMs?: number;
 };
@@ -25,7 +27,9 @@ type PolicyBooleanKey =
   | "allowWhatsAppAuto"
   | "allowOverdueReminderAuto"
   | "allowFinanceTeamNotifications"
-  | "allowGovernanceFollowup";
+  | "allowGovernanceFollowup"
+  | "allowChargeFollowupCreation"
+  | "allowRiskReviewEscalation";
 
 type ModePayload = { mode?: ExecutionMode; policy?: ExecutionPolicy };
 type ExecutionStateSummary = { pending?: number; executed?: number; failed?: number; blocked?: number; throttled?: number };
@@ -37,7 +41,16 @@ type ExecutionEvent = {
   status?: string;
   reasonCode?: string | null;
   timestamp?: string;
-  diagnostics?: { executionKey?: string | null };
+  diagnostics?: { executionKey?: string | null; explanation?: Record<string, unknown> | null };
+};
+type ConfigHistoryEntry = {
+  id: string;
+  actorEmail?: string | null;
+  source?: string | null;
+  context?: string | null;
+  changedAt?: string;
+  before?: Record<string, unknown>;
+  after?: Record<string, unknown>;
 };
 
 function modeLabel(mode?: ExecutionMode) {
@@ -72,6 +85,18 @@ export function ExecutionOperationsPanel() {
   const [draftMode, setDraftMode] = useState<ExecutionMode>("manual");
   const [draftPolicy, setDraftPolicy] = useState<ExecutionPolicy>({});
 
+  const defaultPolicy: Required<ExecutionPolicy> = {
+    allowAutomaticCharge: true,
+    allowWhatsAppAuto: false,
+    allowOverdueReminderAuto: true,
+    allowFinanceTeamNotifications: true,
+    allowGovernanceFollowup: true,
+    allowChargeFollowupCreation: true,
+    allowRiskReviewEscalation: true,
+    maxRetries: 3,
+    throttleWindowMs: 1800000,
+  };
+
   const utils = trpc.useUtils();
   const modeQuery = trpc.nexo.executions.mode.useQuery(undefined, { retry: false });
   const summaryQuery = trpc.nexo.executions.stateSummary.useQuery({ sinceMs: 1000 * 60 * 60 * 24 }, { retry: false });
@@ -84,6 +109,7 @@ export function ExecutionOperationsPanel() {
     },
     { retry: false }
   );
+  const modeHistoryQuery = trpc.nexo.executions.modeHistory.useQuery({ limit: 8 }, { retry: false });
 
   const updateMode = trpc.nexo.executions.updateMode.useMutation({
     onSuccess: async () => {
@@ -91,6 +117,7 @@ export function ExecutionOperationsPanel() {
         utils.nexo.executions.mode.invalidate(),
         utils.nexo.executions.events.invalidate(),
         utils.nexo.executions.stateSummary.invalidate(),
+        utils.nexo.executions.modeHistory.invalidate(),
       ]);
     },
   });
@@ -98,6 +125,7 @@ export function ExecutionOperationsPanel() {
   const modePayload = useMemo(() => getPayloadValue<ModePayload>(modeQuery.data) ?? {}, [modeQuery.data]);
   const summary = useMemo(() => getPayloadValue<ExecutionStateSummary>(summaryQuery.data) ?? {}, [summaryQuery.data]);
   const events = useMemo(() => normalizeArrayPayload<ExecutionEvent>(eventsQuery.data), [eventsQuery.data]);
+  const modeHistory = useMemo(() => normalizeArrayPayload<ConfigHistoryEntry>(modeHistoryQuery.data), [modeHistoryQuery.data]);
 
   const isLoading = modeQuery.isLoading || summaryQuery.isLoading || eventsQuery.isLoading;
 
@@ -120,6 +148,8 @@ export function ExecutionOperationsPanel() {
         allowOverdueReminderAuto: Boolean(draftPolicy.allowOverdueReminderAuto),
         allowFinanceTeamNotifications: Boolean(draftPolicy.allowFinanceTeamNotifications),
         allowGovernanceFollowup: Boolean(draftPolicy.allowGovernanceFollowup),
+        allowChargeFollowupCreation: Boolean(draftPolicy.allowChargeFollowupCreation),
+        allowRiskReviewEscalation: Boolean(draftPolicy.allowRiskReviewEscalation),
         maxRetries: retries,
         throttleWindowMs: throttle,
       },
@@ -147,6 +177,10 @@ export function ExecutionOperationsPanel() {
       </div>
 
       <div className="rounded-xl border border-zinc-700 bg-zinc-900/40 p-4 space-y-3">
+        <div className="rounded-lg border border-zinc-700/70 bg-zinc-950/30 p-3 text-xs text-zinc-300">
+          <p><strong>Config atual:</strong> mode {modeLabel(modePayload.mode)} · retries {Number(draftPolicy.maxRetries ?? defaultPolicy.maxRetries)} · throttle {Number(draftPolicy.throttleWindowMs ?? defaultPolicy.throttleWindowMs)}ms</p>
+          <p className="mt-1"><strong>Default/fallback:</strong> mode Manual · retries {defaultPolicy.maxRetries} · throttle {defaultPolicy.throttleWindowMs}ms</p>
+        </div>
         <div className="flex items-center justify-between gap-2"><h3 className="text-sm font-semibold text-zinc-100">Administração de mode/policy</h3>{!canEdit ? <span className="text-xs text-zinc-400">Sem permissão de edição</span> : null}</div>
         <div className="grid gap-3 md:grid-cols-3">
           <Select value={draftMode} onValueChange={(v) => setDraftMode(v as ExecutionMode)} disabled={!canEdit || updateMode.isPending}>
@@ -167,6 +201,8 @@ export function ExecutionOperationsPanel() {
             ["allowOverdueReminderAuto", "Lembrete de vencida"],
             ["allowFinanceTeamNotifications", "Notificar equipe financeira"],
             ["allowGovernanceFollowup", "Marcar atenção operacional"],
+            ["allowChargeFollowupCreation", "Criar follow-up cobrança"],
+            ["allowRiskReviewEscalation", "Escalar revisão de risco"],
           ] as [PolicyBooleanKey, string][]).map(([key, label]) => (
             <label key={key} className="rounded-lg border border-zinc-700 p-2 flex items-center justify-between gap-2">
               <span>{label}</span>
@@ -178,7 +214,33 @@ export function ExecutionOperationsPanel() {
             </label>
           ))}
         </div>
+        <div className="rounded-lg border border-zinc-700/70 bg-zinc-950/30 p-3 text-xs text-zinc-300">
+          <p className="font-semibold text-zinc-100">Overrides ativos vs default</p>
+          <ul className="mt-2 space-y-1">
+            {(Object.keys(defaultPolicy) as (keyof ExecutionPolicy)[])
+              .filter((key) => draftPolicy[key] !== undefined && draftPolicy[key] !== defaultPolicy[key])
+              .map((key) => (
+                <li key={String(key)}>{String(key)}: default={String(defaultPolicy[key])} → atual={String(draftPolicy[key])}</li>
+              ))}
+          </ul>
+        </div>
         <div className="flex justify-end"><Button onClick={() => void saveConfig()} disabled={!canEdit || updateMode.isPending}>{updateMode.isPending ? "Salvando..." : "Salvar configuração"}</Button></div>
+      </div>
+
+      <div className="rounded-xl border border-zinc-700 bg-zinc-900/40 p-4 space-y-3">
+        <h3 className="text-sm font-semibold text-zinc-100">Histórico auditável de configuração</h3>
+        {modeHistory.length === 0 ? (
+          <p className="text-xs text-zinc-500">Sem alterações recentes de mode/policy.</p>
+        ) : (
+          modeHistory.map((entry) => (
+            <div key={entry.id} className="rounded-lg border border-zinc-700/80 bg-zinc-950/40 p-3 text-xs text-zinc-300">
+              <p>{formatTimestamp(entry.changedAt)} · por <strong>{entry.actorEmail || "sistema"}</strong> · fonte {entry.source || "—"}</p>
+              <p className="mt-1">Contexto: {entry.context || "—"}</p>
+              <p className="mt-1">Before: {JSON.stringify(entry.before ?? {})}</p>
+              <p className="mt-1">After: {JSON.stringify(entry.after ?? {})}</p>
+            </div>
+          ))
+        )}
       </div>
 
       <div className="rounded-xl border border-zinc-700 bg-zinc-900/40 p-4 space-y-3">
@@ -220,6 +282,7 @@ export function ExecutionOperationsPanel() {
                 <div className="mt-1 text-xs text-zinc-300">Entidade: <strong>{event.entityType || "—"}</strong> · {event.entityId || "—"}</div>
                 <div className="mt-1 text-xs text-zinc-400">Motivo (reasonCode): <strong>{event.reasonCode || "—"}</strong> · {formatTimestamp(event.timestamp)}</div>
                 <div className="mt-1 text-[11px] text-zinc-500">Diagnóstico: executionKey {event.diagnostics?.executionKey ?? "—"}</div>
+                {event.diagnostics?.explanation ? <div className="mt-1 text-[11px] text-zinc-500">Explicação: {JSON.stringify(event.diagnostics.explanation)}</div> : null}
               </div>
             ))
           )}
