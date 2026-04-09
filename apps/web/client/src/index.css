@@ -59,6 +59,9 @@
 
 :root {
   --radius: 0.9rem;
+  --radius-panel: 1.1rem;
+  --radius-surface: 0.95rem;
+  --radius-control: 0.7rem;
 
   --primary: #f97316;
   --primary-foreground: #fff7ed;
@@ -102,6 +105,25 @@
   --sidebar-accent-foreground: #0f172a;
   --sidebar-border: #e5e7eb;
   --sidebar-ring: #f97316;
+
+  --nexo-app-bg: #f6f8fb;
+  --nexo-surface-1: rgba(255, 255, 255, 0.92);
+  --nexo-surface-2: #ffffff;
+  --nexo-border-soft: #e2e8f0;
+  --nexo-border-strong: #cbd5e1;
+  --nexo-shadow-soft: 0 6px 18px rgba(15, 23, 42, 0.05);
+  --nexo-shadow-panel: 0 14px 42px rgba(15, 23, 42, 0.08);
+  --nexo-focus-ring: rgba(249, 115, 22, 0.28);
+  --nexo-title-font:
+    "Outfit",
+    "Inter",
+    system-ui,
+    sans-serif;
+  --nexo-body-font:
+    "DM Sans",
+    "Inter",
+    system-ui,
+    sans-serif;
 }
 
 .dark {
@@ -147,6 +169,15 @@
   --sidebar-accent-foreground: #f4f4f5;
   --sidebar-border: rgba(255, 255, 255, 0.06);
   --sidebar-ring: rgba(251, 146, 60, 0.4);
+
+  --nexo-app-bg: #070b11;
+  --nexo-surface-1: rgba(12, 16, 23, 0.92);
+  --nexo-surface-2: rgba(17, 22, 31, 0.94);
+  --nexo-border-soft: rgba(148, 163, 184, 0.2);
+  --nexo-border-strong: rgba(148, 163, 184, 0.36);
+  --nexo-shadow-soft: 0 10px 24px rgba(2, 6, 23, 0.36);
+  --nexo-shadow-panel: 0 22px 56px rgba(2, 6, 23, 0.55);
+  --nexo-focus-ring: rgba(251, 146, 60, 0.32);
 }
 
 @layer base {
@@ -186,14 +217,7 @@
   }
 
   body {
-    font-family:
-      "Inter",
-      system-ui,
-      -apple-system,
-      "Segoe UI",
-      Roboto,
-      Arial,
-      sans-serif;
+    font-family: var(--nexo-body-font);
     background: var(--background);
     scrollbar-width: thin;
     scrollbar-color: #cbd5e1 #f8fafc;
@@ -301,7 +325,19 @@ body::-webkit-scrollbar-thumb:hover {
   }
 
   .nexo-app-shell {
-    @apply min-h-screen bg-background dark:bg-background;
+    @apply min-h-screen;
+    background:
+      radial-gradient(
+        circle at 15% -10%,
+        rgba(249, 115, 22, 0.1),
+        transparent 34%
+      ),
+      radial-gradient(
+        circle at 90% -20%,
+        rgba(124, 58, 237, 0.08),
+        transparent 38%
+      ),
+      var(--nexo-app-bg);
   }
 
   .nexo-app-panel {
@@ -309,11 +345,18 @@ body::-webkit-scrollbar-thumb:hover {
   }
 
   .nexo-app-panel-strong {
-    @apply rounded-[1.35rem] border border-slate-200/80 bg-white/90 backdrop-blur-xl shadow-sm dark:border-white/8 dark:bg-[linear-gradient(180deg,rgba(17,19,24,0.97),rgba(12,14,18,0.94))] dark:shadow-[0_18px_60px_rgba(0,0,0,0.45)];
+    @apply backdrop-blur-xl;
+    border-radius: var(--radius-panel);
+    border: 1px solid var(--nexo-border-soft);
+    background: var(--nexo-surface-1);
+    box-shadow: var(--nexo-shadow-panel);
   }
 
   .nexo-app-content {
-    @apply rounded-[1.35rem] border border-slate-200/70 bg-background backdrop-blur-none dark:border-white/6 dark:bg-background;
+    border-radius: var(--radius-panel);
+    border: 1px solid var(--nexo-border-soft);
+    background: var(--nexo-surface-2);
+    box-shadow: var(--nexo-shadow-soft);
   }
 
   .nexo-surface {
@@ -353,6 +396,7 @@ body::-webkit-scrollbar-thumb:hover {
 
   .nexo-section-title {
     @apply text-base font-semibold tracking-tight text-zinc-950 dark:text-white;
+    font-family: var(--nexo-title-font);
   }
 
   .nexo-section-description {
@@ -398,6 +442,63 @@ body::-webkit-scrollbar-thumb:hover {
 
   .nexo-fade-in {
     animation: nexo-fade-in 0.35s ease-out;
+  }
+
+  .nexo-page-shell {
+    @apply space-y-5 p-4 pb-24 md:space-y-6 md:p-6 md:pb-8;
+  }
+
+  .nexo-page-header {
+    @apply relative overflow-hidden border px-5 py-5 md:px-6;
+    border-radius: calc(var(--radius-panel) + 0.2rem);
+    border-color: var(--nexo-border-soft);
+    background: var(--nexo-surface-1);
+    box-shadow: var(--nexo-shadow-soft);
+  }
+
+  .nexo-page-header-title {
+    @apply text-2xl font-semibold tracking-tight text-zinc-950 dark:text-white md:text-3xl;
+    font-family: var(--nexo-title-font);
+  }
+
+  .nexo-page-header-description {
+    @apply mt-2 max-w-3xl text-sm leading-6 text-zinc-600 dark:text-zinc-400;
+  }
+
+  .nexo-surface-operational {
+    @apply border p-4 md:p-5;
+    border-radius: var(--radius-surface);
+    border-color: var(--nexo-border-soft);
+    background: var(--nexo-surface-1);
+    box-shadow: var(--nexo-shadow-soft);
+  }
+
+  .nexo-data-table {
+    @apply overflow-hidden border;
+    border-radius: var(--radius-surface);
+    border-color: var(--nexo-border-soft);
+    background: var(--nexo-surface-2);
+    box-shadow: var(--nexo-shadow-soft);
+  }
+
+  .nexo-data-table thead {
+    @apply bg-slate-50/90 dark:bg-slate-900/50;
+  }
+
+  .nexo-data-table th {
+    @apply px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300;
+  }
+
+  .nexo-data-table td {
+    @apply px-4 py-3 text-sm text-slate-700 dark:text-slate-200;
+  }
+
+  .nexo-data-table tbody tr {
+    @apply border-t border-slate-200/70 transition-colors dark:border-white/10;
+  }
+
+  .nexo-data-table tbody tr:hover {
+    @apply bg-slate-100/70 dark:bg-white/[0.04];
   }
 }
 

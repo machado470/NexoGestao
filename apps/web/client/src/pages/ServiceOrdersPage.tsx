@@ -2,6 +2,7 @@ import { useMemo, useRef, useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   buildServiceOrdersDeepLink,
@@ -476,7 +477,7 @@ export default function ServiceOrdersPage() {
       />
 
       {activeId && (
-        <div className="rounded-lg border border-orange-200 bg-orange-50 p-3 text-sm text-orange-800 dark:border-orange-900/40 dark:bg-orange-950/20 dark:text-orange-300">
+        <div className="nexo-surface-operational border-orange-200 bg-orange-50/85 p-3 text-sm text-orange-800 dark:border-orange-500/30 dark:bg-orange-500/10 dark:text-orange-300">
           Você está visualizando uma O.S. em foco por deep-link. A lista continua
           estável, sem redirecionamento automático.
         </div>
@@ -529,11 +530,11 @@ export default function ServiceOrdersPage() {
       <Card className="nexo-kpi-card">
         <CardContent className="flex flex-col gap-3 p-4 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex-1">
-            <input
+            <Input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Buscar por título, cliente, responsável ou status"
-              className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+              className="w-full"
             />
           </div>
 

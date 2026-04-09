@@ -273,7 +273,7 @@ export function MainLayout({ children }: MainLayoutProps) {
 
   return (
     <div className="nexo-app-shell min-h-screen text-zinc-900 dark:text-zinc-100">
-      <div className="flex min-h-screen w-full gap-3 p-2 md:gap-4 md:p-3">
+      <div className="flex min-h-screen w-full gap-3 p-2 md:gap-4 md:p-4">
         {isMobile && mobileMenuOpen ? (
           <button
             type="button"
@@ -296,7 +296,7 @@ export function MainLayout({ children }: MainLayoutProps) {
               : "w-[min(248px,calc(100vw-1rem))]"
           }`}
         >
-          <div className="border-b border-slate-200/70 px-3 py-3 dark:border-white/6">
+          <div className="border-b border-slate-200/70 px-3 py-3 dark:border-white/10">
             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0">
                 {!sidebarCollapsed ? (
@@ -423,7 +423,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                   <button
                     type="button"
                     onClick={() => setMobileMenuOpen(prev => !prev)}
-                    className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-200/80 text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-white/10 dark:text-zinc-200 dark:hover:bg-white/[0.08]"
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-200/80 bg-white/85 text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-white/10 dark:bg-white/[0.04] dark:text-zinc-200 dark:hover:bg-white/[0.08]"
                     aria-label={
                       mobileMenuOpen ? "Fechar menu lateral" : "Abrir menu lateral"
                     }
@@ -454,7 +454,7 @@ export function MainLayout({ children }: MainLayoutProps) {
             </div>
           </header>
 
-          <main className="nexo-app-content min-h-0 flex-1 overflow-auto p-4 md:p-5">
+          <main className="nexo-app-content min-h-0 flex-1 overflow-auto p-2 md:p-3">
             {children}
           </main>
         </div>

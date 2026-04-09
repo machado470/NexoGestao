@@ -257,10 +257,10 @@ function SectionCard({
     : Boolean(children);
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+    <div className="nexo-surface-operational">
       <div className="mb-3 flex items-center gap-2">
         <Icon className="h-4 w-4 text-orange-500" />
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+        <h3 className="text-sm font-semibold text-zinc-900 dark:text-white">
           {title}
         </h3>
       </div>
@@ -268,7 +268,7 @@ function SectionCard({
       {hasContent ? (
         <div className="space-y-3">{children}</div>
       ) : (
-        <p className="text-sm text-gray-500 dark:text-gray-400">{emptyText}</p>
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">{emptyText}</p>
       )}
     </div>
   );
@@ -289,16 +289,16 @@ function SummaryCard({
     tone === "success"
       ? "border-green-200 bg-green-50 dark:border-green-900/40 dark:bg-green-950/20"
       : tone === "muted"
-        ? "border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-900/40"
-        : "border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800";
+        ? "border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-white/[0.03]"
+        : "border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.04]";
 
   return (
     <div className={`rounded-xl border p-4 ${toneClass}`}>
-      <p className="text-sm text-gray-600 dark:text-gray-400">{title}</p>
-      <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">
+      <p className="text-sm text-zinc-600 dark:text-zinc-400">{title}</p>
+      <p className="mt-1 text-2xl font-bold text-zinc-900 dark:text-white">
         {value}
       </p>
-      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+      <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
         {subtitle}
       </p>
     </div>
@@ -1022,14 +1022,14 @@ export default function CustomersPage() {
           </div>
         </SurfaceSection>
 
-        <SurfaceSection className="overflow-hidden rounded-xl border border-gray-200 bg-white p-0 dark:border-gray-700 dark:bg-gray-800">
-          <div className="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
+        <SurfaceSection className="nexo-data-table p-0">
+          <div className="border-b border-slate-200/80 px-4 py-3 dark:border-white/10">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                <p className="text-sm font-medium text-zinc-900 dark:text-white">
                   Base que gera receita
                 </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
                   Abra um workspace para entender o contexto, o impacto e a ação
                   imediata por cliente.
                 </p>
@@ -1074,7 +1074,7 @@ export default function CustomersPage() {
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
-                <thead className="bg-gray-50 dark:bg-gray-900/40">
+                <thead>
                   <tr className="text-left">
                     <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
                       Nome
@@ -1100,7 +1100,7 @@ export default function CustomersPage() {
                   </tr>
                 </thead>
 
-                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                <tbody>
                   {customers.map(customer => {
                     const isOpen = workspaceCustomerId === customer.id;
 
@@ -1115,11 +1115,11 @@ export default function CustomersPage() {
                         tabIndex={
                           highlightedCustomerId === customer.id ? -1 : undefined
                         }
-                        className={`hover:bg-gray-50 dark:hover:bg-gray-900/30 ${
+                        className={`${
                           isOpen ? "bg-orange-50/60 dark:bg-orange-950/10" : ""
                         } ${highlightedCustomerId === customer.id ? "ring-2 ring-orange-400" : ""}`}
                       >
-                        <td className="px-4 py-3 text-gray-900 dark:text-white">
+                        <td className="px-4 py-3 text-zinc-900 dark:text-white">
                           <div className="flex items-center gap-2">
                             <span className="font-medium">{customer.name}</span>
                             {isOpen ? (
@@ -1130,22 +1130,22 @@ export default function CustomersPage() {
                           </div>
                         </td>
 
-                        <td className="px-4 py-3 text-gray-700 dark:text-gray-300">
+                        <td className="px-4 py-3 text-zinc-700 dark:text-zinc-300">
                           {customer.phone ?? "—"}
                         </td>
 
-                        <td className="px-4 py-3 text-gray-700 dark:text-gray-300">
+                        <td className="px-4 py-3 text-zinc-700 dark:text-zinc-300">
                           {customer.email ?? "—"}
                         </td>
 
                         <td
-                          className="max-w-[260px] px-4 py-3 text-gray-700 dark:text-gray-300"
+                          className="max-w-[260px] px-4 py-3 text-zinc-700 dark:text-zinc-300"
                           title={customer.notes ?? ""}
                         >
                           {truncateText(customer.notes)}
                         </td>
 
-                        <td className="px-4 py-3 text-gray-700 dark:text-gray-300">
+                        <td className="px-4 py-3 text-zinc-700 dark:text-zinc-300">
                           {formatDate(customer.createdAt)}
                         </td>
 
@@ -1200,16 +1200,16 @@ export default function CustomersPage() {
         open={Boolean(workspaceCustomerId)}
         onOpenChange={open => (!open ? closeWorkspace() : undefined)}
       >
-        <DialogContent className="left-auto right-0 top-0 h-screen w-full max-h-screen max-w-2xl translate-x-0 translate-y-0 overflow-y-auto rounded-none border-l border-gray-200 bg-gray-50 p-0 shadow-2xl dark:border-gray-700 dark:bg-gray-900">
-          <DialogHeader className="sticky top-0 z-10 border-b border-gray-200 bg-white/95 px-5 py-4 backdrop-blur dark:border-gray-700 dark:bg-gray-800/95">
+        <DialogContent className="left-auto right-0 top-0 h-screen w-full max-h-screen max-w-2xl translate-x-0 translate-y-0 overflow-y-auto rounded-none border-l border-slate-200/80 bg-slate-50 p-0 shadow-2xl dark:border-white/10 dark:bg-[#0b1017]">
+          <DialogHeader className="sticky top-0 z-10 border-b border-slate-200/80 bg-white/95 px-5 py-4 backdrop-blur dark:border-white/10 dark:bg-[#111722]/95">
             <div>
               <p className="text-xs font-medium uppercase tracking-wide text-orange-500">
                 Workspace do cliente
               </p>
-              <DialogTitle className="mt-1 text-left text-xl font-semibold text-gray-900 dark:text-white">
+              <DialogTitle className="mt-1 text-left text-xl font-semibold text-zinc-900 dark:text-white">
                 {workspace?.customer?.name ?? "Carregando..."}
               </DialogTitle>
-              <DialogDescription className="mt-1 text-left text-sm text-gray-600 dark:text-gray-400">
+              <DialogDescription className="mt-1 text-left text-sm text-zinc-600 dark:text-zinc-400">
                 Hub lateral de contexto, histórico e próxima ação.
               </DialogDescription>
               <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
