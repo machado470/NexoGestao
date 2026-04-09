@@ -92,8 +92,8 @@ function MetricCard({
   return (
     <div className="nexo-kpi-card nexo-fade-in">
       <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
+        <div className="min-w-0">
+          <p className="nexo-text-wrap text-sm font-medium text-zinc-500 dark:text-zinc-400">
             {label}
           </p>
           <div className="mt-3 nexo-metric-value min-h-10">
@@ -104,7 +104,7 @@ function MetricCard({
             )}
           </div>
           {description ? (
-            <p className="mt-2 min-h-4 text-xs text-zinc-500 dark:text-zinc-400">
+            <p className="nexo-text-wrap mt-2 min-h-4 text-xs text-zinc-500 dark:text-zinc-400">
               {loading ? (
                 <span className="nexo-skeleton inline-block h-4 w-44 rounded" />
               ) : (
@@ -668,16 +668,16 @@ export default function ExecutiveDashboardNew() {
               <p className="inline-flex items-center rounded-full bg-orange-500 px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] text-white">
                 Prioridade nº1 de hoje
               </p>
-              <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-zinc-950 dark:text-white md:text-4xl">
+              <h2 className="nexo-text-wrap mt-3 text-3xl font-extrabold tracking-tight text-zinc-950 dark:text-white md:text-4xl">
                 Hoje você tem{" "}
                 {formatCurrency(totalPausedRevenue + nonBilledServicesImpact)}{" "}
                 parado
               </h2>
-              <p className="mt-3 text-base font-medium text-zinc-800 dark:text-zinc-100">
+              <p className="nexo-text-wrap mt-3 text-base font-medium text-zinc-800 dark:text-zinc-100">
                 {overdueCharges} cobranças vencidas • {nonBilledServices}{" "}
                 serviços sem faturamento.
               </p>
-              <p className="mt-2 text-sm text-zinc-700 dark:text-zinc-300">
+              <p className="nexo-text-wrap mt-2 text-sm text-zinc-700 dark:text-zinc-300">
                 Próxima decisão já definida:{" "}
                 <strong>{dominantProblem.title}</strong>.{" "}
                 {dominantProblem.helperText}
@@ -686,7 +686,7 @@ export default function ExecutiveDashboardNew() {
             <button
               type="button"
               onClick={() => navigate(dominantProblem.ctaPath)}
-              className="nexo-cta-primary min-h-14 min-w-[220px] !rounded-xl !text-base font-bold shadow-lg shadow-orange-500/35"
+              className="nexo-cta-primary min-h-14 min-w-[220px] max-w-full !rounded-xl !text-base font-bold shadow-lg shadow-orange-500/35"
             >
               {dominantProblem.ctaLabel}
             </button>
@@ -701,10 +701,10 @@ export default function ExecutiveDashboardNew() {
               <BarChart3 className="h-3.5 w-3.5" />
               Visão executiva
             </div>
-            <h1 className="nexo-page-header-title md:text-4xl">
+            <h1 className="nexo-page-header-title nexo-text-wrap md:text-4xl">
               Dashboard Executivo
             </h1>
-            <p className="nexo-page-header-description max-w-xl">
+            <p className="nexo-page-header-description nexo-text-wrap max-w-xl">
               Organize sua operação, evite erros e mantenha controle financeiro
               no funil Cliente → Agendamento → O.S. → Pagamento.
             </p>
@@ -727,7 +727,7 @@ export default function ExecutiveDashboardNew() {
             </button>
           </div>
         </div>
-        <div className="mt-4 rounded-xl border border-orange-200/60 bg-orange-50/80 px-4 py-3 text-sm text-orange-700 dark:border-orange-500/20 dark:bg-orange-500/10 dark:text-orange-200">
+        <div className="mt-3 rounded-xl border border-orange-200/60 bg-orange-50/80 px-4 py-3 text-sm text-orange-700 dark:border-orange-500/20 dark:bg-orange-500/10 dark:text-orange-200">
           <p className="font-semibold">O que precisa de atenção agora</p>
           <p className="mt-1">
             Você tem <strong>{formatCurrency(totalPausedRevenue)}</strong>{" "}
@@ -976,11 +976,11 @@ export default function ExecutiveDashboardNew() {
                 key={item.id}
                 className={`nexo-list-row ${item.severity === "critical" ? "nexo-list-row-critical" : "nexo-list-row-high"}`}
               >
-                <div>
-                  <p className="font-semibold text-zinc-900 dark:text-zinc-100">
+                <div className="min-w-0">
+                  <p className="nexo-text-wrap font-semibold text-zinc-900 dark:text-zinc-100">
                     {item.label}
                   </p>
-                  <p className="text-xs text-zinc-600 dark:text-zinc-300">
+                  <p className="nexo-text-wrap text-xs text-zinc-600 dark:text-zinc-300">
                     <span className="mr-1.5 inline-block rounded-full bg-black/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide dark:bg-white/10">
                       {item.severity === "critical" ? "Crítico" : "Alto"}
                     </span>
@@ -1042,11 +1042,11 @@ export default function ExecutiveDashboardNew() {
                       className={`rounded-xl border p-4 ${getOperationalSeverityClasses(item.severity)}`}
                     >
                       <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <p className="font-semibold text-zinc-900 dark:text-zinc-100">
+                        <div className="min-w-0">
+                          <p className="nexo-text-wrap font-semibold text-zinc-900 dark:text-zinc-100">
                             {item.title}
                           </p>
-                          <p className="text-xs text-zinc-700 dark:text-zinc-300">
+                          <p className="nexo-text-wrap text-xs text-zinc-700 dark:text-zinc-300">
                             {item.description}
                           </p>
                           <span
@@ -1090,8 +1090,8 @@ export default function ExecutiveDashboardNew() {
                   #{index + 1} prioridade
                 </p>
                 <div className="mt-1 flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-semibold text-zinc-900 dark:text-zinc-100">
+                  <div className="min-w-0">
+                    <p className="nexo-text-wrap font-semibold text-zinc-900 dark:text-zinc-100">
                       {problem.title}
                     </p>
                     <p className="text-xs text-zinc-600 dark:text-zinc-300">

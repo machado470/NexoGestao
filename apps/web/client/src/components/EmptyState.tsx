@@ -23,16 +23,20 @@ export function EmptyState({
   secondaryAction,
 }: EmptyStateProps) {
   return (
-    <div className="nexo-surface-operational flex flex-col items-center justify-center px-4 py-10 text-center">
-      <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-slate-200/80 bg-slate-100 text-slate-500 dark:border-white/12 dark:bg-white/[0.04] dark:text-slate-300">
+    <div className="nexo-surface-operational flex flex-col items-center justify-center px-4 py-8 text-center sm:px-6">
+      <div className="mb-3 inline-flex items-center rounded-full border border-orange-200/70 bg-orange-100/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-orange-700 dark:border-orange-500/20 dark:bg-orange-500/10 dark:text-orange-300">
+        Próxima ação recomendada
+      </div>
+
+      <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl border border-slate-200/80 bg-slate-100 text-slate-500 dark:border-white/12 dark:bg-white/[0.04] dark:text-slate-300">
         {icon}
       </div>
 
-      <h3 className="mb-2 text-lg font-semibold text-zinc-900 dark:text-white">{title}</h3>
+      <h3 className="nexo-text-wrap mb-2 text-lg font-semibold text-zinc-900 dark:text-white">{title}</h3>
 
-      <p className="mb-6 max-w-sm text-sm text-zinc-600 dark:text-zinc-400">{description}</p>
+      <p className="nexo-text-wrap mb-5 max-w-xl text-sm text-zinc-600 dark:text-zinc-400">{description}</p>
 
-      <div className="flex gap-3">
+      <div className="flex flex-wrap justify-center gap-2.5">
         {action && (
           <Button onClick={action.onClick} size="sm">
             {action.label}

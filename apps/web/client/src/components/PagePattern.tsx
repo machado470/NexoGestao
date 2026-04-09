@@ -80,21 +80,21 @@ export function SmartPage({
     : dominantImpact;
 
   return (
-    <section className="space-y-4 rounded-2xl border border-orange-200 bg-orange-50/70 p-4 dark:border-orange-900/40 dark:bg-orange-950/20">
+    <section className="space-y-3 rounded-2xl border border-orange-200 bg-orange-50/70 p-4 dark:border-orange-900/40 dark:bg-orange-950/20">
       <div className="space-y-2">
         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-orange-700 dark:text-orange-300">
-          SmartPage
+          Prioridade operacional
         </p>
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">{headline}</h2>
-        <p className="text-sm text-zinc-700 dark:text-zinc-300">{resolvedDominantProblem}</p>
-        <p className="text-sm font-medium text-red-700 dark:text-red-300">Impacto: {resolvedDominantImpact}</p>
+        <h2 className="nexo-text-wrap text-lg font-semibold text-zinc-900 dark:text-zinc-100">{headline}</h2>
+        <p className="nexo-text-wrap text-sm text-zinc-700 dark:text-zinc-300">{resolvedDominantProblem}</p>
+        <p className="nexo-text-wrap text-sm font-medium text-red-700 dark:text-red-300">Impacto: {resolvedDominantImpact}</p>
       </div>
 
       {primaryAction ? (
         <div className="rounded-xl border border-orange-300 bg-white/90 p-3 dark:border-orange-800/60 dark:bg-zinc-900/70">
           <p className="text-xs font-semibold uppercase tracking-wide text-orange-700 dark:text-orange-300">Ação principal</p>
-          <p className="mt-1 text-sm font-semibold text-zinc-900 dark:text-zinc-100">{primaryAction.label}</p>
-          <p className="text-xs text-zinc-600 dark:text-zinc-300">{primaryAction.reason}</p>
+          <p className="nexo-text-wrap mt-1 text-sm font-semibold text-zinc-900 dark:text-zinc-100">{primaryAction.label}</p>
+          <p className="nexo-text-wrap text-xs text-zinc-600 dark:text-zinc-300">{primaryAction.reason}</p>
           <div className="mt-3">
             <Button type="button" size="sm" className="bg-orange-500 text-white" onClick={primaryAction.onExecute}>
               Executar agora
@@ -110,9 +110,9 @@ export function SmartPage({
             {orderedActions.map((action) => (
               <div key={action.id} className="rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-900/60">
                 <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{action.label}</p>
-                    <p className="text-xs text-zinc-600 dark:text-zinc-400">{action.reason}</p>
+                  <div className="min-w-0">
+                    <p className="nexo-text-wrap text-sm font-medium text-zinc-900 dark:text-zinc-100">{action.label}</p>
+                    <p className="nexo-text-wrap text-xs text-zinc-600 dark:text-zinc-400">{action.reason}</p>
                     <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
                       {action.impact} • prioridade {action.priority}{action.auto ? " • auto" : ""}
                     </p>
@@ -151,8 +151,8 @@ export function SmartPage({
         <div className="grid gap-2 md:grid-cols-3">
           {topPriorities.map((item) => (
             <div key={item.id} className="rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-900/60">
-              <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{item.title}</p>
-              <p className="text-xs text-zinc-600 dark:text-zinc-400">{item.helperText}</p>
+              <p className="nexo-text-wrap text-sm font-medium text-zinc-900 dark:text-zinc-100">{item.title}</p>
+              <p className="nexo-text-wrap text-xs text-zinc-600 dark:text-zinc-400">{item.helperText}</p>
             </div>
           ))}
         </div>
