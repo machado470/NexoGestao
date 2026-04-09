@@ -14,6 +14,7 @@ import { Throttle } from '@nestjs/throttler'
 
 import { AuthService } from './auth.service'
 import { Public } from './decorators/public.decorator'
+import { readGoogleOAuthEnv } from '../common/config/google-oauth-env'
 
 @Controller('auth')
 export class AuthController {
@@ -22,22 +23,10 @@ export class AuthController {
     private readonly config: ConfigService,
   ) {}
 
-  private getGoogleRedirectUrl() {
-    const redirectUrl = this.config.get<string>('GOOGLE_REDIRECT_URL')?.trim()
-    if (redirectUrl) return redirectUrl
-
-    const redirectUri = this.config.get<string>('GOOGLE_REDIRECT_URI')?.trim()
-    if (redirectUri) return redirectUri
-
-    return ''
-  }
-
   private ensureGoogleOAuthEnabled() {
-    const clientId = this.config.get<string>('GOOGLE_CLIENT_ID')?.trim()
-    const clientSecret = this.config.get<string>('GOOGLE_CLIENT_SECRET')?.trim()
-    const redirectUrl = this.getGoogleRedirectUrl()
+    const googleOAuthEnv = readGoogleOAuthEnv(this.config)
 
-    if (!clientId || !clientSecret || !redirectUrl) {
+    if (!googleOAuthEnv.clientId || !googleOAuthEnv.clientSecret || !googleOAuthEnv.redirectUrl) {
       throw new ServiceUnavailableException(
         'Login com Google não está configurado neste ambiente.',
       )
@@ -121,18 +110,20 @@ export class AuthController {
   @Public()
   @Get('google/status')
   googleStatus() {
-    const clientId = this.config.get<string>('GOOGLE_CLIENT_ID')?.trim()
-    const clientSecret = this.config.get<string>('GOOGLE_CLIENT_SECRET')?.trim()
-    const redirectUrl = this.getGoogleRedirectUrl()
-    const configured = Boolean(clientId && clientSecret && redirectUrl)
+    const googleOAuthEnv = readGoogleOAuthEnv(this.config)
+    const configured = Boolean(
+      googleOAuthEnv.clientId &&
+        googleOAuthEnv.clientSecret &&
+        googleOAuthEnv.redirectUrl,
+    )
 
     return {
       configured,
       status: configured ? 'configured' : 'missing',
       missing: {
-        clientId: !clientId,
-        clientSecret: !clientSecret,
-        redirectUrl: !redirectUrl,
+        clientId: !googleOAuthEnv.clientId,
+        clientSecret: !googleOAuthEnv.clientSecret,
+        redirectUrl: !googleOAuthEnv.redirectUrl,
       },
       message: configured
         ? 'Google OAuth configurado.'

@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config'
 import { PrismaService } from '../prisma/prisma.service'
 import { MetricsService } from '../common/metrics/metrics.service'
 import { QueueService } from '../queue/queue.service'
+import { isGoogleOAuthConfigured } from '../common/config/google-oauth-env'
 
 @Controller('health')
 export class HealthController {
@@ -16,11 +17,6 @@ export class HealthController {
   private hasValue(name: string): boolean {
     return (this.config.get<string>(name) ?? '').trim().length > 0
   }
-
-  private hasAnyValue(...names: string[]): boolean {
-    return names.some(name => this.hasValue(name))
-  }
-
   @Get()
   async health() {
     const startedAt = Date.now()
@@ -69,10 +65,7 @@ export class HealthController {
       this.hasValue('STRIPE_PRICE_PRO') &&
       this.hasValue('STRIPE_PRICE_BUSINESS')
 
-    const googleAuthConfigured =
-      this.hasValue('GOOGLE_CLIENT_ID') &&
-      this.hasValue('GOOGLE_CLIENT_SECRET') &&
-      this.hasAnyValue('GOOGLE_REDIRECT_URL', 'GOOGLE_REDIRECT_URI')
+    const googleAuthConfigured = isGoogleOAuthConfigured(this.config)
 
     const emailConfigured = this.hasValue('RESEND_API_KEY')
     const whatsappConfigured = this.hasValue('WHATSAPP_PROVIDER')
