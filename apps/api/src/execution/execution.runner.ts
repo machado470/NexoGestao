@@ -126,11 +126,15 @@ export class ExecutionRunner {
       where: {
         orgId,
         status: { in: ['PENDING', 'OVERDUE'] },
-        customer: { phone: { not: null } },
       },
       select: {
         id: true,
         customerId: true,
+        customer: {
+          select: {
+            phone: true,
+          },
+        },
         amountCents: true,
         dueDate: true,
         status: true,
@@ -156,6 +160,7 @@ export class ExecutionRunner {
     const alreadySent = new Set(sent.map((item) => item.entityId))
 
     return charges
+      .filter((item) => item.customer.phone.trim().length > 0)
       .filter((item) => !alreadySent.has(item.id))
       .map((item) => ({
         actionId: 'action-send-whatsapp-payment-link',
@@ -204,11 +209,15 @@ export class ExecutionRunner {
       where: {
         orgId,
         status: 'OVERDUE',
-        customer: { phone: { not: null } },
       },
       select: {
         id: true,
         customerId: true,
+        customer: {
+          select: {
+            phone: true,
+          },
+        },
         amountCents: true,
         dueDate: true,
       },
@@ -216,19 +225,21 @@ export class ExecutionRunner {
       orderBy: { updatedAt: 'desc' },
     })
 
-    return overdueCharges.map((item) => ({
-      actionId: 'action-send-overdue-charge-reminder',
-      decisionId: 'decision-overdue-charge-reminder',
-      entityType: 'charge',
-      entityId: item.id,
-      orgId,
-      metadata: {
-        customerId: item.customerId,
-        amountCents: item.amountCents,
-        dueDate: item.dueDate?.toISOString() ?? null,
-        chargeStatus: 'OVERDUE',
-      },
-    }))
+    return overdueCharges
+      .filter((item) => item.customer.phone.trim().length > 0)
+      .map((item) => ({
+        actionId: 'action-send-overdue-charge-reminder',
+        decisionId: 'decision-overdue-charge-reminder',
+        entityType: 'charge',
+        entityId: item.id,
+        orgId,
+        metadata: {
+          customerId: item.customerId,
+          amountCents: item.amountCents,
+          dueDate: item.dueDate?.toISOString() ?? null,
+          chargeStatus: 'OVERDUE',
+        },
+      }))
   }
 
   private async loadNotifyFinanceTeamCandidates(orgId: string): Promise<ExecutionActionCandidate[]> {
