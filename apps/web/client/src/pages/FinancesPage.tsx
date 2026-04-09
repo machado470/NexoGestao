@@ -16,7 +16,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import FinanceOverviewAreaChart from "@/components/finance/FinanceOverviewAreaChart";
 import { Receipt } from "lucide-react";
-import { PageHero, PageShell, SmartPage, SurfaceSection } from "@/components/PagePattern";
+import { PageShell, SmartPage, SurfaceSection } from "@/components/PagePattern";
 import { EmptyState } from "@/components/EmptyState";
 import { TableSkeleton } from "@/components/QueryStateBoundary";
 import { StatusBadge, mapFinanceStatus } from "@/components/StatusBadge";
@@ -29,6 +29,9 @@ import {
   CHARGE_STATUS_BADGE,
   CHARGE_STATUS_LABEL,
 } from "@shared/types/api";
+import { ActionBarWrapper } from "@/components/operating-system/ActionBar";
+import { PageHeader } from "@/components/operating-system/PageHeader";
+import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedbackButton";
 
 type FinanceCharge = {
   id: string;
@@ -459,10 +462,10 @@ export default function FinancesPage() {
   if (isInitializing) {
     return (
       <PageShell>
-        <PageHero
-          eyebrow="Financeiro"
+        <PageHeader
           title="Financeiro"
-          description="Validando sessão e restaurando o contexto financeiro."
+          subtitle="Validando sessão e restaurando o contexto financeiro."
+          breadcrumb={[{ label: "Operação" }, { label: "Financeiro" }]}
         />
         <SurfaceSection>
           <TableSkeleton rows={4} columns={3} />
@@ -474,10 +477,10 @@ export default function FinancesPage() {
   if (!isAuthenticated) {
     return (
       <PageShell>
-        <PageHero
-          eyebrow="Financeiro"
+        <PageHeader
           title="Financeiro"
-          description="Sua sessão não está ativa."
+          subtitle="Sua sessão não está ativa."
+          breadcrumb={[{ label: "Operação" }, { label: "Financeiro" }]}
         />
       </PageShell>
     );
@@ -486,10 +489,10 @@ export default function FinancesPage() {
   if (queryState.isInitialLoading) {
     return (
       <PageShell>
-        <PageHero
-          eyebrow="Financeiro"
+        <PageHeader
           title="Financeiro"
-          description="Estamos organizando suas cobranças para mostrar onde está o dinheiro e qual ação gera caixa agora."
+          subtitle="Estamos organizando suas cobranças para mostrar onde está o dinheiro e qual ação gera caixa agora."
+          breadcrumb={[{ label: "Operação" }, { label: "Financeiro" }]}
         />
         <SurfaceSection>
           <TableSkeleton rows={6} columns={5} />
@@ -501,10 +504,10 @@ export default function FinancesPage() {
   if (queryState.shouldBlockForError) {
     return (
       <PageShell>
-        <PageHero
-          eyebrow="Financeiro"
+        <PageHeader
           title="Financeiro"
-          description="Não foi possível carregar os dados financeiros."
+          subtitle="Não foi possível carregar os dados financeiros."
+          breadcrumb={[{ label: "Operação" }, { label: "Financeiro" }]}
         />
         <SurfaceSection className="space-y-3 border-red-200 text-red-700 dark:border-red-900/40 dark:text-red-300">
           <p>{errorMessage}</p>
@@ -518,31 +521,33 @@ export default function FinancesPage() {
 
   return (
     <PageShell>
-        <PageHero
-          eyebrow="Financeiro"
-          title="Financeiro"
-          description="Veja o que está acontecendo no caixa, por que isso importa para sua venda e qual ação executar agora."
-        actions={
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                track("cta_click", { screen: "finances", ctaId: "hero_prioritize_charges" });
-                navigate("/finances");
-              }}
-              className="inline-flex min-h-12 items-center justify-center rounded-xl bg-orange-500 px-4 text-sm font-medium text-white"
-            >
-              Priorizar cobranças
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate("/service-orders")}
-              className="inline-flex min-h-12 items-center justify-center rounded-xl border border-zinc-300 px-4 text-sm font-medium text-zinc-700 dark:border-zinc-700 dark:text-zinc-200"
-            >
-              Ir para Ordens de Serviço
-            </button>
-          </div>
-        }
+      <PageHeader
+        title="Financeiro"
+        subtitle="Veja o que está acontecendo no caixa, por que isso importa para sua venda e qual ação executar agora."
+        breadcrumb={[{ label: "Operação" }, { label: "Financeiro" }]}
+      />
+      <ActionBarWrapper
+        secondaryActions={(
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => navigate("/service-orders")}
+          >
+            Ir para Ordens de Serviço
+          </Button>
+        )}
+        primaryAction={(
+          <Button
+            type="button"
+            className="bg-orange-500 text-white"
+            onClick={() => {
+              track("cta_click", { screen: "finances", ctaId: "hero_prioritize_charges" });
+              navigate("/finances");
+            }}
+          >
+            Priorizar cobranças
+          </Button>
+        )}
       />
 
 
@@ -696,30 +701,33 @@ export default function FinancesPage() {
                   >
                     {whatsAppOpeningId === charge.id ? "WhatsApp aberto" : "WhatsApp"}
                   </Button>
-                  <Button
-                    size="sm"
-                    disabled={isSubmitting && paymentSubmittingId === charge.id}
-                    aria-busy={isSubmitting && paymentSubmittingId === charge.id}
-                    onClick={async () => {
-                      try {
-                        setPaymentSubmittingId(charge.id);
-                        await registerPayment(charge, "CASH");
-                        setPaymentDoneId(charge.id);
-                        setTimeout(() => setPaymentDoneId(null), 1500);
-                        void chargesQuery.refetch();
-                      } catch {
-                        // handled by hook
-                      } finally {
-                        setPaymentSubmittingId(null);
-                      }
+                  <ActionFeedbackButton
+                    state={
+                      isSubmitting && paymentSubmittingId === charge.id
+                        ? "loading"
+                        : paymentDoneId === charge.id
+                          ? "success"
+                          : "idle"
+                    }
+                    idleLabel="Marcar pago"
+                    loadingLabel="Processando..."
+                    successLabel="Pago registrado"
+                    onClick={() => {
+                      void (async () => {
+                        try {
+                          setPaymentSubmittingId(charge.id);
+                          await registerPayment(charge, "CASH");
+                          setPaymentDoneId(charge.id);
+                          setTimeout(() => setPaymentDoneId(null), 1500);
+                          void chargesQuery.refetch();
+                        } catch {
+                          // handled by hook
+                        } finally {
+                          setPaymentSubmittingId(null);
+                        }
+                      })();
                     }}
-                  >
-                    {isSubmitting && paymentSubmittingId === charge.id
-                      ? "Processando..."
-                      : paymentDoneId === charge.id
-                        ? "Pago registrado"
-                        : "Marcar pago"}
-                  </Button>
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -778,39 +786,43 @@ export default function FinancesPage() {
                     label={getChargeStatusLabel(normalizedStatus)}
                   />
                   {normalizedStatus !== ChargeStatus.PAID && (
-                    <Button
-                      size="sm"
+                    <ActionFeedbackButton
+                      state={
+                        isSubmitting && paymentSubmittingId === c.id
+                          ? "loading"
+                          : paymentDoneId === c.id
+                            ? "success"
+                            : "idle"
+                      }
+                      idleLabel="Marcar pago"
+                      loadingLabel="Processando..."
+                      successLabel="Pago registrado"
                       variant="outline"
-                      disabled={isSubmitting && paymentSubmittingId === c.id}
-                      onClick={async () => {
-                        try {
-                          setPaymentSubmittingId(c.id);
-                          const result = (await registerPayment(c, "CASH")) as
-                            | { paymentId?: string }
-                            | undefined;
-                          setPaymentDoneId(c.id);
-                          setTimeout(() => setPaymentDoneId(null), 1500);
-                          const paymentId = String(result?.paymentId ?? "").trim();
-                          const params = new URLSearchParams();
-                          params.set("chargeId", c.id);
-                          if (paymentId) params.set("paymentId", paymentId);
-                          if (customerIdFromUrl) {
-                            params.set("customerId", customerIdFromUrl);
+                      onClick={() => {
+                        void (async () => {
+                          try {
+                            setPaymentSubmittingId(c.id);
+                            const result = (await registerPayment(c, "CASH")) as
+                              | { paymentId?: string }
+                              | undefined;
+                            setPaymentDoneId(c.id);
+                            setTimeout(() => setPaymentDoneId(null), 1500);
+                            const paymentId = String(result?.paymentId ?? "").trim();
+                            const params = new URLSearchParams();
+                            params.set("chargeId", c.id);
+                            if (paymentId) params.set("paymentId", paymentId);
+                            if (customerIdFromUrl) {
+                              params.set("customerId", customerIdFromUrl);
+                            }
+                            navigate(`/finances?${params.toString()}`);
+                          } catch {
+                            // feedback handled in useChargeActions
+                          } finally {
+                            setPaymentSubmittingId(null);
                           }
-                          navigate(`/finances?${params.toString()}`);
-                        } catch {
-                          // feedback handled in useChargeActions
-                        } finally {
-                          setPaymentSubmittingId(null);
-                        }
+                        })();
                       }}
-                    >
-                      {isSubmitting && paymentSubmittingId === c.id
-                        ? "Processando..."
-                        : paymentDoneId === c.id
-                          ? "Pago registrado"
-                          : "Marcar pago"}
-                    </Button>
+                    />
                   )}
                   {normalizedStatus === ChargeStatus.PAID ? (
                     <Button

@@ -13,8 +13,6 @@ import {
   Users,
   Plus,
   RefreshCcw,
-  Pencil,
-  PanelRightOpen,
   CalendarDays,
   Briefcase,
   Wallet,
@@ -53,7 +51,6 @@ import {
   normalizeObjectPayload,
 } from "@/lib/query-helpers";
 import {
-  PageHero,
   PageShell,
   SmartPage,
   SurfaceSection,
@@ -66,6 +63,9 @@ import { useCriticalActionStore } from "@/stores/criticalActionStore";
 import { invalidateOperationalGraph } from "@/lib/operationalConsistency";
 import { useProductAnalytics } from "@/hooks/useProductAnalytics";
 import { generateCustomerActions } from "@/lib/smartActions";
+import { ActionBarWrapper } from "@/components/operating-system/ActionBar";
+import { PageHeader } from "@/components/operating-system/PageHeader";
+import { RowActions } from "@/components/operating-system/RowActions";
 
 type Customer = {
   id: string;
@@ -860,45 +860,47 @@ export default function CustomersPage() {
 
   return (
     <PageShell>
-      <PageHero
-        eyebrow="Clientes"
+      <PageHeader
         title={
           <span className="inline-flex items-center gap-2">
             <Users className="h-6 w-6 text-orange-500" />
             Clientes
           </span>
         }
-        description="Ponto de partida do fluxo oficial: cada cliente conecta agenda, execução, cobrança, comunicação e rastreabilidade."
-        actions={
-          <>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => void listCustomers.refetch()}
-              className="flex items-center gap-2"
-              disabled={interactionBlocked}
-            >
-              <RefreshCcw className="h-4 w-4" />
-              Atualizar
-            </Button>
+        subtitle="Ponto de partida do fluxo oficial: cada cliente conecta agenda, execução, cobrança, comunicação e rastreabilidade."
+        breadcrumb={[{ label: "Operação" }, { label: "Clientes" }]}
+      />
 
-            <Button
-              type="button"
-              onClick={() => {
-                track("cta_click", {
-                  screen: "customers",
-                  ctaId: "hero_new_customer",
-                });
-                setIsCreateOpen(true);
-              }}
-              className="min-h-12 flex items-center gap-2 bg-orange-500 text-white"
-              disabled={interactionBlocked}
-            >
-              <Plus className="h-4 w-4" />
-              Novo Cliente
-            </Button>
-          </>
-        }
+      <ActionBarWrapper
+        secondaryActions={(
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => void listCustomers.refetch()}
+            className="flex items-center gap-2"
+            disabled={interactionBlocked}
+          >
+            <RefreshCcw className="h-4 w-4" />
+            Atualizar
+          </Button>
+        )}
+        primaryAction={(
+          <Button
+            type="button"
+            onClick={() => {
+              track("cta_click", {
+                screen: "customers",
+                ctaId: "hero_new_customer",
+              });
+              setIsCreateOpen(true);
+            }}
+            className="min-h-12 flex items-center gap-2 bg-orange-500 text-white"
+            disabled={interactionBlocked}
+          >
+            <Plus className="h-4 w-4" />
+            Novo Cliente
+          </Button>
+        )}
       />
 
       <SmartPage
@@ -1159,29 +1161,10 @@ export default function CustomersPage() {
                         </td>
 
                         <td className="px-4 py-3">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Button
-                              type="button"
-                              variant={isOpen ? "default" : "outline"}
-                              size="sm"
-                              onClick={() => openWorkspace(customer.id)}
-                              className="inline-flex items-center gap-2"
-                            >
-                              <PanelRightOpen className="h-4 w-4" />
-                              Workspace
-                            </Button>
-
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setEditingCustomerId(customer.id)}
-                              className="inline-flex items-center gap-2"
-                            >
-                              <Pencil className="h-4 w-4" />
-                              Editar
-                            </Button>
-                          </div>
+                          <RowActions
+                            onView={() => openWorkspace(customer.id)}
+                            onEdit={() => setEditingCustomerId(customer.id)}
+                          />
                         </td>
                       </tr>
                     );
