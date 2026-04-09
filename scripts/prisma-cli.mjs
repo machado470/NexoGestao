@@ -1,7 +1,18 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process'
+import { existsSync } from 'node:fs'
+import path from 'node:path'
 
-const args = process.argv.slice(2)
+const rawArgs = process.argv.slice(2)
+const hasSchemaArg = rawArgs.some((arg) => arg === '--schema' || arg.startsWith('--schema='))
+const schemaFromAppsApi = path.resolve(process.cwd(), '../../prisma/schema.prisma')
+const schemaFromRepoRoot = path.resolve(process.cwd(), 'prisma/schema.prisma')
+const schemaPath = existsSync(schemaFromAppsApi)
+  ? schemaFromAppsApi
+  : existsSync(schemaFromRepoRoot)
+    ? schemaFromRepoRoot
+    : null
+const args = !hasSchemaArg && schemaPath ? [...rawArgs, '--schema', schemaPath] : rawArgs
 const isGenerate = args[0] === 'generate'
 
 const result = spawnSync('pnpm', ['exec', 'prisma', ...args], {
