@@ -1,13 +1,13 @@
 {
-  "startedAt": "2026-04-09T06:28:47.553Z",
-  "finishedAt": "2026-04-09T06:28:48.817Z",
-  "orgId": "1adf909d-fe9c-4108-b875-b953b3f89c77",
-  "orgSlug": "e2e-v5-1775716127553",
+  "startedAt": "2026-04-09T06:42:35.058Z",
+  "finishedAt": "2026-04-09T06:42:36.285Z",
+  "orgId": "d27ab294-b091-4514-b311-9d6570828f3b",
+  "orgSlug": "e2e-v5-1775716955058",
   "runSummary": {
     "firstRun": {
       "orgs": 1,
       "totalCandidates": 28,
-      "executed": 12
+      "executed": 20
     },
     "secondRun": {
       "orgs": 1,
@@ -17,9 +17,9 @@
   },
   "events": {
     "total": 76,
-    "executed": 12,
+    "executed": 20,
     "blocked": 36,
-    "failed": 8,
+    "failed": 0,
     "throttled": 0,
     "idempotencyBlockedCount": 20
   },
@@ -28,7 +28,7 @@
       "id": "billing-followup-or-reminder",
       "required": true,
       "ok": true,
-      "matchedEventId": "4ae675aa-39b0-4472-95da-9fe0d441e424",
+      "matchedEventId": "529983a9-688e-4595-aaab-2fee6557fa1e",
       "matchedActionId": "action-create-charge-followup",
       "matchedStatus": "blocked",
       "matchedReasonCode": "idempotency_recent_execution",
@@ -39,7 +39,7 @@
       "id": "risk-escalation",
       "required": true,
       "ok": true,
-      "matchedEventId": "82a5ffdb-b691-4e14-ac52-1422c4d39664",
+      "matchedEventId": "5f79accd-c607-4166-a213-3d955fe94bca",
       "matchedActionId": "action-escalate-risk-review",
       "matchedStatus": "blocked",
       "matchedReasonCode": "idempotency_recent_execution",
@@ -50,7 +50,7 @@
       "id": "operational-attention",
       "required": false,
       "ok": true,
-      "matchedEventId": "60af558a-4f06-487e-9d7e-f924eb8344b2",
+      "matchedEventId": "fc9519ea-e1b5-4a35-8a85-61bf4f75d7f8",
       "matchedActionId": "action-mark-operational-attention",
       "matchedStatus": "blocked",
       "matchedReasonCode": "idempotency_recent_execution",
@@ -96,17 +96,21 @@
     {
       "action": "RISK_REVIEW_ESCALATED",
       "count": 1
+    },
+    {
+      "action": "WHATSAPP_OVERDUE_REMINDER_SIMULATED",
+      "count": 8
     }
   ],
   "configHistoryCount": 1,
   "sampleEvents": [
     {
-      "id": "1cd2e690-0ddc-406f-ba21-198de9534635",
-      "createdAt": "2026-04-09T06:28:48.549Z",
+      "id": "67d8cdf5-8a51-4320-a0a8-f488a4729018",
+      "createdAt": "2026-04-09T06:42:35.982Z",
       "actionId": "action-send-overdue-charge-reminder",
       "decisionId": "decision-overdue-charge-reminder",
       "entityType": "charge",
-      "entityId": "e81a995d-9d67-4829-a156-f547de971c94",
+      "entityId": "28ed0022-5b13-4a0a-a16a-ed369c4aef9f",
       "status": "blocked",
       "reasonCode": "idempotency_recent_execution",
       "mode": "automatic",
@@ -116,12 +120,12 @@
       }
     },
     {
-      "id": "447aec14-f9b6-4038-83c6-b1255f4f8924",
-      "createdAt": "2026-04-09T06:28:48.561Z",
+      "id": "20edf2c7-11b9-447a-8269-8f45d25f9883",
+      "createdAt": "2026-04-09T06:42:36.002Z",
       "actionId": "action-send-overdue-charge-reminder",
       "decisionId": "decision-overdue-charge-reminder",
       "entityType": "charge",
-      "entityId": "f6699675-5733-4f34-81e4-baee283ba2b3",
+      "entityId": "96680f7f-2116-4afb-967f-6db2a2f3fd9b",
       "status": "blocked",
       "reasonCode": "idempotency_recent_execution",
       "mode": "automatic",
@@ -131,12 +135,12 @@
       }
     },
     {
-      "id": "91120a10-f4dd-4cdb-982d-5dbe41947dcf",
-      "createdAt": "2026-04-09T06:28:48.570Z",
+      "id": "5e57874a-787c-4df0-aae2-0625bc388552",
+      "createdAt": "2026-04-09T06:42:36.026Z",
       "actionId": "action-send-overdue-charge-reminder",
       "decisionId": "decision-overdue-charge-reminder",
       "entityType": "charge",
-      "entityId": "fe50ee39-140a-446e-8ab7-7b3502a87c73",
+      "entityId": "162d3264-1af6-44eb-b779-1fa64361f26d",
       "status": "blocked",
       "reasonCode": "idempotency_recent_execution",
       "mode": "automatic",
@@ -146,12 +150,12 @@
       }
     },
     {
-      "id": "197b2f5d-c791-4de1-936e-7c867669f8b4",
-      "createdAt": "2026-04-09T06:28:48.584Z",
+      "id": "3a3d83b0-ea50-4be9-a089-9b8080bba587",
+      "createdAt": "2026-04-09T06:42:36.043Z",
       "actionId": "action-send-overdue-charge-reminder",
       "decisionId": "decision-overdue-charge-reminder",
       "entityType": "charge",
-      "entityId": "05560578-8419-421d-8d80-9ef372090602",
+      "entityId": "24394ec7-7524-44ad-8697-7fe4b8bd3f6a",
       "status": "blocked",
       "reasonCode": "idempotency_recent_execution",
       "mode": "automatic",
@@ -161,12 +165,12 @@
       }
     },
     {
-      "id": "206db924-816a-4fe1-8051-9db9992f2d44",
-      "createdAt": "2026-04-09T06:28:48.601Z",
+      "id": "5a4d195f-fade-4344-a49b-c6890f214a3d",
+      "createdAt": "2026-04-09T06:42:36.055Z",
       "actionId": "action-send-overdue-charge-reminder",
       "decisionId": "decision-overdue-charge-reminder",
       "entityType": "charge",
-      "entityId": "138a4baf-8a8f-4614-991f-6668ad202779",
+      "entityId": "080f9868-0312-4164-95e5-d6d747f79145",
       "status": "blocked",
       "reasonCode": "idempotency_recent_execution",
       "mode": "automatic",
@@ -176,12 +180,12 @@
       }
     },
     {
-      "id": "e8760385-1b4f-4ae6-a9ea-14da20e14237",
-      "createdAt": "2026-04-09T06:28:48.627Z",
+      "id": "87e69f06-f26f-4c14-979d-b0c3930458de",
+      "createdAt": "2026-04-09T06:42:36.074Z",
       "actionId": "action-send-overdue-charge-reminder",
       "decisionId": "decision-overdue-charge-reminder",
       "entityType": "charge",
-      "entityId": "c1fdcd56-b9c8-4fb5-a622-2895dfc9c1bd",
+      "entityId": "7af72f0f-2509-4f73-8f90-eb926214f97a",
       "status": "blocked",
       "reasonCode": "idempotency_recent_execution",
       "mode": "automatic",
@@ -191,12 +195,12 @@
       }
     },
     {
-      "id": "d13a12f2-8750-4727-94d7-660eed17aa73",
-      "createdAt": "2026-04-09T06:28:48.641Z",
+      "id": "60c8a9b1-0991-446c-8650-c3eb43353ec5",
+      "createdAt": "2026-04-09T06:42:36.086Z",
       "actionId": "action-send-overdue-charge-reminder",
       "decisionId": "decision-overdue-charge-reminder",
       "entityType": "charge",
-      "entityId": "e9f0c21f-71db-4e36-8886-3a200e00d23a",
+      "entityId": "03ec8a30-250a-4d27-a99c-e7de8726941d",
       "status": "blocked",
       "reasonCode": "idempotency_recent_execution",
       "mode": "automatic",
@@ -206,12 +210,12 @@
       }
     },
     {
-      "id": "dfa99240-3851-4ca7-a46a-daab340c5fd7",
-      "createdAt": "2026-04-09T06:28:48.650Z",
+      "id": "4219c194-a59a-4880-90ad-4d47441b1f52",
+      "createdAt": "2026-04-09T06:42:36.101Z",
       "actionId": "action-send-overdue-charge-reminder",
       "decisionId": "decision-overdue-charge-reminder",
       "entityType": "charge",
-      "entityId": "8f2f70de-ac56-4313-b18a-7a5cd617560b",
+      "entityId": "973f424d-bb08-4f77-adc2-77416d429e93",
       "status": "blocked",
       "reasonCode": "idempotency_recent_execution",
       "mode": "automatic",
@@ -221,12 +225,12 @@
       }
     },
     {
-      "id": "da94e943-0a13-4b21-801b-32c7ec556db7",
-      "createdAt": "2026-04-09T06:28:48.659Z",
+      "id": "1db3d147-b946-4459-a1f2-ab80b5c480c8",
+      "createdAt": "2026-04-09T06:42:36.122Z",
       "actionId": "action-notify-operational-alert",
       "decisionId": "decision-operational-risk-threshold",
       "entityType": "system",
-      "entityId": "org:1adf909d-fe9c-4108-b875-b953b3f89c77",
+      "entityId": "org:d27ab294-b091-4514-b311-9d6570828f3b",
       "status": "blocked",
       "reasonCode": "idempotency_recent_execution",
       "mode": "automatic",
@@ -236,12 +240,12 @@
       }
     },
     {
-      "id": "dc045f9b-d73a-441e-b824-a67f02239090",
-      "createdAt": "2026-04-09T06:28:48.667Z",
+      "id": "af6951a2-8e62-4c11-8957-77dc689a4b7d",
+      "createdAt": "2026-04-09T06:42:36.141Z",
       "actionId": "action-notify-finance-team",
       "decisionId": "decision-finance-overdue-threshold",
       "entityType": "system",
-      "entityId": "org:1adf909d-fe9c-4108-b875-b953b3f89c77",
+      "entityId": "org:d27ab294-b091-4514-b311-9d6570828f3b",
       "status": "blocked",
       "reasonCode": "idempotency_recent_execution",
       "mode": "automatic",
@@ -251,12 +255,12 @@
       }
     },
     {
-      "id": "60af558a-4f06-487e-9d7e-f924eb8344b2",
-      "createdAt": "2026-04-09T06:28:48.681Z",
+      "id": "fc9519ea-e1b5-4a35-8a85-61bf4f75d7f8",
+      "createdAt": "2026-04-09T06:42:36.149Z",
       "actionId": "action-mark-operational-attention",
       "decisionId": "decision-stalled-service-orders-attention-threshold",
       "entityType": "system",
-      "entityId": "org:1adf909d-fe9c-4108-b875-b953b3f89c77",
+      "entityId": "org:d27ab294-b091-4514-b311-9d6570828f3b",
       "status": "blocked",
       "reasonCode": "idempotency_recent_execution",
       "mode": "automatic",
@@ -266,12 +270,12 @@
       }
     },
     {
-      "id": "41007fab-032c-4452-b372-0968f344ad64",
-      "createdAt": "2026-04-09T06:28:48.691Z",
+      "id": "5d86a7ba-80c9-47a1-9819-197a8bc239d1",
+      "createdAt": "2026-04-09T06:42:36.163Z",
       "actionId": "action-create-charge-followup",
       "decisionId": "decision-overdue-charge-followup-threshold",
       "entityType": "charge",
-      "entityId": "e81a995d-9d67-4829-a156-f547de971c94",
+      "entityId": "28ed0022-5b13-4a0a-a16a-ed369c4aef9f",
       "status": "blocked",
       "reasonCode": "idempotency_recent_execution",
       "mode": "automatic",
@@ -281,12 +285,12 @@
       }
     },
     {
-      "id": "4cf899ea-e747-402c-b48b-e1e651996192",
-      "createdAt": "2026-04-09T06:28:48.701Z",
+      "id": "3af710cf-9a29-4599-a3a4-d1ecf2b5a1de",
+      "createdAt": "2026-04-09T06:42:36.170Z",
       "actionId": "action-create-charge-followup",
       "decisionId": "decision-overdue-charge-followup-threshold",
       "entityType": "charge",
-      "entityId": "f6699675-5733-4f34-81e4-baee283ba2b3",
+      "entityId": "96680f7f-2116-4afb-967f-6db2a2f3fd9b",
       "status": "blocked",
       "reasonCode": "idempotency_recent_execution",
       "mode": "automatic",
@@ -296,12 +300,12 @@
       }
     },
     {
-      "id": "3891b2fc-a3db-48d4-8ac0-845e20b3e3a8",
-      "createdAt": "2026-04-09T06:28:48.714Z",
+      "id": "385eb493-23b2-4a23-acae-dc58fe76a0ff",
+      "createdAt": "2026-04-09T06:42:36.183Z",
       "actionId": "action-create-charge-followup",
       "decisionId": "decision-overdue-charge-followup-threshold",
       "entityType": "charge",
-      "entityId": "fe50ee39-140a-446e-8ab7-7b3502a87c73",
+      "entityId": "162d3264-1af6-44eb-b779-1fa64361f26d",
       "status": "blocked",
       "reasonCode": "idempotency_recent_execution",
       "mode": "automatic",
@@ -311,12 +315,12 @@
       }
     },
     {
-      "id": "5eb83c9b-971a-4e86-bedf-ab87af69804a",
-      "createdAt": "2026-04-09T06:28:48.723Z",
+      "id": "ebe5bf65-ce2d-4dc8-8647-feed6a96abb5",
+      "createdAt": "2026-04-09T06:42:36.193Z",
       "actionId": "action-create-charge-followup",
       "decisionId": "decision-overdue-charge-followup-threshold",
       "entityType": "charge",
-      "entityId": "05560578-8419-421d-8d80-9ef372090602",
+      "entityId": "24394ec7-7524-44ad-8697-7fe4b8bd3f6a",
       "status": "blocked",
       "reasonCode": "idempotency_recent_execution",
       "mode": "automatic",
@@ -326,12 +330,12 @@
       }
     },
     {
-      "id": "ed131df8-7d50-4bbe-b1ae-3aa5faf68996",
-      "createdAt": "2026-04-09T06:28:48.735Z",
+      "id": "f51f850b-bd2d-493f-96ac-1448a8ee195d",
+      "createdAt": "2026-04-09T06:42:36.205Z",
       "actionId": "action-create-charge-followup",
       "decisionId": "decision-overdue-charge-followup-threshold",
       "entityType": "charge",
-      "entityId": "138a4baf-8a8f-4614-991f-6668ad202779",
+      "entityId": "080f9868-0312-4164-95e5-d6d747f79145",
       "status": "blocked",
       "reasonCode": "idempotency_recent_execution",
       "mode": "automatic",
@@ -341,12 +345,12 @@
       }
     },
     {
-      "id": "b5d0f815-3649-4a56-a4a4-77db429ac815",
-      "createdAt": "2026-04-09T06:28:48.746Z",
+      "id": "b1b703c3-36cc-4276-9876-8a528becc733",
+      "createdAt": "2026-04-09T06:42:36.215Z",
       "actionId": "action-create-charge-followup",
       "decisionId": "decision-overdue-charge-followup-threshold",
       "entityType": "charge",
-      "entityId": "c1fdcd56-b9c8-4fb5-a622-2895dfc9c1bd",
+      "entityId": "7af72f0f-2509-4f73-8f90-eb926214f97a",
       "status": "blocked",
       "reasonCode": "idempotency_recent_execution",
       "mode": "automatic",
@@ -356,12 +360,12 @@
       }
     },
     {
-      "id": "c1383024-744c-4963-b6fa-e8fea037ad48",
-      "createdAt": "2026-04-09T06:28:48.755Z",
+      "id": "e61a3d9a-ba8c-4d6c-8440-9ad89dfd7516",
+      "createdAt": "2026-04-09T06:42:36.228Z",
       "actionId": "action-create-charge-followup",
       "decisionId": "decision-overdue-charge-followup-threshold",
       "entityType": "charge",
-      "entityId": "e9f0c21f-71db-4e36-8886-3a200e00d23a",
+      "entityId": "03ec8a30-250a-4d27-a99c-e7de8726941d",
       "status": "blocked",
       "reasonCode": "idempotency_recent_execution",
       "mode": "automatic",
@@ -371,12 +375,12 @@
       }
     },
     {
-      "id": "4ae675aa-39b0-4472-95da-9fe0d441e424",
-      "createdAt": "2026-04-09T06:28:48.767Z",
+      "id": "529983a9-688e-4595-aaab-2fee6557fa1e",
+      "createdAt": "2026-04-09T06:42:36.237Z",
       "actionId": "action-create-charge-followup",
       "decisionId": "decision-overdue-charge-followup-threshold",
       "entityType": "charge",
-      "entityId": "8f2f70de-ac56-4313-b18a-7a5cd617560b",
+      "entityId": "973f424d-bb08-4f77-adc2-77416d429e93",
       "status": "blocked",
       "reasonCode": "idempotency_recent_execution",
       "mode": "automatic",
@@ -386,12 +390,12 @@
       }
     },
     {
-      "id": "82a5ffdb-b691-4e14-ac52-1422c4d39664",
-      "createdAt": "2026-04-09T06:28:48.779Z",
+      "id": "5f79accd-c607-4166-a213-3d955fe94bca",
+      "createdAt": "2026-04-09T06:42:36.249Z",
       "actionId": "action-escalate-risk-review",
       "decisionId": "decision-escalate-risk-review-threshold",
       "entityType": "system",
-      "entityId": "org:1adf909d-fe9c-4108-b875-b953b3f89c77",
+      "entityId": "org:d27ab294-b091-4514-b311-9d6570828f3b",
       "status": "blocked",
       "reasonCode": "idempotency_recent_execution",
       "mode": "automatic",
