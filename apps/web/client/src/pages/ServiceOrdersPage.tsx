@@ -39,10 +39,23 @@ import type {
   FinancialFilter,
   ServiceOrder,
 } from "@/components/service-orders/service-order.types";
-import { getErrorMessage, getQueryUiState, normalizeArrayPayload } from "@/lib/query-helpers";
+import {
+  getErrorMessage,
+  getQueryUiState,
+  normalizeArrayPayload,
+} from "@/lib/query-helpers";
 import { useProductAnalytics } from "@/hooks/useProductAnalytics";
 import { generateServiceOrderActions } from "@/lib/smartActions";
+import {
+  compareOperationalSeverity,
+  getNextActionServiceOrder,
+  getOperationalSeverityClasses,
+  getOperationalSeverityLabel,
+  getServiceOrderSeverity,
+  type OperationalSeverity,
+} from "@/lib/operations/operational-intelligence";
 import { ActionBarWrapper } from "@/components/operating-system/ActionBar";
+import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedbackButton";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 
 const FINANCIAL_FILTERS: Array<{
@@ -60,6 +73,12 @@ const FINANCIAL_FILTERS: Array<{
 
 function sortOrders(items: ServiceOrder[]) {
   return [...items].sort((a, b) => {
+    const severityDiff = compareOperationalSeverity(
+      getServiceOrderSeverity(a),
+      getServiceOrderSeverity(b)
+    );
+    if (severityDiff !== 0) return severityDiff;
+
     const priorityDiff = getPriorityScore(b) - getPriorityScore(a);
     if (priorityDiff !== 0) return priorityDiff;
 
@@ -76,7 +95,7 @@ function sortOrders(items: ServiceOrder[]) {
 
 function buildOperationalQueue(items: ServiceOrder[]) {
   return items.filter(
-    (item) => item.status !== "DONE" && item.status !== "CANCELED"
+    item => item.status !== "DONE" && item.status !== "CANCELED"
   );
 }
 
@@ -112,7 +131,10 @@ export default function ServiceOrdersPage() {
   const deepLinkBase =
     basePath === "/operations" ? "operations" : "service-orders";
 
-  const activeId = useMemo(() => getServiceOrderIdFromUrl(location), [location]);
+  const activeId = useMemo(
+    () => getServiceOrderIdFromUrl(location),
+    [location]
+  );
   const customerIdFromUrl = useMemo(() => {
     const query = location.includes("?") ? location.split("?")[1] : "";
     return new URLSearchParams(query).get("customerId");
@@ -169,13 +191,15 @@ export default function ServiceOrdersPage() {
   }, [ordersQuery.data]);
 
   const people = useMemo(() => {
-    return normalizeArrayPayload<{ id: string; name: string }>(peopleQuery.data);
+    return normalizeArrayPayload<{ id: string; name: string }>(
+      peopleQuery.data
+    );
   }, [peopleQuery.data]);
 
   const filtered = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
 
-    return orders.filter((item) => {
+    return orders.filter(item => {
       if (
         customerIdFromUrl &&
         String(item.customerId ?? item.customer?.id ?? "") !== customerIdFromUrl
@@ -218,7 +242,7 @@ export default function ServiceOrdersPage() {
     const fromQuery = extractServiceOrder(activeOrderQuery.data);
     if (fromQuery) return fromQuery;
 
-    return sorted.find((item) => item.id === activeId) ?? null;
+    return sorted.find(item => item.id === activeId) ?? null;
   }, [activeOrderQuery.data, sorted, activeId]);
 
   const totalOrders = orders.length;
@@ -227,18 +251,22 @@ export default function ServiceOrdersPage() {
 
   const totalWithUrgency = useMemo(() => {
     return sorted.filter(
-      (item) =>
+      item =>
         item.financialSummary?.chargeStatus === "OVERDUE" ||
         (item.status === "DONE" && !item.financialSummary?.hasCharge)
     ).length;
   }, [sorted]);
 
   const nextAction = useMemo(() => {
-    if (activeOrder?.status === "DONE" && !activeOrder.financialSummary?.hasCharge) {
+    if (
+      activeOrder?.status === "DONE" &&
+      !activeOrder.financialSummary?.hasCharge
+    ) {
       return {
         severity: "critical" as const,
         title: "Gerar cobrança desta O.S.",
-        description: "A execução foi concluída e o próximo passo ideal é faturar imediatamente.",
+        description:
+          "A execução foi concluída e o próximo passo ideal é faturar imediatamente.",
         ctaLabel: "Gerar cobrança",
         onClick: () => navigate(`/finances?serviceOrderId=${activeOrder.id}`),
       };
@@ -249,7 +277,8 @@ export default function ServiceOrdersPage() {
       return {
         severity: "critical" as const,
         title: "Cobrança vencida: acionar WhatsApp",
-        description: "A cobrança está vencida. Conduza recuperação com contato direto.",
+        description:
+          "A cobrança está vencida. Conduza recuperação com contato direto.",
         ctaLabel: "Enviar WhatsApp",
         onClick: () => {
           if (url) openWhatsApp(url);
@@ -262,7 +291,8 @@ export default function ServiceOrdersPage() {
       return {
         severity: "healthy" as const,
         title: "Pagamento confirmado: fechar execução",
-        description: "Finalize a O.S. com resultado registrado para encerrar o ciclo.",
+        description:
+          "Finalize a O.S. com resultado registrado para encerrar o ciclo.",
         ctaLabel: "Revisar e concluir",
         onClick: () => openAsActive(activeOrder.id),
       };
@@ -271,7 +301,7 @@ export default function ServiceOrdersPage() {
     const queueOrder = operationalQueue[0];
     if (queueOrder) {
       return {
-        severity: "attention" as const,
+        severity: "pending" as const,
         title: "Retomar fila operacional",
         description: "Sem foco definido: abra a próxima O.S. prioritária.",
         ctaLabel: "Abrir próxima O.S.",
@@ -282,7 +312,8 @@ export default function ServiceOrdersPage() {
     return {
       severity: "healthy" as const,
       title: "Criar nova ordem de serviço",
-      description: "Não há itens pendentes. Gere uma nova O.S. para manter o fluxo ativo.",
+      description:
+        "Não há itens pendentes. Gere uma nova O.S. para manter o fluxo ativo.",
       ctaLabel: "Nova O.S.",
       onClick: () => setIsCreateOpen(true),
     };
@@ -333,62 +364,55 @@ export default function ServiceOrdersPage() {
     navigate(appendReturnTo(url, returnTo));
   }
 
-  function getSeverityClasses(severity: "critical" | "attention" | "healthy") {
-    if (severity === "critical") {
-      return "border-red-200 bg-red-50/90 dark:border-red-900/40 dark:bg-red-950/20";
-    }
-    if (severity === "healthy") {
-      return "border-emerald-200 bg-emerald-50/90 dark:border-emerald-900/40 dark:bg-emerald-950/20";
-    }
-    return "border-amber-200 bg-amber-50/90 dark:border-amber-900/40 dark:bg-amber-950/20";
-  }
-
   const nextActionAccent =
     nextAction.severity === "critical"
       ? "text-red-700 dark:text-red-300"
       : nextAction.severity === "healthy"
-        ? "text-emerald-700 dark:text-emerald-300"
+        ? "text-zinc-700 dark:text-zinc-300"
         : "text-amber-700 dark:text-amber-300";
 
-
-  const smartPriorities = useMemo(() => [
-    {
-      id: "so-stalled",
-      type: "stalled_service_orders" as const,
-      title: "O.S. paradas",
-      count: totalOperational,
-      impactCents: totalOperational * 35000,
-      ctaLabel: "Abrir próxima O.S.",
-      ctaPath: "/service-orders",
-      helperText: "Execução parada atrasa entrega e faturamento.",
-    },
-    {
-      id: "so-overdue",
-      type: "overdue_charges" as const,
-      title: "Risco financeiro na execução",
-      count: totalWithUrgency,
-      impactCents: totalWithUrgency * 50000,
-      ctaLabel: "Cobrar agora",
-      ctaPath: "/finances",
-      helperText: "O.S. concluída sem cobrança representa dinheiro parado.",
-    },
-    {
-      id: "so-risk",
-      type: "operational_risk" as const,
-      title: "Deep-links com foco ativo",
-      count: activeId ? 1 : 0,
-      impactCents: 0,
-      ctaLabel: "Revisar foco",
-      ctaPath: "/service-orders",
-      helperText: "Garantir foco certo evita retrabalho e desvio de fila.",
-    },
-  ], [activeId, totalOperational, totalWithUrgency]);
+  const smartPriorities = useMemo(
+    () => [
+      {
+        id: "so-stalled",
+        type: "stalled_service_orders" as const,
+        title: "O.S. paradas",
+        count: totalOperational,
+        impactCents: totalOperational * 35000,
+        ctaLabel: "Abrir próxima O.S.",
+        ctaPath: "/service-orders",
+        helperText: "Execução parada atrasa entrega e faturamento.",
+      },
+      {
+        id: "so-overdue",
+        type: "overdue_charges" as const,
+        title: "Risco financeiro na execução",
+        count: totalWithUrgency,
+        impactCents: totalWithUrgency * 50000,
+        ctaLabel: "Cobrar agora",
+        ctaPath: "/finances",
+        helperText: "O.S. concluída sem cobrança representa dinheiro parado.",
+      },
+      {
+        id: "so-risk",
+        type: "operational_risk" as const,
+        title: "Deep-links com foco ativo",
+        count: activeId ? 1 : 0,
+        impactCents: 0,
+        ctaLabel: "Revisar foco",
+        ctaPath: "/service-orders",
+        helperText: "Garantir foco certo evita retrabalho e desvio de fila.",
+      },
+    ],
+    [activeId, totalOperational, totalWithUrgency]
+  );
 
   const smartOperationalActions = useMemo(
     () =>
       generateServiceOrderActions({
         orders: sorted,
-        onGenerateCharge: (serviceOrderId) => navigate(`/finances?serviceOrderId=${serviceOrderId}`),
+        onGenerateCharge: serviceOrderId =>
+          navigate(`/finances?serviceOrderId=${serviceOrderId}`),
       }),
     [navigate, sorted]
   );
@@ -429,7 +453,7 @@ export default function ServiceOrdersPage() {
       breadcrumb={[{ label: "Operação" }, { label: "Ordens de Serviço" }]}
     >
       <ActionBarWrapper
-        secondaryActions={(
+        secondaryActions={
           <>
             {activeId ? (
               <Button
@@ -447,9 +471,11 @@ export default function ServiceOrdersPage() {
               Atualizar
             </Button>
           </>
-        )}
-        primaryAction={(
-          <Button
+        }
+        primaryAction={
+          <ActionFeedbackButton
+            state="idle"
+            idleLabel="Nova O.S."
             onClick={() => {
               track("cta_click", {
                 screen: "service-orders",
@@ -457,14 +483,10 @@ export default function ServiceOrdersPage() {
               });
               setIsCreateOpen(true);
             }}
-            className="min-h-12"
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Nova O.S.
-          </Button>
-        )}
+            icon={<Plus className="h-4 w-4" />}
+          />
+        }
       />
-
 
       <SmartPage
         pageContext="service-orders"
@@ -482,14 +504,14 @@ export default function ServiceOrdersPage() {
 
       {activeId && (
         <div className="nexo-surface-operational border-orange-200 bg-orange-50/85 p-3 text-sm text-orange-800 dark:border-orange-500/30 dark:bg-orange-500/10 dark:text-orange-300">
-          Você está visualizando uma O.S. em foco por deep-link. A lista continua
-          estável, sem redirecionamento automático.
+          Você está visualizando uma O.S. em foco por deep-link. A lista
+          continua estável, sem redirecionamento automático.
         </div>
       )}
       {activeId && !activeOrder && !activeOrderQuery.isLoading ? (
         <SurfaceSection className="border-amber-500/30 bg-amber-500/10 text-sm text-amber-200">
-          Deep link inválido: a O.S. <strong>{activeId}</strong> não foi encontrada.
-          Revise o link ou volte para a lista.
+          Deep link inválido: a O.S. <strong>{activeId}</strong> não foi
+          encontrada. Revise o link ou volte para a lista.
         </SurfaceSection>
       ) : null}
 
@@ -517,7 +539,9 @@ export default function ServiceOrdersPage() {
             <div className="text-xs uppercase tracking-wide text-muted-foreground">
               O que precisa andar
             </div>
-            <div className="mt-2 text-2xl font-semibold">{totalOperational}</div>
+            <div className="mt-2 text-2xl font-semibold">
+              {totalOperational}
+            </div>
           </CardContent>
         </Card>
 
@@ -526,7 +550,9 @@ export default function ServiceOrdersPage() {
             <div className="text-xs uppercase tracking-wide text-muted-foreground">
               Impacto imediato
             </div>
-            <div className="mt-2 text-2xl font-semibold">{totalWithUrgency}</div>
+            <div className="mt-2 text-2xl font-semibold">
+              {totalWithUrgency}
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -540,15 +566,15 @@ export default function ServiceOrdersPage() {
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
             <Input
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={event => setSearch(event.target.value)}
               placeholder="Buscar por título, cliente, responsável ou status"
               className="w-full pl-9"
             />
           </div>
         }
-        filtersSlot={(
+        filtersSlot={
           <div className="flex flex-wrap gap-2">
-            {FINANCIAL_FILTERS.map((item) => (
+            {FINANCIAL_FILTERS.map(item => (
               <Button
                 key={item.value}
                 size="sm"
@@ -559,14 +585,21 @@ export default function ServiceOrdersPage() {
               </Button>
             ))}
           </div>
-        )}
+        }
       />
 
-      <SurfaceSection className={getSeverityClasses(nextAction.severity)}>
+      <SurfaceSection
+        className={getOperationalSeverityClasses(nextAction.severity)}
+      >
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className={`text-xs font-semibold uppercase tracking-wide ${nextActionAccent}`}>
-              Próxima ação
+            <p
+              className={`text-xs font-semibold uppercase tracking-wide ${nextActionAccent}`}
+            >
+              Próxima ação •{" "}
+              {getOperationalSeverityLabel(
+                nextAction.severity as OperationalSeverity
+              )}
             </p>
             <p className={`mt-1 font-medium ${nextActionAccent}`}>
               {nextAction.title}
@@ -575,7 +608,17 @@ export default function ServiceOrdersPage() {
               {nextAction.description}
             </p>
           </div>
-          <Button
+          <ActionFeedbackButton
+            state={
+              nextActionState === "running"
+                ? "loading"
+                : nextActionState === "done"
+                  ? "success"
+                  : "idle"
+            }
+            idleLabel={nextAction.ctaLabel}
+            loadingLabel="Abrindo..."
+            successLabel="Ação iniciada"
             onClick={() => {
               track("cta_click", {
                 screen: "service-orders",
@@ -587,13 +630,7 @@ export default function ServiceOrdersPage() {
               setTimeout(() => setNextActionState("done"), 220);
               setTimeout(() => setNextActionState("idle"), 1400);
             }}
-          >
-            {nextActionState === "running"
-              ? "Abrindo..."
-              : nextActionState === "done"
-                ? "Ação iniciada"
-                : nextAction.ctaLabel}
-          </Button>
+          />
         </div>
       </SurfaceSection>
 
@@ -640,19 +677,29 @@ export default function ServiceOrdersPage() {
       ) : (
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(380px,0.9fr)]">
           <div className="space-y-4">
-            {sorted.map((os) => {
+            {sorted.map(os => {
               const isActive = os.id === activeId;
               const chargeBadge = getChargeBadge(os.financialSummary);
               const operationalStage = getOperationalStage(os);
               const financialStage = getFinancialStage(os);
               const whatsappUrl = buildWhatsAppUrlFromServiceOrder(os);
+              const itemSeverity = getServiceOrderSeverity(os);
+              const itemNextAction = getNextActionServiceOrder(os);
 
               return (
                 <div
                   key={os.id}
                   ref={isActive ? activeRef : null}
-                  className={isActive ? "rounded-2xl ring-2 ring-orange-300" : ""}
+                  className={`${isActive ? "rounded-2xl ring-2 ring-orange-300" : ""} ${getOperationalSeverityClasses(itemSeverity)}`}
                 >
+                  <div className="mb-2 flex items-center justify-between px-1">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-300">
+                      Severidade: {getOperationalSeverityLabel(itemSeverity)}
+                    </span>
+                    <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                      Próxima ação: {itemNextAction.label}
+                    </span>
+                  </div>
                   <ServiceOrderCard
                     os={os}
                     isProcessing={false}
@@ -662,7 +709,7 @@ export default function ServiceOrdersPage() {
                     onEdit={setEditId}
                     onOpenDeepLink={openAsActive}
                     onOpenWhatsApp={
-                      whatsappUrl ? (url) => openWhatsApp(url) : undefined
+                      whatsappUrl ? url => openWhatsApp(url) : undefined
                     }
                     isUpdating={false}
                   />
@@ -681,11 +728,13 @@ export default function ServiceOrdersPage() {
                     Selecione uma O.S. para abrir o hub operacional.
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Aqui você acompanha execução, cobrança, pagamento, timeline e
-                    ação seguinte sem navegar no escuro.
+                    Aqui você acompanha execução, cobrança, pagamento, timeline
+                    e ação seguinte sem navegar no escuro.
                   </p>
                   {operationalQueue[0] ? (
-                    <Button onClick={() => openAsActive(operationalQueue[0].id)}>
+                    <Button
+                      onClick={() => openAsActive(operationalQueue[0].id)}
+                    >
                       Abrir próxima da fila
                     </Button>
                   ) : null}
@@ -706,7 +755,10 @@ export default function ServiceOrdersPage() {
                       const url = buildWhatsAppUrlFromServiceOrder(activeOrder);
                       if (url) {
                         navigate(
-                          appendReturnTo(url, `${basePath}?os=${activeOrder.id}`)
+                          appendReturnTo(
+                            url,
+                            `${basePath}?os=${activeOrder.id}`
+                          )
                         );
                       }
                     }}

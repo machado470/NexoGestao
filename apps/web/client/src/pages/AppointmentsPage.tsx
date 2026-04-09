@@ -41,6 +41,13 @@ import { StatusBadge, mapAppointmentStatus } from "@/components/StatusBadge";
 import { SmartPage, SurfaceSection } from "@/components/PagePattern";
 import { DemoEnvironmentCta } from "@/components/DemoEnvironmentCta";
 import { generateAppointmentActions } from "@/lib/smartActions";
+import {
+  compareOperationalSeverity,
+  getAppointmentSeverity,
+  getNextActionAppointment,
+  getOperationalSeverityClasses,
+  getOperationalSeverityLabel,
+} from "@/lib/operations/operational-intelligence";
 import { ActionBarWrapper } from "@/components/operating-system/ActionBar";
 import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedbackButton";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
@@ -193,13 +200,7 @@ function getStage(appointment: Appointment) {
   }
 }
 
-function InfoItem({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
+function InfoItem({ label, value }: { label: string; value: string }) {
   return (
     <div className="nexo-subtle-surface p-3">
       <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
@@ -290,91 +291,95 @@ function getAppointmentNextAction(params: {
 }) {
   const { appointment, serviceOrders } = params;
   const customerOrders = serviceOrders.filter(
-    (item) => String(item.customerId ?? "") === appointment.customerId
+    item => String(item.customerId ?? "") === appointment.customerId
   );
 
   const latestOrder = customerOrders[0] ?? null;
   const hasOrder = customerOrders.length > 0;
-  const hasPendingCharge = customerOrders.some((order) => {
-    const status = String(order.financialSummary?.chargeStatus ?? "").toUpperCase();
+  const hasPendingCharge = customerOrders.some(order => {
+    const status = String(
+      order.financialSummary?.chargeStatus ?? ""
+    ).toUpperCase();
     return status === "PENDING" || status === "OVERDUE";
   });
 
+  const baseNextAction = getNextActionAppointment(appointment);
+
   if (appointment.status === "CANCELED") {
     return {
-      tone:
-        "border-gray-200 bg-gray-50 text-gray-900 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-300",
+      severity: "healthy" as const,
       title: "Fluxo encerrado",
       description: "Agendamento cancelado. Nenhuma ação operacional imediata.",
+      label: baseNextAction.label,
     };
   }
 
   if (appointment.status === "NO_SHOW") {
     return {
-      tone:
-        "border-yellow-200 bg-yellow-50 text-yellow-900 dark:border-yellow-900/40 dark:bg-yellow-950/20 dark:text-yellow-300",
+      severity: "overdue" as const,
       title: "Retomar contato",
       description:
         "Cliente não compareceu. Vale reabrir conversa e tentar remarcar.",
+      label: baseNextAction.label,
     };
   }
 
   if (appointment.status === "SCHEDULED") {
     return {
-      tone:
-        "border-orange-200 bg-orange-50 text-orange-900 dark:border-orange-500/40 dark:bg-orange-500/15 dark:text-orange-200",
+      severity: "pending" as const,
       title: "Confirmar o horário",
       description:
         "O próximo passo é validar presença e reduzir risco de ausência.",
+      label: baseNextAction.label,
     };
   }
 
   if (appointment.status === "CONFIRMED" && !hasOrder) {
     return {
-      tone:
-        "border-orange-200 bg-orange-50 text-orange-900 dark:border-orange-900/40 dark:bg-orange-950/20 dark:text-orange-300",
+      severity: "critical" as const,
       title: "Abrir execução",
       description:
         "Cliente confirmado sem O.S. vinculada visível. Hora de puxar a operação.",
+      label: "Criar O.S.",
     };
   }
 
   if (appointment.status === "CONFIRMED" && hasOrder) {
     return {
-      tone:
-        "border-green-200 bg-green-50 text-green-900 dark:border-green-900/40 dark:bg-green-950/20 dark:text-green-300",
+      severity: "pending" as const,
       title: "Acompanhar O.S.",
       description: latestOrder
         ? "Já existe operação em andamento para este cliente. Use a ordem como hub."
         : "Cliente confirmado com operação em andamento.",
+      label: "Acompanhar O.S.",
     };
   }
 
   if (appointment.status === "DONE" && hasPendingCharge) {
     return {
-      tone:
-        "border-red-200 bg-red-50 text-red-900 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300",
+      severity: "critical" as const,
       title: "Fechar financeiro",
       description:
         "Atendimento concluído, mas ainda existem pendências financeiras pedindo ação.",
+      label: "Cobrar cliente",
     };
   }
 
   if (appointment.status === "DONE" && hasOrder) {
     return {
-      tone:
-        "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-300",
+      severity: "healthy" as const,
       title: "Fluxo em acompanhamento",
       description:
         "Agendamento concluído. Agora a leitura correta é acompanhar operação e financeiro.",
+      label: baseNextAction.label,
     };
   }
 
   return {
-    tone:
-      "border-gray-200 bg-gray-50 text-gray-900 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-300",
+    severity: "healthy" as const,
     title: "Sem ação imediata",
     description: "Nenhum próximo passo crítico identificado no momento.",
+    label: baseNextAction.label,
   };
 }
 
@@ -419,7 +424,7 @@ export default function AppointmentsPage() {
   );
 
   const updateAppointment = trpc.nexo.appointments.update.useMutation({
-    onMutate: async (variables) => {
+    onMutate: async variables => {
       const previous = listAppointments.data;
       const targetId = String(variables.id);
       const targetStatus = String(variables.status ?? "");
@@ -429,11 +434,14 @@ export default function AppointmentsPage() {
         (old: any) => {
           const raw = old as any[] | { data?: any[] } | undefined;
           const applyUpdate = (items: any[]) =>
-            items.map((item) =>
-              String(item?.id) === targetId ? { ...item, status: targetStatus } : item
+            items.map(item =>
+              String(item?.id) === targetId
+                ? { ...item, status: targetStatus }
+                : item
             );
           if (Array.isArray(raw)) return applyUpdate(raw);
-          if (raw && Array.isArray(raw.data)) return { ...raw, data: applyUpdate(raw.data) };
+          if (raw && Array.isArray(raw.data))
+            return { ...raw, data: applyUpdate(raw.data) };
           return old;
         }
       );
@@ -464,39 +472,56 @@ export default function AppointmentsPage() {
   }, [listAppointments.data]);
 
   const customers = useMemo(() => {
-    return normalizeArrayPayload<CustomerOption>(listCustomers.data).map((customer) => ({
-      id: String(customer.id),
-      name: String(customer.name),
-    }));
+    return normalizeArrayPayload<CustomerOption>(listCustomers.data).map(
+      customer => ({
+        id: String(customer.id),
+        name: String(customer.name),
+      })
+    );
   }, [listCustomers.data]);
 
   const serviceOrders = useMemo(() => {
-    return normalizeServiceOrdersPayload(listServiceOrders.data).sort((a, b) => {
-      const dateA = new Date(a.createdAt ?? 0).getTime();
-      const dateB = new Date(b.createdAt ?? 0).getTime();
-      return dateB - dateA;
-    });
+    return normalizeServiceOrdersPayload(listServiceOrders.data).sort(
+      (a, b) => {
+        const dateA = new Date(a.createdAt ?? 0).getTime();
+        const dateB = new Date(b.createdAt ?? 0).getTime();
+        return dateB - dateA;
+      }
+    );
   }, [listServiceOrders.data]);
 
   const filteredAppointments = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
 
-    return appointments.filter((appointment) => {
-      if (
-        customerFilter &&
-        String(appointment.customerId ?? "") !== String(customerFilter)
-      ) {
-        return false;
-      }
+    return appointments
+      .filter(appointment => {
+        if (
+          customerFilter &&
+          String(appointment.customerId ?? "") !== String(customerFilter)
+        ) {
+          return false;
+        }
 
-      if (!q) return true;
+        if (!q) return true;
 
-      return (
-        String(appointment.customer?.name ?? "").toLowerCase().includes(q) ||
-        String(appointment.notes ?? "").toLowerCase().includes(q) ||
-        String(getStatusLabel(appointment.status)).toLowerCase().includes(q)
-      );
-    });
+        return (
+          String(appointment.customer?.name ?? "")
+            .toLowerCase()
+            .includes(q) ||
+          String(appointment.notes ?? "")
+            .toLowerCase()
+            .includes(q) ||
+          String(getStatusLabel(appointment.status)).toLowerCase().includes(q)
+        );
+      })
+      .sort((a, b) => {
+        const severityDiff = compareOperationalSeverity(
+          getAppointmentSeverity(a),
+          getAppointmentSeverity(b)
+        );
+        if (severityDiff !== 0) return severityDiff;
+        return new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime();
+      });
   }, [appointments, searchQuery, customerFilter]);
 
   const highlightedAppointment = useMemo(() => {
@@ -504,7 +529,7 @@ export default function AppointmentsPage() {
 
     return (
       appointments.find(
-        (appointment) => appointment.id === highlightedAppointmentId
+        appointment => appointment.id === highlightedAppointmentId
       ) ?? null
     );
   }, [appointments, highlightedAppointmentId]);
@@ -529,11 +554,11 @@ export default function AppointmentsPage() {
     const syncFromUrl = () => {
       const appointmentIdFromUrl = getAppointmentIdFromUrl();
       const customerIdFromUrl = getCustomerIdFromUrl();
-      setHighlightedAppointmentId((current) => {
+      setHighlightedAppointmentId(current => {
         if (current === appointmentIdFromUrl) return current;
         return appointmentIdFromUrl;
       });
-      setCustomerFilter((current) => {
+      setCustomerFilter(current => {
         if (current === customerIdFromUrl) return current;
         return customerIdFromUrl;
       });
@@ -558,71 +583,81 @@ export default function AppointmentsPage() {
       behavior: "smooth",
       block: "center",
     });
-  }, [highlightedAppointmentId, listAppointments.isLoading, filteredAppointments]);
+  }, [
+    highlightedAppointmentId,
+    listAppointments.isLoading,
+    filteredAppointments,
+  ]);
 
   const total = filteredAppointments.length;
   const totalScheduled = filteredAppointments.filter(
-    (a) => a.status === "SCHEDULED"
+    a => a.status === "SCHEDULED"
   ).length;
   const totalConfirmed = filteredAppointments.filter(
-    (a) => a.status === "CONFIRMED"
+    a => a.status === "CONFIRMED"
   ).length;
-  const totalDone = filteredAppointments.filter((a) => a.status === "DONE").length;
+  const totalDone = filteredAppointments.filter(
+    a => a.status === "DONE"
+  ).length;
   const totalNoShow = filteredAppointments.filter(
-    (a) => a.status === "NO_SHOW"
+    a => a.status === "NO_SHOW"
   ).length;
   const totalCanceled = filteredAppointments.filter(
-    (a) => a.status === "CANCELED"
+    a => a.status === "CANCELED"
   ).length;
 
-  const appointmentsWithOperations = filteredAppointments.filter((appointment) =>
+  const appointmentsWithOperations = filteredAppointments.filter(appointment =>
     serviceOrders.some(
-      (order) => String(order.customerId ?? "") === appointment.customerId
+      order => String(order.customerId ?? "") === appointment.customerId
     )
   ).length;
 
   const appointmentsWithoutOperations =
     filteredAppointments.length - appointmentsWithOperations;
 
-
-  const smartPriorities = useMemo(() => [
-    {
-      id: "appt-unconfirmed",
-      type: "operational_risk" as const,
-      title: "Agendamentos sem confirmação",
-      count: totalScheduled,
-      impactCents: totalScheduled * 18000,
-      ctaLabel: "Confirmar agenda",
-      ctaPath: "/appointments",
-      helperText: "Sem confirmação o risco de no-show sobe.",
-    },
-    {
-      id: "appt-no-os",
-      type: "stalled_service_orders" as const,
-      title: "Agendamentos sem O.S.",
-      count: appointmentsWithoutOperations,
-      impactCents: appointmentsWithoutOperations * 28000,
-      ctaLabel: "Criar O.S.",
-      ctaPath: "/service-orders",
-      helperText: "Sem O.S. a agenda não vira entrega faturável.",
-    },
-    {
-      id: "appt-fin",
-      type: "overdue_charges" as const,
-      title: "Concluídos com risco financeiro",
-      count: totalDone,
-      impactCents: totalDone * 12000,
-      ctaLabel: "Ver financeiro",
-      ctaPath: "/finances",
-      helperText: "Concluir atendimento sem cobrança derruba conversão em caixa.",
-    },
-  ], [appointmentsWithoutOperations, totalDone, totalScheduled]);
+  const smartPriorities = useMemo(
+    () => [
+      {
+        id: "appt-unconfirmed",
+        type: "operational_risk" as const,
+        title: "Agendamentos sem confirmação",
+        count: totalScheduled,
+        impactCents: totalScheduled * 18000,
+        ctaLabel: "Confirmar agenda",
+        ctaPath: "/appointments",
+        helperText: "Sem confirmação o risco de no-show sobe.",
+      },
+      {
+        id: "appt-no-os",
+        type: "stalled_service_orders" as const,
+        title: "Agendamentos sem O.S.",
+        count: appointmentsWithoutOperations,
+        impactCents: appointmentsWithoutOperations * 28000,
+        ctaLabel: "Criar O.S.",
+        ctaPath: "/service-orders",
+        helperText: "Sem O.S. a agenda não vira entrega faturável.",
+      },
+      {
+        id: "appt-fin",
+        type: "overdue_charges" as const,
+        title: "Concluídos com risco financeiro",
+        count: totalDone,
+        impactCents: totalDone * 12000,
+        ctaLabel: "Ver financeiro",
+        ctaPath: "/finances",
+        helperText:
+          "Concluir atendimento sem cobrança derruba conversão em caixa.",
+      },
+    ],
+    [appointmentsWithoutOperations, totalDone, totalScheduled]
+  );
 
   const smartOperationalActions = useMemo(
     () =>
       generateAppointmentActions({
         appointments: filteredAppointments,
-        onConfirmAppointment: (appointmentId) => handleOpenDeepLink(appointmentId),
+        onConfirmAppointment: appointmentId =>
+          handleOpenDeepLink(appointmentId),
       }),
     [filteredAppointments]
   );
@@ -714,7 +749,13 @@ export default function AppointmentsPage() {
           <Button
             type="button"
             variant="outline"
-            onClick={() => Promise.all([listAppointments.refetch(), listServiceOrders.refetch(), listCustomers.refetch()])}
+            onClick={() =>
+              Promise.all([
+                listAppointments.refetch(),
+                listServiceOrders.refetch(),
+                listCustomers.refetch(),
+              ])
+            }
           >
             Tentar novamente
           </Button>
@@ -730,7 +771,7 @@ export default function AppointmentsPage() {
       breadcrumb={[{ label: "Operação" }, { label: "Agendamentos" }]}
     >
       <ActionBarWrapper
-        secondaryActions={(
+        secondaryActions={
           <Button
             type="button"
             variant="outline"
@@ -746,28 +787,35 @@ export default function AppointmentsPage() {
             <RefreshCcw className="h-4 w-4" />
             Atualizar
           </Button>
-        )}
-        primaryAction={(
-          <Button
+        }
+        primaryAction={
+          <ActionFeedbackButton
+            state="idle"
+            idleLabel="Novo Agendamento"
             onClick={() => setShowCreateModal(true)}
-            className="min-h-12 gap-2 bg-orange-500 text-white"
-          >
-            <Plus className="h-4 w-4" />
-            Novo Agendamento
-          </Button>
-        )}
+            icon={<Plus className="h-4 w-4" />}
+          />
+        }
       />
-
 
       <SmartPage
         pageContext="appointments"
         headline="Agenda com direção operacional"
-        dominantProblem={appointmentsWithoutOperations > 0 ? "Agendamentos sem O.S. ativa" : "Agenda precisa de confirmação"}
+        dominantProblem={
+          appointmentsWithoutOperations > 0
+            ? "Agendamentos sem O.S. ativa"
+            : "Agenda precisa de confirmação"
+        }
         dominantImpact={`${appointmentsWithoutOperations} agendamentos sem execução`}
         dominantCta={{
-          label: appointmentsWithoutOperations > 0 ? "Criar O.S. agora" : "Confirmar agenda",
+          label:
+            appointmentsWithoutOperations > 0
+              ? "Criar O.S. agora"
+              : "Confirmar agenda",
           onClick: () => {
-            const target = filteredAppointments.find((item) => item.status === "SCHEDULED") ?? filteredAppointments[0];
+            const target =
+              filteredAppointments.find(item => item.status === "SCHEDULED") ??
+              filteredAppointments[0];
             if (target) handleOpenDeepLink(target.id);
           },
           path: "/appointments",
@@ -782,8 +830,8 @@ export default function AppointmentsPage() {
           <input
             type="text"
             value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            onKeyDown={(e) => {
+            onChange={e => setSearchInput(e.target.value)}
+            onKeyDown={e => {
               if (e.key === "Enter") handleApplySearch();
             }}
             placeholder="Buscar por cliente, status ou observações"
@@ -861,22 +909,22 @@ export default function AppointmentsPage() {
       </div>
 
       <div className="flex flex-wrap gap-2">
-        {(["", "SCHEDULED", "CONFIRMED", "DONE", "CANCELED", "NO_SHOW"] as const).map(
-          (status) => (
-            <button
-              key={status || "ALL"}
-              type="button"
-              onClick={() => setStatusFilter(status)}
-              className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${
-                statusFilter === status
-                  ? "bg-orange-500 text-white"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-              }`}
-            >
-              {status === "" ? "Todos" : getStatusLabel(status)}
-            </button>
-          )
-        )}
+        {(
+          ["", "SCHEDULED", "CONFIRMED", "DONE", "CANCELED", "NO_SHOW"] as const
+        ).map(status => (
+          <button
+            key={status || "ALL"}
+            type="button"
+            onClick={() => setStatusFilter(status)}
+            className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${
+              statusFilter === status
+                ? "bg-orange-500 text-white"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+            }`}
+          >
+            {status === "" ? "Todos" : getStatusLabel(status)}
+          </button>
+        ))}
       </div>
 
       {queryState.hasBackgroundUpdate ? (
@@ -887,18 +935,18 @@ export default function AppointmentsPage() {
 
       {filteredAppointments.length > 0 ? (
         <div className="space-y-4">
-          {filteredAppointments.map((appointment) => {
+          {filteredAppointments.map(appointment => {
             const isProcessing = processingId === appointment.id;
             const stage = getStage(appointment);
             const StageIcon = stage.icon;
             const isHighlighted = highlightedAppointmentId === appointment.id;
 
             const relatedOrders = serviceOrders.filter(
-              (order) => String(order.customerId ?? "") === appointment.customerId
+              order => String(order.customerId ?? "") === appointment.customerId
             );
             const latestOrder = relatedOrders[0] ?? null;
             const hasOperation = relatedOrders.length > 0;
-            const hasPendingFinancial = relatedOrders.some((order) => {
+            const hasPendingFinancial = relatedOrders.some(order => {
               const chargeStatus = String(
                 order.financialSummary?.chargeStatus ?? ""
               ).toUpperCase();
@@ -909,12 +957,14 @@ export default function AppointmentsPage() {
               appointment,
               serviceOrders,
             });
+            const appointmentSeverity = getAppointmentSeverity(appointment);
             const primaryAction =
               appointment.status === "SCHEDULED"
                 ? {
                     label: "Confirmar",
                     icon: CheckCheck,
-                    onClick: () => void handleUpdateStatus(appointment.id, "CONFIRMED"),
+                    onClick: () =>
+                      void handleUpdateStatus(appointment.id, "CONFIRMED"),
                     disabled: isProcessing || updateAppointment.isPending,
                   }
                 : !hasOperation
@@ -964,10 +1014,10 @@ export default function AppointmentsPage() {
             return (
               <div
                 key={appointment.id}
-                ref={(element) => {
+                ref={element => {
                   appointmentRefs.current[appointment.id] = element;
                 }}
-                className={`rounded-xl border bg-white p-4 transition-shadow hover:shadow-md dark:bg-gray-800 ${
+                className={`rounded-xl border p-4 transition-shadow hover:shadow-md ${getOperationalSeverityClasses(appointmentSeverity)} ${
                   isHighlighted
                     ? "border-orange-400 ring-2 ring-orange-200 dark:border-orange-500 dark:ring-orange-900/40"
                     : "border-gray-200 dark:border-gray-700"
@@ -978,10 +1028,13 @@ export default function AppointmentsPage() {
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <h3 className="truncate text-base font-semibold text-gray-900 dark:text-white">
-                          {appointment.customer?.name ?? "Cliente não identificado"}
+                          {appointment.customer?.name ??
+                            "Cliente não identificado"}
                         </h3>
 
-                        <StatusBadge {...mapAppointmentStatus(appointment.status)} />
+                        <StatusBadge
+                          {...mapAppointmentStatus(appointment.status)}
+                        />
 
                         {isHighlighted ? (
                           <span className="inline-flex items-center rounded-full bg-orange-100 px-2 py-1 text-xs font-medium text-orange-800 dark:bg-orange-900/30 dark:text-orange-300">
@@ -1088,7 +1141,9 @@ export default function AppointmentsPage() {
                         disabled={
                           isProcessing ||
                           updateAppointment.isPending ||
-                          !["SCHEDULED", "CONFIRMED"].includes(appointment.status)
+                          !["SCHEDULED", "CONFIRMED"].includes(
+                            appointment.status
+                          )
                         }
                       >
                         <CheckCircle2 className="h-4 w-4" />
@@ -1106,7 +1161,9 @@ export default function AppointmentsPage() {
                         disabled={
                           isProcessing ||
                           updateAppointment.isPending ||
-                          !["SCHEDULED", "CONFIRMED"].includes(appointment.status)
+                          !["SCHEDULED", "CONFIRMED"].includes(
+                            appointment.status
+                          )
                         }
                       >
                         <Clock3 className="h-4 w-4" />
@@ -1124,7 +1181,9 @@ export default function AppointmentsPage() {
                         disabled={
                           isProcessing ||
                           updateAppointment.isPending ||
-                          !["SCHEDULED", "CONFIRMED"].includes(appointment.status)
+                          !["SCHEDULED", "CONFIRMED"].includes(
+                            appointment.status
+                          )
                         }
                       >
                         <Ban className="h-4 w-4" />
@@ -1145,14 +1204,20 @@ export default function AppointmentsPage() {
                     </div>
                   </div>
 
-                  <div className={`rounded-lg border p-3 ${nextAction.tone}`}>
+                  <div
+                    className={`rounded-lg border p-3 ${getOperationalSeverityClasses(nextAction.severity)}`}
+                  >
                     <div className="flex items-start gap-2">
                       <ArrowRight className="mt-0.5 h-4 w-4 shrink-0" />
                       <div>
                         <p className="text-sm font-semibold">
-                          Próxima ação recomendada
+                          Próxima ação recomendada •{" "}
+                          {getOperationalSeverityLabel(nextAction.severity)}
                         </p>
                         <p className="mt-1 text-sm">{nextAction.title}</p>
+                        <p className="mt-1 text-xs font-medium">
+                          Ação sugerida: {nextAction.label}
+                        </p>
                         <p className="mt-1 text-xs opacity-90">
                           {nextAction.description}
                         </p>

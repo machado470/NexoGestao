@@ -6,6 +6,11 @@ import { EmptyState } from "@/components/EmptyState";
 import { getLatestActionFlowSuggestion } from "@/lib/actionFlow";
 import { rankPriorityProblems } from "@/lib/priorityEngine";
 import {
+  compareOperationalSeverity,
+  getOperationalSeverityClasses,
+  type OperationalSeverity,
+} from "@/lib/operations/operational-intelligence";
+import {
   AlertTriangle,
   BarChart3,
   Briefcase,
@@ -82,13 +87,23 @@ function MetricCard({
     <div className="nexo-kpi-card nexo-fade-in">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{label}</p>
+          <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
+            {label}
+          </p>
           <div className="mt-3 nexo-metric-value min-h-10">
-            {loading ? <div className="nexo-skeleton h-10 w-24 rounded-lg" /> : value}
+            {loading ? (
+              <div className="nexo-skeleton h-10 w-24 rounded-lg" />
+            ) : (
+              value
+            )}
           </div>
           {description ? (
             <p className="mt-2 min-h-4 text-xs text-zinc-500 dark:text-zinc-400">
-              {loading ? <span className="nexo-skeleton inline-block h-4 w-44 rounded" /> : description}
+              {loading ? (
+                <span className="nexo-skeleton inline-block h-4 w-44 rounded" />
+              ) : (
+                description
+              )}
             </p>
           ) : null}
         </div>
@@ -117,7 +132,9 @@ function DashboardCardSkeleton({ className = "" }: { className?: string }) {
 
 function getErrorMessage(error: unknown) {
   if (error && typeof error === "object" && "message" in error) {
-    const message = String((error as { message?: unknown }).message ?? "").trim();
+    const message = String(
+      (error as { message?: unknown }).message ?? ""
+    ).trim();
     if (message) return message;
   }
 
@@ -125,24 +142,35 @@ function getErrorMessage(error: unknown) {
 }
 
 function normalizeMetrics(payload: unknown) {
-  const raw = (payload as any)?.data?.data ?? (payload as any)?.data ?? payload ?? {};
+  const raw =
+    (payload as any)?.data?.data ?? (payload as any)?.data ?? payload ?? {};
 
   return {
     totalCustomers: Number((raw as any)?.totalCustomers ?? 0),
     createdCustomers: Number((raw as any)?.createdCustomers ?? 0),
     totalServiceOrders: Number((raw as any)?.totalServiceOrders ?? 0),
-    openServiceOrders: Number((raw as any)?.openServiceOrders ?? (raw as any)?.openOrders ?? 0),
+    openServiceOrders: Number(
+      (raw as any)?.openServiceOrders ?? (raw as any)?.openOrders ?? 0
+    ),
     inProgressOrders: Number(
-      (raw as any)?.inProgressOrders ?? (raw as any)?.inProgressServiceOrders ?? 0
+      (raw as any)?.inProgressOrders ??
+        (raw as any)?.inProgressServiceOrders ??
+        0
     ),
     totalRevenueInCents: Number((raw as any)?.totalRevenueInCents ?? 0),
     paidRevenueInCents: Number((raw as any)?.paidRevenueInCents ?? 0),
     pendingPaymentsInCents: Number(
-      (raw as any)?.pendingPaymentsInCents ?? (raw as any)?.pendingRevenueInCents ?? 0
+      (raw as any)?.pendingPaymentsInCents ??
+        (raw as any)?.pendingRevenueInCents ??
+        0
     ),
     weeklyRevenueInCents: Number((raw as any)?.weeklyRevenueInCents ?? 0),
-    completedOrders: Number((raw as any)?.completedOrders ?? (raw as any)?.doneServiceOrders ?? 0),
-    completedServices: Number((raw as any)?.completedServices ?? (raw as any)?.completedOrders ?? 0),
+    completedOrders: Number(
+      (raw as any)?.completedOrders ?? (raw as any)?.doneServiceOrders ?? 0
+    ),
+    completedServices: Number(
+      (raw as any)?.completedServices ?? (raw as any)?.completedOrders ?? 0
+    ),
     chargesGenerated: Number((raw as any)?.chargesGenerated ?? 0),
     riskTickets: Number((raw as any)?.riskTickets ?? 0),
     delayedOrders: Number((raw as any)?.delayedOrders ?? 0),
@@ -174,10 +202,17 @@ function normalizeStatusCollection(payload: unknown) {
     return raw
       .map((item: any, index: number) => {
         const key =
-          String(item?.key ?? item?.status ?? item?.name ?? item?.label ?? `item_${index}`).trim() ||
-          `item_${index}`;
+          String(
+            item?.key ??
+              item?.status ??
+              item?.name ??
+              item?.label ??
+              `item_${index}`
+          ).trim() || `item_${index}`;
 
-        const value = Number(item?.value ?? item?.count ?? item?.total ?? item?.amount ?? 0);
+        const value = Number(
+          item?.value ?? item?.count ?? item?.total ?? item?.amount ?? 0
+        );
 
         return {
           key,
@@ -185,15 +220,17 @@ function normalizeStatusCollection(payload: unknown) {
           value,
         };
       })
-      .filter((item) => item.key);
+      .filter(item => item.key);
   }
 
   if (raw && typeof raw === "object") {
-    return Object.entries(raw as Record<string, unknown>).map(([key, value]) => ({
-      key,
-      label: normalizeKeyLabel(key),
-      value: Number(value ?? 0),
-    }));
+    return Object.entries(raw as Record<string, unknown>).map(
+      ([key, value]) => ({
+        key,
+        label: normalizeKeyLabel(key),
+        value: Number(value ?? 0),
+      })
+    );
   }
 
   return [];
@@ -214,21 +251,43 @@ export default function ExecutiveDashboardNew() {
   );
 
   const metricsQuery = trpc.dashboard.kpis.useQuery(undefined, queryOptions);
-  const revenueQuery = trpc.dashboard.revenueTrend.useQuery(undefined, queryOptions);
-  const serviceOrdersStatusQuery = trpc.dashboard.serviceOrdersStatus.useQuery(undefined, queryOptions);
-  const chargesStatusQuery = trpc.dashboard.chargeDistribution.useQuery(undefined, queryOptions);
-  const billingLimitsQuery = trpc.billing.limits.useQuery(undefined, queryOptions);
+  const revenueQuery = trpc.dashboard.revenueTrend.useQuery(
+    undefined,
+    queryOptions
+  );
+  const serviceOrdersStatusQuery = trpc.dashboard.serviceOrdersStatus.useQuery(
+    undefined,
+    queryOptions
+  );
+  const chargesStatusQuery = trpc.dashboard.chargeDistribution.useQuery(
+    undefined,
+    queryOptions
+  );
+  const appointmentsQuery = trpc.nexo.appointments.list.useQuery(
+    undefined,
+    queryOptions
+  );
+  const billingLimitsQuery = trpc.billing.limits.useQuery(
+    undefined,
+    queryOptions
+  );
   const [isSlowLoading, setIsSlowLoading] = useState(false);
   const [optimisticTick, setOptimisticTick] = useState(false);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
-  const [stableMetrics, setStableMetrics] = useState(() => normalizeMetrics(undefined));
+  const [stableMetrics, setStableMetrics] = useState(() =>
+    normalizeMetrics(undefined)
+  );
   const [stableRevenue, setStableRevenue] = useState<any[]>([]);
-  const [stableServiceOrdersStatus, setStableServiceOrdersStatus] = useState<any[]>([]);
+  const [stableServiceOrdersStatus, setStableServiceOrdersStatus] = useState<
+    any[]
+  >([]);
   const [stableChargesStatus, setStableChargesStatus] = useState<any[]>([]);
 
   const metrics = normalizeMetrics(metricsQuery.data);
   const revenue = normalizeSeriesArray(revenueQuery.data);
-  const serviceOrdersStatus = normalizeStatusCollection(serviceOrdersStatusQuery.data);
+  const serviceOrdersStatus = normalizeStatusCollection(
+    serviceOrdersStatusQuery.data
+  );
   const chargesStatus = normalizeStatusCollection(chargesStatusQuery.data);
 
   useEffect(() => {
@@ -259,11 +318,16 @@ export default function ExecutiveDashboardNew() {
     }
   }, [chargesStatus, chargesStatusQuery.data]);
 
-  const displayMetrics = metricsQuery.data !== undefined ? metrics : stableMetrics;
-  const displayRevenue = revenueQuery.data !== undefined ? revenue : stableRevenue;
+  const displayMetrics =
+    metricsQuery.data !== undefined ? metrics : stableMetrics;
+  const displayRevenue =
+    revenueQuery.data !== undefined ? revenue : stableRevenue;
   const displayServiceOrdersStatus =
-    serviceOrdersStatusQuery.data !== undefined ? serviceOrdersStatus : stableServiceOrdersStatus;
-  const displayChargesStatus = chargesStatusQuery.data !== undefined ? chargesStatus : stableChargesStatus;
+    serviceOrdersStatusQuery.data !== undefined
+      ? serviceOrdersStatus
+      : stableServiceOrdersStatus;
+  const displayChargesStatus =
+    chargesStatusQuery.data !== undefined ? chargesStatus : stableChargesStatus;
   const quotaWarnings = useMemo(() => {
     const usage = (billingLimitsQuery.data as any)?.usage;
     if (!usage || typeof usage !== "object") return [];
@@ -287,27 +351,49 @@ export default function ExecutiveDashboardNew() {
     [displayRevenue]
   );
 
-  const paidCharges = displayChargesStatus.find((item) => item.key.toLowerCase() === "paid")?.value ?? 0;
+  const paidCharges =
+    displayChargesStatus.find(item => item.key.toLowerCase() === "paid")
+      ?.value ?? 0;
   const funnelData = [
     { value: Math.max(displayMetrics.totalCustomers, 0), name: "Clientes" },
-    { value: Math.max(displayMetrics.totalServiceOrders + displayMetrics.openServiceOrders, 0), name: "Agendamentos" },
+    {
+      value: Math.max(
+        displayMetrics.totalServiceOrders + displayMetrics.openServiceOrders,
+        0
+      ),
+      name: "Agendamentos",
+    },
     { value: Math.max(displayMetrics.totalServiceOrders, 0), name: "O.S." },
     { value: Math.max(paidCharges, 0), name: "Pagamentos" },
   ];
 
-  const totalPausedRevenue = Math.max(displayMetrics.pendingPaymentsInCents ?? 0, 0);
-  const overdueCharges = displayChargesStatus.find((item) => item.key.toLowerCase() === "overdue")?.value ?? 0;
+  const totalPausedRevenue = Math.max(
+    displayMetrics.pendingPaymentsInCents ?? 0,
+    0
+  );
+  const overdueCharges =
+    displayChargesStatus.find(item => item.key.toLowerCase() === "overdue")
+      ?.value ?? 0;
   const averageOrderValueCents =
     displayMetrics.totalServiceOrders > 0
-      ? Math.round(displayMetrics.totalRevenueInCents / Math.max(displayMetrics.totalServiceOrders, 1))
+      ? Math.round(
+          displayMetrics.totalRevenueInCents /
+            Math.max(displayMetrics.totalServiceOrders, 1)
+        )
       : 0;
   const nonBilledServices = Math.max(displayMetrics.openServiceOrders, 0);
-  const nonBilledServicesImpact = Math.max(nonBilledServices * averageOrderValueCents, 0);
+  const nonBilledServicesImpact = Math.max(
+    nonBilledServices * averageOrderValueCents,
+    0
+  );
   const overdueImpactCents = Math.max(
     overdueCharges *
       Math.max(
         averageOrderValueCents,
-        Math.round((displayMetrics.pendingPaymentsInCents || 0) / Math.max(overdueCharges || 1, 1))
+        Math.round(
+          (displayMetrics.pendingPaymentsInCents || 0) /
+            Math.max(overdueCharges || 1, 1)
+        )
       ),
     0
   );
@@ -345,7 +431,9 @@ export default function ExecutiveDashboardNew() {
       type: "stalled_service_orders",
       title: "O.S. paradas",
       count: Math.max(displayMetrics.delayedOrders, 0),
-      impactCents: Math.max(displayMetrics.delayedOrders, 0) * Math.max(averageOrderValueCents, 0),
+      impactCents:
+        Math.max(displayMetrics.delayedOrders, 0) *
+        Math.max(averageOrderValueCents, 0),
       ctaLabel: "Destravar O.S.",
       ctaPath: "/service-orders",
       helperText: "Execução travada impactando faturamento.",
@@ -363,6 +451,85 @@ export default function ExecutiveDashboardNew() {
   ]);
   const dominantProblem = priorityProblems[0];
   const actionFlowSuggestion = getLatestActionFlowSuggestion();
+  const todayAppointments = useMemo(() => {
+    const raw =
+      (appointmentsQuery.data as any)?.data ?? appointmentsQuery.data ?? [];
+    const list = Array.isArray(raw) ? raw : [];
+    const today = new Date().toDateString();
+    return list.filter((item: any) => {
+      const startsAt = item?.startsAt ? new Date(item.startsAt) : null;
+      if (!startsAt || Number.isNaN(startsAt.getTime())) return false;
+      const status = String(item?.status ?? "").toUpperCase();
+      return (
+        startsAt.toDateString() === today &&
+        (status === "SCHEDULED" || status === "CONFIRMED")
+      );
+    }).length;
+  }, [appointmentsQuery.data]);
+
+  const globalActionFeed = useMemo(() => {
+    const actions: Array<{
+      id: string;
+      title: string;
+      description: string;
+      severity: OperationalSeverity;
+      ctaLabel: string;
+      onClick: () => void;
+    }> = [];
+
+    if (overdueCharges > 0) {
+      actions.push({
+        id: "feed-overdue-charges",
+        title: "Cobranças vencidas",
+        description: `${overdueCharges} cobranças vencidas exigem recuperação imediata.`,
+        severity: "overdue",
+        ctaLabel: "Cobrar cliente",
+        onClick: () => navigate("/finances"),
+      });
+    }
+
+    if (displayMetrics.delayedOrders > 0) {
+      actions.push({
+        id: "feed-overdue-service-orders",
+        title: "O.S. atrasadas",
+        description: `${displayMetrics.delayedOrders} ordens paradas bloqueando entrega e caixa.`,
+        severity: "critical",
+        ctaLabel: "Destravar O.S.",
+        onClick: () => navigate("/service-orders"),
+      });
+    }
+
+    if (todayAppointments > 0) {
+      actions.push({
+        id: "feed-today-appointments",
+        title: "Tarefas do dia",
+        description: `${todayAppointments} agendamentos de hoje aguardam execução.`,
+        severity: "pending",
+        ctaLabel: "Executar serviços",
+        onClick: () => navigate("/appointments"),
+      });
+    }
+
+    if (actions.length === 0) {
+      actions.push({
+        id: "feed-healthy",
+        title: "Fluxo operacional saudável",
+        description: "Sem pendências críticas no momento.",
+        severity: "healthy",
+        ctaLabel: "Revisar painel",
+        onClick: () => navigate("/"),
+      });
+    }
+
+    return actions.sort((a, b) =>
+      compareOperationalSeverity(a.severity, b.severity)
+    );
+  }, [
+    displayMetrics.delayedOrders,
+    navigate,
+    overdueCharges,
+    todayAppointments,
+  ]);
 
   const bottlenecks = [
     {
@@ -441,14 +608,20 @@ export default function ExecutiveDashboardNew() {
           <h1 className="text-3xl font-semibold tracking-tight text-zinc-950 dark:text-white md:text-4xl">
             Dashboard Executivo
           </h1>
-          <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">Preparando sessão e carregando contexto.</p>
+          <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">
+            Preparando sessão e carregando contexto.
+          </p>
         </section>
       </div>
     );
   }
 
   if (!isAuthenticated) {
-    return <div className="p-6 text-sm text-zinc-500">Sua sessão não está ativa.</div>;
+    return (
+      <div className="p-6 text-sm text-zinc-500">
+        Sua sessão não está ativa.
+      </div>
+    );
   }
 
   if (hasAnyCriticalError) {
@@ -472,13 +645,18 @@ export default function ExecutiveDashboardNew() {
                 Prioridade nº1 de hoje
               </p>
               <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-zinc-950 dark:text-white md:text-4xl">
-                Hoje você tem {formatCurrency(totalPausedRevenue + nonBilledServicesImpact)} parado
+                Hoje você tem{" "}
+                {formatCurrency(totalPausedRevenue + nonBilledServicesImpact)}{" "}
+                parado
               </h2>
               <p className="mt-3 text-base font-medium text-zinc-800 dark:text-zinc-100">
-                {overdueCharges} cobranças vencidas • {nonBilledServices} serviços sem faturamento.
+                {overdueCharges} cobranças vencidas • {nonBilledServices}{" "}
+                serviços sem faturamento.
               </p>
               <p className="mt-2 text-sm text-zinc-700 dark:text-zinc-300">
-                Próxima decisão já definida: <strong>{dominantProblem.title}</strong>. {dominantProblem.helperText}
+                Próxima decisão já definida:{" "}
+                <strong>{dominantProblem.title}</strong>.{" "}
+                {dominantProblem.helperText}
               </p>
             </div>
             <button
@@ -503,7 +681,8 @@ export default function ExecutiveDashboardNew() {
               Dashboard Executivo
             </h1>
             <p className="nexo-page-header-description max-w-xl">
-              Organize sua operação, evite erros e mantenha controle financeiro no funil Cliente → Agendamento → O.S. → Pagamento.
+              Organize sua operação, evite erros e mantenha controle financeiro
+              no funil Cliente → Agendamento → O.S. → Pagamento.
             </p>
           </div>
 
@@ -527,22 +706,48 @@ export default function ExecutiveDashboardNew() {
         <div className="mt-4 rounded-xl border border-orange-200/60 bg-orange-50/80 px-4 py-3 text-sm text-orange-700 dark:border-orange-500/20 dark:bg-orange-500/10 dark:text-orange-200">
           <p className="font-semibold">O que precisa de atenção agora</p>
           <p className="mt-1">
-            Você tem <strong>{formatCurrency(totalPausedRevenue)}</strong> parado e{" "}
-            <strong>{formatCurrency(nonBilledServicesImpact)}</strong> em serviços ainda não faturados.
+            Você tem <strong>{formatCurrency(totalPausedRevenue)}</strong>{" "}
+            parado e <strong>{formatCurrency(nonBilledServicesImpact)}</strong>{" "}
+            em serviços ainda não faturados.
           </p>
         </div>
         {quotaWarnings.length > 0 ? (
           <div className="mt-3 rounded-xl border border-amber-300/60 bg-amber-50/80 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
-            Limite do plano atingido em {quotaWarnings.join(", ")}. Faça upgrade para continuar crescendo sem bloqueios.
+            Limite do plano atingido em {quotaWarnings.join(", ")}. Faça upgrade
+            para continuar crescendo sem bloqueios.
           </div>
         ) : null}
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard icon={Users} label="Clientes criados" value={displayMetrics.createdCustomers} loading={metricsQuery.isLoading && metricsQuery.data === undefined} description="Base total de clientes cadastrados." />
-        <MetricCard icon={Briefcase} label="Serviços concluídos" value={displayMetrics.completedServices} loading={metricsQuery.isLoading && metricsQuery.data === undefined} description="Total de O.S. finalizadas com sucesso." />
-        <MetricCard icon={DollarSign} label="Cobranças geradas" value={displayMetrics.chargesGenerated} loading={metricsQuery.isLoading && metricsQuery.data === undefined} description={`${formatCurrency(displayMetrics.paidRevenueInCents)} já recebido`} />
-        <MetricCard icon={AlertTriangle} label="Pendente + atrasado" value={formatCurrency(totalPausedRevenue)} loading={metricsQuery.isLoading && metricsQuery.data === undefined} description={`${overdueCharges} cobranças vencidas em foco`} />
+        <MetricCard
+          icon={Users}
+          label="Clientes criados"
+          value={displayMetrics.createdCustomers}
+          loading={metricsQuery.isLoading && metricsQuery.data === undefined}
+          description="Base total de clientes cadastrados."
+        />
+        <MetricCard
+          icon={Briefcase}
+          label="Serviços concluídos"
+          value={displayMetrics.completedServices}
+          loading={metricsQuery.isLoading && metricsQuery.data === undefined}
+          description="Total de O.S. finalizadas com sucesso."
+        />
+        <MetricCard
+          icon={DollarSign}
+          label="Cobranças geradas"
+          value={displayMetrics.chargesGenerated}
+          loading={metricsQuery.isLoading && metricsQuery.data === undefined}
+          description={`${formatCurrency(displayMetrics.paidRevenueInCents)} já recebido`}
+        />
+        <MetricCard
+          icon={AlertTriangle}
+          label="Pendente + atrasado"
+          value={formatCurrency(totalPausedRevenue)}
+          loading={metricsQuery.isLoading && metricsQuery.data === undefined}
+          description={`${overdueCharges} cobranças vencidas em foco`}
+        />
       </section>
 
       {displayMetrics.totalCustomers === 0 ? (
@@ -551,13 +756,22 @@ export default function ExecutiveDashboardNew() {
             Seu dashboard não precisa ficar vazio.
           </p>
           <p className="mt-1 text-sm text-orange-700 dark:text-orange-300">
-            Comece agora com ações simples: crie seu primeiro cliente e agende seu primeiro serviço.
+            Comece agora com ações simples: crie seu primeiro cliente e agende
+            seu primeiro serviço.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <button type="button" onClick={() => navigate("/customers")} className="nexo-cta-primary min-h-10">
+            <button
+              type="button"
+              onClick={() => navigate("/customers")}
+              className="nexo-cta-primary min-h-10"
+            >
               Crie seu primeiro cliente
             </button>
-            <button type="button" onClick={() => navigate("/appointments")} className="nexo-cta-secondary min-h-10">
+            <button
+              type="button"
+              onClick={() => navigate("/appointments")}
+              className="nexo-cta-secondary min-h-10"
+            >
               Agende seu primeiro serviço
             </button>
           </div>
@@ -567,28 +781,60 @@ export default function ExecutiveDashboardNew() {
       <section className="grid gap-6 xl:grid-cols-3">
         <article className="nexo-surface nexo-fade-in p-5 xl:col-span-2">
           <h2 className="nexo-section-title">Receita ao longo do tempo</h2>
-          <p className="mt-1 nexo-section-description">Linha temporal de evolução de receita.</p>
-          {revenueQuery.isLoading && revenueQuery.data === undefined && displayRevenue.length === 0 ? (
+          <p className="mt-1 nexo-section-description">
+            Linha temporal de evolução de receita.
+          </p>
+          {revenueQuery.isLoading &&
+          revenueQuery.data === undefined &&
+          displayRevenue.length === 0 ? (
             <DashboardCardSkeleton className="mt-4 min-h-[260px]" />
           ) : lineChartData.length === 0 ? (
             <EmptyState
               icon={<BarChart3 className="h-6 w-6" />}
               title="Ainda não há série temporal de receita"
               description="Assim que houver cobranças registradas, você verá a evolução no tempo para decidir com mais precisão."
-              action={{ label: "Ir para financeiro", onClick: () => navigate("/finances") }}
+              action={{
+                label: "Ir para financeiro",
+                onClick: () => navigate("/finances"),
+              }}
             />
           ) : (
             <div className="mt-4 h-[260px] nexo-fade-in">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={lineChartData}>
-                  <XAxis dataKey="period" tickLine={false} axisLine={false} tickMargin={8} />
-                  <YAxis tickLine={false} axisLine={false} width={84} tickFormatter={(value) => formatCurrency(Number(value) * 100)} />
-                  <Tooltip
-                    contentStyle={{ borderRadius: 14, border: "1px solid rgba(251,146,60,.25)", background: "rgba(9,9,11,.94)", color: "#fff" }}
-                    formatter={(value: number) => [formatCurrency(Number(value) * 100), "Receita"]}
-                    labelFormatter={(label) => `Período: ${label}`}
+                  <XAxis
+                    dataKey="period"
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={8}
                   />
-                  <Line type="monotone" dataKey="value" stroke="#f97316" strokeWidth={3} dot={false} activeDot={{ r: 5, fill: "#f97316" }} />
+                  <YAxis
+                    tickLine={false}
+                    axisLine={false}
+                    width={84}
+                    tickFormatter={value => formatCurrency(Number(value) * 100)}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      borderRadius: 14,
+                      border: "1px solid rgba(251,146,60,.25)",
+                      background: "rgba(9,9,11,.94)",
+                      color: "#fff",
+                    }}
+                    formatter={(value: number) => [
+                      formatCurrency(Number(value) * 100),
+                      "Receita",
+                    ]}
+                    labelFormatter={label => `Período: ${label}`}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="value"
+                    stroke="#f97316"
+                    strokeWidth={3}
+                    dot={false}
+                    activeDot={{ r: 5, fill: "#f97316" }}
+                  />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -597,25 +843,42 @@ export default function ExecutiveDashboardNew() {
 
         <article className="nexo-surface nexo-fade-in p-5">
           <h2 className="nexo-section-title">Funil operacional</h2>
-          <p className="mt-1 nexo-section-description">Cliente → Agendamento → O.S. → Pagamento.</p>
-          {funnelData.every((item) => item.value <= 0) ? (
+          <p className="mt-1 nexo-section-description">
+            Cliente → Agendamento → O.S. → Pagamento.
+          </p>
+          {funnelData.every(item => item.value <= 0) ? (
             <EmptyState
               icon={<Briefcase className="h-6 w-6" />}
               title="Funil operacional sem dados"
               description="Cadastre clientes e agendamentos para abrir o fluxo customer → appointment → service order → charge."
-              action={{ label: "Crie seu primeiro cliente", onClick: () => navigate("/customers") }}
-              secondaryAction={{ label: "Agende seu primeiro serviço", onClick: () => navigate("/appointments") }}
+              action={{
+                label: "Crie seu primeiro cliente",
+                onClick: () => navigate("/customers"),
+              }}
+              secondaryAction={{
+                label: "Agende seu primeiro serviço",
+                onClick: () => navigate("/appointments"),
+              }}
             />
           ) : (
             <div className="mt-4 h-[260px] nexo-fade-in">
               <ResponsiveContainer width="100%" height="100%">
                 <FunnelChart>
                   <Tooltip
-                    contentStyle={{ borderRadius: 14, border: "1px solid rgba(251,146,60,.3)", background: "rgba(255,255,255,.96)" }}
+                    contentStyle={{
+                      borderRadius: 14,
+                      border: "1px solid rgba(251,146,60,.3)",
+                      background: "rgba(255,255,255,.96)",
+                    }}
                     formatter={(value: number) => [value, "Volume"]}
                   />
                   <Funnel dataKey="value" data={funnelData} isAnimationActive>
-                    <LabelList position="right" fill="#52525b" stroke="none" dataKey="name" />
+                    <LabelList
+                      position="right"
+                      fill="#52525b"
+                      stroke="none"
+                      dataKey="name"
+                    />
                   </Funnel>
                 </FunnelChart>
               </ResponsiveContainer>
@@ -627,37 +890,72 @@ export default function ExecutiveDashboardNew() {
       <section className="grid gap-6 lg:grid-cols-2">
         <article className="nexo-surface nexo-fade-in p-5">
           <h2 className="nexo-section-title">Distribuição de status</h2>
-          <p className="mt-1 nexo-section-description">Volume atual por status de cobrança.</p>
-          {chargesStatusQuery.isLoading && chargesStatusQuery.data === undefined && displayChargesStatus.length === 0 ? (
+          <p className="mt-1 nexo-section-description">
+            Volume atual por status de cobrança.
+          </p>
+          {chargesStatusQuery.isLoading &&
+          chargesStatusQuery.data === undefined &&
+          displayChargesStatus.length === 0 ? (
             <DashboardCardSkeleton className="mt-4 min-h-[260px]" />
           ) : (
             <div className="mt-4 h-[260px] nexo-fade-in">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart margin={{ top: 6, right: 10, bottom: 12, left: 10 }}>
-                  <Pie data={displayChargesStatus} dataKey="value" nameKey="label" innerRadius={52} outerRadius={86} paddingAngle={3}>
+                  <Pie
+                    data={displayChargesStatus}
+                    dataKey="value"
+                    nameKey="label"
+                    innerRadius={52}
+                    outerRadius={86}
+                    paddingAngle={3}
+                  >
                     {displayChargesStatus.map((entry, index) => (
-                      <Cell key={entry.key} fill={["#f97316", "#22c55e", "#ef4444", "#3b82f6"][index % 4]} />
+                      <Cell
+                        key={entry.key}
+                        fill={
+                          ["#f97316", "#22c55e", "#ef4444", "#3b82f6"][
+                            index % 4
+                          ]
+                        }
+                      />
                     ))}
                   </Pie>
                   <Tooltip
-                    contentStyle={{ borderRadius: 14, border: "1px solid rgba(251,146,60,.25)", background: "rgba(9,9,11,.94)", color: "#fff" }}
+                    contentStyle={{
+                      borderRadius: 14,
+                      border: "1px solid rgba(251,146,60,.25)",
+                      background: "rgba(9,9,11,.94)",
+                      color: "#fff",
+                    }}
                     formatter={(value: number, name) => [value, String(name)]}
                   />
-                  <Legend verticalAlign="bottom" wrapperStyle={{ paddingTop: 14, fontSize: 12 }} />
+                  <Legend
+                    verticalAlign="bottom"
+                    wrapperStyle={{ paddingTop: 14, fontSize: 12 }}
+                  />
                 </PieChart>
               </ResponsiveContainer>
             </div>
           )}
         </article>
 
-        <article className={`nexo-surface nexo-fade-in p-5 transition-all duration-300 ${optimisticTick ? "ring-2 ring-orange-300/40 dark:ring-orange-500/30" : ""}`}>
+        <article
+          className={`nexo-surface nexo-fade-in p-5 transition-all duration-300 ${optimisticTick ? "ring-2 ring-orange-300/40 dark:ring-orange-500/30" : ""}`}
+        >
           <h2 className="nexo-section-title">Gargalos agora</h2>
-          <p className="mt-1 nexo-section-description">Pendências com ação direta para destravar receita.</p>
+          <p className="mt-1 nexo-section-description">
+            Pendências com ação direta para destravar receita.
+          </p>
           <div className="mt-4 space-y-3">
-            {bottlenecks.map((item) => (
-              <div key={item.id} className={`nexo-list-row ${item.severity === "critical" ? "nexo-list-row-critical" : "nexo-list-row-high"}`}>
+            {bottlenecks.map(item => (
+              <div
+                key={item.id}
+                className={`nexo-list-row ${item.severity === "critical" ? "nexo-list-row-critical" : "nexo-list-row-high"}`}
+              >
                 <div>
-                  <p className="font-semibold text-zinc-900 dark:text-zinc-100">{item.label}</p>
+                  <p className="font-semibold text-zinc-900 dark:text-zinc-100">
+                    {item.label}
+                  </p>
                   <p className="text-xs text-zinc-600 dark:text-zinc-300">
                     <span className="mr-1.5 inline-block rounded-full bg-black/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide dark:bg-white/10">
                       {item.severity === "critical" ? "Crítico" : "Alto"}
@@ -675,7 +973,10 @@ export default function ExecutiveDashboardNew() {
               </div>
             ))}
           </div>
-          {(metricsQuery.isFetching || revenueQuery.isFetching || serviceOrdersStatusQuery.isFetching || chargesStatusQuery.isFetching) && (
+          {(metricsQuery.isFetching ||
+            revenueQuery.isFetching ||
+            serviceOrdersStatusQuery.isFetching ||
+            chargesStatusQuery.isFetching) && (
             <div className="mt-3 inline-flex items-center gap-2 text-xs text-zinc-500">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
               Atualizando blocos sem interromper sua leitura...
@@ -690,20 +991,61 @@ export default function ExecutiveDashboardNew() {
       </section>
 
       <section className="grid gap-6 lg:grid-cols-2">
+        <article className="nexo-surface nexo-fade-in p-5 lg:col-span-2">
+          <h2 className="nexo-section-title">Action Feed Global</h2>
+          <p className="mt-1 nexo-section-description">
+            Ações prioritárias ordenadas por severidade operacional.
+          </p>
+          <div className="mt-4 space-y-3">
+            {globalActionFeed.map(item => (
+              <div
+                key={item.id}
+                className={`rounded-xl border p-4 ${getOperationalSeverityClasses(item.severity)}`}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-zinc-900 dark:text-zinc-100">
+                      {item.title}
+                    </p>
+                    <p className="text-xs text-zinc-700 dark:text-zinc-300">
+                      {item.description}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={item.onClick}
+                    className="nexo-cta-secondary !h-9 !rounded-lg !px-3 !text-xs"
+                  >
+                    {item.ctaLabel}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </article>
+
         <article className="nexo-surface nexo-fade-in p-5">
           <h2 className="nexo-section-title">Top 3 prioridades automáticas</h2>
-          <p className="mt-1 nexo-section-description">Sem lista genérica: apenas o que gera caixa mais rápido.</p>
+          <p className="mt-1 nexo-section-description">
+            Sem lista genérica: apenas o que gera caixa mais rápido.
+          </p>
           <div className="mt-4 space-y-3">
             {priorityProblems.map((problem, index) => (
-              <div key={problem.id} className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-zinc-900/80">
+              <div
+                key={problem.id}
+                className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-zinc-900/80"
+              >
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-orange-600 dark:text-orange-300">
                   #{index + 1} prioridade
                 </p>
                 <div className="mt-1 flex items-start justify-between gap-3">
                   <div>
-                    <p className="font-semibold text-zinc-900 dark:text-zinc-100">{problem.title}</p>
+                    <p className="font-semibold text-zinc-900 dark:text-zinc-100">
+                      {problem.title}
+                    </p>
                     <p className="text-xs text-zinc-600 dark:text-zinc-300">
-                      {problem.count} itens • {formatCurrency(problem.impactCents)} de impacto
+                      {problem.count} itens •{" "}
+                      {formatCurrency(problem.impactCents)} de impacto
                     </p>
                   </div>
                   <button
@@ -727,7 +1069,9 @@ export default function ExecutiveDashboardNew() {
             <h3 className="mt-2 text-lg font-semibold text-emerald-900 dark:text-emerald-100">
               {actionFlowSuggestion.title}
             </h3>
-            <p className="mt-1 text-sm text-emerald-700 dark:text-emerald-300">{actionFlowSuggestion.description}</p>
+            <p className="mt-1 text-sm text-emerald-700 dark:text-emerald-300">
+              {actionFlowSuggestion.description}
+            </p>
             <button
               type="button"
               onClick={() => navigate(actionFlowSuggestion.ctaPath)}
@@ -738,23 +1082,32 @@ export default function ExecutiveDashboardNew() {
           </article>
         ) : (
           <article className="rounded-2xl border border-zinc-200/80 bg-white/80 p-5 dark:border-white/10 dark:bg-zinc-900/70">
-            <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Fluxo automático de ação</h3>
+            <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+              Fluxo automático de ação
+            </h3>
             <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-300">
-              Assim que você criar Cliente, O.S. ou Cobrança, a próxima ação aparece aqui sem precisar interpretar.
+              Assim que você criar Cliente, O.S. ou Cobrança, a próxima ação
+              aparece aqui sem precisar interpretar.
             </p>
           </article>
         )}
       </section>
 
-      {(metricsQuery.isError || revenueQuery.isError || serviceOrdersStatusQuery.isError || chargesStatusQuery.isError) && !hasAnyCriticalError ? (
+      {(metricsQuery.isError ||
+        revenueQuery.isError ||
+        serviceOrdersStatusQuery.isError ||
+        chargesStatusQuery.isError) &&
+      !hasAnyCriticalError ? (
         <section className="rounded-2xl border border-amber-300/50 bg-amber-50/70 p-4 text-sm text-amber-800 dark:border-amber-800/60 dark:bg-amber-950/20 dark:text-amber-200">
-          Parte dos blocos não foi carregada. Os dados visíveis já são válidos; atualize a página para tentar completar o painel.
+          Parte dos blocos não foi carregada. Os dados visíveis já são válidos;
+          atualize a página para tentar completar o painel.
         </section>
       ) : null}
 
       {isSlowLoading ? (
         <section className="rounded-2xl border border-blue-300/50 bg-blue-50/70 p-4 text-sm text-blue-800 dark:border-blue-800/60 dark:bg-blue-950/20 dark:text-blue-200">
-          A atualização está mais lenta que o normal. Você pode continuar navegando enquanto os blocos terminam de carregar.
+          A atualização está mais lenta que o normal. Você pode continuar
+          navegando enquanto os blocos terminam de carregar.
         </section>
       ) : null}
     </div>

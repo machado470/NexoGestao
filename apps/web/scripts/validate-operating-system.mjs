@@ -1,21 +1,26 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 const root = process.cwd();
 const pages = [
-  'client/src/pages/CustomersPage.tsx',
-  'client/src/pages/AppointmentsPage.tsx',
-  'client/src/pages/ServiceOrdersPage.tsx',
-  'client/src/pages/FinancesPage.tsx',
-  'client/src/pages/SettingsPage.tsx',
-  'client/src/pages/GovernancePage.tsx',
-  'client/src/pages/PeoplePage.tsx',
+  "client/src/pages/CustomersPage.tsx",
+  "client/src/pages/AppointmentsPage.tsx",
+  "client/src/pages/ServiceOrdersPage.tsx",
+  "client/src/pages/FinancesPage.tsx",
+  "client/src/pages/SettingsPage.tsx",
+  "client/src/pages/GovernancePage.tsx",
+  "client/src/pages/PeoplePage.tsx",
 ];
 
 const errors = [];
+const statusScopePages = [
+  "client/src/pages/AppointmentsPage.tsx",
+  "client/src/pages/ServiceOrdersPage.tsx",
+  "client/src/pages/FinancesPage.tsx",
+];
 
 for (const page of pages) {
-  const source = readFileSync(join(root, page), 'utf8');
+  const source = readFileSync(join(root, page), "utf8");
 
   if (/\bPageHero\b/.test(source)) {
     errors.push(`${page}: uso legado de PageHero detectado.`);
@@ -30,18 +35,48 @@ for (const page of pages) {
   }
 
   if (/from\s+["']@\/components\/ui\/table["']/.test(source)) {
-    errors.push(`${page}: import direto de tabela legado detectado (@/components/ui/table).`);
+    errors.push(
+      `${page}: import direto de tabela legado detectado (@/components/ui/table).`
+    );
   }
 
   if (/\bDataTable\b/.test(source) && !/\bDataTableWrapper\b/.test(source)) {
-    errors.push(`${page}: DataTableWrapper obrigatório para renderização tabular.`);
+    errors.push(
+      `${page}: DataTableWrapper obrigatório para renderização tabular.`
+    );
+  }
+
+  if (statusScopePages.includes(page)) {
+    if (/severity:\s*["']attention["']/.test(source)) {
+      errors.push(
+        `${page}: severidade "attention" é proibida; use pending/overdue/critical/healthy.`
+      );
+    }
+
+    const hasOperationalSeverityReference =
+      /OperationalSeverity/.test(source) ||
+      /getOperationalSeverity/.test(source);
+    if (!hasOperationalSeverityReference) {
+      errors.push(
+        `${page}: severidade operacional padronizada não encontrada.`
+      );
+    }
+
+    const hasPrimaryButtonInActionBar = /primaryAction=\{\(\s*<Button\b/.test(
+      source
+    );
+    if (hasPrimaryButtonInActionBar) {
+      errors.push(
+        `${page}: botão primário em ActionBar deve usar ActionFeedbackButton.`
+      );
+    }
   }
 }
 
 if (errors.length > 0) {
-  console.error('\n❌ Validação Operating System falhou:\n');
+  console.error("\n❌ Validação Operating System falhou:\n");
   for (const err of errors) console.error(`- ${err}`);
   process.exit(1);
 }
 
-console.log('✅ Validação Operating System concluída sem inconsistências.');
+console.log("✅ Validação Operating System concluída sem inconsistências.");
