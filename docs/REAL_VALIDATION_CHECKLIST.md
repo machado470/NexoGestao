@@ -1,6 +1,32 @@
 # Checklist de Validação Real (sem mock)
 
-> Pré-requisito: Docker ativo, portas 5432/6379 livres e `.env` criado a partir de `.env.example`.
+> Pré-requisito: Docker ativo e `.env` criado a partir de `.env.example`.
+
+## Fluxo operacional da execution v5 (porta alternativa, sem depender da 5432)
+
+> Sequência copy/paste para validação E2E da execution v5 em máquina local com conflito de porta:
+
+```bash
+docker run --name nexogestao-postgres-e2e \
+  -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_DB=nexogestao \
+  -p 5433:5432 \
+  -d postgres:16-alpine
+
+DATABASE_URL="postgresql://postgres:postgres@localhost:5433/nexogestao?schema=public" \
+  pnpm --filter ./apps/api prisma migrate deploy
+
+DATABASE_URL="postgresql://postgres:postgres@localhost:5433/nexogestao?schema=public" \
+  pnpm --filter ./apps/api validate:execution:v5
+```
+
+Critérios obrigatórios de sucesso:
+- O script termina sem crash.
+- O relatório JSON é gerado em `apps/api/artifacts/execution-v5-e2e.json`.
+- O JSON contém evidências de:
+  - cobrança (`action-create-charge-followup` ou `action-send-overdue-charge-reminder`);
+  - risco (`action-escalate-risk-review`);
+  - idempotência (`idempotency_recent_execution`).
 
 ## 1) Subir sistema completo
 - [ ] Executar `pnpm install`
