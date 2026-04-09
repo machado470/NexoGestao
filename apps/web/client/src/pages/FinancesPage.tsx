@@ -26,6 +26,7 @@ import { useProductAnalytics } from "@/hooks/useProductAnalytics";
 import { generateFinanceActions } from "@/lib/smartActions";
 import {
   compareOperationalSeverity,
+  getChargeDecision,
   getChargeSeverity,
   getNextActionCharge,
   getOperationalSeverityClasses,
@@ -421,24 +422,7 @@ export default function FinancesPage() {
       item => item.normalized === ChargeStatus.OVERDUE
     );
     if (overdue) {
-      return {
-        severity: "overdue" as const,
-        title: "Você tem dinheiro parado aqui",
-        description:
-          "Essa cobrança já venceu e está travando seu caixa. Acione o cliente agora e recupere receita.",
-        ctaLabel: "Recuperar no WhatsApp",
-        onClick: () => {
-          track("send_whatsapp", {
-            screen: "finances",
-            chargeId: overdue.charge.id,
-            source: "next_action_overdue",
-          });
-          navigate(
-            buildWhatsAppUrlFromCharge(overdue.charge) ??
-              `/whatsapp?returnTo=${encodeURIComponent("/finances")}`
-          );
-        },
-      };
+      return getChargeDecision(overdue.charge);
     }
 
     if (isPaymentScoped && paymentById?.id) {
@@ -447,14 +431,8 @@ export default function FinancesPage() {
         title: "Pagamento registrado",
         description:
           "Feche o ciclo operacional marcando a O.S. como concluída e com resultado.",
-        ctaLabel: "Ir para O.S.",
-        onClick: () => {
-          const serviceOrderId = String(
-            paymentScopedCharge?.serviceOrderId ?? ""
-          ).trim();
-          if (serviceOrderId) navigate(`/service-orders?os=${serviceOrderId}`);
-          else navigate("/service-orders");
-        },
+        primaryAction: { key: "open_service_order" as const, label: "Ir para O.S." },
+        secondaryActions: [{ key: "open_finances" as const, label: "Voltar ao financeiro" }],
       };
     }
 
@@ -463,32 +441,69 @@ export default function FinancesPage() {
       title: "Seu caixa está em ritmo saudável",
       description:
         "Sem urgência crítica agora. Continue pela fila priorizada para manter previsibilidade de receita.",
-      ctaLabel: "Seguir fila",
-      onClick: () => navigate("/finances"),
+      primaryAction: { key: "open_finances" as const, label: "Seguir fila" },
+      secondaryActions: [],
     };
   }, [
     billingQueue,
     isPaymentScoped,
-    navigate,
     paymentById?.id,
-    paymentScopedCharge?.serviceOrderId,
   ]);
+
+  const nextActionButtons = useMemo(() => {
+    const resolve = (key: string) => {
+      if (key === "open_whatsapp") {
+        const overdue = billingQueue.find(item => item.normalized === ChargeStatus.OVERDUE);
+        const whatsappUrl = overdue
+          ? buildWhatsAppUrlFromCharge(overdue.charge)
+          : null;
+        return () => {
+          track("send_whatsapp", {
+            screen: "finances",
+            chargeId: overdue?.charge.id,
+            source: "next_action_overdue",
+          });
+          navigate(
+            whatsappUrl ?? `/whatsapp?returnTo=${encodeURIComponent("/finances")}`
+          );
+        };
+      }
+      if (key === "open_service_order") {
+        return () => {
+          const serviceOrderId = String(paymentScopedCharge?.serviceOrderId ?? "").trim();
+          if (serviceOrderId) navigate(`/service-orders?os=${serviceOrderId}`);
+          else navigate("/service-orders");
+        };
+      }
+      if (key === "open_finances") return () => navigate("/finances");
+      return null;
+    };
+
+    return [nextAction.primaryAction, ...nextAction.secondaryActions]
+      .map(action => ({ ...action, onClick: resolve(action.key) }))
+      .filter(
+        (action): action is typeof action & { onClick: () => void } =>
+          Boolean(action.onClick)
+      );
+  }, [billingQueue, navigate, nextAction, paymentScopedCharge?.serviceOrderId, track]);
 
   const smartOperationalActions = useMemo(
     () =>
       generateFinanceActions({
         billingQueue,
-        onSendWhatsApp: (chargeId, phone) => {
+        onSendWhatsApp: (chargeId, _phone) => {
           track("send_whatsapp", {
             screen: "finances",
             chargeId,
             source: "smartpage_operational_action",
           });
-          if (phone) {
-            window.open(`https://wa.me/${phone}`, "_blank");
-            return;
-          }
-          navigate("/whatsapp");
+          const targetCharge = billingQueue.find(
+            item => item.charge.id === chargeId
+          )?.charge;
+          const url =
+            (targetCharge ? buildWhatsAppUrlFromCharge(targetCharge) : null) ??
+            "/whatsapp";
+          navigate(url);
         },
       }),
     [billingQueue, navigate, track]
@@ -627,8 +642,8 @@ export default function FinancesPage() {
             : "Sem pressão crítica agora"
         }
         dominantCta={{
-          label: nextAction.ctaLabel,
-          onClick: nextAction.onClick,
+          label: nextAction.primaryAction.label,
+          onClick: nextActionButtons[0]?.onClick ?? (() => undefined),
           path: "/finances",
         }}
         priorities={smartPriorities}
@@ -668,17 +683,39 @@ export default function FinancesPage() {
           </div>
           <ActionFeedbackButton
             state="idle"
-            idleLabel={nextAction.ctaLabel}
+            idleLabel={nextAction.primaryAction.label}
             onClick={() => {
               track("cta_click", {
                 screen: "finances",
                 ctaId: "next_action_primary",
-                label: nextAction.ctaLabel,
+                label: nextAction.primaryAction.label,
               });
-              nextAction.onClick();
+              nextActionButtons[0]?.onClick?.();
             }}
           />
         </div>
+        {nextActionButtons.length > 1 ? (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {nextActionButtons.slice(1).map(action => (
+              <Button
+                key={action.key}
+                type="button"
+                variant="outline"
+                size="sm"
+                className="opacity-75"
+                onClick={action.onClick}
+              >
+                {action.label}
+              </Button>
+            ))}
+          </div>
+        ) : null}
+        {nextAction.invalidState ? (
+          <div className="mt-3 rounded-md border border-red-300/70 bg-red-50 p-2 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200">
+            <p className="font-semibold">{nextAction.invalidState.title}</p>
+            <p className="mt-1">{nextAction.invalidState.description}</p>
+          </div>
+        ) : null}
       </SurfaceSection>
 
       {totalOpenAmountInQueue > 0 ? (
