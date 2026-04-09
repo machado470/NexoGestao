@@ -81,6 +81,16 @@ export default function BillingPage() {
       ]);
     },
     onError: (error) => {
+      const message = (error.message || "").toLowerCase();
+      if (
+        message.includes("integração stripe não configurada") ||
+        message.includes("integration_not_configured")
+      ) {
+        toast.error(
+          "Checkout indisponível: integração Stripe ainda não foi configurada neste ambiente."
+        );
+        return;
+      }
       toast.error(error.message || "Falha ao iniciar checkout.");
     },
   });

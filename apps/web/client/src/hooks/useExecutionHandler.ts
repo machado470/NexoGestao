@@ -12,6 +12,7 @@ import type {
   ExecuteActionResult,
   ExecutionAction,
   ExecutionLog,
+  ExecutionPolicyStatus,
   ExecutionSource,
   OperationalDecision,
   RiskOperationalState,
@@ -46,6 +47,15 @@ function toFailedStatus(status: ExecuteActionResult["status"]): ExecutionLog["st
   if (status === "throttled") return "throttled";
   if (status === "restricted") return "restricted";
   return "failed";
+}
+
+function toBlockedLogStatus(
+  status: ExecutionPolicyStatus
+): Extract<ExecutionLog["status"], "blocked" | "throttled" | "restricted" | "requires_confirmation"> {
+  if (status === "throttled") return "throttled";
+  if (status === "restricted") return "restricted";
+  if (status === "requires_confirmation") return "requires_confirmation";
+  return "blocked";
 }
 
 export function useExecutionHandler() {
@@ -152,7 +162,7 @@ export function useExecutionHandler() {
           id: `${action.id}-${Date.now()}-blocked`,
           ...baseLogPayload,
           eventType: "EXECUTION_ACTION_BLOCKED",
-          status: policy.status,
+          status: toBlockedLogStatus(policy.status),
           reasonCode: policy.reasonCode,
           message: policy.message,
         };
@@ -167,14 +177,23 @@ export function useExecutionHandler() {
           source: params.source,
           telemetryKey: action.telemetryKey,
           reasonCode: policy.reasonCode,
-          status: policy.status,
+          status: toBlockedLogStatus(policy.status),
           ok: false,
           message: policy.message,
         });
 
+        const deniedStatus: ExecuteActionResult["status"] =
+          policy.status === "throttled"
+            ? "throttled"
+            : policy.status === "restricted"
+              ? "restricted"
+              : policy.status === "requires_confirmation"
+                ? "requires_confirmation"
+                : "blocked";
+
         return {
           ok: false,
-          status: policy.status,
+          status: deniedStatus,
           reasonCode: policy.reasonCode,
           message: policy.message ?? "Execução bloqueada por política operacional.",
         };
@@ -258,7 +277,6 @@ export function useExecutionHandler() {
         status: result.status,
         ok: result.ok,
         message: result.message,
-        timestamp: new Date().toISOString(),
         reasonCode: result.reasonCode,
       });
 

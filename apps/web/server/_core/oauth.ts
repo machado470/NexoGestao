@@ -63,6 +63,33 @@ export function registerOAuthRoutes(app?: Express) {
   app.get("/api/oauth/google/callback", (req, res) => {
     return redirectToApiGoogleCallback(req, res);
   });
+
+  app.get("/api/oauth/google/status", async (_req, res) => {
+    try {
+      const upstream = await fetch(`${NEXO_API_URL}/auth/google/status`, {
+        method: "GET",
+        headers: { "content-type": "application/json" },
+      });
+
+      const payload = await upstream.json().catch(() => null);
+
+      if (!upstream.ok) {
+        return res.status(200).json({
+          configured: false,
+          status: "missing",
+          message: "Google OAuth indisponível no backend.",
+        });
+      }
+
+      return res.status(200).json(payload ?? { configured: false, status: "missing" });
+    } catch {
+      return res.status(200).json({
+        configured: false,
+        status: "missing",
+        message: "Não foi possível validar status do Google OAuth.",
+      });
+    }
+  });
 }
 
 export function initOAuth() {}
