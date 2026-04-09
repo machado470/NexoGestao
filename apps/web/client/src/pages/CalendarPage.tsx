@@ -31,6 +31,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  getConcurrencyErrorMessage,
+  isConcurrentConflictError,
+} from "@/lib/concurrency";
 
 const STATUS_COLORS: Record<string, string> = {
   SCHEDULED: "#f97316",
@@ -54,6 +58,7 @@ type AppointmentEvent = {
   endsAt: string | null;
   status: "SCHEDULED" | "CONFIRMED" | "DONE" | "CANCELED" | "NO_SHOW";
   notes?: string | null;
+  updatedAt?: string | null;
 };
 
 interface CreateModalState {
@@ -140,6 +145,12 @@ function EventDetailModal({
       onClose();
     },
     onError: err => {
+      if (isConcurrentConflictError(err)) {
+        toast.error(getConcurrencyErrorMessage("agendamento"), {
+          action: { label: "Recarregar", onClick: onUpdate },
+        });
+        return;
+      }
       toast.error("Erro ao atualizar: " + err.message);
     },
   });
@@ -152,6 +163,7 @@ function EventDetailModal({
     updateMutation.mutate({
       id: event.id,
       status: newStatus,
+      expectedUpdatedAt: event.updatedAt ?? undefined,
     });
   };
 
@@ -296,6 +308,11 @@ export default function CalendarPage() {
       void appointmentsQuery.refetch();
     },
     onError: err => {
+      if (isConcurrentConflictError(err)) {
+        toast.error(getConcurrencyErrorMessage("agendamento"));
+        void appointmentsQuery.refetch();
+        return;
+      }
       toast.error("Erro ao atualizar: " + err.message);
       void appointmentsQuery.refetch();
     },
@@ -371,6 +388,8 @@ export default function CalendarPage() {
         id,
         startsAt: newStart.toISOString(),
         endsAt: newEnd ? newEnd.toISOString() : undefined,
+        expectedUpdatedAt:
+          (arg.event.extendedProps as AppointmentEvent | undefined)?.updatedAt ?? undefined,
       });
     },
     [updateMutation]

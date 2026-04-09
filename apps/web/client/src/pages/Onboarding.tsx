@@ -488,6 +488,12 @@ export default function Onboarding() {
                   id: createdServiceOrderId,
                   status: "DONE",
                   outcomeSummary: "Serviço concluído durante onboarding guiado.",
+                  expectedUpdatedAt:
+                    typeof (result as any)?.updatedAt === "string"
+                      ? (result as any).updatedAt
+                      : typeof (result as any)?.data?.updatedAt === "string"
+                        ? (result as any).data.updatedAt
+                        : undefined,
                 });
                 setJourneyIds((prev) => ({ ...prev, serviceOrderId: createdServiceOrderId }));
                 await utils.nexo.serviceOrders.list.invalidate();

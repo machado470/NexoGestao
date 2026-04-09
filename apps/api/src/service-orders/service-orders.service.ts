@@ -81,7 +81,12 @@ function parseOptionalDate(label: string, value?: string): Date | null {
 }
 
 function parseExpectedUpdatedAt(value?: string): Date | null {
-  if (!value) return null
+  if (!value) {
+    throw new BadRequestException({
+      code: 'EXPECTED_UPDATED_AT_REQUIRED',
+      message: 'expectedUpdatedAt é obrigatório para atualizar ordem de serviço.',
+    })
+  }
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) {
     throw new BadRequestException('expectedUpdatedAt inválido (use ISO)')
@@ -781,8 +786,7 @@ export class ServiceOrdersService {
       doneTransitionIdemRecordId = idem.recordId
     }
 
-    const expectedUpdatedAt =
-      parseExpectedUpdatedAt(params.data.expectedUpdatedAt) ?? before.updatedAt
+    const expectedUpdatedAt = parseExpectedUpdatedAt(params.data.expectedUpdatedAt)
 
     try {
       let updated: any

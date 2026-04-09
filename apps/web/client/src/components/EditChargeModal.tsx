@@ -21,6 +21,10 @@ import { toast } from "sonner";
 import { chargeEditSchema } from "@/lib/validations";
 import { useCriticalActionGuard } from "@/hooks/useCriticalActionGuard";
 import { invalidateOperationalGraph } from "@/lib/operationalConsistency";
+import {
+  getConcurrencyErrorMessage,
+  isConcurrentConflictError,
+} from "@/lib/concurrency";
 
 interface EditChargeModalProps {
   isOpen: boolean;
@@ -151,6 +155,15 @@ export function EditChargeModal({
       onClose();
     },
     onError: (error) => {
+      if (isConcurrentConflictError(error)) {
+        toast.error(getConcurrencyErrorMessage("cobrança"), {
+          action: {
+            label: "Recarregar",
+            onClick: () => void getCharge.refetch(),
+          },
+        });
+        return;
+      }
       toast.error(error.message || "Erro ao atualizar cobrança");
     },
   });
@@ -201,6 +214,8 @@ export function EditChargeModal({
       dueDate: new Date(`${parsed.data.dueDate}T12:00:00`).toISOString(),
       status: parsed.data.status === "CANCELED" ? "CANCELED" : undefined,
       notes: parsed.data.notes || undefined,
+      expectedUpdatedAt:
+        typeof charge?.updatedAt === "string" ? charge.updatedAt : undefined,
     });
   };
 

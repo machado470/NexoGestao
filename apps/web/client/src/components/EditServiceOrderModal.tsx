@@ -27,6 +27,10 @@ import { useLocation } from "wouter";
 import { buildServiceOrdersDeepLink } from "@/lib/operations/operations.utils";
 import { useCriticalActionGuard } from "@/hooks/useCriticalActionGuard";
 import { invalidateOperationalGraph } from "@/lib/operationalConsistency";
+import {
+  getConcurrencyErrorMessage,
+  isConcurrentConflictError,
+} from "@/lib/concurrency";
 
 type ServiceOrderStatus =
   | "OPEN"
@@ -54,6 +58,7 @@ type ServiceOrderDetails = {
   status?: ServiceOrderStatus | null;
   cancellationReason?: string | null;
   outcomeSummary?: string | null;
+  updatedAt?: string | null;
   customer?: { name?: string | null } | null;
   assignedTo?: { name?: string | null } | null;
   financialSummary?: { hasCharge?: boolean | null } | null;
@@ -395,6 +400,10 @@ export default function EditServiceOrderModal({
           parsed.data.status === "DONE"
             ? parsed.data.outcomeSummary || undefined
             : undefined,
+        expectedUpdatedAt:
+          typeof serviceOrder?.updatedAt === "string"
+            ? serviceOrder.updatedAt
+            : undefined,
       });
       const resolvedCustomerId =
         String((updated as any)?.customerId ?? (serviceOrder as any)?.customerId ?? "").trim() ||
@@ -410,6 +419,15 @@ export default function EditServiceOrderModal({
       onSuccess();
       onClose();
     } catch (error) {
+      if (isConcurrentConflictError(error)) {
+        toast.error(getConcurrencyErrorMessage("ordem de serviço"), {
+          action: {
+            label: "Recarregar",
+            onClick: () => void getServiceOrder.refetch(),
+          },
+        });
+        return;
+      }
       const message =
         error instanceof Error
           ? error.message

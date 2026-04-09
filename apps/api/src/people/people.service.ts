@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common'
+import { Injectable, BadRequestException, ConflictException, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import { TimelineService } from '../timeline/timeline.service'
@@ -10,6 +10,20 @@ export class PeopleService {
     private readonly audit: AuditService,
     private readonly timeline: TimelineService,
   ) {}
+
+  private parseExpectedUpdatedAt(value?: string): Date {
+    if (!value) {
+      throw new BadRequestException({
+        code: 'EXPECTED_UPDATED_AT_REQUIRED',
+        message: 'expectedUpdatedAt é obrigatório para atualizar pessoa.',
+      })
+    }
+    const parsed = new Date(value)
+    if (Number.isNaN(parsed.getTime())) {
+      throw new BadRequestException('expectedUpdatedAt inválido (use ISO)')
+    }
+    return parsed
+  }
 
   async listActiveByOrg(orgId: string) {
     return this.prisma.person.findMany({
@@ -40,17 +54,40 @@ export class PeopleService {
   }
 
   async updatePerson(id: string, orgId: string, data: any) {
-    const person = await this.prisma.person.findFirst({ where: { id, orgId } })
+    const person = await this.prisma.person.findFirst({
+      where: { id, orgId },
+      select: { id: true, updatedAt: true, active: true },
+    })
     if (!person) throw new NotFoundException('Pessoa não encontrada')
-    return this.prisma.person.update({
-      where: { id },
+    const expectedUpdatedAt = this.parseExpectedUpdatedAt(data?.expectedUpdatedAt)
+    const { expectedUpdatedAt: _expectedUpdatedAt, ...patch } = data ?? {}
+    const mutation = await this.prisma.person.updateMany({
+      where: { id, orgId, updatedAt: expectedUpdatedAt },
       data: {
-        name: data.name,
-        role: data.role,
-        email: data.email,
-        active: data.active,
+        name: patch.name,
+        role: patch.role,
+        email: patch.email,
+        active: patch.active,
       },
     })
+    if (mutation.count !== 1) {
+      const latest = await this.prisma.person.findFirst({
+        where: { id, orgId },
+        select: { id: true, updatedAt: true, active: true },
+      })
+      if (!latest) throw new NotFoundException('Pessoa não encontrada')
+      throw new ConflictException({
+        code: 'PERSON_CONCURRENT_MODIFICATION',
+        message:
+          'Pessoa foi alterada por outra operação. Recarregue antes de salvar.',
+        details: {
+          personId: latest.id,
+          currentUpdatedAt: latest.updatedAt,
+          active: latest.active,
+        },
+      })
+    }
+    return this.prisma.person.findFirst({ where: { id, orgId } })
   }
 
   /**

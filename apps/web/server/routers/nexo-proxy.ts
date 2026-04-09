@@ -170,6 +170,8 @@ async function nexoFetch(path: string, options: RequestInit = {}) {
     const errorCode =
       typeof body?.code === "string" && body.code.trim().length > 0
         ? body.code.trim()
+        : typeof body?.data?.code === "string" && body.data.code.trim().length > 0
+          ? body.data.code.trim()
         : null;
     const contextualMessage = errorCode
       ? `${normalizedMessage} [${errorCode}]`
@@ -185,6 +187,10 @@ async function nexoFetch(path: string, options: RequestInit = {}) {
 
     if (response.status === 404) {
       throw new TRPCError({ code: "NOT_FOUND", message: contextualMessage });
+    }
+
+    if (response.status === 409) {
+      throw new TRPCError({ code: "CONFLICT", message: contextualMessage });
     }
 
     if (response.status === 400) {
@@ -255,6 +261,7 @@ const customerUpdateInput = customerCreateInput
   .extend({
     id: z.string().min(1),
     active: z.boolean().optional(),
+    expectedUpdatedAt: z.string().datetime().optional(),
   });
 
 const appointmentCreateInput = z.object({
@@ -271,6 +278,7 @@ const appointmentUpdateInput = z.object({
   endsAt: z.string().optional(),
   status: z.enum(["SCHEDULED", "CONFIRMED", "CANCELED", "DONE", "NO_SHOW"]).optional(),
   notes: z.string().optional(),
+  expectedUpdatedAt: z.string().datetime().optional(),
 });
 
 const serviceOrderCreateInput = z.object({
@@ -297,6 +305,7 @@ const serviceOrderUpdateInput = z.object({
   dueDate: z.string().optional(),
   cancellationReason: z.string().optional(),
   outcomeSummary: z.string().optional(),
+  expectedUpdatedAt: z.string().datetime().optional(),
 });
 
 const whatsappSendInput = z.object({
