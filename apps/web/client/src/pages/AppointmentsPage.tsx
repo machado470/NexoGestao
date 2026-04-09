@@ -38,12 +38,12 @@ import {
 import { EmptyState } from "@/components/EmptyState";
 import { TableSkeleton } from "@/components/QueryStateBoundary";
 import { StatusBadge, mapAppointmentStatus } from "@/components/StatusBadge";
-import { PageShell, SmartPage, SurfaceSection } from "@/components/PagePattern";
+import { SmartPage, SurfaceSection } from "@/components/PagePattern";
 import { DemoEnvironmentCta } from "@/components/DemoEnvironmentCta";
 import { generateAppointmentActions } from "@/lib/smartActions";
 import { ActionBarWrapper } from "@/components/operating-system/ActionBar";
-import { PageHeader } from "@/components/operating-system/PageHeader";
 import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedbackButton";
+import { PageWrapper } from "@/components/operating-system/Wrappers";
 
 type CustomerRef = {
   id: string;
@@ -690,27 +690,25 @@ export default function AppointmentsPage() {
 
   if (queryState.isInitialLoading) {
     return (
-      <PageShell>
-        <PageHeader
-          title="Agendamentos"
-          subtitle="Preparando agenda, execução e clientes para sugerir a próxima ação."
-          breadcrumb={[{ label: "Operação" }, { label: "Agendamentos" }]}
-        />
+      <PageWrapper
+        title="Agendamentos"
+        subtitle="Preparando agenda, execução e clientes para sugerir a próxima ação."
+        breadcrumb={[{ label: "Operação" }, { label: "Agendamentos" }]}
+      >
         <SurfaceSection>
           <TableSkeleton rows={6} columns={4} />
         </SurfaceSection>
-      </PageShell>
+      </PageWrapper>
     );
   }
 
   if (queryState.shouldBlockForError) {
     return (
-      <PageShell>
-        <PageHeader
-          title="Agendamentos"
-          subtitle="Não foi possível carregar os dados de agenda."
-          breadcrumb={[{ label: "Operação" }, { label: "Agendamentos" }]}
-        />
+      <PageWrapper
+        title="Agendamentos"
+        subtitle="Não foi possível carregar os dados de agenda."
+        breadcrumb={[{ label: "Operação" }, { label: "Agendamentos" }]}
+      >
         <SurfaceSection className="space-y-3 border-red-200 text-red-700 dark:border-red-900/40 dark:text-red-300">
           <p>{errorMessage}</p>
           <Button
@@ -721,17 +719,16 @@ export default function AppointmentsPage() {
             Tentar novamente
           </Button>
         </SurfaceSection>
-      </PageShell>
+      </PageWrapper>
     );
   }
 
   return (
-    <PageShell>
-      <PageHeader
-        title="Agendamentos"
-        subtitle="Aqui o cliente vira operação: confirme presença, puxe O.S. e mantenha o financeiro conectado sem depender de contexto interno."
-        breadcrumb={[{ label: "Operação" }, { label: "Agendamentos" }]}
-      />
+    <PageWrapper
+      title="Agendamentos"
+      subtitle="Aqui o cliente vira operação: confirme presença, puxe O.S. e mantenha o financeiro conectado sem depender de contexto interno."
+      breadcrumb={[{ label: "Operação" }, { label: "Agendamentos" }]}
+    >
       <ActionBarWrapper
         secondaryActions={(
           <Button
@@ -1281,6 +1278,6 @@ export default function AppointmentsPage() {
         onSuccess={handleCreateSuccess}
         customers={customers}
       />
-    </PageShell>
+    </PageWrapper>
   );
 }

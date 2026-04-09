@@ -3,11 +3,13 @@ import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { getErrorMessage, getPayloadValue, getQueryUiState } from "@/lib/query-helpers";
 import { useAuth } from "@/contexts/AuthContext";
-import { PageHero, PageShell, SurfaceSection } from "@/components/PagePattern";
+import { SurfaceSection } from "@/components/PagePattern";
 import { EmptyState } from "@/components/EmptyState";
 import { Loader2, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DemoEnvironmentCta } from "@/components/DemoEnvironmentCta";
+import { ActionBarWrapper, PageWrapper } from "@/components/operating-system/Wrappers";
+import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedbackButton";
 
 function clamp(value: number) {
   return Math.max(0, Math.min(100, Math.round(value)));
@@ -179,36 +181,56 @@ export default function GovernancePage() {
     },
   ].sort((a, b) => b.weight - a.weight);
 
+  const getSeverityClass = (severity: string) => {
+    if (severity === "critical") return "border-red-200 bg-red-50 dark:border-red-900/40 dark:bg-red-950/20";
+    if (severity === "high") return "border-amber-200 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-950/20";
+    return "border-blue-200 bg-blue-50 dark:border-blue-900/40 dark:bg-blue-950/20";
+  };
+
   if (isInitializing) {
-    return <PageShell><PageHero eyebrow="Governança" title="Governança" description="Validando sessão e permissões." /><SurfaceSection className="flex min-h-[180px] items-center justify-center gap-2 text-sm text-zinc-500 dark:text-zinc-400"><Loader2 className="h-4 w-4 animate-spin" />Carregando sessão...</SurfaceSection></PageShell>;
+    return <PageWrapper title="Governança" subtitle="Validando sessão e permissões."><SurfaceSection className="flex min-h-[180px] items-center justify-center gap-2 text-sm text-zinc-500 dark:text-zinc-400"><Loader2 className="h-4 w-4 animate-spin" />Carregando sessão...</SurfaceSection></PageWrapper>;
   }
 
   if (!isAuthenticated) {
-    return <PageShell><PageHero eyebrow="Governança" title="Governança" description="Sua sessão não está ativa." /></PageShell>;
+    return <PageWrapper title="Governança" subtitle="Sua sessão não está ativa."><SurfaceSection className="text-sm text-zinc-500 dark:text-zinc-400">Faça login para acessar governança.</SurfaceSection></PageWrapper>;
   }
 
   if (queryState.isInitialLoading) {
-    return <PageShell><PageHero eyebrow="Governança" title="Governança" description="Montando leitura institucional de risco." /><SurfaceSection className="flex min-h-[180px] items-center justify-center gap-2 text-sm text-zinc-500 dark:text-zinc-400"><Loader2 className="h-4 w-4 animate-spin" />Carregando governança...</SurfaceSection></PageShell>;
+    return <PageWrapper title="Governança" subtitle="Montando leitura institucional de risco."><SurfaceSection className="flex min-h-[180px] items-center justify-center gap-2 text-sm text-zinc-500 dark:text-zinc-400"><Loader2 className="h-4 w-4 animate-spin" />Carregando governança...</SurfaceSection></PageWrapper>;
   }
 
   if (queryState.shouldBlockForError) {
-    return <PageShell><PageHero eyebrow="Governança" title="Governança" description="Não foi possível montar os blocos de governança." /><SurfaceSection className="border-red-200 text-red-700 dark:border-red-900/40 dark:text-red-300">{errorMessage}</SurfaceSection></PageShell>;
+    return <PageWrapper title="Governança" subtitle="Não foi possível montar os blocos de governança."><SurfaceSection className="border-red-200 text-red-700 dark:border-red-900/40 dark:text-red-300">{errorMessage}</SurfaceSection></PageWrapper>;
   }
 
   return (
-    <PageShell>
-      <PageHero
-        eyebrow="Governança"
+    <PageWrapper
         title="Governança Operacional"
-        description="Aqui você prova valor executivo: o que mudou na operação, por que isso protege caixa e qual decisão tomar agora."
-        actions={<Button className="min-h-11 w-full md:w-auto" onClick={() => navigate("/dashboard/operations")}>Ver operação</Button>}
+        subtitle="Aqui você prova valor executivo: o que mudou na operação, por que isso protege caixa e qual decisão tomar agora."
+      >
+      <ActionBarWrapper
+        secondaryActions={(
+          <ActionFeedbackButton
+            state={summaryQuery.isFetching || runsQuery.isFetching || autoScoreQuery.isFetching || alertsQuery.isFetching ? "loading" : "idle"}
+            idleLabel="Atualizar governança"
+            loadingLabel="Atualizando..."
+            variant="outline"
+            onClick={() => {
+              void summaryQuery.refetch();
+              void runsQuery.refetch();
+              void autoScoreQuery.refetch();
+              void alertsQuery.refetch();
+            }}
+          />
+        )}
+        primaryAction={<Button className="min-h-11 w-full md:w-auto" onClick={() => navigate("/dashboard/operations")}>Ver operação</Button>}
       />
 
       <SurfaceSection className={`space-y-3 transition-all duration-300 ${optimisticBanner ? "ring-2 ring-orange-300/40 dark:ring-orange-500/30" : ""}`}>
         <h2 className="font-semibold">O que precisa de atenção agora</h2>
         <div className="space-y-2">
           {autoProblems.map((problem) => (
-            <div key={problem.id} className="nexo-subtle-surface flex flex-col gap-3 p-3 md:flex-row md:items-center md:justify-between">
+            <div key={problem.id} className={`nexo-subtle-surface border flex flex-col gap-3 p-3 md:flex-row md:items-center md:justify-between ${getSeverityClass(problem.severity)}`}>
               <p className="text-sm font-medium text-zinc-800 dark:text-zinc-100">{problem.message}</p>
               <Button className="min-h-11 w-full md:w-auto" onClick={() => navigate(problem.route)}>
                 {problem.cta}
@@ -313,6 +335,15 @@ export default function GovernancePage() {
           Alertas monitorados: {Number(displayAlerts.total ?? 0)}
         </SurfaceSection>
       ) : null}
-    </PageShell>
+
+      <SurfaceSection className="space-y-2">
+        <h2 className="font-semibold">Fluxo operacional conectado</h2>
+        <div className="grid gap-2 md:grid-cols-4">
+          {["Clientes", "O.S.", "Cobrança", "Pagamento"].map((stage) => (
+            <div key={stage} className="nexo-subtle-surface p-3 text-sm font-medium">{stage}</div>
+          ))}
+        </div>
+      </SurfaceSection>
+    </PageWrapper>
   );
 }

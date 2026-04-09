@@ -3,12 +3,13 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { getQueryUiState, normalizeObjectPayload } from "@/lib/query-helpers";
-import { PageHero, PageShell, SurfaceSection } from "@/components/PagePattern";
+import { SurfaceSection } from "@/components/PagePattern";
 import { EmptyState } from "@/components/EmptyState";
 import { Loader2, Settings2 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedbackButton";
+import { ActionBarWrapper, PageWrapper } from "@/components/operating-system/Wrappers";
 
 type SettingsFormData = {
   name: string;
@@ -133,7 +134,10 @@ export default function SettingsPage() {
 
   const submitForm = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    handleSave();
+  };
 
+  const handleSave = () => {
     const payload = {
       name: form.name.trim(),
       timezone: form.timezone.trim(),
@@ -160,62 +164,59 @@ export default function SettingsPage() {
 
   if (isInitializing) {
     return (
-      <PageShell>
-        <PageHero eyebrow="Configurações" title="Configurações" description="Validando sessão atual." />
+      <PageWrapper title="Configurações" subtitle="Validando sessão atual.">
         <SurfaceSection className="flex min-h-[180px] items-center justify-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
           <Loader2 className="h-4 w-4 animate-spin" />
           Carregando sessão...
         </SurfaceSection>
-      </PageShell>
+      </PageWrapper>
     );
   }
 
   if (!isAuthenticated) {
     return (
-      <PageShell>
-        <PageHero eyebrow="Configurações" title="Configurações" description="Sua sessão não está ativa." />
-      </PageShell>
+      <PageWrapper title="Configurações" subtitle="Sua sessão não está ativa.">
+        <SurfaceSection className="text-sm text-zinc-500 dark:text-zinc-400">Faça login para acessar configurações.</SurfaceSection>
+      </PageWrapper>
     );
   }
 
   if (queryState.isInitialLoading) {
     return (
-      <PageShell>
-        <PageHero eyebrow="Configurações" title="Configurações" description="Carregando dados da organização." />
+      <PageWrapper title="Configurações" subtitle="Carregando dados da organização.">
         <SurfaceSection className="flex min-h-[180px] items-center justify-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
           <Loader2 className="h-4 w-4 animate-spin" />
           Preparando configurações...
         </SurfaceSection>
-      </PageShell>
+      </PageWrapper>
     );
   }
 
   if (queryState.shouldBlockForError) {
     return (
-      <PageShell>
-        <PageHero eyebrow="Configurações" title="Configurações" description="Não foi possível carregar as configurações." />
+      <PageWrapper title="Configurações" subtitle="Não foi possível carregar as configurações.">
         <SurfaceSection className="border-red-200 text-red-700 dark:border-red-900/40 dark:text-red-300">
           {query.error?.message || "Erro ao carregar configurações"}
         </SurfaceSection>
-      </PageShell>
+      </PageWrapper>
     );
   }
 
   return (
-    <PageShell>
-      <PageHero
-        eyebrow="Configurações"
-        title="Configurações"
-        description="Fechamento do fluxo oficial com padronização institucional: nome, timezone e moeda da operação."
-        actions={
-          <Button
-            type="button"
-            onClick={() => query.refetch()}
+    <PageWrapper
+      title="Configurações"
+      subtitle="Fechamento do fluxo oficial com padronização institucional: nome, timezone e moeda da operação."
+    >
+      <ActionBarWrapper
+        secondaryActions={(
+          <ActionFeedbackButton
+            state={query.isFetching ? "loading" : "idle"}
+            idleLabel="Atualizar leitura"
+            loadingLabel="Atualizando..."
             variant="outline"
-          >
-            Atualizar leitura
-          </Button>
-        }
+            onClick={() => void query.refetch()}
+          />
+        )}
       />
 
       {!hasData ? (
@@ -303,11 +304,14 @@ export default function SettingsPage() {
             />
           </div>
 
-          <Button disabled={!hasChanges || mutation.isPending} type="submit">
-            {mutation.isPending ? "Salvando..." : "Salvar alterações"}
-          </Button>
+          <ActionFeedbackButton
+            state={mutation.isPending ? "loading" : "idle"}
+            idleLabel="Salvar alterações"
+            loadingLabel="Salvando..."
+            onClick={handleSave}
+          />
         </form>
       </SurfaceSection>
-    </PageShell>
+    </PageWrapper>
   );
 }

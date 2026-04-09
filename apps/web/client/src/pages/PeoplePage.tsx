@@ -2,9 +2,9 @@ import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/contexts/AuthContext";
-import { Loader2, Users, Plus, Pencil } from "lucide-react";
+import { Loader2, Users, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { PageHero, PageShell, SmartPage, SurfaceSection } from "@/components/PagePattern";
+import { SmartPage, SurfaceSection } from "@/components/PagePattern";
 import { EmptyState } from "@/components/EmptyState";
 import {
   getQueryUiState,
@@ -13,6 +13,8 @@ import {
 } from "@/lib/query-helpers";
 import CreatePersonModal from "@/components/CreatePersonModal";
 import EditPersonModal from "@/components/EditPersonModal";
+import { ActionBarWrapper, DataTableWrapper, PageWrapper } from "@/components/operating-system/Wrappers";
+import { RowActions } from "@/components/operating-system/RowActions";
 
 /* ================= TYPES ================= */
 
@@ -38,23 +40,6 @@ type ServiceOrder = {
   createdAt?: string | null;
   assignedToPersonId?: string | null;
 };
-
-/* ================= HELPERS ================= */
-
-function getStateLabel(value?: string | null) {
-  switch (value) {
-    case "NORMAL":
-      return "Normal";
-    case "WARNING":
-      return "Atenção";
-    case "RESTRICTED":
-      return "Restrito";
-    case "SUSPENDED":
-      return "Suspenso";
-    default:
-      return value || "N/A";
-  }
-}
 
 /* ================= PAGE ================= */
 
@@ -111,6 +96,45 @@ export default function PeoplePage() {
     .sort((a, b) => b.workload - a.workload)
     .slice(0, 5);
 
+  const tableRows = useMemo(() => {
+    return people.map((person) => {
+      const workload = serviceOrders.filter((order) => order.assignedToPersonId === person.id).length;
+      const severity = person.operationalState === "RESTRICTED" || person.operationalState === "SUSPENDED"
+        ? "critical"
+        : person.operationalState === "WARNING"
+          ? "overdue"
+          : workload === 0
+            ? "pending"
+            : "normal";
+      return { ...person, workload, severity };
+    });
+  }, [people, serviceOrders]);
+
+  const columns = useMemo(() => [
+    { key: "name", label: "Pessoa", sortable: true },
+    { key: "role", label: "Papel", render: (value: string | null) => value || "—" },
+    {
+      key: "severity",
+      label: "Estado operacional",
+      render: (value: string) => {
+        const map = {
+          critical: "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300",
+          overdue: "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300",
+          pending: "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300",
+          normal: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300",
+        } as const;
+        const labels = { critical: "Crítico", overdue: "Atrasado", pending: "Pendente", normal: "Em dia" } as const;
+        return <span className={`rounded-full px-2 py-1 text-xs font-semibold ${map[value as keyof typeof map]}`}>{labels[value as keyof typeof labels]}</span>;
+      },
+    },
+    {
+      key: "workload",
+      label: "Carga",
+      sortable: true,
+      render: (value: number) => `${value} O.S.`,
+    },
+  ] as const, []);
+
 
   const smartPriorities = useMemo(() => [
     {
@@ -166,55 +190,64 @@ export default function PeoplePage() {
 
   if (isInitializing) {
     return (
-      <PageShell>
-        <PageHero eyebrow="Pessoas" title="Pessoas" description="Carregando sessão..." />
+      <PageWrapper title="Pessoas" subtitle="Carregando sessão...">
         <SurfaceSection className="flex min-h-[180px] items-center justify-center">
           <div className="inline-flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
             <Loader2 className="h-4 w-4 animate-spin" />
             Carregando sessão...
           </div>
         </SurfaceSection>
-      </PageShell>
+      </PageWrapper>
     );
   }
 
   if (!isAuthenticated) {
     return (
-      <PageShell>
-        <PageHero eyebrow="Pessoas" title="Pessoas" description="Sua sessão não está ativa." />
-      </PageShell>
+      <PageWrapper title="Pessoas" subtitle="Sua sessão não está ativa.">
+        <SurfaceSection className="text-sm text-zinc-500 dark:text-zinc-400">Faça login para acessar pessoas.</SurfaceSection>
+      </PageWrapper>
     );
   }
 
   if (queryState.isInitialLoading) {
     return (
-      <PageShell>
-        <PageHero eyebrow="Pessoas" title="Pessoas" description="Carregando base de pessoas..." />
+      <PageWrapper title="Pessoas" subtitle="Carregando base de pessoas...">
         <SurfaceSection className="flex min-h-[220px] items-center justify-center">
           <div className="inline-flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
             <Loader2 className="h-4 w-4 animate-spin" />
             Carregando base de pessoas...
           </div>
         </SurfaceSection>
-      </PageShell>
+      </PageWrapper>
     );
   }
 
   if (queryState.shouldBlockForError) {
     return (
-      <PageShell>
-        <PageHero eyebrow="Pessoas" title="Pessoas" description="Não foi possível carregar os dados de pessoas." />
+      <PageWrapper title="Pessoas" subtitle="Não foi possível carregar os dados de pessoas.">
         <SurfaceSection className="border-red-200 text-red-700 dark:border-red-900/40 dark:text-red-300">{errorMessage}</SurfaceSection>
-      </PageShell>
+      </PageWrapper>
     );
   }
 
   return (
-    <PageShell>
-      <PageHero
-        eyebrow="Pessoas"
-        title="Pessoas"
-        description="Base de pessoas conectada à operação, com a mesma leitura visual do dashboard executivo."
+    <PageWrapper
+      title="Pessoas"
+      subtitle="Base de pessoas conectada à operação, com a mesma leitura visual do dashboard executivo."
+    >
+      <ActionBarWrapper
+        secondaryActions={(
+          <>
+            <Button type="button" variant="outline" onClick={() => navigate("/service-orders")}>Ir para O.S.</Button>
+            <Button type="button" variant="outline" onClick={() => navigate("/finances")}>Ir para cobrança</Button>
+          </>
+        )}
+        primaryAction={(
+          <Button type="button" className="min-h-12 gap-2" onClick={() => setIsCreateOpen(true)}>
+            <Plus className="h-4 w-4" />
+            Nova pessoa
+          </Button>
+        )}
       />
 
 
@@ -248,13 +281,6 @@ export default function PeoplePage() {
           {errorMessage}
         </div>
       ) : null}
-
-      <div className="flex justify-end">
-        <Button type="button" className="min-h-12 gap-2" onClick={() => setIsCreateOpen(true)}>
-          <Plus className="h-4 w-4" />
-          Nova pessoa
-        </Button>
-      </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
         <div className="nexo-kpi-card p-4"><p className="text-xs text-zinc-500">Pessoas vinculadas</p><p className="text-2xl font-bold">{linkedStats?.count ?? 0}</p></div>
@@ -292,30 +318,17 @@ export default function PeoplePage() {
           />
         </SurfaceSection>
       ) : (
-        <div className="space-y-2">
-          {people.map((p) => (
-            <div key={p.id} className="nexo-surface p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="font-medium">{p.name}</div>
-                  <div className="text-sm text-gray-500">
-                    {getStateLabel(p.operationalState)}
-                  </div>
-                </div>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="gap-2"
-                  onClick={() => setEditingPersonId(p.id)}
-                >
-                  <Pencil className="h-4 w-4" />
-                  Editar
-                </Button>
-              </div>
-            </div>
-          ))}
-        </div>
+        <DataTableWrapper
+          columns={columns as any}
+          data={tableRows}
+          searchFields={["name", "role", "operationalState"]}
+          rowActions={(row) => (
+            <RowActions
+              onEdit={() => setEditingPersonId(row.id)}
+              onView={() => navigate(`/service-orders?personId=${row.id}`)}
+            />
+          )}
+        />
       )}
 
       <CreatePersonModal
@@ -338,6 +351,6 @@ export default function PeoplePage() {
           void serviceOrdersQuery.refetch();
         }}
       />
-    </PageShell>
+    </PageWrapper>
   );
 }

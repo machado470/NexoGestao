@@ -24,7 +24,10 @@
     "web#dev": {
       "cache": false,
       "persistent": true
+    },
+    "lint": {
+      "dependsOn": ["^lint"],
+      "outputs": []
     }
   }
 }
-
