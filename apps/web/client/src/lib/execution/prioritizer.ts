@@ -26,6 +26,29 @@ function getRecencyPenalty(decisionId: string, logs: ExecutionLog[]) {
   return 0;
 }
 
+
+
+function getRecentFailureCount(decisionId: string, logs: ExecutionLog[]) {
+  const now = Date.now();
+  const windowMs = 1000 * 60 * 60 * 12;
+
+  return logs.filter(log => {
+    if (log.decisionId !== decisionId) return false;
+    if (log.status !== "failed") return false;
+    return now - log.executedAt <= windowMs;
+  }).length;
+}
+
+function getRecentBlockedCount(decisionId: string, logs: ExecutionLog[]) {
+  const now = Date.now();
+  const windowMs = 1000 * 60 * 60 * 6;
+
+  return logs.filter(log => {
+    if (log.decisionId !== decisionId) return false;
+    if (log.status !== "blocked" && log.status !== "throttled" && log.status !== "restricted") return false;
+    return now - log.executedAt <= windowMs;
+  }).length;
+}
 export function applyDynamicPriorities(
   decisions: OperationalDecision[],
   facts: DashboardExecutionFacts
@@ -64,11 +87,22 @@ export function applyDynamicPriorities(
     const recentSuccessCount = getRecentSuccessCount(decision.id, logs);
     const recencyPenalty = getRecencyPenalty(decision.id, logs);
     const frequencyPenalty = recentSuccessCount > 0 ? Math.min(recentSuccessCount * 5, 15) : 0;
+    const recentFailureCount = getRecentFailureCount(decision.id, logs);
+    const recentBlockedCount = getRecentBlockedCount(decision.id, logs);
+    const failureBoost = recentFailureCount > 0 ? Math.min(10 + recentFailureCount * 8, 36) : 0;
+    const blockedBoost = recentBlockedCount > 0 ? Math.min(recentBlockedCount * 5, 15) : 0;
 
     return {
       ...decision,
       priority: Math.max(
-        basePriority + timeWeight + valueWeight + frequencyWeight - recencyPenalty - frequencyPenalty,
+        basePriority +
+          timeWeight +
+          valueWeight +
+          frequencyWeight +
+          failureBoost +
+          blockedBoost -
+          recencyPenalty -
+          frequencyPenalty,
         1
       ),
     };

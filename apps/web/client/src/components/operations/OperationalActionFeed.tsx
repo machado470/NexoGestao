@@ -1,13 +1,14 @@
 import { useMemo } from "react";
 import { OperationalCard } from "@/components/operations/OperationalCard";
 import { useExecutionMemory } from "@/lib/execution/execution-memory";
-import type { ExecutionPlan } from "@/lib/execution/types";
+import type { ExecutionPlan, RiskOperationalState } from "@/lib/execution/types";
 
 type OperationalActionFeedProps = {
   plan: ExecutionPlan;
+  riskOperationalState?: RiskOperationalState;
 };
 
-export function OperationalActionFeed({ plan }: OperationalActionFeedProps) {
+export function OperationalActionFeed({ plan, riskOperationalState }: OperationalActionFeedProps) {
   const { logs } = useExecutionMemory();
 
   const executionState = useMemo(() => {
@@ -16,10 +17,13 @@ export function OperationalActionFeed({ plan }: OperationalActionFeedProps) {
 
     const executed = scoped.filter(log => log.status === "success").length;
     const failed = scoped.filter(log => log.status === "failed").length;
+    const blocked = scoped.filter(
+      log => log.status === "blocked" || log.status === "throttled" || log.status === "restricted"
+    ).length;
     const totalActions = plan.decisions.reduce((acc, decision) => acc + decision.actions.length, 0);
-    const pending = Math.max(totalActions - executed - failed, 0);
+    const pending = Math.max(totalActions - executed - failed - blocked, 0);
 
-    return { executed, failed, pending };
+    return { executed, failed, blocked, pending };
   }, [logs, plan.decisions]);
 
   return (
@@ -32,6 +36,9 @@ export function OperationalActionFeed({ plan }: OperationalActionFeedProps) {
       <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold">
         <span className="inline-flex rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-1 text-emerald-700 dark:text-emerald-300">
           Executadas: {executionState.executed}
+        </span>
+        <span className="inline-flex rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-amber-700 dark:text-amber-300">
+          Bloqueadas: {executionState.blocked}
         </span>
         <span className="inline-flex rounded-full border border-red-500/40 bg-red-500/10 px-2 py-1 text-red-700 dark:text-red-300">
           Falhadas: {executionState.failed}
@@ -47,6 +54,7 @@ export function OperationalActionFeed({ plan }: OperationalActionFeedProps) {
             key={decision.id}
             decision={decision}
             source={plan.source}
+            riskOperationalState={riskOperationalState}
           />
         ))}
       </div>

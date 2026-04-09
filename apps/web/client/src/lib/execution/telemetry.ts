@@ -4,7 +4,10 @@ type ExecutionTelemetryEvent =
   | "action_shown"
   | "action_clicked"
   | "action_executed"
-  | "action_failed";
+  | "action_failed"
+  | "action_policy_blocked"
+  | "action_requires_confirmation"
+  | "action_throttled";
 
 type TrackExecutionEventInput = {
   event: ExecutionTelemetryEvent;
@@ -15,6 +18,7 @@ type TrackExecutionEventInput = {
   status?: string;
   ok?: boolean;
   message?: string;
+  reasonCode?: string;
 };
 
 export function trackExecutionEvent(input: TrackExecutionEventInput) {
@@ -26,6 +30,7 @@ export function trackExecutionEvent(input: TrackExecutionEventInput) {
     telemetryKey: input.telemetryKey,
     status: input.status,
     ok: input.ok,
+    reasonCode: input.reasonCode,
     message: input.message,
     timestamp: new Date().toISOString(),
   });

@@ -6,13 +6,16 @@ import { executeExecutionAction } from "@/lib/execution/execute-action";
 import { runExecutionMutation } from "@/lib/execution/mutation-adapter";
 import { useExecutionMemory } from "@/lib/execution/execution-memory";
 import { buildExecutionKey, hasRecentExecutionByKey } from "@/lib/execution/idempotency";
+import { evaluateExecutionPolicy } from "@/lib/execution/policy";
 import { trackExecutionEvent } from "@/lib/execution/telemetry";
 import type {
   ExecuteActionResult,
   ExecutionAction,
+  ExecutionLog,
   ExecutionSource,
+  OperationalDecision,
+  RiskOperationalState,
 } from "@/lib/execution/types";
-
 
 async function hasRecentExecutionOnBackend(executionKey: string) {
   try {
@@ -33,17 +36,25 @@ async function hasRecentExecutionOnBackend(executionKey: string) {
 
 type ExecuteParams = {
   source: ExecutionSource;
-  decisionId?: string;
-  entityType?: "customer" | "appointment" | "serviceOrder" | "charge" | "payment" | "system";
-  entityId?: string;
+  decision: OperationalDecision;
+  confirmed?: boolean;
+  riskOperationalState?: RiskOperationalState;
 };
+
+function toFailedStatus(status: ExecuteActionResult["status"]): ExecutionLog["status"] {
+  if (status === "blocked") return "blocked";
+  if (status === "throttled") return "throttled";
+  if (status === "restricted") return "restricted";
+  return "failed";
+}
 
 export function useExecutionHandler() {
   const [, navigate] = useLocation();
   const apiClient = trpc.useUtils();
   const generateChargeMutation = trpc.nexo.serviceOrders.generateCharge.useMutation();
   const payChargeMutation = trpc.finance.charges.pay.useMutation();
-  const { appendExecutionLog, logs, wasRecentlyExecuted, syncExecutionLogAsync } = useExecutionMemory();
+  const { appendExecutionLog, logs, wasRecentlyExecuted, syncExecutionLogAsync, syncExecutionEventAsync } =
+    useExecutionMemory();
 
   const invalidateOperationalData = useCallback(async () => {
     await Promise.all([
@@ -56,6 +67,7 @@ export function useExecutionHandler() {
       apiClient.dashboard.chargeDistribution.invalidate(),
       apiClient.dashboard.serviceOrdersStatus.invalidate(),
       apiClient.nexo.timeline.listByOrg.invalidate(),
+      apiClient.governance.summary.invalidate(),
     ]);
   }, [apiClient]);
 
@@ -65,20 +77,108 @@ export function useExecutionHandler() {
       params: ExecuteParams
     ): Promise<ExecuteActionResult> => {
       const executionKey = buildExecutionKey(action.id, action.payload);
+      const now = Date.now();
+
+      const baseLogPayload = {
+        actionId: action.id,
+        decisionId: params.decision.id,
+        executionKey,
+        executedAt: now,
+        entityType: params.decision.entityType,
+        entityId: params.decision.entityId,
+        mode: action.mode,
+        telemetryKey: action.telemetryKey,
+      } as const;
 
       trackExecutionEvent({
         event: "action_clicked",
         actionId: action.id,
-        decisionId: params.decisionId,
+        decisionId: params.decision.id,
         source: params.source,
         telemetryKey: action.telemetryKey,
       });
+
+      const requestedEvent: ExecutionLog = {
+        id: `${action.id}-${now}-requested`,
+        ...baseLogPayload,
+        eventType: "EXECUTION_ACTION_REQUESTED",
+        status: "pending",
+      };
+      void syncExecutionEventAsync(requestedEvent);
+
+      const policy = evaluateExecutionPolicy({
+        action,
+        decision: params.decision,
+        mode: action.mode,
+        confirmed: params.confirmed,
+        risk: { operationalState: params.riskOperationalState },
+        recentLogs: logs,
+      });
+
+      if (!policy.allowed) {
+        const status =
+          policy.status === "requires_confirmation"
+            ? "requires_confirmation"
+            : policy.status;
+
+        if (status === "requires_confirmation") {
+          trackExecutionEvent({
+            event: "action_requires_confirmation",
+            actionId: action.id,
+            decisionId: params.decision.id,
+            source: params.source,
+            telemetryKey: action.telemetryKey,
+            reasonCode: policy.reasonCode,
+            status,
+            ok: false,
+            message: policy.message,
+          });
+
+          return {
+            ok: false,
+            status,
+            reasonCode: policy.reasonCode,
+            message: policy.message ?? "Confirmação obrigatória.",
+          };
+        }
+
+        const blockedLog: ExecutionLog = {
+          id: `${action.id}-${Date.now()}-blocked`,
+          ...baseLogPayload,
+          eventType: "EXECUTION_ACTION_BLOCKED",
+          status: policy.status,
+          reasonCode: policy.reasonCode,
+          message: policy.message,
+        };
+
+        appendExecutionLog(blockedLog);
+        void syncExecutionLogAsync(blockedLog);
+
+        trackExecutionEvent({
+          event: policy.status === "throttled" ? "action_throttled" : "action_policy_blocked",
+          actionId: action.id,
+          decisionId: params.decision.id,
+          source: params.source,
+          telemetryKey: action.telemetryKey,
+          reasonCode: policy.reasonCode,
+          status: policy.status,
+          ok: false,
+          message: policy.message,
+        });
+
+        return {
+          ok: false,
+          status: policy.status,
+          reasonCode: policy.reasonCode,
+          message: policy.message ?? "Execução bloqueada por política operacional.",
+        };
+      }
 
       if (
         action.kind === "mutation" &&
         (wasRecentlyExecuted({
           actionId: action.id,
-          decisionId: params.decisionId ?? "unknown",
+          decisionId: params.decision.id,
           executionKey,
         }) ||
           hasRecentExecutionByKey({ executionKey, logs }) ||
@@ -95,7 +195,7 @@ export function useExecutionHandler() {
         action,
         {
           source: params.source,
-          decisionId: params.decisionId,
+          decisionId: params.decision.id,
         },
         {
           navigate,
@@ -114,7 +214,7 @@ export function useExecutionHandler() {
                 checkIdempotency: (key) =>
                   wasRecentlyExecuted({
                     actionId: action.id,
-                    decisionId: params.decisionId ?? "unknown",
+                    decisionId: params.decision.id,
                     executionKey: key,
                   }),
               },
@@ -128,15 +228,14 @@ export function useExecutionHandler() {
         toast.success(result.message);
       }
 
-      const log = {
+      const executionStatus = result.ok ? ("success" as const) : toFailedStatus(result.status);
+      const log: ExecutionLog = {
         id: `${action.id}-${Date.now()}`,
-        actionId: action.id,
-        decisionId: params.decisionId ?? "unknown",
-        executionKey,
-        executedAt: Date.now(),
-        status: result.ok ? ("success" as const) : ("failed" as const),
-        entityType: params.entityType,
-        entityId: params.entityId,
+        ...baseLogPayload,
+        status: executionStatus,
+        eventType: result.ok ? "EXECUTION_ACTION_EXECUTED" : "EXECUTION_ACTION_FAILED",
+        reasonCode: result.reasonCode,
+        message: result.message,
       };
 
       appendExecutionLog(log);
@@ -145,12 +244,13 @@ export function useExecutionHandler() {
       trackExecutionEvent({
         event: result.ok ? "action_executed" : "action_failed",
         actionId: action.id,
-        decisionId: params.decisionId,
+        decisionId: params.decision.id,
         source: params.source,
         telemetryKey: action.telemetryKey,
         status: result.status,
         ok: result.ok,
         message: result.message,
+        reasonCode: result.reasonCode,
       });
 
       return result;
@@ -163,6 +263,7 @@ export function useExecutionHandler() {
       generateChargeMutation,
       payChargeMutation,
       syncExecutionLogAsync,
+      syncExecutionEventAsync,
       wasRecentlyExecuted,
     ]
   );

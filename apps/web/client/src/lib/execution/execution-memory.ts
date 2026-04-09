@@ -89,6 +89,41 @@ export async function syncExecutionLogAsync(log: ExecutionLog) {
         entityType: log.entityType,
         entityId: log.entityId,
         executionKey: log.executionKey,
+        mode: log.mode,
+        eventType: log.eventType,
+        reasonCode: log.reasonCode,
+        message: log.message,
+        telemetryKey: log.telemetryKey,
+      }),
+    });
+  } catch {
+    // fallback silencioso: mantém persistência local
+  }
+}
+
+
+
+export async function syncExecutionEventAsync(event: ExecutionLog) {
+  try {
+    await fetch("/execution/log", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify({
+        actionId: event.actionId,
+        decisionId: event.decisionId,
+        status: event.status,
+        executedAt: event.executedAt,
+        entityType: event.entityType,
+        entityId: event.entityId,
+        executionKey: event.executionKey,
+        mode: event.mode,
+        eventType: event.eventType,
+        reasonCode: event.reasonCode,
+        message: event.message,
+        telemetryKey: event.telemetryKey,
       }),
     });
   } catch {
@@ -152,5 +187,6 @@ export function useExecutionMemory() {
     appendExecutionLog,
     wasRecentlyExecuted,
     syncExecutionLogAsync,
+    syncExecutionEventAsync,
   };
 }

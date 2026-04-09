@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Loader2, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 import { useExecutionHandler } from "@/hooks/useExecutionHandler";
 import { useExecutionMemory } from "@/lib/execution/execution-memory";
@@ -8,11 +8,13 @@ import type {
   ExecutionAction,
   ExecutionSource,
   OperationalDecision,
+  RiskOperationalState,
 } from "@/lib/execution/types";
 
 type OperationalCardProps = {
   decision: OperationalDecision;
   source: ExecutionSource;
+  riskOperationalState?: RiskOperationalState;
 };
 
 function getSeverityClasses(severity: OperationalDecision["severity"]) {
@@ -64,13 +66,14 @@ function getModeLabel(mode: ExecutionAction["mode"]) {
   return "Manual";
 }
 
-export function OperationalCard({ decision, source }: OperationalCardProps) {
+export function OperationalCard({ decision, source, riskOperationalState }: OperationalCardProps) {
   const { execute } = useExecutionHandler();
   const { logs } = useExecutionMemory();
   const [executingActionId, setExecutingActionId] = useState<string | null>(null);
-  const [lastExecutionStatus, setLastExecutionStatus] = useState<"executed" | "failed" | null>(
-    null
-  );
+  const [lastExecutionStatus, setLastExecutionStatus] = useState<
+    "executed" | "failed" | "blocked" | "throttled" | "restricted" | null
+  >(null);
+  const [lastMessage, setLastMessage] = useState<string | null>(null);
 
   const latestDecisionLog = useMemo(
     () => logs.find(log => log.decisionId === decision.id),
@@ -92,18 +95,45 @@ export function OperationalCard({ decision, source }: OperationalCardProps) {
   async function handleExecute(action: ExecutionAction) {
     setExecutingActionId(action.id);
 
-    const result = await execute(action, {
+    let result = await execute(action, {
       source,
-      decisionId: decision.id,
-      entityType: decision.entityType,
-      entityId: decision.entityId,
+      decision,
+      riskOperationalState,
+      confirmed: false,
     });
+
+    if (result.status === "requires_confirmation") {
+      const confirmed = window.confirm(result.message ?? "Confirma a execução desta ação?");
+      if (!confirmed) {
+        setExecutingActionId(null);
+        return;
+      }
+
+      result = await execute(action, {
+        source,
+        decision,
+        riskOperationalState,
+        confirmed: true,
+      });
+    }
 
     if (!result.ok && result.message) {
       toast.warning(result.message);
     }
-    setLastExecutionStatus(result.ok ? "executed" : "failed");
 
+    if (result.ok) {
+      setLastExecutionStatus("executed");
+    } else if (result.status === "throttled") {
+      setLastExecutionStatus("throttled");
+    } else if (result.status === "restricted") {
+      setLastExecutionStatus("restricted");
+    } else if (result.status === "blocked") {
+      setLastExecutionStatus("blocked");
+    } else {
+      setLastExecutionStatus("failed");
+    }
+
+    setLastMessage(result.message ?? null);
     setExecutingActionId(null);
   }
 
@@ -143,6 +173,27 @@ export function OperationalCard({ decision, source }: OperationalCardProps) {
         <p className="mt-2 text-xs font-semibold text-red-700 dark:text-red-300">
           Última execução falhou. Revise os dados e tente novamente.
         </p>
+      ) : null}
+      {lastExecutionStatus === "blocked" || latestDecisionLog?.status === "blocked" ? (
+        <p className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-amber-700 dark:text-amber-300">
+          <ShieldAlert className="h-3.5 w-3.5" />
+          Ação bloqueada por policy operacional.
+        </p>
+      ) : null}
+      {lastExecutionStatus === "throttled" || latestDecisionLog?.status === "throttled" ? (
+        <p className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-amber-700 dark:text-amber-300">
+          <ShieldAlert className="h-3.5 w-3.5" />
+          Circuit breaker ativo: aguarde antes de tentar novamente.
+        </p>
+      ) : null}
+      {lastExecutionStatus === "restricted" || latestDecisionLog?.status === "restricted" ? (
+        <p className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-orange-700 dark:text-orange-300">
+          <ShieldAlert className="h-3.5 w-3.5" />
+          Restrição de governança aplicada para ação sensível.
+        </p>
+      ) : null}
+      {lastMessage ? (
+        <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">{lastMessage}</p>
       ) : null}
 
       <div className="mt-4 flex flex-wrap gap-2">
