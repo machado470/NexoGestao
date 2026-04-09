@@ -31,4 +31,9 @@ export class CreateAppointmentDto {
   @IsString()
   @MaxLength(2000)
   notes?: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  idempotencyKey?: string
 }

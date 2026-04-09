@@ -1,7 +1,8 @@
-import { Controller, Get } from '@nestjs/common'
+import { Controller, Get, Optional } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { PrismaService } from '../prisma/prisma.service'
 import { MetricsService } from '../common/metrics/metrics.service'
+import { QueueService } from '../queue/queue.service'
 
 @Controller('health')
 export class HealthController {
@@ -9,6 +10,7 @@ export class HealthController {
     private readonly prisma: PrismaService,
     private readonly metrics: MetricsService,
     private readonly config: ConfigService,
+    @Optional() private readonly queueService?: QueueService,
   ) {}
 
   private hasValue(name: string): boolean {
@@ -21,7 +23,14 @@ export class HealthController {
 
     let database = { ok: false as boolean, latencyMs: 0 }
     let prismaClient = { ok: false as boolean }
-    const queue = { ok: true, provider: 'database-backed queue' }
+    const queueSummary = this.queueService
+      ? await this.queueService.getQueueStatus().catch(() => ({ ok: false }))
+      : { ok: true, reason: 'queue_service_not_bound' }
+    const queue = {
+      ok: (queueSummary as any)?.ok === false ? false : true,
+      provider: 'bullmq',
+      summary: queueSummary,
+    }
 
     try {
       await this.prisma.$queryRaw`SELECT 1`

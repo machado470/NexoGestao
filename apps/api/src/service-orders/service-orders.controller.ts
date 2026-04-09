@@ -8,6 +8,7 @@ import {
   Post,
   Query,
   UseGuards,
+  Headers,
 } from '@nestjs/common'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
@@ -47,6 +48,7 @@ export class ServiceOrdersController {
   async create(
     @Org() orgId: string,
     @User() user: any,
+    @Headers('idempotency-key') idempotencyKeyHeader: string | undefined,
     @Body() body: CreateServiceOrderDto,
   ) {
     await this.quotas.validateQuota(orgId, 'CREATE_SERVICE_ORDER')
@@ -67,6 +69,7 @@ export class ServiceOrdersController {
       assignedToPersonId: body.assignedToPersonId,
       amountCents: body.amountCents,
       dueDate: body.dueDate,
+      idempotencyKey: body.idempotencyKey ?? idempotencyKeyHeader,
     })
   }
 
@@ -75,6 +78,7 @@ export class ServiceOrdersController {
   update(
     @Org() orgId: string,
     @User() user: any,
+    @Headers('idempotency-key') idempotencyKeyHeader: string | undefined,
     @Param('id') id: string,
     @Body() body: UpdateServiceOrderDto,
   ) {
@@ -87,6 +91,7 @@ export class ServiceOrdersController {
       personId: actorPersonId,
       id,
       data: body as any,
+      idempotencyKey: body.idempotencyKey ?? idempotencyKeyHeader,
     })
   }
 

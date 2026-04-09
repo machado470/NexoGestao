@@ -80,6 +80,8 @@ export class WhatsAppService {
 
     await this.queueService.addJob(QUEUE_NAMES.WHATSAPP, 'dispatch-message', {
       messageId: message.id,
+    }, {
+      jobId: `whatsapp:dispatch:${message.id}`,
     })
 
     return result

@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service'
 import { createHash } from 'crypto'
 import { RequestContextService } from '../context/request-context.service'
+import { MetricsService } from '../metrics/metrics.service'
 
 type BeginInput = {
   orgId: string
@@ -22,10 +23,14 @@ type BeginResult =
 @Injectable()
 export class IdempotencyService {
   private readonly logger = new Logger(IdempotencyService.name)
+  private get idemModel() {
+    return (this.prisma as any).idempotencyRecord
+  }
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly requestContext: RequestContextService,
+    private readonly metrics: MetricsService,
   ) {}
 
   buildPayloadHash(payload: unknown): string {
@@ -51,7 +56,7 @@ export class IdempotencyService {
     const payloadHash = this.buildPayloadHash(input.payload)
 
     try {
-      const created = await this.prisma.idempotencyRecord.create({
+      const created = await this.idemModel.create({
         data: {
           orgId: input.orgId,
           scope: input.scope,
@@ -64,7 +69,7 @@ export class IdempotencyService {
     } catch (error: any) {
       if (error?.code !== 'P2002') throw error
 
-      const existing = await this.prisma.idempotencyRecord.findFirst({
+      const existing = await this.idemModel.findFirst({
         where: {
           orgId: input.orgId,
           scope: input.scope,
@@ -84,6 +89,7 @@ export class IdempotencyService {
             key: input.idempotencyKey,
           }),
         )
+        this.metrics.increment('idempotencyConflicts')
         throw new BadRequestException({
           code: 'IDEMPOTENCY_KEY_CONFLICT',
           message:
@@ -105,17 +111,19 @@ export class IdempotencyService {
             key: input.idempotencyKey,
           }),
         )
+        this.metrics.increment('idempotencyReplays')
         return { mode: 'replay', response: existing.response, recordId: existing.id }
       }
 
       if (existing.status === 'FAILED') {
-        await this.prisma.idempotencyRecord.update({
+        await this.idemModel.update({
           where: { id: existing.id },
           data: { status: 'PROCESSING', response: null, errorCode: null },
         })
         return { mode: 'execute', recordId: existing.id }
       }
 
+      this.metrics.increment('idempotencyInProgress')
       throw new ConflictException({
         code: 'IDEMPOTENCY_IN_PROGRESS',
         message: 'Operação idempotente ainda em processamento.',
@@ -128,7 +136,7 @@ export class IdempotencyService {
   }
 
   async complete(recordId: string, response: unknown) {
-    await this.prisma.idempotencyRecord.update({
+    await this.idemModel.update({
       where: { id: recordId },
       data: {
         status: 'COMPLETED',
@@ -138,7 +146,7 @@ export class IdempotencyService {
   }
 
   async fail(recordId: string, errorCode?: string) {
-    await this.prisma.idempotencyRecord.update({
+    await this.idemModel.update({
       where: { id: recordId },
       data: {
         status: 'FAILED',

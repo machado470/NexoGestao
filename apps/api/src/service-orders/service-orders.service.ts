@@ -24,6 +24,7 @@ import {
   ensureTransition,
   serviceOrderTransitions,
 } from '../common/domain/state-transitions'
+import { IdempotencyService } from '../common/idempotency/idempotency.service'
 
 function normalizeText(v?: string): string | null {
   const s = (v ?? '').trim()
@@ -146,6 +147,7 @@ export class ServiceOrdersService {
     private readonly onboardingService: OnboardingService,
     private readonly whatsApp: WhatsAppService,
     private readonly analytics: AnalyticsService,
+    private readonly idempotency: IdempotencyService,
   ) {}
 
   private async enqueueServiceOrderCreatedMessage(params: {
@@ -463,6 +465,7 @@ export class ServiceOrdersService {
     scheduledFor?: string
     amountCents?: number
     dueDate?: string
+    idempotencyKey?: string | null
   }) {
     if (!params.orgId) throw new BadRequestException('orgId é obrigatório')
     if (!params.customerId) throw new BadRequestException('customerId é obrigatório')
@@ -498,7 +501,9 @@ export class ServiceOrdersService {
       if (!appt) throw new BadRequestException('Agendamento inválido')
     }
 
-    const idempotencyKey = buildServiceOrderIdempotencyKey({
+    const idempotencyKey =
+      params.idempotencyKey?.trim() ||
+      buildServiceOrderIdempotencyKey({
       orgId: params.orgId,
       customerId: params.customerId,
       title,
@@ -506,6 +511,26 @@ export class ServiceOrdersService {
       scheduledFor,
       amountCents,
     })
+
+    const idem = await this.idempotency.begin({
+      orgId: params.orgId,
+      scope: 'service_orders.create',
+      idempotencyKey,
+      payload: {
+        customerId: params.customerId,
+        title,
+        description,
+        priority,
+        assignedToPersonId: params.assignedToPersonId ?? null,
+        appointmentId: params.appointmentId ?? null,
+        scheduledFor: scheduledFor?.toISOString() ?? null,
+        amountCents,
+        dueDate: dueDate?.toISOString() ?? null,
+      },
+    })
+    if (idem.mode === 'replay') {
+      return idem.response as any
+    }
 
     let created: any
     try {
@@ -530,7 +555,10 @@ export class ServiceOrdersService {
         },
       })
     } catch (err) {
-      if (!isUniqueConflict(err)) throw err
+      if (!isUniqueConflict(err)) {
+        await this.idempotency.fail(idem.recordId, err?.code)
+        throw err
+      }
       const existing = await this.prisma.serviceOrder.findFirst({
         where: { orgId: params.orgId, idempotencyKey },
         include: {
@@ -538,7 +566,11 @@ export class ServiceOrdersService {
           assignedTo: { select: { id: true, name: true } },
         },
       })
-      if (!existing) throw err
+      if (!existing) {
+        await this.idempotency.fail(idem.recordId, err?.code)
+        throw err
+      }
+      await this.idempotency.complete(idem.recordId, existing)
       return existing
     }
 
@@ -618,6 +650,7 @@ export class ServiceOrdersService {
       params.assignedToPersonId,
     ])
 
+    await this.idempotency.complete(idem.recordId, created)
     return created
   }
 
@@ -626,6 +659,7 @@ export class ServiceOrdersService {
     updatedBy: string | null
     personId: string | null
     id: string
+    idempotencyKey?: string | null
     data: {
       title?: string
       description?: string
@@ -700,14 +734,97 @@ export class ServiceOrdersService {
       throw new BadRequestException('Nenhum campo para atualizar')
     }
 
-    const updated = await this.prisma.serviceOrder.update({
-      where: { id: params.id },
-      data,
-      include: {
-        customer: { select: { id: true, name: true, phone: true } },
-        assignedTo: { select: { id: true, name: true } },
-      },
-    })
+    let doneTransitionIdemRecordId: string | null = null
+    const isDoneTransition =
+      data.status === 'DONE' && before.status !== 'DONE'
+
+    if (isDoneTransition) {
+      const doneTransitionIdempotencyKey =
+        params.idempotencyKey?.trim() ||
+        ['service-order-done', params.orgId, params.id].join(':')
+
+      const idem = await this.idempotency.begin({
+        orgId: params.orgId,
+        scope: 'service_orders.mark_done',
+        idempotencyKey: doneTransitionIdempotencyKey,
+        payload: {
+          id: params.id,
+          from: before.status,
+          to: data.status,
+          amountCents: data.amountCents ?? before.amountCents ?? null,
+        },
+      })
+      if (idem.mode === 'replay') {
+        return idem.response as any
+      }
+      doneTransitionIdemRecordId = idem.recordId
+    }
+
+    try {
+      let updated: any
+      if (isDoneTransition) {
+      const result = await this.prisma.$transaction(async (tx) => {
+        const mutation = await tx.serviceOrder.updateMany({
+          where: {
+            id: params.id,
+            orgId: params.orgId,
+            status: before.status,
+          },
+          data,
+        })
+
+        if (mutation.count !== 1) {
+          const latest = await tx.serviceOrder.findFirst({
+            where: { id: params.id, orgId: params.orgId },
+            include: {
+              customer: { select: { id: true, name: true, phone: true } },
+              assignedTo: { select: { id: true, name: true } },
+            },
+          })
+
+          if (!latest) {
+            throw new NotFoundException('Ordem de serviço não encontrada')
+          }
+
+          if (latest.status === 'DONE') {
+            return { updated: latest, transitioned: false }
+          }
+
+          throw new BadRequestException(
+            `Ordem de serviço sofreu mudança concorrente (${latest.status}). Recarregue antes de concluir.`,
+          )
+        }
+
+        const row = await tx.serviceOrder.findFirst({
+          where: { id: params.id, orgId: params.orgId },
+          include: {
+            customer: { select: { id: true, name: true, phone: true } },
+            assignedTo: { select: { id: true, name: true } },
+          },
+        })
+
+        if (!row) {
+          throw new NotFoundException('Ordem de serviço não encontrada')
+        }
+
+        return { updated: row, transitioned: true }
+      })
+
+      updated = result.updated
+      if (!result.transitioned && doneTransitionIdemRecordId) {
+        await this.idempotency.complete(doneTransitionIdemRecordId, updated)
+        return updated
+      }
+      } else {
+        updated = await this.prisma.serviceOrder.update({
+        where: { id: params.id },
+        data,
+        include: {
+          customer: { select: { id: true, name: true, phone: true } },
+          assignedTo: { select: { id: true, name: true } },
+        },
+      })
+      }
 
     const context = `Ordem de serviço atualizada: ${updated.title}`
 
@@ -805,7 +922,17 @@ export class ServiceOrdersService {
       updated.assignedToPersonId,
     ])
 
-    return updated
+      if (doneTransitionIdemRecordId) {
+        await this.idempotency.complete(doneTransitionIdemRecordId, updated)
+      }
+
+      return updated
+    } catch (error: any) {
+      if (doneTransitionIdemRecordId) {
+        await this.idempotency.fail(doneTransitionIdemRecordId, error?.code)
+      }
+      throw error
+    }
   }
 
   async generateCharge(params: {

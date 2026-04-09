@@ -54,4 +54,9 @@ export class CreateServiceOrderDto {
   @IsOptional()
   @IsString()
   dueDate?: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  idempotencyKey?: string
 }
