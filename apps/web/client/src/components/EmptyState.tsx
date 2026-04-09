@@ -23,14 +23,14 @@ export function EmptyState({
   secondaryAction,
 }: EmptyStateProps) {
   return (
-    <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-      <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4 text-gray-400 dark:text-gray-500">
+    <div className="nexo-surface-operational flex flex-col items-center justify-center px-4 py-10 text-center">
+      <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-slate-200/80 bg-slate-100 text-slate-500 dark:border-white/12 dark:bg-white/[0.04] dark:text-slate-300">
         {icon}
       </div>
 
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">{title}</h3>
+      <h3 className="mb-2 text-lg font-semibold text-zinc-900 dark:text-white">{title}</h3>
 
-      <p className="text-gray-600 dark:text-gray-400 max-w-sm mb-6">{description}</p>
+      <p className="mb-6 max-w-sm text-sm text-zinc-600 dark:text-zinc-400">{description}</p>
 
       <div className="flex gap-3">
         {action && (

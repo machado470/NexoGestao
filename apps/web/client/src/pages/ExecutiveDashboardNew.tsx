@@ -462,7 +462,7 @@ export default function ExecutiveDashboardNew() {
   }
 
   return (
-    <div className="space-y-8 p-6">
+    <div className="nexo-page-shell">
       {dominantProblem ? (
         <section className="relative overflow-hidden rounded-[2rem] border-2 border-orange-400/70 bg-gradient-to-br from-orange-100 via-white to-orange-50 px-5 py-6 shadow-[0_20px_70px_rgba(251,146,60,.35)] dark:border-orange-400/35 dark:from-orange-950/45 dark:via-zinc-950 dark:to-zinc-900">
           <div className="absolute -right-20 -top-20 h-52 w-52 rounded-full bg-orange-300/30 blur-3xl dark:bg-orange-500/25" />
@@ -492,17 +492,17 @@ export default function ExecutiveDashboardNew() {
         </section>
       ) : null}
 
-      <section className="relative overflow-hidden rounded-[1.8rem] border border-slate-200/80 bg-white/90 px-4 py-5 shadow-sm transition-all duration-300 sm:px-6 sm:py-6 dark:border-white/8 dark:bg-[linear-gradient(135deg,rgba(19,22,30,0.98),rgba(12,14,20,0.96))] dark:shadow-[0_24px_60px_rgba(0,0,0,0.42)]">
+      <section className="nexo-page-header transition-all duration-300 sm:px-6 sm:py-6">
         <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-2xl">
             <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-orange-200/80 bg-orange-100/80 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-orange-700 dark:border-orange-500/20 dark:bg-orange-500/12 dark:text-orange-300">
               <BarChart3 className="h-3.5 w-3.5" />
               Visão executiva
             </div>
-            <h1 className="text-3xl font-semibold tracking-tight text-zinc-950 dark:text-white md:text-4xl">
+            <h1 className="nexo-page-header-title md:text-4xl">
               Dashboard Executivo
             </h1>
-            <p className="mt-3 max-w-xl text-sm leading-6 text-zinc-600 dark:text-zinc-400">
+            <p className="nexo-page-header-description max-w-xl">
               Organize sua operação, evite erros e mantenha controle financeiro no funil Cliente → Agendamento → O.S. → Pagamento.
             </p>
           </div>

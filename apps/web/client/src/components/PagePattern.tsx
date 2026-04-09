@@ -6,7 +6,7 @@ import { getNextActionSuggestion, registerActionFlowEvent } from "@/lib/actionFl
 import { sortSmartActions, type SmartActionWithExecution } from "@/lib/smartActions";
 
 export function PageShell({ children }: { children: ReactNode }) {
-  return <div className="space-y-8 p-6 pb-24 md:pb-6">{children}</div>;
+  return <div className="nexo-page-shell">{children}</div>;
 }
 
 export function PageHero({
@@ -21,8 +21,8 @@ export function PageHero({
   actions?: ReactNode;
 }) {
   return (
-    <section className="relative overflow-hidden rounded-[1.8rem] border border-slate-200/80 bg-white/90 px-6 py-6 shadow-sm dark:border-white/8 dark:bg-[linear-gradient(135deg,rgba(19,22,30,0.98),rgba(12,14,20,0.96))] dark:shadow-[0_24px_60px_rgba(0,0,0,0.42)]">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.14),transparent_28%),radial-gradient(circle_at_top_right,rgba(59,130,246,0.08),transparent_24%)] dark:bg-[radial-gradient(circle_at_top_left,rgba(251,146,60,0.14),transparent_28%),radial-gradient(circle_at_top_right,rgba(96,165,250,0.08),transparent_24%)]" />
+    <section className="nexo-page-header">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.12),transparent_28%),radial-gradient(circle_at_top_right,rgba(99,102,241,0.08),transparent_24%)]" />
 
       <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div className="max-w-3xl">
@@ -33,12 +33,12 @@ export function PageHero({
             </div>
           ) : null}
 
-          <h1 className="text-3xl font-semibold tracking-tight text-zinc-950 dark:text-white md:text-4xl">
+          <h1 className="nexo-page-header-title">
             {title}
           </h1>
 
           {description ? (
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-600 dark:text-zinc-400">
+            <p className="nexo-page-header-description">
               {description}
             </p>
           ) : null}
