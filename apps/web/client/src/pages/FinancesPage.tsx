@@ -16,7 +16,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import FinanceOverviewAreaChart from "@/components/finance/FinanceOverviewAreaChart";
 import { Receipt } from "lucide-react";
-import { PageShell, SmartPage, SurfaceSection } from "@/components/PagePattern";
+import { SmartPage, SurfaceSection } from "@/components/PagePattern";
 import { EmptyState } from "@/components/EmptyState";
 import { TableSkeleton } from "@/components/QueryStateBoundary";
 import { StatusBadge, mapFinanceStatus } from "@/components/StatusBadge";
@@ -30,8 +30,8 @@ import {
   CHARGE_STATUS_LABEL,
 } from "@shared/types/api";
 import { ActionBarWrapper } from "@/components/operating-system/ActionBar";
-import { PageHeader } from "@/components/operating-system/PageHeader";
 import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedbackButton";
+import { PageWrapper } from "@/components/operating-system/Wrappers";
 
 type FinanceCharge = {
   id: string;
@@ -461,71 +461,67 @@ export default function FinancesPage() {
 
   if (isInitializing) {
     return (
-      <PageShell>
-        <PageHeader
-          title="Financeiro"
-          subtitle="Validando sessão e restaurando o contexto financeiro."
-          breadcrumb={[{ label: "Operação" }, { label: "Financeiro" }]}
-        />
+      <PageWrapper
+        title="Financeiro"
+        subtitle="Validando sessão e restaurando o contexto financeiro."
+        breadcrumb={[{ label: "Operação" }, { label: "Financeiro" }]}
+      >
         <SurfaceSection>
           <TableSkeleton rows={4} columns={3} />
         </SurfaceSection>
-      </PageShell>
+      </PageWrapper>
     );
   }
 
   if (!isAuthenticated) {
     return (
-      <PageShell>
-        <PageHeader
-          title="Financeiro"
-          subtitle="Sua sessão não está ativa."
-          breadcrumb={[{ label: "Operação" }, { label: "Financeiro" }]}
-        />
-      </PageShell>
+      <PageWrapper
+        title="Financeiro"
+        subtitle="Sua sessão não está ativa."
+        breadcrumb={[{ label: "Operação" }, { label: "Financeiro" }]}
+      >
+        <SurfaceSection className="text-sm text-zinc-500 dark:text-zinc-400">Faça login para acessar o módulo financeiro.</SurfaceSection>
+      </PageWrapper>
     );
   }
 
   if (queryState.isInitialLoading) {
     return (
-      <PageShell>
-        <PageHeader
-          title="Financeiro"
-          subtitle="Estamos organizando suas cobranças para mostrar onde está o dinheiro e qual ação gera caixa agora."
-          breadcrumb={[{ label: "Operação" }, { label: "Financeiro" }]}
-        />
+      <PageWrapper
+        title="Financeiro"
+        subtitle="Estamos organizando suas cobranças para mostrar onde está o dinheiro e qual ação gera caixa agora."
+        breadcrumb={[{ label: "Operação" }, { label: "Financeiro" }]}
+      >
         <SurfaceSection>
           <TableSkeleton rows={6} columns={5} />
         </SurfaceSection>
-      </PageShell>
+      </PageWrapper>
     );
   }
 
   if (queryState.shouldBlockForError) {
     return (
-      <PageShell>
-        <PageHeader
-          title="Financeiro"
-          subtitle="Não foi possível carregar os dados financeiros."
-          breadcrumb={[{ label: "Operação" }, { label: "Financeiro" }]}
-        />
+      <PageWrapper
+        title="Financeiro"
+        subtitle="Não foi possível carregar os dados financeiros."
+        breadcrumb={[{ label: "Operação" }, { label: "Financeiro" }]}
+      >
         <SurfaceSection className="space-y-3 border-red-200 text-red-700 dark:border-red-900/40 dark:text-red-300">
           <p>{errorMessage}</p>
           <Button type="button" variant="outline" onClick={() => void chargesQuery.refetch()}>
             Tentar novamente
           </Button>
         </SurfaceSection>
-      </PageShell>
+      </PageWrapper>
     );
   }
 
   return (
-    <PageShell>
-      <PageHeader
-        title="Financeiro"
-        subtitle="Veja o que está acontecendo no caixa, por que isso importa para sua venda e qual ação executar agora."
-        breadcrumb={[{ label: "Operação" }, { label: "Financeiro" }]}
-      />
+    <PageWrapper
+      title="Financeiro"
+      subtitle="Veja o que está acontecendo no caixa, por que isso importa para sua venda e qual ação executar agora."
+      breadcrumb={[{ label: "Operação" }, { label: "Financeiro" }]}
+    >
       <ActionBarWrapper
         secondaryActions={(
           <Button
@@ -845,6 +841,6 @@ export default function FinancesPage() {
           })}
         </div>
       )}
-    </PageShell>
+    </PageWrapper>
   );
 }

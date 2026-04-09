@@ -25,7 +25,7 @@ import {
   BriefcaseBusiness,
   Search,
 } from "lucide-react";
-import { PageShell, SmartPage, SurfaceSection } from "@/components/PagePattern";
+import { SmartPage, SurfaceSection } from "@/components/PagePattern";
 import { EmptyState } from "@/components/EmptyState";
 import { DemoEnvironmentCta } from "@/components/DemoEnvironmentCta";
 
@@ -43,7 +43,7 @@ import { getErrorMessage, getQueryUiState, normalizeArrayPayload } from "@/lib/q
 import { useProductAnalytics } from "@/hooks/useProductAnalytics";
 import { generateServiceOrderActions } from "@/lib/smartActions";
 import { ActionBarWrapper } from "@/components/operating-system/ActionBar";
-import { PageHeader } from "@/components/operating-system/PageHeader";
+import { PageWrapper } from "@/components/operating-system/Wrappers";
 
 const FINANCIAL_FILTERS: Array<{
   value: FinancialFilter;
@@ -423,12 +423,11 @@ export default function ServiceOrdersPage() {
     "Erro ao carregar a fila operacional.";
 
   return (
-    <PageShell>
-      <PageHeader
-        title="O que precisa ser executado agora"
-        subtitle="Veja o que está parado na operação, por que isso impacta sua conversão e qual próximo passo deve acontecer agora."
-        breadcrumb={[{ label: "Operação" }, { label: "Ordens de Serviço" }]}
-      />
+    <PageWrapper
+      title="O que precisa ser executado agora"
+      subtitle="Veja o que está parado na operação, por que isso impacta sua conversão e qual próximo passo deve acontecer agora."
+      breadcrumb={[{ label: "Operação" }, { label: "Ordens de Serviço" }]}
+    >
       <ActionBarWrapper
         secondaryActions={(
           <>
@@ -739,6 +738,6 @@ export default function ServiceOrdersPage() {
         serviceOrderId={editId}
         people={people}
       />
-    </PageShell>
+    </PageWrapper>
   );
 }

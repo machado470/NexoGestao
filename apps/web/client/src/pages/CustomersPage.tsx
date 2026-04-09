@@ -51,7 +51,6 @@ import {
   normalizeObjectPayload,
 } from "@/lib/query-helpers";
 import {
-  PageShell,
   SmartPage,
   SurfaceSection,
 } from "@/components/PagePattern";
@@ -64,7 +63,7 @@ import { invalidateOperationalGraph } from "@/lib/operationalConsistency";
 import { useProductAnalytics } from "@/hooks/useProductAnalytics";
 import { generateCustomerActions } from "@/lib/smartActions";
 import { ActionBarWrapper } from "@/components/operating-system/ActionBar";
-import { PageHeader } from "@/components/operating-system/PageHeader";
+import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { RowActions } from "@/components/operating-system/RowActions";
 
 type Customer = {
@@ -859,17 +858,16 @@ export default function CustomersPage() {
     "Não foi possível carregar clientes.";
 
   return (
-    <PageShell>
-      <PageHeader
-        title={
-          <span className="inline-flex items-center gap-2">
-            <Users className="h-6 w-6 text-orange-500" />
-            Clientes
-          </span>
-        }
-        subtitle="Ponto de partida do fluxo oficial: cada cliente conecta agenda, execução, cobrança, comunicação e rastreabilidade."
-        breadcrumb={[{ label: "Operação" }, { label: "Clientes" }]}
-      />
+    <PageWrapper
+      title={
+        <span className="inline-flex items-center gap-2">
+          <Users className="h-6 w-6 text-orange-500" />
+          Clientes
+        </span>
+      }
+      subtitle="Ponto de partida do fluxo oficial: cada cliente conecta agenda, execução, cobrança, comunicação e rastreabilidade."
+      breadcrumb={[{ label: "Operação" }, { label: "Clientes" }]}
+    >
 
       <ActionBarWrapper
         secondaryActions={(
@@ -1802,6 +1800,6 @@ export default function CustomersPage() {
           await refreshCustomerContexts(savedCustomer?.id ?? editingCustomerId);
         }}
       />
-    </PageShell>
+    </PageWrapper>
   );
 }
