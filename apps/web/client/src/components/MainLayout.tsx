@@ -305,6 +305,7 @@ export function MainLayout({ children }: MainLayoutProps) {
         ) : null}
 
         <aside
+          data-scrollbar="nexo"
           className={`nexo-app-panel-strong ${
             isMobile
               ? `fixed inset-y-2 left-2 z-40 h-[calc(100vh-1rem)] ${
@@ -318,7 +319,7 @@ export function MainLayout({ children }: MainLayoutProps) {
           }`}
         >
           <div className="border-b border-slate-200/70 px-3 py-3 dark:border-white/10">
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 {!sidebarCollapsed ? (
                   <>
@@ -335,23 +336,53 @@ export function MainLayout({ children }: MainLayoutProps) {
                   </p>
                 )}
               </div>
-
-              <button
-                type="button"
-                onClick={() => setSidebarCollapsed(prev => !prev)}
-                disabled={isMobile}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-zinc-500 transition-colors hover:bg-zinc-100/80 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-white/[0.05] dark:hover:text-white"
-              >
-                {sidebarCollapsed ? (
-                  <ChevronRight className="h-4 w-4" />
-                ) : (
-                  <ChevronLeft className="h-4 w-4" />
-                )}
-              </button>
+              <div className="flex shrink-0 items-center gap-1">
+                <button
+                  type="button"
+                  onClick={toggleTheme}
+                  className="flex h-8 w-8 items-center justify-center rounded-xl text-zinc-500 transition-colors hover:bg-zinc-100/80 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-white/[0.05] dark:hover:text-white"
+                  title={theme === "dark" ? "Ativar tema claro" : "Ativar tema escuro"}
+                  aria-label={theme === "dark" ? "Ativar tema claro" : "Ativar tema escuro"}
+                >
+                  {theme === "dark" ? (
+                    <Sun className="h-4 w-4" />
+                  ) : (
+                    <Moon className="h-4 w-4" />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleLogout()}
+                  disabled={isLoggingOut}
+                  className="flex h-8 w-8 items-center justify-center rounded-xl text-red-600 transition-colors hover:bg-red-50/90 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-60 dark:text-red-400 dark:hover:bg-red-500/10 dark:hover:text-red-300"
+                  title="Sair"
+                  aria-label="Sair"
+                >
+                  <LogOut className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSidebarCollapsed(prev => !prev)}
+                  disabled={isMobile}
+                  className="flex h-8 w-8 items-center justify-center rounded-xl text-zinc-500 transition-colors hover:bg-zinc-100/80 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-white/[0.05] dark:hover:text-white"
+                  title={sidebarCollapsed ? "Expandir barra lateral" : "Recolher barra lateral"}
+                >
+                  {sidebarCollapsed ? (
+                    <ChevronRight className="h-4 w-4" />
+                  ) : (
+                    <ChevronLeft className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
             </div>
+            {!sidebarCollapsed ? (
+              <p className="mt-2 truncate text-[11px] text-zinc-500 dark:text-zinc-400">
+                Utilitários rápidos: tema e sessão
+              </p>
+            ) : null}
           </div>
 
-          <nav className="min-h-0 flex-1 overflow-y-auto px-2 py-3">
+          <nav data-scrollbar="nexo" className="min-h-0 flex-1 overflow-y-auto px-2 py-3">
             <div className="flex min-h-full flex-col gap-4">
               {visibleSections.map(section => (
                 <div key={section.id}>
@@ -393,68 +424,8 @@ export function MainLayout({ children }: MainLayoutProps) {
                 </div>
               ))}
 
-              <div className="mt-2 border-t border-slate-200/70 pt-3 dark:border-white/10">
-                {!sidebarCollapsed && (
-                  <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-400 dark:text-zinc-500">
-                    Interface
-                  </p>
-                )}
-
-                <button
-                  type="button"
-                  onClick={toggleTheme}
-                  className={`flex w-full items-center rounded-xl px-2.5 py-2 text-[13px] text-zinc-600 transition-colors hover:bg-zinc-100/80 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-white/[0.05] dark:hover:text-white ${
-                    sidebarCollapsed ? "justify-center" : "gap-2.5"
-                  }`}
-                >
-                  {theme === "dark" ? (
-                    <Sun className="h-4 w-4 shrink-0" />
-                  ) : (
-                    <Moon className="h-4 w-4 shrink-0" />
-                  )}
-
-                  {!sidebarCollapsed && (
-                    <>
-                      <span className="truncate font-medium">
-                        {theme === "dark" ? "Tema claro" : "Tema escuro"}
-                      </span>
-                      <span
-                        className={`ml-auto inline-flex h-5 w-9 items-center rounded-full p-0.5 transition-colors ${
-                          theme === "dark" ? "bg-orange-500/80" : "bg-zinc-300"
-                        }`}
-                      >
-                        <span
-                          className={`h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
-                            theme === "dark" ? "translate-x-4" : "translate-x-0"
-                          }`}
-                        />
-                      </span>
-                    </>
-                  )}
-                </button>
-              </div>
             </div>
           </nav>
-
-          <div className="border-t border-slate-200/70 p-2 dark:border-white/6">
-            <div className="space-y-1">
-              <button
-                type="button"
-                onClick={() => void handleLogout()}
-                disabled={isLoggingOut}
-                className={`flex w-full items-center rounded-xl px-2.5 py-2 text-[13px] text-red-600 transition-colors hover:bg-red-50/90 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:text-red-400 dark:hover:bg-red-500/10 dark:hover:text-red-300 dark:focus-visible:ring-offset-[#0d1015] ${
-                  sidebarCollapsed ? "justify-center" : "gap-2.5"
-                }`}
-                aria-busy={isLoggingOut}
-              >
-                <LogOut className="h-4 w-4 shrink-0" />
-
-                {!sidebarCollapsed && (
-                  <span className="truncate font-medium">Sair</span>
-                )}
-              </button>
-            </div>
-          </div>
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col gap-3 md:gap-4">

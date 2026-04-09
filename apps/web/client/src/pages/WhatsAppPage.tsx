@@ -8,6 +8,8 @@ import {
   RefreshCw,
   ArrowLeft,
   Send,
+  Clock3,
+  Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -154,8 +156,8 @@ export default function WhatsAppPage() {
       <PageShell>
       <PageHero
           eyebrow="WhatsApp"
-          title="WhatsApp"
-          description="Comunique com contexto comercial: veja o cenário, entenda o impacto e execute a mensagem certa agora."
+          title="Canal de execução • WhatsApp"
+          description="Abra conversas com contexto operacional pronto: quem contatar, por que agora e qual mensagem acelera a próxima etapa."
           actions={
             <Button variant="outline" onClick={() => navigate("/service-orders")}>
               <ArrowLeft className="mr-2 h-4 w-4" />
@@ -182,7 +184,7 @@ export default function WhatsAppPage() {
   if (queryState.isInitialLoading) {
     return (
       <PageShell>
-        <PageHero eyebrow="WhatsApp" title="WhatsApp" description="Preparando contexto da conversa para você agir em segundos." />
+        <PageHero eyebrow="WhatsApp" title="Canal de execução • WhatsApp" description="Preparando contexto da conversa para você agir em segundos." />
         <SurfaceSection className="flex min-h-[180px] items-center justify-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
           <RefreshCw className="h-4 w-4 animate-spin" />
           Carregando conversa e próxima ação...
@@ -194,7 +196,7 @@ export default function WhatsAppPage() {
   if (queryState.shouldBlockForError) {
     return (
       <PageShell>
-        <PageHero eyebrow="WhatsApp" title="WhatsApp" description="Não foi possível carregar o contexto da conversa." />
+        <PageHero eyebrow="WhatsApp" title="Canal de execução • WhatsApp" description="Não foi possível carregar o contexto da conversa." />
         <SurfaceSection className="border-red-200 text-red-700 dark:border-red-900/40 dark:text-red-300">
           {nonBlockingErrorMessage}
         </SurfaceSection>
@@ -206,7 +208,7 @@ export default function WhatsAppPage() {
     <PageShell>
         <PageHero
           eyebrow="WhatsApp"
-          title="WhatsApp"
+          title="Canal de execução • WhatsApp"
           description="Transforme conversa em fechamento: o contexto já mostra o que aconteceu, por que importa e o que enviar agora."
         actions={
           <Button variant="outline" onClick={() => navigate(resolveBack(route))}>
@@ -231,12 +233,24 @@ export default function WhatsAppPage() {
         priorities={smartPriorities}
       />
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <div className="nexo-kpi-card p-4"><p className="text-xs text-gray-500">Mensagens</p><p className="text-xl font-semibold">{messages.length}</p></div>
-        <div className="nexo-kpi-card p-4"><p className="text-xs text-gray-500">Sem conteúdo</p><p className="text-xl font-semibold">{unresolvedMessages}</p></div>
-        <div className="nexo-kpi-card p-4"><p className="text-xs text-gray-500">Cobrança vinculada</p><p className="text-xl font-semibold">{route.chargeId ? "Sim" : "Não"}</p></div>
-        <div className="nexo-kpi-card p-4"><p className="text-xs text-gray-500">Valor em contexto</p><p className="text-xl font-semibold">{amountLabel ?? "—"}</p></div>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="nexo-kpi-card p-4"><p className="text-xs text-gray-500">Mensagens em histórico</p><p className="text-xl font-semibold">{messages.length}</p></div>
+        <div className="nexo-kpi-card p-4"><p className="text-xs text-gray-500">Mensagens sem conteúdo</p><p className="text-xl font-semibold">{unresolvedMessages}</p></div>
+        <div className="nexo-kpi-card p-4"><p className="text-xs text-gray-500">Vínculo de cobrança</p><p className="text-xl font-semibold">{route.chargeId ? "Ativo" : "Não"}</p></div>
+        <div className="nexo-kpi-card p-4"><p className="text-xs text-gray-500">Valor em contexto</p><p className="text-xl font-semibold nexo-text-wrap">{amountLabel ?? "—"}</p></div>
       </div>
+
+      <SurfaceSection className="border-orange-200/80 bg-orange-50/70 p-4 dark:border-orange-500/20 dark:bg-orange-500/10">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <p className="nexo-text-wrap text-sm font-medium text-orange-800 dark:text-orange-200">
+            Canal pronto para execução: mantenha a mensagem curta, contextual e orientada para próxima decisão.
+          </p>
+          <div className="flex items-center gap-2 text-xs text-orange-700 dark:text-orange-300">
+            <span className="inline-flex items-center gap-1 rounded-full bg-white/85 px-2 py-1 dark:bg-zinc-950/60"><Clock3 className="h-3.5 w-3.5" /> envio imediato</span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-white/85 px-2 py-1 dark:bg-zinc-950/60"><Zap className="h-3.5 w-3.5" /> ação contextual</span>
+          </div>
+        </div>
+      </SurfaceSection>
 
       {queryState.hasBackgroundUpdate ? (
         <SurfaceSection className="border-blue-500/30 bg-blue-500/10 text-sm text-blue-200">
@@ -264,7 +278,7 @@ export default function WhatsAppPage() {
         </SurfaceSection>
       ) : null}
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         {route.chargeId && (
           <Button
             variant="outline"
@@ -289,7 +303,7 @@ export default function WhatsAppPage() {
       </div>
 
       <SurfaceSection className="space-y-3">
-        <div className="text-sm text-muted-foreground">
+        <div className="nexo-text-wrap text-sm text-muted-foreground">
           <strong>{getWhatsAppContextLabel(route.context)}:</strong>{" "}
           {getWhatsAppContextDescription(route)}
           {amountLabel ? ` • Valor: ${amountLabel}` : ""}
@@ -307,9 +321,9 @@ export default function WhatsAppPage() {
             }}
           />
         ) : (
-          <div className="space-y-2">
+          <div data-scrollbar="nexo" className="max-h-[300px] space-y-2 overflow-y-auto pr-1">
             {messages.map((msg) => (
-              <div key={msg.id} className="rounded border p-3 text-sm">
+              <div key={msg.id} className="nexo-text-wrap rounded-xl border border-zinc-200/80 bg-white/80 p-3 text-sm dark:border-white/10 dark:bg-zinc-900/60">
                 {msg.content}
               </div>
             ))}
@@ -321,7 +335,7 @@ export default function WhatsAppPage() {
         <Input
           value={messageInput}
           onChange={(e) => setMessageInput(e.target.value)}
-          placeholder="Digite a mensagem"
+          placeholder="Digite a mensagem operacional com contexto"
         />
 
         <Button

@@ -41,9 +41,9 @@ import PricingPage from "./pages/PricingPage";
 import ContactPage from "./pages/ContactPage";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
+import RegisterPage from "./pages/Register";
 
 const Login = lazy(() => import("./pages/Login"));
-const Register = lazy(() => import("./pages/Register"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
@@ -86,12 +86,10 @@ function FullScreenLoader() {
 
 function AuthRouteLoader() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-6 text-slate-900">
-      <div className="w-full max-w-sm rounded-2xl border border-slate-200/80 bg-white/90 p-5 shadow-[0_18px_44px_rgba(15,23,42,0.1)]">
-        <div className="flex items-center gap-3">
-          <Loader className="h-4 w-4 animate-spin text-orange-500" />
-          <span className="text-sm text-slate-600">Carregando autenticação...</span>
-        </div>
+    <div className="pointer-events-none fixed inset-0 z-10 flex items-start justify-center pt-5">
+      <div className="inline-flex items-center gap-2 rounded-full border border-orange-200/70 bg-white/90 px-3 py-1.5 text-xs text-zinc-600 shadow-sm backdrop-blur dark:border-orange-500/20 dark:bg-zinc-900/90 dark:text-zinc-300">
+        <Loader className="h-3.5 w-3.5 animate-spin text-orange-500" />
+        Sincronizando autenticação...
       </div>
     </div>
   );
@@ -342,6 +340,12 @@ function onboardingPage(Page: LazyExoticComponent<ComponentType>) {
   };
 }
 
+function directAuthPage(Page: ComponentType) {
+  return function DirectAuthPageRoute() {
+    return <AuthRoute component={Page} />;
+  };
+}
+
 const CustomersRoute = protectedPage(CustomersPage, {
   permissions: ["customers:read"],
   requireCompletedOnboarding: true,
@@ -426,7 +430,7 @@ function Router() {
 
       <Route path="/login">{authPage(Login)()}</Route>
 
-      <Route path="/register">{authPage(Register)()}</Route>
+      <Route path="/register" component={directAuthPage(RegisterPage)} />
 
       <Route path="/forgot-password">{authPage(ForgotPasswordPage)()}</Route>
 
