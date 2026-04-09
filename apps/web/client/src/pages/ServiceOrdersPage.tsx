@@ -23,8 +23,9 @@ import {
   RefreshCw,
   ArrowLeft,
   BriefcaseBusiness,
+  Search,
 } from "lucide-react";
-import { PageHero, PageShell, SmartPage, SurfaceSection } from "@/components/PagePattern";
+import { PageShell, SmartPage, SurfaceSection } from "@/components/PagePattern";
 import { EmptyState } from "@/components/EmptyState";
 import { DemoEnvironmentCta } from "@/components/DemoEnvironmentCta";
 
@@ -41,6 +42,8 @@ import type {
 import { getErrorMessage, getQueryUiState, normalizeArrayPayload } from "@/lib/query-helpers";
 import { useProductAnalytics } from "@/hooks/useProductAnalytics";
 import { generateServiceOrderActions } from "@/lib/smartActions";
+import { ActionBarWrapper } from "@/components/operating-system/ActionBar";
+import { PageHeader } from "@/components/operating-system/PageHeader";
 
 const FINANCIAL_FILTERS: Array<{
   value: FinancialFilter;
@@ -421,14 +424,15 @@ export default function ServiceOrdersPage() {
 
   return (
     <PageShell>
-      <PageHero
-        eyebrow="Execução operacional"
+      <PageHeader
         title="O que precisa ser executado agora"
-        description="Veja o que está parado na operação, por que isso impacta sua conversão e qual próximo passo deve acontecer agora."
-        actions={
+        subtitle="Veja o que está parado na operação, por que isso impacta sua conversão e qual próximo passo deve acontecer agora."
+        breadcrumb={[{ label: "Operação" }, { label: "Ordens de Serviço" }]}
+      />
+      <ActionBarWrapper
+        secondaryActions={(
           <>
-      
-      {activeId && (
+            {activeId ? (
               <Button
                 size="sm"
                 variant="outline"
@@ -438,27 +442,28 @@ export default function ServiceOrdersPage() {
                 <ArrowLeft className="h-4 w-4" />
                 Voltar para a lista
               </Button>
-            )}
+            ) : null}
             <Button variant="outline" onClick={() => void refreshAll()}>
               <RefreshCw className="mr-2 h-4 w-4" />
               Atualizar
             </Button>
-
-            <Button
-              onClick={() => {
-                track("cta_click", {
-                  screen: "service-orders",
-                  ctaId: "hero_new_service_order",
-                });
-                setIsCreateOpen(true);
-              }}
-              className="min-h-12"
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Nova O.S.
-            </Button>
           </>
-        }
+        )}
+        primaryAction={(
+          <Button
+            onClick={() => {
+              track("cta_click", {
+                screen: "service-orders",
+                ctaId: "hero_new_service_order",
+              });
+              setIsCreateOpen(true);
+            }}
+            className="min-h-12"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Nova O.S.
+          </Button>
+        )}
       />
 
 
@@ -527,17 +532,22 @@ export default function ServiceOrdersPage() {
         </Card>
       </div>
 
-      <Card className="nexo-kpi-card">
-        <CardContent className="flex flex-col gap-3 p-4 xl:flex-row xl:items-center xl:justify-between">
-          <div className="flex-1">
+      <ActionBarWrapper
+        searchValue={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Buscar por título, cliente, responsável ou status"
+        searchSlot={
+          <div className="relative w-full">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
             <Input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Buscar por título, cliente, responsável ou status"
-              className="w-full"
+              className="w-full pl-9"
             />
           </div>
-
+        }
+        filtersSlot={(
           <div className="flex flex-wrap gap-2">
             {FINANCIAL_FILTERS.map((item) => (
               <Button
@@ -550,8 +560,8 @@ export default function ServiceOrdersPage() {
               </Button>
             ))}
           </div>
-        </CardContent>
-      </Card>
+        )}
+      />
 
       <SurfaceSection className={getSeverityClasses(nextAction.severity)}>
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">

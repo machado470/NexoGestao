@@ -38,9 +38,12 @@ import {
 import { EmptyState } from "@/components/EmptyState";
 import { TableSkeleton } from "@/components/QueryStateBoundary";
 import { StatusBadge, mapAppointmentStatus } from "@/components/StatusBadge";
-import { PageHero, PageShell, SmartPage, SurfaceSection } from "@/components/PagePattern";
+import { PageShell, SmartPage, SurfaceSection } from "@/components/PagePattern";
 import { DemoEnvironmentCta } from "@/components/DemoEnvironmentCta";
 import { generateAppointmentActions } from "@/lib/smartActions";
+import { ActionBarWrapper } from "@/components/operating-system/ActionBar";
+import { PageHeader } from "@/components/operating-system/PageHeader";
+import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedbackButton";
 
 type CustomerRef = {
   id: string;
@@ -688,10 +691,10 @@ export default function AppointmentsPage() {
   if (queryState.isInitialLoading) {
     return (
       <PageShell>
-        <PageHero
-          eyebrow="Porta de entrada da operação"
+        <PageHeader
           title="Agendamentos"
-          description="Preparando agenda, execução e clientes para sugerir a próxima ação."
+          subtitle="Preparando agenda, execução e clientes para sugerir a próxima ação."
+          breadcrumb={[{ label: "Operação" }, { label: "Agendamentos" }]}
         />
         <SurfaceSection>
           <TableSkeleton rows={6} columns={4} />
@@ -703,10 +706,10 @@ export default function AppointmentsPage() {
   if (queryState.shouldBlockForError) {
     return (
       <PageShell>
-        <PageHero
-          eyebrow="Porta de entrada da operação"
+        <PageHeader
           title="Agendamentos"
-          description="Não foi possível carregar os dados de agenda."
+          subtitle="Não foi possível carregar os dados de agenda."
+          breadcrumb={[{ label: "Operação" }, { label: "Agendamentos" }]}
         />
         <SurfaceSection className="space-y-3 border-red-200 text-red-700 dark:border-red-900/40 dark:text-red-300">
           <p>{errorMessage}</p>
@@ -724,11 +727,13 @@ export default function AppointmentsPage() {
 
   return (
     <PageShell>
-      <PageHero
-        eyebrow="Porta de entrada da operação"
+      <PageHeader
         title="Agendamentos"
-        description="Aqui o cliente vira operação: confirme presença, puxe O.S. e mantenha o financeiro conectado sem depender de contexto interno."
-        actions={<>
+        subtitle="Aqui o cliente vira operação: confirme presença, puxe O.S. e mantenha o financeiro conectado sem depender de contexto interno."
+        breadcrumb={[{ label: "Operação" }, { label: "Agendamentos" }]}
+      />
+      <ActionBarWrapper
+        secondaryActions={(
           <Button
             type="button"
             variant="outline"
@@ -744,7 +749,8 @@ export default function AppointmentsPage() {
             <RefreshCcw className="h-4 w-4" />
             Atualizar
           </Button>
-
+        )}
+        primaryAction={(
           <Button
             onClick={() => setShowCreateModal(true)}
             className="min-h-12 gap-2 bg-orange-500 text-white"
@@ -752,7 +758,7 @@ export default function AppointmentsPage() {
             <Plus className="h-4 w-4" />
             Novo Agendamento
           </Button>
-        </>}
+        )}
       />
 
 
@@ -1011,24 +1017,22 @@ export default function AppointmentsPage() {
                     </div>
 
                     <div className="flex flex-wrap gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        className="gap-2"
+                      <ActionFeedbackButton
+                        state={
+                          isProcessing
+                            ? "loading"
+                            : successActionId === `create-${appointment.id}` ||
+                                successActionId === `open-${appointment.id}`
+                              ? "success"
+                              : "idle"
+                        }
+                        idleLabel={primaryAction.label}
+                        loadingLabel="Processando..."
+                        successLabel="Ação iniciada"
                         onClick={primaryAction.onClick}
-                        disabled={primaryAction.disabled}
-                      >
-                        <PrimaryActionIcon className="h-4 w-4" />
-                        {isProcessing
-                          ? "Processando..."
-                          : successActionId === `create-${appointment.id}` ||
-                              successActionId === `open-${appointment.id}`
-                            ? "Ação iniciada"
-                            : routingActionId === `create-${appointment.id}` ||
-                                routingActionId === `open-${appointment.id}`
-                              ? "Abrindo..."
-                              : primaryAction.label}
-                      </Button>
+                        icon={<PrimaryActionIcon className="h-4 w-4" />}
+                        size="sm"
+                      />
                       <Button
                         type="button"
                         size="sm"
