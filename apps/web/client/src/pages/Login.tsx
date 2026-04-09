@@ -49,6 +49,34 @@ function normalizeErrorMessage(error: unknown): string {
   return message;
 }
 
+
+function normalizeOAuthError(errorCode: string): string | null {
+  const normalized = (errorCode ?? "").trim().toLowerCase();
+  if (!normalized) return null;
+
+  if (normalized === "google_oauth_not_configured") {
+    return "Login com Google não está configurado neste ambiente.";
+  }
+
+  if (normalized === "google_oauth_state_secret_missing") {
+    return "Configuração de segurança do Google OAuth está incompleta.";
+  }
+
+  if (normalized === "google_oauth_invalid_state") {
+    return "Não foi possível validar o retorno do Google. Tente novamente.";
+  }
+
+  if (normalized === "google_email_not_verified") {
+    return "Seu e-mail do Google precisa estar verificado para entrar.";
+  }
+
+  if (normalized === "google_oauth_callback_failed") {
+    return "Falha ao finalizar login com Google. Tente novamente.";
+  }
+
+  return null;
+}
+
 function getSafeRedirectParam(): string | null {
   if (typeof window === "undefined") return null;
 
@@ -83,6 +111,7 @@ export default function Login() {
   const registeredParam = searchParams.get("registered") === "1";
   const verificationParam = (searchParams.get("verification") ?? "").trim();
   const queryEmail = (searchParams.get("email") ?? "").trim().toLowerCase();
+  const oauthErrorParam = normalizeOAuthError(searchParams.get("error") ?? "");
 
   const [email, setEmail] = useState(queryEmail);
   const [password, setPassword] = useState("");
@@ -94,9 +123,10 @@ export default function Login() {
 
   const errorText = useMemo(() => {
     if (localError) return localError;
+    if (oauthErrorParam) return oauthErrorParam;
     if (!error) return null;
     return normalizeErrorMessage(error);
-  }, [localError, error]);
+  }, [localError, oauthErrorParam, error]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();

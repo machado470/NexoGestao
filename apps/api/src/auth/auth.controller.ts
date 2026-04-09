@@ -92,6 +92,23 @@ export class AuthController {
   }
 
   @Public()
+  @Post('google/bff-login')
+  @Throttle({ short: { limit: 10, ttl: 60000 } })
+  async googleBffLogin(
+    @Body()
+    body: {
+      email: string
+      firstName?: string
+      lastName?: string
+      picture?: string
+      sub?: string
+      emailVerified?: boolean
+    },
+  ) {
+    return this.auth.loginWithGoogleProfile(body)
+  }
+
+  @Public()
   @Get('google/status')
   googleStatus() {
     const clientId = this.config.get<string>('GOOGLE_CLIENT_ID')?.trim()
