@@ -290,6 +290,34 @@ export class WhatsAppService {
     return updated
   }
 
+
+  async markFailedTerminal(params: {
+    id: string
+    provider: string
+    errorCode: string
+    errorMessage: string
+  }) {
+    const { id, provider, errorCode, errorMessage } = params
+
+    this.logStructured({
+      level: 'error',
+      action: 'WHATSAPP_SEND_FAILED_TERMINAL',
+      entityId: id,
+      message:
+        'Falha fatal de envio WhatsApp. Mensagem marcada como FAILED (sem requeue automático)',
+      extra: { provider, errorCode, errorMessage },
+    })
+
+    return this.prisma.whatsAppMessage.update({
+      where: { id },
+      data: {
+        status: WhatsAppMessageStatus.FAILED,
+        provider,
+        errorCode,
+        errorMessage,
+      },
+    })
+  }
   async markFailedAndRequeue(params: {
     id: string
     provider: string

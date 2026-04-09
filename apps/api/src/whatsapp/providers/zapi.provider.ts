@@ -30,12 +30,20 @@ export class ZApiWhatsAppProvider implements WhatsAppProvider {
     this.token = process.env.ZAPI_TOKEN ?? ''
     this.clientToken = process.env.ZAPI_CLIENT_TOKEN ?? ''
 
-    if (!this.instanceId || !this.token) {
+    const missing = this.getMissingConfig()
+    if (missing.length > 0) {
       this.logger.warn(
-        '[Z-API] ZAPI_INSTANCE_ID ou ZAPI_TOKEN não configurados. ' +
-          'Mensagens não serão enviadas.',
+        `[Z-API] Configuração incompleta (${missing.join(', ')}). Mensagens não serão enviadas até corrigir o .env.`,
       )
     }
+  }
+
+  private getMissingConfig(): string[] {
+    const missing: string[] = []
+    if (!this.instanceId) missing.push('ZAPI_INSTANCE_ID')
+    if (!this.token) missing.push('ZAPI_TOKEN')
+    if (!this.clientToken) missing.push('ZAPI_CLIENT_TOKEN')
+    return missing
   }
 
   /**
@@ -44,21 +52,20 @@ export class ZApiWhatsAppProvider implements WhatsAppProvider {
    */
   private normalizePhone(phone: string): string {
     const digits = phone.replace(/\D/g, '')
-    // Se já começa com 55 e tem 12+ dígitos, está ok
     if (digits.startsWith('55') && digits.length >= 12) return digits
-    // Se tem 10 ou 11 dígitos (DDD + número), adiciona 55
     if (digits.length === 10 || digits.length === 11) return `55${digits}`
     return digits
   }
 
   async send(input: WhatsAppSendInput): Promise<WhatsAppSendResult> {
-    if (!this.instanceId || !this.token) {
+    const missing = this.getMissingConfig()
+
+    if (missing.length > 0) {
       return {
         ok: false,
         provider: this.providerName,
         errorCode: 'NOT_CONFIGURED',
-        errorMessage:
-          'Z-API não configurada. Defina ZAPI_INSTANCE_ID e ZAPI_TOKEN.',
+        errorMessage: `Z-API não configurada. Defina no .env: ${missing.join(', ')}`,
       }
     }
 
@@ -80,7 +87,7 @@ export class ZApiWhatsAppProvider implements WhatsAppProvider {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(this.clientToken ? { 'Client-Token': this.clientToken } : {}),
+          'Client-Token': this.clientToken,
         },
         body: JSON.stringify({
           phone,
@@ -93,18 +100,26 @@ export class ZApiWhatsAppProvider implements WhatsAppProvider {
       if (!response.ok) {
         const errorMessage =
           body?.message ?? body?.error ?? `HTTP ${response.status}`
+
+        const statusErrorCode =
+          response.status === 401
+            ? 'UNAUTHORIZED'
+            : response.status === 403
+              ? 'FORBIDDEN'
+              : `HTTP_${response.status}`
+
         this.logger.warn(
           `[Z-API] Falha ao enviar para ${phone}: ${errorMessage}`,
         )
+
         return {
           ok: false,
           provider: this.providerName,
-          errorCode: `HTTP_${response.status}`,
+          errorCode: statusErrorCode,
           errorMessage,
         }
       }
 
-      // Z-API retorna { zaapId, messageId, id } em caso de sucesso
       const providerMessageId =
         body?.messageId ?? body?.zaapId ?? body?.id ?? `zapi_${Date.now()}`
 

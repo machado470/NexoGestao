@@ -3,7 +3,10 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
 import { WhatsAppService } from './whatsapp.service'
-import { isWhatsAppSendError } from './providers/whatsapp.provider'
+import {
+  isFatalWhatsAppSendError,
+  isWhatsAppSendError,
+} from './providers/whatsapp.provider'
 import { createWhatsAppProvider } from './providers/provider.factory'
 
 @Injectable()
@@ -39,6 +42,16 @@ export class WhatsAppDispatcherJob {
               id: message.id,
               provider: result.provider,
               providerMessageId: result.providerMessageId,
+            })
+            continue
+          }
+
+          if (isFatalWhatsAppSendError(result)) {
+            await this.whatsApp.markFailedTerminal({
+              id: message.id,
+              provider: result.provider,
+              errorCode: result.errorCode,
+              errorMessage: result.errorMessage,
             })
             continue
           }

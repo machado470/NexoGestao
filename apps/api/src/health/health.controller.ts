@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { MetricsService } from '../common/metrics/metrics.service'
 import { QueueService } from '../queue/queue.service'
 import { isGoogleOAuthConfigured } from '../common/config/google-oauth-env'
+import { getWhatsAppProviderReadiness } from '../whatsapp/providers/provider.factory'
 
 @Controller('health')
 export class HealthController {
@@ -17,6 +18,7 @@ export class HealthController {
   private hasValue(name: string): boolean {
     return (this.config.get<string>(name) ?? '').trim().length > 0
   }
+
   @Get()
   async health() {
     const startedAt = Date.now()
@@ -59,25 +61,43 @@ export class HealthController {
   @Get('readiness')
   readiness() {
     const stripeConfigured =
-      this.hasValue('STRIPE_SECRET_KEY') &&
-      this.hasValue('STRIPE_WEBHOOK_SECRET') &&
-      this.hasValue('STRIPE_PRICE_STARTER') &&
-      this.hasValue('STRIPE_PRICE_PRO') &&
-      this.hasValue('STRIPE_PRICE_BUSINESS')
+      this.hasValue('STRIPE_SECRET_KEY')
+      && this.hasValue('STRIPE_WEBHOOK_SECRET')
+      && this.hasValue('STRIPE_PRICE_STARTER')
+      && this.hasValue('STRIPE_PRICE_PRO')
+      && this.hasValue('STRIPE_PRICE_BUSINESS')
 
     const googleAuthConfigured = isGoogleOAuthConfigured(this.config)
 
     const emailConfigured = this.hasValue('RESEND_API_KEY')
-    const whatsappConfigured = this.hasValue('WHATSAPP_PROVIDER')
+    const whatsappReadiness = getWhatsAppProviderReadiness(process.env)
+
+    const whatsappIntegrationStatus = whatsappReadiness.mode === 'mock'
+      ? 'configured_mock'
+      : whatsappReadiness.isReady
+        ? 'configured'
+        : 'misconfigured'
+
+    const readinessStatus = whatsappReadiness.mode === 'real' && !whatsappReadiness.isReady
+      ? 'degraded'
+      : 'ok'
 
     return {
-      status: 'ok',
+      status: readinessStatus,
       timestamp: new Date().toISOString(),
       integrations: {
         stripe: stripeConfigured ? 'configured' : 'missing',
         googleAuth: googleAuthConfigured ? 'configured' : 'missing',
         email: emailConfigured ? 'configured' : 'missing',
-        whatsapp: whatsappConfigured ? 'configured' : 'missing',
+        whatsapp: whatsappIntegrationStatus,
+      },
+      whatsapp: {
+        providerRequested: whatsappReadiness.providerRequested,
+        providerResolved: whatsappReadiness.providerResolved,
+        isProviderKnown: whatsappReadiness.isProviderKnown,
+        mode: whatsappReadiness.mode,
+        credentialsReady: whatsappReadiness.credentialsReady,
+        missingEnv: whatsappReadiness.missingEnv,
       },
     }
   }
