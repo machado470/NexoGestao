@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
@@ -76,6 +77,15 @@ function parseOptionalDate(label: string, value?: string): Date | null {
     throw new BadRequestException(`${label} inválido (use ISO)`)
   }
 
+  return parsed
+}
+
+function parseExpectedUpdatedAt(value?: string): Date | null {
+  if (!value) return null
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) {
+    throw new BadRequestException('expectedUpdatedAt inválido (use ISO)')
+  }
   return parsed
 }
 
@@ -496,9 +506,19 @@ export class ServiceOrdersService {
     if (params.appointmentId) {
       const appt = await this.prisma.appointment.findFirst({
         where: { id: params.appointmentId, orgId: params.orgId },
-        select: { id: true },
+        select: { id: true, customerId: true, status: true },
       })
       if (!appt) throw new BadRequestException('Agendamento inválido')
+      if (appt.customerId !== params.customerId) {
+        throw new BadRequestException(
+          'appointmentId deve pertencer ao mesmo customerId da ordem de serviço',
+        )
+      }
+      if (appt.status === 'CANCELED' || appt.status === 'NO_SHOW') {
+        throw new BadRequestException(
+          `Não é permitido criar O.S. para agendamento em estado ${appt.status}`,
+        )
+      }
     }
 
     const idempotencyKey =
@@ -667,6 +687,7 @@ export class ServiceOrdersService {
       status?: ServiceOrderStatus
       scheduledFor?: string
       amountCents?: number
+      expectedUpdatedAt?: string
     }
   }) {
     if (!params.orgId) throw new BadRequestException('orgId é obrigatório')
@@ -760,6 +781,9 @@ export class ServiceOrdersService {
       doneTransitionIdemRecordId = idem.recordId
     }
 
+    const expectedUpdatedAt =
+      parseExpectedUpdatedAt(params.data.expectedUpdatedAt) ?? before.updatedAt
+
     try {
       let updated: any
       if (isDoneTransition) {
@@ -769,6 +793,7 @@ export class ServiceOrdersService {
             id: params.id,
             orgId: params.orgId,
             status: before.status,
+            updatedAt: expectedUpdatedAt,
           },
           data,
         })
@@ -790,9 +815,16 @@ export class ServiceOrdersService {
             return { updated: latest, transitioned: false }
           }
 
-          throw new BadRequestException(
-            `Ordem de serviço sofreu mudança concorrente (${latest.status}). Recarregue antes de concluir.`,
-          )
+          throw new ConflictException({
+            code: 'SERVICE_ORDER_CONCURRENT_MODIFICATION',
+            message:
+              'Ordem de serviço sofreu mudança concorrente. Recarregue antes de concluir.',
+            details: {
+              serviceOrderId: latest.id,
+              currentStatus: latest.status,
+              currentUpdatedAt: latest.updatedAt,
+            },
+          })
         }
 
         const row = await tx.serviceOrder.findFirst({
@@ -816,14 +848,42 @@ export class ServiceOrdersService {
         return updated
       }
       } else {
-        updated = await this.prisma.serviceOrder.update({
-        where: { id: params.id },
-        data,
-        include: {
-          customer: { select: { id: true, name: true, phone: true } },
-          assignedTo: { select: { id: true, name: true } },
-        },
-      })
+        const mutation = await this.prisma.serviceOrder.updateMany({
+          where: {
+            id: params.id,
+            orgId: params.orgId,
+            updatedAt: expectedUpdatedAt,
+          },
+          data,
+        })
+        if (mutation.count !== 1) {
+          const latest = await this.prisma.serviceOrder.findFirst({
+            where: { id: params.id, orgId: params.orgId },
+            include: {
+              customer: { select: { id: true, name: true, phone: true } },
+              assignedTo: { select: { id: true, name: true } },
+            },
+          })
+          if (!latest) throw new NotFoundException('Ordem de serviço não encontrada')
+          throw new ConflictException({
+            code: 'SERVICE_ORDER_CONCURRENT_MODIFICATION',
+            message:
+              'Ordem de serviço foi alterada por outra operação. Recarregue antes de salvar.',
+            details: {
+              serviceOrderId: latest.id,
+              currentStatus: latest.status,
+              currentUpdatedAt: latest.updatedAt,
+            },
+          })
+        }
+        updated = await this.prisma.serviceOrder.findFirst({
+          where: { id: params.id, orgId: params.orgId },
+          include: {
+            customer: { select: { id: true, name: true, phone: true } },
+            assignedTo: { select: { id: true, name: true } },
+          },
+        })
+        if (!updated) throw new NotFoundException('Ordem de serviço não encontrada')
       }
 
     const context = `Ordem de serviço atualizada: ${updated.title}`

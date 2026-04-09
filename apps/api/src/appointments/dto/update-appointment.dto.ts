@@ -26,4 +26,8 @@ export class UpdateAppointmentDto {
   @IsString()
   @MaxLength(2000)
   notes?: string
+
+  @IsOptional()
+  @IsString()
+  expectedUpdatedAt?: string
 }

@@ -35,6 +35,15 @@ function normalizeNotes(v?: string): string | null {
   return s ? s : null
 }
 
+function parseExpectedUpdatedAt(value?: string): Date | null {
+  if (!value) return null
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) {
+    throw new BadRequestException('expectedUpdatedAt inválido (use ISO)')
+  }
+  return parsed
+}
+
 function isStatus(v: any): v is AppointmentStatus {
   return (
     v === 'SCHEDULED' ||
@@ -441,6 +450,7 @@ export class AppointmentsService {
       endsAt?: string
       status?: AppointmentStatus
       notes?: string
+      expectedUpdatedAt?: string
     }
   }) {
     if (!params.orgId) throw new BadRequestException('orgId é obrigatório')
@@ -488,13 +498,45 @@ export class AppointmentsService {
     }
 
     try {
-      const updated = await this.prisma.appointment.update({
-        where: { id: params.id },
+      const expectedUpdatedAt =
+        parseExpectedUpdatedAt(params.data.expectedUpdatedAt) ?? before.updatedAt
+
+      const updatedInPlace = await this.prisma.appointment.updateMany({
+        where: {
+          id: params.id,
+          orgId: params.orgId,
+          updatedAt: expectedUpdatedAt,
+        },
         data,
+      })
+
+      if (updatedInPlace.count !== 1) {
+        const latest = await this.prisma.appointment.findFirst({
+          where: { id: params.id, orgId: params.orgId },
+          include: {
+            customer: { select: { id: true, name: true, phone: true } },
+          },
+        })
+        if (!latest) throw new NotFoundException('Agendamento não encontrado')
+        throw new ConflictException({
+          code: 'APPOINTMENT_CONCURRENT_MODIFICATION',
+          message:
+            'Agendamento foi alterado por outra operação. Recarregue antes de salvar.',
+          details: {
+            appointmentId: latest.id,
+            currentStatus: latest.status,
+            currentUpdatedAt: latest.updatedAt,
+          },
+        })
+      }
+
+      const updated = await this.prisma.appointment.findFirst({
+        where: { id: params.id, orgId: params.orgId },
         include: {
           customer: { select: { id: true, name: true, phone: true } },
         },
       })
+      if (!updated) throw new NotFoundException('Agendamento não encontrado')
 
       const context = `Agendamento atualizado: ${updated.customer.name}`
 

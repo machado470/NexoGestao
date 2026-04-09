@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   Logger,
   NotFoundException,
@@ -136,6 +137,15 @@ export class FinanceService {
     if (from === to) return
 
     ensureTransition(from, to, chargeTransitions, 'charge')
+  }
+
+  private parseExpectedUpdatedAt(value?: string | null): Date | null {
+    if (!value) return null
+    const parsed = new Date(value)
+    if (Number.isNaN(parsed.getTime())) {
+      throw new BadRequestException('expectedUpdatedAt inválido (use ISO)')
+    }
+    return parsed
   }
 
   // =========================
@@ -423,10 +433,11 @@ export class FinanceService {
     status?: $Enums.ChargeStatus
     notes?: string | null
     actorUserId?: string | null
+    expectedUpdatedAt?: string | null
   }) {
     const charge = await this.prisma.charge.findFirst({
       where: { id: input.id, orgId: input.orgId },
-      select: { id: true, status: true, paidAt: true },
+      select: { id: true, status: true, paidAt: true, updatedAt: true },
     })
 
     if (!charge) throw new NotFoundException('Charge não encontrada')
@@ -435,8 +446,15 @@ export class FinanceService {
       this.assertChargeStatusTransition(charge.status, input.status)
     }
 
-    return this.prisma.charge.update({
-      where: { id: charge.id },
+    const expectedUpdatedAt =
+      this.parseExpectedUpdatedAt(input.expectedUpdatedAt) ?? charge.updatedAt
+
+    const mutation = await this.prisma.charge.updateMany({
+      where: {
+        id: charge.id,
+        orgId: input.orgId,
+        updatedAt: expectedUpdatedAt,
+      },
       data: {
         amountCents: input.amountCents,
         dueDate: input.dueDate,
@@ -449,6 +467,22 @@ export class FinanceService {
               : undefined,
         notes: input.notes,
       },
+    })
+    if (mutation.count !== 1) {
+      const latest = await this.prisma.charge.findFirst({
+        where: { id: charge.id, orgId: input.orgId },
+        select: { id: true, status: true, updatedAt: true },
+      })
+      throw new ConflictException({
+        code: 'CHARGE_CONCURRENT_MODIFICATION',
+        message:
+          'Cobrança foi alterada por outra operação. Recarregue antes de salvar.',
+        details: latest ?? { chargeId: input.id },
+      })
+    }
+
+    return this.prisma.charge.findFirst({
+      where: { id: charge.id, orgId: input.orgId },
     })
   }
 
