@@ -21,6 +21,7 @@ export type ExecutionGovernanceStatus =
   | 'requires_confirmation'
 
 export type ExecutionRunnerStatus =
+  | 'pending'
   | 'executed'
   | 'failed'
   | 'blocked'

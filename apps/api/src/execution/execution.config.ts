@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common'
+import { PrismaService } from '../prisma/prisma.service'
 import type { ExecutionMode, ExecutionPolicyConfig } from './execution.types'
 
 const DEFAULT_POLICY: ExecutionPolicyConfig = {
@@ -17,28 +18,89 @@ function normalizeMode(raw: string | undefined): ExecutionMode {
 
 @Injectable()
 export class ExecutionConfigService {
-  private readonly modeOverrides = new Map<string, ExecutionMode>()
-  private readonly policyOverrides = new Map<string, Partial<ExecutionPolicyConfig>>()
+  private readonly modeCache = new Map<string, ExecutionMode>()
+  private readonly policyCache = new Map<string, Partial<ExecutionPolicyConfig>>()
 
-  getExecutionMode(context: { orgId: string }): ExecutionMode {
-    const override = this.modeOverrides.get(context.orgId)
-    if (override) return override
+  constructor(private readonly prisma: PrismaService) {}
 
-    return normalizeMode(process.env.EXECUTION_MODE_DEFAULT)
+  private sanitizePolicy(value: unknown): Partial<ExecutionPolicyConfig> {
+    if (!value || typeof value !== 'object') return {}
+    const input = value as Record<string, unknown>
+    const output: Partial<ExecutionPolicyConfig> = {}
+
+    if (typeof input.allowAutomaticCharge === 'boolean') {
+      output.allowAutomaticCharge = input.allowAutomaticCharge
+    }
+    if (typeof input.allowWhatsAppAuto === 'boolean') {
+      output.allowWhatsAppAuto = input.allowWhatsAppAuto
+    }
+    if (Number.isFinite(input.maxRetries)) {
+      output.maxRetries = Math.max(0, Number(input.maxRetries))
+    }
+    if (Number.isFinite(input.throttleWindowMs)) {
+      output.throttleWindowMs = Math.max(5_000, Number(input.throttleWindowMs))
+    }
+    return output
   }
 
-  getPolicyConfig(context: { orgId: string }): ExecutionPolicyConfig {
+  async getExecutionMode(context: { orgId: string }): Promise<ExecutionMode> {
+    const cached = this.modeCache.get(context.orgId)
+    if (cached) return cached
+
+    const config = await this.prisma.organizationExecutionConfig.findUnique({
+      where: { orgId: context.orgId },
+      select: { mode: true, policy: true },
+    })
+
+    const mode = config?.mode ?? normalizeMode(process.env.EXECUTION_MODE_DEFAULT)
+    this.modeCache.set(context.orgId, mode)
+    if (config?.policy) {
+      this.policyCache.set(context.orgId, this.sanitizePolicy(config.policy))
+    }
+    return mode
+  }
+
+  async getPolicyConfig(context: { orgId: string }): Promise<ExecutionPolicyConfig> {
+    const cached = this.policyCache.get(context.orgId)
+    if (cached) {
+      return { ...DEFAULT_POLICY, ...cached }
+    }
+
+    const config = await this.prisma.organizationExecutionConfig.findUnique({
+      where: { orgId: context.orgId },
+      select: { policy: true },
+    })
+
+    const persisted = this.sanitizePolicy(config?.policy)
+    this.policyCache.set(context.orgId, persisted)
+
     return {
       ...DEFAULT_POLICY,
-      ...(this.policyOverrides.get(context.orgId) ?? {}),
+      ...persisted,
     }
   }
 
-  setExecutionModeForOrg(orgId: string, mode: ExecutionMode) {
-    this.modeOverrides.set(orgId, mode)
+  async setExecutionModeForOrg(orgId: string, mode: ExecutionMode) {
+    const nextMode = normalizeMode(mode)
+    await this.prisma.organizationExecutionConfig.upsert({
+      where: { orgId },
+      update: { mode: nextMode },
+      create: { orgId, mode: nextMode },
+    })
+    this.modeCache.set(orgId, nextMode)
   }
 
-  setPolicyOverrideForOrg(orgId: string, policy: Partial<ExecutionPolicyConfig>) {
-    this.policyOverrides.set(orgId, policy)
+  async setPolicyOverrideForOrg(orgId: string, policy: Partial<ExecutionPolicyConfig>) {
+    const sanitized = this.sanitizePolicy(policy)
+    await this.prisma.organizationExecutionConfig.upsert({
+      where: { orgId },
+      update: { policy: sanitized },
+      create: {
+        orgId,
+        mode: normalizeMode(process.env.EXECUTION_MODE_DEFAULT),
+        policy: sanitized,
+      },
+    })
+    this.policyCache.set(orgId, sanitized)
   }
 }

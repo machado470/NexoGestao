@@ -13,6 +13,8 @@ type GovernanceResult = {
 export class ExecutionGovernanceService {
   evaluate(candidate: ExecutionActionCandidate): GovernanceResult {
     const amountCents = Number(candidate.metadata?.amountCents ?? 0)
+    const overdueCount = Number(candidate.metadata?.overdueCount ?? 0)
+    const stalledServiceOrders = Number(candidate.metadata?.stalledServiceOrders ?? 0)
 
     if (amountCents > 500_000) {
       return {
@@ -25,6 +27,17 @@ export class ExecutionGovernanceService {
       return {
         status: 'blocked',
         reasonCode: 'governance_blocked_candidate',
+      }
+    }
+
+    if (
+      candidate.actionId === 'action-notify-operational-alert' &&
+      overdueCount < 3 &&
+      stalledServiceOrders < 8
+    ) {
+      return {
+        status: 'blocked',
+        reasonCode: 'governance_alert_threshold_not_reached',
       }
     }
 

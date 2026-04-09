@@ -9,6 +9,7 @@ import { Throttle } from '@nestjs/throttler'
 import { ExecutionRunner } from './execution.runner'
 import { ExecutionEventsService } from './execution.events'
 import { ExecutionConfigService } from './execution.config'
+import type { ExecutionMode, ExecutionPolicyConfig } from './execution.types'
 
 @Controller('executions')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -16,7 +17,7 @@ export class ExecutionController {
   constructor(
     private readonly execution: ExecutionService,
     private readonly runner: ExecutionRunner,
-    private readonly events: ExecutionEventsService,
+    private readonly executionEvents: ExecutionEventsService,
     private readonly config: ExecutionConfigService,
   ) {}
 
@@ -43,16 +44,42 @@ export class ExecutionController {
   @Roles('ADMIN', 'MANAGER', 'STAFF', 'VIEWER')
   stateSummary(@Org() orgId: string, @Query('sinceMs') sinceMs?: string) {
     const normalizedSinceMs = Number(sinceMs ?? 1000 * 60 * 60 * 24)
-    return this.events.getStateSummary(orgId, Number.isFinite(normalizedSinceMs) ? normalizedSinceMs : undefined)
+    return this.executionEvents.getStateSummary(orgId, Number.isFinite(normalizedSinceMs) ? normalizedSinceMs : undefined)
   }
 
   @Get('mode')
   @Roles('ADMIN', 'MANAGER', 'STAFF', 'VIEWER')
-  mode(@Org() orgId: string) {
+  async mode(@Org() orgId: string) {
     return {
-      mode: this.config.getExecutionMode({ orgId }),
-      policy: this.config.getPolicyConfig({ orgId }),
+      mode: await this.config.getExecutionMode({ orgId }),
+      policy: await this.config.getPolicyConfig({ orgId }),
     }
+  }
+
+  @Post('mode')
+  @Roles('ADMIN', 'MANAGER')
+  async updateMode(
+    @Org() orgId: string,
+    @Body() body: { mode?: ExecutionMode; policy?: Partial<ExecutionPolicyConfig> },
+  ) {
+    if (body?.mode) {
+      await this.config.setExecutionModeForOrg(orgId, body.mode)
+    }
+    if (body?.policy && typeof body.policy === 'object') {
+      await this.config.setPolicyOverrideForOrg(orgId, body.policy)
+    }
+    return {
+      ok: true,
+      mode: await this.config.getExecutionMode({ orgId }),
+      policy: await this.config.getPolicyConfig({ orgId }),
+    }
+  }
+
+  @Get('events')
+  @Roles('ADMIN', 'MANAGER', 'STAFF', 'VIEWER')
+  listEvents(@Org() orgId: string, @Query('limit') limit?: string) {
+    const normalizedLimit = Number(limit ?? 100)
+    return this.executionEvents.listRecentEvents(orgId, normalizedLimit)
   }
 
   @Post('runner/run-once')

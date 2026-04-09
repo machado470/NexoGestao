@@ -622,10 +622,34 @@ export const nexoProxyRouter = router({
       return authedGet(ctx as CtxLike, "/executions/mode");
     }),
 
+    updateMode: protectedProcedure
+      .input(
+        z.object({
+          mode: z.enum(["manual", "semi_automatic", "automatic"]).optional(),
+          policy: z
+            .object({
+              allowAutomaticCharge: z.boolean().optional(),
+              allowWhatsAppAuto: z.boolean().optional(),
+              maxRetries: z.number().int().min(0).optional(),
+              throttleWindowMs: z.number().int().min(5000).optional(),
+            })
+            .optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        return authedPost(ctx as CtxLike, "/executions/mode", input);
+      }),
+
     stateSummary: protectedProcedure
       .input(z.object({ sinceMs: z.number().optional() }).optional())
       .query(async ({ ctx, input }) => {
         return authedGet(ctx as CtxLike, "/executions/state-summary", input ?? {});
+      }),
+
+    events: protectedProcedure
+      .input(z.object({ limit: z.number().int().min(1).max(500).optional() }).optional())
+      .query(async ({ ctx, input }) => {
+        return authedGet(ctx as CtxLike, "/executions/events", input ?? {});
       }),
 
     runOnce: protectedProcedure.mutation(async ({ ctx }) => {
