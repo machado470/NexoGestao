@@ -293,12 +293,22 @@ export default function ExecutiveDashboardNew() {
   >([]);
   const [stableChargesStatus, setStableChargesStatus] = useState<any[]>([]);
 
-  const metrics = normalizeMetrics(metricsQuery.data);
-  const revenue = normalizeSeriesArray(revenueQuery.data);
-  const serviceOrdersStatus = normalizeStatusCollection(
-    serviceOrdersStatusQuery.data
+  const metrics = useMemo(
+    () => normalizeMetrics(metricsQuery.data),
+    [metricsQuery.data]
   );
-  const chargesStatus = normalizeStatusCollection(chargesStatusQuery.data);
+  const revenue = useMemo(
+    () => normalizeSeriesArray(revenueQuery.data),
+    [revenueQuery.data]
+  );
+  const serviceOrdersStatus = useMemo(
+    () => normalizeStatusCollection(serviceOrdersStatusQuery.data),
+    [serviceOrdersStatusQuery.data]
+  );
+  const chargesStatus = useMemo(
+    () => normalizeStatusCollection(chargesStatusQuery.data),
+    [chargesStatusQuery.data]
+  );
 
   useEffect(() => {
     if (metricsQuery.data !== undefined) {
