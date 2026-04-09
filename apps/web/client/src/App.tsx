@@ -33,19 +33,19 @@ import CalendarPage from "./pages/CalendarPage";
 import SettingsPage from "./pages/SettingsPage";
 import TimelinePage from "./pages/TimelinePage";
 import BillingPage from "./pages/BillingPage";
+import Landing from "./pages/Landing";
+import About from "./pages/About";
+import ProductPage from "./pages/ProductPage";
+import FunctionalitiesPage from "./pages/FunctionalitiesPage";
+import PricingPage from "./pages/PricingPage";
+import ContactPage from "./pages/ContactPage";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TermsOfService from "./pages/TermsOfService";
 
-const Landing = lazy(() => import("./pages/Landing"));
 const Login = lazy(() => import("./pages/Login"));
 const Register = lazy(() => import("./pages/Register"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const NotFound = lazy(() => import("./pages/NotFound"));
-const About = lazy(() => import("./pages/About"));
-const ProductPage = lazy(() => import("./pages/ProductPage"));
-const PricingPage = lazy(() => import("./pages/PricingPage"));
-const FunctionalitiesPage = lazy(() => import("./pages/FunctionalitiesPage"));
-const ContactPage = lazy(() => import("./pages/ContactPage"));
-const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
-const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
 const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
 const AcceptInvitePage = lazy(() => import("./pages/AcceptInvitePage"));
@@ -299,11 +299,9 @@ function protectedPage(
   };
 }
 
-function publicPage(Page: LazyExoticComponent<ComponentType>) {
+function publicPage(Page: ComponentType) {
   return function PublicPageRoute() {
-    return (
-      <MarketingRoute component={() => <LazyPage component={Page} fallback={null} />} />
-    );
+    return <MarketingRoute component={Page} />;
   };
 }
 
