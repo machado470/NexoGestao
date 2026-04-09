@@ -13,6 +13,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import {
+  getConcurrencyErrorMessage,
+  isConcurrentConflictError,
+} from "@/lib/concurrency";
 
 type Props = {
   open: boolean;
@@ -27,6 +31,7 @@ type PersonDetails = {
   role: string | null;
   email: string | null;
   active: boolean;
+  updatedAt: string | null;
 };
 
 type FormData = {
@@ -58,6 +63,7 @@ function normalizePersonPayload(payload: unknown): PersonDetails | null {
     role: typeof candidate.role === "string" ? candidate.role : null,
     email: typeof candidate.email === "string" ? candidate.email : null,
     active: candidate.active === false ? false : true,
+    updatedAt: typeof candidate.updatedAt === "string" ? candidate.updatedAt : null,
   };
 }
 
@@ -129,6 +135,15 @@ export default function EditPersonModal({
       onClose();
     },
     onError: (error) => {
+      if (isConcurrentConflictError(error)) {
+        toast.error(getConcurrencyErrorMessage("cadastro da pessoa"), {
+          action: {
+            label: "Recarregar",
+            onClick: () => void personQuery.refetch(),
+          },
+        });
+        return;
+      }
       toast.error(error.message || "Erro ao atualizar pessoa.");
     },
   });
@@ -173,6 +188,7 @@ export default function EditPersonModal({
       role,
       email: email || undefined,
       active: formData.active,
+      expectedUpdatedAt: personData?.updatedAt ?? undefined,
     });
   };
 

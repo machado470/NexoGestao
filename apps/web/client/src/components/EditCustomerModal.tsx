@@ -18,6 +18,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { normalizeObjectPayload } from "@/lib/query-helpers";
 import { useCriticalActionGuard } from "@/hooks/useCriticalActionGuard";
 import { invalidateOperationalGraph } from "@/lib/operationalConsistency";
+import {
+  getConcurrencyErrorMessage,
+  isConcurrentConflictError,
+} from "@/lib/concurrency";
 
 type Props = {
   open: boolean;
@@ -32,6 +36,7 @@ type CustomerDetails = {
   email?: string | null;
   notes?: string | null;
   active?: boolean | null;
+  updatedAt?: string | null;
 };
 
 function normalizeCustomerPayload(payload: unknown): CustomerDetails | null {
@@ -155,6 +160,8 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
         email: parsed.data.email || undefined,
         notes: parsed.data.notes?.trim() ? parsed.data.notes.trim() : undefined,
         active,
+        expectedUpdatedAt:
+          typeof customer?.updatedAt === "string" ? customer.updatedAt : undefined,
       };
 
       utils.nexo.customers.list.setData(undefined, (old: any) => {
@@ -183,6 +190,15 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
       onClose();
     } catch (error) {
       utils.nexo.customers.list.setData(undefined, previousCustomers as any);
+      if (isConcurrentConflictError(error)) {
+        toast.error(getConcurrencyErrorMessage("cliente"), {
+          action: {
+            label: "Recarregar",
+            onClick: () => void customerQuery.refetch(),
+          },
+        });
+        return;
+      }
       const message =
         error instanceof Error ? error.message : "Erro ao atualizar cliente";
       toast.error(message);

@@ -24,4 +24,8 @@ export class UpdateCustomerDto {
   @IsOptional()
   @IsBoolean()
   active?: boolean
+
+  @IsOptional()
+  @IsString()
+  expectedUpdatedAt?: string
 }

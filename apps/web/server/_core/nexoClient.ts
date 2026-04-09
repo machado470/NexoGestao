@@ -75,12 +75,19 @@ function extractErrorMessage(body: any, status: number): string {
   return `Nexo API error ${status}`;
 }
 
+function extractErrorCode(body: any): string | null {
+  const code = body?.code ?? body?.data?.code ?? body?.errorCode;
+  return typeof code === "string" && code.trim() ? code.trim() : null;
+}
+
 export class NexoHttpError extends Error {
   status: number;
   body: any;
 
   constructor(status: number, body: any) {
-    super(extractErrorMessage(body, status));
+    const message = extractErrorMessage(body, status);
+    const code = extractErrorCode(body);
+    super(code ? `${message} [${code}]` : message);
     this.name = "NexoHttpError";
     this.status = status;
     this.body = body;
@@ -98,6 +105,10 @@ function mapNexoHttpErrorToTrpcError(error: NexoHttpError): TRPCError {
 
   if (error.status === 404) {
     return new TRPCError({ code: "NOT_FOUND", message: error.message, cause: error });
+  }
+
+  if (error.status === 409) {
+    return new TRPCError({ code: "CONFLICT", message: error.message, cause: error });
   }
 
   if (error.status === 400) {

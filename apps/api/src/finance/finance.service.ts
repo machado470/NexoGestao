@@ -140,7 +140,12 @@ export class FinanceService {
   }
 
   private parseExpectedUpdatedAt(value?: string | null): Date | null {
-    if (!value) return null
+    if (!value) {
+      throw new BadRequestException({
+        code: 'EXPECTED_UPDATED_AT_REQUIRED',
+        message: 'expectedUpdatedAt é obrigatório para atualizar cobrança.',
+      })
+    }
     const parsed = new Date(value)
     if (Number.isNaN(parsed.getTime())) {
       throw new BadRequestException('expectedUpdatedAt inválido (use ISO)')
@@ -446,8 +451,7 @@ export class FinanceService {
       this.assertChargeStatusTransition(charge.status, input.status)
     }
 
-    const expectedUpdatedAt =
-      this.parseExpectedUpdatedAt(input.expectedUpdatedAt) ?? charge.updatedAt
+    const expectedUpdatedAt = this.parseExpectedUpdatedAt(input.expectedUpdatedAt)
 
     const mutation = await this.prisma.charge.updateMany({
       where: {

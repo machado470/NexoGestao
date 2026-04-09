@@ -56,6 +56,7 @@ export const peopleRouter = router({
         role: z.string().optional(),
         email: z.string().email().optional(),
         active: z.boolean().optional(),
+        expectedUpdatedAt: z.string().datetime().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {

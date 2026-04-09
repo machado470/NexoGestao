@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
@@ -25,6 +26,20 @@ function normalizePhone(v?: string): string {
 
 function isUniqueConflict(err: any): boolean {
   return err?.code === 'P2002'
+}
+
+function parseExpectedUpdatedAt(value?: string): Date {
+  if (!value) {
+    throw new BadRequestException({
+      code: 'EXPECTED_UPDATED_AT_REQUIRED',
+      message: 'expectedUpdatedAt é obrigatório para atualizar cliente protegido.',
+    })
+  }
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) {
+    throw new BadRequestException('expectedUpdatedAt inválido (use ISO)')
+  }
+  return parsed
 }
 
 @Injectable()
@@ -317,6 +332,7 @@ export class CustomersService {
       email?: string
       notes?: string
       active?: boolean
+      expectedUpdatedAt?: string
     }
   }) {
     if (!params.orgId) throw new BadRequestException('orgId é obrigatório')
@@ -331,6 +347,7 @@ export class CustomersService {
         email: true,
         notes: true,
         active: true,
+        updatedAt: true,
       },
     })
 
@@ -384,13 +401,31 @@ export class CustomersService {
       throw new BadRequestException('Nenhum campo para atualizar')
     }
 
+    const expectedUpdatedAt = parseExpectedUpdatedAt(
+      (params.data as any).expectedUpdatedAt,
+    )
+
     const result = await this.prisma.customer.updateMany({
-      where: { id: params.id, orgId: params.orgId },
+      where: { id: params.id, orgId: params.orgId, updatedAt: expectedUpdatedAt },
       data,
     })
 
     if (result.count === 0) {
-      throw new NotFoundException('Cliente não encontrado')
+      const latest = await this.prisma.customer.findFirst({
+        where: { id: params.id, orgId: params.orgId },
+        select: { id: true, updatedAt: true, active: true },
+      })
+      if (!latest) throw new NotFoundException('Cliente não encontrado')
+      throw new ConflictException({
+        code: 'CUSTOMER_CONCURRENT_MODIFICATION',
+        message:
+          'Cliente foi alterado por outra operação. Recarregue antes de salvar.',
+        details: {
+          customerId: latest.id,
+          currentUpdatedAt: latest.updatedAt,
+          active: latest.active,
+        },
+      })
     }
 
     const updated = await this.prisma.customer.findFirst({

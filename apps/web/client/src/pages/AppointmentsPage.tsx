@@ -52,6 +52,10 @@ import {
 import { ActionBarWrapper } from "@/components/operating-system/ActionBar";
 import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedbackButton";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
+import {
+  getConcurrencyErrorMessage,
+  isConcurrentConflictError,
+} from "@/lib/concurrency";
 
 type CustomerRef = {
   id: string;
@@ -80,6 +84,7 @@ type Appointment = {
   status: AppointmentStatus;
   notes: string | null;
   createdAt?: string;
+  updatedAt?: string;
 };
 
 type ServiceOrder = {
@@ -587,8 +592,24 @@ export default function AppointmentsPage() {
       await updateAppointment.mutateAsync({
         id: appointmentId,
         status,
+        expectedUpdatedAt: appointments.find((item) => item.id === appointmentId)?.updatedAt,
       });
     } catch (error) {
+      if (isConcurrentConflictError(error)) {
+        toast.error(getConcurrencyErrorMessage("agendamento"), {
+          action: {
+            label: "Recarregar",
+            onClick: () =>
+              Promise.all([
+                listAppointments.refetch(),
+                listServiceOrders.refetch(),
+                listCustomers.refetch(),
+              ]),
+          },
+        });
+        setProcessingId(null);
+        return;
+      }
       const message =
         error instanceof Error
           ? error.message

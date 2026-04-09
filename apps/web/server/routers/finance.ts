@@ -135,10 +135,11 @@ export const financeRouter = router({
           dueDate: z.coerce.date().optional(),
           status: z.enum(["PENDING", "OVERDUE", "CANCELED"]).optional(),
           notes: z.string().optional(),
+          expectedUpdatedAt: z.string().datetime().optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
-        const { id, amount, amountCents: amountCentsInput, ...rest } = input;
+        const { id, amount, amountCents: amountCentsInput, expectedUpdatedAt, ...rest } = input;
 
         const amountCents =
           amountCentsInput ??
@@ -150,6 +151,7 @@ export const financeRouter = router({
             ...rest,
             amountCents,
             dueDate: rest.dueDate ? rest.dueDate.toISOString() : undefined,
+            expectedUpdatedAt,
           }),
         });
 
