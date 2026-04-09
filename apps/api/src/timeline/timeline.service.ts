@@ -100,24 +100,29 @@ export class TimelineService {
       )
     }
 
-    const customerId =
+    const resolvedCustomerId =
       input.customerId ??
       pickString(input.metadata ?? null, 'customerId') ??
       pickString(input.metadata ?? null, 'entityId')
 
-    if (!customerId) {
-      console.warn('[Timeline] Skipped event due to invalid customerId')
-      return null
-    }
+    let customerId: string | null = null
+    let customerReferenceErrorMetadata: Record<string, unknown> = {}
 
-    const customerExists = await this.prisma.customer.findFirst({
-      where: { id: customerId, orgId: input.orgId },
-      select: { id: true },
-    })
+    if (resolvedCustomerId) {
+      const customerExists = await this.prisma.customer.findFirst({
+        where: { id: resolvedCustomerId, orgId: input.orgId },
+        select: { id: true },
+      })
 
-    if (!customerExists?.id) {
-      console.warn('[Timeline] Skipped event due to invalid customerId')
-      return null
+      if (customerExists?.id) {
+        customerId = customerExists.id
+      } else {
+        console.warn('[Timeline] Invalid customerId detected')
+        customerReferenceErrorMetadata = {
+          originalCustomerId: resolvedCustomerId,
+          error: 'INVALID_CUSTOMER_REFERENCE',
+        }
+      }
     }
 
     const serviceOrderId =
@@ -135,9 +140,15 @@ export class TimelineService {
 
     const requestId = this.requestContext.requestId
 
+    if (!String(input.action || '').trim()) {
+      console.warn('[Timeline] Skipped event due to missing minimal data')
+      return null
+    }
+
     const metadata = JSON.parse(
       JSON.stringify({
         ...(input.metadata ?? {}),
+        ...customerReferenceErrorMetadata,
         ...(requestId ? { requestId } : {}),
       }),
     ) as Prisma.InputJsonValue
@@ -163,7 +174,7 @@ export class TimelineService {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2003'
       ) {
-        console.warn('[Timeline] Skipped event due to invalid customerId')
+        console.warn('[Timeline] Invalid customerId detected')
         return null
       }
       throw error
