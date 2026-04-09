@@ -13,12 +13,13 @@ import {
   normalizeStatus,
 } from "@/lib/operations/operations.utils";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import FinanceOverviewAreaChart from "@/components/finance/FinanceOverviewAreaChart";
-import { Loader2, Receipt } from "lucide-react";
+import { Receipt } from "lucide-react";
 import { PageHero, PageShell, SmartPage, SurfaceSection } from "@/components/PagePattern";
 import { EmptyState } from "@/components/EmptyState";
+import { TableSkeleton } from "@/components/QueryStateBoundary";
+import { StatusBadge, mapFinanceStatus } from "@/components/StatusBadge";
 import { DemoEnvironmentCta } from "@/components/DemoEnvironmentCta";
 import { useChargeActions } from "@/hooks/useChargeActions";
 import { useProductAnalytics } from "@/hooks/useProductAnalytics";
@@ -67,11 +68,6 @@ function normalizeChargeStatus(status?: string | null): FinanceNormalizedStatus 
   if (normalized === ChargeStatus.OVERDUE) return ChargeStatus.OVERDUE;
   if (normalized === ChargeStatus.CANCELED) return ChargeStatus.CANCELED;
   return "NONE";
-}
-
-function getChargeStatusBadge(status: FinanceNormalizedStatus) {
-  if (status === "NONE") return "";
-  return CHARGE_STATUS_BADGE[status];
 }
 
 function getChargeStatusLabel(status: FinanceNormalizedStatus) {
@@ -468,9 +464,8 @@ export default function FinancesPage() {
           title="Financeiro"
           description="Validando sessão e restaurando o contexto financeiro."
         />
-        <SurfaceSection className="flex min-h-[180px] items-center justify-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Carregando sessão...
+        <SurfaceSection>
+          <TableSkeleton rows={4} columns={3} />
         </SurfaceSection>
       </PageShell>
     );
@@ -496,11 +491,8 @@ export default function FinancesPage() {
           title="Financeiro"
           description="Estamos organizando suas cobranças para mostrar onde está o dinheiro e qual ação gera caixa agora."
         />
-        <SurfaceSection className="flex min-h-[180px] items-center justify-center">
-          <div className="inline-flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Carregando painel de caixa...
-          </div>
+        <SurfaceSection>
+          <TableSkeleton rows={6} columns={5} />
         </SurfaceSection>
       </PageShell>
     );
@@ -514,8 +506,11 @@ export default function FinancesPage() {
           title="Financeiro"
           description="Não foi possível carregar os dados financeiros."
         />
-        <SurfaceSection className="border-red-200 text-red-700 dark:border-red-900/40 dark:text-red-300">
-          {errorMessage}
+        <SurfaceSection className="space-y-3 border-red-200 text-red-700 dark:border-red-900/40 dark:text-red-300">
+          <p>{errorMessage}</p>
+          <Button type="button" variant="outline" onClick={() => void chargesQuery.refetch()}>
+            Tentar novamente
+          </Button>
         </SurfaceSection>
       </PageShell>
     );
@@ -704,6 +699,7 @@ export default function FinancesPage() {
                   <Button
                     size="sm"
                     disabled={isSubmitting && paymentSubmittingId === charge.id}
+                    aria-busy={isSubmitting && paymentSubmittingId === charge.id}
                     onClick={async () => {
                       try {
                         setPaymentSubmittingId(charge.id);
@@ -777,11 +773,10 @@ export default function FinancesPage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge
-                    className={getChargeStatusBadge(normalizedStatus)}
-                  >
-                    {getChargeStatusLabel(normalizedStatus)}
-                  </Badge>
+                  <StatusBadge
+                    {...mapFinanceStatus(normalizedStatus)}
+                    label={getChargeStatusLabel(normalizedStatus)}
+                  />
                   {normalizedStatus !== ChargeStatus.PAID && (
                     <Button
                       size="sm"

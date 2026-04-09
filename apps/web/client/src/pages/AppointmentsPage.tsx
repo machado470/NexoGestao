@@ -4,7 +4,6 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import {
   Plus,
-  Loader,
   Calendar,
   RefreshCcw,
   CheckCircle2,
@@ -37,6 +36,8 @@ import {
   normalizeArrayPayload,
 } from "@/lib/query-helpers";
 import { EmptyState } from "@/components/EmptyState";
+import { TableSkeleton } from "@/components/QueryStateBoundary";
+import { StatusBadge, mapAppointmentStatus } from "@/components/StatusBadge";
 import { PageHero, PageShell, SmartPage, SurfaceSection } from "@/components/PagePattern";
 import { DemoEnvironmentCta } from "@/components/DemoEnvironmentCta";
 import { generateAppointmentActions } from "@/lib/smartActions";
@@ -139,23 +140,6 @@ function getStatusLabel(status: AppointmentStatus) {
   };
 
   return labels[status] ?? status;
-}
-
-function getStatusColor(status: AppointmentStatus) {
-  const colors: Record<AppointmentStatus, string> = {
-    SCHEDULED:
-      "bg-orange-100 text-orange-800 dark:bg-orange-500/20 dark:text-orange-200",
-    CONFIRMED:
-      "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-    DONE:
-      "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400",
-    CANCELED:
-      "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
-    NO_SHOW:
-      "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
-  };
-
-  return colors[status];
 }
 
 function getStage(appointment: Appointment) {
@@ -709,9 +693,8 @@ export default function AppointmentsPage() {
           title="Agendamentos"
           description="Preparando agenda, execução e clientes para sugerir a próxima ação."
         />
-        <SurfaceSection className="flex min-h-[180px] items-center justify-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
-          <Loader className="h-4 w-4 animate-spin text-orange-500" />
-          Carregando painel de agendamentos...
+        <SurfaceSection>
+          <TableSkeleton rows={6} columns={4} />
         </SurfaceSection>
       </PageShell>
     );
@@ -725,8 +708,15 @@ export default function AppointmentsPage() {
           title="Agendamentos"
           description="Não foi possível carregar os dados de agenda."
         />
-        <SurfaceSection className="border-red-200 text-red-700 dark:border-red-900/40 dark:text-red-300">
-          {errorMessage}
+        <SurfaceSection className="space-y-3 border-red-200 text-red-700 dark:border-red-900/40 dark:text-red-300">
+          <p>{errorMessage}</p>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => Promise.all([listAppointments.refetch(), listServiceOrders.refetch(), listCustomers.refetch()])}
+          >
+            Tentar novamente
+          </Button>
         </SurfaceSection>
       </PageShell>
     );
@@ -988,13 +978,7 @@ export default function AppointmentsPage() {
                           {appointment.customer?.name ?? "Cliente não identificado"}
                         </h3>
 
-                        <span
-                          className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${getStatusColor(
-                            appointment.status
-                          )}`}
-                        >
-                          {getStatusLabel(appointment.status)}
-                        </span>
+                        <StatusBadge {...mapAppointmentStatus(appointment.status)} />
 
                         {isHighlighted ? (
                           <span className="inline-flex items-center rounded-full bg-orange-100 px-2 py-1 text-xs font-medium text-orange-800 dark:bg-orange-900/30 dark:text-orange-300">

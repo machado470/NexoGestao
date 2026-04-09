@@ -230,3 +230,45 @@ export function truncate(text: string, length: number = 50): string {
   if (text.length <= length) return text;
   return text.slice(0, length) + '...';
 }
+
+/**
+ * Formata valor numérico em BRL (já em reais, sem conversão de centavos)
+ */
+export function formatCurrencyBRL(value: number): string {
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Number.isFinite(value) ? value : 0);
+}
+
+/**
+ * Formata tempo relativo suportando passado e futuro.
+ */
+export function formatRelativeTime(timestamp: number | Date): string {
+  const date = typeof timestamp === 'number' ? new Date(timestamp) : timestamp;
+  const diffMs = date.getTime() - Date.now();
+  const diffMins = Math.round(diffMs / 60000);
+
+  if (Math.abs(diffMins) < 1) return 'agora';
+
+  const rtf = new Intl.RelativeTimeFormat('pt-BR', { numeric: 'auto' });
+
+  if (Math.abs(diffMins) < 60) return rtf.format(diffMins, 'minute');
+
+  const diffHours = Math.round(diffMins / 60);
+  if (Math.abs(diffHours) < 24) return rtf.format(diffHours, 'hour');
+
+  const diffDays = Math.round(diffHours / 24);
+  return rtf.format(diffDays, 'day');
+}
+
+/**
+ * Valores críticos para apoio visual (vermelho para negativo, verde para positivo).
+ */
+export function getCriticalValueTone(value: number): 'danger' | 'success' | 'neutral' {
+  if (value < 0) return 'danger';
+  if (value > 0) return 'success';
+  return 'neutral';
+}
