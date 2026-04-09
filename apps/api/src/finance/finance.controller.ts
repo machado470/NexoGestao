@@ -147,6 +147,7 @@ export class FinanceController {
       dueDate: parseDueDate(body.dueDate),
       status: body.status,
       notes: body.notes,
+      expectedUpdatedAt: body.expectedUpdatedAt,
     })
 
     return { ok: true, data }

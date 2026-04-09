@@ -77,4 +77,8 @@ export class UpdateServiceOrderDto {
   @IsString()
   @MaxLength(200)
   idempotencyKey?: string
+
+  @IsOptional()
+  @IsString()
+  expectedUpdatedAt?: string
 }

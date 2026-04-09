@@ -20,4 +20,8 @@ export class UpdateChargeDto {
   @IsString()
   @IsOptional()
   notes?: string
+
+  @IsString()
+  @IsOptional()
+  expectedUpdatedAt?: string
 }
