@@ -37,6 +37,7 @@ model Organization {
 
   subscription Subscription?
   executionConfig OrganizationExecutionConfig?
+  featureOverrides TenantFeatureOverride[]
 }
 
 model OrganizationExecutionConfig {
@@ -568,7 +569,10 @@ model WhatsAppMessage {
 model Plan {
   id            String         @id @default(uuid())
   name          PlanName       @unique
+  displayName   String
   priceCents    Int
+  limitsJson    Json?
+  featuresJson  Json?
   createdAt     DateTime       @default(now())
   subscriptions Subscription[]
 }
@@ -578,6 +582,9 @@ model Subscription {
   orgId              String             @unique
   planId             String
   status             SubscriptionStatus @default(ACTIVE)
+  billingProvider    BillingProvider?
+  billingCustomerRef String?
+  billingExternalRef String?
   currentPeriodStart DateTime
   currentPeriodEnd   DateTime
   canceledAt         DateTime?
@@ -586,6 +593,21 @@ model Subscription {
   org    Organization   @relation(fields: [orgId], references: [id])
   plan   Plan           @relation(fields: [planId], references: [id])
   events BillingEvent[]
+}
+
+model TenantFeatureOverride {
+  id         String   @id @default(uuid())
+  orgId      String
+  featureKey String
+  enabled    Boolean
+  reason     String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, featureKey])
+  @@index([orgId, enabled])
 }
 
 model BillingEvent {
@@ -628,6 +650,14 @@ enum SubscriptionStatus {
   TRIALING
   CANCELED
   PAST_DUE
+  SUSPENDED
+}
+
+enum BillingProvider {
+  STRIPE
+  MERCADO_PAGO
+  PAGARME
+  MANUAL
 }
 
 enum BillingEventType {

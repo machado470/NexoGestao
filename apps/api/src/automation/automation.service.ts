@@ -20,6 +20,10 @@ import { WhatsAppService } from '../whatsapp/whatsapp.service'
 import { QueueService } from '../queue/queue.service'
 import { QUEUE_NAMES } from '../queue/queue.constants'
 import { TenantOperationsService } from '../common/tenant-ops/tenant-ops.service'
+import {
+  CommercialPolicyService,
+  isCommercialBlocked,
+} from '../common/commercial/commercial-policy.service'
 
 import { CreateAutomationRuleDto } from './dto/create-automation-rule.dto'
 import { UpdateAutomationRuleDto } from './dto/update-automation-rule.dto'
@@ -41,6 +45,7 @@ export class AutomationService {
     private readonly whatsapp: WhatsAppService,
     private readonly queueService: QueueService,
     private readonly tenantOps: TenantOperationsService,
+    private readonly commercial: CommercialPolicyService,
   ) {}
 
   private matchesConditions(
@@ -168,6 +173,38 @@ export class AutomationService {
     for (const rule of rules) {
       if (!this.matchesConditions(rule.conditionSet as Array<Record<string, any>> | undefined, context.payload)) {
         this.tenantOps.increment(context.orgId, 'automation_blocked')
+        continue
+      }
+
+      const featureAccess = await this.commercial.canUseFeature(context.orgId, 'advanced_automation')
+      if (isCommercialBlocked(featureAccess)) {
+        this.tenantOps.increment(context.orgId, 'automation_blocked')
+        this.tenantOps.recordCriticalEvent(context.orgId, 'automation_plan_blocked', {
+          ruleId: rule.id,
+          reason: featureAccess.reasonCode,
+        })
+        results.push({
+          ruleId: rule.id,
+          status: 'BLOCKED',
+          actions: 0,
+          reason: featureAccess.reasonCode,
+          policyType: featureAccess.policyType,
+          message: featureAccess.reasonMessage,
+        })
+        continue
+      }
+
+      const planLimit = await this.commercial.enforceMeter(context.orgId, 'automation_executions')
+      if (isCommercialBlocked(planLimit)) {
+        this.tenantOps.increment(context.orgId, 'automation_blocked')
+        results.push({
+          ruleId: rule.id,
+          status: 'BLOCKED',
+          actions: 0,
+          reason: planLimit.reasonCode,
+          policyType: planLimit.policyType,
+          message: planLimit.reasonMessage,
+        })
         continue
       }
 

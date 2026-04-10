@@ -9,6 +9,10 @@ import { buildExecutionKey } from './execution.idempotency'
 import type { ExecutionActionCandidate } from './execution.types'
 import { MetricsService } from '../common/metrics/metrics.service'
 import { TenantOperationsService } from '../common/tenant-ops/tenant-ops.service'
+import {
+  CommercialPolicyService,
+  isCommercialBlocked,
+} from '../common/commercial/commercial-policy.service'
 
 @Injectable()
 export class ExecutionRunner {
@@ -25,6 +29,7 @@ export class ExecutionRunner {
     private readonly events: ExecutionEventsService,
     private readonly metrics: MetricsService,
     private readonly tenantOps: TenantOperationsService,
+    private readonly commercial: CommercialPolicyService,
   ) {}
 
   private countOperationalStatus(status: 'executed' | 'blocked' | 'requires_confirmation' | 'throttled' | 'failed') {
@@ -510,6 +515,28 @@ export class ExecutionRunner {
       this.countOperationalStatus('throttled')
       this.tenantOps.increment(candidate.orgId, 'automation_throttled')
       return 'throttled'
+    }
+
+    const featureAccess = await this.commercial.canUseFeature(candidate.orgId, 'advanced_automation')
+    if (isCommercialBlocked(featureAccess)) {
+      await this.recordBlocked(candidate, executionKey, mode, featureAccess.reasonCode, 'blocked', {
+        ruleId: candidate.decisionId,
+        ruleReason: featureAccess.reasonMessage,
+      })
+      this.countOperationalStatus('blocked')
+      this.tenantOps.increment(candidate.orgId, 'automation_blocked')
+      return 'blocked'
+    }
+
+    const commercialLimit = await this.commercial.enforceMeter(candidate.orgId, 'automation_executions')
+    if (isCommercialBlocked(commercialLimit)) {
+      await this.recordBlocked(candidate, executionKey, mode, commercialLimit.reasonCode, 'blocked', {
+        ruleId: candidate.decisionId,
+        ruleReason: commercialLimit.reasonMessage,
+      })
+      this.countOperationalStatus('blocked')
+      this.tenantOps.increment(candidate.orgId, 'automation_blocked')
+      return 'blocked'
     }
 
     const tenantLimit = this.tenantOps.enforceLimit({

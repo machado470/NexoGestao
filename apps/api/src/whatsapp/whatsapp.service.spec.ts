@@ -27,6 +27,9 @@ describe('WhatsAppService queue hardening', () => {
     const timeline = { log: jest.fn() } as any
     const requestContext = { requestId: 'req-1' } as any
     const tenantOps = new TenantOperationsService()
+    const commercial = {
+      enforceMeter: jest.fn().mockResolvedValue({ allowed: true }),
+    } as any
 
     const service = new WhatsAppService(
       prisma,
@@ -34,6 +37,7 @@ describe('WhatsAppService queue hardening', () => {
       timeline,
       requestContext,
       tenantOps,
+      commercial,
     )
 
     await service.enqueueMessage({
@@ -68,6 +72,7 @@ describe('WhatsAppService queue hardening', () => {
       { log: jest.fn() } as any,
       { requestId: 'req-2' } as any,
       new TenantOperationsService(),
+      { enforceMeter: jest.fn().mockResolvedValue({ allowed: true }) } as any,
     )
 
     await expect(

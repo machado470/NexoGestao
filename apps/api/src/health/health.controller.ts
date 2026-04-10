@@ -6,6 +6,7 @@ import { QueueService } from '../queue/queue.service'
 import { isGoogleOAuthConfigured } from '../common/config/google-oauth-env'
 import { getWhatsAppProviderReadiness } from '../whatsapp/providers/provider.factory'
 import { TenantOperationsService } from '../common/tenant-ops/tenant-ops.service'
+import { CommercialPolicyService } from '../common/commercial/commercial-policy.service'
 
 @Controller('health')
 export class HealthController {
@@ -13,6 +14,7 @@ export class HealthController {
     private readonly prisma: PrismaService,
     private readonly metrics: MetricsService,
     private readonly tenantOps: TenantOperationsService,
+    private readonly commercial: CommercialPolicyService,
     private readonly config: ConfigService,
     @Optional() private readonly queueService?: QueueService,
   ) {}
@@ -58,6 +60,7 @@ export class HealthController {
       },
       metrics: this.metrics.snapshot(),
       tenantOperations: this.tenantOps.snapshot(),
+      commercial: await this.commercial.getAdminTenantCommercialOverview(),
     }
   }
 
