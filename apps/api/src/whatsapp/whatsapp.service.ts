@@ -10,6 +10,10 @@ import { QUEUE_NAMES } from '../queue/queue.constants'
 import { TimelineService } from '../timeline/timeline.service'
 import { RequestContextService } from '../common/context/request-context.service'
 import { TenantOperationsService } from '../common/tenant-ops/tenant-ops.service'
+import {
+  CommercialPolicyService,
+  isCommercialBlocked,
+} from '../common/commercial/commercial-policy.service'
 
 type QueueMessageInput = {
   orgId: string
@@ -47,6 +51,7 @@ export class WhatsAppService {
     private readonly timeline: TimelineService,
     private readonly requestContext: RequestContextService,
     private readonly tenantOps: TenantOperationsService,
+    private readonly commercial: CommercialPolicyService,
   ) {}
 
   private async assertEntityBelongsToOrg(input: {
@@ -187,6 +192,14 @@ export class WhatsAppService {
       entityId,
       customerId,
     })
+
+    const commercialLimit = await this.commercial.enforceMeter(orgId, 'message_sends')
+    if (isCommercialBlocked(commercialLimit)) {
+      this.tenantOps.increment(orgId, 'whatsapp_blocked')
+      throw new BadRequestException(
+        `Envio bloqueado por política comercial: ${commercialLimit.reasonCode}`,
+      )
+    }
 
     const limitCheck = this.tenantOps.enforceLimit({
       orgId,

@@ -59,6 +59,7 @@ import { ReferralsModule } from './referrals/referrals.module'
 import { OrganizationSettingsModule } from './organization-settings/organization-settings.module'
 import { WebhookModule } from './webhooks/webhook.module'
 import { SentryModule } from './common/sentry/sentry.module'
+import { CommercialModule } from './commercial/commercial.module'
 
 @Module({
   imports: [
@@ -96,6 +97,7 @@ import { SentryModule } from './common/sentry/sentry.module'
     AnalyticsModule,
     EmailModule,
     WebhookModule,
+    CommercialModule,
 
     BootstrapModule,
     AuthModule,

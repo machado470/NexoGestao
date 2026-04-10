@@ -26,6 +26,10 @@ import { ChargesQueryDto } from './dto/charges-query.dto'
 import { CreateChargeDto } from './dto/create-charge.dto'
 import { UpdateChargeDto } from './dto/update-charge.dto'
 import { TenantOperationsService } from '../common/tenant-ops/tenant-ops.service'
+import {
+  CommercialPolicyService,
+  isCommercialBlocked,
+} from '../common/commercial/commercial-policy.service'
 
 type AuthUser = { userId?: string; sub?: string } | null | undefined
 
@@ -47,6 +51,7 @@ export class FinanceController {
   constructor(
     private readonly finance: FinanceService,
     private readonly tenantOps: TenantOperationsService,
+    private readonly commercial: CommercialPolicyService,
   ) {}
 
   @Get('overview')
@@ -115,6 +120,13 @@ export class FinanceController {
     @Headers('idempotency-key') idempotencyKeyHeader: string | undefined,
     @Body() body: CreateChargeDto,
   ) {
+    const commercialLimit = await this.commercial.enforceMeter(orgId, 'finance_critical_actions')
+    if (isCommercialBlocked(commercialLimit)) {
+      throw new BadRequestException(
+        `Criação de cobrança bloqueada por política comercial: ${commercialLimit.reasonCode}`,
+      )
+    }
+
     const createChargeLimit = this.tenantOps.enforceLimit({
       orgId,
       scope: 'finance:create-charge',
@@ -203,6 +215,13 @@ export class FinanceController {
     @Param('chargeId') chargeId: string,
     @Body() body: CreatePaymentDto,
   ) {
+    const commercialLimit = await this.commercial.enforceMeter(orgId, 'finance_critical_actions')
+    if (isCommercialBlocked(commercialLimit)) {
+      throw new BadRequestException(
+        `Pagamento bloqueado por política comercial: ${commercialLimit.reasonCode}`,
+      )
+    }
+
     const payLimit = this.tenantOps.enforceLimit({
       orgId,
       scope: 'finance:pay-charge',

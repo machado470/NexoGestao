@@ -143,6 +143,7 @@ export default function BillingPage() {
   });
 
   const currentPlan = String(status?.plan ?? limits?.plan ?? "FREE").toUpperCase();
+  const subscriptionStatus = String(status?.status ?? "ACTIVE").toUpperCase();
   const stripeConfigured = readinessQuery.data?.integrations?.stripe === "configured";
   const isTrial = Boolean(limits?.trial?.isTrial);
   const blockedItems = usageItems.filter((item) => {
@@ -206,6 +207,11 @@ export default function BillingPage() {
       {!stripeConfigured ? (
         <SurfaceSection className="border-amber-300/60 bg-amber-50 text-amber-900 dark:border-amber-600/50 dark:bg-amber-900/20 dark:text-amber-200">
           Checkout online indisponível: Stripe não configurado. Alternativa segura: registre cobranças e pagamentos manualmente na tela de Finanças.
+        </SurfaceSection>
+      ) : null}
+      {["PAST_DUE", "SUSPENDED", "CANCELED"].includes(subscriptionStatus) ? (
+        <SurfaceSection className="border-red-300/60 bg-red-50 text-red-900 dark:border-red-600/50 dark:bg-red-900/20 dark:text-red-200">
+          Política comercial ativa para este tenant ({subscriptionStatus}). Alguns recursos premium podem ser bloqueados até regularizar a assinatura.
         </SurfaceSection>
       ) : null}
 
