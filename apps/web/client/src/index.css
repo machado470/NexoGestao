@@ -362,6 +362,27 @@
       var(--nexo-app-bg);
   }
 
+
+  .nexo-sidebar {
+    background: linear-gradient(180deg, #0b1220 0%, #0f172a 45%, #111827 100%);
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 18px 0 36px rgba(2, 6, 23, 0.28);
+  }
+
+  .nexo-sidebar-item {
+    @apply flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-zinc-300 transition-colors hover:bg-white/8 hover:text-white;
+  }
+
+  .nexo-sidebar-item-active {
+    @apply bg-orange-500/16 text-orange-200 ring-1 ring-orange-400/40;
+  }
+
+  .nexo-topbar {
+    border-bottom: 1px solid var(--nexo-border-soft);
+    background: color-mix(in srgb, var(--nexo-surface-2) 86%, transparent);
+    backdrop-filter: blur(14px);
+  }
+
   .nexo-app-panel {
     @apply rounded-[1.35rem] border border-slate-200/70 bg-white/80 backdrop-blur-md shadow-sm dark:border-white/6 dark:bg-white/[0.03] dark:shadow-[0_12px_40px_rgba(0,0,0,0.35)];
   }
@@ -467,7 +488,7 @@
   }
 
   .nexo-page-shell {
-    @apply space-y-5 p-4 pb-24 md:space-y-6 md:p-6 md:pb-8;
+    @apply mx-auto w-full max-w-[1400px] space-y-5 p-4 pb-24 md:space-y-6 md:p-6 md:pb-8;
   }
 
   .nexo-page-header {
