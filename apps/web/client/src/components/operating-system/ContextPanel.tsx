@@ -1,10 +1,10 @@
 import type { ReactNode } from "react";
 import { Bot, Sparkles, User, X } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
 import { PrimaryActionButton } from "@/components/operating-system/PrimaryActionButton";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { Badge, GhostButton, SecondaryButton } from "@/components/design-system";
 
 type ContextPanelAction = {
   label: string;
@@ -72,13 +72,17 @@ export function ContextPanel({
             <div>
               <SheetTitle className="text-left">{title}</SheetTitle>
               {subtitle ? (
-                <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
+                <p className="mt-1 text-sm text-[var(--text-secondary)]">{subtitle}</p>
               ) : null}
-              {statusLabel ? <p className="mt-2 inline-flex rounded-full bg-orange-100 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-orange-700 dark:bg-orange-950/40 dark:text-orange-300">Status: {statusLabel}</p> : null}
+              {statusLabel ? (
+                <div className="mt-2">
+                  <Badge>Status: {statusLabel}</Badge>
+                </div>
+              ) : null}
             </div>
-            <Button size="icon" variant="ghost" onClick={() => onOpenChange(false)}>
+            <GhostButton onClick={() => onOpenChange(false)} className="h-9 px-2">
               <X className="h-4 w-4" />
-            </Button>
+            </GhostButton>
           </div>
         </SheetHeader>
 
@@ -97,8 +101,8 @@ export function ContextPanel({
           ) : null}
 
           {primaryAction ? (
-            <div className="rounded-lg border border-orange-300 bg-orange-50 p-3 dark:bg-orange-950/20">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-orange-700 dark:text-orange-300">
+            <div className="rounded-lg border border-[var(--border-soft)] bg-[var(--accent-soft)]/35 p-3">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--accent-primary)]">
                 Próxima ação prioritária
               </p>
               <PrimaryActionButton
@@ -111,61 +115,61 @@ export function ContextPanel({
           ) : null}
 
           {explainLayer ? (
-            <div className="space-y-2 rounded-lg border border-blue-200 bg-blue-50/70 p-3 dark:border-blue-900/60 dark:bg-blue-950/30">
-              <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300">
+            <div className="space-y-2 rounded-lg border border-[var(--border-soft)] bg-[color-mix(in_srgb,var(--bg-surface)_88%,transparent)] p-3">
+              <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
                 <Sparkles className="h-3.5 w-3.5" />
                 Explain layer
               </p>
-              <p className="text-sm font-medium text-blue-900 dark:text-blue-100">{explainLayer.reason}</p>
+              <p className="text-sm font-medium text-[var(--text-primary)]">{explainLayer.reason}</p>
               <div className="flex flex-wrap gap-1">
                 {explainLayer.impact ? (
-                  <span className="rounded-full border border-blue-300/70 bg-white/70 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-blue-800 dark:border-blue-800 dark:bg-blue-950/60 dark:text-blue-200">
+                  <span className="rounded-full border border-[var(--border-soft)] bg-[var(--bg-surface)]/65 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
                     Impacto: {explainLayer.impact}
                   </span>
                 ) : null}
                 {explainLayer.riskOfInaction ? (
-                  <span className="rounded-full border border-rose-300/70 bg-white/70 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
+                  <span className="rounded-full border border-[var(--border-soft)] bg-[var(--bg-surface)]/65 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--warning)]">
                     Risco: {explainLayer.riskOfInaction}
                   </span>
                 ) : null}
                 {explainLayer.elapsedTime ? (
-                  <span className="rounded-full border border-amber-300/70 bg-white/70 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+                  <span className="rounded-full border border-[var(--border-soft)] bg-[var(--bg-surface)]/65 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
                     Tempo: {explainLayer.elapsedTime}
                   </span>
                 ) : null}
                 {explainLayer.contextualPriority ? (
-                  <span className="rounded-full border border-violet-300/70 bg-white/70 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-violet-700 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-200">
+                  <span className="rounded-full border border-[var(--border-soft)] bg-[var(--bg-surface)]/65 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
                     Prioridade: {explainLayer.contextualPriority}
                   </span>
                 ) : null}
               </div>
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-blue-700/80 dark:text-blue-300/90">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
                   Condições detectadas
                 </p>
                 <ul className="mt-1 space-y-1">
                   {explainLayer.conditions.map(condition => (
-                    <li key={condition} className="text-xs text-blue-900/90 dark:text-blue-100/90">
+                    <li key={condition} className="text-xs text-[var(--text-primary)]">
                       • {condition}
                     </li>
                   ))}
                 </ul>
               </div>
-              <p className="text-xs text-blue-800 dark:text-blue-200">
+              <p className="text-xs text-[var(--text-secondary)]">
                 <span className="font-semibold">Depois:</span> {explainLayer.afterAction}
               </p>
             </div>
           ) : null}
 
           {whatsAppPreview ? (
-            <div className="space-y-2 rounded-lg border border-emerald-200 bg-emerald-50/70 p-3 dark:border-emerald-900/50 dark:bg-emerald-950/20">
-              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+            <div className="space-y-2 rounded-lg border border-[var(--border-soft)] bg-[color-mix(in_srgb,var(--bg-surface)_88%,transparent)] p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
                 WhatsApp no fluxo operacional
               </p>
-              <p className="text-sm font-medium text-emerald-900 dark:text-emerald-100">
+              <p className="text-sm font-medium text-[var(--text-primary)]">
                 {whatsAppPreview.contextLabel}
               </p>
-              <p className="text-xs text-emerald-800/90 dark:text-emerald-200/90">
+              <p className="text-xs text-[var(--text-secondary)]">
                 {whatsAppPreview.contextDescription}
               </p>
               {whatsAppPreview.editable ? (
@@ -178,7 +182,7 @@ export function ContextPanel({
                   className="text-xs"
                 />
               ) : (
-                <div className="rounded-md border border-emerald-200 bg-white/80 p-2 text-xs text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-100">
+                <div className="rounded-md border border-[var(--border-soft)] bg-[var(--bg-surface)] p-2 text-xs text-[var(--text-primary)]">
                   {whatsAppPreview.message}
                 </div>
               )}
@@ -192,15 +196,14 @@ export function ContextPanel({
               </p>
               <div className="flex flex-wrap gap-2">
                 {secondaryActions.map(action => (
-                  <Button
+                  <SecondaryButton
                     key={action.label}
-                    size="sm"
-                    variant="outline"
                     onClick={action.onClick}
                     disabled={action.disabled}
+                    className="h-9 px-3 text-xs"
                   >
                     {action.label}
-                  </Button>
+                  </SecondaryButton>
                 ))}
               </div>
             </div>

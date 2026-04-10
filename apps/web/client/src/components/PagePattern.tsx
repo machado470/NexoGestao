@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import { ArrowRight, Sparkles } from "lucide-react";
 import { useLocation } from "wouter";
-import { Button } from "@/components/ui/button";
 import {
   rankPriorityProblems,
   type PriorityPageContext,
@@ -21,8 +20,11 @@ import {
 } from "@/lib/smartActions";
 import {
   AlertCard,
+  GhostButton,
   PageHeader,
+  PrimaryButton,
   PriorityList,
+  SecondaryButton,
   SurfaceCard,
   TimelineList,
 } from "@/components/design-system";
@@ -120,14 +122,13 @@ export function SmartPage({
             {primaryAction.reason}
           </p>
           <div className="mt-3">
-            <Button
+            <PrimaryButton
               type="button"
-              size="sm"
-              className="bg-[var(--accent)] text-[var(--accent-foreground)]"
+              className="h-9 px-3 text-xs"
               onClick={primaryAction.onExecute}
             >
               Executar agora
-            </Button>
+            </PrimaryButton>
           </div>
         </AlertCard>
       ) : null}
@@ -156,14 +157,13 @@ export function SmartPage({
                       {action.auto ? " • auto" : ""}
                     </p>
                   </div>
-                  <Button
+                  <SecondaryButton
                     type="button"
-                    size="sm"
-                    variant="outline"
                     onClick={action.onExecute}
+                    className="h-9 px-3 text-xs"
                   >
                     Executar
-                  </Button>
+                  </SecondaryButton>
                 </div>
               </div>
             ))}
@@ -187,14 +187,13 @@ export function SmartPage({
           >
             Intent: {getActionIntentLabel(nextActionSuggestion.intent)}
           </span>
-          <Button
+          <GhostButton
             type="button"
-            size="sm"
-            variant="outline"
             onClick={() => navigate(nextActionSuggestion.ctaPath)}
+            className="h-8 px-2 text-xs"
           >
             {nextActionSuggestion.ctaLabel}
-          </Button>
+          </GhostButton>
         </div>
       </SurfaceCard>
 
@@ -217,7 +216,7 @@ export function SmartPage({
       </TimelineList>
 
       <div className="sticky bottom-3 z-20 rounded-2xl border border-[var(--accent-soft)] bg-[var(--nexo-card-surface)] p-2 shadow-lg md:static md:border-none md:bg-transparent md:p-0 md:shadow-none">
-        <Button
+        <PrimaryButton
           type="button"
           className="nexo-cta-dominant nexo-state-transition min-h-12 w-full gap-2"
           onClick={() => {
@@ -234,7 +233,7 @@ export function SmartPage({
         >
           {primaryAction ? "Executar ação principal" : dominantCta.label}
           <ArrowRight className="h-4 w-4" />
-        </Button>
+        </PrimaryButton>
       </div>
     </section>
   );
