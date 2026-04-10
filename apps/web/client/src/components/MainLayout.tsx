@@ -122,10 +122,12 @@ function getPageMeta(location: string) {
     isRouteActive(location, route)
   );
 
-  return matched?.[1] ?? {
-    title: "NexoGestão",
-    subtitle: "Sistema operacional para execução, cobrança e governança.",
-  };
+  return (
+    matched?.[1] ?? {
+      title: "NexoGestão",
+      subtitle: "Sistema operacional para execução, cobrança e governança.",
+    }
+  );
 }
 
 interface MainLayoutProps {
@@ -136,9 +138,9 @@ export function MainLayout({ children }: MainLayoutProps) {
   const [location, navigate] = useLocation();
   const { role, user, logout, isLoggingOut } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const notifications = useNotificationStore((state) => state.notifications);
-  const clearNotifications = useNotificationStore((state) => state.clear);
-  const removeNotification = useNotificationStore((state) => state.remove);
+  const notifications = useNotificationStore(state => state.notifications);
+  const clearNotifications = useNotificationStore(state => state.clear);
+  const removeNotification = useNotificationStore(state => state.remove);
 
   const isMobile = useIsMobile();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -149,36 +151,106 @@ export function MainLayout({ children }: MainLayoutProps) {
       id: "operacao",
       label: "Operação",
       items: [
-        { id: "dashboard", label: "Dashboard", route: "/executive-dashboard", icon: LayoutDashboard },
-        { id: "customers", label: "Clientes", route: "/customers", icon: Users, permissions: ["customers:read"] },
-        { id: "appointments", label: "Agendamentos", route: "/appointments", icon: Calendar, permissions: ["appointments:read"] },
-        { id: "service-orders", label: "Ordens de Serviço", route: "/service-orders", icon: Briefcase, permissions: ["orders:read"] },
-        { id: "whatsapp", label: "WhatsApp", route: "/whatsapp", icon: MessageCircle },
+        {
+          id: "dashboard",
+          label: "Dashboard",
+          route: "/executive-dashboard",
+          icon: LayoutDashboard,
+        },
+        {
+          id: "customers",
+          label: "Clientes",
+          route: "/customers",
+          icon: Users,
+          permissions: ["customers:read"],
+        },
+        {
+          id: "appointments",
+          label: "Agendamentos",
+          route: "/appointments",
+          icon: Calendar,
+          permissions: ["appointments:read"],
+        },
+        {
+          id: "service-orders",
+          label: "Ordens de Serviço",
+          route: "/service-orders",
+          icon: Briefcase,
+          permissions: ["orders:read"],
+        },
+        {
+          id: "whatsapp",
+          label: "WhatsApp",
+          route: "/whatsapp",
+          icon: MessageCircle,
+        },
       ],
     },
     {
       id: "financeiro",
       label: "Financeiro",
       items: [
-        { id: "finances", label: "Financeiro", route: "/finances", icon: DollarSign, permissions: ["finance:read"] },
-        { id: "billing", label: "Billing", route: "/billing", icon: CreditCard, permissions: ["settings:manage"] },
+        {
+          id: "finances",
+          label: "Financeiro",
+          route: "/finances",
+          icon: DollarSign,
+          permissions: ["finance:read"],
+        },
+        {
+          id: "billing",
+          label: "Billing",
+          route: "/billing",
+          icon: CreditCard,
+          permissions: ["settings:manage"],
+        },
       ],
     },
     {
       id: "inteligencia",
       label: "Inteligência",
       items: [
-        { id: "calendar", label: "Calendário", route: "/calendar", icon: CalendarDays, permissions: ["appointments:read"] },
-        { id: "timeline", label: "Timeline", route: "/timeline", icon: History, permissions: ["reports:read"] },
-        { id: "governance", label: "Governança", route: "/governance", icon: Shield, permissions: ["governance:read"] },
+        {
+          id: "calendar",
+          label: "Calendário",
+          route: "/calendar",
+          icon: CalendarDays,
+          permissions: ["appointments:read"],
+        },
+        {
+          id: "timeline",
+          label: "Timeline",
+          route: "/timeline",
+          icon: History,
+          permissions: ["reports:read"],
+        },
+        {
+          id: "governance",
+          label: "Governança",
+          route: "/governance",
+          icon: Shield,
+          permissions: ["governance:read"],
+        },
       ],
     },
     {
       id: "administracao",
       label: "Administração",
       items: [
-        { id: "people", label: "Pessoas", route: "/people", icon: Building2, permissions: ["people:manage"] },
-        { id: "settings", label: "Configurações", route: "/settings", icon: Settings, permissions: ["settings:manage"] },
+        {
+          id: "people",
+          label: "Pessoas",
+          route: "/people",
+          icon: Building2,
+          permissions: ["people:manage"],
+        },
+        {
+          id: "settings",
+          label: "Configurações",
+          route: "/settings",
+          icon: Settings,
+          permissions: ["settings:manage"],
+        },
       ],
     },
   ];
@@ -186,15 +258,15 @@ export function MainLayout({ children }: MainLayoutProps) {
   const visibleSections = useMemo(
     () =>
       sections
-        .map((section) => ({
+        .map(section => ({
           ...section,
-          items: section.items.filter((item) => {
+          items: section.items.filter(item => {
             if (!item.permissions?.length) return true;
             if (!role) return false;
             return canAny(role, item.permissions);
           }),
         }))
-        .filter((section) => section.items.length > 0),
+        .filter(section => section.items.length > 0),
     [role]
   );
 
@@ -234,7 +306,9 @@ export function MainLayout({ children }: MainLayoutProps) {
         return;
       }
 
-      toast.error(error instanceof Error ? error.message : "Falha ao encerrar sessão.");
+      toast.error(
+        error instanceof Error ? error.message : "Falha ao encerrar sessão."
+      );
     }
   };
 
@@ -272,8 +346,12 @@ export function MainLayout({ children }: MainLayoutProps) {
                 </div>
                 {!sidebarCollapsed || isMobile ? (
                   <div className="min-w-0 text-left">
-                    <p className="truncate text-sm font-semibold text-white">NexoGestão</p>
-                    <p className="truncate text-xs text-zinc-400">Workspace Operacional</p>
+                    <p className="truncate text-sm font-semibold text-white">
+                      NexoGestão
+                    </p>
+                    <p className="truncate text-xs text-zinc-400">
+                      Workspace Operacional
+                    </p>
                   </div>
                 ) : null}
               </button>
@@ -281,10 +359,14 @@ export function MainLayout({ children }: MainLayoutProps) {
               {!isMobile ? (
                 <button
                   type="button"
-                  onClick={() => setSidebarCollapsed((prev) => !prev)}
+                  onClick={() => setSidebarCollapsed(prev => !prev)}
                   className="rounded-lg border border-white/10 p-1.5 text-zinc-400 transition hover:bg-white/10 hover:text-white"
                 >
-                  {sidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+                  {sidebarCollapsed ? (
+                    <ChevronRight className="h-4 w-4" />
+                  ) : (
+                    <ChevronLeft className="h-4 w-4" />
+                  )}
                 </button>
               ) : (
                 <button
@@ -300,7 +382,7 @@ export function MainLayout({ children }: MainLayoutProps) {
 
           <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
             <div className="space-y-6">
-              {visibleSections.map((section) => (
+              {visibleSections.map(section => (
                 <section key={section.id} className="space-y-2">
                   {!sidebarCollapsed || isMobile ? (
                     <p className="px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
@@ -308,7 +390,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                     </p>
                   ) : null}
                   <div className="space-y-1">
-                    {section.items.map((item) => {
+                    {section.items.map(item => {
                       const active = isRouteActive(location, item.route);
                       const Icon = item.icon;
 
@@ -319,12 +401,16 @@ export function MainLayout({ children }: MainLayoutProps) {
                           title={item.label}
                           onClick={() => handleNavigate(item.route)}
                           className={`nexo-sidebar-item ${active ? "nexo-sidebar-item-active" : ""} ${
-                            sidebarCollapsed && !isMobile ? "justify-center px-2" : ""
+                            sidebarCollapsed && !isMobile
+                              ? "justify-center px-2"
+                              : ""
                           }`}
                         >
                           <Icon className="h-4 w-4 shrink-0" />
                           {!sidebarCollapsed || isMobile ? (
-                            <span className="truncate text-sm font-medium">{item.label}</span>
+                            <span className="truncate text-sm font-medium">
+                              {item.label}
+                            </span>
                           ) : null}
                         </button>
                       );
@@ -341,7 +427,11 @@ export function MainLayout({ children }: MainLayoutProps) {
               onClick={toggleTheme}
               className={`nexo-sidebar-item w-full ${sidebarCollapsed && !isMobile ? "justify-center px-2" : ""}`}
             >
-              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              {theme === "dark" ? (
+                <Sun className="h-4 w-4" />
+              ) : (
+                <Moon className="h-4 w-4" />
+              )}
               {!sidebarCollapsed || isMobile ? (
                 <span>{theme === "dark" ? "Tema claro" : "Tema escuro"}</span>
               ) : null}
@@ -357,7 +447,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                   {isMobile ? (
                     <button
                       type="button"
-                      onClick={() => setMobileMenuOpen((prev) => !prev)}
+                      onClick={() => setMobileMenuOpen(prev => !prev)}
                       className="nexo-topbar-control"
                     >
                       <Menu className="h-5 w-5" />
@@ -367,7 +457,9 @@ export function MainLayout({ children }: MainLayoutProps) {
                     <p className="truncate text-lg font-semibold tracking-tight text-zinc-950 dark:text-white">
                       {currentMeta.title}
                     </p>
-                    <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">{currentMeta.subtitle}</p>
+                    <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
+                      {currentMeta.subtitle}
+                    </p>
                   </div>
                 </div>
 
@@ -387,7 +479,10 @@ export function MainLayout({ children }: MainLayoutProps) {
                         ) : null}
                       </button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-[360px] nexo-floating-panel">
+                    <DropdownMenuContent
+                      align="end"
+                      className="w-[360px] nexo-floating-panel"
+                    >
                       <DropdownMenuLabel className="flex items-center justify-between px-3 py-2">
                         <span>Notificações</span>
                         {notifications.length > 0 ? (
@@ -404,43 +499,65 @@ export function MainLayout({ children }: MainLayoutProps) {
                       {notifications.length === 0 ? (
                         <div className="px-3 py-8 text-center">
                           <Bell className="mx-auto h-5 w-5 text-zinc-500" />
-                          <p className="mt-2 text-sm text-zinc-400">Nenhuma notificação no momento.</p>
+                          <p className="mt-2 text-sm text-zinc-400">
+                            Nenhuma notificação no momento.
+                          </p>
                         </div>
                       ) : (
-                        notifications.slice().reverse().slice(0, 6).map((item) => (
-                          <DropdownMenuItem
-                            key={item.id}
-                            className="flex cursor-pointer flex-col items-start gap-1 rounded-xl px-3 py-2"
-                            onSelect={(evt) => {
-                              evt.preventDefault();
-                              item.action?.onClick();
-                              removeNotification(item.id);
-                            }}
-                          >
-                            <p className="text-sm font-medium text-zinc-100">{item.title}</p>
-                            {item.description ? (
-                              <p className="line-clamp-2 text-xs text-zinc-400">{item.description}</p>
-                            ) : null}
-                          </DropdownMenuItem>
-                        ))
+                        notifications
+                          .slice()
+                          .reverse()
+                          .slice(0, 6)
+                          .map(item => (
+                            <DropdownMenuItem
+                              key={item.id}
+                              className="flex cursor-pointer flex-col items-start gap-1 rounded-xl px-3 py-2"
+                              onSelect={evt => {
+                                evt.preventDefault();
+                                item.action?.onClick();
+                                removeNotification(item.id);
+                              }}
+                            >
+                              <p className="text-sm font-medium text-zinc-100">
+                                {item.title}
+                              </p>
+                              {item.description ? (
+                                <p className="line-clamp-2 text-xs text-zinc-400">
+                                  {item.description}
+                                </p>
+                              ) : null}
+                            </DropdownMenuItem>
+                          ))
                       )}
                     </DropdownMenuContent>
                   </DropdownMenu>
 
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <button type="button" className="nexo-topbar-control px-2.5 py-2">
+                      <button
+                        type="button"
+                        className="nexo-topbar-control px-2.5 py-2"
+                      >
                         <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-zinc-800 text-zinc-100">
                           <User className="h-4 w-4" />
                         </div>
-                        <span className="hidden max-w-28 truncate md:block">{user?.name ?? "Usuário"}</span>
+                        <span className="hidden max-w-28 truncate md:block">
+                          {user?.name ?? "Usuário"}
+                        </span>
                         <ChevronDown className="h-4 w-4 text-zinc-500" />
                       </button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-60 nexo-floating-panel">
+                    <DropdownMenuContent
+                      align="end"
+                      className="w-60 nexo-floating-panel"
+                    >
                       <DropdownMenuLabel>
-                        <p className="text-sm font-semibold text-zinc-100">{user?.name ?? "Usuário"}</p>
-                        <p className="text-xs text-zinc-400">{user?.email ?? "Sem e-mail"}</p>
+                        <p className="text-sm font-semibold text-zinc-100">
+                          {user?.name ?? "Usuário"}
+                        </p>
+                        <p className="text-xs text-zinc-400">
+                          {user?.email ?? "Sem e-mail"}
+                        </p>
                       </DropdownMenuLabel>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={() => navigate("/settings")}>
@@ -450,7 +567,12 @@ export function MainLayout({ children }: MainLayoutProps) {
                         <CreditCard className="mr-2 h-4 w-4" /> Conta e plano
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={toggleTheme}>
-                        {theme === "dark" ? <Sun className="mr-2 h-4 w-4" /> : <Moon className="mr-2 h-4 w-4" />} Tema
+                        {theme === "dark" ? (
+                          <Sun className="mr-2 h-4 w-4" />
+                        ) : (
+                          <Moon className="mr-2 h-4 w-4" />
+                        )}{" "}
+                        Tema
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => navigate("/contato")}>
                         <HelpCircle className="mr-2 h-4 w-4" /> Suporte
@@ -476,7 +598,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                 <button
                   type="button"
                   onClick={() => navigate("/service-orders")}
-                  className="nexo-cta-primary h-11 w-full gap-2 rounded-xl px-5 text-sm lg:w-auto"
+                  className="nexo-cta-dominant h-11 w-full gap-2 rounded-xl px-5 text-sm lg:w-auto"
                 >
                   <Search className="h-4 w-4" /> Executar agora
                 </button>
@@ -484,14 +606,17 @@ export function MainLayout({ children }: MainLayoutProps) {
             </div>
           </header>
 
-          <main data-scrollbar="nexo" className="nexo-app-content m-3 mt-0 min-h-0 flex-1 overflow-auto md:m-4 md:mt-0">
+          <main
+            data-scrollbar="nexo"
+            className="nexo-app-content m-3 mt-0 min-h-0 flex-1 overflow-auto md:m-4 md:mt-0"
+          >
             {children}
           </main>
           <div className="nexo-primary-dock hidden lg:block">
             <button
               type="button"
               onClick={() => navigate("/service-orders")}
-              className="nexo-cta-primary h-12 gap-2 rounded-2xl px-5 text-sm shadow-xl shadow-orange-500/25"
+              className="nexo-cta-dominant h-12 gap-2 rounded-2xl px-5 text-sm"
             >
               <Search className="h-4 w-4" />
               Executar agora
