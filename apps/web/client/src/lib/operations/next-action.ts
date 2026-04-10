@@ -1,4 +1,5 @@
 import {
+  getCustomerDecision,
   getAppointmentDecision,
   getChargeDecision,
   getServiceOrderDecision,
@@ -20,13 +21,16 @@ export type NextActionItem = {
 export function getNextAction(params:
   | { entity: "service_order"; item: any }
   | { entity: "charge"; item: any }
-  | { entity: "appointment"; item: any }) : NextActionItem {
+  | { entity: "appointment"; item: any }
+  | { entity: "customer"; item: any }) : NextActionItem {
   const decision =
     params.entity === "service_order"
       ? getServiceOrderDecision(params.item)
       : params.entity === "charge"
         ? getChargeDecision(params.item)
-        : getAppointmentDecision({ appointment: params.item });
+        : params.entity === "appointment"
+          ? getAppointmentDecision({ appointment: params.item })
+          : getCustomerDecision(params.item);
 
   return {
     label: decision.primaryAction.label,
@@ -47,6 +51,6 @@ function mapSeverity(severity: "critical" | "overdue" | "pending" | "healthy"): 
 function mapIntent(actionKey: OperationalActionKey): NextActionIntent {
   if (actionKey === "generate_charge" || actionKey === "review_execution") return "resolve";
   if (actionKey === "open_whatsapp") return "notify";
-  if (actionKey === "create_service_order") return "create";
+  if (actionKey === "create_service_order" || actionKey === "create_appointment") return "create";
   return "follow_up";
 }

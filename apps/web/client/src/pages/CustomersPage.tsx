@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   buildFinanceChargeUrl,
+  buildWhatsAppConversationUrl,
   buildServiceOrdersDeepLink,
 } from "@/lib/operations/operations.utils";
 import {
@@ -64,7 +65,12 @@ import { useProductAnalytics } from "@/hooks/useProductAnalytics";
 import { generateCustomerActions } from "@/lib/smartActions";
 import { ActionBarWrapper } from "@/components/operating-system/ActionBar";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
-import { RowActions } from "@/components/operating-system/RowActions";
+import { NextActionCell } from "@/components/operating-system/NextActionCell";
+import {
+  getCustomerDecision,
+  getCustomerSeverity,
+  getOperationalSeverityLabel,
+} from "@/lib/operations/operational-intelligence";
 
 type Customer = {
   id: string;
@@ -383,6 +389,18 @@ export default function CustomersPage() {
     retry: false,
     refetchOnWindowFocus: false,
   });
+  const listAppointments = trpc.nexo.appointments.list.useQuery(undefined, {
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+  const listServiceOrders = trpc.nexo.serviceOrders.list.useQuery(undefined, {
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+  const listCharges = trpc.finance.charges.list.useQuery(undefined, {
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
 
   const workspaceQuery = trpc.nexo.customers.workspace.useQuery(
     { id: workspaceCustomerId ?? "" },
@@ -396,6 +414,15 @@ export default function CustomersPage() {
   const customers = useMemo(() => {
     return normalizeArrayPayload<Customer>(listCustomers.data);
   }, [listCustomers.data]);
+  const appointments = useMemo(() => {
+    return normalizeArrayPayload<any>(listAppointments.data);
+  }, [listAppointments.data]);
+  const serviceOrders = useMemo(() => {
+    return normalizeArrayPayload<any>(listServiceOrders.data);
+  }, [listServiceOrders.data]);
+  const charges = useMemo(() => {
+    return normalizeArrayPayload<any>(listCharges.data);
+  }, [listCharges.data]);
 
   const workspace = useMemo(() => {
     const next = normalizeWorkspacePayload(workspaceQuery.data);
@@ -516,6 +543,51 @@ export default function CustomersPage() {
   const total = customers.length;
   const totalActive = customers.filter(c => c.active).length;
   const totalInactive = total - totalActive;
+  const customerOperationalMap = useMemo(() => {
+    return new Map(
+      customers.map(customer => {
+        const customerAppointments = appointments.filter(
+          item => String(item.customerId ?? "") === customer.id
+        );
+        const customerOrders = serviceOrders.filter(
+          item => String(item.customerId ?? "") === customer.id
+        );
+        const customerCharges = charges.filter(
+          item => String(item.customerId ?? "") === customer.id
+        );
+        const pendingCharges = customerCharges.filter((item: any) => {
+          const status = String(item.status ?? "").toUpperCase();
+          return status === "PENDING";
+        }).length;
+        const overdueCharges = customerCharges.filter((item: any) => {
+          const status = String(item.status ?? "").toUpperCase();
+          return status === "OVERDUE";
+        }).length;
+        const openServiceOrders = customerOrders.filter((item: any) => {
+          const status = String(item.status ?? "").toUpperCase();
+          return status === "OPEN" || status === "ASSIGNED" || status === "IN_PROGRESS";
+        }).length;
+        const lastInteractionAt = [
+          customer.updatedAt,
+          ...customerAppointments.map((item: any) => item.startsAt),
+          ...customerOrders.map((item: any) => item.updatedAt ?? item.createdAt),
+          ...customerCharges.map((item: any) => item.createdAt ?? item.dueDate),
+        ]
+          .filter(Boolean)
+          .sort((a, b) => toTimestamp(String(b)) - toTimestamp(String(a)))[0];
+
+        return [
+          customer.id,
+          {
+            openServiceOrders,
+            pendingCharges,
+            overdueCharges,
+            lastInteractionAt: lastInteractionAt ?? null,
+          },
+        ] as const;
+      })
+    );
+  }, [appointments, charges, customers, serviceOrders]);
   const stressLabEnabled =
     typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).get("stress") === "1";
@@ -850,11 +922,21 @@ export default function CustomersPage() {
     [navigate, workspace, workspaceAppointmentsCount]
   );
   const hasRenderableData =
-    listCustomers.data !== undefined || workspaceQuery.data !== undefined;
-  const queryState = getQueryUiState([listCustomers, workspaceQuery], hasRenderableData);
+    listCustomers.data !== undefined ||
+    workspaceQuery.data !== undefined ||
+    listAppointments.data !== undefined ||
+    listServiceOrders.data !== undefined ||
+    listCharges.data !== undefined;
+  const queryState = getQueryUiState(
+    [listCustomers, workspaceQuery, listAppointments, listServiceOrders, listCharges],
+    hasRenderableData
+  );
   const blockingErrorMessage =
     getErrorMessage(listCustomers.error, "") ||
     getErrorMessage(workspaceQuery.error, "") ||
+    getErrorMessage(listAppointments.error, "") ||
+    getErrorMessage(listServiceOrders.error, "") ||
+    getErrorMessage(listCharges.error, "") ||
     "Não foi possível carregar clientes.";
 
   return (
@@ -1082,19 +1164,16 @@ export default function CustomersPage() {
                       Nome
                     </th>
                     <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
-                      Telefone
+                      Situação operacional
                     </th>
                     <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
-                      Email
+                      Situação financeira
                     </th>
                     <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
-                      Observações
+                      Última interação
                     </th>
                     <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
-                      Criado em
-                    </th>
-                    <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
-                      Status
+                      Próxima ação
                     </th>
                     <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
                       Ações
@@ -1105,6 +1184,25 @@ export default function CustomersPage() {
                 <tbody>
                   {customers.map(customer => {
                     const isOpen = workspaceCustomerId === customer.id;
+                    const operational = customerOperationalMap.get(customer.id) ?? {
+                      openServiceOrders: 0,
+                      pendingCharges: 0,
+                      overdueCharges: 0,
+                      lastInteractionAt: customer.updatedAt,
+                    };
+                    const decision = getCustomerDecision({
+                      active: customer.active,
+                      ...operational,
+                    });
+                    const whatsappUrl = buildWhatsAppConversationUrl({
+                      customerId: customer.id,
+                      context:
+                        operational.overdueCharges > 0
+                          ? "charge_overdue"
+                          : operational.pendingCharges > 0
+                            ? "charge_pending"
+                            : "general",
+                    });
 
                     return (
                       <tr
@@ -1133,36 +1231,94 @@ export default function CustomersPage() {
                         </td>
 
                         <td className="px-4 py-3 text-zinc-700 dark:text-zinc-300">
-                          {customer.phone ?? "—"}
+                          <p>{operational.openServiceOrders} O.S. abertas</p>
+                          <p className="text-xs text-zinc-500">
+                            {customer.active ? "Cliente ativo" : "Cliente inativo"}
+                          </p>
                         </td>
 
                         <td className="px-4 py-3 text-zinc-700 dark:text-zinc-300">
-                          {customer.email ?? "—"}
-                        </td>
-
-                        <td
-                          className="max-w-[260px] px-4 py-3 text-zinc-700 dark:text-zinc-300"
-                          title={customer.notes ?? ""}
-                        >
-                          {truncateText(customer.notes)}
+                          <p>{operational.pendingCharges} pendente(s)</p>
+                          <p className="text-xs text-zinc-500">
+                            {operational.overdueCharges} vencida(s)
+                          </p>
                         </td>
 
                         <td className="px-4 py-3 text-zinc-700 dark:text-zinc-300">
-                          {formatDate(customer.createdAt)}
+                          {formatDateTime(operational.lastInteractionAt)}
                         </td>
 
                         <td className="px-4 py-3">
-                          <StatusBadge
-                            label={customer.active ? "Ativo" : "Inativo"}
-                            tone={customer.active ? "success" : "neutral"}
-                          />
+                          <div className="space-y-2">
+                            <StatusBadge
+                              label={getOperationalSeverityLabel(getCustomerSeverity({
+                                active: customer.active,
+                                ...operational,
+                              }))}
+                              tone={
+                                getCustomerSeverity({
+                                  active: customer.active,
+                                  ...operational,
+                                }) === "critical"
+                                  ? "danger"
+                                  : getCustomerSeverity({
+                                        active: customer.active,
+                                        ...operational,
+                                      }) === "healthy"
+                                    ? "success"
+                                    : "warning"
+                              }
+                            />
+                            <NextActionCell
+                              entity="customer"
+                              item={{
+                                active: customer.active,
+                                ...operational,
+                              }}
+                            />
+                          </div>
                         </td>
 
                         <td className="px-4 py-3">
-                          <RowActions
-                            onView={() => openWorkspace(customer.id)}
-                            onEdit={() => setEditingCustomerId(customer.id)}
-                          />
+                          <div className="flex flex-wrap gap-2">
+                            <Button size="sm" variant="outline" onClick={() => openWorkspace(customer.id)}>
+                              Ver detalhes
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => navigate(`/appointments?customerId=${customer.id}`)}>
+                              Agendar
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => navigate(`/finances?customerId=${customer.id}`)}>
+                              Gerar cobrança
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => whatsappUrl && navigate(whatsappUrl)}
+                              disabled={!whatsappUrl}
+                            >
+                              Enviar WhatsApp
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={() => {
+                                if (decision.primaryAction.key === "create_appointment") {
+                                  navigate(`/appointments?customerId=${customer.id}`);
+                                  return;
+                                }
+                                if (decision.primaryAction.key === "open_finances") {
+                                  navigate(`/finances?customerId=${customer.id}`);
+                                  return;
+                                }
+                                if (decision.primaryAction.key === "open_whatsapp" && whatsappUrl) {
+                                  navigate(whatsappUrl);
+                                  return;
+                                }
+                                openWorkspace(customer.id);
+                              }}
+                            >
+                              {decision.primaryAction.label}
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     );
