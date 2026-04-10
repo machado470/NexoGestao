@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { AlertCircle, CheckCircle, Info, AlertTriangle, X } from 'lucide-react';
+import { AlertCircle, CheckCircle, Info, AlertTriangle } from 'lucide-react';
 
 export type NotificationType = 'success' | 'error' | 'warning' | 'info';
 
@@ -39,13 +39,13 @@ const getIcon = (type: NotificationType) => {
 const getColor = (type: NotificationType) => {
   switch (type) {
     case 'success':
-      return 'bg-green-50 border-green-200 text-green-900';
+      return 'border-l-2 border-l-[var(--success)] text-[var(--text-primary)]';
     case 'error':
-      return 'bg-red-50 border-red-200 text-red-900';
+      return 'border-l-2 border-l-[var(--danger)] text-[var(--text-primary)]';
     case 'warning':
-      return 'bg-yellow-50 border-yellow-200 text-yellow-900';
+      return 'border-l-2 border-l-[var(--warning)] text-[var(--text-primary)]';
     case 'info':
-      return 'bg-orange-50 border-orange-200 text-orange-900';
+      return 'border-l-2 border-l-[var(--accent)] text-[var(--text-primary)]';
   }
 };
 
@@ -67,7 +67,6 @@ export const useNotificationStore = create<NotificationStore>((set) => ({
       ],
     }));
 
-    // Auto-remove after duration (if duration > 0)
     if (duration > 0) {
       setTimeout(() => {
         set((state) => ({
@@ -90,7 +89,6 @@ export const useNotificationStore = create<NotificationStore>((set) => ({
   },
 }));
 
-// Helper functions for easier usage
 export const notify = {
   success: (title: string, description?: string, action?: Notification['action']) => {
     return useNotificationStore.getState().add({
@@ -147,7 +145,7 @@ export const notify = {
       type: 'info',
       title,
       description,
-      duration: 0, // persistent
+      duration: 0,
     });
   },
 };

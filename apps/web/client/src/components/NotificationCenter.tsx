@@ -15,7 +15,7 @@ export function NotificationCenter() {
         return (
           <div
             key={notification.id}
-            className={`nexo-floating-panel flex items-start gap-3 rounded-xl border p-4 ${colorClass} animate-in fade-in slide-in-from-top-2 duration-300`}
+            className={`nexo-floating-panel flex items-start gap-3 rounded-[var(--radius-surface)] border p-4 ${colorClass} animate-in fade-in slide-in-from-top-2 duration-300`}
           >
             <Icon className="mt-0.5 h-5 w-5 flex-shrink-0" />
 
@@ -28,7 +28,7 @@ export function NotificationCenter() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="mt-2 h-auto p-0 text-xs"
+                  className="mt-2 h-auto p-0 text-xs text-[var(--accent)]"
                   onClick={() => {
                     notification.action?.onClick();
                     remove(notification.id);
@@ -41,7 +41,7 @@ export function NotificationCenter() {
 
             <button
               onClick={() => remove(notification.id)}
-              className="flex-shrink-0 rounded p-1 transition-colors hover:bg-white/10"
+              className="flex-shrink-0 rounded p-1 transition-colors hover:bg-[var(--accent-soft)]"
             >
               <X className="h-4 w-4" />
             </button>
