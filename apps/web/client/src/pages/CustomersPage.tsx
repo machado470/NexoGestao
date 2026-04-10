@@ -44,6 +44,9 @@ import {
   buildFinanceChargeUrl,
   buildWhatsAppConversationUrl,
   buildServiceOrdersDeepLink,
+  getWhatsAppContextDescription,
+  getWhatsAppContextLabel,
+  getWhatsAppPrefilledMessage,
 } from "@/lib/operations/operations.utils";
 import {
   getErrorMessage,
@@ -72,6 +75,7 @@ import {
   getOperationalSeverityLabel,
 } from "@/lib/operations/operational-intelligence";
 import { ContextPanel } from "@/components/operating-system/ContextPanel";
+import { getCustomerExplainLayer } from "@/lib/operations/explain-layer";
 
 type Customer = {
   id: string;
@@ -377,6 +381,7 @@ export default function CustomersPage() {
   const [workspaceFeedback, setWorkspaceFeedback] = useState<string | null>(
     null
   );
+  const [whatsAppDraft, setWhatsAppDraft] = useState("");
   const [localTimeline, setLocalTimeline] = useState<TimelineEvent[]>([]);
   const [crossTabMessage, setCrossTabMessage] = useState<string | null>(null);
   const [isDegradedMode, setIsDegradedMode] = useState(false);
@@ -910,6 +915,31 @@ export default function CustomersPage() {
         : workspacePendingCharges > 0
           ? "critical"
         : "healthy";
+  const workspaceWhatsAppRoute = useMemo(() => {
+    if (!workspace) return null;
+    const mainCharge = workspace.charges.find(c => c.status === "OVERDUE")
+      ?? workspace.charges.find(c => c.status === "PENDING");
+    return {
+      customerId: workspace.customer.id,
+      context: mainCharge?.status === "OVERDUE" ? "overdue_charge" : "general",
+      amountCents: mainCharge?.amountCents ?? null,
+      dueDate: mainCharge?.dueDate ?? null,
+      chargeId: mainCharge?.id ?? null,
+      serviceOrderId: null,
+      returnTo: "/customers",
+    } as const;
+  }, [workspace]);
+  const defaultWhatsAppMessage = useMemo(() => {
+    if (!workspace || !workspaceWhatsAppRoute) return "";
+    return getWhatsAppPrefilledMessage(
+      { name: workspace.customer.name },
+      workspaceWhatsAppRoute
+    );
+  }, [workspace, workspaceWhatsAppRoute]);
+
+  useEffect(() => {
+    setWhatsAppDraft(defaultWhatsAppMessage);
+  }, [defaultWhatsAppMessage]);
   const smartOperationalActions = useMemo(
     () =>
       generateCustomerActions({
@@ -1983,7 +2013,20 @@ export default function CustomersPage() {
           id: item.id,
           label: item.action ?? "Evento",
           description: item.description ?? formatDateTime(item.createdAt),
+          source: item.action?.includes("UPDATED") ? "user" : "system",
         }))}
+        explainLayer={workspace ? getCustomerExplainLayer(workspace) : undefined}
+        whatsAppPreview={
+          workspace && workspaceWhatsAppRoute
+            ? {
+                contextLabel: getWhatsAppContextLabel(workspaceWhatsAppRoute.context),
+                contextDescription: getWhatsAppContextDescription(workspaceWhatsAppRoute),
+                message: whatsAppDraft,
+                editable: true,
+                onMessageChange: setWhatsAppDraft,
+              }
+            : undefined
+        }
       />
 
       <CreateCustomerModal

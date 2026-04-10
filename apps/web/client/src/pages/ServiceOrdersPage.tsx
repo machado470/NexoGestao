@@ -7,6 +7,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   buildServiceOrdersDeepLink,
   buildWhatsAppUrlFromServiceOrder,
+  getWhatsAppContextDescription,
+  getWhatsAppContextLabel,
+  getWhatsAppPrefilledMessage,
   getServiceOrderIdFromUrl,
   normalizeOrders,
 } from "@/lib/operations/operations.utils";
@@ -61,6 +64,7 @@ import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { NextActionCell } from "@/components/operating-system/NextActionCell";
 import { ContextPanel } from "@/components/operating-system/ContextPanel";
 import { runFlowChain } from "@/lib/operations/flowChain";
+import { getServiceOrderExplainLayer } from "@/lib/operations/explain-layer";
 
 const FINANCIAL_FILTERS: Array<{
   value: FinancialFilter;
@@ -156,6 +160,7 @@ export default function ServiceOrdersPage() {
     "idle" | "running" | "done"
   >("idle");
   const [flowFeedback, setFlowFeedback] = useState<string | null>(null);
+  const [whatsAppDraft, setWhatsAppDraft] = useState("");
 
   const activeRef = useRef<HTMLDivElement | null>(null);
 
@@ -249,6 +254,36 @@ export default function ServiceOrdersPage() {
 
     return sorted.find(item => item.id === activeId) ?? null;
   }, [activeOrderQuery.data, sorted, activeId]);
+  const activeOrderWhatsAppRoute = useMemo(() => {
+    if (!activeOrder) return null;
+    return {
+      customerId: activeOrder.customerId ?? activeOrder.customer?.id ?? null,
+      context:
+        activeOrder.financialSummary?.chargeStatus === "OVERDUE"
+          ? "overdue_charge"
+          : activeOrder.financialSummary?.hasCharge
+            ? "charge_pending"
+            : "service_order_followup",
+      amountCents: activeOrder.financialSummary?.chargeAmountCents ?? null,
+      dueDate: activeOrder.financialSummary?.chargeDueDate
+        ? String(activeOrder.financialSummary.chargeDueDate)
+        : null,
+      chargeId: activeOrder.financialSummary?.chargeId ?? null,
+      serviceOrderId: activeOrder.id,
+      returnTo: "/service-orders",
+    } as const;
+  }, [activeOrder]);
+  const defaultWhatsAppMessage = useMemo(() => {
+    if (!activeOrderWhatsAppRoute) return "";
+    return getWhatsAppPrefilledMessage(
+      { name: activeOrder?.customer?.name ?? "Cliente" },
+      activeOrderWhatsAppRoute
+    );
+  }, [activeOrder?.customer?.name, activeOrderWhatsAppRoute]);
+
+  useEffect(() => {
+    setWhatsAppDraft(defaultWhatsAppMessage);
+  }, [defaultWhatsAppMessage]);
 
   const totalOrders = orders.length;
   const totalVisible = sorted.length;
@@ -873,11 +908,23 @@ export default function ServiceOrdersPage() {
         timeline={
           activeOrder
             ? [
-                { id: "created", label: "Criada", description: String(activeOrder.createdAt ?? "—") },
-                { id: "updated", label: "Última atualização", description: String(activeOrder.updatedAt ?? "—") },
-                { id: "scheduled", label: "Agendada para", description: String(activeOrder.scheduledFor ?? "—") },
+                { id: "created", label: "Criada", description: String(activeOrder.createdAt ?? "—"), source: "system" },
+                { id: "updated", label: "Última atualização", description: String(activeOrder.updatedAt ?? "—"), source: "system" },
+                { id: "scheduled", label: "Agendada para", description: String(activeOrder.scheduledFor ?? "—"), source: "user" },
               ]
             : []
+        }
+        explainLayer={activeOrder ? getServiceOrderExplainLayer(activeOrder) : undefined}
+        whatsAppPreview={
+          activeOrder && activeOrderWhatsAppRoute
+            ? {
+                contextLabel: getWhatsAppContextLabel(activeOrderWhatsAppRoute.context),
+                contextDescription: getWhatsAppContextDescription(activeOrderWhatsAppRoute),
+                message: whatsAppDraft,
+                editable: true,
+                onMessageChange: setWhatsAppDraft,
+              }
+            : undefined
         }
       />
     </PageWrapper>
