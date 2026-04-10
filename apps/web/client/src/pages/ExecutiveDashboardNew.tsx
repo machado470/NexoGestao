@@ -963,696 +963,208 @@ export default function ExecutiveDashboardNew() {
   }
 
   return (
-    <div className="nexo-page-shell">
-      {dominantProblem ? (
-        <section className="nexo-hero-operational">
-          <div className="absolute -right-20 -top-20 h-52 w-52 rounded-full bg-orange-300/30 blur-3xl dark:bg-orange-500/25" />
-          <div className="relative grid gap-5 lg:grid-cols-[1.2fr_auto] lg:items-end">
-            <div>
-              <p className="inline-flex items-center rounded-full bg-orange-500 px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] text-white">
-                Zona de comando
-              </p>
-              <h2 className="nexo-text-wrap mt-3 text-3xl font-extrabold tracking-tight text-zinc-950 dark:text-white md:text-4xl">
-                Estado da operação: {heroState}
-              </h2>
-              <p
-                className={`nexo-text-wrap mt-3 text-base font-semibold ${heroStateTone}`}
-              >
-                {overdueCharges} cobranças vencidas • {nonBilledServices}{" "}
-                serviços sem faturamento.
-              </p>
-              <p className="nexo-text-wrap mt-2 text-sm text-[var(--text-secondary)] dark:text-[var(--text-secondary)]">
-                Próxima ação dominante: <strong>{dominantProblem.title}</strong>
-                . {dominantProblem.helperText}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => navigate(dominantProblem.ctaPath)}
-              className="nexo-cta-dominant min-h-14 min-w-[240px] max-w-full !rounded-xl !text-base"
-            >
-              {dominantProblem.ctaLabel}
-            </button>
-          </div>
-        </section>
-      ) : null}
-
-      <section className="nexo-page-header nexo-card-operational transition-all duration-300 sm:px-6 sm:py-6">
-        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-2xl">
-            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-orange-200/80 bg-orange-100/80 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-orange-700 dark:border-orange-500/20 dark:bg-orange-500/12 dark:text-orange-300">
-              <BarChart3 className="h-3.5 w-3.5" />
-              Visão executiva
-            </div>
-            <h1 className="nexo-page-header-title nexo-text-wrap md:text-4xl">
-              Dashboard Executivo
+    <div className="space-y-6 pb-6">
+      <section className="nexo-surface-primary p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="max-w-3xl space-y-3">
+            <span className="inline-flex items-center gap-2 rounded-full border border-orange-400/30 bg-orange-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-orange-300">
+              <BarChart3 className="h-3.5 w-3.5" /> Centro executivo
+            </span>
+            <h1 className="text-3xl font-semibold tracking-tight text-[var(--text-primary)] md:text-4xl">
+              Estado da operação: {heroState}
             </h1>
-            <p className="nexo-page-header-description nexo-text-wrap max-w-xl">
-              Organize sua operação, evite erros e mantenha controle financeiro
-              no funil Cliente → Agendamento → O.S. → Pagamento.
+            <p className="text-sm text-[var(--text-secondary)]">
+              {overdueCharges} cobranças vencidas • {nonBilledServices} serviços sem faturamento • prioridade dominante {dominantProblem?.title ?? "Operação estável"}.
             </p>
           </div>
-
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={() => navigate("/service-orders")}
-              className="nexo-cta-dominant min-h-12 flex-1 sm:flex-none"
+              onClick={() => navigate(dominantProblem?.ctaPath ?? "/service-orders")}
+              className="nexo-cta-dominant min-h-11"
             >
-              Atacar gargalos
+              {dominantProblem?.ctaLabel ?? "Executar prioridades"}
             </button>
             <button
               type="button"
               onClick={() => navigate("/finances")}
-              className="nexo-cta-secondary min-h-12 flex-1 sm:flex-none"
+              className="nexo-cta-secondary min-h-11"
             >
               Abrir financeiro
             </button>
           </div>
         </div>
-        <OperationalHealthView
-          criticalPending={criticalPending}
-          overdueItems={overdueCharges}
-          bottlenecks={bottlenecks.filter(item => item.value > 0).length}
-          urgentActions={urgentActions}
+
+        <div className="mt-5 grid gap-3 border-t border-[var(--border-soft)] pt-4 md:grid-cols-4">
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--text-muted)]">Receita em risco</p>
+            <p className="mt-1 text-lg font-semibold text-[var(--text-primary)]">{formatCurrency(totalPausedRevenue + nonBilledServicesImpact)}</p>
+          </div>
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--text-muted)]">Gargalos ativos</p>
+            <p className="mt-1 text-lg font-semibold text-[var(--text-primary)]">{bottlenecks.filter(item => item.value > 0).length}</p>
+          </div>
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--text-muted)]">Ações urgentes</p>
+            <p className="mt-1 text-lg font-semibold text-[var(--text-primary)]">{urgentActions}</p>
+          </div>
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--text-muted)]">Última atualização</p>
+            <p className="mt-1 text-lg font-semibold text-[var(--text-primary)]">{lastUpdatedAt ? lastUpdatedAt.toLocaleTimeString("pt-BR") : "—"}</p>
+          </div>
+        </div>
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <MetricCard
+          icon={Users}
+          label="Clientes criados"
+          value={displayMetrics.createdCustomers}
+          loading={metricsQuery.isLoading && metricsQuery.data === undefined}
+          description="Base total de clientes cadastrados."
         />
-        <div className="mt-3 grid gap-3 xl:grid-cols-3">
-          <div className="nexo-card-informative p-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-              Operation mode control
-            </p>
-            <p className="mt-1 text-xs text-[var(--text-secondary)] dark:text-[var(--text-secondary)]">
-              Organização em <strong>{orgOperationMode}</strong> • efetivo em{" "}
-              <strong>{effectiveGlobalMode}</strong>
-            </p>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {(
-                ["manual", "assisted", "semi_automatic", "automatic"] as const
-              ).map(mode => (
-                <button
-                  key={mode}
-                  type="button"
-                  onClick={() => setUserOperationMode(mode)}
-                  className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
-                    userOperationMode === mode
-                      ? "border-orange-400 bg-orange-100 text-orange-700 dark:bg-orange-950/30 dark:text-orange-300"
-                      : "border-zinc-300 text-[var(--text-secondary)] dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)]"
-                  }`}
-                >
-                  {mode}
-                </button>
-              ))}
-            </div>
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              <span className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-                Financeiro:
-              </span>
-              {(["manual", "semi_automatic", "automatic"] as const).map(
-                mode => (
-                  <button
-                    key={`finance-${mode}`}
-                    type="button"
-                    onClick={() =>
-                      setActionTypeOverrides(prev => ({
-                        ...prev,
-                        finance: mode,
-                      }))
-                    }
-                    className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
-                      actionTypeOverrides.finance === mode
-                        ? "border-blue-400 bg-blue-100 text-blue-700 dark:bg-blue-950/30 dark:text-blue-300"
-                        : "border-zinc-300 text-[var(--text-muted)] dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)]"
-                    }`}
-                  >
-                    {mode}
-                  </button>
-                )
-              )}
-            </div>
-          </div>
-          <div className="nexo-card-informative p-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-              Safety limits
-            </p>
-            <p className="mt-1 flex items-center gap-2 text-xs">
-              {safetyState.shouldFallbackToManual ? (
-                <>
-                  <ShieldAlert className="h-3.5 w-3.5 text-red-500" /> Fallback
-                  manual ativado
-                </>
-              ) : (
-                <>
-                  <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />{" "}
-                  Automação dentro do limite
-                </>
-              )}
-            </p>
-            <p className="mt-1 text-[11px] text-[var(--text-muted)]">
-              Financeiro {safetyState.remainingByActionType.finance} • O.S.{" "}
-              {safetyState.remainingByActionType.service_order} • Comunicação{" "}
-              {safetyState.remainingByActionType.communication}
-            </p>
-          </div>
-          <div className="nexo-card-informative p-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-              Cross-entity context
-            </p>
-            <p className="mt-1 text-xs font-medium">
-              {crossEntitySignals.label}
-            </p>
-            <p className="mt-1 text-[11px] text-[var(--text-muted)]">
-              Risco {crossEntitySignals.riskScore}/100 • Carga{" "}
-              {crossEntitySignals.loadScore}/100 • Prioridade{" "}
-              {crossEntitySignals.priorityScore}/100
-            </p>
-          </div>
-        </div>
-        {quotaWarnings.length > 0 ? (
-          <div className="mt-3 rounded-xl border border-amber-300/60 bg-amber-50/80 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
-            Limite do plano atingido em {quotaWarnings.join(", ")}. Faça upgrade
-            para continuar crescendo sem bloqueios.
-          </div>
-        ) : null}
+        <MetricCard
+          icon={Briefcase}
+          label="Serviços concluídos"
+          value={displayMetrics.completedServices}
+          loading={metricsQuery.isLoading && metricsQuery.data === undefined}
+          description="Total de O.S. finalizadas com sucesso."
+        />
+        <MetricCard
+          icon={DollarSign}
+          label="Cobranças geradas"
+          value={displayMetrics.chargesGenerated}
+          loading={metricsQuery.isLoading && metricsQuery.data === undefined}
+          description={`${formatCurrency(displayMetrics.paidRevenueInCents)} recebido`}
+        />
+        <MetricCard
+          icon={AlertTriangle}
+          label="Pendente + atrasado"
+          value={formatCurrency(totalPausedRevenue)}
+          loading={metricsQuery.isLoading && metricsQuery.data === undefined}
+          description={`${overdueCharges} cobranças vencidas`}
+        />
       </section>
 
-      <section className="nexo-cockpit-zone">
-        <p className="nexo-zone-title">Visão geral</p>
-        <div className="grid gap-5 xl:grid-cols-2">
-          <AlertStrip
-            severity={overdueCharges > 0 ? "critical" : "normal"}
-            title="Atenção operacional imediata"
-            description={
-              overdueCharges > 0
-                ? `${overdueCharges} cobranças vencidas impactando caixa agora.`
-                : "Sem bloqueio crítico de cobrança no momento."
-            }
-            action={
-              <PrimaryActionButton
-                label={
-                  overdueCharges > 0 ? "Atacar vencidas" : "Abrir financeiro"
-                }
-                onClick={() => navigate("/finances")}
-              />
-            }
-          />
-          <AlertStrip
-            severity={displayMetrics.delayedOrders > 0 ? "warning" : "success"}
-            title="Pendências da execução"
-            description={`${displayMetrics.delayedOrders} O.S. com risco de travamento operacional.`}
-            action={
-              <PrimaryActionButton
-                label="Abrir Service Orders"
-                onClick={() => navigate("/service-orders")}
-              />
-            }
-          />
-        </div>
-      </section>
-
-      <section className="nexo-cockpit-zone">
-        <p className="nexo-zone-title">Execução</p>
-        <div className="grid gap-5 xl:grid-cols-2">
-          <ActionFeed
-            items={operationalActionFeed}
-            focusCriticalOnly={focusCriticalOnly}
-          />
-          <div className="space-y-2">
+      <section className="grid gap-6 xl:grid-cols-3">
+        <article className="nexo-surface-primary xl:col-span-2 p-5">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-base font-semibold text-[var(--text-primary)]">Execução prioritária</h2>
+            <button
+              type="button"
+              onClick={() => setFocusCriticalOnly(prev => !prev)}
+              className="rounded-full border border-[var(--border-soft)] px-3 py-1 text-[11px] font-semibold text-[var(--text-secondary)]"
+            >
+              {focusCriticalOnly ? "Foco crítico" : "Mostrar todas"}
+            </button>
+          </div>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">Linhas de ação, pipeline e decisão operacional sem empilhar blocos internos.</p>
+          <div className="mt-4 space-y-4">
+            <ActionFeed items={operationalActionFeed} focusCriticalOnly={focusCriticalOnly} />
             <PipelineStage
               stages={pipelineStages}
               selectedStage={selectedPipelineStage}
               onStageSelect={setSelectedPipelineStage}
             />
-            {selectedPipelineStage ? (
-              <p className="text-xs text-[var(--text-muted)]">
-                Filtro ativo no pipeline:{" "}
-                <strong>{selectedPipelineStage}</strong>.
-              </p>
-            ) : null}
           </div>
-        </div>
-      </section>
+        </article>
 
-      <section className="nexo-cockpit-zone">
-        <p className="nexo-zone-title">Decisões e controle</p>
-        <div className="grid gap-5 xl:grid-cols-2">
-          <article className="nexo-card-operational">
-            <h3 className="text-sm font-semibold">Executive summary</h3>
-            <p className="mt-1 text-xs text-[var(--text-secondary)] dark:text-[var(--text-secondary)]">
-              Gargalos, risco financeiro e volume travado para decisão rápida.
-            </p>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              <div className="rounded-md border border-white/10 bg-white/5 p-2 text-xs">
-                Gargalos ativos:{" "}
-                <strong>
-                  {bottlenecks.filter(item => item.value > 0).length}
-                </strong>
+        <article className="nexo-surface-primary p-5">
+          <h2 className="text-base font-semibold text-[var(--text-primary)]">Top prioridades</h2>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">Impacto direto em caixa e velocidade de operação.</p>
+          <div className="mt-4 space-y-3">
+            {priorityProblems.map((problem, index) => (
+              <div key={problem.id} className="nexo-surface-inner p-3">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-orange-300">#{index + 1} prioridade</p>
+                <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">{problem.title}</p>
+                <p className="text-xs text-[var(--text-muted)]">{problem.count} itens • {formatCurrency(problem.impactCents)} de impacto</p>
               </div>
-              <div className="rounded-md border border-white/10 bg-white/5 p-2 text-xs">
-                Risco financeiro:{" "}
-                <strong>{formatCurrency(totalPausedRevenue)}</strong>
-              </div>
-              <div className="rounded-md border border-white/10 bg-white/5 p-2 text-xs">
-                Volume travado:{" "}
-                <strong>{displayMetrics.openServiceOrders}</strong>
-              </div>
-              <div className="rounded-md border border-white/10 bg-white/5 p-2 text-xs">
-                Ação nº1:{" "}
-                <strong>{dominantProblem?.title ?? "Operação estável"}</strong>
-              </div>
-            </div>
-          </article>
-          <article className="nexo-card-operational">
-            <div className="flex items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold">
-                Decision log (auditoria)
-              </h3>
-              <button
-                type="button"
-                onClick={() => setFocusCriticalOnly(prev => !prev)}
-                className="rounded-full border px-2.5 py-1 text-[11px] font-semibold"
-              >
-                {focusCriticalOnly ? "Mostrar mais" : "Foco crítico"}
-              </button>
-            </div>
-            <div className="mt-3 space-y-2">
-              {decisionAuditLog.slice(0, 5).map(log => (
-                <div
-                  key={log.id}
-                  className="rounded-md border border-white/10 bg-white/5 p-2"
-                >
-                  <p className="text-xs font-semibold">
-                    {log.actionLabel}{" "}
-                    <span className="text-[var(--text-muted)]">• {log.actionType}</span>
-                  </p>
-                  <p className="text-[11px] text-[var(--text-secondary)] dark:text-[var(--text-secondary)]">
-                    {log.reason}
-                  </p>
-                  <p className="mt-1 text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-                    regra {log.ruleApplied} • origem {log.origin} • modo{" "}
-                    {log.mode}
-                  </p>
-                </div>
-              ))}
-              {decisionAuditLog.length === 0 ? (
-                <p className="text-xs text-[var(--text-muted)]">
-                  Sem decisões no momento.
-                </p>
-              ) : null}
-            </div>
-          </article>
-        </div>
-      </section>
-
-      <section className="nexo-card-operational">
-        <p className="flex items-center gap-2 text-sm font-semibold">
-          <Bot className="h-4 w-4" /> Background automation prep
-        </p>
-        <p className="mt-1 text-xs text-[var(--text-secondary)] dark:text-[var(--text-secondary)]">
-          Execução fora da UI pronta para eventos (cobrança vencida, O.S.
-          concluída, risco elevado) com notificações inteligentes e trilha de
-          auditoria.
-        </p>
-      </section>
-
-      <section className="nexo-cockpit-zone">
-        <p className="nexo-zone-title">KPIs de comando</p>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <MetricCard
-            icon={Users}
-            label="Clientes criados"
-            value={displayMetrics.createdCustomers}
-            loading={metricsQuery.isLoading && metricsQuery.data === undefined}
-            description="Base total de clientes cadastrados."
-          />
-          <MetricCard
-            icon={Briefcase}
-            label="Serviços concluídos"
-            value={displayMetrics.completedServices}
-            loading={metricsQuery.isLoading && metricsQuery.data === undefined}
-            description="Total de O.S. finalizadas com sucesso."
-          />
-          <MetricCard
-            icon={DollarSign}
-            label="Cobranças geradas"
-            value={displayMetrics.chargesGenerated}
-            loading={metricsQuery.isLoading && metricsQuery.data === undefined}
-            description={`${formatCurrency(displayMetrics.paidRevenueInCents)} já recebido`}
-          />
-          <MetricCard
-            icon={AlertTriangle}
-            label="Pendente + atrasado"
-            value={formatCurrency(totalPausedRevenue)}
-            loading={metricsQuery.isLoading && metricsQuery.data === undefined}
-            description={`${overdueCharges} cobranças vencidas em foco`}
-          />
-        </div>
-      </section>
-
-      {displayMetrics.totalCustomers === 0 ? (
-        <section className="rounded-xl border border-orange-200 bg-orange-50/80 p-4 dark:border-orange-900/40 dark:bg-orange-950/20">
-          <p className="text-sm font-semibold text-orange-800 dark:text-orange-200">
-            Seu dashboard não precisa ficar vazio.
-          </p>
-          <p className="mt-1 text-sm text-orange-700 dark:text-orange-300">
-            Comece agora com ações simples: crie seu primeiro cliente e agende
-            seu primeiro serviço.
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => navigate("/customers")}
-              className="nexo-cta-primary min-h-10"
-            >
-              Crie seu primeiro cliente
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate("/appointments")}
-              className="nexo-cta-secondary min-h-10"
-            >
-              Agende seu primeiro serviço
-            </button>
+            ))}
           </div>
-        </section>
-      ) : null}
+        </article>
+      </section>
 
       <section className="grid gap-6 xl:grid-cols-3">
-        <article className="nexo-card-operational nexo-fade-in xl:col-span-2">
-          <h2 className="nexo-section-title">Receita ao longo do tempo</h2>
-          <p className="mt-1 nexo-section-description">
-            Linha temporal de evolução de receita.
-          </p>
-          {revenueQuery.isLoading &&
-          revenueQuery.data === undefined &&
-          displayRevenue.length === 0 ? (
-            <DashboardCardSkeleton className="mt-4 min-h-[260px]" />
-          ) : lineChartData.length === 0 ? (
-            <EmptyState
-              icon={<BarChart3 className="h-6 w-6" />}
-              title="Ainda não há série temporal de receita"
-              description="Assim que houver cobranças registradas, você verá a evolução no tempo para decidir com mais precisão."
-              action={{
-                label: "Ir para financeiro",
-                onClick: () => navigate("/finances"),
-              }}
-            />
+        <article className="nexo-surface-primary xl:col-span-2 p-5">
+          <h2 className="text-base font-semibold text-[var(--text-primary)]">Receita ao longo do tempo</h2>
+          {lineChartData.length === 0 ? (
+            <div className="mt-3 text-sm text-[var(--text-muted)]">Sem série temporal disponível no momento.</div>
           ) : (
-            <div className="mt-4 h-[260px] nexo-fade-in">
+            <div className="mt-4 h-[250px]">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={lineChartData}>
-                  <XAxis
-                    dataKey="period"
-                    tickLine={false}
-                    axisLine={false}
-                    tickMargin={8}
-                  />
-                  <YAxis
-                    tickLine={false}
-                    axisLine={false}
-                    width={84}
-                    tickFormatter={value => formatCurrency(Number(value) * 100)}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      borderRadius: 14,
-                      border: "1px solid rgba(251,146,60,.25)",
-                      background: "rgba(9,9,11,.94)",
-                      color: "#fff",
-                    }}
-                    formatter={(value: number) => [
-                      formatCurrency(Number(value) * 100),
-                      "Receita",
-                    ]}
-                    labelFormatter={label => `Período: ${label}`}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="value"
-                    stroke="#f97316"
-                    strokeWidth={3}
-                    dot={false}
-                    activeDot={{ r: 5, fill: "#f97316" }}
-                  />
+                  <XAxis dataKey="period" tickLine={false} axisLine={false} tickMargin={8} />
+                  <YAxis tickLine={false} axisLine={false} width={84} tickFormatter={value => formatCurrency(Number(value) * 100)} />
+                  <Tooltip formatter={(value: number) => [formatCurrency(Number(value) * 100), "Receita"]} />
+                  <Line type="monotone" dataKey="value" stroke="#f97316" strokeWidth={3} dot={false} activeDot={{ r: 5, fill: "#f97316" }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
           )}
         </article>
 
-        <article className="nexo-card-informative nexo-fade-in">
-          <h2 className="nexo-section-title">Funil operacional</h2>
-          <p className="mt-1 nexo-section-description">
-            Cliente → Agendamento → O.S. → Pagamento.
-          </p>
-          {funnelData.every(item => item.value <= 0) ? (
-            <EmptyState
-              icon={<Briefcase className="h-6 w-6" />}
-              title="Funil operacional sem dados"
-              description="Cadastre clientes e agendamentos para abrir o fluxo customer → appointment → service order → charge."
-              action={{
-                label: "Crie seu primeiro cliente",
-                onClick: () => navigate("/customers"),
-              }}
-              secondaryAction={{
-                label: "Agende seu primeiro serviço",
-                onClick: () => navigate("/appointments"),
-              }}
-            />
-          ) : (
-            <div className="mt-4 h-[260px] nexo-fade-in">
-              <ResponsiveContainer width="100%" height="100%">
-                <FunnelChart>
-                  <Tooltip
-                    contentStyle={{
-                      borderRadius: 14,
-                      border: "1px solid rgba(251,146,60,.3)",
-                      background: "rgba(9,9,11,.94)",
-                      color: "#fff",
-                    }}
-                    formatter={(value: number) => [value, "Volume"]}
-                  />
-                  <Funnel dataKey="value" data={funnelData} isAnimationActive>
-                    <LabelList
-                      position="right"
-                      fill="#a1a1aa"
-                      stroke="none"
-                      dataKey="name"
-                    />
-                  </Funnel>
-                </FunnelChart>
-              </ResponsiveContainer>
-            </div>
-          )}
+        <article className="nexo-surface-primary p-5">
+          <h2 className="text-base font-semibold text-[var(--text-primary)]">Distribuição de cobrança</h2>
+          <div className="mt-4 h-[250px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart margin={{ top: 6, right: 10, bottom: 12, left: 10 }}>
+                <Pie data={displayChargesStatus} dataKey="value" nameKey="label" innerRadius={52} outerRadius={86} paddingAngle={3}>
+                  {displayChargesStatus.map((entry, index) => (
+                    <Cell key={entry.key} fill={["#f97316", "#22c55e", "#ef4444", "#3b82f6"][index % 4]} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(value: number, name) => [value, String(name)]} />
+                <Legend verticalAlign="bottom" wrapperStyle={{ paddingTop: 14, fontSize: 12 }} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
         </article>
       </section>
 
-      <section className="nexo-cockpit-zone">
-        <p className="nexo-zone-title">Alertas e gargalos</p>
-        <div className="grid gap-6 lg:grid-cols-2">
-          <article className="nexo-card-informative nexo-fade-in">
-            <h2 className="nexo-section-title">Distribuição de status</h2>
-            <p className="mt-1 nexo-section-description">
-              Volume atual por status de cobrança.
-            </p>
-            {chargesStatusQuery.isLoading &&
-            chargesStatusQuery.data === undefined &&
-            displayChargesStatus.length === 0 ? (
-              <DashboardCardSkeleton className="mt-4 min-h-[260px]" />
-            ) : (
-              <div className="mt-4 h-[260px] nexo-fade-in">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart
-                    margin={{ top: 6, right: 10, bottom: 12, left: 10 }}
-                  >
-                    <Pie
-                      data={displayChargesStatus}
-                      dataKey="value"
-                      nameKey="label"
-                      innerRadius={52}
-                      outerRadius={86}
-                      paddingAngle={3}
-                    >
-                      {displayChargesStatus.map((entry, index) => (
-                        <Cell
-                          key={entry.key}
-                          fill={
-                            ["#f97316", "#22c55e", "#ef4444", "#3b82f6"][
-                              index % 4
-                            ]
-                          }
-                        />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{
-                        borderRadius: 14,
-                        border: "1px solid rgba(251,146,60,.25)",
-                        background: "rgba(9,9,11,.94)",
-                        color: "#fff",
-                      }}
-                      formatter={(value: number, name) => [value, String(name)]}
-                    />
-                    <Legend
-                      verticalAlign="bottom"
-                      wrapperStyle={{ paddingTop: 14, fontSize: 12 }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </article>
-
-          <article
-            className={`nexo-card-operational nexo-fade-in transition-all duration-300 ${optimisticTick ? "ring-2 ring-orange-300/40 dark:ring-orange-500/30" : ""}`}
-          >
-            <h2 className="nexo-section-title">Gargalos agora</h2>
-            <p className="mt-1 nexo-section-description">
-              Pendências com ação direta para destravar receita.
-            </p>
-            <div className="mt-4 space-y-3">
-              {bottlenecks.map(item => (
-                <div
-                  key={item.id}
-                  className={`nexo-list-row ${item.severity === "critical" ? "nexo-list-row-critical" : "nexo-list-row-high"}`}
-                >
-                  <div className="min-w-0">
-                    <p className="nexo-text-wrap font-semibold text-[var(--text-primary)] dark:text-[var(--text-primary)]">
-                      {item.label}
-                    </p>
-                    <p className="nexo-text-wrap text-xs text-[var(--text-secondary)] dark:text-[var(--text-secondary)]">
-                      <span className="mr-1.5 inline-block rounded-full bg-black/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide dark:bg-white/10">
-                        {item.severity === "critical" ? "Crítico" : "Alto"}
-                      </span>
-                      {item.value} itens
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={item.onClick}
-                    className="nexo-cta-secondary !h-10 !rounded-lg !px-4 !text-xs md:!h-8 md:!px-3"
-                  >
-                    {item.action}
-                  </button>
-                </div>
-              ))}
-            </div>
-            {(metricsQuery.isFetching ||
-              revenueQuery.isFetching ||
-              serviceOrdersStatusQuery.isFetching ||
-              chargesStatusQuery.isFetching) && (
-              <div className="mt-3 inline-flex items-center gap-2 text-xs text-[var(--text-muted)]">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Atualizando blocos sem interromper sua leitura...
-              </div>
-            )}
-            {lastUpdatedAt ? (
-              <p className="mt-2 text-xs text-[var(--text-muted)] dark:text-[var(--text-muted)]">
-                Última atualização: {lastUpdatedAt.toLocaleTimeString("pt-BR")}
-              </p>
-            ) : null}
-          </article>
-        </div>
-      </section>
-
-      <section className="nexo-cockpit-zone">
-        <p className="nexo-zone-title">Automação e próximas ações</p>
-        <div className="grid gap-6 lg:grid-cols-2">
-          <div className="lg:col-span-2">
-            <div className="mb-3 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-xs font-medium text-emerald-800 dark:text-emerald-300">
-              O motor operacional suporta execução híbrida: ações manuais
-              continuam disponíveis e ações automáticas podem rodar sozinhas
-              quando policy + modo permitirem. Modo atual do tenant:{" "}
-              {executionMode}.
-            </div>
-            <OperationalActionFeed
-              plan={executionPlan}
-              riskOperationalState={riskOperationalState}
-            />
+      <section className="grid gap-6 xl:grid-cols-3">
+        <article className="nexo-surface-primary xl:col-span-2 p-5">
+          <h2 className="text-base font-semibold text-[var(--text-primary)]">Automação e próximas ações</h2>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">Execução híbrida com trilha de decisão auditável.</p>
+          <div className="mt-4">
+            <OperationalActionFeed plan={executionPlan} riskOperationalState={riskOperationalState} />
           </div>
-          <article className="nexo-card-informative nexo-fade-in">
-            <h2 className="nexo-section-title">
-              Top 3 prioridades automáticas
-            </h2>
-            <p className="mt-1 nexo-section-description">
-              Sem lista genérica: apenas o que gera caixa mais rápido.
-            </p>
-            <div className="mt-4 space-y-3">
-              {priorityProblems.map((problem, index) => (
-                <div key={problem.id} className="nexo-card-informative p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-orange-600 dark:text-orange-300">
-                    #{index + 1} prioridade
-                  </p>
-                  <div className="mt-1 flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="nexo-text-wrap font-semibold text-[var(--text-primary)] dark:text-[var(--text-primary)]">
-                        {problem.title}
-                      </p>
-                      <p className="text-xs text-[var(--text-secondary)] dark:text-[var(--text-secondary)]">
-                        {problem.count} itens •{" "}
-                        {formatCurrency(problem.impactCents)} de impacto
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => navigate(problem.ctaPath)}
-                      className="nexo-cta-secondary !h-9 !rounded-lg !px-3 !text-xs"
-                    >
-                      {problem.ctaLabel}
-                    </button>
-                  </div>
-                </div>
-              ))}
+        </article>
+        <article className="nexo-surface-primary p-5">
+          <h2 className="text-base font-semibold text-[var(--text-primary)]">Alertas</h2>
+          <div className="mt-3 space-y-3 text-sm">
+            <div className="nexo-surface-inner p-3">
+              <p className="font-medium text-[var(--text-primary)]">Safety limits</p>
+              <p className="mt-1 text-xs text-[var(--text-muted)]">
+                {safetyState.shouldFallbackToManual ? "Fallback manual ativado." : "Automação dentro do limite."}
+              </p>
             </div>
-          </article>
-
-          {actionFlowSuggestion ? (
-            <article className="nexo-card-alert border-emerald-300/60 bg-emerald-50/70 dark:border-emerald-700/50 dark:bg-emerald-950/20">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-300">
-                Fluxo automático de ação
-              </p>
-              <h3 className="mt-2 text-lg font-semibold text-emerald-900 dark:text-emerald-100">
-                {actionFlowSuggestion.title}
-              </h3>
-              <p className="mt-1 text-sm text-emerald-700 dark:text-emerald-300">
-                {actionFlowSuggestion.description}
-              </p>
+            {quotaWarnings.length > 0 ? (
+              <div className="nexo-surface-inner border-amber-400/30 p-3 text-amber-200">
+                Limite do plano atingido em {quotaWarnings.join(", ")}.
+              </div>
+            ) : null}
+            {actionFlowSuggestion ? (
               <button
                 type="button"
                 onClick={() => navigate(actionFlowSuggestion.ctaPath)}
-                className="nexo-cta-dominant mt-4 !h-11 !rounded-xl !px-5"
+                className="nexo-cta-dominant w-full"
               >
                 {actionFlowSuggestion.ctaLabel}
               </button>
-            </article>
-          ) : (
-            <article className="nexo-card-informative">
-              <h3 className="text-lg font-semibold text-[var(--text-primary)] dark:text-[var(--text-primary)]">
-                Fluxo automático de ação
-              </h3>
-              <p className="mt-1 text-sm text-[var(--text-secondary)] dark:text-[var(--text-secondary)]">
-                Assim que você criar Cliente, O.S. ou Cobrança, a próxima ação
-                aparece aqui sem precisar interpretar.
-              </p>
-            </article>
-          )}
-        </div>
+            ) : null}
+          </div>
+        </article>
       </section>
 
-      {(metricsQuery.isError ||
-        revenueQuery.isError ||
-        serviceOrdersStatusQuery.isError ||
-        chargesStatusQuery.isError) &&
-      !hasAnyCriticalError ? (
-        <section className="rounded-2xl border border-amber-300/50 bg-amber-50/70 p-4 text-sm text-amber-800 dark:border-amber-800/60 dark:bg-amber-950/20 dark:text-amber-200">
-          Parte dos blocos não foi carregada. Os dados visíveis já são válidos;
-          atualize a página para tentar completar o painel.
+      {(metricsQuery.isError || revenueQuery.isError || serviceOrdersStatusQuery.isError || chargesStatusQuery.isError) && !hasAnyCriticalError ? (
+        <section className="nexo-surface-inner border-amber-400/40 p-4 text-sm text-amber-200">
+          Parte dos blocos não foi carregada. Os dados visíveis já são válidos.
         </section>
       ) : null}
 
       {isSlowLoading ? (
-        <section className="rounded-2xl border border-blue-300/50 bg-blue-50/70 p-4 text-sm text-blue-800 dark:border-blue-800/60 dark:bg-blue-950/20 dark:text-blue-200">
-          A atualização está mais lenta que o normal. Você pode continuar
-          navegando enquanto os blocos terminam de carregar.
+        <section className="nexo-surface-inner border-blue-400/40 p-4 text-sm text-blue-200">
+          A atualização está mais lenta que o normal; continue navegando enquanto os blocos são carregados.
         </section>
       ) : null}
     </div>

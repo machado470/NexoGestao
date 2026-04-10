@@ -463,8 +463,25 @@
     box-shadow: var(--nexo-shadow-soft);
   }
 
-  .nexo-surface {
+  .nexo-surface,
+  .nexo-surface-primary {
     @apply rounded-[1.2rem] border border-white/10 bg-[var(--nexo-surface-2)] shadow-[0_14px_32px_rgba(2,6,23,0.32)];
+    background: linear-gradient(
+      168deg,
+      color-mix(in srgb, var(--nexo-card-surface) 92%, rgba(251, 146, 60, 0.05)),
+      color-mix(in srgb, var(--nexo-card-muted) 64%, transparent)
+    );
+    border-color: color-mix(
+      in srgb,
+      var(--nexo-border-soft) 84%,
+      rgba(56, 189, 248, 0.18)
+    );
+  }
+
+  .nexo-surface-inner {
+    @apply rounded-xl border border-white/10;
+    background: color-mix(in srgb, var(--nexo-card-muted) 56%, transparent);
+    border-color: color-mix(in srgb, var(--nexo-border-soft) 74%, transparent);
   }
 
   .nexo-subtle-surface {
