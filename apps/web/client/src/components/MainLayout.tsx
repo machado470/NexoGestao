@@ -372,7 +372,7 @@ export function MainLayout({ children }: MainLayoutProps) {
               {visibleSections.map(section => (
                 <section key={section.id} className="space-y-2">
                   {!sidebarCollapsed || isMobile ? (
-                    <p className="px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">
+                    <p className="px-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--text-muted)]">
                       {section.label}
                     </p>
                   ) : null}
@@ -449,9 +449,14 @@ export function MainLayout({ children }: MainLayoutProps) {
                     </button>
                   ) : null}
                   <div className="nexo-topbar-meta min-w-0">
-                    <p className="truncate text-lg font-semibold tracking-tight text-[var(--text-primary)]">
+                    <p className="truncate text-base font-semibold tracking-tight text-[var(--text-primary)] md:text-lg">
                       {currentMeta.title}
                     </p>
+                    {currentMeta.subtitle ? (
+                      <p className="truncate text-xs text-[var(--text-muted)]">
+                        {currentMeta.subtitle}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
 
