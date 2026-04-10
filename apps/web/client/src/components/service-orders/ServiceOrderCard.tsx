@@ -9,7 +9,8 @@ import {
 } from "@/lib/operations/operations.utils";
 
 import { getServiceOrderNextAction } from "@/lib/operations/operations.selectors";
-import { StatusBadge, mapFinanceStatus, mapServiceOrderStatus } from "@/components/StatusBadge";
+import { NexoStatusBadge } from "@/components/design-system";
+import { mapFinanceStatus, mapServiceOrderStatus } from "@/lib/status-badge";
 
 interface Props {
   os: ServiceOrder;
@@ -88,9 +89,12 @@ export default function ServiceOrderCard({
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="font-semibold">{os.title}</h3>
 
-          <StatusBadge {...mapServiceOrderStatus(status)} />
+          <NexoStatusBadge {...mapServiceOrderStatus(status)} />
 
-          <StatusBadge {...mapFinanceStatus(normalizeFinanceBadgeLabel(chargeBadge.label))} label={chargeBadge.label} />
+          <NexoStatusBadge
+            {...mapFinanceStatus(normalizeFinanceBadgeLabel(chargeBadge.label))}
+            label={chargeBadge.label}
+          />
 
           <span className="text-xs text-gray-400">{timeAgo}</span>
 
@@ -120,7 +124,9 @@ export default function ServiceOrderCard({
           <div className="text-[11px] uppercase tracking-wide text-gray-500">
             Próxima ação
           </div>
-          <div className="text-sm font-medium text-gray-800">{nextAction.title}</div>
+          <div className="text-sm font-medium text-gray-800">
+            {nextAction.title}
+          </div>
           <div className="text-xs text-gray-600">{nextAction.description}</div>
         </div>
 
@@ -128,7 +134,7 @@ export default function ServiceOrderCard({
           <Button
             size="sm"
             variant="outline"
-            onClick={(e) => {
+            onClick={e => {
               e.stopPropagation();
               onOpenDeepLink(os.id);
             }}
@@ -140,7 +146,7 @@ export default function ServiceOrderCard({
           <Button
             size="sm"
             variant="outline"
-            onClick={(e) => {
+            onClick={e => {
               e.stopPropagation();
               if (whatsappUrl && onOpenWhatsApp) {
                 onOpenWhatsApp(whatsappUrl);
@@ -153,7 +159,7 @@ export default function ServiceOrderCard({
 
           <Button
             size="sm"
-            onClick={(e) => {
+            onClick={e => {
               e.stopPropagation();
               onEdit(os.id);
             }}

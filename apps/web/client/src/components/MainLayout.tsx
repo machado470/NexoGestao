@@ -32,7 +32,12 @@ import { canAny, type Permission } from "@/lib/rbac";
 import { useIsMobile } from "@/hooks/useMobile";
 import { useNotificationStore } from "@/stores/notificationStore";
 import { GlobalSearch } from "@/components/GlobalSearch";
-import { AppShell, SidebarNav, Topbar } from "@/components/design-system";
+import {
+  NexoAppShell,
+  NexoMainContainer,
+  NexoSidebar,
+  NexoTopbar,
+} from "@/components/design-system";
 import { BrandSignature } from "@/components/BrandSignature";
 import {
   DropdownMenu,
@@ -311,7 +316,7 @@ export function MainLayout({ children }: MainLayoutProps) {
   };
 
   return (
-    <AppShell
+    <NexoAppShell
       className={`app-root ${theme === "dark" ? "dark" : ""} h-screen overflow-hidden text-[var(--text-primary)]`}
       data-theme={theme}
     >
@@ -325,7 +330,7 @@ export function MainLayout({ children }: MainLayoutProps) {
       ) : null}
 
       <div className="flex h-full w-full">
-        <SidebarNav
+        <NexoSidebar
           data-scrollbar="nexo"
           className={`nexo-sidebar z-40 flex shrink-0 flex-col overflow-hidden nexo-state-transition ${
             isMobile
@@ -430,12 +435,12 @@ export function MainLayout({ children }: MainLayoutProps) {
               ) : null}
             </button>
           </div>
-        </SidebarNav>
+        </NexoSidebar>
 
         <div
           className={`flex min-w-0 flex-1 flex-col overflow-hidden ${!isMobile ? (sidebarCollapsed ? "md:ml-[92px]" : "md:ml-[286px]") : ""}`}
         >
-          <Topbar className="z-20 nexo-state-transition">
+          <NexoTopbar className="z-20 nexo-state-transition">
             <div className="nexo-topbar-grid">
               <div className="grid grid-cols-1 items-center gap-2 md:grid-cols-[auto_minmax(0,1fr)_auto] md:gap-3">
                 <div className="flex min-w-0 items-center gap-2.5 md:gap-3">
@@ -548,7 +553,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                         <ChevronDown className="h-4 w-4 text-[var(--text-muted)]" />
                       </button>
                     </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-52 p-1">
+                    <DropdownMenuContent align="end" className="w-52 p-1">
                       <DropdownMenuLabel className="px-2 py-1.5">
                         <p className="truncate text-xs font-semibold text-[var(--text-primary)]">
                           {user?.name ?? "Usuário"}
@@ -588,16 +593,11 @@ export function MainLayout({ children }: MainLayoutProps) {
                 </div>
               </div>
             </div>
-          </Topbar>
+          </NexoTopbar>
 
-          <main
-            data-scrollbar="nexo"
-            className="nexo-app-content nexo-section-reveal m-3 mt-2 min-h-0 flex-1 overflow-auto pr-2 md:m-4 md:mt-3 md:pr-3"
-          >
-            {children}
-          </main>
+          <NexoMainContainer>{children}</NexoMainContainer>
         </div>
       </div>
-    </AppShell>
+    </NexoAppShell>
   );
 }

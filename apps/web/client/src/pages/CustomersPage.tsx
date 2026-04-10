@@ -57,7 +57,7 @@ import {
 import { SurfaceSection } from "@/components/PagePattern";
 import { EmptyState } from "@/components/EmptyState";
 import { TableSkeleton } from "@/components/QueryStateBoundary";
-import { StatusBadge } from "@/components/StatusBadge";
+import { NexoStatusBadge } from "@/components/design-system";
 import { useCriticalActionStore } from "@/stores/criticalActionStore";
 import { invalidateOperationalGraph } from "@/lib/operationalConsistency";
 import { useProductAnalytics } from "@/hooks/useProductAnalytics";
@@ -276,7 +276,9 @@ function SectionCard({
       {hasContent ? (
         <div className="space-y-3">{children}</div>
       ) : (
-        <p className="text-sm text-[var(--text-muted)] dark:text-[var(--text-muted)]">{emptyText}</p>
+        <p className="text-sm text-[var(--text-muted)] dark:text-[var(--text-muted)]">
+          {emptyText}
+        </p>
       )}
     </div>
   );
@@ -302,7 +304,9 @@ function SummaryCard({
 
   return (
     <div className={`rounded-xl border p-4 ${toneClass}`}>
-      <p className="text-sm text-[var(--text-secondary)] dark:text-[var(--text-muted)]">{title}</p>
+      <p className="text-sm text-[var(--text-secondary)] dark:text-[var(--text-muted)]">
+        {title}
+      </p>
       <p className="mt-1 text-2xl font-bold text-[var(--text-primary)] dark:text-white">
         {value}
       </p>
@@ -566,12 +570,18 @@ export default function CustomersPage() {
         }).length;
         const openServiceOrders = customerOrders.filter((item: any) => {
           const status = String(item.status ?? "").toUpperCase();
-          return status === "OPEN" || status === "ASSIGNED" || status === "IN_PROGRESS";
+          return (
+            status === "OPEN" ||
+            status === "ASSIGNED" ||
+            status === "IN_PROGRESS"
+          );
         }).length;
         const lastInteractionAt = [
           customer.updatedAt,
           ...customerAppointments.map((item: any) => item.startsAt),
-          ...customerOrders.map((item: any) => item.updatedAt ?? item.createdAt),
+          ...customerOrders.map(
+            (item: any) => item.updatedAt ?? item.createdAt
+          ),
           ...customerCharges.map((item: any) => item.createdAt ?? item.dueDate),
         ]
           .filter(Boolean)
@@ -730,7 +740,9 @@ export default function CustomersPage() {
   const stalledCustomerDays = latestWorkspaceActivityAt
     ? Math.max(
         0,
-        Math.floor((Date.now() - latestWorkspaceActivityAt) / (1000 * 60 * 60 * 24))
+        Math.floor(
+          (Date.now() - latestWorkspaceActivityAt) / (1000 * 60 * 60 * 24)
+        )
       )
     : 0;
   const riskScore = useMemo(() => {
@@ -903,8 +915,9 @@ export default function CustomersPage() {
             : "Iniciar relacionamento com este cliente";
   const workspaceWhatsAppRoute = useMemo(() => {
     if (!workspace) return null;
-    const mainCharge = workspace.charges.find(c => c.status === "OVERDUE")
-      ?? workspace.charges.find(c => c.status === "PENDING");
+    const mainCharge =
+      workspace.charges.find(c => c.status === "OVERDUE") ??
+      workspace.charges.find(c => c.status === "PENDING");
     return {
       customerId: workspace.customer.id,
       context: mainCharge?.status === "OVERDUE" ? "overdue_charge" : "general",
@@ -945,7 +958,13 @@ export default function CustomersPage() {
     listServiceOrders.data !== undefined ||
     listCharges.data !== undefined;
   const queryState = getQueryUiState(
-    [listCustomers, workspaceQuery, listAppointments, listServiceOrders, listCharges],
+    [
+      listCustomers,
+      workspaceQuery,
+      listAppointments,
+      listServiceOrders,
+      listCharges,
+    ],
     hasRenderableData
   );
   const blockingErrorMessage =
@@ -967,7 +986,6 @@ export default function CustomersPage() {
       subtitle="Ponto de partida do fluxo oficial: cada cliente conecta agenda, execução, cobrança, comunicação e rastreabilidade."
       breadcrumb={[{ label: "Operação" }, { label: "Clientes" }]}
     >
-
       <OperationalTopCard
         contextLabel="Direção operacional"
         title={nextActionLabel}
@@ -976,12 +994,15 @@ export default function CustomersPage() {
             ? `${workspacePendingCharges} pendências financeiras em aberto para o cliente em foco.`
             : "Sem cliente em foco. Selecione um registro para abrir o workspace completo."
         }
-        chips={smartPriorities.slice(0, 3).map((priority) => (
-          <span key={priority.id} className="rounded-full border px-3 py-1 text-xs text-[var(--text-secondary)]">
+        chips={smartPriorities.slice(0, 3).map(priority => (
+          <span
+            key={priority.id}
+            className="rounded-full border px-3 py-1 text-xs text-[var(--text-secondary)]"
+          >
             {priority.title}: {priority.count}
           </span>
         ))}
-        secondaryActions={(
+        secondaryActions={
           <Button
             type="button"
             variant="outline"
@@ -992,8 +1013,8 @@ export default function CustomersPage() {
             <RefreshCcw className="h-4 w-4" />
             Atualizar
           </Button>
-        )}
-        primaryAction={(
+        }
+        primaryAction={
           <Button
             type="button"
             onClick={() => {
@@ -1009,7 +1030,7 @@ export default function CustomersPage() {
             <Plus className="h-4 w-4" />
             Novo cliente
           </Button>
-        )}
+        }
       />
 
       {queryState.hasBackgroundUpdate ? (
@@ -1091,7 +1112,6 @@ export default function CustomersPage() {
                   onClick: () => void listCustomers.refetch(),
                 }}
               />
-
             </SurfaceSection>
           ) : (
             <div className="overflow-x-auto">
@@ -1122,7 +1142,9 @@ export default function CustomersPage() {
                 <tbody>
                   {customers.map(customer => {
                     const isOpen = workspaceCustomerId === customer.id;
-                    const operational = customerOperationalMap.get(customer.id) ?? {
+                    const operational = customerOperationalMap.get(
+                      customer.id
+                    ) ?? {
                       openServiceOrders: 0,
                       pendingCharges: 0,
                       overdueCharges: 0,
@@ -1172,7 +1194,9 @@ export default function CustomersPage() {
                         <td className="px-4 py-3 text-[var(--text-secondary)] dark:text-[var(--text-secondary)]">
                           <p>{operational.openServiceOrders} O.S. abertas</p>
                           <p className="text-xs text-[var(--text-muted)]">
-                            {customer.active ? "Cliente ativo" : "Cliente inativo"}
+                            {customer.active
+                              ? "Cliente ativo"
+                              : "Cliente inativo"}
                           </p>
                         </td>
 
@@ -1189,11 +1213,13 @@ export default function CustomersPage() {
 
                         <td className="px-4 py-3">
                           <div className="space-y-2">
-                            <StatusBadge
-                              label={getOperationalSeverityLabel(getCustomerSeverity({
-                                active: customer.active,
-                                ...operational,
-                              }))}
+                            <NexoStatusBadge
+                              label={getOperationalSeverityLabel(
+                                getCustomerSeverity({
+                                  active: customer.active,
+                                  ...operational,
+                                })
+                              )}
                               tone={
                                 getCustomerSeverity({
                                   active: customer.active,
@@ -1220,19 +1246,39 @@ export default function CustomersPage() {
 
                         <td className="px-4 py-3">
                           <div className="flex flex-wrap gap-2">
-                            <Button size="sm" variant="outline" onClick={() => openWorkspace(customer.id)}>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openWorkspace(customer.id)}
+                            >
                               Ver detalhes
                             </Button>
-                            <Button size="sm" variant="outline" onClick={() => navigate(`/appointments?customerId=${customer.id}`)}>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() =>
+                                navigate(
+                                  `/appointments?customerId=${customer.id}`
+                                )
+                              }
+                            >
                               Agendar
                             </Button>
-                            <Button size="sm" variant="outline" onClick={() => navigate(`/finances?customerId=${customer.id}`)}>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() =>
+                                navigate(`/finances?customerId=${customer.id}`)
+                              }
+                            >
                               Gerar cobrança
                             </Button>
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => whatsappUrl && navigate(whatsappUrl)}
+                              onClick={() =>
+                                whatsappUrl && navigate(whatsappUrl)
+                              }
                               disabled={!whatsappUrl}
                             >
                               Enviar WhatsApp
@@ -1240,15 +1286,28 @@ export default function CustomersPage() {
                             <Button
                               size="sm"
                               onClick={() => {
-                                if (decision.primaryAction.key === "create_appointment") {
-                                  navigate(`/appointments?customerId=${customer.id}`);
+                                if (
+                                  decision.primaryAction.key ===
+                                  "create_appointment"
+                                ) {
+                                  navigate(
+                                    `/appointments?customerId=${customer.id}`
+                                  );
                                   return;
                                 }
-                                if (decision.primaryAction.key === "open_finances") {
-                                  navigate(`/finances?customerId=${customer.id}`);
+                                if (
+                                  decision.primaryAction.key === "open_finances"
+                                ) {
+                                  navigate(
+                                    `/finances?customerId=${customer.id}`
+                                  );
                                   return;
                                 }
-                                if (decision.primaryAction.key === "open_whatsapp" && whatsappUrl) {
+                                if (
+                                  decision.primaryAction.key ===
+                                    "open_whatsapp" &&
+                                  whatsappUrl
+                                ) {
                                   navigate(whatsappUrl);
                                   return;
                                 }
@@ -1269,10 +1328,7 @@ export default function CustomersPage() {
         </SurfaceSection>
       </SurfaceSection>
 
-      <Dialog
-        open={false}
-        onOpenChange={() => undefined}
-      >
+      <Dialog open={false} onOpenChange={() => undefined}>
         <DialogContent className="left-auto right-0 top-0 h-screen w-full max-h-screen max-w-2xl translate-x-0 translate-y-0 overflow-y-auto rounded-none border-l border-[var(--border-subtle)] bg-[var(--surface-base)] p-0 shadow-2xl dark:border-white/10 dark:bg-[#0b1017]">
           <DialogHeader className="sticky top-0 z-10 border-b border-[var(--border-subtle)] bg-white/95 px-5 py-4 backdrop-blur dark:border-white/10 dark:bg-[#111722]/95">
             <div>
@@ -1881,8 +1937,14 @@ export default function CustomersPage() {
         summary={
           workspace
             ? [
-                { label: "Agendamentos", value: String(workspace.appointments.length) },
-                { label: "Ordens de serviço", value: String(workspace.serviceOrders.length) },
+                {
+                  label: "Agendamentos",
+                  value: String(workspace.appointments.length),
+                },
+                {
+                  label: "Ordens de serviço",
+                  value: String(workspace.serviceOrders.length),
+                },
                 { label: "Cobranças", value: String(workspace.charges.length) },
                 { label: "Próxima ação", value: nextActionLabel },
               ]
@@ -1907,11 +1969,15 @@ export default function CustomersPage() {
             ? [
                 {
                   label: "Abrir agendamentos",
-                  onClick: () => navigate(`/appointments?customerId=${workspace.customer.id}`),
+                  onClick: () =>
+                    navigate(
+                      `/appointments?customerId=${workspace.customer.id}`
+                    ),
                 },
                 {
                   label: "Abrir financeiro",
-                  onClick: () => navigate(`/finances?customerId=${workspace.customer.id}`),
+                  onClick: () =>
+                    navigate(`/finances?customerId=${workspace.customer.id}`),
                 },
               ]
             : []
@@ -1922,12 +1988,18 @@ export default function CustomersPage() {
           description: item.description ?? formatDateTime(item.createdAt),
           source: item.action?.includes("UPDATED") ? "user" : "system",
         }))}
-        explainLayer={workspace ? getCustomerExplainLayer(workspace) : undefined}
+        explainLayer={
+          workspace ? getCustomerExplainLayer(workspace) : undefined
+        }
         whatsAppPreview={
           workspace && workspaceWhatsAppRoute
             ? {
-                contextLabel: getWhatsAppContextLabel(workspaceWhatsAppRoute.context),
-                contextDescription: getWhatsAppContextDescription(workspaceWhatsAppRoute),
+                contextLabel: getWhatsAppContextLabel(
+                  workspaceWhatsAppRoute.context
+                ),
+                contextDescription: getWhatsAppContextDescription(
+                  workspaceWhatsAppRoute
+                ),
                 message: whatsAppDraft,
                 editable: true,
                 onMessageChange: setWhatsAppDraft,

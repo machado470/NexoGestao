@@ -44,6 +44,8 @@ export function AppShell({
   );
 }
 
+export const NexoAppShell = AppShell;
+
 export function SidebarNav({
   children,
   className,
@@ -54,6 +56,8 @@ export function SidebarNav({
   return <aside className={cn("nexo-sidebar", className)}>{children}</aside>;
 }
 
+export const NexoSidebar = SidebarNav;
+
 export function Topbar({
   children,
   className,
@@ -62,6 +66,29 @@ export function Topbar({
   className?: string;
 }) {
   return <header className={cn("nexo-topbar", className)}>{children}</header>;
+}
+
+export const NexoTopbar = Topbar;
+
+export function NexoMainContainer({
+  children,
+  className,
+  ...props
+}: ComponentProps<"main"> & {
+  children: ReactNode;
+}) {
+  return (
+    <main
+      data-scrollbar="nexo"
+      className={cn(
+        "nexo-app-content nexo-section-reveal m-3 mt-2 min-h-0 flex-1 overflow-auto pr-2 md:m-4 md:mt-3 md:pr-3",
+        className
+      )}
+      {...props}
+    >
+      {children}
+    </main>
+  );
 }
 
 export function PageHeader({
@@ -102,9 +129,7 @@ export function SurfaceCard({
       ? "nexo-surface-inner p-4"
       : "nexo-surface-primary p-4 md:p-5";
 
-  return (
-    <section className={cn(surfaceClass, className)}>{children}</section>
-  );
+  return <section className={cn(surfaceClass, className)}>{children}</section>;
 }
 
 export function NexoCard({
@@ -124,7 +149,9 @@ export function NexoCard({
     priority: "nexo-card-priority",
   } as const;
 
-  return <section className={cn(variantMap[variant], className)}>{children}</section>;
+  return (
+    <section className={cn(variantMap[variant], className)}>{children}</section>
+  );
 }
 
 export function StatCard({
@@ -177,7 +204,9 @@ export function NexoStatCard({
             {value}
           </p>
           {helper ? (
-            <p className="mt-1 text-xs text-[var(--text-secondary)]">{helper}</p>
+            <p className="mt-1 text-xs text-[var(--text-secondary)]">
+              {helper}
+            </p>
           ) : null}
         </div>
         {icon ? <div className="nexo-icon-tile">{icon}</div> : null}
@@ -189,7 +218,10 @@ export function NexoStatCard({
 
 export function DataTable({ className, ...props }: ComponentProps<"table">) {
   return (
-    <table className={cn("w-full nexo-data-table text-sm", className)} {...props} />
+    <table
+      className={cn("w-full nexo-data-table text-sm", className)}
+      {...props}
+    />
   );
 }
 
@@ -313,7 +345,9 @@ export function NexoAlertCard({
 }
 
 export function NexoTable({ className, ...props }: ComponentProps<"table">) {
-  return <table className={cn("nexo-data-table nexo-table", className)} {...props} />;
+  return (
+    <table className={cn("nexo-data-table nexo-table", className)} {...props} />
+  );
 }
 
 export function NexoPageHeader({
@@ -333,12 +367,75 @@ export function NexoPageHeader({
         <div className="min-w-0">
           {overline ? <p className="nexo-overline mb-2">{overline}</p> : null}
           <h1 className="nexo-page-header-title">{title}</h1>
-          {subtitle ? <p className="nexo-page-header-description">{subtitle}</p> : null}
+          {subtitle ? (
+            <p className="nexo-page-header-description">{subtitle}</p>
+          ) : null}
         </div>
-        {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
+        {actions ? (
+          <div className="flex flex-wrap items-center gap-2">{actions}</div>
+        ) : null}
       </div>
     </section>
   );
+}
+
+export function NexoOperationalHero({
+  eyebrow,
+  title,
+  description,
+  actions,
+}: {
+  eyebrow?: ReactNode;
+  title: ReactNode;
+  description?: ReactNode;
+  actions?: ReactNode;
+}) {
+  return (
+    <NexoPageHeader
+      overline={eyebrow}
+      title={title}
+      subtitle={description}
+      actions={actions}
+    />
+  );
+}
+
+export function NexoPageSection({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <SurfaceCard className={cn("p-4 md:p-5", className)}>
+      {children}
+    </SurfaceCard>
+  );
+}
+
+export function NexoActionGroup({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn("flex flex-wrap items-center gap-2", className)}>
+      {children}
+    </div>
+  );
+}
+
+export function NexoIconTile({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return <div className={cn("nexo-icon-tile", className)}>{children}</div>;
 }
 
 export function TimelineList({

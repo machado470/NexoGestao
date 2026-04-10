@@ -22,7 +22,8 @@ import { Receipt } from "lucide-react";
 import { SurfaceSection } from "@/components/PagePattern";
 import { EmptyState } from "@/components/EmptyState";
 import { TableSkeleton } from "@/components/QueryStateBoundary";
-import { StatusBadge, mapFinanceStatus } from "@/components/StatusBadge";
+import { NexoStatusBadge } from "@/components/design-system";
+import { mapFinanceStatus } from "@/lib/status-badge";
 import { useChargeActions } from "@/hooks/useChargeActions";
 import { useProductAnalytics } from "@/hooks/useProductAnalytics";
 import { generateFinanceActions } from "@/lib/smartActions";
@@ -473,8 +474,13 @@ export default function FinancesPage() {
         title: "Pagamento registrado",
         description:
           "Feche o ciclo operacional marcando a O.S. como concluída e com resultado.",
-        primaryAction: { key: "open_service_order" as const, label: "Ir para O.S." },
-        secondaryActions: [{ key: "open_finances" as const, label: "Voltar ao financeiro" }],
+        primaryAction: {
+          key: "open_service_order" as const,
+          label: "Ir para O.S.",
+        },
+        secondaryActions: [
+          { key: "open_finances" as const, label: "Voltar ao financeiro" },
+        ],
       };
     }
 
@@ -486,16 +492,14 @@ export default function FinancesPage() {
       primaryAction: { key: "open_finances" as const, label: "Seguir fila" },
       secondaryActions: [],
     };
-  }, [
-    billingQueue,
-    isPaymentScoped,
-    paymentById?.id,
-  ]);
+  }, [billingQueue, isPaymentScoped, paymentById?.id]);
 
   const nextActionButtons = useMemo(() => {
     const resolve = (key: string) => {
       if (key === "open_whatsapp") {
-        const overdue = billingQueue.find(item => item.normalized === ChargeStatus.OVERDUE);
+        const overdue = billingQueue.find(
+          item => item.normalized === ChargeStatus.OVERDUE
+        );
         const whatsappUrl = overdue
           ? buildWhatsAppUrlFromCharge(overdue.charge)
           : null;
@@ -506,13 +510,16 @@ export default function FinancesPage() {
             source: "next_action_overdue",
           });
           navigate(
-            whatsappUrl ?? `/whatsapp?returnTo=${encodeURIComponent("/finances")}`
+            whatsappUrl ??
+              `/whatsapp?returnTo=${encodeURIComponent("/finances")}`
           );
         };
       }
       if (key === "open_service_order") {
         return () => {
-          const serviceOrderId = String(paymentScopedCharge?.serviceOrderId ?? "").trim();
+          const serviceOrderId = String(
+            paymentScopedCharge?.serviceOrderId ?? ""
+          ).trim();
           if (serviceOrderId) navigate(`/service-orders?os=${serviceOrderId}`);
           else navigate("/service-orders");
         };
@@ -523,11 +530,16 @@ export default function FinancesPage() {
 
     return [nextAction.primaryAction, ...nextAction.secondaryActions]
       .map(action => ({ ...action, onClick: resolve(action.key) }))
-      .filter(
-        (action): action is typeof action & { onClick: () => void } =>
-          Boolean(action.onClick)
+      .filter((action): action is typeof action & { onClick: () => void } =>
+        Boolean(action.onClick)
       );
-  }, [billingQueue, navigate, nextAction, paymentScopedCharge?.serviceOrderId, track]);
+  }, [
+    billingQueue,
+    navigate,
+    nextAction,
+    paymentScopedCharge?.serviceOrderId,
+    track,
+  ]);
 
   const smartOperationalActions = useMemo(
     () =>
@@ -658,7 +670,10 @@ export default function FinancesPage() {
             : "Sem pressão crítica agora."
         }
         chips={smartPriorities.slice(0, 3).map(priority => (
-          <span key={priority.id} className="rounded-full border px-3 py-1 text-xs text-[var(--text-secondary)]">
+          <span
+            key={priority.id}
+            className="rounded-full border px-3 py-1 text-xs text-[var(--text-secondary)]"
+          >
             {priority.title}: {priority.count}
           </span>
         ))}
@@ -677,20 +692,20 @@ export default function FinancesPage() {
         primaryAction={
           <div className="flex w-full flex-col items-stretch gap-2 lg:w-auto lg:items-end">
             <div className="flex w-full flex-col gap-2 sm:flex-row lg:w-auto">
-            <Button type="button" onClick={nextActionButtons[0]?.onClick}>
-              {nextAction.primaryAction.label}
-            </Button>
-            <ActionFeedbackButton
-              state="idle"
-              idleLabel="Priorizar cobranças"
-              onClick={() => {
-                track("cta_click", {
-                  screen: "finances",
-                  ctaId: "hero_prioritize_charges",
-                });
-                navigate("/finances");
-              }}
-            />
+              <Button type="button" onClick={nextActionButtons[0]?.onClick}>
+                {nextAction.primaryAction.label}
+              </Button>
+              <ActionFeedbackButton
+                state="idle"
+                idleLabel="Priorizar cobranças"
+                onClick={() => {
+                  track("cta_click", {
+                    screen: "finances",
+                    ctaId: "hero_prioritize_charges",
+                  });
+                  navigate("/finances");
+                }}
+              />
             </div>
           </div>
         }
@@ -928,7 +943,6 @@ export default function FinancesPage() {
               onClick: () => navigate("/service-orders"),
             }}
           />
-
         </SurfaceSection>
       ) : (
         <div className="space-y-3">
@@ -955,7 +969,7 @@ export default function FinancesPage() {
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <StatusBadge
+                    <NexoStatusBadge
                       {...mapFinanceStatus(normalizedStatus)}
                       label={getChargeStatusLabel(normalizedStatus)}
                     />
@@ -977,7 +991,8 @@ export default function FinancesPage() {
                                     "CASH"
                                   )) as { paymentId?: string } | undefined;
                                 },
-                                nextSuggestedAction: "Enviar cobrança via WhatsApp",
+                                nextSuggestedAction:
+                                  "Enviar cobrança via WhatsApp",
                               });
                               setPaymentDoneId(c.id);
                               setFlowFeedback(
@@ -1040,14 +1055,29 @@ export default function FinancesPage() {
         }}
         title={`Cobrança #${activeCharge?.id ?? ""}`}
         subtitle={activeCharge?.customer?.name ?? "Financeiro em execução"}
-        statusLabel={activeCharge ? getChargeStatusLabel(normalizeChargeStatus(activeCharge.status)) : undefined}
+        statusLabel={
+          activeCharge
+            ? getChargeStatusLabel(normalizeChargeStatus(activeCharge.status))
+            : undefined
+        }
         summary={
           activeCharge
             ? [
-                { label: "Valor", value: formatCurrencyFromCents(activeCharge.amountCents) },
-                { label: "Vencimento", value: String(activeCharge.dueDate ?? "—") },
+                {
+                  label: "Valor",
+                  value: formatCurrencyFromCents(activeCharge.amountCents),
+                },
+                {
+                  label: "Vencimento",
+                  value: String(activeCharge.dueDate ?? "—"),
+                },
                 { label: "Cliente", value: activeCharge.customer?.name ?? "—" },
-                { label: "Status", value: getChargeStatusLabel(normalizeChargeStatus(activeCharge.status)) },
+                {
+                  label: "Status",
+                  value: getChargeStatusLabel(
+                    normalizeChargeStatus(activeCharge.status)
+                  ),
+                },
               ]
             : []
         }
@@ -1055,7 +1085,10 @@ export default function FinancesPage() {
           activeCharge
             ? {
                 label: "Enviar no WhatsApp",
-                onClick: () => navigate(buildWhatsAppUrlFromCharge(activeCharge) ?? "/whatsapp"),
+                onClick: () =>
+                  navigate(
+                    buildWhatsAppUrlFromCharge(activeCharge) ?? "/whatsapp"
+                  ),
               }
             : undefined
         }
@@ -1074,18 +1107,39 @@ export default function FinancesPage() {
         timeline={
           activeCharge
             ? [
-                { id: "created", label: "Criada", description: String(activeCharge.createdAt ?? "—"), source: "system" },
-                { id: "updated", label: "Atualizada", description: String(activeCharge.updatedAt ?? "—"), source: "system" },
-                { id: "due", label: "Vencimento", description: String(activeCharge.dueDate ?? "—"), source: "user" },
+                {
+                  id: "created",
+                  label: "Criada",
+                  description: String(activeCharge.createdAt ?? "—"),
+                  source: "system",
+                },
+                {
+                  id: "updated",
+                  label: "Atualizada",
+                  description: String(activeCharge.updatedAt ?? "—"),
+                  source: "system",
+                },
+                {
+                  id: "due",
+                  label: "Vencimento",
+                  description: String(activeCharge.dueDate ?? "—"),
+                  source: "user",
+                },
               ]
             : []
         }
-        explainLayer={activeCharge ? getChargeExplainLayer(activeCharge) : undefined}
+        explainLayer={
+          activeCharge ? getChargeExplainLayer(activeCharge) : undefined
+        }
         whatsAppPreview={
           activeCharge && activeChargeWhatsAppRoute
             ? {
-                contextLabel: getWhatsAppContextLabel(activeChargeWhatsAppRoute.context),
-                contextDescription: getWhatsAppContextDescription(activeChargeWhatsAppRoute),
+                contextLabel: getWhatsAppContextLabel(
+                  activeChargeWhatsAppRoute.context
+                ),
+                contextDescription: getWhatsAppContextDescription(
+                  activeChargeWhatsAppRoute
+                ),
                 message: whatsAppDraft,
                 editable: true,
                 onMessageChange: setWhatsAppDraft,

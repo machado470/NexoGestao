@@ -1,20 +1,9 @@
-import { NexoStatusBadge } from "@/components/design-system";
-
 export type StatusTone = "success" | "warning" | "danger" | "neutral" | "info";
 
-export function StatusBadge({
-  label,
-  tone,
-  className,
-}: {
+export function mapFinanceStatus(status?: string | null): {
   label: string;
   tone: StatusTone;
-  className?: string;
-}) {
-  return <NexoStatusBadge label={label} tone={tone} className={className} />;
-}
-
-export function mapFinanceStatus(status?: string | null): { label: string; tone: StatusTone } {
+} {
   switch (String(status ?? "").toUpperCase()) {
     case "PAID":
       return { label: "Pago", tone: "success" };
@@ -29,7 +18,10 @@ export function mapFinanceStatus(status?: string | null): { label: string; tone:
   }
 }
 
-export function mapServiceOrderStatus(status?: string | null): { label: string; tone: StatusTone } {
+export function mapServiceOrderStatus(status?: string | null): {
+  label: string;
+  tone: StatusTone;
+} {
   switch (String(status ?? "").toUpperCase()) {
     case "DONE":
       return { label: "Concluído", tone: "success" };
@@ -46,7 +38,10 @@ export function mapServiceOrderStatus(status?: string | null): { label: string; 
   }
 }
 
-export function mapAppointmentStatus(status?: string | null): { label: string; tone: StatusTone } {
+export function mapAppointmentStatus(status?: string | null): {
+  label: string;
+  tone: StatusTone;
+} {
   switch (String(status ?? "").toUpperCase()) {
     case "DONE":
       return { label: "Concluído", tone: "success" };

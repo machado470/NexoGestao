@@ -20,14 +20,16 @@ import {
   type SmartActionWithExecution,
 } from "@/lib/smartActions";
 import {
-  AlertCard,
+  NexoActionGroup,
+  NexoAlertCard,
   GhostButton,
-  PageHeader,
+  NexoOperationalHero,
+  NexoPageSection,
   PrimaryButton,
-  PriorityList,
+  NexoPriorityList,
   SecondaryButton,
   SurfaceCard,
-  TimelineList,
+  NexoTimeline,
 } from "@/components/design-system";
 
 export function PageShell({ children }: { children: ReactNode }) {
@@ -50,19 +52,17 @@ export function PageHero({
   actions?: ReactNode;
 }) {
   return (
-    <PageHeader
-      title={
-        <div className="max-w-3xl">
-          {eyebrow ? (
-            <div className="mb-2 inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-secondary)]">
-              <Sparkles className="h-3.5 w-3.5 text-[var(--accent-primary)]" />
-              {eyebrow}
-            </div>
-          ) : null}
-          {title}
-        </div>
+    <NexoOperationalHero
+      eyebrow={
+        eyebrow ? (
+          <span className="inline-flex items-center gap-2">
+            <Sparkles className="h-3.5 w-3.5 text-[var(--accent-primary)]" />
+            {eyebrow}
+          </span>
+        ) : undefined
       }
-      subtitle={description}
+      title={<div className="max-w-3xl">{title}</div>}
+      description={description}
       actions={actions}
     />
   );
@@ -116,7 +116,7 @@ export function SmartPage({
       </div>
 
       {primaryAction ? (
-        <AlertCard className="p-3">
+        <NexoAlertCard className="p-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-[var(--accent)] dark:text-orange-300">
             Ação principal
           </p>
@@ -135,11 +135,11 @@ export function SmartPage({
               Executar agora
             </PrimaryButton>
           </div>
-        </AlertCard>
+        </NexoAlertCard>
       ) : null}
 
       {orderedActions.length > 0 ? (
-        <PriorityList>
+        <NexoPriorityList>
           <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
             Ações ordenadas
           </p>
@@ -173,7 +173,7 @@ export function SmartPage({
               </div>
             ))}
           </div>
-        </PriorityList>
+        </NexoPriorityList>
       ) : null}
 
       <SurfaceCard className="nexo-card-informative p-3">
@@ -202,7 +202,7 @@ export function SmartPage({
         </div>
       </SurfaceCard>
 
-      <TimelineList>
+      <NexoTimeline>
         <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
           Top 3 prioridades
         </p>
@@ -218,9 +218,9 @@ export function SmartPage({
             </div>
           ))}
         </div>
-      </TimelineList>
+      </NexoTimeline>
 
-      <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-surface)] p-2 md:border-none md:bg-transparent md:p-0">
+      <NexoActionGroup className="rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-surface)] p-2 md:border-none md:bg-transparent md:p-0">
         <PrimaryButton
           type="button"
           className="nexo-cta-dominant nexo-state-transition min-h-10 w-full gap-2"
@@ -239,7 +239,7 @@ export function SmartPage({
           {primaryAction ? "Executar ação principal" : dominantCta.label}
           <ArrowRight className="h-4 w-4" />
         </PrimaryButton>
-      </div>
+      </NexoActionGroup>
     </section>
   );
 }
@@ -251,5 +251,5 @@ export function SurfaceSection({
   children: ReactNode;
   className?: string;
 }) {
-  return <SurfaceCard className={cn("p-4 md:p-5", className)}>{children}</SurfaceCard>;
+  return <NexoPageSection className={className}>{children}</NexoPageSection>;
 }
