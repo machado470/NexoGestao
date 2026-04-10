@@ -1522,6 +1522,9 @@ html {
     background: var(--bg-app);
     color: var(--text-primary);
     font-family: var(--nexo-body-font);
+    width: 100%;
+    min-height: 100vh;
+    overflow: hidden;
   }
 
   .nexo-sidebar {
@@ -1586,13 +1589,32 @@ html {
     border-radius: 0;
     background: var(--bg-app);
     box-shadow: none;
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: hidden;
   }
 
   .nexo-page-shell {
     max-width: 1560px;
+    width: 100%;
+    min-width: 0;
     padding: 1.25rem;
     padding-bottom: 2.5rem;
     gap: 1.25rem;
+    overflow-x: clip;
+  }
+
+  .nexo-page-shell > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .app-root img,
+  .app-root video,
+  .app-root canvas,
+  .app-root iframe,
+  .app-root svg {
+    max-width: 100%;
   }
 
   .nexo-surface-primary,

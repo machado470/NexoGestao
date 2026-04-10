@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import { ArrowLeft } from "lucide-react";
+import { BrandSignature } from "@/components/BrandSignature";
 
 import "@/pages/landing.css";
 
@@ -42,18 +43,10 @@ export function AuthMarketingShell({
             <div className="relative flex h-full flex-col justify-between p-10 xl:p-14">
               <div>
                 <button type="button" onClick={() => navigate("/")} className="flex items-center gap-3">
-                  <div className="grid h-11 w-11 place-content-center rounded-xl bg-slate-900 shadow-sm">
-                    <div className="grid grid-cols-2 gap-1">
-                      <span className="h-2.5 w-2.5 rounded-[3px] bg-white" />
-                      <span className="h-2.5 w-2.5 rounded-[3px] bg-orange-500" />
-                      <span className="h-2.5 w-2.5 rounded-[3px] bg-blue-500" />
-                      <span className="h-2.5 w-2.5 rounded-[3px] bg-white" />
-                    </div>
-                  </div>
-                  <div className="text-left">
-                    <p className="text-base font-semibold leading-none">NexoGestão</p>
-                    <p className="mt-1 text-sm text-slate-500">operação centralizada de verdade</p>
-                  </div>
+                  <BrandSignature
+                    subtitle="operação centralizada de verdade"
+                    className="[&>div:nth-child(2)>p:first-child]:text-slate-900 [&>div:nth-child(2)>p:last-child]:text-slate-500"
+                  />
                 </button>
 
                 <div className="mt-14 max-w-xl">

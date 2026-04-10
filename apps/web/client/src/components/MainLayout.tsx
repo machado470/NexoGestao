@@ -10,6 +10,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  CreditCard,
   DollarSign,
   History,
   LayoutDashboard,
@@ -19,7 +20,6 @@ import {
   Moon,
   Settings,
   Shield,
-  Sparkles,
   Sun,
   User,
   Users,
@@ -33,6 +33,7 @@ import { useIsMobile } from "@/hooks/useMobile";
 import { useNotificationStore } from "@/stores/notificationStore";
 import { GlobalSearch } from "@/components/GlobalSearch";
 import { AppShell, SidebarNav, Topbar } from "@/components/design-system";
+import { BrandSignature } from "@/components/BrandSignature";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -337,21 +338,9 @@ export function MainLayout({ children }: MainLayoutProps) {
               <button
                 type="button"
                 onClick={() => handleNavigate("/executive-dashboard")}
-                className={`flex min-w-0 items-center ${sidebarCollapsed && !isMobile ? "justify-center" : "gap-3"}`}
+                className={`flex min-w-0 items-center ${sidebarCollapsed && !isMobile ? "justify-center" : ""}`}
               >
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)] ring-1 ring-[color-mix(in_srgb,var(--accent)_45%,transparent)]">
-                  <Sparkles className="h-4 w-4" />
-                </div>
-                {!sidebarCollapsed || isMobile ? (
-                  <div className="min-w-0 text-left">
-                    <p className="truncate text-sm font-semibold text-[var(--text-primary)]">
-                      NexoGestão
-                    </p>
-                    <p className="truncate text-xs text-[var(--text-muted)]">
-                      Workspace Operacional
-                    </p>
-                  </div>
-                ) : null}
+                <BrandSignature compact={sidebarCollapsed && !isMobile} />
               </button>
 
               {!isMobile ? (

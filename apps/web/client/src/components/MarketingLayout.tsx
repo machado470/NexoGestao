@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import { Instagram, Linkedin, Menu, Twitter, X } from "lucide-react";
+import { BrandSignature } from "@/components/BrandSignature";
 
 type MarketingLayoutProps = {
   children: ReactNode;
@@ -65,15 +66,10 @@ export function MarketingLayout({ children }: MarketingLayoutProps) {
             className="flex items-center gap-3"
             aria-label="Ir para página inicial"
           >
-            <div className="grid h-11 w-11 place-content-center rounded-xl bg-slate-900 shadow-sm">
-              <div className="grid grid-cols-2 gap-1">
-                <span className="h-2.5 w-2.5 rounded-[3px] bg-white" />
-                <span className="h-2.5 w-2.5 rounded-[3px] bg-orange-500" />
-                <span className="h-2.5 w-2.5 rounded-[3px] bg-violet-500" />
-                <span className="h-2.5 w-2.5 rounded-[3px] bg-white" />
-              </div>
-            </div>
-            <span className="text-lg font-semibold text-slate-900">NexoGestão</span>
+            <BrandSignature
+              className="[&>div:nth-child(2)>p:first-child]:text-slate-900 [&>div:nth-child(2)>p:last-child]:hidden"
+              subtitle=""
+            />
           </button>
 
           <nav className="hidden items-center gap-8 md:flex" aria-label="Menu principal">
