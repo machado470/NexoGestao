@@ -64,6 +64,10 @@ import { ContextPanel } from "@/components/operating-system/ContextPanel";
 import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import { runFlowChain, type ExecutionSnapshot } from "@/lib/operations/flowChain";
 import { getServiceOrderExplainLayer } from "@/lib/operations/explain-layer";
+import {
+  OperationalStickyZone,
+  OperationalSummaryCards,
+} from "@/components/operating-system/OperationalStickyZone";
 
 const FINANCIAL_FILTERS: Array<{
   value: FinancialFilter;
@@ -548,43 +552,52 @@ export default function ServiceOrdersPage() {
         </SurfaceSection>
       ) : null}
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-        <SurfaceSection><div className="text-xs uppercase tracking-wide text-muted-foreground">Total em execução</div><div className="mt-2 text-2xl font-semibold">{totalOrders}</div></SurfaceSection>
-        <SurfaceSection><div className="text-xs uppercase tracking-wide text-muted-foreground">Visíveis agora</div><div className="mt-2 text-2xl font-semibold">{totalVisible}</div></SurfaceSection>
-        <SurfaceSection><div className="text-xs uppercase tracking-wide text-muted-foreground">O que precisa andar</div><div className="mt-2 text-2xl font-semibold">{totalOperational}</div></SurfaceSection>
-        <SurfaceSection><div className="text-xs uppercase tracking-wide text-muted-foreground">Impacto imediato</div><div className="mt-2 text-2xl font-semibold">{totalWithUrgency}</div></SurfaceSection>
-      </div>
-
-      <ActionBarWrapper
-        searchValue={search}
-        onSearchChange={setSearch}
-        searchPlaceholder="Buscar por título, cliente, responsável ou status"
-        searchSlot={
-          <div className="relative w-full">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
-            <Input
-              value={search}
-              onChange={event => setSearch(event.target.value)}
-              placeholder="Buscar por título, cliente, responsável ou status"
-              className="w-full pl-9"
-            />
-          </div>
-        }
-        filtersSlot={
-          <div className="flex flex-wrap gap-2">
-            {FINANCIAL_FILTERS.map(item => (
-              <Button
-                key={item.value}
-                size="sm"
-                variant={filter === item.value ? "default" : "outline"}
-                onClick={() => setFilter(item.value)}
-              >
-                {item.label}
-              </Button>
-            ))}
-          </div>
-        }
-      />
+      <OperationalStickyZone
+        summaryCards={(
+          <OperationalSummaryCards>
+            <SurfaceSection>
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">O que precisa andar</div>
+              <div className="mt-2 text-2xl font-semibold">{totalOperational}</div>
+            </SurfaceSection>
+            <SurfaceSection>
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">Impacto imediato</div>
+              <div className="mt-2 text-2xl font-semibold">{totalWithUrgency}</div>
+            </SurfaceSection>
+          </OperationalSummaryCards>
+        )}
+        searchBar={(
+          <ActionBarWrapper
+            searchValue={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Buscar por título, cliente, responsável ou status"
+            searchSlot={
+              <div className="relative w-full">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
+                <Input
+                  value={search}
+                  onChange={event => setSearch(event.target.value)}
+                  placeholder="Buscar por título, cliente, responsável ou status"
+                  className="w-full pl-9"
+                />
+              </div>
+            }
+            filtersSlot={(
+              <div className="flex flex-wrap gap-2">
+                {FINANCIAL_FILTERS.map(item => (
+                  <Button
+                    key={item.value}
+                    size="sm"
+                    variant={filter === item.value ? "default" : "outline"}
+                    onClick={() => setFilter(item.value)}
+                  >
+                    {item.label}
+                  </Button>
+                ))}
+              </div>
+            )}
+          />
+        )}
+      >
 
       <SurfaceSection
         className={getOperationalSeverityClasses(nextAction.severity)}
@@ -910,6 +923,7 @@ export default function ServiceOrdersPage() {
             : undefined
         }
       />
+      </OperationalStickyZone>
     </PageWrapper>
   );
 }
