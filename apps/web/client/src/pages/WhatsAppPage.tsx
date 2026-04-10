@@ -28,6 +28,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { PageHero, PageShell, SmartPage, SurfaceSection } from "@/components/PagePattern";
 import { getQueryUiState } from "@/lib/query-helpers";
 import { buildIdempotencyKey } from "@/lib/idempotency";
+import { resolveOperationFeedback } from "@/lib/operations/operation-feedback";
 
 function getMessageTypeFromContext(context: string) {
   if (context === "overdue_charge") return "PAYMENT_REMINDER";
@@ -375,13 +376,17 @@ export default function WhatsAppPage() {
               await messagesQuery.refetch();
               setMessageInput("");
               const operationStatus = String((result as any)?.operation?.status ?? "").toLowerCase();
-              if (operationStatus === "duplicate") {
-                toast.success("Envio duplicado detectado: mensagem anterior reaproveitada.");
-              } else if (operationStatus === "queued") {
-                toast.success("Mensagem enfileirada para envio.");
-              } else {
-                toast.success("Mensagem enviada");
-              }
+              const executedMessage = operationStatus === "queued" ? "Mensagem enfileirada para envio." : "Mensagem enviada";
+              toast.success(
+                resolveOperationFeedback({
+                  operationStatus,
+                  degradedStatus: null,
+                  executedMessage,
+                  duplicateMessage: "Envio duplicado detectado: mensagem anterior reaproveitada.",
+                  retryScheduledMessage: "Mensagem enfileirada para retry.",
+                  blockedMessage: "Envio bloqueado por política operacional.",
+                })
+              );
             } catch (error) {
               const message =
                 error instanceof Error ? error.message : "Erro ao enviar mensagem";

@@ -8,6 +8,9 @@ type MetricKey =
   | 'idempotencyConflicts'
   | 'idempotencyInProgress'
   | 'integrationTemporaryFailures'
+  | `executionActionStatus:${'executed' | 'blocked' | 'throttled' | 'failed'}`
+  | `financeOperationStatus:${'executed' | 'blocked' | 'skipped' | 'duplicate' | 'retry_scheduled' | 'failed' | 'degraded' | 'queued'}`
+  | `providerTimeouts:${string}`
   | `errorsByEndpoint:${string}`
   | `requestsByEndpoint:${string}`
   | `latencyByEndpoint:${string}:count`
@@ -73,6 +76,22 @@ export class MetricsService {
       idempotencyConflicts: this.counters.get('idempotencyConflicts') ?? 0,
       idempotencyInProgress: this.counters.get('idempotencyInProgress') ?? 0,
       integrationTemporaryFailures: this.counters.get('integrationTemporaryFailures') ?? 0,
+      executionActionStatus: {
+        executed: this.counters.get('executionActionStatus:executed') ?? 0,
+        blocked: this.counters.get('executionActionStatus:blocked') ?? 0,
+        throttled: this.counters.get('executionActionStatus:throttled') ?? 0,
+        failed: this.counters.get('executionActionStatus:failed') ?? 0,
+      },
+      financeOperationStatus: {
+        executed: this.counters.get('financeOperationStatus:executed') ?? 0,
+        blocked: this.counters.get('financeOperationStatus:blocked') ?? 0,
+        skipped: this.counters.get('financeOperationStatus:skipped') ?? 0,
+        duplicate: this.counters.get('financeOperationStatus:duplicate') ?? 0,
+        queued: this.counters.get('financeOperationStatus:queued') ?? 0,
+        retryScheduled: this.counters.get('financeOperationStatus:retry_scheduled') ?? 0,
+        failed: this.counters.get('financeOperationStatus:failed') ?? 0,
+        degraded: this.counters.get('financeOperationStatus:degraded') ?? 0,
+      },
       errorsByEndpoint,
       requestsByEndpoint,
       endpointLatency,

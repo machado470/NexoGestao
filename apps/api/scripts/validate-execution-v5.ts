@@ -320,6 +320,7 @@ async function main() {
     const governance = new ExecutionGovernanceService()
     const eventsAdapter = new ScriptExecutionEventsAdapter(prisma)
     const financeStub = new ScriptFinanceStub(prisma)
+    const metricsStub = { increment: () => undefined } as any
 
     const runner = new ExecutionRunner(
       prisma as never,
@@ -327,6 +328,7 @@ async function main() {
       executionConfig,
       governance,
       eventsAdapter as never,
+      metricsStub,
     )
 
     const org = await prisma.organization.create({

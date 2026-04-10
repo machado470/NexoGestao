@@ -26,6 +26,7 @@ import { invalidateOperationalGraph } from "@/lib/operationalConsistency";
 import { useProductAnalytics } from "@/hooks/useProductAnalytics";
 import { notify } from "@/stores/notificationStore";
 import { buildIdempotencyKey } from "@/lib/idempotency";
+import { resolveOperationFeedback } from "@/lib/operations/operation-feedback";
 
 interface CreateChargeModalProps {
   isOpen: boolean;
@@ -209,12 +210,13 @@ export function CreateChargeModal({
         await invalidateOperationalGraph(utils, customerId || undefined);
         const operationStatus = String((created as any)?.operation?.status ?? "").toLowerCase();
         const degraded = (created as any)?.degraded;
-        const successMessage =
-          operationStatus === "duplicate"
-            ? "Requisição duplicada detectada: cobrança reaproveitada com segurança."
-            : degraded?.status === "retry_scheduled"
-              ? "Cobrança criada. WhatsApp entrou em modo pendente para retry."
-              : "Cobrança criada com contexto sincronizado.";
+        const successMessage = resolveOperationFeedback({
+          operationStatus,
+          degradedStatus: degraded?.status,
+          executedMessage: "Cobrança criada com contexto sincronizado.",
+          duplicateMessage: "Requisição duplicada detectada: cobrança reaproveitada com segurança.",
+          retryScheduledMessage: "Cobrança criada. WhatsApp entrou em modo pendente para retry.",
+        });
 
         toast.success(successMessage, {
           action: {
