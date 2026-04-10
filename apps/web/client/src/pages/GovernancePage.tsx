@@ -207,7 +207,7 @@ export default function GovernancePage() {
   return (
     <PageWrapper
         title="Governança Operacional"
-        subtitle="Aqui você prova valor executivo: o que mudou na operação, por que isso protege caixa e qual decisão tomar agora."
+        subtitle="Risco institucional, sinais operacionais e decisões imediatas em um único fluxo."
       >
       <ActionBarWrapper
         secondaryActions={(
@@ -243,8 +243,8 @@ export default function GovernancePage() {
 
       <ExecutionOperationsPanel />
 
-      <div
-        className={`nexo-surface p-6 text-center ${
+      <SurfaceSection
+        className={`p-6 text-center ${
           scoreTone === "critical"
             ? "border-red-200 bg-red-50 dark:border-red-900/40 dark:bg-red-950/20"
             : scoreTone === "attention"
@@ -261,7 +261,7 @@ export default function GovernancePage() {
               ? "Atenção operacional: existem pontos de risco pedindo ajuste imediato."
               : "Saúde estável: mantenha disciplina para preservar o ritmo do fluxo."}
         </p>
-      </div>
+      </SurfaceSection>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <SurfaceSection><p className="text-xs uppercase text-[var(--text-muted)]">Financeiro</p><p className="mt-1 text-3xl font-bold">{financialScore}</p></SurfaceSection>

@@ -205,7 +205,7 @@ export default function SettingsPage() {
   return (
     <PageWrapper
       title="Configurações"
-      subtitle="Fechamento do fluxo oficial com padronização institucional: nome, timezone e moeda da operação."
+      subtitle="Parâmetros institucionais que sustentam operação, financeiro e governança."
     >
       <ActionBarWrapper
         secondaryActions={(
@@ -240,10 +240,10 @@ export default function SettingsPage() {
       ) : null}
 
       {hasError && !queryState.shouldBlockForError ? (
-        <div className="rounded border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200">
+        <SurfaceSection className="border-amber-500/30 bg-amber-500/10 text-sm text-amber-200">
           {query.error?.message ||
             "Houve um problema ao recarregar as configurações."}
-        </div>
+        </SurfaceSection>
       ) : null}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
@@ -253,14 +253,8 @@ export default function SettingsPage() {
         <div className="nexo-kpi-card p-4"><p className="text-xs text-[var(--text-muted)]">Status</p><p className="text-lg font-semibold">{hasChanges ? "Com alterações" : "Sincronizado"}</p></div>
       </div>
 
-      <SurfaceSection>
-        <p className="text-sm text-[var(--text-secondary)] dark:text-[var(--text-secondary)]">
-          Bloco analítico: padronização institucional consistente reduz erro de operação, relatórios e faturamento.
-        </p>
-      </SurfaceSection>
-
       <SurfaceSection className="space-y-2">
-        <h2 className="font-semibold">Fila operacional de configuração</h2>
+        <h2 className="font-semibold">Checklist de configuração</h2>
         <div className="nexo-subtle-surface p-3 text-sm">1. Validar nome institucional.</div>
         <div className="nexo-subtle-surface p-3 text-sm">2. Confirmar timezone oficial da operação.</div>
         <div className="nexo-subtle-surface p-3 text-sm">3. Validar moeda padrão para financeiro e governança.</div>

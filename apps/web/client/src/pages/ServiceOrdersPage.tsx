@@ -3,7 +3,6 @@ import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/design-system";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   buildServiceOrdersDeepLink,
   buildWhatsAppUrlFromServiceOrder,
@@ -28,7 +27,7 @@ import {
   BriefcaseBusiness,
   Search,
 } from "lucide-react";
-import { SmartPage, SurfaceSection } from "@/components/PagePattern";
+import { SurfaceSection } from "@/components/PagePattern";
 import { EmptyState } from "@/components/EmptyState";
 import { DemoEnvironmentCta } from "@/components/DemoEnvironmentCta";
 
@@ -529,19 +528,29 @@ export default function ServiceOrdersPage() {
         }
       />
 
-      <SmartPage
-        pageContext="service-orders"
-        headline="Execução guiada por impacto"
-        dominantProblem={nextAction.title}
-        dominantImpact={`${totalWithUrgency} itens com impacto imediato`}
-        dominantCta={{
-          label: nextAction.primaryAction.label,
-          onClick: nextActionButtons[0]?.onClick ?? (() => undefined),
-          path: "/service-orders",
-        }}
-        priorities={smartPriorities}
-        operationalActions={smartOperationalActions}
-      />
+      <SurfaceSection className="space-y-3">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+              Direção de execução
+            </p>
+            <p className="mt-1 font-medium text-[var(--text-primary)]">{nextAction.title}</p>
+            <p className="text-sm text-[var(--text-secondary)]">
+              {totalWithUrgency} itens com impacto imediato no fluxo operacional e financeiro.
+            </p>
+          </div>
+          <Button type="button" onClick={nextActionButtons[0]?.onClick}>
+            {nextAction.primaryAction.label}
+          </Button>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {smartPriorities.slice(0, 3).map((priority) => (
+            <span key={priority.id} className="rounded-full border px-3 py-1 text-xs text-[var(--text-secondary)]">
+              {priority.title}: {priority.count}
+            </span>
+          ))}
+        </div>
+      </SurfaceSection>
 
       {activeId && (
         <div className="nexo-surface-operational border-orange-200 bg-orange-50/85 p-3 text-sm text-orange-800 dark:border-orange-500/30 dark:bg-orange-500/10 dark:text-orange-300">
@@ -557,45 +566,10 @@ export default function ServiceOrdersPage() {
       ) : null}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-        <Card className="nexo-kpi-card">
-          <CardContent className="p-4">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">
-              Total em execução
-            </div>
-            <div className="mt-2 text-2xl font-semibold">{totalOrders}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="nexo-kpi-card">
-          <CardContent className="p-4">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">
-              Visíveis agora
-            </div>
-            <div className="mt-2 text-2xl font-semibold">{totalVisible}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="nexo-kpi-card">
-          <CardContent className="p-4">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">
-              O que precisa andar
-            </div>
-            <div className="mt-2 text-2xl font-semibold">
-              {totalOperational}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="nexo-kpi-card">
-          <CardContent className="p-4">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">
-              Impacto imediato
-            </div>
-            <div className="mt-2 text-2xl font-semibold">
-              {totalWithUrgency}
-            </div>
-          </CardContent>
-        </Card>
+        <SurfaceSection><div className="text-xs uppercase tracking-wide text-muted-foreground">Total em execução</div><div className="mt-2 text-2xl font-semibold">{totalOrders}</div></SurfaceSection>
+        <SurfaceSection><div className="text-xs uppercase tracking-wide text-muted-foreground">Visíveis agora</div><div className="mt-2 text-2xl font-semibold">{totalVisible}</div></SurfaceSection>
+        <SurfaceSection><div className="text-xs uppercase tracking-wide text-muted-foreground">O que precisa andar</div><div className="mt-2 text-2xl font-semibold">{totalOperational}</div></SurfaceSection>
+        <SurfaceSection><div className="text-xs uppercase tracking-wide text-muted-foreground">Impacto imediato</div><div className="mt-2 text-2xl font-semibold">{totalWithUrgency}</div></SurfaceSection>
       </div>
 
       <ActionBarWrapper
@@ -844,52 +818,40 @@ export default function ServiceOrdersPage() {
             {activeOrder ? (
               <ServiceOrderDetailsPanel os={activeOrder} />
             ) : (
-              <Card className="nexo-kpi-card">
-                <CardContent className="space-y-3 p-6">
-                  <div className="text-sm font-medium">
-                    Selecione uma O.S. para abrir o hub operacional.
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Aqui você acompanha execução, cobrança, pagamento, timeline
-                    e ação seguinte sem navegar no escuro.
-                  </p>
-                  {operationalQueue[0] ? (
-                    <Button
-                      onClick={() => openAsActive(operationalQueue[0].id)}
-                    >
-                      Abrir próxima da fila
-                    </Button>
-                  ) : null}
-                </CardContent>
-              </Card>
+              <SurfaceSection className="space-y-3">
+                <div className="text-sm font-medium">
+                  Selecione uma O.S. para abrir o hub operacional.
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Aqui você acompanha execução, cobrança, pagamento, timeline e ação seguinte sem navegar no escuro.
+                </p>
+                {operationalQueue[0] ? (
+                  <Button onClick={() => openAsActive(operationalQueue[0].id)}>
+                    Abrir próxima da fila
+                  </Button>
+                ) : null}
+              </SurfaceSection>
             )}
 
             {activeOrder?.customer?.phone ? (
-              <Card className="nexo-kpi-card">
-                <CardContent className="p-4">
-                  <div className="mb-2 text-xs uppercase tracking-wide text-muted-foreground">
-                    Atalho rápido
-                  </div>
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => {
-                      const url = buildWhatsAppUrlFromServiceOrder(activeOrder);
-                      if (url) {
-                        navigate(
-                          appendReturnTo(
-                            url,
-                            `${basePath}?os=${activeOrder.id}`
-                          )
-                        );
-                      }
-                    }}
-                  >
-                    <MessageCircle className="mr-2 h-4 w-4" />
-                    Abrir conversa da O.S.
-                  </Button>
-                </CardContent>
-              </Card>
+              <SurfaceSection>
+                <div className="mb-2 text-xs uppercase tracking-wide text-muted-foreground">
+                  Atalho rápido
+                </div>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    const url = buildWhatsAppUrlFromServiceOrder(activeOrder);
+                    if (url) {
+                      navigate(appendReturnTo(url, `${basePath}?os=${activeOrder.id}`));
+                    }
+                  }}
+                >
+                  <MessageCircle className="mr-2 h-4 w-4" />
+                  Abrir conversa da O.S.
+                </Button>
+              </SurfaceSection>
             ) : null}
           </div>
         </div>
