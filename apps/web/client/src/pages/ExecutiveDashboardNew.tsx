@@ -11,13 +11,25 @@ import { PrimaryActionButton } from "@/components/operating-system/PrimaryAction
 import { getLatestActionFlowSuggestion } from "@/lib/actionFlow";
 import { buildDashboardExecutionPlan } from "@/lib/execution/decision-engine";
 import { useExecutionMemory } from "@/lib/execution/execution-memory";
+import {
+  buildCrossEntitySignals,
+  buildDecisionLog,
+  evaluateSafetyLimits,
+  mapBackendModeToOperationMode,
+  resolveModeForAction,
+  type ActionType,
+  type OperationMode,
+} from "@/lib/operations/automation-control";
 import { rankPriorityProblems } from "@/lib/priorityEngine";
 import {
   AlertTriangle,
+  Bot,
   BarChart3,
   Briefcase,
   DollarSign,
   Loader2,
+  ShieldAlert,
+  ShieldCheck,
   Users,
 } from "lucide-react";
 import {
@@ -309,6 +321,13 @@ export default function ExecutiveDashboardNew() {
   const executionModeQuery = trpc.nexo.executions.mode.useQuery(undefined, queryOptions);
   const { logs } = useExecutionMemory();
   const executionMode = String((executionModeQuery.data as any)?.mode ?? "manual");
+  const orgOperationMode = useMemo<OperationMode>(
+    () => mapBackendModeToOperationMode(executionMode),
+    [executionMode]
+  );
+  const [userOperationMode, setUserOperationMode] = useState<OperationMode | undefined>(undefined);
+  const [actionTypeOverrides, setActionTypeOverrides] = useState<Partial<Record<ActionType, OperationMode>>>({});
+  const [focusCriticalOnly, setFocusCriticalOnly] = useState(true);
   const [isSlowLoading, setIsSlowLoading] = useState(false);
   const [optimisticTick, setOptimisticTick] = useState(false);
   const [selectedPipelineStage, setSelectedPipelineStage] = useState<string | null>(null);
@@ -321,6 +340,38 @@ export default function ExecutiveDashboardNew() {
     any[]
   >([]);
   const [stableChargesStatus, setStableChargesStatus] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem("nexo.operation.mode.user.v1");
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as {
+        userMode?: OperationMode;
+        actionTypeOverrides?: Partial<Record<ActionType, OperationMode>>;
+        focusCriticalOnly?: boolean;
+      };
+      setUserOperationMode(parsed.userMode);
+      setActionTypeOverrides(parsed.actionTypeOverrides ?? {});
+      setFocusCriticalOnly(parsed.focusCriticalOnly ?? true);
+    } catch {
+      setUserOperationMode(undefined);
+      setActionTypeOverrides({});
+      setFocusCriticalOnly(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(
+      "nexo.operation.mode.user.v1",
+      JSON.stringify({
+        userMode: userOperationMode,
+        actionTypeOverrides,
+        focusCriticalOnly,
+      })
+    );
+  }, [actionTypeOverrides, focusCriticalOnly, userOperationMode]);
 
   const metrics = useMemo(
     () => normalizeMetrics(metricsQuery.data),
@@ -623,6 +674,11 @@ export default function ExecutiveDashboardNew() {
     }> = [];
 
     if (overdueChargeCandidate) {
+      const actionMode = resolveModeForAction(
+        { orgMode: orgOperationMode, userMode: userOperationMode, actionTypeOverrides },
+        "finance"
+      );
+      const autoReady = actionMode === "automatic";
       actions.push({
         id: `charge-${overdueChargeCandidate.id}`,
         entity: String(overdueChargeCandidate?.customer?.name ?? "Cliente sem nome"),
@@ -635,10 +691,16 @@ export default function ExecutiveDashboardNew() {
         impactScore: 94,
         urgencyScore: Math.min(80 + Number(daysOverdue ?? 0), 100),
         isCritical: true,
+        mode: actionMode,
+        origin: autoReady ? "auto" : "user",
       });
     }
 
     if (doneWithoutChargeCandidate) {
+      const actionMode = resolveModeForAction(
+        { orgMode: orgOperationMode, userMode: userOperationMode, actionTypeOverrides },
+        "service_order"
+      );
       actions.push({
         id: `os-${doneWithoutChargeCandidate.id}`,
         entity: `O.S. #${doneWithoutChargeCandidate.id}`,
@@ -650,11 +712,21 @@ export default function ExecutiveDashboardNew() {
         impactScore: 88,
         urgencyScore: 78,
         isCritical: true,
+        mode: actionMode,
+        origin: actionMode === "automatic" ? "auto" : "user",
       });
     }
 
     return actions;
-  }, [doneWithoutChargeCandidate, overdueChargeCandidate, daysOverdue, navigate]);
+  }, [
+    actionTypeOverrides,
+    daysOverdue,
+    doneWithoutChargeCandidate,
+    navigate,
+    orgOperationMode,
+    overdueChargeCandidate,
+    userOperationMode,
+  ]);
 
   const pipelineStages = useMemo(
     () => [
@@ -701,6 +773,52 @@ export default function ExecutiveDashboardNew() {
   ].sort((a, b) => b.value - a.value);
   const criticalPending = executionPlan.decisions.filter(item => item.severity === "critical").length;
   const urgentActions = operationalActionFeed.filter(item => item.isCritical).length;
+  const safetyState = useMemo(() => evaluateSafetyLimits(logs), [logs]);
+  const effectiveGlobalMode: OperationMode = safetyState.shouldFallbackToManual
+    ? "manual"
+    : (userOperationMode ?? orgOperationMode);
+  const crossEntitySignals = useMemo(
+    () =>
+      buildCrossEntitySignals({
+        overdueCharges,
+        delayedOrders: displayMetrics.delayedOrders,
+        todayAppointments,
+        totalCustomers: displayMetrics.totalCustomers,
+        pausedRevenueInCents: totalPausedRevenue,
+        openServiceOrders: displayMetrics.openServiceOrders,
+      }),
+    [
+      overdueCharges,
+      displayMetrics.delayedOrders,
+      displayMetrics.totalCustomers,
+      displayMetrics.openServiceOrders,
+      todayAppointments,
+      totalPausedRevenue,
+    ]
+  );
+  const decisionAuditLog = useMemo(
+    () =>
+      buildDecisionLog(
+        operationalActionFeed.map(item => ({
+          action: {
+            actionId: item.id,
+            actionType: item.group === "financeiro" ? "finance" : "service_order",
+            label: item.nextAction,
+            explainReason: item.reason,
+            explainImpact: `${item.impactScore ?? 50}/100`,
+            explainRisk: `${item.urgencyScore ?? 50}/100`,
+            ruleApplied:
+              item.group === "financeiro"
+                ? "finance.overdue.recovery"
+                : "service-order.done-without-charge",
+          },
+          mode: item.mode ?? effectiveGlobalMode,
+          origin: item.origin ?? "user",
+          status: "queued",
+        }))
+      ),
+    [effectiveGlobalMode, operationalActionFeed]
+  );
 
   const hasAnyCriticalError =
     metricsQuery.isError &&
@@ -853,6 +971,86 @@ export default function ExecutiveDashboardNew() {
           bottlenecks={bottlenecks.filter(item => item.value > 0).length}
           urgentActions={urgentActions}
         />
+        <div className="mt-3 grid gap-3 xl:grid-cols-3">
+          <div className="rounded-xl border border-zinc-200/80 bg-white/80 p-3 dark:border-zinc-800 dark:bg-zinc-950/40">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+              Operation mode control
+            </p>
+            <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-300">
+              Organização em <strong>{orgOperationMode}</strong> • efetivo em{" "}
+              <strong>{effectiveGlobalMode}</strong>
+            </p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {(["manual", "assisted", "semi_automatic", "automatic"] as const).map(mode => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setUserOperationMode(mode)}
+                  className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
+                    userOperationMode === mode
+                      ? "border-orange-400 bg-orange-100 text-orange-700 dark:bg-orange-950/30 dark:text-orange-300"
+                      : "border-zinc-300 text-zinc-600 dark:border-zinc-700 dark:text-zinc-300"
+                  }`}
+                >
+                  {mode}
+                </button>
+              ))}
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              <span className="text-[10px] uppercase tracking-wide text-zinc-500">Financeiro:</span>
+              {(["manual", "semi_automatic", "automatic"] as const).map(mode => (
+                <button
+                  key={`finance-${mode}`}
+                  type="button"
+                  onClick={() =>
+                    setActionTypeOverrides(prev => ({
+                      ...prev,
+                      finance: mode,
+                    }))
+                  }
+                  className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
+                    actionTypeOverrides.finance === mode
+                      ? "border-blue-400 bg-blue-100 text-blue-700 dark:bg-blue-950/30 dark:text-blue-300"
+                      : "border-zinc-300 text-zinc-500 dark:border-zinc-700 dark:text-zinc-300"
+                  }`}
+                >
+                  {mode}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="rounded-xl border border-zinc-200/80 bg-white/80 p-3 dark:border-zinc-800 dark:bg-zinc-950/40">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+              Safety limits
+            </p>
+            <p className="mt-1 flex items-center gap-2 text-xs">
+              {safetyState.shouldFallbackToManual ? (
+                <>
+                  <ShieldAlert className="h-3.5 w-3.5 text-red-500" /> Fallback manual ativado
+                </>
+              ) : (
+                <>
+                  <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" /> Automação dentro do limite
+                </>
+              )}
+            </p>
+            <p className="mt-1 text-[11px] text-zinc-500">
+              Financeiro {safetyState.remainingByActionType.finance} • O.S.{" "}
+              {safetyState.remainingByActionType.service_order} • Comunicação{" "}
+              {safetyState.remainingByActionType.communication}
+            </p>
+          </div>
+          <div className="rounded-xl border border-zinc-200/80 bg-white/80 p-3 dark:border-zinc-800 dark:bg-zinc-950/40">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+              Cross-entity context
+            </p>
+            <p className="mt-1 text-xs font-medium">{crossEntitySignals.label}</p>
+            <p className="mt-1 text-[11px] text-zinc-500">
+              Risco {crossEntitySignals.riskScore}/100 • Carga {crossEntitySignals.loadScore}/100 • Prioridade{" "}
+              {crossEntitySignals.priorityScore}/100
+            </p>
+          </div>
+        </div>
         {quotaWarnings.length > 0 ? (
           <div className="mt-3 rounded-xl border border-amber-300/60 bg-amber-50/80 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
             Limite do plano atingido em {quotaWarnings.join(", ")}. Faça upgrade
@@ -891,7 +1089,7 @@ export default function ExecutiveDashboardNew() {
       </section>
 
       <section className="grid gap-4 xl:grid-cols-2">
-        <ActionFeed items={operationalActionFeed} />
+        <ActionFeed items={operationalActionFeed} focusCriticalOnly={focusCriticalOnly} />
         <div className="space-y-2">
           <PipelineStage
             stages={pipelineStages}
@@ -904,6 +1102,54 @@ export default function ExecutiveDashboardNew() {
             </p>
           ) : null}
         </div>
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-2">
+        <article className="rounded-xl border border-zinc-200/80 bg-white/80 p-4 dark:border-zinc-800 dark:bg-zinc-950/40">
+          <h3 className="text-sm font-semibold">Executive summary</h3>
+          <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-300">
+            Gargalos, risco financeiro e volume travado para decisão rápida.
+          </p>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <div className="rounded-md border p-2 text-xs">Gargalos ativos: <strong>{bottlenecks.filter(item => item.value > 0).length}</strong></div>
+            <div className="rounded-md border p-2 text-xs">Risco financeiro: <strong>{formatCurrency(totalPausedRevenue)}</strong></div>
+            <div className="rounded-md border p-2 text-xs">Volume travado: <strong>{displayMetrics.openServiceOrders}</strong></div>
+            <div className="rounded-md border p-2 text-xs">Ação nº1: <strong>{dominantProblem?.title ?? "Operação estável"}</strong></div>
+          </div>
+        </article>
+        <article className="rounded-xl border border-zinc-200/80 bg-white/80 p-4 dark:border-zinc-800 dark:bg-zinc-950/40">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold">Decision log (auditoria)</h3>
+            <button
+              type="button"
+              onClick={() => setFocusCriticalOnly(prev => !prev)}
+              className="rounded-full border px-2.5 py-1 text-[11px] font-semibold"
+            >
+              {focusCriticalOnly ? "Mostrar mais" : "Foco crítico"}
+            </button>
+          </div>
+          <div className="mt-3 space-y-2">
+            {decisionAuditLog.slice(0, 5).map(log => (
+              <div key={log.id} className="rounded-md border p-2">
+                <p className="text-xs font-semibold">{log.actionLabel} <span className="text-zinc-500">• {log.actionType}</span></p>
+                <p className="text-[11px] text-zinc-600 dark:text-zinc-300">{log.reason}</p>
+                <p className="mt-1 text-[10px] uppercase tracking-wide text-zinc-500">
+                  regra {log.ruleApplied} • origem {log.origin} • modo {log.mode}
+                </p>
+              </div>
+            ))}
+            {decisionAuditLog.length === 0 ? (
+              <p className="text-xs text-zinc-500">Sem decisões no momento.</p>
+            ) : null}
+          </div>
+        </article>
+      </section>
+
+      <section className="rounded-xl border border-zinc-200/80 bg-white/80 p-4 dark:border-zinc-800 dark:bg-zinc-950/40">
+        <p className="flex items-center gap-2 text-sm font-semibold"><Bot className="h-4 w-4" /> Background automation prep</p>
+        <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-300">
+          Execução fora da UI pronta para eventos (cobrança vencida, O.S. concluída, risco elevado) com notificações inteligentes e trilha de auditoria.
+        </p>
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

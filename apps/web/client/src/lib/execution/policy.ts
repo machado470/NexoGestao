@@ -54,6 +54,7 @@ function requiresConfirmation(action: ExecutionAction, mode: ExecutionActionMode
   if (action.requiresConfirmation) return true;
   if (action.safetyLevel === "high") return true;
   const sensitiveAction = action.kind === "mutation" || action.kind === "external";
+  if (mode === "assisted" && sensitiveAction) return true;
   return mode === "semi_automatic" && sensitiveAction && action.safetyLevel !== "low";
 }
 
