@@ -120,16 +120,8 @@
   --nexo-card-muted: #f8fafc;
   --nexo-shadow-elev-1: 0 8px 24px rgba(15, 23, 42, 0.06);
   --nexo-shadow-elev-2: 0 16px 40px rgba(15, 23, 42, 0.11);
-  --nexo-title-font:
-    "Outfit",
-    "Inter",
-    system-ui,
-    sans-serif;
-  --nexo-body-font:
-    "DM Sans",
-    "Inter",
-    system-ui,
-    sans-serif;
+  --nexo-title-font: "Outfit", "Inter", system-ui, sans-serif;
+  --nexo-body-font: "DM Sans", "Inter", system-ui, sans-serif;
 }
 
 .dark {
@@ -371,9 +363,12 @@
         rgba(124, 58, 237, 0.08),
         transparent 38%
       ),
-      linear-gradient(180deg, color-mix(in srgb, var(--nexo-page-surface) 86%, transparent), var(--nexo-app-bg));
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--nexo-page-surface) 86%, transparent),
+        var(--nexo-app-bg)
+      );
   }
-
 
   .nexo-sidebar {
     background: linear-gradient(180deg, #090d16 0%, #0b111d 56%, #090f1a 100%);
@@ -391,7 +386,11 @@
 
   .nexo-topbar {
     border-bottom: 1px solid var(--nexo-border-strong);
-    background: linear-gradient(180deg, color-mix(in srgb, var(--nexo-surface-2) 96%, transparent), color-mix(in srgb, var(--nexo-surface-2) 82%, transparent));
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--nexo-surface-2) 96%, transparent),
+      color-mix(in srgb, var(--nexo-surface-2) 82%, transparent)
+    );
     box-shadow: 0 10px 28px rgba(2, 6, 23, 0.18);
     backdrop-filter: blur(18px);
   }
@@ -422,7 +421,11 @@
   .nexo-app-content {
     border-radius: var(--radius-panel);
     border: 1px solid var(--nexo-border-soft);
-    background: color-mix(in srgb, var(--nexo-section-surface) 88%, #05080f 12%);
+    background: color-mix(
+      in srgb,
+      var(--nexo-section-surface) 88%,
+      #05080f 12%
+    );
     box-shadow: var(--nexo-shadow-soft);
   }
 
@@ -447,9 +450,17 @@
 
   .nexo-card-kpi {
     @apply relative overflow-hidden rounded-2xl border p-4 md:p-5;
-    box-shadow: var(--nexo-shadow-elev-2);
-    background: var(--nexo-card-surface);
-    border-color: color-mix(in srgb, var(--nexo-border-soft) 70%, rgba(251, 146, 60, 0.3));
+    box-shadow: 0 20px 42px rgba(2, 6, 23, 0.34);
+    background: linear-gradient(
+      168deg,
+      color-mix(in srgb, var(--nexo-card-surface) 90%, #fff 10%),
+      var(--nexo-card-surface)
+    );
+    border-color: color-mix(
+      in srgb,
+      var(--nexo-border-soft) 55%,
+      rgba(251, 146, 60, 0.42)
+    );
   }
 
   .nexo-card-kpi::before {
@@ -457,29 +468,49 @@
     position: absolute;
     inset: 0;
     pointer-events: none;
-    background: linear-gradient(180deg, rgba(251, 146, 60, 0.14) 0%, rgba(251, 146, 60, 0) 45%);
+    background: linear-gradient(
+      180deg,
+      rgba(251, 146, 60, 0.14) 0%,
+      rgba(251, 146, 60, 0) 45%
+    );
     opacity: 0.85;
   }
 
   .nexo-card-operational {
     @apply rounded-2xl border p-4 md:p-5;
-    background: color-mix(in srgb, var(--nexo-card-surface) 85%, var(--nexo-card-muted));
-    border-color: var(--nexo-border-strong);
-    box-shadow: var(--nexo-shadow-elev-1);
+    background: linear-gradient(
+      170deg,
+      color-mix(
+        in srgb,
+        var(--nexo-card-surface) 92%,
+        rgba(251, 146, 60, 0.06)
+      ),
+      color-mix(in srgb, var(--nexo-card-muted) 68%, transparent)
+    );
+    border-color: color-mix(
+      in srgb,
+      var(--nexo-border-strong) 72%,
+      rgba(251, 146, 60, 0.3)
+    );
+    box-shadow: 0 16px 34px rgba(2, 6, 23, 0.28);
   }
 
   .nexo-card-informative {
     @apply rounded-2xl border p-4 md:p-5;
-    background: color-mix(in srgb, var(--nexo-card-muted) 85%, transparent);
-    border-color: var(--nexo-border-soft);
-    box-shadow: var(--nexo-shadow-elev-1);
+    background: color-mix(in srgb, var(--nexo-card-muted) 76%, transparent);
+    border-color: color-mix(in srgb, var(--nexo-border-soft) 85%, transparent);
+    box-shadow: 0 10px 22px rgba(2, 6, 23, 0.16);
   }
 
   .nexo-card-alert {
     @apply rounded-2xl border p-4 md:p-5;
-    border-color: rgba(251, 146, 60, 0.45);
-    background: linear-gradient(160deg, rgba(251, 146, 60, 0.12), rgba(251, 146, 60, 0.02));
-    box-shadow: var(--nexo-shadow-elev-1);
+    border-color: rgba(251, 146, 60, 0.55);
+    background: linear-gradient(
+      160deg,
+      rgba(251, 146, 60, 0.18),
+      rgba(251, 146, 60, 0.04)
+    );
+    box-shadow: 0 18px 34px rgba(251, 146, 60, 0.14);
   }
 
   .nexo-kpi-card::before {
@@ -528,12 +559,53 @@
 
   .nexo-cta-primary {
     @apply inline-flex h-10 items-center justify-center rounded-xl bg-orange-500 px-4 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-orange-600 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400/60;
+    box-shadow: 0 10px 22px rgba(251, 146, 60, 0.28);
   }
 
   .nexo-cta-secondary {
     @apply inline-flex h-10 items-center justify-center rounded-xl border border-zinc-300 px-4 text-sm font-semibold text-zinc-700 transition-all duration-200 hover:-translate-y-0.5 hover:bg-zinc-100 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-300/50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800;
   }
 
+  .nexo-hero-operational {
+    @apply relative overflow-hidden rounded-[2rem] border-2 px-5 py-6 md:px-7 md:py-7;
+    border-color: rgba(251, 146, 60, 0.58);
+    background: linear-gradient(
+      130deg,
+      color-mix(
+        in srgb,
+        var(--nexo-card-surface) 76%,
+        rgba(251, 146, 60, 0.14)
+      ),
+      color-mix(in srgb, var(--nexo-card-muted) 62%, transparent)
+    );
+    box-shadow: 0 24px 70px rgba(251, 146, 60, 0.2);
+  }
+
+  .nexo-cockpit-zone {
+    @apply space-y-4 rounded-[1.35rem] border px-4 py-4 md:px-5;
+    border-color: color-mix(
+      in srgb,
+      var(--nexo-border-soft) 82%,
+      rgba(251, 146, 60, 0.2)
+    );
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--nexo-card-muted) 50%, transparent),
+      transparent
+    );
+  }
+
+  .nexo-zone-title {
+    @apply text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-500 dark:text-zinc-400;
+  }
+
+  .nexo-cta-dominant {
+    @apply inline-flex items-center justify-center rounded-xl bg-orange-500 px-5 py-3 text-sm font-bold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-orange-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400/70;
+    letter-spacing: 0.01em;
+    box-shadow:
+      0 14px 34px rgba(249, 115, 22, 0.42),
+      inset 0 1px 0 rgba(255, 255, 255, 0.24);
+  }
   .nexo-skeleton {
     @apply relative overflow-hidden bg-zinc-200/75 dark:bg-zinc-700/55;
   }
@@ -543,7 +615,12 @@
     position: absolute;
     inset: 0;
     transform: translateX(-100%);
-    background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.42) 50%, transparent 100%);
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.42) 50%,
+      transparent 100%
+    );
     animation: nexo-shimmer 1.4s ease-in-out infinite;
   }
 
@@ -580,7 +657,11 @@
     @apply border p-4 md:p-5;
     border-radius: var(--radius-surface);
     border-color: var(--nexo-border-strong);
-    background: color-mix(in srgb, var(--nexo-card-surface) 86%, var(--nexo-card-muted));
+    background: color-mix(
+      in srgb,
+      var(--nexo-card-surface) 86%,
+      var(--nexo-card-muted)
+    );
     box-shadow: var(--nexo-shadow-elev-1);
   }
 

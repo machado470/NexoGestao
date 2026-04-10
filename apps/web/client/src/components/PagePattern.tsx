@@ -2,10 +2,23 @@ import type { ReactNode } from "react";
 import { ArrowRight, Sparkles } from "lucide-react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { rankPriorityProblems, type PriorityPageContext, type PriorityProblem } from "@/lib/priorityEngine";
-import { getNextActionSuggestion, registerActionFlowEvent } from "@/lib/actionFlow";
-import { getActionIntentClasses, getActionIntentLabel } from "@/lib/operations/action-intent";
-import { sortSmartActions, type SmartActionWithExecution } from "@/lib/smartActions";
+import {
+  rankPriorityProblems,
+  type PriorityPageContext,
+  type PriorityProblem,
+} from "@/lib/priorityEngine";
+import {
+  getNextActionSuggestion,
+  registerActionFlowEvent,
+} from "@/lib/actionFlow";
+import {
+  getActionIntentClasses,
+  getActionIntentLabel,
+} from "@/lib/operations/action-intent";
+import {
+  sortSmartActions,
+  type SmartActionWithExecution,
+} from "@/lib/smartActions";
 
 export function PageShell({ children }: { children: ReactNode }) {
   return <div className="nexo-page-shell">{children}</div>;
@@ -35,14 +48,10 @@ export function PageHero({
             </div>
           ) : null}
 
-          <h1 className="nexo-page-header-title">
-            {title}
-          </h1>
+          <h1 className="nexo-page-header-title">{title}</h1>
 
           {description ? (
-            <p className="nexo-page-header-description">
-              {description}
-            </p>
+            <p className="nexo-page-header-description">{description}</p>
           ) : null}
         </div>
 
@@ -70,7 +79,10 @@ export function SmartPage({
   operationalActions?: SmartActionWithExecution[];
 }) {
   const [, navigate] = useLocation();
-  const topPriorities = rankPriorityProblems(priorities, { pageContext, limit: 3 });
+  const topPriorities = rankPriorityProblems(priorities, {
+    pageContext,
+    limit: 3,
+  });
   const nextActionSuggestion = getNextActionSuggestion(pageContext);
   const orderedActions = sortSmartActions(operationalActions);
   const primaryAction = orderedActions[0];
@@ -80,23 +92,40 @@ export function SmartPage({
     : dominantImpact;
 
   return (
-    <section className="nexo-card-operational space-y-4">
+    <section className="nexo-card-operational nexo-cockpit-zone space-y-4">
       <div className="space-y-2">
         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-orange-700 dark:text-orange-300">
           Prioridade operacional
         </p>
-        <h2 className="nexo-text-wrap text-lg font-semibold text-zinc-900 dark:text-zinc-100">{headline}</h2>
-        <p className="nexo-text-wrap text-sm text-zinc-700 dark:text-zinc-300">{resolvedDominantProblem}</p>
-        <p className="nexo-text-wrap text-sm font-medium text-red-700 dark:text-red-300">Impacto: {resolvedDominantImpact}</p>
+        <h2 className="nexo-text-wrap text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+          {headline}
+        </h2>
+        <p className="nexo-text-wrap text-sm text-zinc-700 dark:text-zinc-300">
+          {resolvedDominantProblem}
+        </p>
+        <p className="nexo-text-wrap text-sm font-medium text-red-700 dark:text-red-300">
+          Impacto: {resolvedDominantImpact}
+        </p>
       </div>
 
       {primaryAction ? (
         <div className="nexo-card-alert p-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-orange-700 dark:text-orange-300">Ação principal</p>
-          <p className="nexo-text-wrap mt-1 text-sm font-semibold text-zinc-900 dark:text-zinc-100">{primaryAction.label}</p>
-          <p className="nexo-text-wrap text-xs text-zinc-600 dark:text-zinc-300">{primaryAction.reason}</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-orange-700 dark:text-orange-300">
+            Ação principal
+          </p>
+          <p className="nexo-text-wrap mt-1 text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+            {primaryAction.label}
+          </p>
+          <p className="nexo-text-wrap text-xs text-zinc-600 dark:text-zinc-300">
+            {primaryAction.reason}
+          </p>
           <div className="mt-3">
-            <Button type="button" size="sm" className="bg-orange-500 text-white" onClick={primaryAction.onExecute}>
+            <Button
+              type="button"
+              size="sm"
+              className="bg-orange-500 text-white"
+              onClick={primaryAction.onExecute}
+            >
               Executar agora
             </Button>
           </div>
@@ -105,19 +134,34 @@ export function SmartPage({
 
       {orderedActions.length > 0 ? (
         <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-300">Ações ordenadas</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-300">
+            Ações ordenadas
+          </p>
           <div className="grid gap-2">
-            {orderedActions.map((action) => (
-              <div key={action.id} className="nexo-card-informative rounded-lg p-3">
+            {orderedActions.map(action => (
+              <div
+                key={action.id}
+                className="nexo-card-informative rounded-lg p-3"
+              >
                 <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                   <div className="min-w-0">
-                    <p className="nexo-text-wrap text-sm font-medium text-zinc-900 dark:text-zinc-100">{action.label}</p>
-                    <p className="nexo-text-wrap text-xs text-zinc-600 dark:text-zinc-400">{action.reason}</p>
+                    <p className="nexo-text-wrap text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                      {action.label}
+                    </p>
+                    <p className="nexo-text-wrap text-xs text-zinc-600 dark:text-zinc-400">
+                      {action.reason}
+                    </p>
                     <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
-                      {action.impact} • prioridade {action.priority}{action.auto ? " • auto" : ""}
+                      {action.impact} • prioridade {action.priority}
+                      {action.auto ? " • auto" : ""}
                     </p>
                   </div>
-                  <Button type="button" size="sm" variant="outline" onClick={action.onExecute}>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={action.onExecute}
+                  >
                     Executar
                   </Button>
                 </div>
@@ -128,11 +172,19 @@ export function SmartPage({
       ) : null}
 
       <div className="nexo-card-informative p-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-300">Próxima ação automática</p>
-        <p className="mt-1 text-sm font-medium text-zinc-900 dark:text-zinc-100">{nextActionSuggestion.title}</p>
-        <p className="text-xs text-zinc-600 dark:text-zinc-400">{nextActionSuggestion.description}</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-300">
+          Próxima ação automática
+        </p>
+        <p className="mt-1 text-sm font-medium text-zinc-900 dark:text-zinc-100">
+          {nextActionSuggestion.title}
+        </p>
+        <p className="text-xs text-zinc-600 dark:text-zinc-400">
+          {nextActionSuggestion.description}
+        </p>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-          <span className={`inline-flex rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide ${getActionIntentClasses(nextActionSuggestion.intent)}`}>
+          <span
+            className={`inline-flex rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide ${getActionIntentClasses(nextActionSuggestion.intent)}`}
+          >
             Intent: {getActionIntentLabel(nextActionSuggestion.intent)}
           </span>
           <Button
@@ -147,12 +199,18 @@ export function SmartPage({
       </div>
 
       <div className="space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-300">Top 3 prioridades</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-300">
+          Top 3 prioridades
+        </p>
         <div className="grid gap-2 md:grid-cols-3">
-          {topPriorities.map((item) => (
+          {topPriorities.map(item => (
             <div key={item.id} className="nexo-card-informative rounded-lg p-3">
-              <p className="nexo-text-wrap text-sm font-medium text-zinc-900 dark:text-zinc-100">{item.title}</p>
-              <p className="nexo-text-wrap text-xs text-zinc-600 dark:text-zinc-400">{item.helperText}</p>
+              <p className="nexo-text-wrap text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                {item.title}
+              </p>
+              <p className="nexo-text-wrap text-xs text-zinc-600 dark:text-zinc-400">
+                {item.helperText}
+              </p>
             </div>
           ))}
         </div>
@@ -161,7 +219,7 @@ export function SmartPage({
       <div className="sticky bottom-3 z-20 rounded-2xl border border-orange-400/30 bg-[var(--nexo-card-surface)] p-2 shadow-lg md:static md:border-none md:bg-transparent md:p-0 md:shadow-none">
         <Button
           type="button"
-          className="min-h-12 w-full gap-2 bg-orange-500 text-white"
+          className="nexo-cta-dominant min-h-12 w-full gap-2"
           onClick={() => {
             registerActionFlowEvent("page_primary_cta_clicked", {
               pageContext,
@@ -182,6 +240,16 @@ export function SmartPage({
   );
 }
 
-export function SurfaceSection({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <section className={`nexo-surface p-5 ${className}`.trim()}>{children}</section>;
+export function SurfaceSection({
+  children,
+  className = "",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <section className={`nexo-surface p-5 ${className}`.trim()}>
+      {children}
+    </section>
+  );
 }
