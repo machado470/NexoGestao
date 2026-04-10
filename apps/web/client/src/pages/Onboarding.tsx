@@ -329,7 +329,7 @@ export default function Onboarding() {
       ) : null}
 
       {flowMessage ? (
-        <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-300">
+        <div className="nexo-info-banner rounded-xl px-4 py-3 text-sm">
           {flowMessage}
         </div>
       ) : null}

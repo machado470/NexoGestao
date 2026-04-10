@@ -928,6 +928,7 @@
     border: 1px solid var(--border-soft);
     background: color-mix(in srgb, var(--bg-app) 72%, var(--bg-surface) 28%);
     box-shadow: 0 8px 20px rgba(2, 6, 23, 0.22);
+    scrollbar-gutter: stable both-edges;
   }
 
   .nexo-sidebar-item {
@@ -949,6 +950,12 @@
     background: color-mix(in srgb, var(--accent-primary) 18%, transparent);
     box-shadow: none;
     ring: 0;
+  }
+
+  .nexo-info-banner {
+    border: 1px solid color-mix(in srgb, var(--info) 45%, var(--border-soft));
+    background: color-mix(in srgb, var(--info) 12%, var(--bg-surface));
+    color: var(--text-secondary);
   }
 
   .nexo-topbar-control {

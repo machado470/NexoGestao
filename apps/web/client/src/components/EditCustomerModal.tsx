@@ -220,7 +220,7 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
         onInteractOutside={(event) => {
           if (updateMutation.isPending) event.preventDefault();
         }}
-        className="max-w-2xl border-[var(--border-subtle)] bg-[var(--card-bg)] p-0 text-[var(--text-primary)] shadow-2xl backdrop-blur"
+        className="max-h-[90vh] max-w-3xl overflow-hidden border-[var(--border-subtle)] bg-[var(--card-bg)] p-0 text-[var(--text-primary)] shadow-2xl backdrop-blur"
       >
         <DialogHeader className="border-b border-zinc-800/90 px-6 py-5">
           <DialogTitle className="text-xl font-semibold">Editar Cliente</DialogTitle>
@@ -229,7 +229,7 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 px-6 py-5">
+        <div className="space-y-4 overflow-y-auto px-6 py-5">
           {customerQuery.isLoading && !customer ? (
             <div className="flex items-center justify-center py-8 text-sm text-[var(--text-muted)]">
               <Loader2 className="mr-2 h-5 w-5 animate-spin text-orange-500" />

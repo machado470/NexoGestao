@@ -7,7 +7,6 @@ import { SurfaceSection } from "@/components/PagePattern";
 import { EmptyState } from "@/components/EmptyState";
 import { Loader2, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/design-system";
-import { DemoEnvironmentCta } from "@/components/DemoEnvironmentCta";
 import { ActionBarWrapper, PageWrapper } from "@/components/operating-system/Wrappers";
 import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedbackButton";
 import { ExecutionOperationsPanel } from "@/components/operations/ExecutionOperationsPanel";
@@ -320,7 +319,7 @@ export default function GovernancePage() {
             description="Assim que a operação gerar eventos de risco e controle, este bloco exibirá a evolução do score."
             action={{ label: "Atualizar governança", onClick: () => void runsQuery.refetch() }}
           />
-          <DemoEnvironmentCta />
+
         </SurfaceSection>
       )}
 

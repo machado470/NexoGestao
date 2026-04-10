@@ -234,7 +234,7 @@ export default function SettingsPage() {
       ) : null}
 
       {queryState.hasBackgroundUpdate ? (
-        <SurfaceSection className="border-blue-500/30 bg-blue-500/10 text-sm text-blue-200">
+        <SurfaceSection className="nexo-info-banner text-sm">
           Atualizando configurações em segundo plano...
         </SurfaceSection>
       ) : null}

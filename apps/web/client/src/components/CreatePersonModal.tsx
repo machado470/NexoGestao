@@ -88,7 +88,7 @@ export default function CreatePersonModal({ open, onClose, onSaved }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => (!nextOpen ? onClose() : undefined)}>
-      <DialogContent className="max-w-xl border-[var(--border-subtle)] bg-[var(--card-bg)] p-0 text-[var(--text-primary)] shadow-2xl backdrop-blur">
+      <DialogContent className="max-h-[90vh] max-w-2xl overflow-hidden border-[var(--border-subtle)] bg-[var(--card-bg)] p-0 text-[var(--text-primary)] shadow-2xl backdrop-blur">
         <DialogHeader className="border-b border-zinc-800/90 px-6 py-5">
           <DialogTitle className="flex items-center gap-2 text-xl font-semibold">
             <UserPlus className="h-5 w-5 text-orange-500" />
@@ -97,7 +97,8 @@ export default function CreatePersonModal({ open, onClose, onSaved }: Props) {
           <DialogDescription className="text-[var(--text-muted)]">Cadastre colaboradores mantendo a experiência visual unificada.</DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4 px-6 py-5">
+        <form onSubmit={handleSubmit} className="flex max-h-[calc(90vh-84px)] flex-col">
+          <div className="space-y-4 overflow-y-auto px-6 py-5">
           <div className="space-y-2">
             <Label htmlFor="person-name">Nome</Label>
             <Input
@@ -132,7 +133,9 @@ export default function CreatePersonModal({ open, onClose, onSaved }: Props) {
             />
           </div>
 
-          <DialogFooter className="border-t border-zinc-800/90 pt-4">
+          </div>
+
+          <DialogFooter className="border-t border-[var(--border-subtle)] px-6 py-4">
             <Button type="button" variant="outline" onClick={onClose} disabled={createPerson.isPending}>
               Cancelar
             </Button>

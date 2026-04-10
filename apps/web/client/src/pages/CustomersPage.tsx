@@ -58,7 +58,6 @@ import { SurfaceSection } from "@/components/PagePattern";
 import { EmptyState } from "@/components/EmptyState";
 import { TableSkeleton } from "@/components/QueryStateBoundary";
 import { StatusBadge } from "@/components/StatusBadge";
-import { DemoEnvironmentCta } from "@/components/DemoEnvironmentCta";
 import { useCriticalActionStore } from "@/stores/criticalActionStore";
 import { invalidateOperationalGraph } from "@/lib/operationalConsistency";
 import { useProductAnalytics } from "@/hooks/useProductAnalytics";
@@ -1051,7 +1050,7 @@ export default function CustomersPage() {
       </SurfaceSection>
 
       {queryState.hasBackgroundUpdate ? (
-        <SurfaceSection className="border-blue-500/30 bg-blue-500/10 text-sm text-blue-200">
+        <SurfaceSection className="nexo-info-banner text-sm">
           Atualizando clientes e workspace em segundo plano...
         </SurfaceSection>
       ) : null}
@@ -1191,7 +1190,7 @@ export default function CustomersPage() {
                   onClick: () => void listCustomers.refetch(),
                 }}
               />
-              <DemoEnvironmentCta />
+
             </SurfaceSection>
           ) : (
             <div className="overflow-x-auto">
@@ -1468,7 +1467,7 @@ export default function CustomersPage() {
                   </div>
                 ) : null}
                 {crossTabMessage ? (
-                  <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-xs text-blue-700 dark:border-blue-900/40 dark:bg-blue-950/20 dark:text-blue-300">
+                  <div className="nexo-info-banner rounded-xl p-3 text-xs">
                     {crossTabMessage}
                   </div>
                 ) : null}

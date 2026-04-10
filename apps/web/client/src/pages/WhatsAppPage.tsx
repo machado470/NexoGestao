@@ -23,7 +23,6 @@ import {
   buildFinanceChargeUrl,
   buildServiceOrdersDeepLink,
 } from "@/lib/operations/operations.utils";
-import { DemoEnvironmentCta } from "@/components/DemoEnvironmentCta";
 import { EmptyState } from "@/components/EmptyState";
 import { SmartPage, SurfaceSection } from "@/components/PagePattern";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
@@ -183,7 +182,7 @@ export default function WhatsAppPage() {
             }}
           />
         </SurfaceSection>
-        <DemoEnvironmentCta />
+
       </PageWrapper>
     );
   }
@@ -256,7 +255,7 @@ export default function WhatsAppPage() {
       </SurfaceSection>
 
       {queryState.hasBackgroundUpdate ? (
-        <SurfaceSection className="border-blue-500/30 bg-blue-500/10 text-sm text-blue-200">
+        <SurfaceSection className="nexo-info-banner text-sm">
           Atualizando histórico de mensagens em segundo plano...
         </SurfaceSection>
       ) : null}
@@ -410,7 +409,7 @@ export default function WhatsAppPage() {
         </Button>
       </SurfaceSection>
 
-      <DemoEnvironmentCta />
+
     </PageWrapper>
   );
 }

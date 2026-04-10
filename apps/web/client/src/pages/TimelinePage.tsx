@@ -31,7 +31,6 @@ import { toast } from "sonner";
 import { EmptyState } from "@/components/EmptyState";
 import { SmartPage, SurfaceSection } from "@/components/PagePattern";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
-import { DemoEnvironmentCta } from "@/components/DemoEnvironmentCta";
 import {
   formatDateTime,
   getTimelineEventDescription,
@@ -456,7 +455,7 @@ export default function TimelinePage() {
       ) : null}
 
       {queryState.hasBackgroundUpdate ? (
-        <SurfaceSection className="border-blue-500/30 bg-blue-500/10 text-sm text-blue-200">
+        <SurfaceSection className="nexo-info-banner text-sm">
           Atualizando timeline em segundo plano...
         </SurfaceSection>
       ) : null}
@@ -515,7 +514,7 @@ export default function TimelinePage() {
                     <div className="text-sm text-gray-500 dark:text-gray-400">
                       Ainda não há clientes para montar timeline. Comece em Clientes para ligar operação, cobrança e comunicação.
                     </div>
-                    <DemoEnvironmentCta />
+
                   </div>
                 ) : (
                   <select
@@ -663,7 +662,7 @@ export default function TimelinePage() {
                   Abrir O.S.
                 </Button>
               </div>
-              <DemoEnvironmentCta className="mx-auto max-w-xl text-left" />
+
             </div>
           ) : (
             <div className="space-y-4">
