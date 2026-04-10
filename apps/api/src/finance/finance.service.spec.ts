@@ -139,7 +139,58 @@ describe('FinanceService hardening', () => {
       channel: 'whatsapp',
       reason: 'whatsapp_send_failed',
       fallback: 'message_queued',
+      status: 'retry_scheduled',
     })
+    expect(result.operation?.status).toBe('executed')
     expect(metrics.increment).toHaveBeenCalledWith('integrationTemporaryFailures')
+  })
+
+  it('retorna duplicate quando idempotência replaya createCharge', async () => {
+    const { service, idempotency, prisma } = buildService()
+    prisma.customer.findFirst.mockResolvedValue({ id: 'c-1' })
+    idempotency.begin.mockResolvedValue({
+      mode: 'replay',
+      recordId: 'idem-1',
+      response: { id: 'ch-1', idempotent: true },
+    })
+
+    const result = await service.createCharge({
+      orgId: 'org-1',
+      customerId: 'c-1',
+      amountCents: 1000,
+      dueDate: new Date('2026-01-01T00:00:00Z'),
+      idempotencyKey: 'k-charge-1',
+    })
+
+    expect(result.id).toBe('ch-1')
+    expect(result.operation).toEqual({
+      status: 'duplicate',
+      reason: 'idempotency_replay',
+      idempotencyKey: 'k-charge-1',
+    })
+  })
+
+  it('retorna duplicate quando idempotência replaya payCharge', async () => {
+    const { service, idempotency } = buildService()
+    idempotency.begin.mockResolvedValue({
+      mode: 'replay',
+      recordId: 'idem-1',
+      response: { ok: true, paymentId: 'pay-1', idempotent: true },
+    })
+
+    const result = await service.payCharge({
+      orgId: 'org-1',
+      chargeId: 'ch-1',
+      amountCents: 1000,
+      method: 'PIX',
+      idempotencyKey: 'k-pay-1',
+    })
+
+    expect(result.paymentId).toBe('pay-1')
+    expect(result.operation).toEqual({
+      status: 'duplicate',
+      reason: 'idempotency_replay',
+      idempotencyKey: 'k-pay-1',
+    })
   })
 })

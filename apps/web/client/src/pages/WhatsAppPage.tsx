@@ -359,7 +359,7 @@ export default function WhatsAppPage() {
             }
 
             try {
-              await sendMutation.mutateAsync({
+              const result = await sendMutation.mutateAsync({
                 customerId: route.customerId!,
                 content: messageInput.trim(),
                 entityType: getEntityType(route),
@@ -374,7 +374,14 @@ export default function WhatsAppPage() {
               });
               await messagesQuery.refetch();
               setMessageInput("");
-              toast.success("Mensagem enviada");
+              const operationStatus = String((result as any)?.operation?.status ?? "").toLowerCase();
+              if (operationStatus === "duplicate") {
+                toast.success("Envio duplicado detectado: mensagem anterior reaproveitada.");
+              } else if (operationStatus === "queued") {
+                toast.success("Mensagem enfileirada para envio.");
+              } else {
+                toast.success("Mensagem enviada");
+              }
             } catch (error) {
               const message =
                 error instanceof Error ? error.message : "Erro ao enviar mensagem";

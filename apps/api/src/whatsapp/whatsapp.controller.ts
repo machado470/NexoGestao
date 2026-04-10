@@ -23,6 +23,15 @@ import { PrismaService } from '../prisma/prisma.service'
 import { QuotasService } from '../quotas/quotas.service'
 import { IdempotencyService } from '../common/idempotency/idempotency.service'
 
+type OperationalActionStatus =
+  | 'executed'
+  | 'queued'
+  | 'skipped'
+  | 'blocked'
+  | 'duplicate'
+  | 'failed'
+  | 'retry_scheduled'
+
 @Controller('whatsapp')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class WhatsAppController {
@@ -32,6 +41,18 @@ export class WhatsAppController {
     private readonly quotas: QuotasService,
     private readonly idempotency: IdempotencyService,
   ) {}
+
+  private buildOperationStatus(params: {
+    status: OperationalActionStatus
+    reason?: string | null
+    idempotencyKey?: string | null
+  }) {
+    return {
+      status: params.status,
+      reason: params.reason ?? null,
+      idempotencyKey: params.idempotencyKey ?? null,
+    }
+  }
 
   @Get('messages/:customerId')
   @Roles('ADMIN')
@@ -116,7 +137,14 @@ export class WhatsAppController {
       payload: requestPayload,
     })
     if (idem.mode === 'replay') {
-      return idem.response
+      return {
+        ...(idem.response as Record<string, unknown>),
+        operation: this.buildOperationStatus({
+          status: 'duplicate',
+          reason: 'idempotency_replay',
+          idempotencyKey,
+        }),
+      }
     }
 
     try {
@@ -134,8 +162,19 @@ export class WhatsAppController {
       }),
       renderedText: String(body.content).trim(),
     })
-      await this.idempotency.complete(idem.recordId, result)
-      return result
+      const payload = {
+        ...result,
+        operation: this.buildOperationStatus({
+          status: result?.created === false ? 'duplicate' : 'queued',
+          reason:
+            result?.created === false
+              ? 'duplicate_message_prevented'
+              : 'message_queued_for_dispatch',
+          idempotencyKey,
+        }),
+      }
+      await this.idempotency.complete(idem.recordId, payload)
+      return payload
     } catch (error: any) {
       await this.idempotency.fail(idem.recordId, error?.code)
       throw error

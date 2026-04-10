@@ -207,7 +207,16 @@ export function CreateChargeModal({
 
         const customerId = String((created as any)?.customerId ?? payload.customerId ?? "");
         await invalidateOperationalGraph(utils, customerId || undefined);
-        toast.success("Cobrança criada com contexto sincronizado.", {
+        const operationStatus = String((created as any)?.operation?.status ?? "").toLowerCase();
+        const degraded = (created as any)?.degraded;
+        const successMessage =
+          operationStatus === "duplicate"
+            ? "Requisição duplicada detectada: cobrança reaproveitada com segurança."
+            : degraded?.status === "retry_scheduled"
+              ? "Cobrança criada. WhatsApp entrou em modo pendente para retry."
+              : "Cobrança criada com contexto sincronizado.";
+
+        toast.success(successMessage, {
           action: {
             label: "Ver cobrança",
             onClick: () =>

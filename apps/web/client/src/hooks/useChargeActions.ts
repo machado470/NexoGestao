@@ -63,7 +63,7 @@ export function useChargeActions(options?: UseChargeActionsOptions) {
   };
 
   const payCharge = trpc.finance.charges.pay.useMutation({
-    onSuccess: async (_result, variables) => {
+    onSuccess: async (result, variables) => {
       utils.finance.charges.list.setData(undefined, (old: any) => {
         const raw = old as { data: any[]; pagination: any } | undefined;
         const applyPaid = (items: any[]) =>
@@ -82,7 +82,15 @@ export function useChargeActions(options?: UseChargeActionsOptions) {
         return { ...raw, data: applyPaid(raw.data) };
       });
 
-      toast.success("Pagamento registrado com sucesso");
+      const operationStatus = String((result as any)?.operation?.status ?? "").toLowerCase();
+      const degraded = (result as any)?.degraded;
+      const message =
+        operationStatus === "duplicate"
+          ? "Pagamento já havia sido processado. Resultado reaproveitado sem duplicação."
+          : degraded?.status === "retry_scheduled"
+            ? "Pagamento registrado. Confirmação WhatsApp ficou pendente para retry."
+            : "Pagamento registrado com sucesso";
+      toast.success(message);
       notify.successPersistent(
         "Receita confirmada no caixa",
         "Próximo passo: validar a O.S. relacionada e concluir o ciclo operacional.",
