@@ -44,6 +44,42 @@ function atHour(base: Date, dayOffset: number, hour: number, minute = 0) {
   return date
 }
 
+function toIsoMinute(date: Date) {
+  return date.toISOString().slice(0, 16)
+}
+
+async function resolveNonOverlappingWindow(params: {
+  orgId: string
+  desiredStartsAt: Date
+  desiredEndsAt: Date
+  preserveAppointmentId?: string
+}) {
+  const durationMs = params.desiredEndsAt.getTime() - params.desiredStartsAt.getTime()
+  let candidateStartsAt = new Date(params.desiredStartsAt)
+  let candidateEndsAt = new Date(params.desiredEndsAt)
+
+  while (true) {
+    const conflict = await prisma.appointment.findFirst({
+      where: {
+        orgId: params.orgId,
+        ...(params.preserveAppointmentId
+          ? { id: { not: params.preserveAppointmentId } }
+          : {}),
+        startsAt: { lt: candidateEndsAt },
+        endsAt: { gt: candidateStartsAt },
+      },
+      orderBy: [{ startsAt: 'asc' }, { id: 'asc' }],
+    })
+
+    if (!conflict) {
+      return { startsAt: candidateStartsAt, endsAt: candidateEndsAt }
+    }
+
+    candidateStartsAt = new Date(conflict.endsAt.getTime())
+    candidateEndsAt = new Date(candidateStartsAt.getTime() + durationMs)
+  }
+}
+
 function deriveStartedAt(params: {
   status: ServiceOrderStatus
   scheduledFor?: Date
@@ -156,6 +192,7 @@ async function upsertCustomer(orgId: string, customer: CustomerSeed) {
 }
 
 async function upsertAppointment(params: {
+  idempotencyKey: string
   orgId: string
   customerId: string
   startsAt: Date
@@ -163,19 +200,37 @@ async function upsertAppointment(params: {
   status: AppointmentStatus
   notes: string
 }) {
-  const found = await prisma.appointment.findFirst({
+  const foundByKey = await prisma.appointment.findUnique({
     where: {
-      orgId: params.orgId,
-      customerId: params.customerId,
-      startsAt: params.startsAt,
+      idempotencyKey: params.idempotencyKey,
     },
   })
 
-  if (found) {
+  const foundLegacy =
+    foundByKey ??
+    (await prisma.appointment.findFirst({
+      where: {
+        orgId: params.orgId,
+        customerId: params.customerId,
+        startsAt: params.startsAt,
+      },
+    }))
+
+  const resolvedWindow = await resolveNonOverlappingWindow({
+    orgId: params.orgId,
+    desiredStartsAt: params.startsAt,
+    desiredEndsAt: params.endsAt,
+    preserveAppointmentId: foundLegacy?.id,
+  })
+
+  if (foundLegacy) {
     return prisma.appointment.update({
-      where: { id: found.id },
+      where: { id: foundLegacy.id },
       data: {
-        endsAt: params.endsAt,
+        idempotencyKey: params.idempotencyKey,
+        customerId: params.customerId,
+        startsAt: resolvedWindow.startsAt,
+        endsAt: resolvedWindow.endsAt,
         status: params.status,
         notes: params.notes,
       },
@@ -183,8 +238,146 @@ async function upsertAppointment(params: {
   }
 
   return prisma.appointment.create({
-    data: params,
+    data: {
+      idempotencyKey: params.idempotencyKey,
+      orgId: params.orgId,
+      customerId: params.customerId,
+      startsAt: resolvedWindow.startsAt,
+      endsAt: resolvedWindow.endsAt,
+      status: params.status,
+      notes: params.notes,
+    },
   })
+}
+
+type PilotAppointmentSeed = {
+  key: string
+  customerIndex: number
+  dayOffset: number
+  startsHour: number
+  startsMinute: number
+  durationMinutes: number
+  status: AppointmentStatus
+  notes: string
+}
+
+function buildPilotAppointmentDate(params: {
+  base: Date
+  dayOffset: number
+  startsHour: number
+  startsMinute: number
+  durationMinutes: number
+}) {
+  const startsAt = atHour(
+    params.base,
+    params.dayOffset,
+    params.startsHour,
+    params.startsMinute,
+  )
+  const endsAt = new Date(startsAt.getTime() + params.durationMinutes * 60 * 1000)
+
+  return { startsAt, endsAt }
+}
+
+async function seedPilotAppointments(params: {
+  orgId: string
+  baseDate: Date
+  customers: Array<Awaited<ReturnType<typeof upsertCustomer>>>
+}) {
+  const seedPlan: PilotAppointmentSeed[] = [
+    {
+      key: 'condominio-manutencao-eletrica',
+      customerIndex: 0,
+      dayOffset: 1,
+      startsHour: 8,
+      startsMinute: 30,
+      durationMinutes: 120,
+      status: AppointmentStatus.CONFIRMED,
+      notes:
+        'Visita técnica mensal elétrica nas áreas comuns. Validar acesso na portaria.',
+    },
+    {
+      key: 'clinica-revisao-climatizacao',
+      customerIndex: 1,
+      dayOffset: 2,
+      startsHour: 14,
+      startsMinute: 0,
+      durationMinutes: 90,
+      status: AppointmentStatus.SCHEDULED,
+      notes:
+        'Inspeção de ar-condicionado na recepção. Equipamento split 36.000 BTUs.',
+    },
+    {
+      key: 'restaurante-corretiva-coifa',
+      customerIndex: 2,
+      dayOffset: -2,
+      startsHour: 21,
+      startsMinute: 0,
+      durationMinutes: 120,
+      status: AppointmentStatus.DONE,
+      notes:
+        'Manutenção corretiva da coifa industrial concluída dentro do prazo.',
+    },
+    {
+      key: 'escola-preventiva-hidraulica',
+      customerIndex: 3,
+      dayOffset: 3,
+      startsHour: 9,
+      startsMinute: 0,
+      durationMinutes: 60,
+      status: AppointmentStatus.CONFIRMED,
+      notes:
+        'Revisão preventiva hidráulica com acompanhamento da coordenação escolar.',
+    },
+    {
+      key: 'loja-diagnostico-rede-no-show',
+      customerIndex: 4,
+      dayOffset: 0,
+      startsHour: 16,
+      startsMinute: 0,
+      durationMinutes: 90,
+      status: AppointmentStatus.NO_SHOW,
+      notes:
+        'Diagnóstico de rede interna. Responsável da loja não estava presente.',
+    },
+    {
+      key: 'escola-emergencial-reservatorio',
+      customerIndex: 3,
+      dayOffset: -4,
+      startsHour: 8,
+      startsMinute: 0,
+      durationMinutes: 120,
+      status: AppointmentStatus.DONE,
+      notes:
+        'Atendimento emergencial no bloco B para reparo de vazamento no reservatório.',
+    },
+  ]
+
+  const appointments: Array<Awaited<ReturnType<typeof upsertAppointment>>> = []
+
+  for (const seed of seedPlan) {
+    const { startsAt, endsAt } = buildPilotAppointmentDate({
+      base: params.baseDate,
+      dayOffset: seed.dayOffset,
+      startsHour: seed.startsHour,
+      startsMinute: seed.startsMinute,
+      durationMinutes: seed.durationMinutes,
+    })
+
+    appointments.push(
+      await upsertAppointment({
+        idempotencyKey: `pilot:${params.orgId}:appointment:${seed.key}:${toIsoMinute(startsAt)}`,
+        orgId: params.orgId,
+        customerId: params.customers[seed.customerIndex].id,
+        startsAt,
+        endsAt,
+        status: seed.status,
+        notes: seed.notes,
+      }),
+    )
+  }
+
+  return appointments
 }
 
 async function upsertServiceOrder(params: {
@@ -561,6 +754,7 @@ async function ensureBusinessSubscription(orgId: string) {
 
 export async function seedPilot() {
   const now = new Date()
+  const baseDate = atHour(now, 0, 0, 0)
   const pilotOrgSlug = env('PILOT_ORG_SLUG', 'pilot-servicos-viva')
   const pilotOrgName = env('PILOT_ORG_NAME', 'Serviços Viva - Ambiente Piloto')
 
@@ -666,79 +860,11 @@ export async function seedPilot() {
     customers.push(await upsertCustomer(org.id, customer))
   }
 
-  const appointments: Array<Awaited<ReturnType<typeof upsertAppointment>>> = []
-
-  appointments.push(
-    await upsertAppointment({
-      orgId: org.id,
-      customerId: customers[0].id,
-      startsAt: atHour(now, 1, 8, 30),
-      endsAt: atHour(now, 1, 10, 30),
-      status: AppointmentStatus.CONFIRMED,
-      notes:
-        'Visita técnica mensal elétrica nas áreas comuns. Validar acesso na portaria.',
-    }),
-  )
-
-  appointments.push(
-    await upsertAppointment({
-      orgId: org.id,
-      customerId: customers[1].id,
-      startsAt: atHour(now, 2, 14, 0),
-      endsAt: atHour(now, 2, 15, 30),
-      status: AppointmentStatus.SCHEDULED,
-      notes:
-        'Inspeção de ar-condicionado na recepção. Equipamento split 36.000 BTUs.',
-    }),
-  )
-
-  appointments.push(
-    await upsertAppointment({
-      orgId: org.id,
-      customerId: customers[2].id,
-      startsAt: atHour(now, -2, 21, 0),
-      endsAt: atHour(now, -2, 23, 0),
-      status: AppointmentStatus.DONE,
-      notes:
-        'Manutenção corretiva da coifa industrial concluída dentro do prazo.',
-    }),
-  )
-
-  appointments.push(
-    await upsertAppointment({
-      orgId: org.id,
-      customerId: customers[3].id,
-      startsAt: atHour(now, 3, 9, 0),
-      endsAt: atHour(now, 3, 10, 0),
-      status: AppointmentStatus.CONFIRMED,
-      notes:
-        'Revisão preventiva hidráulica com acompanhamento da coordenação escolar.',
-    }),
-  )
-
-  appointments.push(
-    await upsertAppointment({
-      orgId: org.id,
-      customerId: customers[4].id,
-      startsAt: atHour(now, 0, 16, 0),
-      endsAt: atHour(now, 0, 17, 30),
-      status: AppointmentStatus.NO_SHOW,
-      notes:
-        'Diagnóstico de rede interna. Responsável da loja não estava presente.',
-    }),
-  )
-
-  appointments.push(
-    await upsertAppointment({
-      orgId: org.id,
-      customerId: customers[3].id,
-      startsAt: atHour(now, -4, 8, 0),
-      endsAt: atHour(now, -4, 10, 0),
-      status: AppointmentStatus.DONE,
-      notes:
-        'Atendimento emergencial no bloco B para reparo de vazamento no reservatório.',
-    }),
-  )
+  const appointments = await seedPilotAppointments({
+    orgId: org.id,
+    baseDate,
+    customers,
+  })
 
   const serviceOrders: Array<Awaited<ReturnType<typeof upsertServiceOrder>>> = []
 
@@ -755,7 +881,7 @@ export async function seedPilot() {
       dueDate: atHour(now, 7, 18, 0),
       status: ServiceOrderStatus.IN_PROGRESS,
       priority: 3,
-      scheduledFor: atHour(now, 1, 8, 30),
+      scheduledFor: appointments[0].startsAt,
     }),
   )
 
@@ -771,7 +897,7 @@ export async function seedPilot() {
       dueDate: atHour(now, 10, 18, 0),
       status: ServiceOrderStatus.ASSIGNED,
       priority: 2,
-      scheduledFor: atHour(now, 2, 14, 0),
+      scheduledFor: appointments[1].startsAt,
     }),
   )
 
@@ -788,7 +914,7 @@ export async function seedPilot() {
       dueDate: atHour(now, -1, 18, 0),
       status: ServiceOrderStatus.DONE,
       priority: 3,
-      scheduledFor: atHour(now, -2, 21, 0),
+      scheduledFor: appointments[2].startsAt,
       outcomeSummary:
         'Equipamento liberado para uso com recomendação de monitoramento semanal.',
     }),
@@ -807,7 +933,7 @@ export async function seedPilot() {
       dueDate: atHour(now, 12, 18, 0),
       status: ServiceOrderStatus.OPEN,
       priority: 2,
-      scheduledFor: atHour(now, 3, 9, 0),
+      scheduledFor: appointments[3].startsAt,
     }),
   )
 
@@ -841,7 +967,7 @@ export async function seedPilot() {
       dueDate: atHour(now, 2, 17, 0),
       status: ServiceOrderStatus.DONE,
       priority: 3,
-      scheduledFor: atHour(now, -4, 8, 0),
+      scheduledFor: appointments[5].startsAt,
       outcomeSummary:
         'Sistema estabilizado e operação normalizada; recomendado retorno preventivo em 30 dias.',
     }),
