@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import { cva, type VariantProps } from "class-variance-authority";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 rounded-xl text-sm font-semibold transition disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex items-center justify-center gap-2 rounded-[12px] text-sm font-semibold transition disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
@@ -11,15 +11,15 @@ const buttonVariants = cva(
         secondary: "nexo-cta-secondary",
         outline: "nexo-cta-secondary",
         ghost:
-          "h-10 px-3 text-[var(--text-secondary)] hover:bg-[color-mix(in_srgb,var(--surface-base)_88%,transparent)] hover:text-[var(--text-primary)]",
+          "h-9 px-3 text-[var(--text-secondary)] hover:bg-[var(--accent-soft)] hover:text-[var(--text-primary)]",
         destructive: "nexo-cta-primary",
         link: "h-auto px-0 text-[var(--accent)] underline-offset-4 hover:underline",
       },
       size: {
-        default: "h-10 px-4",
+        default: "h-9 px-4",
         sm: "h-9 px-3 text-xs",
-        lg: "h-11 px-6",
-        icon: "size-10 px-0",
+        lg: "h-10 px-6",
+        icon: "size-9 px-0",
       },
     },
     defaultVariants: {
@@ -95,7 +95,7 @@ export function SurfaceCard({
   const surfaceClass =
     variant === "inner"
       ? "nexo-surface-inner p-4"
-      : "nexo-surface-primary p-5";
+      : "nexo-surface-primary p-5 md:p-6";
 
   return (
     <section className={cn(surfaceClass, className)}>{children}</section>
@@ -188,7 +188,7 @@ export function SearchInput(props: ComponentProps<"input">) {
     <input
       {...props}
       className={cn(
-        "h-10 w-full rounded-xl border border-[var(--border-soft)] bg-[color-mix(in_srgb,var(--bg-surface)_78%,transparent)] px-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/35",
+        "h-9 w-full rounded-[12px] border border-[var(--border-soft)] bg-[var(--surface-contrast)] px-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/35",
         props.className
       )}
     />
@@ -202,7 +202,7 @@ export function Select(props: ComponentProps<"select">) {
     <select
       {...props}
       className={cn(
-        "h-10 w-full rounded-xl border border-[var(--border-soft)] bg-[color-mix(in_srgb,var(--bg-surface)_78%,transparent)] px-3 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/35",
+        "h-9 w-full rounded-[12px] border border-[var(--border-soft)] bg-[var(--surface-contrast)] px-3 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/35",
         props.className
       )}
     />
@@ -228,7 +228,7 @@ export function GhostButton({ className, ...props }: ComponentProps<"button">) {
     <button
       {...props}
       className={cn(
-        "inline-flex h-10 items-center rounded-xl px-3 text-sm text-[var(--text-secondary)] transition hover:bg-[color-mix(in_srgb,var(--bg-surface-hover)_65%,transparent)] hover:text-[var(--text-primary)]",
+        "inline-flex h-9 items-center rounded-[12px] px-3 text-sm text-[var(--text-secondary)] transition hover:bg-[var(--accent-soft)] hover:text-[var(--text-primary)]",
         className
       )}
     />
