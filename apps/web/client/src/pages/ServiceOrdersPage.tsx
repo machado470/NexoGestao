@@ -63,7 +63,7 @@ import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedba
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { NextActionCell } from "@/components/operating-system/NextActionCell";
 import { ContextPanel } from "@/components/operating-system/ContextPanel";
-import { runFlowChain } from "@/lib/operations/flowChain";
+import { runFlowChain, type ExecutionSnapshot } from "@/lib/operations/flowChain";
 import { getServiceOrderExplainLayer } from "@/lib/operations/explain-layer";
 
 const FINANCIAL_FILTERS: Array<{
@@ -160,6 +160,7 @@ export default function ServiceOrdersPage() {
     "idle" | "running" | "done"
   >("idle");
   const [flowFeedback, setFlowFeedback] = useState<string | null>(null);
+  const [flowSnapshots, setFlowSnapshots] = useState<ExecutionSnapshot[]>([]);
   const [whatsAppDraft, setWhatsAppDraft] = useState("");
 
   const activeRef = useRef<HTMLDivElement | null>(null);
@@ -669,19 +670,36 @@ export default function ServiceOrdersPage() {
                 setNextActionState("running");
                 const result = await runFlowChain({
                   actionLabel: nextAction.primaryAction.label,
+                  actionId:
+                    nextAction.primaryAction.key === "generate_charge"
+                      ? "generate_charge"
+                      : "complete_service",
+                  executionKey: activeOrder?.id
+                    ? `service-orders:${activeOrder.id}:${nextAction.primaryAction.key}`
+                    : `service-orders:queue:${nextAction.primaryAction.key}`,
+                  facts: {
+                    hasOpenCharge: Boolean(activeOrder?.financialSummary?.hasCharge),
+                    isChargePaid: activeOrder?.financialSummary?.chargeStatus === "PAID",
+                  },
                   onExecute: () => nextActionButtons[0]?.onClick?.(),
+                  throwOnError: false,
                   nextSuggestedAction:
                     activeOrder?.status === "DONE"
                       ? "Gerar cobrança e enviar WhatsApp"
                       : undefined,
                 });
+                setFlowSnapshots(result.snapshots);
                 setFlowFeedback(
-                  result.suggestions[0]
-                    ? `${result.completedAction} concluída. Próximo passo sugerido: ${result.suggestions[0].label}.`
-                    : `${result.completedAction} concluída.`
+                  result.latestStatus === "success"
+                    ? result.suggestions[0]
+                      ? `✔ ${result.completedAction} concluída. Próximo passo: ${result.suggestions[0].label}.`
+                      : `✔ ${result.completedAction} concluída com sucesso.`
+                    : `Falha ao executar ${result.completedAction}. Revise o erro e tente novamente.`
                 );
-                setNextActionState("done");
-                setTimeout(() => setNextActionState("idle"), 1400);
+                setNextActionState(result.latestStatus === "success" ? "done" : "idle");
+                if (result.latestStatus === "success") {
+                  setTimeout(() => setNextActionState("idle"), 1400);
+                }
               })();
             }}
           />
@@ -712,6 +730,26 @@ export default function ServiceOrdersPage() {
       {flowFeedback ? (
         <div className="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-300">
           {flowFeedback}
+        </div>
+      ) : null}
+      {flowSnapshots.length > 0 ? (
+        <div className="rounded-md border border-border/70 bg-card/50 px-3 py-2 text-xs">
+          <p className="font-semibold text-foreground">Execução da cadeia</p>
+          <div className="mt-2 space-y-1">
+            {flowSnapshots.slice(-4).map((snapshot, index) => (
+              <p key={`${snapshot.actionId}-${snapshot.timestamp}-${index}`} className="text-muted-foreground">
+                {snapshot.status === "success"
+                  ? "✔"
+                  : snapshot.status === "failed"
+                    ? "✖"
+                    : snapshot.status === "running"
+                      ? "…"
+                      : "○"}{" "}
+                {snapshot.label}
+                {snapshot.error ? ` — ${snapshot.error}` : ""}
+              </p>
+            ))}
+          </div>
         </div>
       ) : null}
 
