@@ -86,12 +86,19 @@ export function PageHeader({
 export function SurfaceCard({
   children,
   className,
+  variant = "primary",
 }: {
   children: ReactNode;
   className?: string;
+  variant?: "primary" | "inner";
 }) {
+  const surfaceClass =
+    variant === "inner"
+      ? "nexo-surface-inner p-4"
+      : "nexo-surface-primary p-5";
+
   return (
-    <section className={cn("nexo-surface p-5", className)}>{children}</section>
+    <section className={cn(surfaceClass, className)}>{children}</section>
   );
 }
 
