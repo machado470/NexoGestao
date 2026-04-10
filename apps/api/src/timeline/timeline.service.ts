@@ -48,6 +48,14 @@ function pickString(
   return normalized ? normalized : null
 }
 
+function getEventOrigin(metadata?: Record<string, unknown> | null): string {
+  const raw =
+    pickString(metadata ?? null, 'origin')
+    ?? pickString(metadata ?? null, 'source')
+    ?? pickString(metadata ?? null, 'eventType')
+  return raw ?? 'unknown_origin'
+}
+
 @Injectable()
 export class TimelineService {
   constructor(
@@ -56,6 +64,31 @@ export class TimelineService {
     private readonly requestContext: RequestContextService,
     private readonly webhookDispatcher: WebhookDispatcher,
   ) {}
+
+  private logInvalidCustomerReference(params: {
+    input: TimelineLogInput
+    reason: string
+    customerId: string | null
+  }) {
+    const metadata = params.input.metadata ?? null
+    console.error(
+      JSON.stringify({
+        event: 'timeline_invalid_customer_reference',
+        reason: params.reason,
+        origin: getEventOrigin(metadata),
+        orgId: params.input.orgId,
+        action: params.input.action,
+        actionId: pickString(metadata, 'actionId'),
+        entityId:
+          params.input.chargeId
+          ?? params.input.serviceOrderId
+          ?? params.input.appointmentId
+          ?? pickString(metadata, 'entityId')
+          ?? null,
+        customerId: params.customerId,
+      }),
+    )
+  }
 
   async log(input: TimelineLogInput) {
     if (!input.orgId) {
@@ -102,11 +135,9 @@ export class TimelineService {
 
     const resolvedCustomerId =
       input.customerId ??
-      pickString(input.metadata ?? null, 'customerId') ??
-      pickString(input.metadata ?? null, 'entityId')
+      pickString(input.metadata ?? null, 'customerId')
 
     let customerId: string | null = null
-    let customerReferenceErrorMetadata: Record<string, unknown> = {}
 
     if (resolvedCustomerId) {
       const customerExists = await this.prisma.customer.findFirst({
@@ -117,11 +148,12 @@ export class TimelineService {
       if (customerExists?.id) {
         customerId = customerExists.id
       } else {
-        console.warn('[Timeline] Invalid customerId detected')
-        customerReferenceErrorMetadata = {
-          originalCustomerId: resolvedCustomerId,
-          error: 'INVALID_CUSTOMER_REFERENCE',
-        }
+        this.logInvalidCustomerReference({
+          input,
+          reason: 'customer_not_found_for_org',
+          customerId: resolvedCustomerId,
+        })
+        return null
       }
     }
 
@@ -148,7 +180,6 @@ export class TimelineService {
     const metadata = JSON.parse(
       JSON.stringify({
         ...(input.metadata ?? {}),
-        ...customerReferenceErrorMetadata,
         ...(requestId ? { requestId } : {}),
       }),
     ) as Prisma.InputJsonValue
@@ -174,7 +205,11 @@ export class TimelineService {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2003'
       ) {
-        console.warn('[Timeline] Invalid customerId detected')
+        this.logInvalidCustomerReference({
+          input,
+          reason: 'foreign_key_rejected',
+          customerId,
+        })
         return null
       }
       throw error
