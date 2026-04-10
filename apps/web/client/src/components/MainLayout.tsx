@@ -351,7 +351,7 @@ export function MainLayout({ children }: MainLayoutProps) {
 
         <div className="flex min-w-0 flex-1 flex-col">
           <header className="nexo-topbar sticky top-0 z-20">
-            <div className="mx-auto grid w-full max-w-[1680px] grid-cols-1 gap-3 px-4 py-3 md:px-6">
+            <div className="nexo-topbar-grid">
               <div className="grid grid-cols-1 items-center gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
                 <div className="flex min-w-0 items-center gap-2.5 md:gap-3">
                   {isMobile ? (
@@ -363,7 +363,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                       <Menu className="h-5 w-5" />
                     </button>
                   ) : null}
-                  <div className="min-w-0">
+                  <div className="nexo-topbar-meta min-w-0">
                     <p className="truncate text-lg font-semibold tracking-tight text-zinc-950 dark:text-white">
                       {currentMeta.title}
                     </p>
@@ -476,7 +476,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                 <button
                   type="button"
                   onClick={() => navigate("/service-orders")}
-                  className="nexo-cta-primary h-10 w-full gap-2 rounded-xl px-4 text-sm lg:w-auto"
+                  className="nexo-cta-primary h-11 w-full gap-2 rounded-xl px-5 text-sm lg:w-auto"
                 >
                   <Search className="h-4 w-4" /> Executar agora
                 </button>
@@ -487,6 +487,16 @@ export function MainLayout({ children }: MainLayoutProps) {
           <main data-scrollbar="nexo" className="nexo-app-content m-3 mt-0 min-h-0 flex-1 overflow-auto md:m-4 md:mt-0">
             {children}
           </main>
+          <div className="nexo-primary-dock hidden lg:block">
+            <button
+              type="button"
+              onClick={() => navigate("/service-orders")}
+              className="nexo-cta-primary h-12 gap-2 rounded-2xl px-5 text-sm shadow-xl shadow-orange-500/25"
+            >
+              <Search className="h-4 w-4" />
+              Executar agora
+            </button>
+          </div>
         </div>
       </div>
     </div>

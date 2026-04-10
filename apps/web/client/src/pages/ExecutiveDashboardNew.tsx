@@ -98,13 +98,13 @@ function MetricCard({
   loading,
 }: MetricCardProps) {
   return (
-    <div className="nexo-kpi-card nexo-fade-in">
+    <div className="nexo-card-kpi nexo-fade-in">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <p className="nexo-text-wrap text-sm font-medium text-zinc-500 dark:text-zinc-400">
+          <p className="nexo-text-wrap text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500 dark:text-zinc-400">
             {label}
           </p>
-          <div className="mt-3 nexo-metric-value min-h-10">
+          <div className="relative mt-3 min-h-10 text-4xl font-bold tracking-tight text-zinc-950 dark:text-white">
             {loading ? (
               <div className="nexo-skeleton h-10 w-24 rounded-lg" />
             ) : (
@@ -142,7 +142,7 @@ function OperationalHealthView({
   urgentActions: number;
 }) {
   return (
-    <section className="nexo-surface p-4">
+    <section className="nexo-card-operational">
       <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Operational health</p>
       <div className="mt-2 grid gap-2 sm:grid-cols-4">
         <div className="rounded-lg border border-red-300/60 bg-red-50/60 p-2 text-xs">Críticas: <strong>{criticalPending}</strong></div>
@@ -932,7 +932,7 @@ export default function ExecutiveDashboardNew() {
         </section>
       ) : null}
 
-      <section className="nexo-page-header transition-all duration-300 sm:px-6 sm:py-6">
+      <section className="nexo-page-header nexo-card-operational transition-all duration-300 sm:px-6 sm:py-6">
         <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-2xl">
             <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-orange-200/80 bg-orange-100/80 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-orange-700 dark:border-orange-500/20 dark:bg-orange-500/12 dark:text-orange-300">
@@ -972,7 +972,7 @@ export default function ExecutiveDashboardNew() {
           urgentActions={urgentActions}
         />
         <div className="mt-3 grid gap-3 xl:grid-cols-3">
-          <div className="rounded-xl border border-zinc-200/80 bg-white/80 p-3 dark:border-zinc-800 dark:bg-zinc-950/40">
+          <div className="nexo-card-informative p-3">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
               Operation mode control
             </p>
@@ -1019,7 +1019,7 @@ export default function ExecutiveDashboardNew() {
               ))}
             </div>
           </div>
-          <div className="rounded-xl border border-zinc-200/80 bg-white/80 p-3 dark:border-zinc-800 dark:bg-zinc-950/40">
+          <div className="nexo-card-informative p-3">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
               Safety limits
             </p>
@@ -1040,7 +1040,7 @@ export default function ExecutiveDashboardNew() {
               {safetyState.remainingByActionType.communication}
             </p>
           </div>
-          <div className="rounded-xl border border-zinc-200/80 bg-white/80 p-3 dark:border-zinc-800 dark:bg-zinc-950/40">
+          <div className="nexo-card-informative p-3">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
               Cross-entity context
             </p>
@@ -1059,7 +1059,7 @@ export default function ExecutiveDashboardNew() {
         ) : null}
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-2">
+      <section className="grid gap-5 xl:grid-cols-2">
         <AlertStrip
           severity={overdueCharges > 0 ? "critical" : "normal"}
           title="Atenção operacional imediata"
@@ -1088,7 +1088,7 @@ export default function ExecutiveDashboardNew() {
         />
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-2">
+      <section className="grid gap-5 xl:grid-cols-2">
         <ActionFeed items={operationalActionFeed} focusCriticalOnly={focusCriticalOnly} />
         <div className="space-y-2">
           <PipelineStage
@@ -1104,8 +1104,8 @@ export default function ExecutiveDashboardNew() {
         </div>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-2">
-        <article className="nexo-surface p-4">
+      <section className="grid gap-5 xl:grid-cols-2">
+        <article className="nexo-card-operational">
           <h3 className="text-sm font-semibold">Executive summary</h3>
           <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-300">
             Gargalos, risco financeiro e volume travado para decisão rápida.
@@ -1117,7 +1117,7 @@ export default function ExecutiveDashboardNew() {
             <div className="rounded-md border border-white/10 bg-white/5 p-2 text-xs">Ação nº1: <strong>{dominantProblem?.title ?? "Operação estável"}</strong></div>
           </div>
         </article>
-        <article className="nexo-surface p-4">
+        <article className="nexo-card-operational">
           <div className="flex items-center justify-between gap-2">
             <h3 className="text-sm font-semibold">Decision log (auditoria)</h3>
             <button
@@ -1145,7 +1145,7 @@ export default function ExecutiveDashboardNew() {
         </article>
       </section>
 
-      <section className="nexo-surface p-4">
+      <section className="nexo-card-operational">
         <p className="flex items-center gap-2 text-sm font-semibold"><Bot className="h-4 w-4" /> Background automation prep</p>
         <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-300">
           Execução fora da UI pronta para eventos (cobrança vencida, O.S. concluída, risco elevado) com notificações inteligentes e trilha de auditoria.
@@ -1212,7 +1212,7 @@ export default function ExecutiveDashboardNew() {
       ) : null}
 
       <section className="grid gap-6 xl:grid-cols-3">
-        <article className="nexo-surface nexo-fade-in p-5 xl:col-span-2">
+        <article className="nexo-card-operational nexo-fade-in xl:col-span-2">
           <h2 className="nexo-section-title">Receita ao longo do tempo</h2>
           <p className="mt-1 nexo-section-description">
             Linha temporal de evolução de receita.
@@ -1274,7 +1274,7 @@ export default function ExecutiveDashboardNew() {
           )}
         </article>
 
-        <article className="nexo-surface nexo-fade-in p-5">
+        <article className="nexo-card-informative nexo-fade-in">
           <h2 className="nexo-section-title">Funil operacional</h2>
           <p className="mt-1 nexo-section-description">
             Cliente → Agendamento → O.S. → Pagamento.
@@ -1322,7 +1322,7 @@ export default function ExecutiveDashboardNew() {
       </section>
 
       <section className="grid gap-6 lg:grid-cols-2">
-        <article className="nexo-surface nexo-fade-in p-5">
+        <article className="nexo-card-informative nexo-fade-in">
           <h2 className="nexo-section-title">Distribuição de status</h2>
           <p className="mt-1 nexo-section-description">
             Volume atual por status de cobrança.
@@ -1374,7 +1374,7 @@ export default function ExecutiveDashboardNew() {
         </article>
 
         <article
-          className={`nexo-surface nexo-fade-in p-5 transition-all duration-300 ${optimisticTick ? "ring-2 ring-orange-300/40 dark:ring-orange-500/30" : ""}`}
+          className={`nexo-card-operational nexo-fade-in transition-all duration-300 ${optimisticTick ? "ring-2 ring-orange-300/40 dark:ring-orange-500/30" : ""}`}
         >
           <h2 className="nexo-section-title">Gargalos agora</h2>
           <p className="mt-1 nexo-section-description">
@@ -1431,7 +1431,7 @@ export default function ExecutiveDashboardNew() {
           </div>
           <OperationalActionFeed plan={executionPlan} riskOperationalState={riskOperationalState} />
         </div>
-        <article className="nexo-surface nexo-fade-in p-5">
+        <article className="nexo-card-informative nexo-fade-in">
           <h2 className="nexo-section-title">Top 3 prioridades automáticas</h2>
           <p className="mt-1 nexo-section-description">
             Sem lista genérica: apenas o que gera caixa mais rápido.
@@ -1440,7 +1440,7 @@ export default function ExecutiveDashboardNew() {
             {priorityProblems.map((problem, index) => (
               <div
                 key={problem.id}
-                className="rounded-xl border border-white/10 bg-white/5 p-4"
+                className="nexo-card-informative p-4"
               >
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-orange-600 dark:text-orange-300">
                   #{index + 1} prioridade
@@ -1469,7 +1469,7 @@ export default function ExecutiveDashboardNew() {
         </article>
 
         {actionFlowSuggestion ? (
-          <article className="rounded-2xl border border-emerald-300/60 bg-emerald-50/70 p-5 dark:border-emerald-700/50 dark:bg-emerald-950/20">
+          <article className="nexo-card-alert border-emerald-300/60 bg-emerald-50/70 dark:border-emerald-700/50 dark:bg-emerald-950/20">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-300">
               Fluxo automático de ação
             </p>
@@ -1488,7 +1488,7 @@ export default function ExecutiveDashboardNew() {
             </button>
           </article>
         ) : (
-          <article className="nexo-surface p-5">
+          <article className="nexo-card-informative">
             <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
               Fluxo automático de ação
             </h3>
