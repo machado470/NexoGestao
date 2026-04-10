@@ -1340,26 +1340,30 @@ html {
 /* Frontend global refactor baseline aligned to frontnexo3 visual language. */
 @layer base {
   :root {
-    --bg-app: #f4f7fb;
-    --bg-sidebar: #f8fbff;
-    --bg-header: #ffffff;
+    --bg-app: #f3f7fb;
+    --bg-sidebar: #eaf0f7;
+    --bg-header: #f8fbff;
     --bg-surface: #ffffff;
-    --surface-contrast: #f7fafc;
-    --border-soft: rgba(15, 31, 56, 0.08);
-    --text-primary: #0f1f38;
-    --text-secondary: #5f7692;
-    --text-muted: #7e93ac;
+    --surface-contrast: #eef3f8;
+    --border-soft: rgba(36, 82, 114, 0.2);
+    --text-primary: #162a4a;
+    --text-secondary: #245272;
+    --text-muted: #6b8baa;
     --accent-primary: #e8772e;
     --accent-primary-hover: #f0893f;
-    --accent-soft: rgba(232, 119, 46, 0.12);
+    --accent-soft: rgba(232, 119, 46, 0.1);
+    --radius-control: 12px;
+    --radius-surface: 16px;
+    --nexo-title-font: "Plus Jakarta Sans", sans-serif;
+    --nexo-body-font: "Plus Jakarta Sans", sans-serif;
   }
 
   .dark {
     --bg-app: #0a1628;
     --bg-sidebar: #0f1f38;
     --bg-header: #0f1f38;
-    --bg-surface: #122744;
-    --surface-contrast: #162e4e;
+    --bg-surface: #162a4a;
+    --surface-contrast: #1a3a52;
     --border-soft: rgba(36, 82, 114, 0.3);
     --text-primary: #ffffff;
     --text-secondary: #c8d6e5;
@@ -1374,6 +1378,7 @@ html {
   .nexo-app-shell {
     background: var(--bg-app);
     color: var(--text-primary);
+    font-family: var(--nexo-body-font);
   }
 
   .nexo-sidebar {
@@ -1434,9 +1439,9 @@ html {
   }
 
   .nexo-app-content {
-    border: none;
+    border: 0;
     border-radius: 0;
-    background: transparent;
+    background: var(--bg-app);
     box-shadow: none;
   }
 
@@ -1456,20 +1461,16 @@ html {
   .nexo-data-table,
   .nexo-floating-panel,
   .nexo-surface-operational {
-    border-radius: 14px;
+    border-radius: var(--radius-surface);
     border: 1px solid var(--border-soft);
-    background: linear-gradient(
-      180deg,
-      color-mix(in srgb, rgba(30, 58, 82, 0.6) 14%, var(--bg-surface)),
-      color-mix(in srgb, rgba(22, 42, 74, 0.4) 10%, var(--bg-surface))
-    );
+    background: var(--bg-surface);
     box-shadow: none;
   }
 
   .nexo-surface-inner {
     border-radius: 12px;
     border: 1px solid var(--border-soft);
-    background: color-mix(in srgb, var(--surface-contrast) 92%, transparent);
+    background: var(--surface-contrast);
     box-shadow: none;
   }
 
@@ -1503,5 +1504,13 @@ html {
     background: var(--accent-primary-hover);
     transform: none;
     box-shadow: none;
+  }
+
+  .nexo-data-table thead {
+    background: var(--surface-contrast);
+  }
+
+  .nexo-data-table tbody tr:hover {
+    background: color-mix(in srgb, var(--surface-contrast) 80%, transparent);
   }
 }
