@@ -6,7 +6,7 @@ export type ExecutionSeverity = "normal" | "warning" | "critical";
 
 export type ExecutionState = "ready" | "blocked" | "invalid" | "completed";
 
-export type ExecutionActionMode = "manual" | "semi_automatic" | "automatic";
+export type ExecutionActionMode = "manual" | "assisted" | "semi_automatic" | "automatic";
 
 export type ExecutionPolicyStatus =
   | "allowed"
