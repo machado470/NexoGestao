@@ -39,7 +39,8 @@ import {
 } from "@/lib/query-helpers";
 import { EmptyState } from "@/components/EmptyState";
 import { TableSkeleton } from "@/components/QueryStateBoundary";
-import { StatusBadge, mapAppointmentStatus } from "@/components/StatusBadge";
+import { NexoStatusBadge } from "@/components/design-system";
+import { mapAppointmentStatus } from "@/lib/status-badge";
 import { SurfaceSection } from "@/components/PagePattern";
 import { generateAppointmentActions } from "@/lib/smartActions";
 import {
@@ -311,7 +312,9 @@ export default function AppointmentsPage() {
   const [statusFilter, setStatusFilter] = useState<AppointmentStatus | "">("");
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [focusWindow, setFocusWindow] = useState<"today" | "upcoming" | "overdue" | "all">("today");
+  const [focusWindow, setFocusWindow] = useState<
+    "today" | "upcoming" | "overdue" | "all"
+  >("today");
   const [customerFilter, setCustomerFilter] = useState<string | null>(() =>
     getCustomerIdFromUrl()
   );
@@ -455,7 +458,8 @@ export default function AppointmentsPage() {
         }
         return (
           startsAt < now &&
-          (appointment.status === "SCHEDULED" || appointment.status === "CONFIRMED")
+          (appointment.status === "SCHEDULED" ||
+            appointment.status === "CONFIRMED")
         );
       })
       .sort((a, b) => {
@@ -649,7 +653,9 @@ export default function AppointmentsPage() {
           updateAppointment.mutateAsync({
             id: appointmentId,
             status,
-            expectedUpdatedAt: appointments.find((item) => item.id === appointmentId)?.updatedAt,
+            expectedUpdatedAt: appointments.find(
+              item => item.id === appointmentId
+            )?.updatedAt,
           }),
         nextSuggestedAction:
           status === "DONE"
@@ -780,7 +786,10 @@ export default function AppointmentsPage() {
         }
         description={`${appointmentsWithoutOperations} agendamentos ainda sem execução vinculada.`}
         chips={smartPriorities.slice(0, 3).map(priority => (
-          <span key={priority.id} className="rounded-full border px-3 py-1 text-xs text-[var(--text-secondary)]">
+          <span
+            key={priority.id}
+            className="rounded-full border px-3 py-1 text-xs text-[var(--text-secondary)]"
+          >
             {priority.title}: {priority.count}
           </span>
         ))}
@@ -790,8 +799,9 @@ export default function AppointmentsPage() {
             variant="outline"
             onClick={() => {
               const target =
-                filteredAppointments.find(item => item.status === "SCHEDULED") ??
-                filteredAppointments[0];
+                filteredAppointments.find(
+                  item => item.status === "SCHEDULED"
+                ) ?? filteredAppointments[0];
               if (target) handleOpenDeepLink(target.id);
             }}
             disabled={filteredAppointments.length === 0}
@@ -953,23 +963,38 @@ export default function AppointmentsPage() {
             <table className="min-w-full text-sm">
               <thead>
                 <tr className="text-left">
-                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Cliente</th>
-                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Horário</th>
-                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Status</th>
-                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Próxima ação</th>
-                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Execução direta</th>
+                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
+                    Cliente
+                  </th>
+                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
+                    Horário
+                  </th>
+                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
+                    Status
+                  </th>
+                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
+                    Próxima ação
+                  </th>
+                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
+                    Execução direta
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {filteredAppointments.map(appointment => {
                   const relatedOrders = serviceOrders.filter(
-                    order => String(order.customerId ?? "") === appointment.customerId
+                    order =>
+                      String(order.customerId ?? "") === appointment.customerId
                   );
                   const latestOrder = relatedOrders[0] ?? null;
                   const hasOperation = relatedOrders.length > 0;
                   const hasPendingFinancial = relatedOrders.some(order => {
-                    const chargeStatus = String(order.financialSummary?.chargeStatus ?? "").toUpperCase();
-                    return chargeStatus === "PENDING" || chargeStatus === "OVERDUE";
+                    const chargeStatus = String(
+                      order.financialSummary?.chargeStatus ?? ""
+                    ).toUpperCase();
+                    return (
+                      chargeStatus === "PENDING" || chargeStatus === "OVERDUE"
+                    );
                   });
                   const primaryLabel =
                     appointment.status === "SCHEDULED"
@@ -983,20 +1008,37 @@ export default function AppointmentsPage() {
                             : "Cancelar";
 
                   return (
-                    <tr key={`exec-${appointment.id}`} className="border-t border-[var(--border-subtle)]/70 dark:border-zinc-800/70">
-                      <td className="px-4 py-3">{appointment.customer?.name ?? "Cliente não identificado"}</td>
-                      <td className="px-4 py-3">{formatDateTime(appointment.startsAt)}</td>
+                    <tr
+                      key={`exec-${appointment.id}`}
+                      className="border-t border-[var(--border-subtle)]/70 dark:border-zinc-800/70"
+                    >
                       <td className="px-4 py-3">
-                        <StatusBadge {...mapAppointmentStatus(appointment.status)} />
+                        {appointment.customer?.name ??
+                          "Cliente não identificado"}
                       </td>
                       <td className="px-4 py-3">
-                        <NextActionCell entity="appointment" item={appointment} />
+                        {formatDateTime(appointment.startsAt)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <NexoStatusBadge
+                          {...mapAppointmentStatus(appointment.status)}
+                        />
+                      </td>
+                      <td className="px-4 py-3">
+                        <NextActionCell
+                          entity="appointment"
+                          item={appointment}
+                        />
                       </td>
                       <td className="px-4 py-3">
                         <Button
                           size="sm"
                           onClick={() => {
-                            if (appointment.status === "SCHEDULED") return void handleUpdateStatus(appointment.id, "CONFIRMED");
+                            if (appointment.status === "SCHEDULED")
+                              return void handleUpdateStatus(
+                                appointment.id,
+                                "CONFIRMED"
+                              );
                             if (appointment.status === "CONFIRMED") {
                               return navigate(
                                 hasOperation && latestOrder
@@ -1004,9 +1046,19 @@ export default function AppointmentsPage() {
                                   : `/service-orders?customerId=${appointment.customerId}&appointmentId=${appointment.id}`
                               );
                             }
-                            if (appointment.status === "NO_SHOW") return void handleUpdateStatus(appointment.id, "SCHEDULED");
-                            if (appointment.status === "DONE") return navigate(`/finances?customerId=${appointment.customerId}`);
-                            return void handleUpdateStatus(appointment.id, "CANCELED");
+                            if (appointment.status === "NO_SHOW")
+                              return void handleUpdateStatus(
+                                appointment.id,
+                                "SCHEDULED"
+                              );
+                            if (appointment.status === "DONE")
+                              return navigate(
+                                `/finances?customerId=${appointment.customerId}`
+                              );
+                            return void handleUpdateStatus(
+                              appointment.id,
+                              "CANCELED"
+                            );
                           }}
                         >
                           {primaryLabel}
@@ -1100,7 +1152,9 @@ export default function AppointmentsPage() {
               serviceOrderId: latestOrder?.id ?? null,
             });
             const mapDecisionActionToClick = (key: string) => {
-              if (key === "confirm_appointment") return () => void handleUpdateStatus(appointment.id, "CONFIRMED");
+              if (key === "confirm_appointment")
+                return () =>
+                  void handleUpdateStatus(appointment.id, "CONFIRMED");
               if (key === "create_service_order") {
                 return () =>
                   navigate(
@@ -1123,8 +1177,10 @@ export default function AppointmentsPage() {
                       : "/finances"
                   );
               }
-              if (key === "open_whatsapp" && whatsappUrl) return () => navigate(whatsappUrl);
-              if (key === "open_queue" || key === "reschedule_appointment") return () => navigate("/appointments");
+              if (key === "open_whatsapp" && whatsappUrl)
+                return () => navigate(whatsappUrl);
+              if (key === "open_queue" || key === "reschedule_appointment")
+                return () => navigate("/appointments");
               return null;
             };
             const nextActionButtons: Array<{
@@ -1170,7 +1226,7 @@ export default function AppointmentsPage() {
                             "Cliente não identificado"}
                         </h3>
 
-                        <StatusBadge
+                        <NexoStatusBadge
                           {...mapAppointmentStatus(appointment.status)}
                         />
 
@@ -1335,7 +1391,9 @@ export default function AppointmentsPage() {
                               type="button"
                               size="sm"
                               variant={index === 0 ? "default" : "outline"}
-                              className={index === 0 ? "min-w-[140px]" : "opacity-75"}
+                              className={
+                                index === 0 ? "min-w-[140px]" : "opacity-75"
+                              }
                               onClick={action.onClick}
                             >
                               {action.label}
@@ -1344,59 +1402,124 @@ export default function AppointmentsPage() {
                         </div>
                         {nextAction.invalidState ? (
                           <div className="mt-3 rounded-md border border-red-300/70 bg-red-50 p-2 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200">
-                            <p className="font-semibold">{nextAction.invalidState.title}</p>
-                            <p className="mt-1">{nextAction.invalidState.description}</p>
-        </div>
-      ) : null}
+                            <p className="font-semibold">
+                              {nextAction.invalidState.title}
+                            </p>
+                            <p className="mt-1">
+                              {nextAction.invalidState.description}
+                            </p>
+                          </div>
+                        ) : null}
 
-      <ContextPanel
-        open={Boolean(highlightedAppointment)}
-        onOpenChange={open => {
-          if (!open) handleClearDeepLink();
-        }}
-        title={highlightedAppointment?.customer?.name ?? "Contexto do agendamento"}
-        subtitle={highlightedAppointment ? formatDateTime(highlightedAppointment.startsAt) : undefined}
-        statusLabel={highlightedAppointment ? getStatusLabel(highlightedAppointment.status) : undefined}
-        summary={
-          highlightedAppointment
-            ? [
-                { label: "Início", value: formatDateTime(highlightedAppointment.startsAt) },
-                { label: "Fim", value: formatTime(highlightedAppointment.endsAt) },
-                { label: "Status", value: getStatusLabel(highlightedAppointment.status) },
-                { label: "Próxima ação", value: getAppointmentDecision({
-                  appointment: highlightedAppointment,
-                  hasServiceOrder: serviceOrders.some(order => String(order.customerId ?? "") === highlightedAppointment.customerId),
-                  hasPendingFinancial: false,
-                }).primaryAction.label },
-              ]
-            : []
-        }
-        timeline={
-          highlightedAppointment
-            ? [
-                { id: "created", label: "Criado", description: String(highlightedAppointment.createdAt ?? "—"), source: "system" },
-                { id: "updated", label: "Atualizado", description: String(highlightedAppointment.updatedAt ?? "—"), source: "system" },
-                { id: "notes", label: "Observação", description: truncateText(highlightedAppointment.notes), source: "user" },
-              ]
-            : []
-        }
-        explainLayer={
-          highlightedAppointment
-            ? getAppointmentExplainLayer(highlightedAppointment)
-            : undefined
-        }
-        whatsAppPreview={
-          highlightedAppointment && highlightedWhatsAppRoute
-            ? {
-                contextLabel: getWhatsAppContextLabel(highlightedWhatsAppRoute.context),
-                contextDescription: getWhatsAppContextDescription(highlightedWhatsAppRoute),
-                message: whatsAppDraft,
-                editable: true,
-                onMessageChange: setWhatsAppDraft,
-              }
-            : undefined
-        }
-      />
+                        <ContextPanel
+                          open={Boolean(highlightedAppointment)}
+                          onOpenChange={open => {
+                            if (!open) handleClearDeepLink();
+                          }}
+                          title={
+                            highlightedAppointment?.customer?.name ??
+                            "Contexto do agendamento"
+                          }
+                          subtitle={
+                            highlightedAppointment
+                              ? formatDateTime(highlightedAppointment.startsAt)
+                              : undefined
+                          }
+                          statusLabel={
+                            highlightedAppointment
+                              ? getStatusLabel(highlightedAppointment.status)
+                              : undefined
+                          }
+                          summary={
+                            highlightedAppointment
+                              ? [
+                                  {
+                                    label: "Início",
+                                    value: formatDateTime(
+                                      highlightedAppointment.startsAt
+                                    ),
+                                  },
+                                  {
+                                    label: "Fim",
+                                    value: formatTime(
+                                      highlightedAppointment.endsAt
+                                    ),
+                                  },
+                                  {
+                                    label: "Status",
+                                    value: getStatusLabel(
+                                      highlightedAppointment.status
+                                    ),
+                                  },
+                                  {
+                                    label: "Próxima ação",
+                                    value: getAppointmentDecision({
+                                      appointment: highlightedAppointment,
+                                      hasServiceOrder: serviceOrders.some(
+                                        order =>
+                                          String(order.customerId ?? "") ===
+                                          highlightedAppointment.customerId
+                                      ),
+                                      hasPendingFinancial: false,
+                                    }).primaryAction.label,
+                                  },
+                                ]
+                              : []
+                          }
+                          timeline={
+                            highlightedAppointment
+                              ? [
+                                  {
+                                    id: "created",
+                                    label: "Criado",
+                                    description: String(
+                                      highlightedAppointment.createdAt ?? "—"
+                                    ),
+                                    source: "system",
+                                  },
+                                  {
+                                    id: "updated",
+                                    label: "Atualizado",
+                                    description: String(
+                                      highlightedAppointment.updatedAt ?? "—"
+                                    ),
+                                    source: "system",
+                                  },
+                                  {
+                                    id: "notes",
+                                    label: "Observação",
+                                    description: truncateText(
+                                      highlightedAppointment.notes
+                                    ),
+                                    source: "user",
+                                  },
+                                ]
+                              : []
+                          }
+                          explainLayer={
+                            highlightedAppointment
+                              ? getAppointmentExplainLayer(
+                                  highlightedAppointment
+                                )
+                              : undefined
+                          }
+                          whatsAppPreview={
+                            highlightedAppointment && highlightedWhatsAppRoute
+                              ? {
+                                  contextLabel: getWhatsAppContextLabel(
+                                    highlightedWhatsAppRoute.context
+                                  ),
+                                  contextDescription:
+                                    getWhatsAppContextDescription(
+                                      highlightedWhatsAppRoute
+                                    ),
+                                  message: whatsAppDraft,
+                                  editable: true,
+                                  onMessageChange: setWhatsAppDraft,
+                                }
+                              : undefined
+                          }
+                        />
                       </div>
                     </div>
                   </div>
