@@ -17,7 +17,7 @@ describe('FinanceService hardening', () => {
     const whatsapp = {} as any
     const timeline = { log: jest.fn().mockResolvedValue(undefined) } as any
     const analytics = { track: jest.fn() } as any
-    const requestContext = { requestId: 'req-1' } as any
+    const requestContext = { requestId: 'req-1', correlationId: 'corr-1' } as any
     const idempotency = {
       begin: jest.fn(),
       complete: jest.fn(),
@@ -163,11 +163,15 @@ describe('FinanceService hardening', () => {
     })
 
     expect(result.id).toBe('ch-1')
-    expect(result.operation).toEqual({
-      status: 'duplicate',
-      reason: 'idempotency_replay',
-      idempotencyKey: 'k-charge-1',
-    })
+    expect(result.operation).toEqual(
+      expect.objectContaining({
+        status: 'duplicate',
+        reason: 'idempotency_replay',
+        idempotencyKey: 'k-charge-1',
+        requestId: 'req-1',
+        correlationId: 'corr-1',
+      }),
+    )
   })
 
   it('retorna duplicate quando idempotência replaya payCharge', async () => {
@@ -187,10 +191,14 @@ describe('FinanceService hardening', () => {
     })
 
     expect(result.paymentId).toBe('pay-1')
-    expect(result.operation).toEqual({
-      status: 'duplicate',
-      reason: 'idempotency_replay',
-      idempotencyKey: 'k-pay-1',
-    })
+    expect(result.operation).toEqual(
+      expect.objectContaining({
+        status: 'duplicate',
+        reason: 'idempotency_replay',
+        idempotencyKey: 'k-pay-1',
+        requestId: 'req-1',
+        correlationId: 'corr-1',
+      }),
+    )
   })
 })

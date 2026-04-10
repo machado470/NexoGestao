@@ -1,5 +1,9 @@
 import {
   appointmentTransitions,
+  chargeTransitions,
+  ensureAppointmentTransition,
+  ensureChargeTransition,
+  ensureServiceOrderTransition,
   ensureTransition,
   serviceOrderTransitions,
 } from './state-transitions'
@@ -31,6 +35,18 @@ describe('state transitions', () => {
   it('bloqueia transições inválidas de ServiceOrder', () => {
     expect(() => ensureTransition('OPEN', 'DONE', serviceOrderTransitions, 'serviceOrder')).toThrow(
       'Transição inválida para serviceOrder',
+    )
+  })
+
+  it('cobre helpers explícitos por entidade', () => {
+    expect(() => ensureAppointmentTransition('CONFIRMED', 'NO_SHOW')).not.toThrow()
+    expect(() => ensureServiceOrderTransition('ASSIGNED', 'IN_PROGRESS')).not.toThrow()
+    expect(() => ensureChargeTransition('PENDING', 'PAID')).not.toThrow()
+  })
+
+  it('bloqueia transição inválida de Charge', () => {
+    expect(() => ensureTransition('PAID', 'PENDING', chargeTransitions, 'charge')).toThrow(
+      'Transição inválida para charge',
     )
   })
 })

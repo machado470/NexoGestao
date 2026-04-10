@@ -13,8 +13,7 @@ import { WhatsAppService } from '../whatsapp/whatsapp.service'
 import { RiskService } from '../risk/risk.service'
 import { AutomationService } from '../automation/automation.service'
 import {
-  appointmentTransitions,
-  ensureTransition,
+  ensureAppointmentTransition,
 } from '../common/domain/state-transitions'
 import { IdempotencyService } from '../common/idempotency/idempotency.service'
 
@@ -126,10 +125,6 @@ export class AppointmentsService {
     private readonly automation: AutomationService,
     private readonly idempotency: IdempotencyService,
   ) {}
-
-  private canTransition(from: AppointmentStatus, to: AppointmentStatus): boolean {
-    return from === to || appointmentTransitions[from].includes(to)
-  }
 
   private async enqueueAppointmentWorkflow(params: {
     orgId: string
@@ -484,14 +479,7 @@ export class AppointmentsService {
     }
     if (params.data.status) {
       if (!isStatus(params.data.status)) throw new BadRequestException('status inválido')
-      if (!this.canTransition(before.status, params.data.status)) {
-        ensureTransition(
-          before.status,
-          params.data.status,
-          appointmentTransitions,
-          'appointment',
-        )
-      }
+      ensureAppointmentTransition(before.status, params.data.status)
       data.status = params.data.status
     }
     if (params.data.notes !== undefined) {

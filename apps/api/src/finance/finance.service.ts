@@ -8,7 +8,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service'
 import { $Enums, Prisma, WhatsAppEntityType, WhatsAppMessageType } from '@prisma/client'
 import { IdempotencyService } from '../common/idempotency/idempotency.service'
-import { chargeTransitions, ensureTransition } from '../common/domain/state-transitions'
+import { ensureChargeTransition } from '../common/domain/state-transitions'
 import {
   WhatsAppService,
   buildDeterministicMessageKey,
@@ -18,15 +18,10 @@ import { ChargesQueryDto } from './dto/charges-query.dto'
 import { AnalyticsService, UsageMetricEvent } from '../analytics/analytics.service'
 import { RequestContextService } from '../common/context/request-context.service'
 import { MetricsService } from '../common/metrics/metrics.service'
-
-type OperationalActionStatus =
-  | 'executed'
-  | 'queued'
-  | 'skipped'
-  | 'blocked'
-  | 'duplicate'
-  | 'failed'
-  | 'retry_scheduled'
+import {
+  OperationalExecutionStatus,
+  buildOperationalResult,
+} from '../common/operations/operational-result'
 
 @Injectable()
 export class FinanceService {
@@ -90,15 +85,20 @@ export class FinanceService {
   }
 
   private buildOperationStatus(params: {
-    status: OperationalActionStatus
+    status: OperationalExecutionStatus
     reason?: string | null
     idempotencyKey?: string | null
+    executionKey?: string | null
   }) {
-    return {
+    this.metrics.increment(`financeOperationStatus:${params.status}`)
+    return buildOperationalResult({
       status: params.status,
-      reason: params.reason ?? null,
-      idempotencyKey: params.idempotencyKey ?? null,
-    }
+      reason: params.reason,
+      idempotencyKey: params.idempotencyKey,
+      executionKey: params.executionKey,
+      requestId: this.requestContext.requestId,
+      correlationId: this.requestContext.correlationId,
+    })
   }
 
   private buildChargeCreateIdempotencyKey(input: {
@@ -155,9 +155,7 @@ export class FinanceService {
     from: $Enums.ChargeStatus,
     to: $Enums.ChargeStatus,
   ) {
-    if (from === to) return
-
-    ensureTransition(from, to, chargeTransitions, 'charge')
+    ensureChargeTransition(from, to)
   }
 
   private parseExpectedUpdatedAt(value?: string | null): Date | null {
@@ -460,7 +458,7 @@ export class FinanceService {
               channel: 'whatsapp',
               reason: 'whatsapp_send_failed',
               fallback: 'message_queued',
-              status: 'retry_scheduled' as OperationalActionStatus,
+              status: 'retry_scheduled' as OperationalExecutionStatus,
             }
           : null,
       }
@@ -769,7 +767,7 @@ export class FinanceService {
               channel: 'whatsapp',
               reason: 'whatsapp_send_failed',
               fallback: 'message_queued',
-              status: 'retry_scheduled' as OperationalActionStatus,
+              status: 'retry_scheduled' as OperationalExecutionStatus,
             }
           : null,
       }

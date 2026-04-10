@@ -7,6 +7,7 @@ import { ExecutionGovernanceService } from './execution.governance'
 import { ExecutionEventsService } from './execution.events'
 import { buildExecutionKey } from './execution.idempotency'
 import type { ExecutionActionCandidate } from './execution.types'
+import { MetricsService } from '../common/metrics/metrics.service'
 
 @Injectable()
 export class ExecutionRunner {
@@ -21,7 +22,16 @@ export class ExecutionRunner {
     private readonly config: ExecutionConfigService,
     private readonly governance: ExecutionGovernanceService,
     private readonly events: ExecutionEventsService,
+    private readonly metrics: MetricsService,
   ) {}
+
+  private countOperationalStatus(status: 'executed' | 'blocked' | 'requires_confirmation' | 'throttled' | 'failed') {
+    const mapped =
+      status === 'requires_confirmation'
+        ? 'blocked'
+        : status
+    this.metrics.increment(`executionActionStatus:${mapped}`)
+  }
 
   async runOnce() {
     const orgs = await this.prisma.organization.findMany({
@@ -366,6 +376,7 @@ export class ExecutionRunner {
         ruleReason: 'runner mode em manual',
         eligibility: 'blocked',
       })
+      this.countOperationalStatus('blocked')
       return 'blocked'
     }
 
@@ -382,6 +393,7 @@ export class ExecutionRunner {
           eligibility: 'requires_confirmation',
         },
       )
+      this.countOperationalStatus('requires_confirmation')
       return 'requires_confirmation'
     }
 
@@ -391,6 +403,7 @@ export class ExecutionRunner {
         policyKey: 'allowAutomaticCharge',
         policyValue: policy.allowAutomaticCharge,
       })
+      this.countOperationalStatus('blocked')
       return 'blocked'
     }
 
@@ -400,6 +413,7 @@ export class ExecutionRunner {
         policyKey: 'allowWhatsAppAuto',
         policyValue: policy.allowWhatsAppAuto,
       })
+      this.countOperationalStatus('blocked')
       return 'blocked'
     }
     if (candidate.actionId === 'action-send-overdue-charge-reminder' && !policy.allowOverdueReminderAuto) {
@@ -408,6 +422,7 @@ export class ExecutionRunner {
         policyKey: 'allowOverdueReminderAuto',
         policyValue: policy.allowOverdueReminderAuto,
       })
+      this.countOperationalStatus('blocked')
       return 'blocked'
     }
     if (candidate.actionId === 'action-notify-finance-team' && !policy.allowFinanceTeamNotifications) {
@@ -416,6 +431,7 @@ export class ExecutionRunner {
         policyKey: 'allowFinanceTeamNotifications',
         policyValue: policy.allowFinanceTeamNotifications,
       })
+      this.countOperationalStatus('blocked')
       return 'blocked'
     }
     if (candidate.actionId === 'action-mark-operational-attention' && !policy.allowGovernanceFollowup) {
@@ -424,6 +440,7 @@ export class ExecutionRunner {
         policyKey: 'allowGovernanceFollowup',
         policyValue: policy.allowGovernanceFollowup,
       })
+      this.countOperationalStatus('blocked')
       return 'blocked'
     }
     if (candidate.actionId === 'action-create-charge-followup' && !policy.allowChargeFollowupCreation) {
@@ -432,6 +449,7 @@ export class ExecutionRunner {
         policyKey: 'allowChargeFollowupCreation',
         policyValue: policy.allowChargeFollowupCreation,
       })
+      this.countOperationalStatus('blocked')
       return 'blocked'
     }
     if (candidate.actionId === 'action-escalate-risk-review' && !policy.allowRiskReviewEscalation) {
@@ -440,6 +458,7 @@ export class ExecutionRunner {
         policyKey: 'allowRiskReviewEscalation',
         policyValue: policy.allowRiskReviewEscalation,
       })
+      this.countOperationalStatus('blocked')
       return 'blocked'
     }
 
@@ -456,6 +475,7 @@ export class ExecutionRunner {
           governanceReason: governance.reasonCode ?? 'governance_blocked',
         },
       )
+      this.countOperationalStatus(governance.status)
       return governance.status
     }
 
@@ -470,6 +490,7 @@ export class ExecutionRunner {
         ruleId: candidate.decisionId,
         ruleReason: 'idempotency',
       })
+      this.countOperationalStatus('blocked')
       return 'blocked'
     }
 
@@ -484,6 +505,7 @@ export class ExecutionRunner {
         ruleId: candidate.decisionId,
         ruleReason: 'retry limit reached',
       })
+      this.countOperationalStatus('throttled')
       return 'throttled'
     }
 
@@ -541,6 +563,7 @@ export class ExecutionRunner {
           executionKey,
         }),
       )
+      this.countOperationalStatus('executed')
 
       return 'executed'
     } catch (error) {
@@ -578,6 +601,7 @@ export class ExecutionRunner {
           error: error instanceof Error ? error.message : String(error),
         }),
       )
+      this.countOperationalStatus('failed')
 
       return 'failed'
     }

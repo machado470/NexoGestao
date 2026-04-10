@@ -22,8 +22,7 @@ import { OnboardingService } from '../onboarding/onboarding.service'
 import { WhatsAppService } from '../whatsapp/whatsapp.service'
 import { AnalyticsService, UsageMetricEvent } from '../analytics/analytics.service'
 import {
-  ensureTransition,
-  serviceOrderTransitions,
+  ensureServiceOrderTransition,
 } from '../common/domain/state-transitions'
 import { IdempotencyService } from '../common/idempotency/idempotency.service'
 
@@ -207,10 +206,6 @@ export class ServiceOrdersService {
       messageKey: `service_order_done:${params.serviceOrderId}`,
       renderedText: `Olá, ${params.customerName}! Sua ordem de serviço "${params.title}" foi concluída.`,
     })
-  }
-
-  private canTransition(from: ServiceOrderStatus, to: ServiceOrderStatus): boolean {
-    return from === to || serviceOrderTransitions[from].includes(to)
   }
 
   private async syncOperationalForPeople(
@@ -737,14 +732,7 @@ export class ServiceOrdersService {
       if (!isStatus(params.data.status)) {
         throw new BadRequestException('status inválido')
       }
-      if (!this.canTransition(before.status, params.data.status)) {
-        ensureTransition(
-          before.status,
-          params.data.status,
-          serviceOrderTransitions,
-          'serviceOrder',
-        )
-      }
+      ensureServiceOrderTransition(before.status, params.data.status)
       data.status = params.data.status
     }
 

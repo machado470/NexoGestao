@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { useProductAnalytics } from "@/hooks/useProductAnalytics";
 import { notify } from "@/stores/notificationStore";
 import { buildIdempotencyKey } from "@/lib/idempotency";
+import { resolveOperationFeedback } from "@/lib/operations/operation-feedback";
 
 type NavigateFn = (path: string) => void;
 
@@ -84,12 +85,13 @@ export function useChargeActions(options?: UseChargeActionsOptions) {
 
       const operationStatus = String((result as any)?.operation?.status ?? "").toLowerCase();
       const degraded = (result as any)?.degraded;
-      const message =
-        operationStatus === "duplicate"
-          ? "Pagamento já havia sido processado. Resultado reaproveitado sem duplicação."
-          : degraded?.status === "retry_scheduled"
-            ? "Pagamento registrado. Confirmação WhatsApp ficou pendente para retry."
-            : "Pagamento registrado com sucesso";
+      const message = resolveOperationFeedback({
+        operationStatus,
+        degradedStatus: degraded?.status,
+        executedMessage: "Pagamento registrado com sucesso",
+        duplicateMessage: "Pagamento já havia sido processado. Resultado reaproveitado sem duplicação.",
+        retryScheduledMessage: "Pagamento registrado. Confirmação WhatsApp ficou pendente para retry.",
+      });
       toast.success(message);
       notify.successPersistent(
         "Receita confirmada no caixa",
