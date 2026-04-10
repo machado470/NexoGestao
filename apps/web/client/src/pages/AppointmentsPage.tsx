@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
-import { Button } from "@/components/design-system";
+import {
+  Button,
+  NexoActionGroup,
+  NexoAlertCard,
+} from "@/components/design-system";
 import {
   Plus,
   Calendar,
@@ -819,7 +823,7 @@ export default function AppointmentsPage() {
         }
       />
 
-      <div className="grid gap-3 md:grid-cols-[1fr_auto_auto]">
+      <SurfaceSection className="space-y-3">
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <input
@@ -833,21 +837,21 @@ export default function AppointmentsPage() {
             className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-10 pr-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
           />
         </div>
-
-        <Button onClick={handleApplySearch}>Buscar</Button>
-
-        <Button
-          variant="outline"
-          onClick={handleClearLocalFilters}
-          disabled={!hasLocalFilters && !searchInput}
-        >
-          <X className="mr-2 h-4 w-4" />
-          Limpar
-        </Button>
-      </div>
+        <NexoActionGroup>
+          <Button onClick={handleApplySearch}>Buscar</Button>
+          <Button
+            variant="outline"
+            onClick={handleClearLocalFilters}
+            disabled={!hasLocalFilters && !searchInput}
+          >
+            <X className="mr-2 h-4 w-4" />
+            Limpar
+          </Button>
+        </NexoActionGroup>
+      </SurfaceSection>
 
       {highlightedAppointmentId ? (
-        <div className="flex flex-wrap items-center gap-2 text-sm">
+        <NexoAlertCard className="flex flex-wrap items-center gap-2 text-sm">
           <span className="rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-orange-700 dark:border-orange-900/40 dark:bg-orange-950/20 dark:text-orange-300">
             Deep-link ativo:{" "}
             {highlightedAppointment?.customer?.name ?? highlightedAppointmentId}
@@ -861,16 +865,68 @@ export default function AppointmentsPage() {
           >
             Limpar foco
           </Button>
-        </div>
+        </NexoAlertCard>
       ) : null}
 
       {hasLocalFilters ? (
-        <div className="flex flex-wrap gap-2 text-sm text-gray-500">
+        <NexoAlertCard className="flex flex-wrap gap-2 text-sm text-gray-500">
           <span className="rounded-full border px-3 py-1">
             Busca local: {searchQuery}
           </span>
-        </div>
+        </NexoAlertCard>
       ) : null}
+
+      <SurfaceSection className="space-y-4">
+        <NexoActionGroup>
+          {(
+            [
+              ["today", "Hoje"],
+              ["upcoming", "Próximos dias"],
+              ["overdue", "Atrasados"],
+              ["all", "Todos"],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setFocusWindow(value)}
+              className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${
+                focusWindow === value
+                  ? "bg-[var(--surface-base)] text-white dark:bg-[var(--surface-base)] dark:text-[var(--text-primary)]"
+                  : "bg-[var(--surface-base)] text-[var(--text-secondary)] hover:bg-zinc-200 dark:bg-[var(--surface-base)] dark:text-[var(--text-secondary)] dark:hover:bg-zinc-700"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </NexoActionGroup>
+
+        <NexoActionGroup>
+          {(
+            [
+              "",
+              "SCHEDULED",
+              "CONFIRMED",
+              "DONE",
+              "CANCELED",
+              "NO_SHOW",
+            ] as const
+          ).map(status => (
+            <button
+              key={status || "ALL"}
+              type="button"
+              onClick={() => setStatusFilter(status)}
+              className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${
+                statusFilter === status
+                  ? "bg-orange-500 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+              }`}
+            >
+              {status === "" ? "Todos" : getStatusLabel(status)}
+            </button>
+          ))}
+        </NexoActionGroup>
+      </SurfaceSection>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <SummaryCard
@@ -903,58 +959,15 @@ export default function AppointmentsPage() {
         />
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        {(
-          [
-            ["today", "Hoje"],
-            ["upcoming", "Próximos dias"],
-            ["overdue", "Atrasados"],
-            ["all", "Todos"],
-          ] as const
-        ).map(([value, label]) => (
-          <button
-            key={value}
-            type="button"
-            onClick={() => setFocusWindow(value)}
-            className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${
-              focusWindow === value
-                ? "bg-[var(--surface-base)] text-white dark:bg-[var(--surface-base)] dark:text-[var(--text-primary)]"
-                : "bg-[var(--surface-base)] text-[var(--text-secondary)] hover:bg-zinc-200 dark:bg-[var(--surface-base)] dark:text-[var(--text-secondary)] dark:hover:bg-zinc-700"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        {(
-          ["", "SCHEDULED", "CONFIRMED", "DONE", "CANCELED", "NO_SHOW"] as const
-        ).map(status => (
-          <button
-            key={status || "ALL"}
-            type="button"
-            onClick={() => setStatusFilter(status)}
-            className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${
-              statusFilter === status
-                ? "bg-orange-500 text-white"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-            }`}
-          >
-            {status === "" ? "Todos" : getStatusLabel(status)}
-          </button>
-        ))}
-      </div>
-
       {queryState.hasBackgroundUpdate ? (
         <SurfaceSection className="nexo-info-banner text-sm">
           Atualizando agenda em segundo plano...
         </SurfaceSection>
       ) : null}
       {flowFeedback ? (
-        <SurfaceSection className="border-emerald-300 bg-emerald-50 text-xs text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-300">
+        <NexoAlertCard className="border-emerald-300 bg-emerald-50 text-xs text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-300">
           {flowFeedback}
-        </SurfaceSection>
+        </NexoAlertCard>
       ) : null}
 
       {filteredAppointments.length > 0 ? (
