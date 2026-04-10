@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 type ActionFeedbackState = "idle" | "loading" | "success" | "error";
 
@@ -15,6 +16,8 @@ type ActionFeedbackButtonProps = {
   icon?: ReactNode;
   variant?: "default" | "outline" | "secondary";
   size?: "sm" | "default" | "lg" | "icon";
+  className?: string;
+  disabled?: boolean;
 };
 
 export function ActionFeedbackButton({
@@ -28,6 +31,8 @@ export function ActionFeedbackButton({
   icon,
   variant = "default",
   size = "sm",
+  className,
+  disabled = false,
 }: ActionFeedbackButtonProps) {
   if (state === "error" && onRetry) {
     return (
@@ -54,8 +59,8 @@ export function ActionFeedbackButton({
       size={size}
       onClick={onClick}
       aria-busy={state === "loading"}
-      disabled={state === "loading"}
-      className="gap-2"
+      disabled={state === "loading" || disabled}
+      className={cn("gap-2", className)}
     >
       {icon}
       {label}

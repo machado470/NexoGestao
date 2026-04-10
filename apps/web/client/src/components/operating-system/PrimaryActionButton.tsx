@@ -5,11 +5,15 @@ export function PrimaryActionButton({
   onClick,
   loadingLabel = "Executando...",
   successLabel = "Concluído",
+  className,
+  disabled,
 }: {
   label: string;
   onClick: () => void;
   loadingLabel?: string;
   successLabel?: string;
+  className?: string;
+  disabled?: boolean;
 }) {
   return (
     <ActionFeedbackButton
@@ -18,6 +22,8 @@ export function PrimaryActionButton({
       loadingLabel={loadingLabel}
       successLabel={successLabel}
       onClick={onClick}
+      className={className}
+      disabled={disabled}
     />
   );
 }
