@@ -50,6 +50,9 @@ export type ExecutionAction = {
   payload?: Record<string, unknown>;
   telemetryKey: string;
   mode: ExecutionActionMode;
+  safetyLevel?: "low" | "medium" | "high";
+  requiresConfirmation?: boolean;
+  autoWhenPossible?: boolean;
 };
 
 export type OperationalDecision = {
@@ -64,6 +67,9 @@ export type OperationalDecision = {
   actions: ExecutionAction[];
   suggestedActionId?: string;
   priority?: number;
+  impactScore?: number;
+  urgencyScore?: number;
+  contextualPriority?: "low" | "medium" | "high" | "critical";
 };
 
 export type ExecutionPlan = {

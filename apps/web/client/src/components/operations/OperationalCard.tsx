@@ -97,6 +97,27 @@ export function OperationalCard({ decision, source, riskOperationalState }: Oper
   const recentlyExecuted = Boolean(latestDecisionLog?.status === "success" && Date.now() - latestDecisionLog.executedAt <= 1000 * 60 * 30);
   const hasBlockedLog = latestDecisionLog?.status === "blocked" || latestDecisionLog?.status === "restricted";
   const hasThrottledLog = latestDecisionLog?.status === "throttled";
+  const autoAction = useMemo(
+    () =>
+      decision.actions.find(
+        action =>
+          action.enabled &&
+          action.autoWhenPossible &&
+          (action.mode === "automatic" || action.mode === "semi_automatic")
+      ) ?? null,
+    [decision.actions]
+  );
+
+  const hasAutoExecutedLog = useMemo(
+    () =>
+      logs.some(
+        log =>
+          log.decisionId === decision.id &&
+          log.actionId === autoAction?.id &&
+          log.status === "success"
+      ),
+    [autoAction?.id, decision.id, logs]
+  );
 
   async function handleExecute(action: ExecutionAction) {
     setExecutingActionId(action.id);
@@ -142,6 +163,14 @@ export function OperationalCard({ decision, source, riskOperationalState }: Oper
     setLastMessage(result.message ?? null);
     setExecutingActionId(null);
   }
+
+  useEffect(() => {
+    if (!autoAction) return;
+    if (executingActionId) return;
+    if (hasAutoExecutedLog) return;
+
+    void handleExecute(autoAction);
+  }, [autoAction, executingActionId, hasAutoExecutedLog]);
 
   return (
     <article className={`rounded-xl border p-4 ${getSeverityClasses(decision.severity)}`}>
@@ -195,6 +224,14 @@ export function OperationalCard({ decision, source, riskOperationalState }: Oper
         {decision.title}
       </h3>
       <p className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">{decision.summary}</p>
+      <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
+        Impacto {decision.impactScore ?? 0}/100 • urgência {decision.urgencyScore ?? 0}/100 • prioridade {decision.contextualPriority ?? "low"}
+      </p>
+      {autoAction ? (
+        <p className="mt-1 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+          Auto Action Mode: {hasAutoExecutedLog ? "ação aplicada automaticamente." : "ação segura sendo aplicada automaticamente."}
+        </p>
+      ) : null}
       {lastExecutionStatus === "executed" || latestDecisionLog?.status === "success" ? (
         <p className="mt-2 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
           Ação executada com sucesso.

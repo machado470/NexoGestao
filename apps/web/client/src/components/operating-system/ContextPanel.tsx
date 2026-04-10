@@ -23,6 +23,10 @@ type ContextPanelExplainLayer = {
   reason: string;
   conditions: string[];
   afterAction: string;
+  impact?: string;
+  riskOfInaction?: string;
+  elapsedTime?: string;
+  contextualPriority?: string;
 };
 
 type ContextPanelWhatsAppPreview = {
@@ -113,6 +117,28 @@ export function ContextPanel({
                 Explain layer
               </p>
               <p className="text-sm font-medium text-blue-900 dark:text-blue-100">{explainLayer.reason}</p>
+              <div className="flex flex-wrap gap-1">
+                {explainLayer.impact ? (
+                  <span className="rounded-full border border-blue-300/70 bg-white/70 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-blue-800 dark:border-blue-800 dark:bg-blue-950/60 dark:text-blue-200">
+                    Impacto: {explainLayer.impact}
+                  </span>
+                ) : null}
+                {explainLayer.riskOfInaction ? (
+                  <span className="rounded-full border border-rose-300/70 bg-white/70 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
+                    Risco: {explainLayer.riskOfInaction}
+                  </span>
+                ) : null}
+                {explainLayer.elapsedTime ? (
+                  <span className="rounded-full border border-amber-300/70 bg-white/70 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+                    Tempo: {explainLayer.elapsedTime}
+                  </span>
+                ) : null}
+                {explainLayer.contextualPriority ? (
+                  <span className="rounded-full border border-violet-300/70 bg-white/70 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-violet-700 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-200">
+                    Prioridade: {explainLayer.contextualPriority}
+                  </span>
+                ) : null}
+              </div>
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-blue-700/80 dark:text-blue-300/90">
                   Condições detectadas

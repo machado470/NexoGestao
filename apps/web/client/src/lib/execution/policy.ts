@@ -51,8 +51,10 @@ function evaluateCircuitBreaker(action: ExecutionAction, logs: ExecutionLog[]): 
 }
 
 function requiresConfirmation(action: ExecutionAction, mode: ExecutionActionMode) {
+  if (action.requiresConfirmation) return true;
+  if (action.safetyLevel === "high") return true;
   const sensitiveAction = action.kind === "mutation" || action.kind === "external";
-  return mode === "semi_automatic" && sensitiveAction;
+  return mode === "semi_automatic" && sensitiveAction && action.safetyLevel !== "low";
 }
 
 export function evaluateExecutionPolicy(input: EvaluateExecutionPolicyInput): ExecutionPolicyResult {
