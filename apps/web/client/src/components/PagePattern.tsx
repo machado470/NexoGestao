@@ -31,7 +31,11 @@ import {
 } from "@/components/design-system";
 
 export function PageShell({ children }: { children: ReactNode }) {
-  return <div className="nexo-page-shell nexo-section-reveal space-y-4">{children}</div>;
+  return (
+    <div className="nexo-page-shell nexo-section-reveal min-w-0 max-w-full space-y-4">
+      {children}
+    </div>
+  );
 }
 
 export function PageHero({

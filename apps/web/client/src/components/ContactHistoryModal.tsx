@@ -219,12 +219,12 @@ export function ContactHistoryModal({
         )}
       </DialogTrigger>
 
-      <DialogContent className="max-h-[80vh] max-w-2xl overflow-y-auto">
+      <DialogContent className="max-h-[90vh] max-w-2xl overflow-hidden">
         <DialogHeader>
           <DialogTitle>Histórico de Contatos — {customerName}</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6">
+        <div className="min-h-0 space-y-6 overflow-y-auto pr-1">
           <Card className="border-dashed bg-gray-50 p-4 dark:bg-gray-900">
             <h3 className="mb-4 flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
               <Plus className="h-4 w-4" />

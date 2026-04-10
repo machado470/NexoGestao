@@ -126,8 +126,8 @@ export default function CreateExpenseModal({
 
   return (
     <Dialog open={open} onOpenChange={nextOpen => !nextOpen && onClose()}>
-      <DialogContent className="max-w-2xl border-[var(--border-subtle)] bg-white p-0 shadow-sm dark:bg-zinc-950">
-        <div className="w-full rounded-2xl border bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+      <DialogContent className="max-h-[90vh] max-w-2xl overflow-hidden border-[var(--border-subtle)] bg-white p-0 shadow-sm dark:bg-zinc-950">
+        <div className="flex max-h-[90vh] w-full flex-col rounded-2xl border bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
           <div className="flex items-center justify-between border-b p-4 dark:border-zinc-800">
             <div className="flex items-center gap-2">
               <Receipt className="h-5 w-5 text-orange-500" />
@@ -144,8 +144,8 @@ export default function CreateExpenseModal({
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4 p-4">
-            <div className="grid gap-4 md:grid-cols-2">
+          <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+            <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto p-4 md:grid-cols-2">
               <div className="space-y-2 md:col-span-2">
                 <label className="text-sm font-medium">Descrição</label>
                 <input
@@ -208,7 +208,7 @@ export default function CreateExpenseModal({
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 border-t pt-4 dark:border-zinc-800">
+            <div className="flex items-center justify-end gap-2 border-t px-4 py-4 dark:border-zinc-800">
               <button
                 type="button"
                 onClick={onClose}
