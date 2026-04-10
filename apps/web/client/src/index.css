@@ -64,6 +64,16 @@
   }
 
   .app-root {
+    --bg-app: #eef3fa;
+    --bg-sidebar: #f4f7fc;
+    --bg-header: #f8fbff;
+    --bg-surface: #ffffff;
+    --bg-surface-hover: #f2f6fd;
+    --border-soft: rgba(95, 119, 156, 0.24);
+    --accent-primary: #e8772e;
+    --accent-primary-hover: #d96d28;
+    --info: #0ea5e9;
+
     --background-base: #edf2f8;
     --surface-base: #e6edf6;
     --surface-elevated: #f4f7fc;
@@ -106,9 +116,34 @@
     --sidebar-accent-foreground: var(--text-primary);
     --sidebar-border: var(--border-subtle);
     --sidebar-ring: var(--ring);
+
+    --nexo-app-bg: #edf2f8;
+    --nexo-page-surface: #e8eff8;
+    --nexo-section-surface: #f2f6fc;
+    --nexo-surface-1: rgba(255, 255, 255, 0.94);
+    --nexo-surface-2: #ffffff;
+    --nexo-card-surface: #ffffff;
+    --nexo-card-muted: #f6f9ff;
+    --nexo-border-soft: #d4deec;
+    --nexo-border-strong: #bfcbdf;
+    --nexo-shadow-soft: 0 10px 24px rgba(17, 35, 64, 0.08);
+    --nexo-shadow-panel: 0 20px 44px rgba(17, 35, 64, 0.1);
+    --nexo-shadow-elev-1: 0 8px 20px rgba(17, 35, 64, 0.08);
+    --nexo-shadow-elev-2: 0 18px 36px rgba(17, 35, 64, 0.12);
   }
 
-  .dark .app-root {
+  .app-root.dark,
+  .app-root[data-theme="dark"] {
+    --bg-app: #080c18;
+    --bg-sidebar: #0b1122;
+    --bg-header: #111d2e;
+    --bg-surface: #111d2e;
+    --bg-surface-hover: #1a3a52;
+    --border-soft: rgba(125, 146, 184, 0.26);
+    --accent-primary: #e8772e;
+    --accent-primary-hover: #f0893f;
+    --info: #38bdf8;
+
     --background-base: #11151d;
     --surface-base: #181e2a;
     --surface-elevated: #1c2432;
@@ -125,6 +160,20 @@
     --warning: #df9b4a;
     --danger: #de6b6b;
     --surface-contrast: #1a3a52;
+
+    --nexo-app-bg: #05080f;
+    --nexo-page-surface: #03060d;
+    --nexo-section-surface: rgba(12, 16, 24, 0.82);
+    --nexo-surface-1: rgba(15, 19, 28, 0.9);
+    --nexo-surface-2: rgba(14, 18, 27, 0.96);
+    --nexo-card-surface: rgba(16, 21, 31, 0.96);
+    --nexo-card-muted: rgba(19, 25, 36, 0.9);
+    --nexo-border-soft: rgba(148, 163, 184, 0.2);
+    --nexo-border-strong: rgba(148, 163, 184, 0.36);
+    --nexo-shadow-soft: 0 10px 24px rgba(2, 6, 23, 0.36);
+    --nexo-shadow-panel: 0 22px 56px rgba(2, 6, 23, 0.55);
+    --nexo-shadow-elev-1: 0 14px 30px rgba(2, 6, 23, 0.34);
+    --nexo-shadow-elev-2: 0 24px 60px rgba(2, 6, 23, 0.52);
   }
 }
 
@@ -318,7 +367,6 @@
   html,
   body,
   #root {
-    @apply bg-background text-foreground;
     width: 100%;
     min-height: 100%;
     margin: 0;
@@ -328,7 +376,8 @@
   html,
   body {
     min-height: 100vh;
-    background-color: var(--background);
+    background-color: #f8f9fb;
+    color: #0f172a;
     overscroll-behavior-x: none;
   }
 
@@ -347,13 +396,9 @@
 
   body {
     font-family: var(--nexo-body-font);
-    background: var(--background);
+    background: #f8f9fb;
     scrollbar-width: thin;
     scrollbar-color: rgba(249, 115, 22, 0.6) transparent;
-  }
-
-  .dark body {
-    background: #09090b;
   }
 
   button:not(:disabled),
@@ -393,7 +438,7 @@
   background-clip: padding-box;
 }
 
-.dark :where(html, body, [data-scrollbar="nexo"]) {
+.app-root.dark :where([data-scrollbar="nexo"]) {
   scrollbar-color: rgba(251, 146, 60, 0.62) transparent;
 }
 
@@ -404,7 +449,7 @@
   scrollbar-gutter: stable;
 }
 
-.dark [data-scrollbar="nexo"] {
+.app-root.dark [data-scrollbar="nexo"] {
   scrollbar-color: rgba(251, 146, 60, 0.58) transparent;
 }
 

@@ -313,7 +313,10 @@ export function MainLayout({ children }: MainLayoutProps) {
   };
 
   return (
-    <AppShell className="app-root h-screen overflow-hidden text-[var(--text-primary)]">
+    <AppShell
+      className={`app-root ${theme === "dark" ? "dark" : ""} h-screen overflow-hidden text-[var(--text-primary)]`}
+      data-theme={theme}
+    >
       {isMobile && mobileMenuOpen ? (
         <button
           type="button"

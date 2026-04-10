@@ -32,11 +32,15 @@ const buttonVariants = cva(
 export function AppShell({
   children,
   className,
-}: {
+  ...props
+}: ComponentProps<"div"> & {
   children: ReactNode;
-  className?: string;
 }) {
-  return <div className={cn("nexo-app-shell", className)}>{children}</div>;
+  return (
+    <div className={cn("nexo-app-shell", className)} {...props}>
+      {children}
+    </div>
+  );
 }
 
 export function SidebarNav({
