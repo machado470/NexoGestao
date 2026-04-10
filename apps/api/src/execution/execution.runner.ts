@@ -40,6 +40,116 @@ export class ExecutionRunner {
     this.metrics.increment(`executionActionStatus:${mapped}`)
   }
 
+  private extractCustomerId(metadata: Record<string, unknown> | null | undefined): string | null {
+    const raw = metadata?.customerId
+    if (typeof raw !== 'string') return null
+    const normalized = raw.trim()
+    return normalized.length > 0 ? normalized : null
+  }
+
+  private async validateCandidateContext(candidate: ExecutionActionCandidate) {
+    const customerId = this.extractCustomerId(candidate.metadata ?? null)
+
+    if (!candidate.orgId || !candidate.actionId || !candidate.decisionId || !candidate.entityId) {
+      return {
+        valid: false as const,
+        reason: 'missing_required_context_fields',
+        customerId,
+      }
+    }
+
+    if (candidate.entityType === 'serviceOrder') {
+      const serviceOrder = await this.prisma.serviceOrder.findFirst({
+        where: { id: candidate.entityId, orgId: candidate.orgId },
+        select: { id: true, customerId: true },
+      })
+
+      if (!serviceOrder?.id) {
+        return {
+          valid: false as const,
+          reason: 'service_order_not_found_for_org',
+          customerId,
+        }
+      }
+
+      if (!serviceOrder.customerId) {
+        return {
+          valid: false as const,
+          reason: 'service_order_missing_customer',
+          customerId,
+        }
+      }
+
+      if (customerId && customerId !== serviceOrder.customerId) {
+        return {
+          valid: false as const,
+          reason: 'service_order_customer_mismatch',
+          customerId,
+        }
+      }
+
+      return {
+        valid: true as const,
+        customerId: serviceOrder.customerId,
+      }
+    }
+
+    if (candidate.entityType === 'charge') {
+      const charge = await this.prisma.charge.findFirst({
+        where: { id: candidate.entityId, orgId: candidate.orgId },
+        select: { id: true, customerId: true },
+      })
+
+      if (!charge?.id) {
+        return {
+          valid: false as const,
+          reason: 'charge_not_found_for_org',
+          customerId,
+        }
+      }
+
+      if (!charge.customerId) {
+        return {
+          valid: false as const,
+          reason: 'charge_missing_customer',
+          customerId,
+        }
+      }
+
+      if (customerId && customerId !== charge.customerId) {
+        return {
+          valid: false as const,
+          reason: 'charge_customer_mismatch',
+          customerId,
+        }
+      }
+
+      return {
+        valid: true as const,
+        customerId: charge.customerId,
+      }
+    }
+
+    if (customerId) {
+      const customer = await this.prisma.customer.findFirst({
+        where: { id: customerId, orgId: candidate.orgId },
+        select: { id: true },
+      })
+      if (!customer?.id) {
+        return {
+          valid: false as const,
+          reason: 'customer_not_found_for_org',
+          customerId,
+        }
+      }
+    }
+
+    return {
+      valid: true as const,
+      customerId,
+    }
+  }
+
   async runOnce() {
     const orgs = await this.prisma.organization.findMany({
       select: { id: true },
@@ -377,6 +487,43 @@ export class ExecutionRunner {
       },
     })
 
+    const contextValidation = await this.validateCandidateContext(candidate)
+    if (!contextValidation.valid) {
+      const detail = {
+        event: 'execution_runner_invalid_context',
+        reason: contextValidation.reason,
+        origin: 'ExecutionRunner.processCandidate',
+        orgId: candidate.orgId,
+        actionId: candidate.actionId,
+        decisionId: candidate.decisionId,
+        entityType: candidate.entityType,
+        entityId: candidate.entityId,
+        customerId: contextValidation.customerId ?? null,
+      }
+      this.logger.error(JSON.stringify(detail))
+      await this.events.recordEvent(candidate.orgId, {
+        eventType: 'EXECUTION_ACTION_FAILED',
+        entityType: candidate.entityType,
+        entityId: candidate.entityId,
+        actionId: candidate.actionId,
+        decisionId: candidate.decisionId,
+        executionKey,
+        mode,
+        status: 'failed',
+        reasonCode: 'invalid_execution_context',
+        timestamp: new Date().toISOString(),
+        metadata: detail,
+        explanation: {
+          ruleId: candidate.decisionId,
+          eligibility: 'failed',
+          ruleReason: contextValidation.reason,
+          trigger: candidate.metadata ?? {},
+        },
+      })
+      this.countOperationalStatus('failed')
+      return 'failed'
+    }
+
     if (mode === 'manual') {
       await this.recordBlocked(candidate, executionKey, mode, 'mode_manual_runner_skip', 'blocked', {
         ruleId: candidate.decisionId,
@@ -580,6 +727,7 @@ export class ExecutionRunner {
       status: 'pending',
       reasonCode: 'runner_execution_requested',
       timestamp: new Date().toISOString(),
+      customerId: contextValidation.customerId ?? undefined,
       metadata: {
         policySnapshot: policy,
         trigger: candidate.metadata ?? {},
@@ -605,6 +753,7 @@ export class ExecutionRunner {
         status: 'executed',
         reasonCode: 'runner_executed',
         timestamp: new Date().toISOString(),
+        customerId: contextValidation.customerId ?? undefined,
         explanation: {
           ruleId: candidate.decisionId,
           eligibility: 'executed',
@@ -639,6 +788,7 @@ export class ExecutionRunner {
         status: 'failed',
         reasonCode: 'runner_execution_failed',
         timestamp: new Date().toISOString(),
+        customerId: contextValidation.customerId ?? undefined,
         metadata: {
           error: error instanceof Error ? error.message : String(error),
           trigger: candidate.metadata ?? {},

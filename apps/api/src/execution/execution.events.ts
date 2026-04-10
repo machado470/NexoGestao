@@ -21,6 +21,7 @@ export class ExecutionEventsService {
       orgId,
       action: EXECUTION_EVENT_ACTION,
       description: `${payload.actionId} => ${payload.status}`,
+      customerId: payload.customerId,
       metadata: payload,
     })
   }

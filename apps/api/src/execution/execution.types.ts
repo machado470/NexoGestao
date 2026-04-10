@@ -53,6 +53,7 @@ export type ExecutionEventPayload = {
   mode: ExecutionMode
   status: ExecutionRunnerStatus
   reasonCode?: string
+  customerId?: string
   timestamp: string
   explanation?: {
     ruleId?: string
