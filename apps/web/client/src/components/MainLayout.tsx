@@ -19,7 +19,6 @@ import {
   Menu,
   MessageCircle,
   Moon,
-  Search,
   Settings,
   Shield,
   Sparkles,
@@ -399,13 +398,19 @@ export function MainLayout({ children }: MainLayoutProps) {
                           type="button"
                           title={item.label}
                           onClick={() => handleNavigate(item.route)}
-                          className={`nexo-sidebar-item nexo-state-transition ${active ? "nexo-sidebar-item-active" : ""} ${
+                          className={`nexo-sidebar-item group nexo-state-transition ${active ? "nexo-sidebar-item-active" : ""} ${
                             sidebarCollapsed && !isMobile
                               ? "justify-center px-2"
                               : ""
                           }`}
                         >
-                          <Icon className="h-4 w-4 shrink-0" />
+                          <Icon
+                            className={`h-4 w-4 shrink-0 ${
+                              active
+                                ? "text-[var(--accent-primary)]"
+                                : "text-[var(--text-muted)] group-hover:text-[var(--text-secondary)]"
+                            }`}
+                          />
                           {!sidebarCollapsed || isMobile ? (
                             <span className="truncate text-sm font-medium">
                               {item.label}
@@ -591,18 +596,11 @@ export function MainLayout({ children }: MainLayoutProps) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 items-center gap-3 lg:grid-cols-[auto_minmax(0,1fr)_auto]">
+              <div className="grid grid-cols-1 items-center gap-3 lg:grid-cols-[auto_minmax(0,1fr)]">
                 <Breadcrumbs />
                 <div className="min-w-0 lg:justify-self-center lg:w-full lg:max-w-2xl">
                   <GlobalSearch />
                 </div>
-                <button
-                  type="button"
-                  onClick={() => navigate("/service-orders")}
-                  className="nexo-cta-dominant h-11 w-full gap-2 rounded-xl px-5 text-sm lg:w-auto"
-                >
-                  <Search className="h-4 w-4" /> Executar agora
-                </button>
               </div>
             </div>
           </Topbar>
@@ -613,15 +611,19 @@ export function MainLayout({ children }: MainLayoutProps) {
           >
             {children}
           </main>
-          <div className="nexo-primary-dock hidden lg:block">
-            <button
-              type="button"
-              onClick={() => navigate("/service-orders")}
-              className="nexo-cta-dominant h-12 gap-2 rounded-2xl px-5 text-sm"
-            >
-              <Search className="h-4 w-4" />
-              Executar agora
-            </button>
+          <div className="border-t border-[var(--border-soft)] px-4 py-3 md:px-6">
+            <div className="flex items-center justify-between text-xs">
+              <p className="truncate text-[var(--text-muted)]">
+                {user?.name ?? "Usuário"} · {user?.email ?? "Sem e-mail"}
+              </p>
+              <button
+                type="button"
+                onClick={() => navigate("/settings")}
+                className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              >
+                Preferências
+              </button>
+            </div>
           </div>
         </div>
       </div>
