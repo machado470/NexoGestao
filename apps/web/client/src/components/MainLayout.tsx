@@ -318,7 +318,7 @@ export function MainLayout({ children }: MainLayoutProps) {
         <button
           type="button"
           aria-label="Fechar menu"
-          className="fixed inset-0 z-30 bg-[color-mix(in_srgb,var(--background-base)_84%,black)]/70 backdrop-blur-sm"
+          className="fixed inset-0 z-30 bg-[color-mix(in_srgb,var(--background-base)_84%,black)]/70 backdrop-blur-sm nexo-state-transition"
           onClick={() => setMobileMenuOpen(false)}
         />
       ) : null}
@@ -326,7 +326,7 @@ export function MainLayout({ children }: MainLayoutProps) {
       <div className="flex h-full w-full">
         <aside
           data-scrollbar="nexo"
-          className={`nexo-sidebar z-40 flex shrink-0 flex-col overflow-hidden transition-all duration-300 ${
+          className={`nexo-sidebar z-40 flex shrink-0 flex-col overflow-hidden nexo-state-transition ${
             isMobile
               ? `fixed inset-y-0 left-0 w-[304px] ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full"}`
               : `fixed inset-y-0 left-0 ${sidebarCollapsed ? "w-[92px]" : "w-[286px]"}`
@@ -398,7 +398,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                           type="button"
                           title={item.label}
                           onClick={() => handleNavigate(item.route)}
-                          className={`nexo-sidebar-item ${active ? "nexo-sidebar-item-active" : ""} ${
+                          className={`nexo-sidebar-item nexo-state-transition ${active ? "nexo-sidebar-item-active" : ""} ${
                             sidebarCollapsed && !isMobile
                               ? "justify-center px-2"
                               : ""
@@ -438,7 +438,7 @@ export function MainLayout({ children }: MainLayoutProps) {
         </aside>
 
         <div className={`flex min-w-0 flex-1 flex-col overflow-hidden ${!isMobile ? (sidebarCollapsed ? "md:ml-[92px]" : "md:ml-[286px]") : ""}` }>
-          <header className="nexo-topbar z-20">
+          <header className="nexo-topbar z-20 nexo-state-transition">
             <div className="nexo-topbar-grid">
               <div className="grid grid-cols-1 items-center gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
                 <div className="flex min-w-0 items-center gap-2.5 md:gap-3">
@@ -606,7 +606,7 @@ export function MainLayout({ children }: MainLayoutProps) {
 
           <main
             data-scrollbar="nexo"
-            className="nexo-app-content m-3 mt-0 min-h-0 flex-1 overflow-auto md:m-4 md:mt-0"
+            className="nexo-app-content nexo-section-reveal m-3 mt-0 min-h-0 flex-1 overflow-auto md:m-4 md:mt-0"
           >
             {children}
           </main>

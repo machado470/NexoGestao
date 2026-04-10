@@ -21,7 +21,7 @@ import {
 } from "@/lib/smartActions";
 
 export function PageShell({ children }: { children: ReactNode }) {
-  return <div className="nexo-page-shell">{children}</div>;
+  return <div className="nexo-page-shell nexo-section-reveal">{children}</div>;
 }
 
 export function PageHero({
@@ -36,7 +36,7 @@ export function PageHero({
   actions?: ReactNode;
 }) {
   return (
-    <section className="nexo-page-header">
+    <section className="nexo-page-header nexo-section-reveal">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,color-mix(in_srgb,var(--accent)_15%,transparent),transparent_28%),radial-gradient(circle_at_top_right,color-mix(in_srgb,var(--accent)_8%,transparent),transparent_24%)]" />
 
       <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
@@ -92,7 +92,7 @@ export function SmartPage({
     : dominantImpact;
 
   return (
-    <section className="nexo-card-operational nexo-cockpit-zone space-y-4">
+    <section className="nexo-card-operational nexo-cockpit-zone nexo-section-reveal space-y-4">
       <div className="space-y-2">
         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--accent)] dark:text-orange-300">
           Prioridade operacional
@@ -219,7 +219,7 @@ export function SmartPage({
       <div className="sticky bottom-3 z-20 rounded-2xl border border-[var(--accent-soft)] bg-[var(--nexo-card-surface)] p-2 shadow-lg md:static md:border-none md:bg-transparent md:p-0 md:shadow-none">
         <Button
           type="button"
-          className="nexo-cta-dominant min-h-12 w-full gap-2"
+          className="nexo-cta-dominant nexo-state-transition min-h-12 w-full gap-2"
           onClick={() => {
             registerActionFlowEvent("page_primary_cta_clicked", {
               pageContext,
