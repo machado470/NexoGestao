@@ -35,6 +35,7 @@ import { canAny, type Permission } from "@/lib/rbac";
 import { useIsMobile } from "@/hooks/useMobile";
 import { useNotificationStore } from "@/stores/notificationStore";
 import { GlobalSearch } from "@/components/GlobalSearch";
+import { AppShell, SidebarNav, Topbar } from "@/components/design-system";
 import { Breadcrumbs } from "./Breadcrumbs";
 import {
   DropdownMenu,
@@ -313,7 +314,7 @@ export function MainLayout({ children }: MainLayoutProps) {
   };
 
   return (
-    <div className="nexo-app-shell h-screen overflow-hidden text-[var(--text-primary)]">
+    <AppShell className="h-screen overflow-hidden text-[var(--text-primary)]">
       {isMobile && mobileMenuOpen ? (
         <button
           type="button"
@@ -324,7 +325,7 @@ export function MainLayout({ children }: MainLayoutProps) {
       ) : null}
 
       <div className="flex h-full w-full">
-        <aside
+        <SidebarNav
           data-scrollbar="nexo"
           className={`nexo-sidebar z-40 flex shrink-0 flex-col overflow-hidden nexo-state-transition ${
             isMobile
@@ -435,10 +436,12 @@ export function MainLayout({ children }: MainLayoutProps) {
               ) : null}
             </button>
           </div>
-        </aside>
+        </SidebarNav>
 
-        <div className={`flex min-w-0 flex-1 flex-col overflow-hidden ${!isMobile ? (sidebarCollapsed ? "md:ml-[92px]" : "md:ml-[286px]") : ""}` }>
-          <header className="nexo-topbar z-20 nexo-state-transition">
+        <div
+          className={`flex min-w-0 flex-1 flex-col overflow-hidden ${!isMobile ? (sidebarCollapsed ? "md:ml-[92px]" : "md:ml-[286px]") : ""}`}
+        >
+          <Topbar className="z-20 nexo-state-transition">
             <div className="nexo-topbar-grid">
               <div className="grid grid-cols-1 items-center gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
                 <div className="flex min-w-0 items-center gap-2.5 md:gap-3">
@@ -602,7 +605,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                 </button>
               </div>
             </div>
-          </header>
+          </Topbar>
 
           <main
             data-scrollbar="nexo"
@@ -622,6 +625,6 @@ export function MainLayout({ children }: MainLayoutProps) {
           </div>
         </div>
       </div>
-    </div>
+    </AppShell>
   );
 }
