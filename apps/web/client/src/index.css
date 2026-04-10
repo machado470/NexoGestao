@@ -170,9 +170,9 @@
   --sidebar-border: rgba(255, 255, 255, 0.06);
   --sidebar-ring: rgba(251, 146, 60, 0.4);
 
-  --nexo-app-bg: #070b11;
-  --nexo-surface-1: rgba(12, 16, 23, 0.92);
-  --nexo-surface-2: rgba(17, 22, 31, 0.94);
+  --nexo-app-bg: #05080f;
+  --nexo-surface-1: rgba(15, 19, 28, 0.9);
+  --nexo-surface-2: rgba(14, 18, 27, 0.96);
   --nexo-border-soft: rgba(148, 163, 184, 0.2);
   --nexo-border-strong: rgba(148, 163, 184, 0.36);
   --nexo-shadow-soft: 0 10px 24px rgba(2, 6, 23, 0.36);
@@ -364,23 +364,34 @@
 
 
   .nexo-sidebar {
-    background: linear-gradient(180deg, #0b1220 0%, #0f172a 45%, #111827 100%);
-    border-right: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 18px 0 36px rgba(2, 6, 23, 0.28);
+    background: linear-gradient(180deg, #090d16 0%, #0b111d 56%, #090f1a 100%);
+    border-right: 1px solid rgba(148, 163, 184, 0.2);
+    box-shadow: 18px 0 36px rgba(2, 6, 23, 0.45);
   }
 
   .nexo-sidebar-item {
-    @apply flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-zinc-300 transition-colors hover:bg-white/8 hover:text-white;
+    @apply flex w-full items-center gap-2.5 rounded-xl border border-transparent px-3 py-2.5 text-left text-zinc-300 transition-all duration-200 hover:border-white/10 hover:bg-white/8 hover:text-white;
   }
 
   .nexo-sidebar-item-active {
-    @apply bg-orange-500/16 text-orange-200 ring-1 ring-orange-400/40;
+    @apply border-orange-400/35 bg-orange-500/14 text-orange-200 ring-1 ring-orange-400/25;
   }
 
   .nexo-topbar {
     border-bottom: 1px solid var(--nexo-border-soft);
-    background: color-mix(in srgb, var(--nexo-surface-2) 86%, transparent);
-    backdrop-filter: blur(14px);
+    background: color-mix(in srgb, var(--nexo-surface-2) 92%, transparent);
+    backdrop-filter: blur(18px);
+  }
+
+  .nexo-topbar-control {
+    @apply inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-zinc-200 transition-colors hover:bg-white/10;
+  }
+
+  .nexo-floating-panel {
+    border: 1px solid rgba(148, 163, 184, 0.24);
+    background: color-mix(in srgb, var(--nexo-surface-2) 96%, #05080f 4%);
+    box-shadow: 0 22px 46px rgba(2, 6, 23, 0.55);
+    backdrop-filter: blur(18px);
   }
 
   .nexo-app-panel {
@@ -398,12 +409,12 @@
   .nexo-app-content {
     border-radius: var(--radius-panel);
     border: 1px solid var(--nexo-border-soft);
-    background: var(--nexo-surface-2);
+    background: color-mix(in srgb, var(--nexo-surface-2) 94%, #05080f 6%);
     box-shadow: var(--nexo-shadow-soft);
   }
 
   .nexo-surface {
-    @apply rounded-[1.25rem] border border-slate-200/70 bg-white/90 shadow-sm dark:border-white/8 dark:bg-[linear-gradient(180deg,rgba(19,22,29,0.95),rgba(13,16,22,0.94))] dark:shadow-[0_14px_40px_rgba(0,0,0,0.4)];
+    @apply rounded-[1.2rem] border border-white/10 bg-[var(--nexo-surface-2)] shadow-[0_14px_32px_rgba(2,6,23,0.32)];
   }
 
   .nexo-subtle-surface {
@@ -411,7 +422,7 @@
   }
 
   .nexo-kpi-card {
-    @apply relative overflow-hidden rounded-[1.25rem] border border-slate-200/70 bg-white/90 p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg dark:border-white/8 dark:bg-[linear-gradient(180deg,rgba(21,24,31,0.96),rgba(13,16,22,0.94))] dark:shadow-[0_18px_45px_rgba(0,0,0,0.42)];
+    @apply relative overflow-hidden rounded-[1.15rem] border border-white/10 bg-[var(--nexo-surface-2)] p-5 shadow-[0_14px_30px_rgba(2,6,23,0.3)] transition-all duration-300 hover:border-orange-400/30 hover:shadow-[0_18px_38px_rgba(2,6,23,0.42)];
   }
 
   .nexo-kpi-card::before {

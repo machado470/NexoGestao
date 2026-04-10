@@ -244,7 +244,7 @@ export function MainLayout({ children }: MainLayoutProps) {
         <button
           type="button"
           aria-label="Fechar menu"
-          className="fixed inset-0 z-30 bg-zinc-950/45"
+          className="fixed inset-0 z-30 bg-zinc-950/65 backdrop-blur-sm"
           onClick={() => setMobileMenuOpen(false)}
         />
       ) : null}
@@ -254,10 +254,10 @@ export function MainLayout({ children }: MainLayoutProps) {
           data-scrollbar="nexo"
           className={`nexo-sidebar z-40 flex shrink-0 flex-col overflow-hidden transition-all duration-300 ${
             isMobile
-              ? `fixed inset-y-0 left-0 w-[300px] ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full"}`
+              ? `fixed inset-y-0 left-0 w-[304px] ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full"}`
               : sidebarCollapsed
-                ? "w-[86px]"
-                : "w-[280px]"
+                ? "w-[92px]"
+                : "w-[286px]"
           }`}
         >
           <div className="border-b border-white/10 px-4 py-4">
@@ -267,7 +267,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                 onClick={() => handleNavigate("/executive-dashboard")}
                 className={`flex min-w-0 items-center ${sidebarCollapsed && !isMobile ? "justify-center" : "gap-3"}`}
               >
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-500/20 text-orange-300 ring-1 ring-orange-400/30">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-500/20 text-orange-300 ring-1 ring-orange-400/35">
                   <Sparkles className="h-4 w-4" />
                 </div>
                 {!sidebarCollapsed || isMobile ? (
@@ -282,7 +282,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                 <button
                   type="button"
                   onClick={() => setSidebarCollapsed((prev) => !prev)}
-                  className="rounded-lg p-1.5 text-zinc-400 transition hover:bg-white/10 hover:text-white"
+                  className="rounded-lg border border-white/10 p-1.5 text-zinc-400 transition hover:bg-white/10 hover:text-white"
                 >
                   {sidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
                 </button>
@@ -290,7 +290,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                 <button
                   type="button"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="rounded-lg p-1.5 text-zinc-400 transition hover:bg-white/10 hover:text-white"
+                  className="rounded-lg border border-white/10 p-1.5 text-zinc-400 transition hover:bg-white/10 hover:text-white"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -351,32 +351,32 @@ export function MainLayout({ children }: MainLayoutProps) {
 
         <div className="flex min-w-0 flex-1 flex-col">
           <header className="nexo-topbar sticky top-0 z-20">
-            <div className="flex flex-col gap-3 px-4 py-3 md:px-6">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
+            <div className="mx-auto grid w-full max-w-[1680px] grid-cols-1 gap-3 px-4 py-3 md:px-6">
+              <div className="grid grid-cols-1 items-center gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
+                <div className="flex min-w-0 items-center gap-2.5 md:gap-3">
                   {isMobile ? (
                     <button
                       type="button"
                       onClick={() => setMobileMenuOpen((prev) => !prev)}
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-200/80 bg-white text-zinc-700 dark:border-white/10 dark:bg-white/[0.03] dark:text-zinc-100"
+                      className="nexo-topbar-control"
                     >
                       <Menu className="h-5 w-5" />
                     </button>
                   ) : null}
-                  <div>
-                    <p className="text-lg font-semibold tracking-tight text-zinc-950 dark:text-white">
+                  <div className="min-w-0">
+                    <p className="truncate text-lg font-semibold tracking-tight text-zinc-950 dark:text-white">
                       {currentMeta.title}
                     </p>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400">{currentMeta.subtitle}</p>
+                    <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">{currentMeta.subtitle}</p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center justify-end gap-2">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <button
                         type="button"
-                        className="relative inline-flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-200/80 bg-white text-zinc-700 hover:bg-zinc-50 dark:border-white/10 dark:bg-white/[0.03] dark:text-zinc-100 dark:hover:bg-white/[0.06]"
+                        className="nexo-topbar-control relative"
                         aria-label="Notificações"
                       >
                         <Bell className="h-4 w-4" />
@@ -387,14 +387,14 @@ export function MainLayout({ children }: MainLayoutProps) {
                         ) : null}
                       </button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-[340px]">
-                      <DropdownMenuLabel className="flex items-center justify-between">
+                    <DropdownMenuContent align="end" className="w-[360px] nexo-floating-panel">
+                      <DropdownMenuLabel className="flex items-center justify-between px-3 py-2">
                         <span>Notificações</span>
                         {notifications.length > 0 ? (
                           <button
                             type="button"
                             onClick={clearNotifications}
-                            className="text-xs font-medium text-orange-600 hover:text-orange-700"
+                            className="text-xs font-medium text-orange-400 hover:text-orange-300"
                           >
                             Limpar
                           </button>
@@ -403,23 +403,23 @@ export function MainLayout({ children }: MainLayoutProps) {
                       <DropdownMenuSeparator />
                       {notifications.length === 0 ? (
                         <div className="px-3 py-8 text-center">
-                          <Bell className="mx-auto h-5 w-5 text-zinc-400" />
-                          <p className="mt-2 text-sm text-zinc-500">Nenhuma notificação no momento.</p>
+                          <Bell className="mx-auto h-5 w-5 text-zinc-500" />
+                          <p className="mt-2 text-sm text-zinc-400">Nenhuma notificação no momento.</p>
                         </div>
                       ) : (
                         notifications.slice().reverse().slice(0, 6).map((item) => (
                           <DropdownMenuItem
                             key={item.id}
-                            className="flex cursor-pointer flex-col items-start gap-1 rounded-lg px-3 py-2"
+                            className="flex cursor-pointer flex-col items-start gap-1 rounded-xl px-3 py-2"
                             onSelect={(evt) => {
                               evt.preventDefault();
                               item.action?.onClick();
                               removeNotification(item.id);
                             }}
                           >
-                            <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{item.title}</p>
+                            <p className="text-sm font-medium text-zinc-100">{item.title}</p>
                             {item.description ? (
-                              <p className="line-clamp-2 text-xs text-zinc-500 dark:text-zinc-400">{item.description}</p>
+                              <p className="line-clamp-2 text-xs text-zinc-400">{item.description}</p>
                             ) : null}
                           </DropdownMenuItem>
                         ))
@@ -429,24 +429,21 @@ export function MainLayout({ children }: MainLayoutProps) {
 
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <button
-                        type="button"
-                        className="inline-flex items-center gap-2 rounded-xl border border-zinc-200/80 bg-white px-2.5 py-2 text-sm text-zinc-700 hover:bg-zinc-50 dark:border-white/10 dark:bg-white/[0.03] dark:text-zinc-100 dark:hover:bg-white/[0.06]"
-                      >
-                        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-100">
+                      <button type="button" className="nexo-topbar-control px-2.5 py-2">
+                        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-zinc-800 text-zinc-100">
                           <User className="h-4 w-4" />
                         </div>
                         <span className="hidden max-w-28 truncate md:block">{user?.name ?? "Usuário"}</span>
                         <ChevronDown className="h-4 w-4 text-zinc-500" />
                       </button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuContent align="end" className="w-60 nexo-floating-panel">
                       <DropdownMenuLabel>
-                        <p className="text-sm font-semibold">{user?.name ?? "Usuário"}</p>
-                        <p className="text-xs text-zinc-500">{user?.email ?? "Sem e-mail"}</p>
+                        <p className="text-sm font-semibold text-zinc-100">{user?.name ?? "Usuário"}</p>
+                        <p className="text-xs text-zinc-400">{user?.email ?? "Sem e-mail"}</p>
                       </DropdownMenuLabel>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => navigate("/settings")}> 
+                      <DropdownMenuItem onClick={() => navigate("/settings")}>
                         <User className="mr-2 h-4 w-4" /> Perfil
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => navigate("/billing")}>
@@ -455,14 +452,14 @@ export function MainLayout({ children }: MainLayoutProps) {
                       <DropdownMenuItem onClick={toggleTheme}>
                         {theme === "dark" ? <Sun className="mr-2 h-4 w-4" /> : <Moon className="mr-2 h-4 w-4" />} Tema
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => navigate("/contact")}> 
+                      <DropdownMenuItem onClick={() => navigate("/contato")}>
                         <HelpCircle className="mr-2 h-4 w-4" /> Suporte
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
                         onClick={() => void handleLogout()}
                         disabled={isLoggingOut}
-                        className="text-red-600 focus:text-red-600"
+                        className="text-red-400 focus:text-red-300"
                       >
                         <LogOut className="mr-2 h-4 w-4" /> Sair
                       </DropdownMenuItem>
@@ -471,24 +468,18 @@ export function MainLayout({ children }: MainLayoutProps) {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between gap-3">
+              <div className="grid grid-cols-1 items-center gap-3 lg:grid-cols-[auto_minmax(0,1fr)_auto]">
                 <Breadcrumbs />
-                <div className="hidden min-w-0 flex-1 justify-end md:flex">
-                  <div className="w-full max-w-lg">
-                    <GlobalSearch />
-                  </div>
+                <div className="min-w-0 lg:justify-self-center lg:w-full lg:max-w-2xl">
+                  <GlobalSearch />
                 </div>
                 <button
                   type="button"
                   onClick={() => navigate("/service-orders")}
-                  className="hidden h-10 items-center gap-2 rounded-xl bg-orange-500 px-4 text-sm font-medium text-white hover:bg-orange-600 md:inline-flex"
+                  className="nexo-cta-primary h-10 w-full gap-2 rounded-xl px-4 text-sm lg:w-auto"
                 >
                   <Search className="h-4 w-4" /> Executar agora
                 </button>
-              </div>
-
-              <div className="md:hidden">
-                <GlobalSearch />
               </div>
             </div>
           </header>
