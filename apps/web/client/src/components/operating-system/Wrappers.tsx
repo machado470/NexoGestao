@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { PageShell } from "@/components/PagePattern";
 import { DataTable, type DataTableProps } from "@/components/DataTable";
 import { ActionBarWrapper } from "./ActionBar";
-import { PageHeader } from "./PageHeader";
+import { OperationalHeader } from "./OperationalHeader";
 
 type PageWrapperProps = {
   title: ReactNode;
@@ -22,13 +22,13 @@ export function PageWrapper({
   return (
     <PageShell>
       <div className="space-y-4 md:space-y-5">
-      <PageHeader
-        title={title}
-        subtitle={subtitle}
-        primaryAction={primaryAction}
-        breadcrumb={breadcrumb}
-      />
-      {children}
+        <OperationalHeader
+          title={title}
+          description={subtitle}
+          primaryAction={primaryAction}
+          breadcrumb={breadcrumb}
+        />
+        {children}
       </div>
     </PageShell>
   );

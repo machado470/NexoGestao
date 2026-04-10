@@ -58,6 +58,97 @@
   --color-nexo-gray: #e5e7eb;
 }
 
+@layer base {
+  body[data-visual-context="landing"] {
+    background: #f8f9fb;
+  }
+
+  .app-root {
+    --background-base: #edf2f8;
+    --surface-base: #e6edf6;
+    --surface-elevated: #f4f7fc;
+    --sidebar-bg: #e8eef7;
+    --card-bg: #f8faff;
+    --border-subtle: #cfd9e8;
+    --text-primary: #172033;
+    --text-secondary: #465777;
+    --text-muted: #607395;
+    --accent: #e8772e;
+    --accent-hover: #d96d28;
+    --accent-soft: color-mix(in srgb, var(--accent) 14%, var(--surface-base));
+    --success: #2f8f66;
+    --warning: #b97828;
+    --danger: #c54b4b;
+    --surface-contrast: #f0f4fa;
+
+    --background: var(--background-base);
+    --foreground: var(--text-primary);
+    --card: var(--card-bg);
+    --card-foreground: var(--text-primary);
+    --popover: var(--surface-elevated);
+    --popover-foreground: var(--text-primary);
+    --primary: var(--accent);
+    --primary-foreground: #fff7ef;
+    --secondary: var(--surface-base);
+    --secondary-foreground: var(--text-secondary);
+    --muted: color-mix(in srgb, var(--surface-base) 82%, #d0dced);
+    --muted-foreground: var(--text-muted);
+    --destructive: var(--danger);
+    --destructive-foreground: #fff3f2;
+    --border: var(--border-subtle);
+    --input: var(--surface-base);
+    --ring: color-mix(in srgb, var(--accent) 35%, transparent);
+    --sidebar: var(--sidebar-bg);
+    --sidebar-foreground: var(--text-primary);
+    --sidebar-primary: var(--accent);
+    --sidebar-primary-foreground: #fff7ef;
+    --sidebar-accent: var(--accent-soft);
+    --sidebar-accent-foreground: var(--text-primary);
+    --sidebar-border: var(--border-subtle);
+    --sidebar-ring: var(--ring);
+  }
+
+  .dark .app-root {
+    --background-base: #11151d;
+    --surface-base: #181e2a;
+    --surface-elevated: #1c2432;
+    --sidebar-bg: #141b26;
+    --card-bg: #1a2230;
+    --border-subtle: #2c3748;
+    --text-primary: #e6ebf5;
+    --text-secondary: #b8c2d4;
+    --text-muted: #8a98b0;
+    --accent: #e8772e;
+    --accent-hover: #f0893f;
+    --accent-soft: color-mix(in srgb, var(--accent) 18%, var(--surface-base));
+    --success: #4eb588;
+    --warning: #df9b4a;
+    --danger: #de6b6b;
+    --surface-contrast: #1a3a52;
+  }
+}
+
+@layer components {
+  .app-root .nexo-data-table th {
+    @apply px-4 py-2 text-left text-[11px] font-semibold uppercase tracking-[0.08em];
+    color: var(--text-muted);
+  }
+
+  .app-root .nexo-data-table td {
+    @apply px-4 py-2.5 text-sm leading-5;
+    color: var(--text-secondary);
+  }
+
+  .app-root .nexo-data-table tbody tr {
+    @apply border-t;
+    border-color: var(--border-soft);
+  }
+
+  .app-root .nexo-page-header-description {
+    max-width: 72ch;
+  }
+}
+
 :root {
   --bg-app: #080c18;
   --bg-sidebar: #0b1122;

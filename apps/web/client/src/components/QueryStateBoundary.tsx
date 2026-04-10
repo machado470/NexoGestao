@@ -1,8 +1,6 @@
 import type { ReactNode } from "react";
-import { AlertTriangle } from "lucide-react";
-import { Button } from "@/components/design-system";
 import { Skeleton } from "@/components/ui/skeleton";
-import { EmptyState } from "@/components/EmptyState";
+import { OperationalState } from "@/components/operating-system/OperationalState";
 
 export function TableSkeleton({ rows = 6, columns = 6 }: { rows?: number; columns?: number }) {
   return (
@@ -38,17 +36,28 @@ export function QueryStateBoundary({
   children: ReactNode;
 }) {
   if (isLoading) {
-    return <>{loading ?? <TableSkeleton />}</>;
+    return (
+      <>
+        {loading ?? (
+          <OperationalState
+            type="loading"
+            title="Carregando contexto operacional"
+            description="Estamos atualizando os dados para mostrar a próxima ação com segurança."
+          />
+        )}
+      </>
+    );
   }
 
   if (isError) {
     return (
-      <div className="m-4 rounded-xl border border-red-200 bg-red-50/70 p-4 dark:border-red-900/40 dark:bg-red-950/20">
-        <p className="text-sm text-red-700 dark:text-red-300">{errorMessage}</p>
-        <Button type="button" variant="outline" size="sm" className="mt-3" onClick={onRetry}>
-          Tentar novamente
-        </Button>
-      </div>
+      <OperationalState
+        type="error"
+        title="Falha ao carregar este bloco"
+        description={errorMessage}
+        actionLabel="Tentar novamente"
+        onAction={onRetry}
+      />
     );
   }
 
@@ -56,10 +65,12 @@ export function QueryStateBoundary({
     return (
       <>{
         empty ?? (
-          <EmptyState
-            icon={<AlertTriangle className="h-6 w-6" />}
-            title="Nenhum dado encontrado"
-            description="Ajuste os filtros ou adicione novos registros."
+          <OperationalState
+            type="empty"
+            title="Sem itens para esta visão"
+            description="Ajuste os filtros atuais ou crie um novo registro para destravar o fluxo."
+            actionLabel="Recarregar visão"
+            onAction={onRetry}
           />
         )
       }</>

@@ -313,7 +313,7 @@ export function MainLayout({ children }: MainLayoutProps) {
   };
 
   return (
-    <AppShell className="h-screen overflow-hidden text-[var(--text-primary)]">
+    <AppShell className="app-root h-screen overflow-hidden text-[var(--text-primary)]">
       {isMobile && mobileMenuOpen ? (
         <button
           type="button"

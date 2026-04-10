@@ -424,6 +424,31 @@ function LegacyAliasRoute({
 }
 
 function Router() {
+  const [location] = useLocation();
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const appPrefixes = [
+      "/executive-dashboard",
+      "/customers",
+      "/appointments",
+      "/service-orders",
+      "/finances",
+      "/people",
+      "/governance",
+      "/whatsapp",
+      "/calendar",
+      "/settings",
+      "/timeline",
+      "/billing",
+      "/onboarding",
+    ];
+    const isAppRoute = appPrefixes.some(
+      prefix => location === prefix || location.startsWith(`${prefix}/`)
+    );
+    document.body.dataset.visualContext = isAppRoute ? "app" : "landing";
+  }, [location]);
+
   return (
     <Switch>
       <Route path="/">{publicPage(Landing)()}</Route>
