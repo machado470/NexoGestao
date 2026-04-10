@@ -57,6 +57,8 @@ import {
   getConcurrencyErrorMessage,
   isConcurrentConflictError,
 } from "@/lib/concurrency";
+import { ContextPanel } from "@/components/operating-system/ContextPanel";
+import { runFlowChain } from "@/lib/operations/flowChain";
 
 type CustomerRef = {
   id: string;
@@ -314,6 +316,7 @@ export default function AppointmentsPage() {
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [routingActionId, setRoutingActionId] = useState<string | null>(null);
   const [successActionId, setSuccessActionId] = useState<string | null>(null);
+  const [flowFeedback, setFlowFeedback] = useState<string | null>(null);
   const [highlightedAppointmentId, setHighlightedAppointmentId] = useState<
     string | null
   >(() => getAppointmentIdFromUrl());
@@ -611,11 +614,26 @@ export default function AppointmentsPage() {
     setProcessingId(appointmentId);
 
     try {
-      await updateAppointment.mutateAsync({
-        id: appointmentId,
-        status,
-        expectedUpdatedAt: appointments.find((item) => item.id === appointmentId)?.updatedAt,
+      await runFlowChain({
+        actionLabel: `Status atualizado para ${getStatusLabel(status)}`,
+        onExecute: () =>
+          updateAppointment.mutateAsync({
+            id: appointmentId,
+            status,
+            expectedUpdatedAt: appointments.find((item) => item.id === appointmentId)?.updatedAt,
+          }),
+        nextSuggestedAction:
+          status === "DONE"
+            ? "Gerar cobrança e enviar WhatsApp"
+            : status === "CONFIRMED"
+              ? "Puxar O.S. para execução"
+              : undefined,
       });
+      setFlowFeedback(
+        status === "DONE"
+          ? "Agendamento concluído. Próximo passo sugerido: abrir financeiro e enviar WhatsApp."
+          : null
+      );
     } catch (error) {
       if (isConcurrentConflictError(error)) {
         toast.error(getConcurrencyErrorMessage("agendamento"), {
@@ -908,6 +926,11 @@ export default function AppointmentsPage() {
       {queryState.hasBackgroundUpdate ? (
         <SurfaceSection className="border-blue-500/30 bg-blue-500/10 text-sm text-blue-200">
           Atualizando agenda em segundo plano...
+        </SurfaceSection>
+      ) : null}
+      {flowFeedback ? (
+        <SurfaceSection className="border-emerald-300 bg-emerald-50 text-xs text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-300">
+          {flowFeedback}
         </SurfaceSection>
       ) : null}
 
@@ -1310,8 +1333,41 @@ export default function AppointmentsPage() {
                           <div className="mt-3 rounded-md border border-red-300/70 bg-red-50 p-2 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200">
                             <p className="font-semibold">{nextAction.invalidState.title}</p>
                             <p className="mt-1">{nextAction.invalidState.description}</p>
-                          </div>
-                        ) : null}
+        </div>
+      ) : null}
+
+      <ContextPanel
+        open={Boolean(highlightedAppointment)}
+        onOpenChange={open => {
+          if (!open) handleClearDeepLink();
+        }}
+        title={highlightedAppointment?.customer?.name ?? "Contexto do agendamento"}
+        subtitle={highlightedAppointment ? formatDateTime(highlightedAppointment.startsAt) : undefined}
+        statusLabel={highlightedAppointment ? getStatusLabel(highlightedAppointment.status) : undefined}
+        summary={
+          highlightedAppointment
+            ? [
+                { label: "Início", value: formatDateTime(highlightedAppointment.startsAt) },
+                { label: "Fim", value: formatTime(highlightedAppointment.endsAt) },
+                { label: "Status", value: getStatusLabel(highlightedAppointment.status) },
+                { label: "Próxima ação", value: getAppointmentDecision({
+                  appointment: highlightedAppointment,
+                  hasServiceOrder: serviceOrders.some(order => String(order.customerId ?? "") === highlightedAppointment.customerId),
+                  hasPendingFinancial: false,
+                }).primaryAction.label },
+              ]
+            : []
+        }
+        timeline={
+          highlightedAppointment
+            ? [
+                { id: "created", label: "Criado", description: String(highlightedAppointment.createdAt ?? "—") },
+                { id: "updated", label: "Atualizado", description: String(highlightedAppointment.updatedAt ?? "—") },
+                { id: "notes", label: "Observação", description: truncateText(highlightedAppointment.notes) },
+              ]
+            : []
+        }
+      />
                       </div>
                     </div>
                   </div>

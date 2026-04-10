@@ -42,6 +42,8 @@ import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedba
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { NextActionCell } from "@/components/operating-system/NextActionCell";
 import { PrimaryActionButton } from "@/components/operating-system/PrimaryActionButton";
+import { ContextPanel } from "@/components/operating-system/ContextPanel";
+import { runFlowChain } from "@/lib/operations/flowChain";
 
 type FinanceCharge = {
   id: string;
@@ -130,6 +132,8 @@ export default function FinancesPage() {
   const [paymentSubmittingId, setPaymentSubmittingId] = useState<string | null>(
     null
   );
+  const [selectedChargeId, setSelectedChargeId] = useState<string>("");
+  const [flowFeedback, setFlowFeedback] = useState<string | null>(null);
 
   const chargesQuery = trpc.finance.charges.list.useQuery(
     {
@@ -269,6 +273,12 @@ export default function FinancesPage() {
       );
     });
   }, [paymentScopedCharge, visibleCharges]);
+
+  const activeCharge = useMemo(() => {
+    const selectedId = selectedChargeId || effectiveChargeId;
+    if (!selectedId) return null;
+    return finalVisibleCharges.find(charge => charge.id === selectedId) ?? null;
+  }, [effectiveChargeId, finalVisibleCharges, selectedChargeId]);
 
   const timelineData = useMemo(() => {
     const ordered = [...finalVisibleCharges];
@@ -895,6 +905,7 @@ export default function FinancesPage() {
               <Card
                 key={c.id}
                 className={`nexo-surface ${getOperationalSeverityClasses(chargeSeverity)}`}
+                onClick={() => setSelectedChargeId(c.id)}
               >
                 <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-4">
                   <div className="w-full text-xs font-medium text-zinc-600 dark:text-zinc-300">
@@ -921,14 +932,26 @@ export default function FinancesPage() {
                           void (async () => {
                             try {
                               setPaymentSubmittingId(c.id);
-                              const result = (await registerPayment(
-                                c,
-                                "CASH"
-                              )) as { paymentId?: string } | undefined;
+                              let paymentResult:
+                                | { paymentId?: string }
+                                | undefined;
+                              await runFlowChain({
+                                actionLabel: "Pagamento registrado",
+                                onExecute: async () => {
+                                  paymentResult = (await registerPayment(
+                                    c,
+                                    "CASH"
+                                  )) as { paymentId?: string } | undefined;
+                                },
+                                nextSuggestedAction: "Enviar cobrança via WhatsApp",
+                              });
                               setPaymentDoneId(c.id);
+                              setFlowFeedback(
+                                "Pagamento confirmado. Próximo passo sugerido: enviar confirmação por WhatsApp."
+                              );
                               setTimeout(() => setPaymentDoneId(null), 1500);
                               const paymentId = String(
-                                result?.paymentId ?? ""
+                                paymentResult?.paymentId ?? ""
                               ).trim();
                               const params = new URLSearchParams();
                               params.set("chargeId", c.id);
@@ -946,17 +969,17 @@ export default function FinancesPage() {
                         }}
                       />
                     )}
-                    {normalizedStatus === ChargeStatus.PAID ? (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() =>
-                          navigate(buildWhatsAppUrlFromCharge(c) ?? "/whatsapp")
-                        }
-                      >
-                        Enviar comprovante
-                      </Button>
-                    ) : null}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        navigate(buildWhatsAppUrlFromCharge(c) ?? "/whatsapp")
+                      }
+                    >
+                      {normalizedStatus === ChargeStatus.PAID
+                        ? "Enviar comprovante"
+                        : "Enviar cobrança"}
+                    </Button>
                   </div>
                 </CardContent>
                 {paymentDoneId === c.id ? (
@@ -970,6 +993,60 @@ export default function FinancesPage() {
           })}
         </div>
       )}
+      {flowFeedback ? (
+        <div className="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-300">
+          {flowFeedback}
+        </div>
+      ) : null}
+
+      <ContextPanel
+        open={Boolean(activeCharge)}
+        onOpenChange={open => {
+          if (!open) setSelectedChargeId("");
+        }}
+        title={`Cobrança #${activeCharge?.id ?? ""}`}
+        subtitle={activeCharge?.customer?.name ?? "Financeiro em execução"}
+        statusLabel={activeCharge ? getChargeStatusLabel(normalizeChargeStatus(activeCharge.status)) : undefined}
+        summary={
+          activeCharge
+            ? [
+                { label: "Valor", value: formatCurrencyFromCents(activeCharge.amountCents) },
+                { label: "Vencimento", value: String(activeCharge.dueDate ?? "—") },
+                { label: "Cliente", value: activeCharge.customer?.name ?? "—" },
+                { label: "Status", value: getChargeStatusLabel(normalizeChargeStatus(activeCharge.status)) },
+              ]
+            : []
+        }
+        primaryAction={
+          activeCharge
+            ? {
+                label: "Enviar no WhatsApp",
+                onClick: () => navigate(buildWhatsAppUrlFromCharge(activeCharge) ?? "/whatsapp"),
+              }
+            : undefined
+        }
+        secondaryActions={
+          activeCharge
+            ? [
+                {
+                  label: "Marcar pago",
+                  onClick: () => {
+                    setSelectedChargeId(activeCharge.id);
+                  },
+                },
+              ]
+            : []
+        }
+        timeline={
+          activeCharge
+            ? [
+                { id: "created", label: "Criada", description: String(activeCharge.createdAt ?? "—") },
+                { id: "updated", label: "Atualizada", description: String(activeCharge.updatedAt ?? "—") },
+                { id: "due", label: "Vencimento", description: String(activeCharge.dueDate ?? "—") },
+              ]
+            : []
+        }
+      />
     </PageWrapper>
   );
 }

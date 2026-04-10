@@ -59,6 +59,8 @@ import { ActionBarWrapper } from "@/components/operating-system/ActionBar";
 import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedbackButton";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { NextActionCell } from "@/components/operating-system/NextActionCell";
+import { ContextPanel } from "@/components/operating-system/ContextPanel";
+import { runFlowChain } from "@/lib/operations/flowChain";
 
 const FINANCIAL_FILTERS: Array<{
   value: FinancialFilter;
@@ -153,6 +155,7 @@ export default function ServiceOrdersPage() {
   const [nextActionState, setNextActionState] = useState<
     "idle" | "running" | "done"
   >("idle");
+  const [flowFeedback, setFlowFeedback] = useState<string | null>(null);
 
   const activeRef = useRef<HTMLDivElement | null>(null);
 
@@ -627,10 +630,24 @@ export default function ServiceOrdersPage() {
                 ctaId: "next_action_primary",
                 label: nextAction.primaryAction.label,
               });
-              setNextActionState("running");
-              nextActionButtons[0]?.onClick?.();
-              setTimeout(() => setNextActionState("done"), 220);
-              setTimeout(() => setNextActionState("idle"), 1400);
+              void (async () => {
+                setNextActionState("running");
+                const result = await runFlowChain({
+                  actionLabel: nextAction.primaryAction.label,
+                  onExecute: () => nextActionButtons[0]?.onClick?.(),
+                  nextSuggestedAction:
+                    activeOrder?.status === "DONE"
+                      ? "Gerar cobrança e enviar WhatsApp"
+                      : undefined,
+                });
+                setFlowFeedback(
+                  result.nextSuggestedAction
+                    ? `${result.completedAction} concluída. Próximo passo sugerido: ${result.nextSuggestedAction}.`
+                    : `${result.completedAction} concluída.`
+                );
+                setNextActionState("done");
+                setTimeout(() => setNextActionState("idle"), 1400);
+              })();
             }}
           />
         </div>
@@ -657,6 +674,11 @@ export default function ServiceOrdersPage() {
           </div>
         ) : null}
       </SurfaceSection>
+      {flowFeedback ? (
+        <div className="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-300">
+          {flowFeedback}
+        </div>
+      ) : null}
 
       {queryState.hasBackgroundUpdate ? (
         <div className="rounded border border-blue-500/30 bg-blue-500/10 p-3 text-sm text-blue-200">
@@ -816,6 +838,47 @@ export default function ServiceOrdersPage() {
         onSuccess={() => void refreshAll()}
         serviceOrderId={editId}
         people={people}
+      />
+
+      <ContextPanel
+        open={Boolean(activeOrder)}
+        onOpenChange={open => {
+          if (!open) closeActivePanel();
+        }}
+        title={activeOrder?.title ?? "Contexto da ordem de serviço"}
+        subtitle={activeOrder?.customer?.name ?? "Execução contínua"}
+        statusLabel={activeOrder?.status ?? "—"}
+        summary={
+          activeOrder
+            ? [
+                { label: "Etapa operacional", value: getOperationalStage(activeOrder).label },
+                { label: "Etapa financeira", value: getFinancialStage(activeOrder).label },
+                { label: "Próxima ação", value: getNextActionServiceOrder(activeOrder).label },
+                { label: "Prioridade", value: String(getPriorityScore(activeOrder)) },
+              ]
+            : []
+        }
+        primaryAction={
+          nextActionButtons[0]
+            ? {
+                label: nextActionButtons[0].label,
+                onClick: nextActionButtons[0].onClick,
+              }
+            : undefined
+        }
+        secondaryActions={nextActionButtons.slice(1).map(action => ({
+          label: action.label,
+          onClick: action.onClick,
+        }))}
+        timeline={
+          activeOrder
+            ? [
+                { id: "created", label: "Criada", description: String(activeOrder.createdAt ?? "—") },
+                { id: "updated", label: "Última atualização", description: String(activeOrder.updatedAt ?? "—") },
+                { id: "scheduled", label: "Agendada para", description: String(activeOrder.scheduledFor ?? "—") },
+              ]
+            : []
+        }
       />
     </PageWrapper>
   );

@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import { SeverityBadge } from "@/components/operating-system/SeverityBadge";
 import { Button } from "@/components/ui/button";
 import type { ActionSeverity } from "@/lib/operations/next-action";
@@ -8,19 +9,27 @@ export type ActionFeedItem = {
   reason: string;
   priority: ActionSeverity;
   nextAction: string;
-  onExecute: () => void;
+  onExecute: () => Promise<void> | void;
   amountLabel?: string;
   group?: "financeiro" | "operacional" | "atendimento";
 };
 
 export function ActionFeed({ items }: { items: ActionFeedItem[] }) {
+  const [executingId, setExecutingId] = useState<string | null>(null);
+  const [resolvedIds, setResolvedIds] = useState<Record<string, boolean>>({});
   const weight: Record<ActionSeverity, number> = {
     critical: 0,
     warning: 1,
     normal: 2,
     success: 3,
   };
-  const sorted = [...items].sort((a, b) => weight[a.priority] - weight[b.priority]);
+  const visibleItems = useMemo(
+    () => items.filter(item => !resolvedIds[item.id]),
+    [items, resolvedIds]
+  );
+  const sorted = [...visibleItems].sort(
+    (a, b) => weight[a.priority] - weight[b.priority]
+  );
   const grouped = sorted.reduce<Record<string, ActionFeedItem[]>>((acc, item) => {
     const key = item.group ?? "operacional";
     if (!acc[key]) acc[key] = [];
@@ -45,7 +54,23 @@ export function ActionFeed({ items }: { items: ActionFeedItem[] }) {
                 </div>
                 <div className="flex items-center gap-2">
                   <SeverityBadge severity={item.priority} />
-                  <Button size="sm" onClick={item.onExecute}>{item.nextAction}</Button>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      void (async () => {
+                        setExecutingId(item.id);
+                        try {
+                          await item.onExecute();
+                          setResolvedIds(prev => ({ ...prev, [item.id]: true }));
+                        } finally {
+                          setExecutingId(null);
+                        }
+                      })();
+                    }}
+                    disabled={executingId === item.id}
+                  >
+                    {executingId === item.id ? "Executando..." : item.nextAction}
+                  </Button>
                 </div>
               </div>
             ))}
