@@ -29,8 +29,9 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/EmptyState";
-import { SmartPage, SurfaceSection } from "@/components/PagePattern";
+import { SurfaceSection } from "@/components/PagePattern";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
+import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import {
   formatDateTime,
   getTimelineEventDescription,
@@ -428,24 +429,30 @@ export default function TimelinePage() {
         </>}
     >
 
-      <SmartPage
-        pageContext="dashboard"
-        headline="Leitura cronológica orientada por ação"
-        dominantProblem={
+      <OperationalTopCard
+        contextLabel="Direção cronológica"
+        title={
           selectedCustomer
             ? `Cliente em foco: ${selectedCustomer.name}`
             : "Selecione um cliente para iniciar a leitura"
         }
-        dominantImpact={`${stats.total} eventos no recorte atual`}
-        dominantCta={{
-          label: customerId ? "Atualizar timeline" : "Selecionar cliente",
-          onClick: () => {
-            if (customerId) void timelineQuery.refetch();
-            else if (customers[0]) setCustomerId(customers[0].id);
-          },
-          path: "/timeline",
-        }}
-        priorities={smartPriorities}
+        description={`${stats.total} eventos no recorte atual.`}
+        chips={smartPriorities.slice(0, 3).map(priority => (
+          <span key={priority.id} className="rounded-full border px-3 py-1 text-xs text-[var(--text-secondary)]">
+            {priority.title}: {priority.count}
+          </span>
+        ))}
+        primaryAction={
+          <Button
+            type="button"
+            onClick={() => {
+              if (customerId) void timelineQuery.refetch();
+              else if (customers[0]) setCustomerId(customers[0].id);
+            }}
+          >
+            {customerId ? "Atualizar timeline" : "Selecionar cliente"}
+          </Button>
+        }
       />
 
       {hasFatalError || queryState.shouldBlockForError ? (

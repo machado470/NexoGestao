@@ -7,9 +7,10 @@ import { SurfaceSection } from "@/components/PagePattern";
 import { EmptyState } from "@/components/EmptyState";
 import { Loader2, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/design-system";
-import { ActionBarWrapper, PageWrapper } from "@/components/operating-system/Wrappers";
+import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedbackButton";
 import { ExecutionOperationsPanel } from "@/components/operations/ExecutionOperationsPanel";
+import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 
 function clamp(value: number) {
   return Math.max(0, Math.min(100, Math.round(value)));
@@ -208,7 +209,16 @@ export default function GovernancePage() {
         title="Governança Operacional"
         subtitle="Risco institucional, sinais operacionais e decisões imediatas em um único fluxo."
       >
-      <ActionBarWrapper
+      <OperationalTopCard
+        className={optimisticBanner ? "ring-2 ring-orange-300/40 dark:ring-orange-500/30" : ""}
+        contextLabel="Direção de governança"
+        title="O que precisa de atenção agora"
+        description={autoProblems[0]?.message ?? "Sem alertas críticos no momento."}
+        chips={autoProblems.slice(0, 3).map(problem => (
+          <span key={problem.id} className={`rounded-full border px-3 py-1 text-xs ${getSeverityClass(problem.severity)}`}>
+            {problem.cta}
+          </span>
+        ))}
         secondaryActions={(
           <ActionFeedbackButton
             state={summaryQuery.isFetching || runsQuery.isFetching || autoScoreQuery.isFetching || alertsQuery.isFetching ? "loading" : "idle"}
@@ -223,22 +233,8 @@ export default function GovernancePage() {
             }}
           />
         )}
-        primaryAction={<Button className="min-h-11 w-full md:w-auto" onClick={() => navigate("/dashboard/operations")}>Ver operação</Button>}
+        primaryAction={<Button className="min-h-11 w-full md:w-auto" onClick={() => navigate(autoProblems[0]?.route ?? "/dashboard/operations")}>{autoProblems[0]?.cta ?? "Ver operação"}</Button>}
       />
-
-      <SurfaceSection className={`space-y-3 transition-all duration-300 ${optimisticBanner ? "ring-2 ring-orange-300/40 dark:ring-orange-500/30" : ""}`}>
-        <h2 className="font-semibold">O que precisa de atenção agora</h2>
-        <div className="space-y-2">
-          {autoProblems.map((problem) => (
-            <div key={problem.id} className={`nexo-subtle-surface border flex flex-col gap-3 p-3 md:flex-row md:items-center md:justify-between ${getSeverityClass(problem.severity)}`}>
-              <p className="text-sm font-medium text-[var(--text-primary)] dark:text-[var(--text-primary)]">{problem.message}</p>
-              <Button className="min-h-11 w-full md:w-auto" onClick={() => navigate(problem.route)}>
-                {problem.cta}
-              </Button>
-            </div>
-          ))}
-        </div>
-      </SurfaceSection>
 
       <ExecutionOperationsPanel />
 

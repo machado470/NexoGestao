@@ -9,7 +9,8 @@ import { Loader2, Settings2 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedbackButton";
-import { ActionBarWrapper, PageWrapper } from "@/components/operating-system/Wrappers";
+import { PageWrapper } from "@/components/operating-system/Wrappers";
+import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 
 type SettingsFormData = {
   name: string;
@@ -207,7 +208,16 @@ export default function SettingsPage() {
       title="Configurações"
       subtitle="Parâmetros institucionais que sustentam operação, financeiro e governança."
     >
-      <ActionBarWrapper
+      <OperationalTopCard
+        contextLabel="Direção institucional"
+        title={hasChanges ? "Existem alterações pendentes de sincronização" : "Configurações sincronizadas"}
+        description="Padronize nome, timezone e moeda em um único bloco para sustentar operação, financeiro e governança."
+        chips={(
+          <>
+            <span className="rounded-full border px-3 py-1 text-xs text-[var(--text-secondary)]">Timezone: {form.timezone || "—"}</span>
+            <span className="rounded-full border px-3 py-1 text-xs text-[var(--text-secondary)]">Moeda: {form.currency || "—"}</span>
+          </>
+        )}
         secondaryActions={(
           <ActionFeedbackButton
             state={query.isFetching ? "loading" : "idle"}
