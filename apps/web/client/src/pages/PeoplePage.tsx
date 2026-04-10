@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/contexts/AuthContext";
-import { Loader2, Users, Plus } from "lucide-react";
+import { Loader2, Users } from "lucide-react";
 import { Button } from "@/components/design-system";
 import { SurfaceSection } from "@/components/PagePattern";
 import { EmptyState } from "@/components/EmptyState";
@@ -246,30 +246,32 @@ export default function PeoplePage() {
           </span>
         ))}
         secondaryActions={(
-          <>
-            <Button type="button" variant="outline" onClick={() => navigate("/service-orders")}>Ir para O.S.</Button>
-            <Button type="button" variant="outline" onClick={() => navigate("/finances")}>Ir para cobrança</Button>
-          </>
+          <div className="w-full lg:w-auto lg:self-end">
+            <Button type="button" variant="outline" className="w-full justify-center lg:w-auto" onClick={() => navigate("/service-orders")}>
+              Ir para O.S.
+            </Button>
+          </div>
         )}
         primaryAction={(
-          <>
-            <Button
-              type="button"
-              onClick={() => {
-                if (unassignedOrders > 0) {
-                  navigate("/service-orders");
-                  return;
-                }
-                setIsCreateOpen(true);
-              }}
-            >
-              {unassignedOrders > 0 ? "Distribuir ordens" : "Nova pessoa"}
-            </Button>
-            <Button type="button" className="min-h-12 gap-2" onClick={() => setIsCreateOpen(true)}>
-              <Plus className="h-4 w-4" />
-              Nova pessoa
-            </Button>
-          </>
+          <div className="flex w-full flex-col items-stretch gap-2 lg:w-auto lg:items-end">
+            <div className="flex w-full flex-col gap-2 sm:flex-row lg:w-auto">
+              <Button
+                type="button"
+                onClick={() => {
+                  if (unassignedOrders > 0) {
+                    navigate("/service-orders");
+                    return;
+                  }
+                  setIsCreateOpen(true);
+                }}
+              >
+                {unassignedOrders > 0 ? "Distribuir ordens" : "Nova pessoa"}
+              </Button>
+              <Button type="button" className="min-h-12 gap-2" onClick={() => navigate("/finances")}>
+                Ir para cobrança
+              </Button>
+            </div>
+          </div>
         )}
       />
 

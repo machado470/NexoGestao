@@ -663,16 +663,20 @@ export default function FinancesPage() {
           </span>
         ))}
         secondaryActions={
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => navigate("/service-orders")}
-          >
-            Ir para Ordens de Serviço
-          </Button>
+          <div className="w-full lg:w-auto lg:self-end">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full justify-center lg:w-auto"
+              onClick={() => navigate("/service-orders")}
+            >
+              Ir para Ordens de Serviço
+            </Button>
+          </div>
         }
         primaryAction={
-          <>
+          <div className="flex w-full flex-col items-stretch gap-2 lg:w-auto lg:items-end">
+            <div className="flex w-full flex-col gap-2 sm:flex-row lg:w-auto">
             <Button type="button" onClick={nextActionButtons[0]?.onClick}>
               {nextAction.primaryAction.label}
             </Button>
@@ -687,7 +691,8 @@ export default function FinancesPage() {
                 navigate("/finances");
               }}
             />
-          </>
+            </div>
+          </div>
         }
       />
 
