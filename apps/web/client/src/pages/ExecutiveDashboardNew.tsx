@@ -287,6 +287,7 @@ export default function ExecutiveDashboardNew() {
   const executionMode = String((executionModeQuery.data as any)?.mode ?? "manual");
   const [isSlowLoading, setIsSlowLoading] = useState(false);
   const [optimisticTick, setOptimisticTick] = useState(false);
+  const [selectedPipelineStage, setSelectedPipelineStage] = useState<string | null>(null);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
   const [stableMetrics, setStableMetrics] = useState(() =>
     normalizeMetrics(undefined)
@@ -591,6 +592,7 @@ export default function ExecutiveDashboardNew() {
       nextAction: string;
       onExecute: () => void;
       amountLabel?: string;
+      group?: "financeiro" | "operacional" | "atendimento";
     }> = [];
 
     if (overdueChargeCandidate) {
@@ -602,6 +604,7 @@ export default function ExecutiveDashboardNew() {
         nextAction: "Cobrar agora",
         onExecute: () => navigate(`/finances?chargeId=${overdueChargeCandidate.id}`),
         amountLabel: formatCurrency(Number(overdueChargeCandidate.amountCents ?? 0)),
+        group: "financeiro",
       });
     }
 
@@ -613,6 +616,7 @@ export default function ExecutiveDashboardNew() {
         priority: "warning",
         nextAction: "Gerar cobrança",
         onExecute: () => navigate(`/finances?serviceOrderId=${doneWithoutChargeCandidate.id}`),
+        group: "operacional",
       });
     }
 
@@ -855,7 +859,18 @@ export default function ExecutiveDashboardNew() {
 
       <section className="grid gap-4 xl:grid-cols-2">
         <ActionFeed items={operationalActionFeed} />
-        <PipelineStage stages={pipelineStages} />
+        <div className="space-y-2">
+          <PipelineStage
+            stages={pipelineStages}
+            selectedStage={selectedPipelineStage}
+            onStageSelect={setSelectedPipelineStage}
+          />
+          {selectedPipelineStage ? (
+            <p className="text-xs text-zinc-500">
+              Filtro ativo no pipeline: <strong>{selectedPipelineStage}</strong>.
+            </p>
+          ) : null}
+        </div>
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

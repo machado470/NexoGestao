@@ -51,6 +51,7 @@ import {
 } from "@/lib/operations/operational-intelligence";
 import { ActionBarWrapper } from "@/components/operating-system/ActionBar";
 import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedbackButton";
+import { NextActionCell } from "@/components/operating-system/NextActionCell";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import {
   getConcurrencyErrorMessage,
@@ -306,6 +307,7 @@ export default function AppointmentsPage() {
   const [statusFilter, setStatusFilter] = useState<AppointmentStatus | "">("");
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [focusWindow, setFocusWindow] = useState<"today" | "upcoming" | "overdue" | "all">("today");
   const [customerFilter, setCustomerFilter] = useState<string | null>(() =>
     getCustomerIdFromUrl()
   );
@@ -408,6 +410,11 @@ export default function AppointmentsPage() {
 
   const filteredAppointments = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
+    const now = new Date();
+    const nowStart = new Date(now);
+    nowStart.setHours(0, 0, 0, 0);
+    const tomorrowStart = new Date(nowStart);
+    tomorrowStart.setDate(tomorrowStart.getDate() + 1);
 
     return appointments
       .filter(appointment => {
@@ -430,6 +437,21 @@ export default function AppointmentsPage() {
           String(getStatusLabel(appointment.status)).toLowerCase().includes(q)
         );
       })
+      .filter(appointment => {
+        if (focusWindow === "all") return true;
+        const startsAt = new Date(appointment.startsAt);
+        if (Number.isNaN(startsAt.getTime())) return true;
+        if (focusWindow === "today") {
+          return startsAt >= nowStart && startsAt < tomorrowStart;
+        }
+        if (focusWindow === "upcoming") {
+          return startsAt >= tomorrowStart;
+        }
+        return (
+          startsAt < now &&
+          (appointment.status === "SCHEDULED" || appointment.status === "CONFIRMED")
+        );
+      })
       .sort((a, b) => {
         const severityDiff = compareOperationalSeverity(
           getAppointmentSeverity(a),
@@ -438,7 +460,7 @@ export default function AppointmentsPage() {
         if (severityDiff !== 0) return severityDiff;
         return new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime();
       });
-  }, [appointments, searchQuery, customerFilter]);
+  }, [appointments, customerFilter, focusWindow, searchQuery]);
 
   const highlightedAppointment = useMemo(() => {
     if (!highlightedAppointmentId) return null;
@@ -842,6 +864,30 @@ export default function AppointmentsPage() {
 
       <div className="flex flex-wrap gap-2">
         {(
+          [
+            ["today", "Hoje"],
+            ["upcoming", "Próximos dias"],
+            ["overdue", "Atrasados"],
+            ["all", "Todos"],
+          ] as const
+        ).map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => setFocusWindow(value)}
+            className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${
+              focusWindow === value
+                ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {(
           ["", "SCHEDULED", "CONFIRMED", "DONE", "CANCELED", "NO_SHOW"] as const
         ).map(status => (
           <button
@@ -862,6 +908,80 @@ export default function AppointmentsPage() {
       {queryState.hasBackgroundUpdate ? (
         <SurfaceSection className="border-blue-500/30 bg-blue-500/10 text-sm text-blue-200">
           Atualizando agenda em segundo plano...
+        </SurfaceSection>
+      ) : null}
+
+      {filteredAppointments.length > 0 ? (
+        <SurfaceSection className="nexo-data-table p-0">
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="text-left">
+                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Cliente</th>
+                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Horário</th>
+                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Status</th>
+                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Próxima ação</th>
+                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Execução direta</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredAppointments.map(appointment => {
+                  const relatedOrders = serviceOrders.filter(
+                    order => String(order.customerId ?? "") === appointment.customerId
+                  );
+                  const latestOrder = relatedOrders[0] ?? null;
+                  const hasOperation = relatedOrders.length > 0;
+                  const hasPendingFinancial = relatedOrders.some(order => {
+                    const chargeStatus = String(order.financialSummary?.chargeStatus ?? "").toUpperCase();
+                    return chargeStatus === "PENDING" || chargeStatus === "OVERDUE";
+                  });
+                  const primaryLabel =
+                    appointment.status === "SCHEDULED"
+                      ? "Confirmar agendamento"
+                      : appointment.status === "CONFIRMED"
+                        ? "Iniciar atendimento"
+                        : appointment.status === "NO_SHOW"
+                          ? "Remarcar"
+                          : appointment.status === "DONE"
+                            ? "Fechar financeiro"
+                            : "Cancelar";
+
+                  return (
+                    <tr key={`exec-${appointment.id}`} className="border-t border-zinc-200/70 dark:border-zinc-800/70">
+                      <td className="px-4 py-3">{appointment.customer?.name ?? "Cliente não identificado"}</td>
+                      <td className="px-4 py-3">{formatDateTime(appointment.startsAt)}</td>
+                      <td className="px-4 py-3">
+                        <StatusBadge {...mapAppointmentStatus(appointment.status)} />
+                      </td>
+                      <td className="px-4 py-3">
+                        <NextActionCell entity="appointment" item={appointment} />
+                      </td>
+                      <td className="px-4 py-3">
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            if (appointment.status === "SCHEDULED") return void handleUpdateStatus(appointment.id, "CONFIRMED");
+                            if (appointment.status === "CONFIRMED") {
+                              return navigate(
+                                hasOperation && latestOrder
+                                  ? buildServiceOrdersDeepLink(latestOrder.id)
+                                  : `/service-orders?customerId=${appointment.customerId}&appointmentId=${appointment.id}`
+                              );
+                            }
+                            if (appointment.status === "NO_SHOW") return void handleUpdateStatus(appointment.id, "SCHEDULED");
+                            if (appointment.status === "DONE") return navigate(`/finances?customerId=${appointment.customerId}`);
+                            return void handleUpdateStatus(appointment.id, "CANCELED");
+                          }}
+                        >
+                          {primaryLabel}
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </SurfaceSection>
       ) : null}
 

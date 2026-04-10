@@ -10,7 +10,11 @@ export type OperationalSeverity =
   | "critical"
   | "healthy";
 
-export type OperationalEntity = "service_order" | "charge" | "appointment";
+export type OperationalEntity =
+  | "service_order"
+  | "charge"
+  | "appointment"
+  | "customer";
 
 export type OperationalActionKey =
   | "open_queue"
@@ -21,7 +25,9 @@ export type OperationalActionKey =
   | "open_whatsapp"
   | "confirm_appointment"
   | "reschedule_appointment"
-  | "review_execution";
+  | "review_execution"
+  | "open_customer"
+  | "create_appointment";
 
 export type OperationalActionPlan = {
   key: OperationalActionKey;
@@ -129,6 +135,15 @@ type AppointmentLike = {
   startsAt?: string | Date | null;
 };
 
+type CustomerLike = {
+  id?: string;
+  active?: boolean | null;
+  openServiceOrders?: number;
+  pendingCharges?: number;
+  overdueCharges?: number;
+  lastInteractionAt?: string | Date | null;
+};
+
 export function getServiceOrderSeverity(item: ServiceOrderLike): OperationalSeverity {
   const status = normalizeStatus(item.status);
   const chargeStatus = normalizeStatus(item.financialSummary?.chargeStatus);
@@ -185,6 +200,26 @@ export function getNextActionCharge(item: ChargeLike) {
 
 export function getNextActionAppointment(item: AppointmentLike) {
   const decision = getAppointmentDecision({ appointment: item });
+  return {
+    label: decision.primaryAction.label,
+    severity: decision.severity,
+  };
+}
+
+export function getCustomerSeverity(item: CustomerLike): OperationalSeverity {
+  const hasOverdue = (item.overdueCharges ?? 0) > 0;
+  const hasPending = (item.pendingCharges ?? 0) > 0;
+  const hasOpenOrders = (item.openServiceOrders ?? 0) > 0;
+  const isInactive = item.active === false;
+
+  if (hasOverdue) return "critical";
+  if (isInactive) return "overdue";
+  if (hasPending || hasOpenOrders) return "pending";
+  return "healthy";
+}
+
+export function getNextActionCustomer(item: CustomerLike) {
+  const decision = getCustomerDecision(item);
   return {
     label: decision.primaryAction.label,
     severity: decision.severity,
@@ -373,6 +408,61 @@ export function getAppointmentDecision(params: {
     description: "Nenhum bloqueio operacional crítico identificado.",
     primaryAction: { key: "open_queue", label: "Ver agenda" },
     secondaryActions: [{ key: "open_whatsapp", label: "Retomar no WhatsApp" }],
+  };
+}
+
+export function getCustomerDecision(item: CustomerLike): OperationalDecision {
+  const hasOverdue = (item.overdueCharges ?? 0) > 0;
+  const hasPending = (item.pendingCharges ?? 0) > 0;
+  const hasOpenOrders = (item.openServiceOrders ?? 0) > 0;
+  const isInactive = item.active === false;
+
+  if (hasOverdue) {
+    return {
+      severity: "critical",
+      title: "Recuperar cliente com cobrança vencida",
+      description: "Existe valor vencido em aberto e o contato deve ser imediato.",
+      primaryAction: { key: "open_whatsapp", label: "Enviar WhatsApp" },
+      secondaryActions: [{ key: "open_finances", label: "Abrir financeiro" }],
+    };
+  }
+
+  if (hasPending) {
+    return {
+      severity: "pending",
+      title: "Acompanhar cobrança pendente",
+      description: "Cliente com cobrança em aberto, precisa de follow-up operacional.",
+      primaryAction: { key: "open_finances", label: "Gerar/acompanhar cobrança" },
+      secondaryActions: [{ key: "open_whatsapp", label: "Enviar lembrete" }],
+    };
+  }
+
+  if (!hasOpenOrders) {
+    return {
+      severity: "pending",
+      title: "Abrir frente de execução",
+      description: "Cliente sem O.S. ativa no momento, próximo passo é gerar agenda.",
+      primaryAction: { key: "create_appointment", label: "Criar agendamento" },
+      secondaryActions: [{ key: "create_service_order", label: "Criar O.S." }],
+    };
+  }
+
+  if (isInactive) {
+    return {
+      severity: "overdue",
+      title: "Reativar relacionamento",
+      description: "Cliente inativo com histórico operacional precisa ser retomado.",
+      primaryAction: { key: "open_whatsapp", label: "Reengajar no WhatsApp" },
+      secondaryActions: [{ key: "open_customer", label: "Abrir cliente" }],
+    };
+  }
+
+  return {
+    severity: "healthy",
+    title: "Fluxo em andamento",
+    description: "Cliente com ciclo operacional saudável e sem bloqueios imediatos.",
+    primaryAction: { key: "open_customer", label: "Ver detalhes" },
+    secondaryActions: [{ key: "open_service_order", label: "Abrir execução" }],
   };
 }
 

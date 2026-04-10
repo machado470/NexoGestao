@@ -1,7 +1,7 @@
 import { SeverityBadge } from "@/components/operating-system/SeverityBadge";
 import { getNextAction } from "@/lib/operations/next-action";
 
-export function NextActionCell({ entity, item }: { entity: "service_order" | "charge" | "appointment"; item: any }) {
+export function NextActionCell({ entity, item }: { entity: "service_order" | "charge" | "appointment" | "customer"; item: any }) {
   const next = getNextAction({ entity, item } as any);
 
   return (
