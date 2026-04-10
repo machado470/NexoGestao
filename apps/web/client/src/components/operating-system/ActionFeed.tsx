@@ -1,7 +1,9 @@
 import { useMemo, useState } from "react";
+import { CheckCircle2, Sparkles } from "lucide-react";
 import { SeverityBadge } from "@/components/operating-system/SeverityBadge";
 import { Button } from "@/components/ui/button";
 import type { ActionSeverity } from "@/lib/operations/next-action";
+import { cn } from "@/lib/utils";
 
 export type ActionFeedItem = {
   id: string;
@@ -16,6 +18,7 @@ export type ActionFeedItem = {
 
 export function ActionFeed({ items }: { items: ActionFeedItem[] }) {
   const [executingId, setExecutingId] = useState<string | null>(null);
+  const [justResolvedId, setJustResolvedId] = useState<string | null>(null);
   const [resolvedIds, setResolvedIds] = useState<Record<string, boolean>>({});
   const weight: Record<ActionSeverity, number> = {
     critical: 0,
@@ -36,20 +39,40 @@ export function ActionFeed({ items }: { items: ActionFeedItem[] }) {
     acc[key].push(item);
     return acc;
   }, {});
+  const nextPriorityId = sorted[0]?.id ?? null;
 
   return (
     <div className="rounded-xl border p-4">
-      <h3 className="text-sm font-semibold">Fila operacional</h3>
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-sm font-semibold">Fila operacional</h3>
+        <span className="rounded-full border border-zinc-200 px-2 py-1 text-[11px] font-semibold text-zinc-600 dark:border-zinc-800 dark:text-zinc-300">
+          {sorted.length} pendente{sorted.length === 1 ? "" : "s"}
+        </span>
+      </div>
       <div className="mt-3 space-y-3">
+        {justResolvedId ? (
+          <div className="flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-2 text-xs text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:text-emerald-300">
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            Item resolvido. Atualizando próxima prioridade...
+          </div>
+        ) : null}
         {Object.entries(grouped).map(([group, groupItems]) => (
           <div key={group} className="space-y-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
               {group}
             </p>
             {groupItems.map(item => (
-              <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3">
+              <div key={item.id} className={cn(
+                "flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 transition-all duration-300",
+                executingId === item.id && "scale-[0.995] border-orange-300 bg-orange-50/50 dark:border-orange-900/40 dark:bg-orange-950/20",
+                nextPriorityId === item.id && "ring-2 ring-orange-300/50 dark:ring-orange-800/40",
+                justResolvedId === item.id && "pointer-events-none translate-x-2 opacity-0"
+              )}>
                 <div className="min-w-0">
-                  <p className="text-sm font-medium">{item.entity}</p>
+                  <p className="flex items-center gap-2 text-sm font-medium">
+                    {nextPriorityId === item.id ? <Sparkles className="h-3.5 w-3.5 text-orange-500" /> : null}
+                    {item.entity}
+                  </p>
                   <p className="text-xs text-zinc-600 dark:text-zinc-400">{item.reason} {item.amountLabel ? `• ${item.amountLabel}` : ""}</p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -61,7 +84,11 @@ export function ActionFeed({ items }: { items: ActionFeedItem[] }) {
                         setExecutingId(item.id);
                         try {
                           await item.onExecute();
-                          setResolvedIds(prev => ({ ...prev, [item.id]: true }));
+                          setJustResolvedId(item.id);
+                          setTimeout(() => {
+                            setResolvedIds(prev => ({ ...prev, [item.id]: true }));
+                            setJustResolvedId(null);
+                          }, 320);
                         } finally {
                           setExecutingId(null);
                         }

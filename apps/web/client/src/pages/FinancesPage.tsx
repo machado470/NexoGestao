@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/contexts/AuthContext";
@@ -10,6 +10,9 @@ import {
 } from "@/lib/query-helpers";
 import {
   buildWhatsAppUrlFromCharge,
+  getWhatsAppContextDescription,
+  getWhatsAppContextLabel,
+  getWhatsAppPrefilledMessage,
   normalizeStatus,
 } from "@/lib/operations/operations.utils";
 import { Card, CardContent } from "@/components/ui/card";
@@ -44,6 +47,7 @@ import { NextActionCell } from "@/components/operating-system/NextActionCell";
 import { PrimaryActionButton } from "@/components/operating-system/PrimaryActionButton";
 import { ContextPanel } from "@/components/operating-system/ContextPanel";
 import { runFlowChain } from "@/lib/operations/flowChain";
+import { getChargeExplainLayer } from "@/lib/operations/explain-layer";
 
 type FinanceCharge = {
   id: string;
@@ -134,6 +138,7 @@ export default function FinancesPage() {
   );
   const [selectedChargeId, setSelectedChargeId] = useState<string>("");
   const [flowFeedback, setFlowFeedback] = useState<string | null>(null);
+  const [whatsAppDraft, setWhatsAppDraft] = useState("");
 
   const chargesQuery = trpc.finance.charges.list.useQuery(
     {
@@ -279,6 +284,32 @@ export default function FinancesPage() {
     if (!selectedId) return null;
     return finalVisibleCharges.find(charge => charge.id === selectedId) ?? null;
   }, [effectiveChargeId, finalVisibleCharges, selectedChargeId]);
+  const activeChargeWhatsAppRoute = useMemo(() => {
+    if (!activeCharge) return null;
+    return {
+      customerId: activeCharge.customerId ?? null,
+      context:
+        normalizeChargeStatus(activeCharge.status) === ChargeStatus.OVERDUE
+          ? "overdue_charge"
+          : "charge_pending",
+      amountCents: activeCharge.amountCents ?? null,
+      dueDate: activeCharge.dueDate ? String(activeCharge.dueDate) : null,
+      chargeId: activeCharge.id,
+      serviceOrderId: activeCharge.serviceOrderId ?? null,
+      returnTo: "/finances",
+    } as const;
+  }, [activeCharge]);
+  const defaultWhatsAppMessage = useMemo(() => {
+    if (!activeChargeWhatsAppRoute) return "";
+    return getWhatsAppPrefilledMessage(
+      { name: activeCharge?.customer?.name ?? "Cliente" },
+      activeChargeWhatsAppRoute
+    );
+  }, [activeCharge?.customer?.name, activeChargeWhatsAppRoute]);
+
+  useEffect(() => {
+    setWhatsAppDraft(defaultWhatsAppMessage);
+  }, [defaultWhatsAppMessage]);
 
   const timelineData = useMemo(() => {
     const ordered = [...finalVisibleCharges];
@@ -1040,11 +1071,23 @@ export default function FinancesPage() {
         timeline={
           activeCharge
             ? [
-                { id: "created", label: "Criada", description: String(activeCharge.createdAt ?? "—") },
-                { id: "updated", label: "Atualizada", description: String(activeCharge.updatedAt ?? "—") },
-                { id: "due", label: "Vencimento", description: String(activeCharge.dueDate ?? "—") },
+                { id: "created", label: "Criada", description: String(activeCharge.createdAt ?? "—"), source: "system" },
+                { id: "updated", label: "Atualizada", description: String(activeCharge.updatedAt ?? "—"), source: "system" },
+                { id: "due", label: "Vencimento", description: String(activeCharge.dueDate ?? "—"), source: "user" },
               ]
             : []
+        }
+        explainLayer={activeCharge ? getChargeExplainLayer(activeCharge) : undefined}
+        whatsAppPreview={
+          activeCharge && activeChargeWhatsAppRoute
+            ? {
+                contextLabel: getWhatsAppContextLabel(activeChargeWhatsAppRoute.context),
+                contextDescription: getWhatsAppContextDescription(activeChargeWhatsAppRoute),
+                message: whatsAppDraft,
+                editable: true,
+                onMessageChange: setWhatsAppDraft,
+              }
+            : undefined
         }
       />
     </PageWrapper>

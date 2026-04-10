@@ -28,6 +28,9 @@ import { toast } from "sonner";
 import {
   buildServiceOrdersDeepLink,
   buildWhatsAppConversationUrl,
+  getWhatsAppContextDescription,
+  getWhatsAppContextLabel,
+  getWhatsAppPrefilledMessage,
   normalizeOrders,
 } from "@/lib/operations/operations.utils";
 import {
@@ -59,6 +62,7 @@ import {
 } from "@/lib/concurrency";
 import { ContextPanel } from "@/components/operating-system/ContextPanel";
 import { runFlowChain } from "@/lib/operations/flowChain";
+import { getAppointmentExplainLayer } from "@/lib/operations/explain-layer";
 
 type CustomerRef = {
   id: string;
@@ -317,6 +321,7 @@ export default function AppointmentsPage() {
   const [routingActionId, setRoutingActionId] = useState<string | null>(null);
   const [successActionId, setSuccessActionId] = useState<string | null>(null);
   const [flowFeedback, setFlowFeedback] = useState<string | null>(null);
+  const [whatsAppDraft, setWhatsAppDraft] = useState("");
   const [highlightedAppointmentId, setHighlightedAppointmentId] = useState<
     string | null
   >(() => getAppointmentIdFromUrl());
@@ -474,6 +479,32 @@ export default function AppointmentsPage() {
       ) ?? null
     );
   }, [appointments, highlightedAppointmentId]);
+  const highlightedWhatsAppRoute = useMemo(() => {
+    if (!highlightedAppointment) return null;
+    return {
+      customerId: highlightedAppointment.customerId ?? null,
+      context:
+        highlightedAppointment.status === "DONE"
+          ? "service_order_followup"
+          : "general",
+      amountCents: null,
+      dueDate: null,
+      chargeId: null,
+      serviceOrderId: null,
+      returnTo: "/appointments",
+    } as const;
+  }, [highlightedAppointment]);
+  const defaultWhatsAppMessage = useMemo(() => {
+    if (!highlightedWhatsAppRoute) return "";
+    return getWhatsAppPrefilledMessage(
+      { name: highlightedAppointment?.customer?.name ?? "Cliente" },
+      highlightedWhatsAppRoute
+    );
+  }, [highlightedAppointment?.customer?.name, highlightedWhatsAppRoute]);
+
+  useEffect(() => {
+    setWhatsAppDraft(defaultWhatsAppMessage);
+  }, [defaultWhatsAppMessage]);
 
   useEffect(() => {
     if (listAppointments.error) {
@@ -1361,11 +1392,27 @@ export default function AppointmentsPage() {
         timeline={
           highlightedAppointment
             ? [
-                { id: "created", label: "Criado", description: String(highlightedAppointment.createdAt ?? "—") },
-                { id: "updated", label: "Atualizado", description: String(highlightedAppointment.updatedAt ?? "—") },
-                { id: "notes", label: "Observação", description: truncateText(highlightedAppointment.notes) },
+                { id: "created", label: "Criado", description: String(highlightedAppointment.createdAt ?? "—"), source: "system" },
+                { id: "updated", label: "Atualizado", description: String(highlightedAppointment.updatedAt ?? "—"), source: "system" },
+                { id: "notes", label: "Observação", description: truncateText(highlightedAppointment.notes), source: "user" },
               ]
             : []
+        }
+        explainLayer={
+          highlightedAppointment
+            ? getAppointmentExplainLayer(highlightedAppointment)
+            : undefined
+        }
+        whatsAppPreview={
+          highlightedAppointment && highlightedWhatsAppRoute
+            ? {
+                contextLabel: getWhatsAppContextLabel(highlightedWhatsAppRoute.context),
+                contextDescription: getWhatsAppContextDescription(highlightedWhatsAppRoute),
+                message: whatsAppDraft,
+                editable: true,
+                onMessageChange: setWhatsAppDraft,
+              }
+            : undefined
         }
       />
                       </div>
