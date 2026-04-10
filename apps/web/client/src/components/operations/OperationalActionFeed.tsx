@@ -10,9 +10,20 @@ type OperationalActionFeedProps = {
 
 export function OperationalActionFeed({ plan, riskOperationalState }: OperationalActionFeedProps) {
   const { logs } = useExecutionMemory();
+  const prioritizedDecisions = useMemo(
+    () =>
+      [...plan.decisions]
+        .sort((a, b) => {
+          const scoreA = (a.impactScore ?? 50) + (a.urgencyScore ?? 50) + (a.priority ?? 0);
+          const scoreB = (b.impactScore ?? 50) + (b.urgencyScore ?? 50) + (b.priority ?? 0);
+          return scoreB - scoreA;
+        })
+        .filter(item => item.severity !== "normal" || item.state !== "completed"),
+    [plan.decisions]
+  );
 
   const executionState = useMemo(() => {
-    const decisionIds = new Set(plan.decisions.map(decision => decision.id));
+    const decisionIds = new Set(prioritizedDecisions.map(decision => decision.id));
     const scoped = logs.filter(log => decisionIds.has(log.decisionId));
 
     const executed = scoped.filter(log => log.status === "success").length;
@@ -21,11 +32,11 @@ export function OperationalActionFeed({ plan, riskOperationalState }: Operationa
       log => log.status === "blocked" || log.status === "restricted" || log.status === "requires_confirmation"
     ).length;
     const throttled = scoped.filter(log => log.status === "throttled").length;
-    const totalActions = plan.decisions.reduce((acc, decision) => acc + decision.actions.length, 0);
+    const totalActions = prioritizedDecisions.reduce((acc, decision) => acc + decision.actions.length, 0);
     const pending = Math.max(totalActions - executed - failed - blocked - throttled, 0);
 
     return { executed, failed, blocked, throttled, pending };
-  }, [logs, plan.decisions]);
+  }, [logs, prioritizedDecisions]);
 
   return (
     <section className="nexo-surface nexo-fade-in p-5">
@@ -53,7 +64,7 @@ export function OperationalActionFeed({ plan, riskOperationalState }: Operationa
       </div>
 
       <div className="mt-4 space-y-3">
-        {plan.decisions.map((decision) => (
+        {prioritizedDecisions.map((decision) => (
           <OperationalCard
             key={decision.id}
             decision={decision}

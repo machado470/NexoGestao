@@ -118,6 +118,30 @@ function MetricCard({
   );
 }
 
+function OperationalHealthView({
+  criticalPending,
+  overdueItems,
+  bottlenecks,
+  urgentActions,
+}: {
+  criticalPending: number;
+  overdueItems: number;
+  bottlenecks: number;
+  urgentActions: number;
+}) {
+  return (
+    <section className="rounded-2xl border border-zinc-200/80 bg-white/80 p-4 dark:border-zinc-800 dark:bg-zinc-950/50">
+      <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Operational health</p>
+      <div className="mt-2 grid gap-2 sm:grid-cols-4">
+        <div className="rounded-lg border border-red-300/60 bg-red-50/60 p-2 text-xs">Críticas: <strong>{criticalPending}</strong></div>
+        <div className="rounded-lg border border-amber-300/60 bg-amber-50/60 p-2 text-xs">Atrasadas: <strong>{overdueItems}</strong></div>
+        <div className="rounded-lg border border-violet-300/60 bg-violet-50/60 p-2 text-xs">Gargalos: <strong>{bottlenecks}</strong></div>
+        <div className="rounded-lg border border-orange-300/60 bg-orange-50/60 p-2 text-xs">Urgentes: <strong>{urgentActions}</strong></div>
+      </div>
+    </section>
+  );
+}
+
 function DashboardCardSkeleton({ className = "" }: { className?: string }) {
   return (
     <div className={`nexo-skeleton-panel ${className}`}>
@@ -593,6 +617,9 @@ export default function ExecutiveDashboardNew() {
       onExecute: () => void;
       amountLabel?: string;
       group?: "financeiro" | "operacional" | "atendimento";
+      impactScore?: number;
+      urgencyScore?: number;
+      isCritical?: boolean;
     }> = [];
 
     if (overdueChargeCandidate) {
@@ -605,6 +632,9 @@ export default function ExecutiveDashboardNew() {
         onExecute: () => navigate(`/finances?chargeId=${overdueChargeCandidate.id}`),
         amountLabel: formatCurrency(Number(overdueChargeCandidate.amountCents ?? 0)),
         group: "financeiro",
+        impactScore: 94,
+        urgencyScore: Math.min(80 + Number(daysOverdue ?? 0), 100),
+        isCritical: true,
       });
     }
 
@@ -617,6 +647,9 @@ export default function ExecutiveDashboardNew() {
         nextAction: "Gerar cobrança",
         onExecute: () => navigate(`/finances?serviceOrderId=${doneWithoutChargeCandidate.id}`),
         group: "operacional",
+        impactScore: 88,
+        urgencyScore: 78,
+        isCritical: true,
       });
     }
 
@@ -666,6 +699,8 @@ export default function ExecutiveDashboardNew() {
       onClick: () => navigate("/service-orders"),
     },
   ].sort((a, b) => b.value - a.value);
+  const criticalPending = executionPlan.decisions.filter(item => item.severity === "critical").length;
+  const urgentActions = operationalActionFeed.filter(item => item.isCritical).length;
 
   const hasAnyCriticalError =
     metricsQuery.isError &&
@@ -812,14 +847,12 @@ export default function ExecutiveDashboardNew() {
             </button>
           </div>
         </div>
-        <div className="mt-3 rounded-xl border border-orange-200/60 bg-orange-50/80 px-4 py-3 text-sm text-orange-700 dark:border-orange-500/20 dark:bg-orange-500/10 dark:text-orange-200">
-          <p className="font-semibold">O que precisa de atenção agora</p>
-          <p className="mt-1">
-            Você tem <strong>{formatCurrency(totalPausedRevenue)}</strong>{" "}
-            parado e <strong>{formatCurrency(nonBilledServicesImpact)}</strong>{" "}
-            em serviços ainda não faturados.
-          </p>
-        </div>
+        <OperationalHealthView
+          criticalPending={criticalPending}
+          overdueItems={overdueCharges}
+          bottlenecks={bottlenecks.filter(item => item.value > 0).length}
+          urgentActions={urgentActions}
+        />
         {quotaWarnings.length > 0 ? (
           <div className="mt-3 rounded-xl border border-amber-300/60 bg-amber-50/80 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
             Limite do plano atingido em {quotaWarnings.join(", ")}. Faça upgrade

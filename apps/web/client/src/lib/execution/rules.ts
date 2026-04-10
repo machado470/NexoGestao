@@ -81,6 +81,9 @@ export function buildDashboardRules(facts: DashboardExecutionFacts): Operational
       reasonCodes: ["service_order_done_without_charge", "revenue_blocked"],
       suggestedActionId: "action-generate-charge",
       priority: 100,
+      impactScore: 98,
+      urgencyScore: 92,
+      contextualPriority: "critical",
       actions: [
         {
           id: "action-generate-charge",
@@ -105,6 +108,8 @@ export function buildDashboardRules(facts: DashboardExecutionFacts): Operational
             : undefined,
           telemetryKey: "execution.generate_charge_from_dashboard",
           mode: "semi_automatic",
+          safetyLevel: "low",
+          autoWhenPossible: true,
         },
         {
           id: "action-open-service-orders",
@@ -115,6 +120,7 @@ export function buildDashboardRules(facts: DashboardExecutionFacts): Operational
           target: "/service-orders",
           telemetryKey: "execution.open_service_orders_from_dashboard",
           mode: "manual",
+          safetyLevel: "low",
         },
       ],
     });
@@ -140,6 +146,9 @@ export function buildDashboardRules(facts: DashboardExecutionFacts): Operational
       reasonCodes: ["charge_overdue", "cashflow_risk"],
       suggestedActionId: "action-open-finance-overdue",
       priority: 95,
+      impactScore: 90,
+      urgencyScore: 95,
+      contextualPriority: "critical",
       actions: [
         {
           id: "action-open-finance-overdue",
@@ -151,6 +160,7 @@ export function buildDashboardRules(facts: DashboardExecutionFacts): Operational
           target: "/finances?filter=overdue",
           telemetryKey: "execution.open_finance_overdue",
           mode: "manual",
+          safetyLevel: "low",
         },
         {
           id: "action-charge-on-whatsapp",
@@ -165,7 +175,9 @@ export function buildDashboardRules(facts: DashboardExecutionFacts): Operational
           externalUrl:
             buildWhatsAppUrlFromCharge(facts.overdueChargeCandidate) ?? undefined,
           telemetryKey: "execution.open_whatsapp_for_charge",
-          mode: "manual",
+          mode: "automatic",
+          safetyLevel: "low",
+          autoWhenPossible: true,
         },
         {
           id: "action-mark-charge-paid",
@@ -185,6 +197,8 @@ export function buildDashboardRules(facts: DashboardExecutionFacts): Operational
             : undefined,
           telemetryKey: "execution.mark_charge_paid",
           mode: "semi_automatic",
+          safetyLevel: "high",
+          requiresConfirmation: true,
         },
       ],
     });
@@ -203,6 +217,9 @@ export function buildDashboardRules(facts: DashboardExecutionFacts): Operational
       reasonCodes: ["whatsapp_context_missing"],
       suggestedActionId: "action-start-from-service-order",
       priority: 70,
+      impactScore: 60,
+      urgencyScore: 45,
+      contextualPriority: "medium",
       actions: [
         {
           id: "action-start-from-service-order",
@@ -213,6 +230,7 @@ export function buildDashboardRules(facts: DashboardExecutionFacts): Operational
           target: "/service-orders",
           telemetryKey: "execution.start_whatsapp_from_service_order",
           mode: "manual",
+          safetyLevel: "low",
         },
         {
           id: "action-start-from-charge",
@@ -223,6 +241,7 @@ export function buildDashboardRules(facts: DashboardExecutionFacts): Operational
           target: "/finances",
           telemetryKey: "execution.start_whatsapp_from_finance",
           mode: "manual",
+          safetyLevel: "low",
         },
       ],
     });
@@ -240,6 +259,9 @@ export function buildDashboardRules(facts: DashboardExecutionFacts): Operational
       reasonCodes: ["today_appointments"],
       suggestedActionId: "action-open-appointments",
       priority: 65,
+      impactScore: 72,
+      urgencyScore: 70,
+      contextualPriority: "high",
       actions: [
         {
           id: "action-open-appointments",
@@ -250,6 +272,7 @@ export function buildDashboardRules(facts: DashboardExecutionFacts): Operational
           target: "/appointments",
           telemetryKey: "execution.open_today_appointments",
           mode: "manual",
+          safetyLevel: "low",
         },
       ],
     });
@@ -269,6 +292,9 @@ export function buildDashboardRules(facts: DashboardExecutionFacts): Operational
       reasonCodes: ["empty_dashboard"],
       suggestedActionId: "action-create-customer",
       priority: 30,
+      impactScore: 35,
+      urgencyScore: 20,
+      contextualPriority: "low",
       actions: [
         {
           id: "action-create-customer",
@@ -279,6 +305,7 @@ export function buildDashboardRules(facts: DashboardExecutionFacts): Operational
           target: "/customers",
           telemetryKey: "execution.create_customer_first",
           mode: "manual",
+          safetyLevel: "low",
         },
         {
           id: "action-create-appointment",
@@ -289,6 +316,7 @@ export function buildDashboardRules(facts: DashboardExecutionFacts): Operational
           target: "/appointments",
           telemetryKey: "execution.create_first_appointment",
           mode: "manual",
+          safetyLevel: "low",
         },
       ],
     });
@@ -305,6 +333,9 @@ export function buildDashboardRules(facts: DashboardExecutionFacts): Operational
     reasonCodes: ["healthy_flow"],
     suggestedActionId: "action-review-dashboard",
     priority: 1,
+    impactScore: 10,
+    urgencyScore: 10,
+    contextualPriority: "low",
     actions: [
       {
         id: "action-review-dashboard",
@@ -314,6 +345,8 @@ export function buildDashboardRules(facts: DashboardExecutionFacts): Operational
         enabled: true,
         telemetryKey: "execution.keep_monitoring",
         mode: "automatic",
+        safetyLevel: "low",
+        autoWhenPossible: true,
       },
     ],
   };
