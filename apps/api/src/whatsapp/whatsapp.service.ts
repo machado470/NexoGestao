@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { BadRequestException, Injectable, Logger } from '@nestjs/common'
 import {
   WhatsAppEntityType,
   WhatsAppMessageStatus,
@@ -9,6 +9,7 @@ import { QueueService } from '../queue/queue.service'
 import { QUEUE_NAMES } from '../queue/queue.constants'
 import { TimelineService } from '../timeline/timeline.service'
 import { RequestContextService } from '../common/context/request-context.service'
+import { TenantOperationsService } from '../common/tenant-ops/tenant-ops.service'
 
 type QueueMessageInput = {
   orgId: string
@@ -45,7 +46,53 @@ export class WhatsAppService {
     private readonly queueService: QueueService,
     private readonly timeline: TimelineService,
     private readonly requestContext: RequestContextService,
+    private readonly tenantOps: TenantOperationsService,
   ) {}
+
+  private async assertEntityBelongsToOrg(input: {
+    orgId: string
+    entityType: WhatsAppEntityType
+    entityId: string
+    customerId: string
+  }) {
+    if (input.entityType === WhatsAppEntityType.SERVICE_ORDER) {
+      const exists = await this.prisma.serviceOrder.findFirst({
+        where: {
+          id: input.entityId,
+          orgId: input.orgId,
+          customerId: input.customerId,
+        },
+        select: { id: true },
+      })
+      if (!exists) throw new BadRequestException('entityId de ServiceOrder inválido para este tenant')
+      return
+    }
+
+    if (input.entityType === WhatsAppEntityType.APPOINTMENT) {
+      const exists = await this.prisma.appointment.findFirst({
+        where: {
+          id: input.entityId,
+          orgId: input.orgId,
+          customerId: input.customerId,
+        },
+        select: { id: true },
+      })
+      if (!exists) throw new BadRequestException('entityId de Appointment inválido para este tenant')
+      return
+    }
+
+    if (input.entityType === WhatsAppEntityType.CHARGE) {
+      const exists = await this.prisma.charge.findFirst({
+        where: {
+          id: input.entityId,
+          orgId: input.orgId,
+          customerId: input.customerId,
+        },
+        select: { id: true },
+      })
+      if (!exists) throw new BadRequestException('entityId de Charge inválido para este tenant')
+    }
+  }
 
   private logStructured(params: {
     level: 'log' | 'warn' | 'error'
@@ -124,6 +171,43 @@ export class WhatsAppService {
       renderedText,
     } = input
 
+    const customer = await this.prisma.customer.findFirst({
+      where: { id: customerId, orgId },
+      select: { id: true },
+    })
+
+    if (!customer) {
+      this.tenantOps.increment(orgId, 'whatsapp_blocked')
+      throw new BadRequestException('customerId não pertence ao tenant informado')
+    }
+
+    await this.assertEntityBelongsToOrg({
+      orgId,
+      entityType,
+      entityId,
+      customerId,
+    })
+
+    const limitCheck = this.tenantOps.enforceLimit({
+      orgId,
+      scope: 'whatsapp:queue',
+      limit: 120,
+      windowMs: 60_000,
+      blockedReason: 'tenant_whatsapp_rate_limit_reached',
+    })
+
+    if (!limitCheck.allowed) {
+      this.tenantOps.increment(orgId, 'whatsapp_blocked')
+      this.tenantOps.recordCriticalEvent(orgId, 'whatsapp_throttled', {
+        reason: limitCheck.reason,
+        used: limitCheck.used,
+        limit: limitCheck.limit,
+      })
+      throw new BadRequestException(
+        `Envio temporariamente bloqueado: ${limitCheck.reason}`,
+      )
+    }
+
     try {
       const created = await this.prisma.whatsAppMessage.create({
         data: {
@@ -150,6 +234,7 @@ export class WhatsAppService {
           toPhone,
         },
       })
+      this.tenantOps.increment(orgId, 'whatsapp_queued')
 
       return { created: true, message: created }
     } catch (err: any) {
