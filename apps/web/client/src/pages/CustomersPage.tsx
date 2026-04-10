@@ -32,7 +32,11 @@ import {
 } from "lucide-react";
 import CreateCustomerModal from "@/components/CreateCustomerModal";
 import EditCustomerModal from "@/components/EditCustomerModal";
-import { Button } from "@/components/design-system";
+import {
+  Button,
+  NexoActionGroup,
+  NexoAlertCard,
+} from "@/components/design-system";
 import {
   Dialog,
   DialogContent,
@@ -1040,10 +1044,10 @@ export default function CustomersPage() {
       ) : null}
 
       <SurfaceSection className="space-y-6">
-        <div className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs font-medium text-orange-700 dark:border-orange-900/40 dark:bg-orange-950/20 dark:text-orange-300">
+        <NexoAlertCard className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs font-medium text-orange-700 dark:border-orange-900/40 dark:bg-orange-950/20 dark:text-orange-300">
           <Sparkles className="h-3.5 w-3.5" />
           Entidade central do relacionamento operacional
-        </div>
+        </NexoAlertCard>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <SummaryCard
@@ -1081,11 +1085,11 @@ export default function CustomersPage() {
           </div>
 
           {queryState.isInitialLoading && customers.length === 0 ? (
-            <SurfaceSection className="m-4">
+            <div className="m-4">
               <TableSkeleton rows={6} columns={7} />
-            </SurfaceSection>
+            </div>
           ) : queryState.shouldBlockForError ? (
-            <SurfaceSection className="m-4 space-y-3 rounded-xl border border-red-200 bg-red-50/70 dark:border-red-900/40 dark:bg-red-950/20">
+            <NexoAlertCard className="m-4 space-y-3 rounded-xl border border-red-200 bg-red-50/70 dark:border-red-900/40 dark:bg-red-950/20">
               <p className="text-sm text-red-700 dark:text-red-200">
                 {blockingErrorMessage}
               </p>
@@ -1096,9 +1100,9 @@ export default function CustomersPage() {
               >
                 Tentar novamente
               </Button>
-            </SurfaceSection>
+            </NexoAlertCard>
           ) : customers.length === 0 ? (
-            <SurfaceSection className="m-4 space-y-3">
+            <div className="m-4 space-y-3">
               <EmptyState
                 icon={<Users className="h-7 w-7" />}
                 title="Sua base de clientes ainda está vazia"
@@ -1112,7 +1116,7 @@ export default function CustomersPage() {
                   onClick: () => void listCustomers.refetch(),
                 }}
               />
-            </SurfaceSection>
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
@@ -1245,7 +1249,7 @@ export default function CustomersPage() {
                         </td>
 
                         <td className="px-4 py-3">
-                          <div className="flex flex-wrap gap-2">
+                          <NexoActionGroup>
                             <Button
                               size="sm"
                               variant="outline"
@@ -1316,7 +1320,7 @@ export default function CustomersPage() {
                             >
                               {decision.primaryAction.label}
                             </Button>
-                          </div>
+                          </NexoActionGroup>
                         </td>
                       </tr>
                     );

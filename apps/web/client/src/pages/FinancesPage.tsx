@@ -16,7 +16,11 @@ import {
   normalizeStatus,
 } from "@/lib/operations/operations.utils";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/design-system";
+import {
+  Button,
+  NexoActionGroup,
+  NexoAlertCard,
+} from "@/components/design-system";
 import FinanceOverviewAreaChart from "@/components/finance/FinanceOverviewAreaChart";
 import { Receipt } from "lucide-react";
 import { SurfaceSection } from "@/components/PagePattern";
@@ -678,7 +682,7 @@ export default function FinancesPage() {
           </span>
         ))}
         secondaryActions={
-          <div className="w-full lg:w-auto lg:self-end">
+          <NexoActionGroup className="w-full lg:w-auto lg:self-end">
             <Button
               type="button"
               variant="outline"
@@ -687,10 +691,10 @@ export default function FinancesPage() {
             >
               Ir para Ordens de Serviço
             </Button>
-          </div>
+          </NexoActionGroup>
         }
         primaryAction={
-          <div className="flex w-full flex-col items-stretch gap-2 lg:w-auto lg:items-end">
+          <NexoActionGroup className="w-full flex-col items-stretch lg:w-auto lg:items-end">
             <div className="flex w-full flex-col gap-2 sm:flex-row lg:w-auto">
               <Button type="button" onClick={nextActionButtons[0]?.onClick}>
                 {nextAction.primaryAction.label}
@@ -707,7 +711,7 @@ export default function FinancesPage() {
                 }}
               />
             </div>
-          </div>
+          </NexoActionGroup>
         }
       />
 
@@ -772,10 +776,10 @@ export default function FinancesPage() {
           </div>
         ) : null}
         {nextAction.invalidState ? (
-          <div className="mt-3 rounded-md border border-red-300/70 bg-red-50 p-2 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200">
+          <NexoAlertCard className="mt-3 rounded-md border border-red-300/70 bg-red-50 p-2 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200">
             <p className="font-semibold">{nextAction.invalidState.title}</p>
             <p className="mt-1">{nextAction.invalidState.description}</p>
-          </div>
+          </NexoAlertCard>
         ) : null}
       </SurfaceSection>
 
@@ -1043,9 +1047,9 @@ export default function FinancesPage() {
         </div>
       )}
       {flowFeedback ? (
-        <div className="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-300">
+        <NexoAlertCard className="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-300">
           {flowFeedback}
-        </div>
+        </NexoAlertCard>
       ) : null}
 
       <ContextPanel
