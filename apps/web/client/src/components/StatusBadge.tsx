@@ -1,21 +1,6 @@
-import { Badge } from "@/components/ui/badge";
+import { NexoStatusBadge } from "@/components/design-system";
 
 export type StatusTone = "success" | "warning" | "danger" | "neutral" | "info";
-
-const STATUS_VARIANT_MAP: Record<StatusTone, "secondary" | "default" | "destructive" | "outline"> = {
-  success: "secondary",
-  warning: "default",
-  danger: "destructive",
-  neutral: "outline",
-  info: "outline",
-};
-
-const INFO_CLASS =
-  "border-sky-200 bg-sky-100 text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/12 dark:text-sky-200";
-
-function toneToClassName(tone: StatusTone) {
-  return tone === "info" ? INFO_CLASS : "";
-}
 
 export function StatusBadge({
   label,
@@ -26,11 +11,7 @@ export function StatusBadge({
   tone: StatusTone;
   className?: string;
 }) {
-  return (
-    <Badge variant={STATUS_VARIANT_MAP[tone]} className={`${toneToClassName(tone)} ${className ?? ""}`.trim()}>
-      {label}
-    </Badge>
-  );
+  return <NexoStatusBadge label={label} tone={tone} className={className} />;
 }
 
 export function mapFinanceStatus(status?: string | null): { label: string; tone: StatusTone } {

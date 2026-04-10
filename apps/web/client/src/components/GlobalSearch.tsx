@@ -113,7 +113,7 @@ export function GlobalSearch() {
 
   return (
     <div ref={searchRef} className="relative w-full">
-      <div className="relative">
+      <div className="nexo-search-input relative h-10">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-[var(--text-muted)]" />
 
         <input
@@ -130,10 +130,10 @@ export function GlobalSearch() {
             setIsOpen(true);
           }}
           onFocus={() => setIsOpen(true)}
-          className="h-10 w-full rounded-xl border border-[var(--border)] bg-[var(--surface-base)] py-2 pl-10 pr-10 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] disabled:cursor-not-allowed disabled:opacity-60"
+          className="h-full w-full bg-transparent py-2 pl-9 pr-9 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
         />
 
-        {query && (
+        {query ? (
           <button
             type="button"
             onClick={() => {
@@ -141,11 +141,11 @@ export function GlobalSearch() {
               setDebouncedQuery("");
               setIsOpen(false);
             }}
-            className="absolute right-3 top-1/2 -translate-y-1/2 transform text-[var(--text-muted)] transition-colors hover:text-[var(--text-secondary)]"
+            className="absolute right-3 top-1/2 -translate-y-1/2 transform text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]"
           >
             <X className="h-4 w-4" />
           </button>
-        )}
+        ) : null}
       </div>
 
       {isOpen && canQuery && (

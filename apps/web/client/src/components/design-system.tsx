@@ -1,4 +1,5 @@
 import type { ComponentProps, ReactNode } from "react";
+import { Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { cva, type VariantProps } from "class-variance-authority";
 
@@ -106,6 +107,26 @@ export function SurfaceCard({
   );
 }
 
+export function NexoCard({
+  children,
+  className,
+  variant = "panel",
+}: {
+  children: ReactNode;
+  className?: string;
+  variant?: "base" | "panel" | "alert" | "timeline" | "priority";
+}) {
+  const variantMap = {
+    base: "nexo-card-base",
+    panel: "nexo-card-panel",
+    alert: "nexo-card-alert",
+    timeline: "nexo-card-timeline",
+    priority: "nexo-card-priority",
+  } as const;
+
+  return <section className={cn(variantMap[variant], className)}>{children}</section>;
+}
+
 export function StatCard({
   label,
   value,
@@ -132,6 +153,40 @@ export function StatCard({
   );
 }
 
+export function NexoStatCard({
+  icon,
+  label,
+  value,
+  helper,
+  delta,
+  className,
+}: {
+  icon?: ReactNode;
+  label: string;
+  value: ReactNode;
+  helper?: ReactNode;
+  delta?: ReactNode;
+  className?: string;
+}) {
+  return (
+    <article className={cn("nexo-card-kpi", className)}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="nexo-overline">{label}</p>
+          <p className="mt-2 text-2xl font-semibold tracking-tight text-[var(--text-primary)]">
+            {value}
+          </p>
+          {helper ? (
+            <p className="mt-1 text-xs text-[var(--text-secondary)]">{helper}</p>
+          ) : null}
+        </div>
+        {icon ? <div className="nexo-icon-tile">{icon}</div> : null}
+      </div>
+      {delta ? <div className="mt-3">{delta}</div> : null}
+    </article>
+  );
+}
+
 export function DataTable({ className, ...props }: ComponentProps<"table">) {
   return (
     <table className={cn("w-full nexo-data-table text-sm", className)} {...props} />
@@ -154,6 +209,135 @@ export function Badge({
     >
       {children}
     </span>
+  );
+}
+
+export function NexoBadge({
+  children,
+  tone = "neutral",
+  className,
+}: {
+  children: ReactNode;
+  tone?: "success" | "warning" | "danger" | "info" | "neutral" | "accent";
+  className?: string;
+}) {
+  return (
+    <span className={cn("nexo-badge", `nexo-badge-${tone}`, className)}>
+      {children}
+    </span>
+  );
+}
+
+export function NexoStatusBadge({
+  label,
+  tone = "neutral",
+  className,
+}: {
+  label: string;
+  tone?: "success" | "warning" | "danger" | "info" | "neutral" | "accent";
+  className?: string;
+}) {
+  return (
+    <NexoBadge tone={tone} className={className}>
+      {label}
+    </NexoBadge>
+  );
+}
+
+export function NexoSearchInput({
+  className,
+  ...props
+}: ComponentProps<"input">) {
+  return (
+    <div className={cn("nexo-search-input", className)}>
+      <Search className="h-4 w-4 text-[var(--text-muted)]" />
+      <input
+        {...props}
+        className="h-full w-full bg-transparent text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none"
+      />
+    </div>
+  );
+}
+
+export function NexoProgressBar({
+  value,
+  max = 100,
+  className,
+}: {
+  value: number;
+  max?: number;
+  className?: string;
+}) {
+  const pct = Math.max(0, Math.min(100, (value / Math.max(1, max)) * 100));
+  return (
+    <div className={cn("nexo-progress-track", className)}>
+      <div className="nexo-progress-fill" style={{ width: `${pct}%` }} />
+    </div>
+  );
+}
+
+export function NexoPriorityList({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return <div className={cn("nexo-priority-list", className)}>{children}</div>;
+}
+
+export function NexoTimeline({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return <div className={cn("nexo-timeline", className)}>{children}</div>;
+}
+
+export function NexoAlertCard({
+  children,
+  tone = "info",
+  className,
+}: {
+  children: ReactNode;
+  tone?: "critical" | "warning" | "info";
+  className?: string;
+}) {
+  return (
+    <div className={cn("nexo-alert-card", `nexo-alert-${tone}`, className)}>
+      {children}
+    </div>
+  );
+}
+
+export function NexoTable({ className, ...props }: ComponentProps<"table">) {
+  return <table className={cn("nexo-data-table nexo-table", className)} {...props} />;
+}
+
+export function NexoPageHeader({
+  overline,
+  title,
+  subtitle,
+  actions,
+}: {
+  overline?: ReactNode;
+  title: ReactNode;
+  subtitle?: ReactNode;
+  actions?: ReactNode;
+}) {
+  return (
+    <section className="nexo-page-header">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="min-w-0">
+          {overline ? <p className="nexo-overline mb-2">{overline}</p> : null}
+          <h1 className="nexo-page-header-title">{title}</h1>
+          {subtitle ? <p className="nexo-page-header-description">{subtitle}</p> : null}
+        </div>
+        {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
+      </div>
+    </section>
   );
 }
 
