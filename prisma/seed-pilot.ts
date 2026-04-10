@@ -2,12 +2,17 @@ import {
   AppointmentStatus,
   ChargeStatus,
   PaymentMethod,
+  PlanName,
   PrismaClient,
   ServiceOrderStatus,
   UserRole,
 } from '@prisma/client'
 
 import bcrypt from 'bcryptjs'
+import {
+  buildDefaultPlanCreateData,
+  getDefaultPlanDefinition,
+} from '../apps/api/src/common/commercial/default-plan-definitions'
 
 const prisma = new PrismaClient()
 
@@ -510,15 +515,17 @@ async function createTimelineIfMissing(params: {
 }
 
 async function ensureBusinessSubscription(orgId: string) {
+  const businessPlan = getDefaultPlanDefinition(PlanName.BUSINESS)
+
   const plan = await prisma.plan.upsert({
-    where: { name: 'BUSINESS' },
+    where: { name: PlanName.BUSINESS },
     update: {
-      priceCents: 19900,
+      displayName: businessPlan.displayName,
+      priceCents: businessPlan.priceCents,
+      limitsJson: businessPlan.limitsJson,
+      featuresJson: businessPlan.featuresJson,
     },
-    create: {
-      name: 'BUSINESS',
-      priceCents: 19900,
-    },
+    create: buildDefaultPlanCreateData(PlanName.BUSINESS),
   })
 
   const currentPeriodStart = atHour(new Date(), -2, 0, 0)
