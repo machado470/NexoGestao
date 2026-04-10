@@ -8,6 +8,7 @@ import { ExecutionEventsService } from './execution.events'
 import { buildExecutionKey } from './execution.idempotency'
 import type { ExecutionActionCandidate } from './execution.types'
 import { MetricsService } from '../common/metrics/metrics.service'
+import { TenantOperationsService } from '../common/tenant-ops/tenant-ops.service'
 
 @Injectable()
 export class ExecutionRunner {
@@ -23,6 +24,7 @@ export class ExecutionRunner {
     private readonly governance: ExecutionGovernanceService,
     private readonly events: ExecutionEventsService,
     private readonly metrics: MetricsService,
+    private readonly tenantOps: TenantOperationsService,
   ) {}
 
   private countOperationalStatus(status: 'executed' | 'blocked' | 'requires_confirmation' | 'throttled' | 'failed') {
@@ -506,6 +508,37 @@ export class ExecutionRunner {
         ruleReason: 'retry limit reached',
       })
       this.countOperationalStatus('throttled')
+      this.tenantOps.increment(candidate.orgId, 'automation_throttled')
+      return 'throttled'
+    }
+
+    const tenantLimit = this.tenantOps.enforceLimit({
+      orgId: candidate.orgId,
+      scope: 'execution:auto-actions',
+      limit: 180,
+      windowMs: 60_000,
+      blockedReason: 'tenant_execution_rate_limit_reached',
+    })
+
+    if (!tenantLimit.allowed) {
+      await this.recordBlocked(
+        candidate,
+        executionKey,
+        mode,
+        tenantLimit.reason ?? 'tenant_execution_rate_limit_reached',
+        'throttled',
+        {
+          ruleId: candidate.decisionId,
+          ruleReason: 'tenant fairness limit reached',
+        },
+      )
+      this.countOperationalStatus('throttled')
+      this.tenantOps.increment(candidate.orgId, 'automation_throttled')
+      this.tenantOps.recordCriticalEvent(candidate.orgId, 'execution_throttled', {
+        actionId: candidate.actionId,
+        used: tenantLimit.used,
+        limit: tenantLimit.limit,
+      })
       return 'throttled'
     }
 
@@ -564,6 +597,7 @@ export class ExecutionRunner {
         }),
       )
       this.countOperationalStatus('executed')
+      this.tenantOps.increment(candidate.orgId, 'automation_execution')
 
       return 'executed'
     } catch (error) {
@@ -602,6 +636,10 @@ export class ExecutionRunner {
         }),
       )
       this.countOperationalStatus('failed')
+      this.tenantOps.recordCriticalEvent(candidate.orgId, 'execution_failed', {
+        actionId: candidate.actionId,
+        error: error instanceof Error ? error.message : String(error),
+      })
 
       return 'failed'
     }

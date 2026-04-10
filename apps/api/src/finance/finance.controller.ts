@@ -25,6 +25,7 @@ import { CreatePaymentDto } from './dto/create-payment.dto'
 import { ChargesQueryDto } from './dto/charges-query.dto'
 import { CreateChargeDto } from './dto/create-charge.dto'
 import { UpdateChargeDto } from './dto/update-charge.dto'
+import { TenantOperationsService } from '../common/tenant-ops/tenant-ops.service'
 
 type AuthUser = { userId?: string; sub?: string } | null | undefined
 
@@ -43,7 +44,10 @@ function parseDueDate(value?: string | Date | null): Date | undefined {
 @UseGuards(JwtAuthGuard, RolesGuard, OperationalStateGuard)
 @Controller('finance')
 export class FinanceController {
-  constructor(private readonly finance: FinanceService) {}
+  constructor(
+    private readonly finance: FinanceService,
+    private readonly tenantOps: TenantOperationsService,
+  ) {}
 
   @Get('overview')
   @Roles('ADMIN', 'MANAGER')
@@ -111,6 +115,23 @@ export class FinanceController {
     @Headers('idempotency-key') idempotencyKeyHeader: string | undefined,
     @Body() body: CreateChargeDto,
   ) {
+    const createChargeLimit = this.tenantOps.enforceLimit({
+      orgId,
+      scope: 'finance:create-charge',
+      limit: 40,
+      windowMs: 60_000,
+      blockedReason: 'tenant_finance_create_charge_rate_limit',
+    })
+    if (!createChargeLimit.allowed) {
+      this.tenantOps.recordCriticalEvent(orgId, 'finance_create_charge_blocked', {
+        reason: createChargeLimit.reason,
+        used: createChargeLimit.used,
+      })
+      throw new BadRequestException(
+        `Criação de cobrança bloqueada temporariamente: ${createChargeLimit.reason}`,
+      )
+    }
+
     const actorUserId = user?.userId ?? user?.sub ?? null
     const dueDate = parseDueDate(body.dueDate)
     if (!dueDate) throw new BadRequestException('dueDate é obrigatório')
@@ -125,6 +146,7 @@ export class FinanceController {
       idempotencyKey: body.idempotencyKey ?? idempotencyKeyHeader,
       actorUserId,
     })
+    this.tenantOps.increment(orgId, 'finance_charge_create')
 
     return { ok: true, data }
   }
@@ -181,6 +203,23 @@ export class FinanceController {
     @Param('chargeId') chargeId: string,
     @Body() body: CreatePaymentDto,
   ) {
+    const payLimit = this.tenantOps.enforceLimit({
+      orgId,
+      scope: 'finance:pay-charge',
+      limit: 30,
+      windowMs: 60_000,
+      blockedReason: 'tenant_finance_pay_charge_rate_limit',
+    })
+    if (!payLimit.allowed) {
+      this.tenantOps.recordCriticalEvent(orgId, 'finance_pay_charge_blocked', {
+        reason: payLimit.reason,
+        used: payLimit.used,
+      })
+      throw new BadRequestException(
+        `Pagamento bloqueado temporariamente: ${payLimit.reason}`,
+      )
+    }
+
     const actorUserId = user?.userId ?? user?.sub ?? null
 
     const data = await this.finance.payCharge({
@@ -191,6 +230,7 @@ export class FinanceController {
       amountCents: body.amountCents,
       idempotencyKey: body.idempotencyKey ?? idempotencyKeyHeader,
     })
+    this.tenantOps.increment(orgId, 'finance_charge_pay')
 
     return { ok: true, data }
   }

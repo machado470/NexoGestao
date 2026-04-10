@@ -19,6 +19,7 @@ import { RiskService } from '../risk/risk.service'
 import { WhatsAppService } from '../whatsapp/whatsapp.service'
 import { QueueService } from '../queue/queue.service'
 import { QUEUE_NAMES } from '../queue/queue.constants'
+import { TenantOperationsService } from '../common/tenant-ops/tenant-ops.service'
 
 import { CreateAutomationRuleDto } from './dto/create-automation-rule.dto'
 import { UpdateAutomationRuleDto } from './dto/update-automation-rule.dto'
@@ -39,7 +40,30 @@ export class AutomationService {
     private readonly risk: RiskService,
     private readonly whatsapp: WhatsAppService,
     private readonly queueService: QueueService,
+    private readonly tenantOps: TenantOperationsService,
   ) {}
+
+  private matchesConditions(
+    conditionSet: Array<Record<string, any>> | null | undefined,
+    payload: Record<string, any>,
+  ): boolean {
+    if (!Array.isArray(conditionSet) || conditionSet.length === 0) return true
+
+    return conditionSet.every((condition) => {
+      const field = String(condition?.field ?? '').trim()
+      const op = String(condition?.operator ?? 'eq').trim()
+      const expected = condition?.value
+      const actual = field ? payload[field] : undefined
+
+      if (!field) return false
+      if (op === 'eq') return actual === expected
+      if (op === 'neq') return actual !== expected
+      if (op === 'in') return Array.isArray(expected) && expected.includes(actual)
+      if (op === 'gte') return Number(actual) >= Number(expected)
+      if (op === 'lte') return Number(actual) <= Number(expected)
+      return false
+    })
+  }
 
   private get automationRuleDelegate(): any | null {
     const prismaAny = this.prisma as any
@@ -142,6 +166,36 @@ export class AutomationService {
     const results: any[] = []
 
     for (const rule of rules) {
+      if (!this.matchesConditions(rule.conditionSet as Array<Record<string, any>> | undefined, context.payload)) {
+        this.tenantOps.increment(context.orgId, 'automation_blocked')
+        continue
+      }
+
+      const limit = this.tenantOps.enforceLimit({
+        orgId: context.orgId,
+        scope: 'automation:execute-trigger',
+        limit: 100,
+        windowMs: 60_000,
+        blockedReason: 'tenant_automation_rate_limit_reached',
+      })
+
+      if (!limit.allowed) {
+        this.tenantOps.increment(context.orgId, 'automation_throttled')
+        this.tenantOps.recordCriticalEvent(context.orgId, 'automation_throttled', {
+          ruleId: rule.id,
+          trigger: context.trigger,
+          used: limit.used,
+          limit: limit.limit,
+        })
+        results.push({
+          ruleId: rule.id,
+          status: 'THROTTLED',
+          actions: 0,
+          reason: limit.reason,
+        })
+        continue
+      }
+
       const execution = await executionDelegate.create({
         data: {
           orgId: context.orgId,
@@ -180,6 +234,7 @@ export class AutomationService {
           status: 'SUCCESS',
           actions: executedActions,
         })
+        this.tenantOps.increment(context.orgId, 'automation_execution')
       } catch (error: any) {
         const message = error?.message ?? String(error)
 
