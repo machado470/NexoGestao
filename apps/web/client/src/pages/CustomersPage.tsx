@@ -71,6 +71,7 @@ import {
   getCustomerSeverity,
   getOperationalSeverityLabel,
 } from "@/lib/operations/operational-intelligence";
+import { ContextPanel } from "@/components/operating-system/ContextPanel";
 
 type Customer = {
   id: string;
@@ -1218,6 +1219,7 @@ export default function CustomersPage() {
                         className={`${
                           isOpen ? "bg-orange-50/60 dark:bg-orange-950/10" : ""
                         } ${highlightedCustomerId === customer.id ? "ring-2 ring-orange-400" : ""}`}
+                        onClick={() => openWorkspace(customer.id)}
                       >
                         <td className="px-4 py-3 text-zinc-900 dark:text-white">
                           <div className="flex items-center gap-2">
@@ -1331,8 +1333,8 @@ export default function CustomersPage() {
       </SurfaceSection>
 
       <Dialog
-        open={Boolean(workspaceCustomerId)}
-        onOpenChange={open => (!open ? closeWorkspace() : undefined)}
+        open={false}
+        onOpenChange={() => undefined}
       >
         <DialogContent className="left-auto right-0 top-0 h-screen w-full max-h-screen max-w-2xl translate-x-0 translate-y-0 overflow-y-auto rounded-none border-l border-slate-200/80 bg-slate-50 p-0 shadow-2xl dark:border-white/10 dark:bg-[#0b1017]">
           <DialogHeader className="sticky top-0 z-10 border-b border-slate-200/80 bg-white/95 px-5 py-4 backdrop-blur dark:border-white/10 dark:bg-[#111722]/95">
@@ -1930,6 +1932,59 @@ export default function CustomersPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ContextPanel
+        open={Boolean(workspace)}
+        onOpenChange={open => {
+          if (!open) closeWorkspace();
+        }}
+        title={workspace?.customer?.name ?? "Contexto do cliente"}
+        subtitle="Atendimento, operação e financeiro no mesmo fluxo"
+        statusLabel={workspace?.customer?.active ? "Ativo" : "Inativo"}
+        summary={
+          workspace
+            ? [
+                { label: "Agendamentos", value: String(workspace.appointments.length) },
+                { label: "Ordens de serviço", value: String(workspace.serviceOrders.length) },
+                { label: "Cobranças", value: String(workspace.charges.length) },
+                { label: "Próxima ação", value: nextActionLabel },
+              ]
+            : []
+        }
+        primaryAction={
+          workspace
+            ? {
+                label: "Enviar WhatsApp",
+                onClick: () =>
+                  navigate(
+                    buildWhatsAppConversationUrl({
+                      customerId: workspace.customer.id,
+                      context: "general",
+                    }) ?? "/whatsapp"
+                  ),
+              }
+            : undefined
+        }
+        secondaryActions={
+          workspace
+            ? [
+                {
+                  label: "Abrir agendamentos",
+                  onClick: () => navigate(`/appointments?customerId=${workspace.customer.id}`),
+                },
+                {
+                  label: "Abrir financeiro",
+                  onClick: () => navigate(`/finances?customerId=${workspace.customer.id}`),
+                },
+              ]
+            : []
+        }
+        timeline={(workspace?.timeline ?? []).slice(0, 4).map(item => ({
+          id: item.id,
+          label: item.action ?? "Evento",
+          description: item.description ?? formatDateTime(item.createdAt),
+        }))}
+      />
 
       <CreateCustomerModal
         open={isCreateOpen}
