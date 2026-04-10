@@ -19,7 +19,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/design-system";
 import FinanceOverviewAreaChart from "@/components/finance/FinanceOverviewAreaChart";
 import { Receipt } from "lucide-react";
-import { SmartPage, SurfaceSection } from "@/components/PagePattern";
+import { SurfaceSection } from "@/components/PagePattern";
 import { EmptyState } from "@/components/EmptyState";
 import { TableSkeleton } from "@/components/QueryStateBoundary";
 import { StatusBadge, mapFinanceStatus } from "@/components/StatusBadge";
@@ -675,23 +675,31 @@ export default function FinancesPage() {
         }
       />
 
-      <SmartPage
-        pageContext="finances"
-        headline="Caixa orientado por prioridade"
-        dominantProblem={nextAction.title}
-        dominantImpact={
-          billingQueue.length > 0
-            ? `${billingQueue.length} cobranças na fila`
-            : "Sem pressão crítica agora"
-        }
-        dominantCta={{
-          label: nextAction.primaryAction.label,
-          onClick: nextActionButtons[0]?.onClick ?? (() => undefined),
-          path: "/finances",
-        }}
-        priorities={smartPriorities}
-        operationalActions={smartOperationalActions}
-      />
+      <SurfaceSection className="space-y-3">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+              Direção financeira
+            </p>
+            <p className="mt-1 font-medium text-[var(--text-primary)]">{nextAction.title}</p>
+            <p className="text-sm text-[var(--text-secondary)]">
+              {billingQueue.length > 0
+                ? `${billingQueue.length} cobranças na fila de priorização.`
+                : "Sem pressão crítica agora."}
+            </p>
+          </div>
+          <Button type="button" onClick={nextActionButtons[0]?.onClick}>
+            {nextAction.primaryAction.label}
+          </Button>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {smartPriorities.slice(0, 3).map(priority => (
+            <span key={priority.id} className="rounded-full border px-3 py-1 text-xs text-[var(--text-secondary)]">
+              {priority.title}: {priority.count}
+            </span>
+          ))}
+        </div>
+      </SurfaceSection>
 
       {queryState.hasBackgroundUpdate ? (
         <SurfaceSection className="border-blue-500/30 bg-blue-500/10 text-sm text-blue-200">

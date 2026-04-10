@@ -4,7 +4,7 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/contexts/AuthContext";
 import { Loader2, Users, Plus } from "lucide-react";
 import { Button } from "@/components/design-system";
-import { SmartPage, SurfaceSection } from "@/components/PagePattern";
+import { SurfaceSection } from "@/components/PagePattern";
 import { EmptyState } from "@/components/EmptyState";
 import {
   getQueryUiState,
@@ -251,35 +251,51 @@ export default function PeoplePage() {
       />
 
 
-      <SmartPage
-        pageContext="people"
-        headline="Equipe orientada por gargalo"
-        dominantProblem={unassignedOrders > 0 ? "Ordens sem responsável" : "Monitorar equipe em atenção"}
-        dominantImpact={`${unassignedOrders} O.S. podem travar por falta de dono`}
-        dominantCta={{
-          label: unassignedOrders > 0 ? "Distribuir ordens agora" : "Nova pessoa",
-          onClick: () => {
-            if (unassignedOrders > 0) {
-              navigate("/service-orders");
-              return;
-            }
-            setIsCreateOpen(true);
-          },
-          path: "/people",
-        }}
-        priorities={smartPriorities}
-      />
+      <SurfaceSection className="space-y-3">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+              Direção da equipe
+            </p>
+            <p className="mt-1 font-medium text-[var(--text-primary)]">
+              {unassignedOrders > 0 ? "Ordens sem responsável" : "Monitorar equipe em atenção"}
+            </p>
+            <p className="text-sm text-[var(--text-secondary)]">
+              {unassignedOrders} O.S. podem travar por falta de responsável.
+            </p>
+          </div>
+          <Button
+            type="button"
+            onClick={() => {
+              if (unassignedOrders > 0) {
+                navigate("/service-orders");
+                return;
+              }
+              setIsCreateOpen(true);
+            }}
+          >
+            {unassignedOrders > 0 ? "Distribuir ordens" : "Nova pessoa"}
+          </Button>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {smartPriorities.slice(0, 3).map(priority => (
+            <span key={priority.id} className="rounded-full border px-3 py-1 text-xs text-[var(--text-secondary)]">
+              {priority.title}: {priority.count}
+            </span>
+          ))}
+        </div>
+      </SurfaceSection>
 
       {queryState.hasBackgroundUpdate ? (
-        <div className="rounded border border-blue-500/30 bg-blue-500/10 p-3 text-sm text-blue-200">
+        <SurfaceSection className="border-blue-500/30 bg-blue-500/10 text-sm text-blue-200">
           Atualizando pessoas em segundo plano...
-        </div>
+        </SurfaceSection>
       ) : null}
 
       {hasError && !queryState.shouldBlockForError ? (
-        <div className="rounded border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200">
+        <SurfaceSection className="border-amber-500/30 bg-amber-500/10 text-sm text-amber-200">
           {errorMessage}
-        </div>
+        </SurfaceSection>
       ) : null}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">

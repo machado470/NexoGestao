@@ -54,10 +54,7 @@ import {
   normalizeArrayPayload,
   normalizeObjectPayload,
 } from "@/lib/query-helpers";
-import {
-  SmartPage,
-  SurfaceSection,
-} from "@/components/PagePattern";
+import { SurfaceSection } from "@/components/PagePattern";
 import { EmptyState } from "@/components/EmptyState";
 import { TableSkeleton } from "@/components/QueryStateBoundary";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -1014,34 +1011,44 @@ export default function CustomersPage() {
         )}
       />
 
-      <SmartPage
-        pageContext="customers"
-        headline="Cliente nunca fica sem próximo passo"
-        dominantProblem={nextActionLabel}
-        dominantImpact={
-          workspace
-            ? `${workspacePendingCharges} pendências financeiras`
-            : "Sem cliente em foco"
-        }
-        dominantCta={{
-          label: workspace ? "Executar próxima ação" : "Novo cliente",
-          onClick: () => {
-            track("cta_click", {
-              screen: "customers",
-              ctaId: "smartpage_primary",
-              hasWorkspace: Boolean(workspace),
-            });
-            if (workspace)
-              navigate(`/service-orders?customerId=${workspace.customer.id}`);
-            else setIsCreateOpen(true);
-          },
-          path: workspace
-            ? `/service-orders?customerId=${workspace?.customer.id}`
-            : "/customers",
-        }}
-        priorities={smartPriorities}
-        operationalActions={smartOperationalActions}
-      />
+      <SurfaceSection className="space-y-3">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+              Direção operacional
+            </p>
+            <p className="mt-1 font-medium text-[var(--text-primary)]">
+              {nextActionLabel}
+            </p>
+            <p className="text-sm text-[var(--text-secondary)]">
+              {workspace
+                ? `${workspacePendingCharges} pendências financeiras em aberto para o cliente em foco.`
+                : "Sem cliente em foco. Selecione um registro para abrir o workspace completo."}
+            </p>
+          </div>
+          <Button
+            type="button"
+            onClick={() => {
+              track("cta_click", {
+                screen: "customers",
+                ctaId: "customers_primary_direction",
+                hasWorkspace: Boolean(workspace),
+              });
+              if (workspace) navigate(`/service-orders?customerId=${workspace.customer.id}`);
+              else setIsCreateOpen(true);
+            }}
+          >
+            {workspace ? "Abrir execução do cliente" : "Cadastrar cliente"}
+          </Button>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {smartPriorities.slice(0, 3).map((priority) => (
+            <span key={priority.id} className="rounded-full border px-3 py-1 text-xs text-[var(--text-secondary)]">
+              {priority.title}: {priority.count}
+            </span>
+          ))}
+        </div>
+      </SurfaceSection>
 
       {queryState.hasBackgroundUpdate ? (
         <SurfaceSection className="border-blue-500/30 bg-blue-500/10 text-sm text-blue-200">

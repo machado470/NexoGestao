@@ -41,7 +41,7 @@ import {
 import { EmptyState } from "@/components/EmptyState";
 import { TableSkeleton } from "@/components/QueryStateBoundary";
 import { StatusBadge, mapAppointmentStatus } from "@/components/StatusBadge";
-import { SmartPage, SurfaceSection } from "@/components/PagePattern";
+import { SurfaceSection } from "@/components/PagePattern";
 import { DemoEnvironmentCta } from "@/components/DemoEnvironmentCta";
 import { generateAppointmentActions } from "@/lib/smartActions";
 import {
@@ -801,31 +801,41 @@ export default function AppointmentsPage() {
         }
       />
 
-      <SmartPage
-        pageContext="appointments"
-        headline="Agenda com direção operacional"
-        dominantProblem={
-          appointmentsWithoutOperations > 0
-            ? "Agendamentos sem O.S. ativa"
-            : "Agenda precisa de confirmação"
-        }
-        dominantImpact={`${appointmentsWithoutOperations} agendamentos sem execução`}
-        dominantCta={{
-          label:
-            appointmentsWithoutOperations > 0
-              ? "Criar O.S. agora"
-              : "Confirmar agenda",
-          onClick: () => {
-            const target =
-              filteredAppointments.find(item => item.status === "SCHEDULED") ??
-              filteredAppointments[0];
-            if (target) handleOpenDeepLink(target.id);
-          },
-          path: "/appointments",
-        }}
-        priorities={smartPriorities}
-        operationalActions={smartOperationalActions}
-      />
+      <SurfaceSection className="space-y-3">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+              Direção da agenda
+            </p>
+            <p className="mt-1 font-medium text-[var(--text-primary)]">
+              {appointmentsWithoutOperations > 0
+                ? "Agendamentos sem O.S. ativa"
+                : "Agenda com foco em confirmação e execução"}
+            </p>
+            <p className="text-sm text-[var(--text-secondary)]">
+              {appointmentsWithoutOperations} agendamentos ainda sem execução vinculada.
+            </p>
+          </div>
+          <Button
+            type="button"
+            onClick={() => {
+              const target =
+                filteredAppointments.find(item => item.status === "SCHEDULED") ??
+                filteredAppointments[0];
+              if (target) handleOpenDeepLink(target.id);
+            }}
+          >
+            {appointmentsWithoutOperations > 0 ? "Abrir próximo gargalo" : "Abrir próximo agendamento"}
+          </Button>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {smartPriorities.slice(0, 3).map(priority => (
+            <span key={priority.id} className="rounded-full border px-3 py-1 text-xs text-[var(--text-secondary)]">
+              {priority.title}: {priority.count}
+            </span>
+          ))}
+        </div>
+      </SurfaceSection>
 
       <div className="grid gap-3 md:grid-cols-[1fr_auto_auto]">
         <div className="relative">
