@@ -1,6 +1,12 @@
 @import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Outfit:wght@500;600;700&display=swap");
 
 .landing-root {
+  --landing-bg: #f8f9fb;
+  --landing-text-primary: #1e293b;
+  --landing-text-secondary: #475569;
+  --landing-surface: rgba(255, 255, 255, 0.95);
+  --landing-border: #e2e8f0;
+
   background-color: #f8f9fb;
   color: #1e293b;
   font-family: "DM Sans", system-ui, sans-serif;
@@ -11,14 +17,7 @@
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cg fill='%230f172a' fill-opacity='0.025'%3E%3Ccircle cx='4' cy='4' r='1.2'/%3E%3C/g%3E%3C/svg%3E");
 }
 
-body[data-visual-context="landing"] {
-  background-color: #f8f9fb;
-}
-
-.dark .landing-root {
-  background-color: #f8f9fb;
-  color: #1e293b;
-}
+body[data-visual-context="landing"] { background-color: #f8f9fb; }
 
 .landing-root h1,
 .landing-root h2,
@@ -34,22 +33,22 @@ body[data-visual-context="landing"] {
 
 .hero-card {
   position: absolute;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--landing-border);
   border-radius: 1rem;
-  background: rgba(255, 255, 255, 0.95);
+  background: var(--landing-surface);
   box-shadow: 0 16px 34px rgba(15, 23, 42, 0.08);
   padding: 1rem;
   animation: fadeUp 0.6s ease both;
 }
 
 .hero-card .title {
-  color: #0f172a;
+  color: var(--landing-text-primary);
   font-weight: 600;
   font-family: "Outfit", "DM Sans", system-ui, sans-serif;
 }
 
 .hero-card .label {
-  color: #64748b;
+  color: var(--landing-text-secondary);
   font-size: 0.73rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
