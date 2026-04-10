@@ -10,13 +10,13 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground shadow-[0_10px_24px_color-mix(in_srgb,var(--primary)_32%,transparent)] hover:-translate-y-[var(--motion-float-y)] hover:bg-[var(--accent-hover)] hover:shadow-[0_14px_28px_color-mix(in_srgb,var(--primary)_34%,transparent)]",
+          "bg-primary text-primary-foreground shadow-[0_12px_26px_color-mix(in_srgb,var(--primary)_34%,transparent)] hover:-translate-y-[var(--motion-float-y)] hover:bg-[var(--accent-hover)] hover:shadow-[0_16px_30px_color-mix(in_srgb,var(--primary)_36%,transparent)]",
         destructive:
           "bg-destructive text-destructive-foreground shadow-[0_10px_24px_color-mix(in_srgb,var(--destructive)_30%,transparent)] hover:-translate-y-[var(--motion-float-y)] hover:bg-[color-mix(in_srgb,var(--destructive)_86%,black)]",
         outline:
           "border border-[var(--border)] bg-[var(--surface-elevated)] text-[var(--text-primary)] hover:-translate-y-[var(--motion-float-y)] hover:border-[var(--accent-soft)] hover:bg-[var(--surface-base)]",
         secondary:
-          "border border-[var(--border)] bg-[var(--surface-base)] text-[var(--text-secondary)] hover:-translate-y-[var(--motion-float-y)] hover:bg-[var(--surface-elevated)]",
+          "border border-[var(--border)] bg-[var(--surface-base)] text-[var(--text-secondary)] hover:-translate-y-[var(--motion-float-y)] hover:border-[var(--accent-soft)] hover:bg-[var(--surface-elevated)]",
         ghost:
           "text-[var(--text-secondary)] hover:bg-[var(--accent-soft)] hover:text-[var(--text-primary)]",
         link: "text-primary underline-offset-4 hover:underline",

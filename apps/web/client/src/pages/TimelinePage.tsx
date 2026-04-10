@@ -29,7 +29,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/EmptyState";
-import { PageHero, PageShell, SmartPage, SurfaceSection } from "@/components/PagePattern";
+import { SmartPage, SurfaceSection } from "@/components/PagePattern";
+import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { DemoEnvironmentCta } from "@/components/DemoEnvironmentCta";
 import {
   formatDateTime,
@@ -385,27 +386,23 @@ export default function TimelinePage() {
 
   if (queryState.isInitialLoading) {
     return (
-      <PageShell>
-        <PageHero
-          eyebrow="Auditoria operacional com leitura humana"
-          title="Timeline"
-          description="Carregando rastreabilidade operacional para sugerir a próxima ação."
-        />
+      <PageWrapper
+        title="Timeline"
+        subtitle="Carregando rastreabilidade operacional para sugerir a próxima ação."
+      >
         <SurfaceSection className="flex min-h-[180px] items-center justify-center gap-2 text-sm text-[var(--text-muted)] dark:text-[var(--text-muted)]">
           <Loader2 className="h-4 w-4 animate-spin" />
           Carregando timeline...
         </SurfaceSection>
-      </PageShell>
+      </PageWrapper>
     );
   }
 
   return (
-    <PageShell>
-      <PageHero
-        eyebrow="Auditoria operacional com leitura humana"
-        title="Timeline"
-        description="Rastreabilidade ponta a ponta do fluxo: clientes, agenda, execução, financeiro, comunicação e governança em ordem cronológica."
-        actions={<>
+    <PageWrapper
+      title="Timeline"
+      subtitle="Rastreabilidade ponta a ponta do fluxo: clientes, agenda, execução, financeiro, comunicação e governança em ordem cronológica."
+      primaryAction={<>
           <Button
             variant="outline"
             onClick={() => void timelineQuery.refetch()}
@@ -430,7 +427,7 @@ export default function TimelinePage() {
             {showMetadata ? "Ocultar metadata" : "Mostrar metadata"}
           </Button>
         </>}
-      />
+    >
 
       <SmartPage
         pageContext="dashboard"
@@ -790,6 +787,6 @@ export default function TimelinePage() {
           )}
         </div>
       </div>
-    </PageShell>
+    </PageWrapper>
   );
 }

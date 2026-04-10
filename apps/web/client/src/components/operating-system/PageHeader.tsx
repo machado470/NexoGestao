@@ -18,8 +18,8 @@ export function PageHeader({
   className,
 }: PageHeaderProps) {
   return (
-    <section className={cn("nexo-page-header", className)}>
-      <div className="relative z-10 space-y-3">
+    <section className={cn("nexo-page-header px-1 py-1", className)}>
+      <div className="relative z-10 space-y-2">
         {breadcrumb && breadcrumb.length > 0 ? (
           <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-1 text-xs text-[var(--text-muted)] dark:text-[var(--text-muted)]">
             {breadcrumb.map((item, index) => (
@@ -37,7 +37,7 @@ export function PageHeader({
           </nav>
         ) : null}
 
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h1 className="nexo-page-header-title">{title}</h1>
             {subtitle ? <p className="nexo-page-header-description">{subtitle}</p> : null}

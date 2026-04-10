@@ -95,7 +95,7 @@ export function SurfaceCard({
   const surfaceClass =
     variant === "inner"
       ? "nexo-surface-inner p-4"
-      : "nexo-surface-primary p-5 md:p-6";
+      : "nexo-surface-primary p-4 md:p-5";
 
   return (
     <section className={cn(surfaceClass, className)}>{children}</section>
@@ -130,7 +130,7 @@ export function StatCard({
 
 export function DataTable({ className, ...props }: ComponentProps<"table">) {
   return (
-    <table className={cn("w-full nexo-data-table", className)} {...props} />
+    <table className={cn("w-full nexo-data-table text-sm", className)} {...props} />
   );
 }
 
@@ -259,7 +259,7 @@ export function EmptyState({
   description: string;
 }) {
   return (
-    <SurfaceCard className="text-center">
+    <SurfaceCard className="text-center py-8">
       <p className="text-sm font-semibold text-[var(--text-primary)]">
         {title}
       </p>
@@ -270,7 +270,7 @@ export function EmptyState({
 
 export function LoadingState({ message }: { message: string }) {
   return (
-    <SurfaceCard className="text-sm text-[var(--text-secondary)]">
+    <SurfaceCard className="py-6 text-sm text-[var(--text-secondary)]">
       {message}
     </SurfaceCard>
   );
@@ -278,7 +278,7 @@ export function LoadingState({ message }: { message: string }) {
 
 export function ErrorState({ message }: { message: string }) {
   return (
-    <SurfaceCard className="border-[color-mix(in_srgb,var(--danger)_45%,transparent)] text-sm text-[color-mix(in_srgb,var(--danger)_75%,white)]">
+    <SurfaceCard className="border-[color-mix(in_srgb,var(--danger)_45%,transparent)] py-6 text-sm text-[color-mix(in_srgb,var(--danger)_75%,white)]">
       {message}
     </SurfaceCard>
   );

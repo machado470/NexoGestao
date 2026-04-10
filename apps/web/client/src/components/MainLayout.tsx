@@ -378,8 +378,8 @@ export function MainLayout({ children }: MainLayoutProps) {
             </div>
           </div>
 
-          <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
-            <div className="space-y-6">
+          <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+            <div className="space-y-5">
               {visibleSections.map(section => (
                 <section key={section.id} className="space-y-2">
                   {!sidebarCollapsed || isMobile ? (
@@ -447,7 +447,7 @@ export function MainLayout({ children }: MainLayoutProps) {
           className={`flex min-w-0 flex-1 flex-col overflow-hidden ${!isMobile ? (sidebarCollapsed ? "md:ml-[92px]" : "md:ml-[286px]") : ""}`}
         >
           <Topbar className="z-20 nexo-state-transition">
-            <div className="nexo-topbar-grid">
+            <div className="nexo-topbar-grid gap-3">
               <div className="grid grid-cols-1 items-center gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
                 <div className="flex min-w-0 items-center gap-2.5 md:gap-3">
                   {isMobile ? (
@@ -611,20 +611,6 @@ export function MainLayout({ children }: MainLayoutProps) {
           >
             {children}
           </main>
-          <div className="border-t border-[var(--border-soft)] px-4 py-3 md:px-6">
-            <div className="flex items-center justify-between text-xs">
-              <p className="truncate text-[var(--text-muted)]">
-                {user?.name ?? "Usuário"} · {user?.email ?? "Sem e-mail"}
-              </p>
-              <button
-                type="button"
-                onClick={() => navigate("/settings")}
-                className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-              >
-                Preferências
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     </AppShell>

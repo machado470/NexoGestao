@@ -10,9 +10,9 @@ const badgeVariants = cva(
     variants: {
       variant: {
         default:
-          "border-orange-200 bg-orange-100 text-orange-700 dark:border-orange-500/30 dark:bg-orange-500/12 dark:text-orange-200 [a&]:hover:bg-orange-200/90",
+          "border-[var(--accent-soft)] bg-[var(--accent-soft)]/60 text-[var(--accent)] dark:border-[var(--accent-soft)] dark:bg-[var(--accent-soft)]/25 dark:text-[var(--accent)] [a&]:hover:bg-[var(--accent-soft)]",
         secondary:
-          "border-emerald-200 bg-emerald-100 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/12 dark:text-emerald-200 [a&]:hover:bg-emerald-200/90",
+          "border-emerald-300/70 bg-emerald-100/80 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/12 dark:text-emerald-200 [a&]:hover:bg-emerald-200/90",
         destructive:
           "border-red-200 bg-red-100 text-red-700 [a&]:hover:bg-red-200/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:border-red-500/30 dark:bg-red-500/12 dark:text-red-200",
         outline:
