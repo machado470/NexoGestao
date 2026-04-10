@@ -25,7 +25,8 @@ import {
 } from "@/lib/operations/operations.utils";
 import { DemoEnvironmentCta } from "@/components/DemoEnvironmentCta";
 import { EmptyState } from "@/components/EmptyState";
-import { PageHero, PageShell, SmartPage, SurfaceSection } from "@/components/PagePattern";
+import { SmartPage, SurfaceSection } from "@/components/PagePattern";
+import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { getQueryUiState } from "@/lib/query-helpers";
 import { buildIdempotencyKey } from "@/lib/idempotency";
 import { resolveOperationFeedback } from "@/lib/operations/operation-feedback";
@@ -161,18 +162,16 @@ export default function WhatsAppPage() {
 
   if (!route.customerId) {
     return (
-      <PageShell>
-      <PageHero
-          eyebrow="WhatsApp"
-          title="Canal de execução • WhatsApp"
-          description="Abra conversas com contexto operacional pronto: quem contatar, por que agora e qual mensagem acelera a próxima etapa."
-          actions={
-            <Button variant="outline" onClick={() => navigate("/service-orders")}>
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Voltar
-            </Button>
-          }
-        />
+      <PageWrapper
+        title="Canal de execução • WhatsApp"
+        subtitle="Abra conversas com contexto operacional pronto: quem contatar, por que agora e qual mensagem acelera a próxima etapa."
+        primaryAction={
+          <Button variant="outline" onClick={() => navigate("/service-orders")}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Voltar
+          </Button>
+        }
+      >
         <SurfaceSection>
           <EmptyState
             icon={<MessageCircle className="h-7 w-7" />}
@@ -185,46 +184,42 @@ export default function WhatsAppPage() {
           />
         </SurfaceSection>
         <DemoEnvironmentCta />
-      </PageShell>
+      </PageWrapper>
     );
   }
 
   if (queryState.isInitialLoading) {
     return (
-      <PageShell>
-        <PageHero eyebrow="WhatsApp" title="Canal de execução • WhatsApp" description="Preparando contexto da conversa para você agir em segundos." />
+      <PageWrapper title="Canal de execução • WhatsApp" subtitle="Preparando contexto da conversa para você agir em segundos.">
         <SurfaceSection className="flex min-h-[180px] items-center justify-center gap-2 text-sm text-[var(--text-muted)] dark:text-[var(--text-muted)]">
           <RefreshCw className="h-4 w-4 animate-spin" />
           Carregando conversa e próxima ação...
         </SurfaceSection>
-      </PageShell>
+      </PageWrapper>
     );
   }
 
   if (queryState.shouldBlockForError) {
     return (
-      <PageShell>
-        <PageHero eyebrow="WhatsApp" title="Canal de execução • WhatsApp" description="Não foi possível carregar o contexto da conversa." />
+      <PageWrapper title="Canal de execução • WhatsApp" subtitle="Não foi possível carregar o contexto da conversa.">
         <SurfaceSection className="border-red-200 text-red-700 dark:border-red-900/40 dark:text-red-300">
           {nonBlockingErrorMessage}
         </SurfaceSection>
-      </PageShell>
+      </PageWrapper>
     );
   }
 
   return (
-    <PageShell>
-        <PageHero
-          eyebrow="WhatsApp"
-          title="Canal de execução • WhatsApp"
-          description="Transforme conversa em fechamento: o contexto já mostra o que aconteceu, por que importa e o que enviar agora."
-        actions={
-          <Button variant="outline" onClick={() => navigate(resolveBack(route))}>
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Voltar
-          </Button>
-        }
-      />
+    <PageWrapper
+      title="Canal de execução • WhatsApp"
+      subtitle="Transforme conversa em fechamento: o contexto já mostra o que aconteceu, por que importa e o que enviar agora."
+      primaryAction={
+        <Button variant="outline" onClick={() => navigate(resolveBack(route))}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Voltar
+        </Button>
+      }
+    >
       <SmartPage
         pageContext="customers"
         headline="Conversa orientada por próxima ação"
@@ -416,6 +411,6 @@ export default function WhatsAppPage() {
       </SurfaceSection>
 
       <DemoEnvironmentCta />
-    </PageShell>
+    </PageWrapper>
   );
 }

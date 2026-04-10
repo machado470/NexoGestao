@@ -21,6 +21,7 @@ export function PageWrapper({
 }: PageWrapperProps) {
   return (
     <PageShell>
+      <div className="space-y-4 md:space-y-5">
       <PageHeader
         title={title}
         subtitle={subtitle}
@@ -28,6 +29,7 @@ export function PageWrapper({
         breadcrumb={breadcrumb}
       />
       {children}
+      </div>
     </PageShell>
   );
 }

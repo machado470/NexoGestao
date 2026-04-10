@@ -966,13 +966,10 @@ export default function ExecutiveDashboardNew() {
     <div className="space-y-6 pb-6">
       <section className="nexo-surface-primary p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="max-w-3xl space-y-3">
-            <span className="inline-flex items-center gap-2 rounded-full border border-orange-400/30 bg-orange-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-orange-300">
-              <BarChart3 className="h-3.5 w-3.5" /> Centro executivo
-            </span>
-            <h1 className="text-3xl font-semibold tracking-tight text-[var(--text-primary)] md:text-4xl">
-              Estado da operação: {heroState}
-            </h1>
+          <div className="max-w-3xl space-y-2">
+            <p className="inline-flex items-center gap-2 rounded-full border border-orange-400/30 bg-orange-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-orange-300">
+              <BarChart3 className="h-3.5 w-3.5" /> Estado operacional: {heroState}
+            </p>
             <p className="text-sm text-[var(--text-secondary)]">
               {overdueCharges} cobranças vencidas • {nonBilledServices} serviços sem faturamento • prioridade dominante {dominantProblem?.title ?? "Operação estável"}.
             </p>

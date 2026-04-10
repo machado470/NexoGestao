@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { ArrowRight, Sparkles } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useLocation } from "wouter";
 import {
   rankPriorityProblems,
@@ -30,7 +31,7 @@ import {
 } from "@/components/design-system";
 
 export function PageShell({ children }: { children: ReactNode }) {
-  return <div className="nexo-page-shell nexo-section-reveal">{children}</div>;
+  return <div className="nexo-page-shell nexo-section-reveal space-y-4">{children}</div>;
 }
 
 export function PageHero({
@@ -94,7 +95,7 @@ export function SmartPage({
     : dominantImpact;
 
   return (
-    <section className="nexo-card-operational nexo-cockpit-zone nexo-section-reveal space-y-4">
+    <section className="nexo-card-operational nexo-cockpit-zone nexo-section-reveal space-y-3">
       <div className="space-y-2">
         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--accent)] dark:text-orange-300">
           Prioridade operacional
@@ -246,5 +247,5 @@ export function SurfaceSection({
   children: ReactNode;
   className?: string;
 }) {
-  return <SurfaceCard className={className}>{children}</SurfaceCard>;
+  return <SurfaceCard className={cn("p-4 md:p-5", className)}>{children}</SurfaceCard>;
 }
