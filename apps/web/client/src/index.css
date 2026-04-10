@@ -1336,3 +1336,172 @@ html {
     color: var(--text-secondary);
   }
 }
+
+/* Frontend global refactor baseline aligned to frontnexo3 visual language. */
+@layer base {
+  :root {
+    --bg-app: #f4f7fb;
+    --bg-sidebar: #f8fbff;
+    --bg-header: #ffffff;
+    --bg-surface: #ffffff;
+    --surface-contrast: #f7fafc;
+    --border-soft: rgba(15, 31, 56, 0.08);
+    --text-primary: #0f1f38;
+    --text-secondary: #5f7692;
+    --text-muted: #7e93ac;
+    --accent-primary: #e8772e;
+    --accent-primary-hover: #f0893f;
+    --accent-soft: rgba(232, 119, 46, 0.12);
+  }
+
+  .dark {
+    --bg-app: #0a1628;
+    --bg-sidebar: #0f1f38;
+    --bg-header: #0f1f38;
+    --bg-surface: #122744;
+    --surface-contrast: #162e4e;
+    --border-soft: rgba(36, 82, 114, 0.3);
+    --text-primary: #ffffff;
+    --text-secondary: #c8d6e5;
+    --text-muted: #8fa7bf;
+    --accent-primary: #e8772e;
+    --accent-primary-hover: #f0893f;
+    --accent-soft: rgba(232, 119, 46, 0.12);
+  }
+}
+
+@layer components {
+  .nexo-app-shell {
+    background: var(--bg-app);
+    color: var(--text-primary);
+  }
+
+  .nexo-sidebar {
+    background: var(--bg-sidebar);
+    border-right: 1px solid var(--border-soft);
+    box-shadow: none;
+  }
+
+  .nexo-sidebar-item {
+    position: relative;
+    border-radius: 12px;
+    min-height: 40px;
+    color: var(--text-secondary);
+  }
+
+  .nexo-sidebar-item:hover {
+    background: color-mix(in srgb, var(--bg-surface) 72%, transparent);
+    color: var(--text-primary);
+    transform: none;
+  }
+
+  .nexo-sidebar-item-active {
+    color: var(--text-primary);
+    background: color-mix(in srgb, var(--accent-soft) 80%, var(--bg-surface));
+    border-color: var(--border-soft);
+    box-shadow: none;
+  }
+
+  .nexo-sidebar-item-active::before {
+    content: "";
+    position: absolute;
+    left: -8px;
+    top: 9px;
+    bottom: 9px;
+    width: 3px;
+    border-radius: 6px;
+    background: var(--accent-primary);
+  }
+
+  .nexo-topbar {
+    border-bottom: 1px solid var(--border-soft);
+    background: color-mix(in srgb, var(--bg-header) 96%, transparent);
+    box-shadow: none;
+    backdrop-filter: blur(10px);
+  }
+
+  .nexo-topbar-grid {
+    gap: 0.75rem;
+    padding-top: 0.8rem;
+    padding-bottom: 0.8rem;
+  }
+
+  .nexo-topbar-meta {
+    border: 1px solid var(--border-soft);
+    background: transparent;
+    box-shadow: none;
+    border-radius: 12px;
+  }
+
+  .nexo-app-content {
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .nexo-page-shell {
+    max-width: 1560px;
+    padding: 1.25rem;
+    padding-bottom: 2.5rem;
+    gap: 1.25rem;
+  }
+
+  .nexo-surface-primary,
+  .nexo-page-header,
+  .nexo-card-base,
+  .nexo-card-kpi,
+  .nexo-card-operational,
+  .nexo-card-informative,
+  .nexo-data-table,
+  .nexo-floating-panel,
+  .nexo-surface-operational {
+    border-radius: 14px;
+    border: 1px solid var(--border-soft);
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, rgba(30, 58, 82, 0.6) 14%, var(--bg-surface)),
+      color-mix(in srgb, rgba(22, 42, 74, 0.4) 10%, var(--bg-surface))
+    );
+    box-shadow: none;
+  }
+
+  .nexo-surface-inner {
+    border-radius: 12px;
+    border: 1px solid var(--border-soft);
+    background: color-mix(in srgb, var(--surface-contrast) 92%, transparent);
+    box-shadow: none;
+  }
+
+  .nexo-card-kpi::before,
+  .nexo-kpi-card::before {
+    display: none;
+  }
+
+  .nexo-topbar-control,
+  .nexo-cta-secondary {
+    border-radius: 12px;
+    border: 1px solid var(--border-soft);
+    background: var(--surface-contrast);
+    color: var(--text-secondary);
+    min-height: 36px;
+    box-shadow: none;
+  }
+
+  .nexo-cta-primary,
+  .nexo-cta-dominant {
+    border-radius: 12px;
+    min-height: 36px;
+    padding-inline: 0.9rem;
+    background: var(--accent-primary);
+    color: #fff;
+    box-shadow: none;
+  }
+
+  .nexo-cta-primary:hover,
+  .nexo-cta-dominant:hover {
+    background: var(--accent-primary-hover);
+    transform: none;
+    box-shadow: none;
+  }
+}
