@@ -17,6 +17,7 @@ import {
 } from './whatsapp.provider'
 
 const ZAPI_BASE_URL = 'https://api.z-api.io'
+const ZAPI_TIMEOUT_MS = 12_000
 
 export class ZApiWhatsAppProvider implements WhatsAppProvider {
   private readonly providerName = 'z-api'
@@ -85,6 +86,7 @@ export class ZApiWhatsAppProvider implements WhatsAppProvider {
     try {
       const response = await fetch(url, {
         method: 'POST',
+        signal: AbortSignal.timeout(ZAPI_TIMEOUT_MS),
         headers: {
           'Content-Type': 'application/json',
           'Client-Token': this.clientToken,
@@ -133,6 +135,16 @@ export class ZApiWhatsAppProvider implements WhatsAppProvider {
         providerMessageId: String(providerMessageId),
       }
     } catch (err: any) {
+      if (err?.name === 'TimeoutError' || err?.name === 'AbortError') {
+        const errorMessage = `Timeout ao enviar WhatsApp após ${ZAPI_TIMEOUT_MS}ms`
+        this.logger.error(`[Z-API] ${errorMessage}`)
+        return {
+          ok: false,
+          provider: this.providerName,
+          errorCode: 'TIMEOUT',
+          errorMessage,
+        }
+      }
       const errorMessage = err?.message ?? 'Erro de rede desconhecido'
       this.logger.error(`[Z-API] Exceção ao enviar para ${phone}: ${errorMessage}`)
       return {

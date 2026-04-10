@@ -19,6 +19,15 @@ import { AnalyticsService, UsageMetricEvent } from '../analytics/analytics.servi
 import { RequestContextService } from '../common/context/request-context.service'
 import { MetricsService } from '../common/metrics/metrics.service'
 
+type OperationalActionStatus =
+  | 'executed'
+  | 'queued'
+  | 'skipped'
+  | 'blocked'
+  | 'duplicate'
+  | 'failed'
+  | 'retry_scheduled'
+
 @Injectable()
 export class FinanceService {
   private readonly logger = new Logger(FinanceService.name)
@@ -77,6 +86,18 @@ export class FinanceService {
           error: error instanceof Error ? error.message : String(error),
         },
       })
+    }
+  }
+
+  private buildOperationStatus(params: {
+    status: OperationalActionStatus
+    reason?: string | null
+    idempotencyKey?: string | null
+  }) {
+    return {
+      status: params.status,
+      reason: params.reason ?? null,
+      idempotencyKey: params.idempotencyKey ?? null,
     }
   }
 
@@ -325,7 +346,14 @@ export class FinanceService {
       payload: idemPayload,
     })
     if (idem.mode === 'replay') {
-      return idem.response as any
+      return {
+        ...(idem.response as any),
+        operation: this.buildOperationStatus({
+          status: 'duplicate',
+          reason: 'idempotency_replay',
+          idempotencyKey,
+        }),
+      }
     }
     const idemRecordId = idem.recordId
     try {
@@ -351,7 +379,15 @@ export class FinanceService {
           include: { customer: true },
         })
         if (!existing) throw err
-        const replayPayload = { ...existing, idempotent: true }
+        const replayPayload = {
+          ...existing,
+          idempotent: true,
+          operation: this.buildOperationStatus({
+            status: 'duplicate',
+            reason: 'duplicate_charge_prevented',
+            idempotencyKey,
+          }),
+        }
         await this.idempotency.complete(idemRecordId, replayPayload)
         return replayPayload
       }
@@ -414,11 +450,17 @@ export class FinanceService {
       const result = {
         ...charge,
         idempotent: false,
+        operation: this.buildOperationStatus({
+          status: 'executed',
+          reason: whatsappFallbackUsed ? 'charge_created_with_retry_scheduled' : 'charge_created',
+          idempotencyKey,
+        }),
         degraded: whatsappFallbackUsed
           ? {
               channel: 'whatsapp',
               reason: 'whatsapp_send_failed',
               fallback: 'message_queued',
+              status: 'retry_scheduled' as OperationalActionStatus,
             }
           : null,
       }
@@ -538,7 +580,14 @@ export class FinanceService {
       },
     })
     if (idem.mode === 'replay') {
-      return idem.response as any
+      return {
+        ...(idem.response as any),
+        operation: this.buildOperationStatus({
+          status: 'duplicate',
+          reason: 'idempotency_replay',
+          idempotencyKey,
+        }),
+      }
     }
 
     const idemRecordId = idem.recordId
@@ -618,7 +667,16 @@ export class FinanceService {
       }
 
       if (idempotent) {
-        const replayed = { ok: true, paymentId: payment.id, idempotent: true }
+        const replayed = {
+          ok: true,
+          paymentId: payment.id,
+          idempotent: true,
+          operation: this.buildOperationStatus({
+            status: 'duplicate',
+            reason: 'payment_already_processed',
+            idempotencyKey,
+          }),
+        }
         await this.idempotency.complete(idemRecordId, replayed)
         return replayed
       }
@@ -699,11 +757,19 @@ export class FinanceService {
         ok: true,
         paymentId: payment.id,
         idempotent: false,
+        operation: this.buildOperationStatus({
+          status: 'executed',
+          reason: whatsappFallbackUsed
+            ? 'payment_recorded_with_retry_scheduled'
+            : 'payment_recorded',
+          idempotencyKey,
+        }),
         degraded: whatsappFallbackUsed
           ? {
               channel: 'whatsapp',
               reason: 'whatsapp_send_failed',
               fallback: 'message_queued',
+              status: 'retry_scheduled' as OperationalActionStatus,
             }
           : null,
       }
