@@ -313,43 +313,41 @@ export function MainLayout({ children }: MainLayoutProps) {
   };
 
   return (
-    <div className="nexo-app-shell min-h-screen text-zinc-900 dark:text-zinc-100">
+    <div className="nexo-app-shell h-screen overflow-hidden text-[var(--text-primary)]">
       {isMobile && mobileMenuOpen ? (
         <button
           type="button"
           aria-label="Fechar menu"
-          className="fixed inset-0 z-30 bg-zinc-950/65 backdrop-blur-sm"
+          className="fixed inset-0 z-30 bg-[color-mix(in_srgb,var(--background-base)_84%,black)]/70 backdrop-blur-sm"
           onClick={() => setMobileMenuOpen(false)}
         />
       ) : null}
 
-      <div className="flex min-h-screen w-full">
+      <div className="flex h-full w-full">
         <aside
           data-scrollbar="nexo"
           className={`nexo-sidebar z-40 flex shrink-0 flex-col overflow-hidden transition-all duration-300 ${
             isMobile
               ? `fixed inset-y-0 left-0 w-[304px] ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full"}`
-              : sidebarCollapsed
-                ? "w-[92px]"
-                : "w-[286px]"
+              : `fixed inset-y-0 left-0 ${sidebarCollapsed ? "w-[92px]" : "w-[286px]"}`
           }`}
         >
-          <div className="border-b border-white/10 px-4 py-4">
+          <div className="border-b border-[var(--border)] px-4 py-4">
             <div className="flex items-center justify-between gap-3">
               <button
                 type="button"
                 onClick={() => handleNavigate("/executive-dashboard")}
                 className={`flex min-w-0 items-center ${sidebarCollapsed && !isMobile ? "justify-center" : "gap-3"}`}
               >
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-500/20 text-orange-300 ring-1 ring-orange-400/35">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)] ring-1 ring-[color-mix(in_srgb,var(--accent)_45%,transparent)]">
                   <Sparkles className="h-4 w-4" />
                 </div>
                 {!sidebarCollapsed || isMobile ? (
                   <div className="min-w-0 text-left">
-                    <p className="truncate text-sm font-semibold text-white">
+                    <p className="truncate text-sm font-semibold text-[var(--text-primary)]">
                       NexoGestão
                     </p>
-                    <p className="truncate text-xs text-zinc-400">
+                    <p className="truncate text-xs text-[var(--text-muted)]">
                       Workspace Operacional
                     </p>
                   </div>
@@ -360,7 +358,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                 <button
                   type="button"
                   onClick={() => setSidebarCollapsed(prev => !prev)}
-                  className="rounded-lg border border-white/10 p-1.5 text-zinc-400 transition hover:bg-white/10 hover:text-white"
+                  className="rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-muted)] transition hover:bg-[var(--accent-soft)] hover:text-[var(--text-primary)]"
                 >
                   {sidebarCollapsed ? (
                     <ChevronRight className="h-4 w-4" />
@@ -372,7 +370,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                 <button
                   type="button"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="rounded-lg border border-white/10 p-1.5 text-zinc-400 transition hover:bg-white/10 hover:text-white"
+                  className="rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-muted)] transition hover:bg-[var(--accent-soft)] hover:text-[var(--text-primary)]"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -385,7 +383,7 @@ export function MainLayout({ children }: MainLayoutProps) {
               {visibleSections.map(section => (
                 <section key={section.id} className="space-y-2">
                   {!sidebarCollapsed || isMobile ? (
-                    <p className="px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
+                    <p className="px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">
                       {section.label}
                     </p>
                   ) : null}
@@ -421,7 +419,7 @@ export function MainLayout({ children }: MainLayoutProps) {
             </div>
           </nav>
 
-          <div className="border-t border-white/10 p-3">
+          <div className="border-t border-[var(--border)] p-3">
             <button
               type="button"
               onClick={toggleTheme}
@@ -439,8 +437,8 @@ export function MainLayout({ children }: MainLayoutProps) {
           </div>
         </aside>
 
-        <div className="flex min-w-0 flex-1 flex-col">
-          <header className="nexo-topbar sticky top-0 z-20">
+        <div className={`flex min-w-0 flex-1 flex-col overflow-hidden ${!isMobile ? (sidebarCollapsed ? "md:ml-[92px]" : "md:ml-[286px]") : ""}` }>
+          <header className="nexo-topbar z-20">
             <div className="nexo-topbar-grid">
               <div className="grid grid-cols-1 items-center gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
                 <div className="flex min-w-0 items-center gap-2.5 md:gap-3">
@@ -454,10 +452,10 @@ export function MainLayout({ children }: MainLayoutProps) {
                     </button>
                   ) : null}
                   <div className="nexo-topbar-meta min-w-0">
-                    <p className="truncate text-lg font-semibold tracking-tight text-zinc-950 dark:text-white">
+                    <p className="truncate text-lg font-semibold tracking-tight text-[var(--text-primary)]">
                       {currentMeta.title}
                     </p>
-                    <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
+                    <p className="truncate text-xs text-[var(--text-muted)] dark:text-[var(--text-muted)]">
                       {currentMeta.subtitle}
                     </p>
                   </div>
@@ -473,7 +471,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                       >
                         <Bell className="h-4 w-4" />
                         {notifications.length > 0 ? (
-                          <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-orange-500 px-1 text-[10px] font-semibold text-white">
+                          <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--accent)] px-1 text-[10px] font-semibold text-[var(--text-primary)]">
                             {Math.min(notifications.length, 9)}
                           </span>
                         ) : null}
@@ -489,7 +487,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                           <button
                             type="button"
                             onClick={clearNotifications}
-                            className="text-xs font-medium text-orange-400 hover:text-orange-300"
+                            className="text-xs font-medium text-[var(--accent)] hover:text-[var(--accent-hover)]"
                           >
                             Limpar
                           </button>
@@ -498,8 +496,8 @@ export function MainLayout({ children }: MainLayoutProps) {
                       <DropdownMenuSeparator />
                       {notifications.length === 0 ? (
                         <div className="px-3 py-8 text-center">
-                          <Bell className="mx-auto h-5 w-5 text-zinc-500" />
-                          <p className="mt-2 text-sm text-zinc-400">
+                          <Bell className="mx-auto h-5 w-5 text-[var(--text-muted)]" />
+                          <p className="mt-2 text-sm text-[var(--text-muted)]">
                             Nenhuma notificação no momento.
                           </p>
                         </div>
@@ -518,11 +516,11 @@ export function MainLayout({ children }: MainLayoutProps) {
                                 removeNotification(item.id);
                               }}
                             >
-                              <p className="text-sm font-medium text-zinc-100">
+                              <p className="text-sm font-medium text-[var(--text-primary)]">
                                 {item.title}
                               </p>
                               {item.description ? (
-                                <p className="line-clamp-2 text-xs text-zinc-400">
+                                <p className="line-clamp-2 text-xs text-[var(--text-muted)]">
                                   {item.description}
                                 </p>
                               ) : null}
@@ -538,13 +536,13 @@ export function MainLayout({ children }: MainLayoutProps) {
                         type="button"
                         className="nexo-topbar-control px-2.5 py-2"
                       >
-                        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-zinc-800 text-zinc-100">
+                        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--surface-elevated)] text-[var(--text-primary)]">
                           <User className="h-4 w-4" />
                         </div>
                         <span className="hidden max-w-28 truncate md:block">
                           {user?.name ?? "Usuário"}
                         </span>
-                        <ChevronDown className="h-4 w-4 text-zinc-500" />
+                        <ChevronDown className="h-4 w-4 text-[var(--text-muted)]" />
                       </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent
@@ -552,10 +550,10 @@ export function MainLayout({ children }: MainLayoutProps) {
                       className="w-60 nexo-floating-panel"
                     >
                       <DropdownMenuLabel>
-                        <p className="text-sm font-semibold text-zinc-100">
+                        <p className="text-sm font-semibold text-[var(--text-primary)]">
                           {user?.name ?? "Usuário"}
                         </p>
-                        <p className="text-xs text-zinc-400">
+                        <p className="text-xs text-[var(--text-muted)]">
                           {user?.email ?? "Sem e-mail"}
                         </p>
                       </DropdownMenuLabel>
@@ -581,7 +579,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                       <DropdownMenuItem
                         onClick={() => void handleLogout()}
                         disabled={isLoggingOut}
-                        className="text-red-400 focus:text-red-300"
+                        className="text-[var(--danger)] focus:text-[var(--danger)]"
                       >
                         <LogOut className="mr-2 h-4 w-4" /> Sair
                       </DropdownMenuItem>

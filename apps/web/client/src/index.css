@@ -828,3 +828,192 @@ html {
 .dark * {
   scrollbar-color: rgba(251, 146, 60, 0.75) transparent;
 }
+
+@layer base {
+  :root {
+    --background-base: #f4f6fa;
+    --surface-base: #eef2f8;
+    --surface-elevated: #f8fafd;
+    --sidebar-bg: #edf1f7;
+    --card-bg: #fbfcfe;
+    --border-subtle: #d9e0eb;
+    --text-primary: #182133;
+    --text-secondary: #3d4a63;
+    --text-muted: #617089;
+    --accent: #c35c2c;
+    --accent-hover: #ad5024;
+    --accent-soft: color-mix(in srgb, var(--accent) 14%, var(--surface-base));
+    --success: #2f8f66;
+    --warning: #b97422;
+    --danger: #c54b4b;
+
+    --background: var(--background-base);
+    --foreground: var(--text-primary);
+    --card: var(--card-bg);
+    --card-foreground: var(--text-primary);
+    --popover: var(--surface-elevated);
+    --popover-foreground: var(--text-primary);
+    --primary: var(--accent);
+    --primary-foreground: #fbf5ef;
+    --secondary: var(--surface-base);
+    --secondary-foreground: var(--text-secondary);
+    --muted: color-mix(in srgb, var(--surface-base) 82%, #cfd7e6);
+    --muted-foreground: var(--text-muted);
+    --destructive: var(--danger);
+    --destructive-foreground: #fff3f2;
+    --border: var(--border-subtle);
+    --input: var(--surface-base);
+    --ring: color-mix(in srgb, var(--accent) 34%, transparent);
+    --sidebar: var(--sidebar-bg);
+    --sidebar-foreground: var(--text-primary);
+    --sidebar-primary: var(--accent);
+    --sidebar-primary-foreground: #fbf5ef;
+    --sidebar-accent: var(--accent-soft);
+    --sidebar-accent-foreground: var(--text-primary);
+    --sidebar-border: var(--border-subtle);
+    --sidebar-ring: var(--ring);
+
+    --nexo-app-bg: var(--background-base);
+    --nexo-page-surface: var(--background-base);
+    --nexo-surface-1: color-mix(in srgb, var(--surface-base) 76%, white);
+    --nexo-surface-2: var(--surface-elevated);
+    --nexo-section-surface: color-mix(in srgb, var(--surface-base) 88%, #eff3f9);
+    --nexo-card-surface: var(--card-bg);
+    --nexo-card-muted: color-mix(in srgb, var(--surface-base) 85%, #e4eaf4);
+    --nexo-border-soft: var(--border-subtle);
+    --nexo-border-strong: color-mix(in srgb, var(--border-subtle) 82%, #b9c5d8);
+    --nexo-focus-ring: var(--ring);
+    --nexo-shadow-soft: 0 8px 24px rgba(17, 24, 39, 0.08);
+    --nexo-shadow-panel: 0 16px 36px rgba(17, 24, 39, 0.1);
+    --nexo-shadow-elev-1: 0 12px 28px rgba(17, 24, 39, 0.1);
+    --nexo-shadow-elev-2: 0 18px 42px rgba(17, 24, 39, 0.14);
+  }
+
+  .dark {
+    --background-base: #11151d;
+    --surface-base: #181e2a;
+    --surface-elevated: #1c2432;
+    --sidebar-bg: #141b26;
+    --card-bg: #1a2230;
+    --border-subtle: #2c3748;
+    --text-primary: #e6ebf5;
+    --text-secondary: #b8c2d4;
+    --text-muted: #8a98b0;
+    --accent: #dc7a48;
+    --accent-hover: #e69064;
+    --accent-soft: color-mix(in srgb, var(--accent) 18%, var(--surface-base));
+    --success: #4eb588;
+    --warning: #df9b4a;
+    --danger: #de6b6b;
+  }
+}
+
+@layer components {
+  .nexo-app-shell {
+    background: linear-gradient(180deg, var(--background-base), color-mix(in srgb, var(--background-base) 92%, black));
+  }
+
+  .nexo-sidebar {
+    background: var(--sidebar-bg);
+    border-right: 1px solid var(--border-subtle);
+    box-shadow: 12px 0 30px rgba(15, 23, 42, 0.14);
+  }
+
+  .nexo-sidebar-item {
+    @apply flex w-full items-center gap-2.5 rounded-[var(--radius-control)] border border-transparent px-3 py-2.5 text-left text-sm transition-all duration-200;
+    color: var(--text-secondary);
+  }
+
+  .nexo-sidebar-item:hover {
+    background: var(--accent-soft);
+    color: var(--text-primary);
+  }
+
+  .nexo-sidebar-item-active {
+    border-color: color-mix(in srgb, var(--accent) 36%, transparent);
+    background: var(--accent-soft);
+    color: var(--accent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent);
+  }
+
+  .nexo-topbar {
+    border-bottom: 1px solid var(--border-subtle);
+    background: color-mix(in srgb, var(--surface-elevated) 94%, transparent);
+    backdrop-filter: blur(12px);
+  }
+
+  .nexo-topbar-control {
+    @apply inline-flex h-10 items-center justify-center gap-2 rounded-[var(--radius-control)] border px-3 text-sm transition-all duration-200;
+    border-color: var(--border-subtle);
+    background: var(--surface-base);
+    color: var(--text-secondary);
+  }
+
+  .nexo-topbar-control:hover {
+    background: var(--accent-soft);
+    color: var(--text-primary);
+  }
+
+  .nexo-topbar-meta,
+  .nexo-app-content,
+  .nexo-surface,
+  .nexo-page-header,
+  .nexo-card-base,
+  .nexo-card-kpi,
+  .nexo-card-operational,
+  .nexo-card-informative,
+  .nexo-card-alert,
+  .nexo-surface-operational,
+  .nexo-data-table,
+  .nexo-floating-panel {
+    border-color: var(--border-subtle);
+    background: var(--card-bg);
+    box-shadow: var(--nexo-shadow-elev-1);
+  }
+
+  .nexo-card-alert {
+    background: color-mix(in srgb, var(--danger) 10%, var(--card-bg));
+  }
+
+  .nexo-card-kpi,
+  .nexo-card-operational {
+    background: color-mix(in srgb, var(--accent-soft) 44%, var(--card-bg));
+  }
+
+  .nexo-cta-primary,
+  .nexo-cta-dominant {
+    @apply inline-flex items-center justify-center rounded-[var(--radius-control)] px-5 py-3 text-sm font-semibold transition-all duration-200;
+    background: var(--accent);
+    color: var(--primary-foreground);
+    box-shadow: 0 10px 26px color-mix(in srgb, var(--accent) 30%, transparent);
+  }
+
+  .nexo-cta-primary:hover,
+  .nexo-cta-dominant:hover {
+    background: var(--accent-hover);
+  }
+
+  .nexo-cta-secondary {
+    @apply inline-flex h-10 items-center justify-center rounded-[var(--radius-control)] border px-4 text-sm font-semibold transition-all duration-200;
+    border-color: var(--border-subtle);
+    background: var(--surface-base);
+    color: var(--text-secondary);
+  }
+
+  .nexo-cta-secondary:hover {
+    background: var(--accent-soft);
+    color: var(--text-primary);
+  }
+
+  .nexo-page-header-title,
+  .nexo-metric-value,
+  .nexo-section-title {
+    color: var(--text-primary);
+  }
+
+  .nexo-page-header-description,
+  .nexo-section-description,
+  .nexo-zone-title {
+    color: var(--text-secondary);
+  }
+}

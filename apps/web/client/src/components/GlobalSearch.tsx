@@ -114,7 +114,7 @@ export function GlobalSearch() {
   return (
     <div ref={searchRef} className="relative w-full">
       <div className="relative">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-zinc-500" />
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-[var(--text-muted)]" />
 
         <input
           type="text"
@@ -130,7 +130,7 @@ export function GlobalSearch() {
             setIsOpen(true);
           }}
           onFocus={() => setIsOpen(true)}
-          className="h-10 w-full rounded-xl border border-white/10 bg-white/5 py-2 pl-10 pr-10 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-orange-400/70 focus:outline-none focus:ring-2 focus:ring-orange-400/30 disabled:cursor-not-allowed disabled:opacity-60"
+          className="h-10 w-full rounded-xl border border-[var(--border)] bg-[var(--surface-base)] py-2 pl-10 pr-10 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] disabled:cursor-not-allowed disabled:opacity-60"
         />
 
         {query && (
@@ -141,7 +141,7 @@ export function GlobalSearch() {
               setDebouncedQuery("");
               setIsOpen(false);
             }}
-            className="absolute right-3 top-1/2 -translate-y-1/2 transform text-zinc-500 transition-colors hover:text-zinc-300"
+            className="absolute right-3 top-1/2 -translate-y-1/2 transform text-[var(--text-muted)] transition-colors hover:text-[var(--text-secondary)]"
           >
             <X className="h-4 w-4" />
           </button>
@@ -149,9 +149,9 @@ export function GlobalSearch() {
       </div>
 
       {isOpen && canQuery && (
-        <div className="nexo-floating-panel absolute left-0 right-0 top-full z-50 mt-2 max-h-96 overflow-hidden rounded-xl p-1">
+        <div className="nexo-floating-panel absolute left-0 right-0 top-full z-50 mt-2 max-h-96 overflow-hidden rounded-[var(--radius-surface)] p-1">
           {isSearching ? (
-            <div className="flex items-center justify-center gap-2 p-4 text-zinc-400">
+            <div className="flex items-center justify-center gap-2 p-4 text-[var(--text-muted)]">
               <Loader className="h-4 w-4 animate-spin" />
               <span className="text-sm">Buscando...</span>
             </div>
@@ -162,19 +162,19 @@ export function GlobalSearch() {
                   key={`${result.type}-${result.id}`}
                   type="button"
                   onClick={() => handleSelectResult(result)}
-                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-white/8"
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-[var(--accent-soft)]"
                 >
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-zinc-400">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface-base)] text-[var(--text-muted)]">
                     {getResultIcon(result.type)}
                   </div>
 
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-zinc-100">
+                    <p className="truncate text-sm font-medium text-[var(--text-primary)]">
                       {result.title}
                     </p>
 
                     {result.subtitle && (
-                      <p className="truncate text-xs text-zinc-400">
+                      <p className="truncate text-xs text-[var(--text-muted)]">
                         {result.subtitle}
                       </p>
                     )}
@@ -183,7 +183,7 @@ export function GlobalSearch() {
               ))}
             </div>
           ) : query.trim().length >= 2 ? (
-            <div className="p-4 text-center text-sm text-zinc-400">
+            <div className="p-4 text-center text-sm text-[var(--text-muted)]">
               Nenhum resultado encontrado
             </div>
           ) : null}
