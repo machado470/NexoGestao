@@ -199,10 +199,10 @@ export default function BillingPage() {
       />
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-        <div className="nexo-kpi-card p-4"><p className="text-xs text-zinc-500">Plano atual</p><p className="text-lg font-semibold">{currentPlan}</p></div>
-        <div className="nexo-kpi-card p-4"><p className="text-xs text-zinc-500">Limites em risco</p><p className="text-lg font-semibold">{blockedItems.length}</p></div>
-        <div className="nexo-kpi-card p-4"><p className="text-xs text-zinc-500">Modo</p><p className="text-lg font-semibold">{isTrial ? "Trial" : "Ativo"}</p></div>
-        <div className="nexo-kpi-card p-4"><p className="text-xs text-zinc-500">Próxima ação</p><p className="text-lg font-semibold">{blockedItems.length > 0 ? "Upgrade urgente" : "Revisar limites"}</p></div>
+        <div className="nexo-card-kpi p-4"><p className="text-xs uppercase tracking-wide text-zinc-500">Plano atual</p><p className="relative mt-2 text-2xl font-bold tracking-tight">{currentPlan}</p></div>
+        <div className="nexo-card-kpi p-4"><p className="text-xs uppercase tracking-wide text-zinc-500">Limites em risco</p><p className="relative mt-2 text-2xl font-bold tracking-tight">{blockedItems.length}</p></div>
+        <div className="nexo-card-kpi p-4"><p className="text-xs uppercase tracking-wide text-zinc-500">Modo</p><p className="relative mt-2 text-2xl font-bold tracking-tight">{isTrial ? "Trial" : "Ativo"}</p></div>
+        <div className="nexo-card-kpi p-4"><p className="text-xs uppercase tracking-wide text-zinc-500">Próxima ação</p><p className="relative mt-2 text-xl font-bold tracking-tight">{blockedItems.length > 0 ? "Upgrade urgente" : "Revisar limites"}</p></div>
       </div>
       {!stripeConfigured ? (
         <SurfaceSection className="border-amber-300/60 bg-amber-50 text-amber-900 dark:border-amber-600/50 dark:bg-amber-900/20 dark:text-amber-200">
@@ -297,10 +297,7 @@ export default function BillingPage() {
             const canUpgrade = !isCurrent && name !== "FREE";
 
             return (
-              <article
-                key={name}
-                className={`nexo-surface p-4 ${planTone(currentPlan, name)}`}
-              >
+              <article key={name} className={`nexo-card-operational ${planTone(currentPlan, name)}`}>
                 <h2 className="text-base font-semibold">{name}</h2>
                 <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
                   {formatCurrency(PLAN_BASE_PRICE_CENTS[name as PlanName] ?? 0)} / mês
@@ -343,7 +340,7 @@ export default function BillingPage() {
               Seu upgrade libera mais execução, mais cobranças e mais receita confirmada sem bloqueio.
             </p>
           </div>
-          <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm">
+          <div className="nexo-card-informative rounded-xl px-3 py-2 text-sm">
             Plano atual: <strong>{currentPlan}</strong>
           </div>
         </div>
