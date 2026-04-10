@@ -19,6 +19,13 @@ import {
   sortSmartActions,
   type SmartActionWithExecution,
 } from "@/lib/smartActions";
+import {
+  AlertCard,
+  PageHeader,
+  PriorityList,
+  SurfaceCard,
+  TimelineList,
+} from "@/components/design-system";
 
 export function PageShell({ children }: { children: ReactNode }) {
   return <div className="nexo-page-shell nexo-section-reveal">{children}</div>;
@@ -36,28 +43,21 @@ export function PageHero({
   actions?: ReactNode;
 }) {
   return (
-    <section className="nexo-page-header nexo-section-reveal">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,color-mix(in_srgb,var(--accent)_15%,transparent),transparent_28%),radial-gradient(circle_at_top_right,color-mix(in_srgb,var(--accent)_8%,transparent),transparent_24%)]" />
-
-      <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+    <PageHeader
+      title={
         <div className="max-w-3xl">
           {eyebrow ? (
-            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[var(--accent-soft)] bg-[var(--accent-soft)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent)] dark:border-[var(--accent-soft)] dark:bg-[var(--accent-soft)] dark:text-[var(--accent)]">
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[var(--border-soft)] bg-[color-mix(in_srgb,var(--accent-primary)_20%,transparent)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent-primary)]">
               <Sparkles className="h-3.5 w-3.5" />
               {eyebrow}
             </div>
           ) : null}
-
-          <h1 className="nexo-page-header-title">{title}</h1>
-
-          {description ? (
-            <p className="nexo-page-header-description">{description}</p>
-          ) : null}
+          {title}
         </div>
-
-        {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
-      </div>
-    </section>
+      }
+      subtitle={description}
+      actions={actions}
+    />
   );
 }
 
@@ -109,7 +109,7 @@ export function SmartPage({
       </div>
 
       {primaryAction ? (
-        <div className="nexo-card-alert p-3">
+        <AlertCard className="p-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-[var(--accent)] dark:text-orange-300">
             Ação principal
           </p>
@@ -129,11 +129,11 @@ export function SmartPage({
               Executar agora
             </Button>
           </div>
-        </div>
+        </AlertCard>
       ) : null}
 
       {orderedActions.length > 0 ? (
-        <div className="space-y-2">
+        <PriorityList>
           <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
             Ações ordenadas
           </p>
@@ -168,10 +168,10 @@ export function SmartPage({
               </div>
             ))}
           </div>
-        </div>
+        </PriorityList>
       ) : null}
 
-      <div className="nexo-card-informative p-3">
+      <SurfaceCard className="nexo-card-informative p-3">
         <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
           Próxima ação automática
         </p>
@@ -196,9 +196,9 @@ export function SmartPage({
             {nextActionSuggestion.ctaLabel}
           </Button>
         </div>
-      </div>
+      </SurfaceCard>
 
-      <div className="space-y-2">
+      <TimelineList>
         <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
           Top 3 prioridades
         </p>
@@ -214,7 +214,7 @@ export function SmartPage({
             </div>
           ))}
         </div>
-      </div>
+      </TimelineList>
 
       <div className="sticky bottom-3 z-20 rounded-2xl border border-[var(--accent-soft)] bg-[var(--nexo-card-surface)] p-2 shadow-lg md:static md:border-none md:bg-transparent md:p-0 md:shadow-none">
         <Button
@@ -247,9 +247,5 @@ export function SurfaceSection({
   children: ReactNode;
   className?: string;
 }) {
-  return (
-    <section className={`nexo-surface p-5 ${className}`.trim()}>
-      {children}
-    </section>
-  );
+  return <SurfaceCard className={className}>{children}</SurfaceCard>;
 }

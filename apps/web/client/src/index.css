@@ -1,3 +1,4 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap");
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -58,6 +59,22 @@
 }
 
 :root {
+  --bg-app: #080c18;
+  --bg-sidebar: #0b1122;
+  --bg-header: #0f172b;
+  --bg-surface: #111d2e;
+  --bg-surface-hover: #162538;
+  --border-soft: rgba(140, 165, 204, 0.22);
+  --text-primary: #e2e8f4;
+  --text-secondary: #8b9cc0;
+  --text-muted: #5f7399;
+  --accent-primary: #e8823a;
+  --accent-primary-hover: #f09a5a;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --info: #38bdf8;
+
   --radius: 0.9rem;
   --radius-panel: 1.1rem;
   --radius-surface: 0.95rem;
@@ -120,11 +137,28 @@
   --nexo-card-muted: #f8fafc;
   --nexo-shadow-elev-1: 0 8px 24px rgba(15, 23, 42, 0.06);
   --nexo-shadow-elev-2: 0 16px 40px rgba(15, 23, 42, 0.11);
-  --nexo-title-font: "Outfit", "Inter", system-ui, sans-serif;
+  --nexo-title-font:
+    "Plus Jakarta Sans", "DM Sans", "Inter", system-ui, sans-serif;
   --nexo-body-font: "DM Sans", "Inter", system-ui, sans-serif;
 }
 
 .dark {
+  --bg-app: #080c18;
+  --bg-sidebar: #0b1122;
+  --bg-header: #111d2e;
+  --bg-surface: #111d2e;
+  --bg-surface-hover: #1a3a52;
+  --border-soft: rgba(125, 146, 184, 0.26);
+  --text-primary: #f0f4ff;
+  --text-secondary: #8b9cc0;
+  --text-muted: #6b7fa8;
+  --accent-primary: #e8772e;
+  --accent-primary-hover: #f0893f;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --danger: #f87171;
+  --info: #38bdf8;
+
   --primary: #fb923c;
   --primary-foreground: #140c05;
   --sidebar-primary: #fb923c;
@@ -716,6 +750,115 @@
   }
 }
 
+@layer components {
+  .nexo-app-shell {
+    background: linear-gradient(180deg, #0a1628 0%, #080c18 100%);
+    color: var(--text-primary);
+  }
+
+  .nexo-sidebar {
+    background: linear-gradient(180deg, #0f172b 0%, #0b1122 100%);
+    border-right: 1px solid var(--border-soft);
+    box-shadow: 10px 0 28px rgba(2, 6, 23, 0.3);
+  }
+
+  .nexo-topbar {
+    position: sticky;
+    top: 0;
+    background: color-mix(in srgb, var(--bg-header) 92%, #000 8%);
+    border-bottom: 1px solid var(--border-soft);
+    box-shadow: 0 8px 22px rgba(2, 6, 23, 0.24);
+    backdrop-filter: blur(10px);
+  }
+
+  .nexo-app-content {
+    border: 1px solid var(--border-soft);
+    background: color-mix(in srgb, var(--bg-app) 72%, var(--bg-surface) 28%);
+    box-shadow: 0 8px 20px rgba(2, 6, 23, 0.22);
+  }
+
+  .nexo-sidebar-item {
+    color: var(--text-secondary);
+    border-radius: 14px;
+    border: 1px solid transparent;
+    transition: all 0.18s ease;
+  }
+
+  .nexo-sidebar-item:hover {
+    color: var(--text-primary);
+    background: color-mix(in srgb, var(--bg-surface) 70%, transparent);
+    border-color: var(--border-soft);
+  }
+
+  .nexo-sidebar-item-active {
+    color: #ffd9bd;
+    border-color: color-mix(in srgb, var(--accent-primary) 35%, transparent);
+    background: color-mix(in srgb, var(--accent-primary) 18%, transparent);
+    box-shadow: none;
+    ring: 0;
+  }
+
+  .nexo-topbar-control {
+    border: 1px solid var(--border-soft);
+    background: color-mix(in srgb, var(--bg-surface) 72%, transparent);
+    color: var(--text-secondary);
+    border-radius: 12px;
+    height: 38px;
+    transition: all 0.16s ease;
+  }
+
+  .nexo-topbar-control:hover {
+    background: color-mix(in srgb, var(--bg-surface-hover) 70%, transparent);
+    color: var(--text-primary);
+    transform: translateY(-1px);
+  }
+
+  .nexo-page-header,
+  .nexo-card-base,
+  .nexo-card-informative,
+  .nexo-card-operational,
+  .nexo-card-kpi,
+  .nexo-surface,
+  .nexo-surface-operational {
+    border-radius: 16px;
+    border: 1px solid var(--border-soft);
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--bg-surface) 96%, white 4%),
+      color-mix(in srgb, var(--bg-surface) 88%, #081226 12%)
+    );
+    box-shadow: 0 8px 22px rgba(2, 6, 23, 0.22);
+  }
+
+  .nexo-cta-primary,
+  .nexo-cta-dominant {
+    background: var(--accent-primary);
+    color: #fff;
+    border-radius: 12px;
+    box-shadow: 0 8px 18px rgba(232, 130, 58, 0.26);
+  }
+
+  .nexo-cta-primary:hover,
+  .nexo-cta-dominant:hover {
+    background: var(--accent-primary-hover);
+    box-shadow: 0 10px 20px rgba(240, 154, 90, 0.3);
+  }
+
+  .nexo-cta-secondary {
+    border-radius: 12px;
+    border: 1px solid var(--border-soft);
+    color: var(--text-primary);
+    background: color-mix(in srgb, var(--bg-surface) 82%, transparent);
+  }
+
+  .ds-surface-card {
+    border-radius: 16px;
+    border: 1px solid var(--border-soft);
+    background: linear-gradient(180deg, #111d2e, #0f1a2b);
+    box-shadow: 0 8px 20px rgba(2, 6, 23, 0.2);
+  }
+}
+
 @keyframes nexo-shimmer {
   100% {
     transform: translateX(100%);
@@ -929,7 +1072,11 @@ html {
     --nexo-page-surface: var(--background-base);
     --nexo-surface-1: color-mix(in srgb, var(--surface-base) 76%, white);
     --nexo-surface-2: var(--surface-elevated);
-    --nexo-section-surface: color-mix(in srgb, var(--surface-base) 88%, #eff3f9);
+    --nexo-section-surface: color-mix(
+      in srgb,
+      var(--surface-base) 88%,
+      #eff3f9
+    );
     --nexo-card-surface: var(--card-bg);
     --nexo-card-muted: color-mix(in srgb, var(--surface-base) 85%, #e4eaf4);
     --nexo-border-soft: var(--border-subtle);
@@ -971,7 +1118,11 @@ html {
 
 @layer components {
   .nexo-app-shell {
-    background: linear-gradient(180deg, var(--background-base), color-mix(in srgb, var(--background-base) 92%, black));
+    background: linear-gradient(
+      180deg,
+      var(--background-base),
+      color-mix(in srgb, var(--background-base) 92%, black)
+    );
   }
 
   .nexo-sidebar {
@@ -1010,7 +1161,8 @@ html {
     border-color: color-mix(in srgb, var(--accent) 36%, transparent);
     background: var(--accent-soft);
     color: var(--accent);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent);
+    box-shadow: inset 0 0 0 1px
+      color-mix(in srgb, var(--accent) 20%, transparent);
   }
 
   .nexo-topbar {
@@ -1084,7 +1236,8 @@ html {
   }
 
   .nexo-section-reveal {
-    animation: nexo-section-reveal var(--motion-slow) var(--motion-ease-standard);
+    animation: nexo-section-reveal var(--motion-slow)
+      var(--motion-ease-standard);
   }
 
   .nexo-motion-panel {
@@ -1130,7 +1283,8 @@ html {
   .nexo-cta-primary:focus-visible,
   .nexo-cta-dominant:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 3px var(--nexo-focus-ring),
+    box-shadow:
+      0 0 0 3px var(--nexo-focus-ring),
       0 12px 28px color-mix(in srgb, var(--accent) 28%, transparent);
   }
 
