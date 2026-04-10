@@ -1,8 +1,10 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/design-system";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { useChargeActions } from "@/hooks/useChargeActions";
 import {
   buildWhatsAppUrlFromServiceOrder,
@@ -26,9 +28,13 @@ import {
   MessageCircle,
   Play,
   Receipt,
+  Send,
   Wrench,
 } from "lucide-react";
 import { toast } from "sonner";
+import { buildIdempotencyKey } from "@/lib/idempotency";
+import { resolveOperationFeedback } from "@/lib/operations/operation-feedback";
+import { runActionChain } from "@/lib/operations/flowChain";
 
 import type {
   ExecutionRecord,
@@ -107,6 +113,11 @@ function withReturnTo(url: string, returnTo: string) {
 export default function ServiceOrderDetailsPanel({ os }: { os: ServiceOrder }) {
   const [location, navigate] = useLocation();
   const utils = trpc.useUtils();
+  const [composeCompleteAndCharge, setComposeCompleteAndCharge] = useState(true);
+  const [composeChargeAndMessage, setComposeChargeAndMessage] = useState(true);
+  const [composeReceiveAndConfirm, setComposeReceiveAndConfirm] = useState(true);
+  const [inlineMessage, setInlineMessage] = useState("");
+  const [lastSuggestions, setLastSuggestions] = useState<Array<{ label: string; reason: string }>>([]);
 
   const whatsappUrl = buildWhatsAppUrlFromServiceOrder(os);
   const whatsappUrlWithReturn = whatsappUrl
@@ -142,6 +153,8 @@ export default function ServiceOrderDetailsPanel({ os }: { os: ServiceOrder }) {
     refreshActions: [invalidateOperationalData],
   });
 
+  const sendInlineMessage = trpc.nexo.whatsapp.send.useMutation();
+
   const startExecution = trpc.nexo.executions.start.useMutation({
     onSuccess: async () => {
       toast.success("Execução iniciada");
@@ -166,17 +179,7 @@ export default function ServiceOrderDetailsPanel({ os }: { os: ServiceOrder }) {
     },
   });
 
-  const generateCharge = trpc.nexo.serviceOrders.generateCharge.useMutation({
-    onSuccess: async () => {
-      toast.success("Cobrança gerada");
-      await invalidateOperationalData();
-      await timelineQuery.refetch();
-      navigate(`/finances?serviceOrderId=${os.id}`);
-    },
-    onError: (error) => {
-      toast.error(error.message || "Erro ao gerar cobrança");
-    },
-  });
+  const generateCharge = trpc.nexo.serviceOrders.generateCharge.useMutation();
 
   const timeline = useMemo(
     () => normalizeOrders<TimelineEvent>(timelineQuery.data),
@@ -219,6 +222,116 @@ export default function ServiceOrderDetailsPanel({ os }: { os: ServiceOrder }) {
   const OperationalIcon = operationalStage.icon;
   const FinancialIcon = financialStage.icon;
 
+  const canSendInline =
+    Boolean(os.customerId) && inlineMessage.trim().length > 0 && !sendInlineMessage.isPending;
+
+  async function createChargeInline() {
+    try {
+      await generateCharge.mutateAsync({ id: os.id });
+      toast.success("Cobrança gerada");
+      await invalidateOperationalData();
+      await timelineQuery.refetch();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Erro ao gerar cobrança";
+      toast.error(message);
+      throw error;
+    }
+  }
+
+  async function sendInlineWhatsAppMessage() {
+    if (!os.customerId || inlineMessage.trim().length === 0) return;
+    const result = await sendInlineMessage.mutateAsync({
+      customerId: os.customerId,
+      content: inlineMessage.trim(),
+      entityType: "SERVICE_ORDER",
+      entityId: os.id,
+      messageType: "SERVICE_UPDATE",
+      serviceOrderId: os.id,
+      idempotencyKey: buildIdempotencyKey("service-order.inline.whatsapp", os.id),
+    });
+    await invalidateOperationalData();
+    setInlineMessage("");
+    const operationStatus = String((result as any)?.operation?.status ?? "").toLowerCase();
+    toast.success(
+      resolveOperationFeedback({
+        operationStatus,
+        degradedStatus: null,
+        executedMessage: operationStatus === "queued" ? "Mensagem enfileirada para envio." : "Mensagem enviada",
+        duplicateMessage: "Envio duplicado detectado: mensagem anterior reaproveitada.",
+        retryScheduledMessage: "Mensagem enfileirada para retry.",
+        blockedMessage: "Envio bloqueado por política operacional.",
+      })
+    );
+  }
+
+  async function runExecutionFlow(rootAction: "complete_service" | "generate_charge" | "receive_payment") {
+    const nodes = {
+      complete_service: {
+        id: "complete_service" as const,
+        label: "Concluir serviço",
+        run: async () => {
+          if (!latestExecution?.id || !canFinish) return;
+          await finishExecution.mutateAsync({ executionId: latestExecution.id });
+        },
+        suggestNext: () =>
+          composeCompleteAndCharge
+            ? [{ actionId: "generate_charge" as const, label: "Gerar cobrança agora", reason: "Serviço concluído sem cobrança" }]
+            : [{ actionId: "send_whatsapp" as const, label: "Enviar atualização ao cliente", reason: "Fechar ciclo de comunicação" }],
+      },
+      generate_charge: {
+        id: "generate_charge" as const,
+        label: "Gerar cobrança",
+        run: async () => {
+          if (!canGenerateCharge) return;
+          await createChargeInline();
+        },
+        suggestNext: () =>
+          composeChargeAndMessage && os.customerId
+            ? [{ actionId: "send_whatsapp" as const, label: "Cobrar via WhatsApp", reason: "Cobrança criada e pronta para envio" }]
+            : [],
+      },
+      send_whatsapp: {
+        id: "send_whatsapp" as const,
+        label: "Enviar WhatsApp",
+        run: async () => {
+          if (inlineMessage.trim().length > 0) {
+            await sendInlineWhatsAppMessage();
+          }
+        },
+        suggestNext: () => [],
+      },
+      receive_payment: {
+        id: "receive_payment" as const,
+        label: "Receber pagamento",
+        run: async () => {
+          if (!charge || chargeIsPaid) return;
+          await registerPayment(charge, "CASH");
+        },
+        suggestNext: () =>
+          composeReceiveAndConfirm
+            ? [{ actionId: "confirm_payment" as const, label: "Enviar confirmação", reason: "Pagamento recebido" }]
+            : [],
+      },
+      confirm_payment: {
+        id: "confirm_payment" as const,
+        label: "Confirmar pagamento",
+        run: async () => {
+          if (inlineMessage.trim().length > 0) {
+            await sendInlineWhatsAppMessage();
+          }
+        },
+        suggestNext: () => [],
+      },
+    };
+
+    const result = await runActionChain({
+      actionId: rootAction,
+      actionLabel: nodes[rootAction].label,
+      nodes,
+    });
+    setLastSuggestions(result.suggestions.map((item) => ({ label: item.label, reason: item.reason })));
+  }
+
   return (
     <div className="space-y-4">
       <Card>
@@ -257,10 +370,7 @@ export default function ServiceOrderDetailsPanel({ os }: { os: ServiceOrder }) {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() =>
-                  latestExecution?.id &&
-                  finishExecution.mutate({ executionId: latestExecution.id })
-                }
+                onClick={() => void runExecutionFlow("complete_service")}
                 disabled={finishExecution.isPending || !canFinish}
               >
                 <CheckCircle2 className="mr-2 h-4 w-4" />
@@ -270,7 +380,7 @@ export default function ServiceOrderDetailsPanel({ os }: { os: ServiceOrder }) {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => generateCharge.mutate({ id: os.id })}
+                onClick={() => void runExecutionFlow("generate_charge")}
                 disabled={generateCharge.isPending || !canGenerateCharge}
               >
                 <Receipt className="mr-2 h-4 w-4" />
@@ -305,6 +415,24 @@ export default function ServiceOrderDetailsPanel({ os }: { os: ServiceOrder }) {
         </CardHeader>
 
         <CardContent className="space-y-6">
+          <div className="rounded-xl border border-orange-200/70 bg-orange-50/60 p-4 dark:border-orange-500/30 dark:bg-orange-500/10">
+            <div className="text-sm font-semibold">Ações compostas (execução contínua)</div>
+            <div className="mt-3 grid gap-2 md:grid-cols-3">
+              <label className="flex items-center justify-between rounded-lg border bg-white/80 p-2 text-xs dark:bg-zinc-900/50">
+                <span>Concluir + Cobrar</span>
+                <Switch checked={composeCompleteAndCharge} onCheckedChange={setComposeCompleteAndCharge} />
+              </label>
+              <label className="flex items-center justify-between rounded-lg border bg-white/80 p-2 text-xs dark:bg-zinc-900/50">
+                <span>Cobrar + Enviar mensagem</span>
+                <Switch checked={composeChargeAndMessage} onCheckedChange={setComposeChargeAndMessage} />
+              </label>
+              <label className="flex items-center justify-between rounded-lg border bg-white/80 p-2 text-xs dark:bg-zinc-900/50">
+                <span>Receber + Confirmar</span>
+                <Switch checked={composeReceiveAndConfirm} onCheckedChange={setComposeReceiveAndConfirm} />
+              </label>
+            </div>
+          </div>
+
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <div className="rounded-xl border p-3">
               <div className="text-xs uppercase tracking-wide text-muted-foreground">
@@ -401,7 +529,7 @@ export default function ServiceOrderDetailsPanel({ os }: { os: ServiceOrder }) {
                 </div>
 
                 <Button
-                  onClick={() => generateCharge.mutate({ id: os.id })}
+                  onClick={() => void runExecutionFlow("generate_charge")}
                   disabled={generateCharge.isPending || !canGenerateCharge}
                 >
                   <Receipt className="mr-2 h-4 w-4" />
@@ -460,14 +588,7 @@ export default function ServiceOrderDetailsPanel({ os }: { os: ServiceOrder }) {
 
                       <Button
                         variant="outline"
-                        onClick={async () => {
-                          try {
-                            await registerPayment(charge, "CASH");
-                            await timelineQuery.refetch();
-                          } catch {
-                            // toast already handled by shared hook
-                          }
-                        }}
+                        onClick={() => void runExecutionFlow("receive_payment")}
                         disabled={isSubmitting}
                       >
                         Marcar pago
@@ -484,6 +605,25 @@ export default function ServiceOrderDetailsPanel({ os }: { os: ServiceOrder }) {
                   >
                     <MessageCircle className="mr-2 h-4 w-4" />
                     {chargeIsPaid ? "Falar com cliente" : "Cobrar no WhatsApp"}
+                  </Button>
+                </div>
+
+                <div className="space-y-2 rounded-xl border border-dashed p-3">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Composer inline (sem navegar para WhatsApp)
+                  </p>
+                  <Input
+                    value={inlineMessage}
+                    onChange={(event) => setInlineMessage(event.target.value)}
+                    placeholder="Mensagem pré-preenchida para cobrança/confirmação"
+                  />
+                  <Button
+                    variant="outline"
+                    onClick={() => void sendInlineWhatsAppMessage()}
+                    disabled={!canSendInline}
+                  >
+                    <Send className="mr-2 h-4 w-4" />
+                    {sendInlineMessage.isPending ? "Enviando..." : "Enviar mensagem inline"}
                   </Button>
                 </div>
               </>
@@ -558,6 +698,32 @@ export default function ServiceOrderDetailsPanel({ os }: { os: ServiceOrder }) {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Fila de prioridade operacional</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {[
+            !chargeIsPaid && os.financialSummary?.chargeStatus === "OVERDUE"
+              ? "Crítico: cobrança vencida, agir agora."
+              : null,
+            canGenerateCharge ? "Alta: serviço concluído sem cobrança vinculada." : null,
+            canFinish ? "Média: execução em andamento aguardando conclusão." : null,
+          ]
+            .filter(Boolean)
+            .map((item) => (
+              <div key={item} className="rounded-lg border border-amber-300/70 bg-amber-50/70 p-2 text-sm text-amber-900 dark:border-amber-700/40 dark:bg-amber-900/20 dark:text-amber-200">
+                {item}
+              </div>
+            ))}
+          {lastSuggestions.map((item) => (
+            <div key={item.label} className="rounded-lg border border-orange-300/70 bg-orange-50/80 p-2 text-sm text-orange-900 dark:border-orange-700/40 dark:bg-orange-900/20 dark:text-orange-200">
+              Próxima ação sugerida: <strong>{item.label}</strong> · {item.reason}
+            </div>
+          ))}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
