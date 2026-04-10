@@ -676,8 +676,8 @@ export default function ServiceOrdersPage() {
                       : undefined,
                 });
                 setFlowFeedback(
-                  result.nextSuggestedAction
-                    ? `${result.completedAction} concluída. Próximo passo sugerido: ${result.nextSuggestedAction}.`
+                  result.suggestions[0]
+                    ? `${result.completedAction} concluída. Próximo passo sugerido: ${result.suggestions[0].label}.`
                     : `${result.completedAction} concluída.`
                 );
                 setNextActionState("done");
