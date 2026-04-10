@@ -10,6 +10,8 @@ const pages = [
   "client/src/pages/SettingsPage.tsx",
   "client/src/pages/GovernancePage.tsx",
   "client/src/pages/PeoplePage.tsx",
+  "client/src/pages/TimelinePage.tsx",
+  "client/src/pages/BillingPage.tsx",
 ];
 
 const errors = [];
@@ -30,8 +32,14 @@ for (const page of pages) {
     errors.push(`${page}: PageWrapper obrigatório não encontrado.`);
   }
 
-  if (!/\bActionBarWrapper\b/.test(source)) {
-    errors.push(`${page}: ActionBarWrapper obrigatório não encontrado.`);
+  const hasLegacyActionBar = /\bActionBarWrapper\b/.test(source);
+  const hasNexoActionContract =
+    /\bOperationalTopCard\b/.test(source) ||
+    /\bNexoActionGroup\b/.test(source);
+  if (!hasLegacyActionBar && !hasNexoActionContract) {
+    errors.push(
+      `${page}: contrato de ações ausente (esperado ActionBarWrapper legado ou OperationalTopCard/NexoActionGroup do Nexo).`
+    );
   }
 
   if (/from\s+["']@\/components\/ui\/table["']/.test(source)) {

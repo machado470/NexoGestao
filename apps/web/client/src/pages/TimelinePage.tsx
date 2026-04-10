@@ -402,31 +402,6 @@ export default function TimelinePage() {
     <PageWrapper
       title="Timeline"
       subtitle="Rastreabilidade ponta a ponta do fluxo: clientes, agenda, execução, financeiro, comunicação e governança em ordem cronológica."
-      primaryAction={<>
-          <Button
-            variant="outline"
-            onClick={() => void timelineQuery.refetch()}
-            disabled={!customerId || timelineQuery.isFetching}
-            className="gap-2"
-          >
-            <RefreshCcw
-              className={`h-4 w-4 ${
-                timelineQuery.isFetching ? "animate-spin" : ""
-              }`}
-            />
-            Atualizar
-          </Button>
-
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setShowMetadata((prev) => !prev)}
-            className="gap-2"
-          >
-            <FileJson className="h-4 w-4" />
-            {showMetadata ? "Ocultar metadata" : "Mostrar metadata"}
-          </Button>
-        </>}
     >
 
       <OperationalTopCard
@@ -452,6 +427,32 @@ export default function TimelinePage() {
           >
             {customerId ? "Atualizar timeline" : "Selecionar cliente"}
           </Button>
+        }
+        secondaryActions={
+          <>
+            <Button
+              variant="outline"
+              onClick={() => void timelineQuery.refetch()}
+              disabled={!customerId || timelineQuery.isFetching}
+              className="gap-2"
+            >
+              <RefreshCcw
+                className={`h-4 w-4 ${
+                  timelineQuery.isFetching ? "animate-spin" : ""
+                }`}
+              />
+              Atualizar
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowMetadata((prev) => !prev)}
+              className="gap-2"
+            >
+              <FileJson className="h-4 w-4" />
+              {showMetadata ? "Ocultar metadata" : "Mostrar metadata"}
+            </Button>
+          </>
         }
       />
 
