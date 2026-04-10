@@ -1495,6 +1495,8 @@ html {
     --accent-primary: #e8772e;
     --accent-primary-hover: #f0893f;
     --accent-soft: rgba(232, 119, 46, 0.1);
+    --popover-foreground: var(--text-primary);
+    --muted-foreground: var(--text-muted);
     --radius-control: 12px;
     --radius-surface: 16px;
     --nexo-title-font: "Plus Jakarta Sans", sans-serif;
@@ -1514,6 +1516,8 @@ html {
     --accent-primary: #e8772e;
     --accent-primary-hover: #f0893f;
     --accent-soft: rgba(232, 119, 46, 0.12);
+    --popover-foreground: #eef4ff;
+    --muted-foreground: #b6c8e0;
   }
 }
 
@@ -1572,9 +1576,9 @@ html {
   }
 
   .nexo-topbar-grid {
-    gap: 0.75rem;
-    padding-top: 0.8rem;
-    padding-bottom: 0.8rem;
+    gap: 0.5rem;
+    padding-top: 0.55rem;
+    padding-bottom: 0.55rem;
   }
 
   .nexo-topbar-meta {
@@ -1652,6 +1656,10 @@ html {
     color: var(--text-secondary);
     min-height: 36px;
     box-shadow: none;
+  }
+
+  .nexo-floating-panel {
+    color: var(--popover-foreground);
   }
 
   .nexo-cta-primary,

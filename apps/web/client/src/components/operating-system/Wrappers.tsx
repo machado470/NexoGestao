@@ -13,7 +13,7 @@ type PageWrapperProps = {
 };
 
 export function PageWrapper({
-  title,
+  title: _title,
   subtitle,
   primaryAction,
   breadcrumb,
@@ -23,7 +23,6 @@ export function PageWrapper({
     <PageShell>
       <div className="space-y-4 md:space-y-5">
         <OperationalHeader
-          title={title}
           description={subtitle}
           primaryAction={primaryAction}
           breadcrumb={breadcrumb}

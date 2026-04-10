@@ -3,7 +3,7 @@ import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type OperationalHeaderProps = {
-  title: ReactNode;
+  title?: ReactNode;
   description?: ReactNode;
   primaryAction?: ReactNode;
   priorities?: ReactNode;
@@ -12,7 +12,6 @@ type OperationalHeaderProps = {
 };
 
 export function OperationalHeader({
-  title,
   description,
   primaryAction,
   priorities,
@@ -21,7 +20,7 @@ export function OperationalHeader({
 }: OperationalHeaderProps) {
   return (
     <section className={cn("nexo-page-header px-1 py-1", className)}>
-      <div className="relative z-10 space-y-3">
+      <div className="relative z-10 space-y-2.5">
         {breadcrumb && breadcrumb.length > 0 ? (
           <nav
             aria-label="Breadcrumb"
@@ -48,9 +47,8 @@ export function OperationalHeader({
           </nav>
         ) : null}
 
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <h1 className="nexo-page-header-title">{title}</h1>
+        <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
             {description ? (
               <p className="nexo-page-header-description">{description}</p>
             ) : null}
