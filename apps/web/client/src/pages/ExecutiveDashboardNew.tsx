@@ -1160,7 +1160,7 @@ export default function ExecutiveDashboardNew() {
       ) : null}
 
       {isSlowLoading ? (
-        <section className="nexo-surface-inner border-blue-400/40 p-4 text-sm text-blue-200">
+        <section className="nexo-surface-inner nexo-info-banner p-4 text-sm">
           A atualização está mais lenta que o normal; continue navegando enquanto os blocos são carregados.
         </section>
       ) : null}

@@ -42,7 +42,6 @@ import { EmptyState } from "@/components/EmptyState";
 import { TableSkeleton } from "@/components/QueryStateBoundary";
 import { StatusBadge, mapAppointmentStatus } from "@/components/StatusBadge";
 import { SurfaceSection } from "@/components/PagePattern";
-import { DemoEnvironmentCta } from "@/components/DemoEnvironmentCta";
 import { generateAppointmentActions } from "@/lib/smartActions";
 import {
   APPOINTMENT_TRANSITIONS,
@@ -965,7 +964,7 @@ export default function AppointmentsPage() {
       </div>
 
       {queryState.hasBackgroundUpdate ? (
-        <SurfaceSection className="border-blue-500/30 bg-blue-500/10 text-sm text-blue-200">
+        <SurfaceSection className="nexo-info-banner text-sm">
           Atualizando agenda em segundo plano...
         </SurfaceSection>
       ) : null}
@@ -1537,7 +1536,6 @@ export default function AppointmentsPage() {
               onClick: handleClearLocalFilters,
             }}
           />
-          {appointments.length === 0 ? <DemoEnvironmentCta /> : null}
         </SurfaceSection>
       )}
 

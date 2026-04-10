@@ -29,7 +29,6 @@ import {
 } from "lucide-react";
 import { SurfaceSection } from "@/components/PagePattern";
 import { EmptyState } from "@/components/EmptyState";
-import { DemoEnvironmentCta } from "@/components/DemoEnvironmentCta";
 
 import ServiceOrderCard from "@/components/service-orders/ServiceOrderCard";
 import ServiceOrderDetailsPanel from "@/components/service-orders/ServiceOrderDetailsPanel";
@@ -728,7 +727,7 @@ export default function ServiceOrdersPage() {
       ) : null}
 
       {queryState.hasBackgroundUpdate ? (
-        <div className="rounded border border-blue-500/30 bg-blue-500/10 p-3 text-sm text-blue-200">
+        <div className="nexo-info-banner rounded p-3 text-sm">
           Atualizando dados em segundo plano...
         </div>
       ) : null}
@@ -765,7 +764,7 @@ export default function ServiceOrdersPage() {
               },
             }}
           />
-          <DemoEnvironmentCta />
+
         </SurfaceSection>
       ) : (
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(380px,0.9fr)]">

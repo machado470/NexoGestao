@@ -10,9 +10,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  CreditCard,
   DollarSign,
-  HelpCircle,
   History,
   LayoutDashboard,
   LogOut,
@@ -35,7 +33,6 @@ import { useIsMobile } from "@/hooks/useMobile";
 import { useNotificationStore } from "@/stores/notificationStore";
 import { GlobalSearch } from "@/components/GlobalSearch";
 import { AppShell, SidebarNav, Topbar } from "@/components/design-system";
-import { Breadcrumbs } from "./Breadcrumbs";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -65,8 +62,8 @@ function isRouteActive(location: string, route: string) {
 
 const pageMeta: Record<string, { title: string; subtitle: string }> = {
   "/executive-dashboard": {
-    title: "Centro Operacional",
-    subtitle: "Prioridades, alertas e execução do dia em um único fluxo.",
+    title: "Dashboard",
+    subtitle: "",
   },
   "/customers": {
     title: "Clientes",
@@ -466,9 +463,6 @@ export function MainLayout({ children }: MainLayoutProps) {
                     <p className="truncate text-lg font-semibold tracking-tight text-[var(--text-primary)]">
                       {currentMeta.title}
                     </p>
-                    <p className="truncate text-xs text-[var(--text-muted)] dark:text-[var(--text-muted)]">
-                      {currentMeta.subtitle}
-                    </p>
                   </div>
                 </div>
 
@@ -545,7 +539,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                     <DropdownMenuTrigger asChild>
                       <button
                         type="button"
-                        className="nexo-topbar-control px-2.5 py-2"
+                        className="nexo-topbar-control h-9 px-2"
                       >
                         <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--surface-elevated)] text-[var(--text-primary)]">
                           <User className="h-4 w-4" />
@@ -558,24 +552,21 @@ export function MainLayout({ children }: MainLayoutProps) {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent
                       align="end"
-                      className="w-60 nexo-floating-panel"
+                      className="w-52 nexo-floating-panel p-1"
                     >
-                      <DropdownMenuLabel>
-                        <p className="text-sm font-semibold text-[var(--text-primary)]">
+                      <DropdownMenuLabel className="px-2 py-1.5">
+                        <p className="truncate text-xs font-semibold text-[var(--text-primary)]">
                           {user?.name ?? "Usuário"}
                         </p>
-                        <p className="text-xs text-[var(--text-muted)]">
+                        <p className="truncate text-[11px] text-[var(--text-muted)]">
                           {user?.email ?? "Sem e-mail"}
                         </p>
                       </DropdownMenuLabel>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => navigate("/settings")}>
+                      <DropdownMenuItem className="h-8 rounded-md px-2 text-sm" onClick={() => navigate("/settings")}>
                         <User className="mr-2 h-4 w-4" /> Perfil
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => navigate("/billing")}>
-                        <CreditCard className="mr-2 h-4 w-4" /> Conta e plano
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={toggleTheme}>
+                      <DropdownMenuItem className="h-8 rounded-md px-2 text-sm" onClick={toggleTheme}>
                         {theme === "dark" ? (
                           <Sun className="mr-2 h-4 w-4" />
                         ) : (
@@ -583,14 +574,11 @@ export function MainLayout({ children }: MainLayoutProps) {
                         )}{" "}
                         Tema
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => navigate("/contato")}>
-                        <HelpCircle className="mr-2 h-4 w-4" /> Suporte
-                      </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
                         onClick={() => void handleLogout()}
                         disabled={isLoggingOut}
-                        className="text-[var(--danger)] focus:text-[var(--danger)]"
+                        className="h-8 rounded-md px-2 text-sm text-[var(--danger)] focus:text-[var(--danger)]"
                       >
                         <LogOut className="mr-2 h-4 w-4" /> Sair
                       </DropdownMenuItem>
@@ -599,8 +587,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 items-center gap-3 lg:grid-cols-[auto_minmax(0,1fr)]">
-                <Breadcrumbs />
+              <div className="grid grid-cols-1 items-center">
                 <div className="min-w-0 lg:justify-self-center lg:w-full lg:max-w-2xl">
                   <GlobalSearch />
                 </div>
@@ -610,7 +597,7 @@ export function MainLayout({ children }: MainLayoutProps) {
 
           <main
             data-scrollbar="nexo"
-            className="nexo-app-content nexo-section-reveal m-3 mt-0 min-h-0 flex-1 overflow-auto md:m-4 md:mt-0"
+            className="nexo-app-content nexo-section-reveal m-3 mt-0 min-h-0 flex-1 overflow-auto pr-2 md:m-4 md:mt-0 md:pr-3"
           >
             {children}
           </main>

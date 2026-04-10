@@ -23,7 +23,6 @@ import { SurfaceSection } from "@/components/PagePattern";
 import { EmptyState } from "@/components/EmptyState";
 import { TableSkeleton } from "@/components/QueryStateBoundary";
 import { StatusBadge, mapFinanceStatus } from "@/components/StatusBadge";
-import { DemoEnvironmentCta } from "@/components/DemoEnvironmentCta";
 import { useChargeActions } from "@/hooks/useChargeActions";
 import { useProductAnalytics } from "@/hooks/useProductAnalytics";
 import { generateFinanceActions } from "@/lib/smartActions";
@@ -702,7 +701,7 @@ export default function FinancesPage() {
       </SurfaceSection>
 
       {queryState.hasBackgroundUpdate ? (
-        <SurfaceSection className="border-blue-500/30 bg-blue-500/10 text-sm text-blue-200">
+        <SurfaceSection className="nexo-info-banner text-sm">
           Atualizando financeiro em segundo plano...
         </SurfaceSection>
       ) : null}
@@ -933,7 +932,7 @@ export default function FinancesPage() {
               onClick: () => navigate("/service-orders"),
             }}
           />
-          <DemoEnvironmentCta />
+
         </SurfaceSection>
       ) : (
         <div className="space-y-3">

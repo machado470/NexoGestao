@@ -287,7 +287,7 @@ export default function PeoplePage() {
       </SurfaceSection>
 
       {queryState.hasBackgroundUpdate ? (
-        <SurfaceSection className="border-blue-500/30 bg-blue-500/10 text-sm text-blue-200">
+        <SurfaceSection className="nexo-info-banner text-sm">
           Atualizando pessoas em segundo plano...
         </SurfaceSection>
       ) : null}

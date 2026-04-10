@@ -194,7 +194,7 @@ export default function EditPersonModal({
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => (!nextOpen ? onClose() : undefined)}>
-      <DialogContent className="max-w-xl border-[var(--border-subtle)] bg-[var(--card-bg)] p-0 text-[var(--text-primary)] shadow-2xl backdrop-blur">
+      <DialogContent className="max-h-[90vh] max-w-2xl overflow-hidden border-[var(--border-subtle)] bg-[var(--card-bg)] p-0 text-[var(--text-primary)] shadow-2xl backdrop-blur">
         <DialogHeader className="border-b border-zinc-800/90 px-6 py-5">
           <DialogTitle className="flex items-center gap-2 text-xl font-semibold">
             <Pencil className="h-5 w-5 text-orange-500" />
@@ -210,7 +210,7 @@ export default function EditPersonModal({
             <Loader2 className="h-6 w-6 animate-spin text-orange-500" />
           </div>
         ) : personQuery.isError || !personData ? (
-          <div className="space-y-4 px-6 py-5">
+          <div className="space-y-4 overflow-y-auto px-6 py-5">
             <div className="rounded-xl border border-red-900/60 bg-red-950/40 p-4 text-sm text-red-300">
               Não foi possível carregar os dados da pessoa.
             </div>
@@ -222,7 +222,8 @@ export default function EditPersonModal({
             </div>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-4 px-6 py-5">
+          <form onSubmit={handleSubmit} className="flex max-h-[calc(90vh-84px)] flex-col">
+          <div className="space-y-4 overflow-y-auto px-6 py-5">
             <div className="space-y-2">
               <Label htmlFor="edit-person-name">Nome</Label>
               <Input
@@ -266,7 +267,9 @@ export default function EditPersonModal({
               Pessoa ativa
             </label>
 
-            <DialogFooter className="border-t border-zinc-800/90 pt-4">
+            </div>
+
+          <DialogFooter className="border-t border-[var(--border-subtle)] px-6 py-4">
               <span className="mr-auto text-xs text-[var(--text-muted)]">
                 {hasChanges ? "Alterações pendentes" : "Nada para salvar"}
               </span>

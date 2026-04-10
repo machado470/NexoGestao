@@ -137,7 +137,7 @@ export function CreateAppointmentModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(nextOpen) => (!nextOpen ? handleClose() : undefined)}>
-      <DialogContent className="max-w-xl border-[var(--border-subtle)] bg-[var(--card-bg)] p-0 text-[var(--text-primary)] shadow-2xl backdrop-blur">
+      <DialogContent className="max-h-[90vh] max-w-2xl overflow-hidden border-[var(--border-subtle)] bg-[var(--card-bg)] p-0 text-[var(--text-primary)] shadow-2xl backdrop-blur">
         <DialogHeader className="border-b border-zinc-800/90 px-6 py-5">
           <DialogTitle className="text-xl font-semibold">Novo Agendamento</DialogTitle>
           <DialogDescription className="text-[var(--text-muted)]">
@@ -145,7 +145,8 @@ export function CreateAppointmentModal({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4 px-6 py-5">
+        <form onSubmit={handleSubmit} className="flex max-h-[calc(90vh-84px)] flex-col">
+          <div className="space-y-4 overflow-y-auto px-6 py-5">
           <div className="space-y-2">
             <Label>Cliente *</Label>
             <select
@@ -215,7 +216,9 @@ export function CreateAppointmentModal({
             />
           </div>
 
-          <DialogFooter className="border-t border-zinc-800/90 pt-4">
+          </div>
+
+          <DialogFooter className="border-t border-[var(--border-subtle)] px-6 py-4">
             <Button
               type="button"
               variant="outline"
