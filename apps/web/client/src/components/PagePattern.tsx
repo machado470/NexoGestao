@@ -80,7 +80,7 @@ export function SmartPage({
     : dominantImpact;
 
   return (
-    <section className="space-y-3 rounded-2xl border border-orange-200 bg-orange-50/70 p-4 dark:border-orange-900/40 dark:bg-orange-950/20">
+    <section className="space-y-3 rounded-2xl border border-orange-400/25 bg-orange-500/8 p-4">
       <div className="space-y-2">
         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-orange-700 dark:text-orange-300">
           Prioridade operacional
@@ -91,7 +91,7 @@ export function SmartPage({
       </div>
 
       {primaryAction ? (
-        <div className="rounded-xl border border-orange-300 bg-white/90 p-3 dark:border-orange-800/60 dark:bg-zinc-900/70">
+        <div className="rounded-xl border border-orange-400/30 bg-white/5 p-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-orange-700 dark:text-orange-300">Ação principal</p>
           <p className="nexo-text-wrap mt-1 text-sm font-semibold text-zinc-900 dark:text-zinc-100">{primaryAction.label}</p>
           <p className="nexo-text-wrap text-xs text-zinc-600 dark:text-zinc-300">{primaryAction.reason}</p>
@@ -108,7 +108,7 @@ export function SmartPage({
           <p className="text-xs font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-300">Ações ordenadas</p>
           <div className="grid gap-2">
             {orderedActions.map((action) => (
-              <div key={action.id} className="rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-900/60">
+              <div key={action.id} className="rounded-lg border border-white/10 bg-white/5 p-3">
                 <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                   <div className="min-w-0">
                     <p className="nexo-text-wrap text-sm font-medium text-zinc-900 dark:text-zinc-100">{action.label}</p>
@@ -127,7 +127,7 @@ export function SmartPage({
         </div>
       ) : null}
 
-      <div className="rounded-xl border border-zinc-200/80 bg-white/90 p-3 dark:border-white/10 dark:bg-zinc-900/70">
+      <div className="rounded-xl border border-white/10 bg-white/5 p-3">
         <p className="text-xs font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-300">Próxima ação automática</p>
         <p className="mt-1 text-sm font-medium text-zinc-900 dark:text-zinc-100">{nextActionSuggestion.title}</p>
         <p className="text-xs text-zinc-600 dark:text-zinc-400">{nextActionSuggestion.description}</p>
@@ -150,7 +150,7 @@ export function SmartPage({
         <p className="text-xs font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-300">Top 3 prioridades</p>
         <div className="grid gap-2 md:grid-cols-3">
           {topPriorities.map((item) => (
-            <div key={item.id} className="rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-900/60">
+            <div key={item.id} className="rounded-lg border border-white/10 bg-white/5 p-3">
               <p className="nexo-text-wrap text-sm font-medium text-zinc-900 dark:text-zinc-100">{item.title}</p>
               <p className="nexo-text-wrap text-xs text-zinc-600 dark:text-zinc-400">{item.helperText}</p>
             </div>

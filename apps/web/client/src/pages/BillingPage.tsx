@@ -34,7 +34,7 @@ function formatCurrency(cents: number) {
 function planTone(currentPlan: string, plan: string) {
   return currentPlan === plan
     ? "border-orange-400 bg-orange-50/70 dark:border-orange-500/60 dark:bg-orange-900/20"
-    : "border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950/60";
+    : "border-white/10 bg-[var(--nexo-surface-2)]";
 }
 
 const PLAN_GAIN: Record<PlanName, string> = {
@@ -299,7 +299,7 @@ export default function BillingPage() {
             return (
               <article
                 key={name}
-                className={`nexo-app-panel p-4 ${planTone(currentPlan, name)}`}
+                className={`nexo-surface p-4 ${planTone(currentPlan, name)}`}
               >
                 <h2 className="text-base font-semibold">{name}</h2>
                 <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
@@ -321,7 +321,7 @@ export default function BillingPage() {
                   ) : (
                     <button
                       type="button"
-                      className="inline-flex items-center gap-2 rounded-lg bg-orange-500 px-3 py-2 text-sm font-medium text-white hover:bg-orange-600 disabled:opacity-60"
+                      className="nexo-cta-primary inline-flex h-10 items-center gap-2 rounded-xl px-4 text-sm font-medium disabled:opacity-60"
                       disabled={!canUpgrade || checkoutMutation.isPending || !stripeConfigured}
                       onClick={() => void handleUpgrade(name as PlanName)}
                     >
@@ -343,7 +343,7 @@ export default function BillingPage() {
               Seu upgrade libera mais execução, mais cobranças e mais receita confirmada sem bloqueio.
             </p>
           </div>
-          <div className="rounded-xl border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-700">
+          <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm">
             Plano atual: <strong>{currentPlan}</strong>
           </div>
         </div>
@@ -380,7 +380,7 @@ export default function BillingPage() {
           })}
         </div>
         {blockedItems.length > 0 ? (
-          <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-900 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-200">
+          <div className="mt-3 rounded-lg border border-red-400/40 bg-red-500/10 p-3 text-xs text-red-200">
             <p className="font-semibold">Motivo do bloqueio atual</p>
             <p>
               Você atingiu: {blockedItems.map((item) => item.label).join(", ")}.

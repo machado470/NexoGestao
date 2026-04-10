@@ -142,7 +142,7 @@ function OperationalHealthView({
   urgentActions: number;
 }) {
   return (
-    <section className="rounded-2xl border border-zinc-200/80 bg-white/80 p-4 dark:border-zinc-800 dark:bg-zinc-950/50">
+    <section className="nexo-surface p-4">
       <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Operational health</p>
       <div className="mt-2 grid gap-2 sm:grid-cols-4">
         <div className="rounded-lg border border-red-300/60 bg-red-50/60 p-2 text-xs">Críticas: <strong>{criticalPending}</strong></div>
@@ -1105,19 +1105,19 @@ export default function ExecutiveDashboardNew() {
       </section>
 
       <section className="grid gap-4 xl:grid-cols-2">
-        <article className="rounded-xl border border-zinc-200/80 bg-white/80 p-4 dark:border-zinc-800 dark:bg-zinc-950/40">
+        <article className="nexo-surface p-4">
           <h3 className="text-sm font-semibold">Executive summary</h3>
           <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-300">
             Gargalos, risco financeiro e volume travado para decisão rápida.
           </p>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            <div className="rounded-md border p-2 text-xs">Gargalos ativos: <strong>{bottlenecks.filter(item => item.value > 0).length}</strong></div>
-            <div className="rounded-md border p-2 text-xs">Risco financeiro: <strong>{formatCurrency(totalPausedRevenue)}</strong></div>
-            <div className="rounded-md border p-2 text-xs">Volume travado: <strong>{displayMetrics.openServiceOrders}</strong></div>
-            <div className="rounded-md border p-2 text-xs">Ação nº1: <strong>{dominantProblem?.title ?? "Operação estável"}</strong></div>
+            <div className="rounded-md border border-white/10 bg-white/5 p-2 text-xs">Gargalos ativos: <strong>{bottlenecks.filter(item => item.value > 0).length}</strong></div>
+            <div className="rounded-md border border-white/10 bg-white/5 p-2 text-xs">Risco financeiro: <strong>{formatCurrency(totalPausedRevenue)}</strong></div>
+            <div className="rounded-md border border-white/10 bg-white/5 p-2 text-xs">Volume travado: <strong>{displayMetrics.openServiceOrders}</strong></div>
+            <div className="rounded-md border border-white/10 bg-white/5 p-2 text-xs">Ação nº1: <strong>{dominantProblem?.title ?? "Operação estável"}</strong></div>
           </div>
         </article>
-        <article className="rounded-xl border border-zinc-200/80 bg-white/80 p-4 dark:border-zinc-800 dark:bg-zinc-950/40">
+        <article className="nexo-surface p-4">
           <div className="flex items-center justify-between gap-2">
             <h3 className="text-sm font-semibold">Decision log (auditoria)</h3>
             <button
@@ -1130,7 +1130,7 @@ export default function ExecutiveDashboardNew() {
           </div>
           <div className="mt-3 space-y-2">
             {decisionAuditLog.slice(0, 5).map(log => (
-              <div key={log.id} className="rounded-md border p-2">
+              <div key={log.id} className="rounded-md border border-white/10 bg-white/5 p-2">
                 <p className="text-xs font-semibold">{log.actionLabel} <span className="text-zinc-500">• {log.actionType}</span></p>
                 <p className="text-[11px] text-zinc-600 dark:text-zinc-300">{log.reason}</p>
                 <p className="mt-1 text-[10px] uppercase tracking-wide text-zinc-500">
@@ -1145,7 +1145,7 @@ export default function ExecutiveDashboardNew() {
         </article>
       </section>
 
-      <section className="rounded-xl border border-zinc-200/80 bg-white/80 p-4 dark:border-zinc-800 dark:bg-zinc-950/40">
+      <section className="nexo-surface p-4">
         <p className="flex items-center gap-2 text-sm font-semibold"><Bot className="h-4 w-4" /> Background automation prep</p>
         <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-300">
           Execução fora da UI pronta para eventos (cobrança vencida, O.S. concluída, risco elevado) com notificações inteligentes e trilha de auditoria.
@@ -1301,14 +1301,15 @@ export default function ExecutiveDashboardNew() {
                     contentStyle={{
                       borderRadius: 14,
                       border: "1px solid rgba(251,146,60,.3)",
-                      background: "rgba(255,255,255,.96)",
+                      background: "rgba(9,9,11,.94)",
+                      color: "#fff",
                     }}
                     formatter={(value: number) => [value, "Volume"]}
                   />
                   <Funnel dataKey="value" data={funnelData} isAnimationActive>
                     <LabelList
                       position="right"
-                      fill="#52525b"
+                      fill="#a1a1aa"
                       stroke="none"
                       dataKey="name"
                     />
@@ -1439,7 +1440,7 @@ export default function ExecutiveDashboardNew() {
             {priorityProblems.map((problem, index) => (
               <div
                 key={problem.id}
-                className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-zinc-900/80"
+                className="rounded-xl border border-white/10 bg-white/5 p-4"
               >
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-orange-600 dark:text-orange-300">
                   #{index + 1} prioridade
@@ -1487,7 +1488,7 @@ export default function ExecutiveDashboardNew() {
             </button>
           </article>
         ) : (
-          <article className="rounded-2xl border border-zinc-200/80 bg-white/80 p-5 dark:border-white/10 dark:bg-zinc-900/70">
+          <article className="nexo-surface p-5">
             <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
               Fluxo automático de ação
             </h3>

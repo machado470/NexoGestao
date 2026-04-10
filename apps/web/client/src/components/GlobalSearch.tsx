@@ -112,9 +112,9 @@ export function GlobalSearch() {
   };
 
   return (
-    <div ref={searchRef} className="relative w-full max-w-md">
+    <div ref={searchRef} className="relative w-full">
       <div className="relative">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-gray-400 dark:text-gray-600" />
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-zinc-500" />
 
         <input
           type="text"
@@ -130,7 +130,7 @@ export function GlobalSearch() {
             setIsOpen(true);
           }}
           onFocus={() => setIsOpen(true)}
-          className="w-full rounded-lg border border-gray-200 bg-gray-100 py-2 pl-10 pr-10 text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+          className="h-10 w-full rounded-xl border border-white/10 bg-white/5 py-2 pl-10 pr-10 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-orange-400/70 focus:outline-none focus:ring-2 focus:ring-orange-400/30 disabled:cursor-not-allowed disabled:opacity-60"
         />
 
         {query && (
@@ -141,7 +141,7 @@ export function GlobalSearch() {
               setDebouncedQuery("");
               setIsOpen(false);
             }}
-            className="absolute right-3 top-1/2 -translate-y-1/2 transform text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            className="absolute right-3 top-1/2 -translate-y-1/2 transform text-zinc-500 transition-colors hover:text-zinc-300"
           >
             <X className="h-4 w-4" />
           </button>
@@ -149,32 +149,32 @@ export function GlobalSearch() {
       </div>
 
       {isOpen && canQuery && (
-        <div className="absolute left-0 right-0 top-full z-50 mt-2 rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800">
+        <div className="nexo-floating-panel absolute left-0 right-0 top-full z-50 mt-2 max-h-96 overflow-hidden rounded-xl p-1">
           {isSearching ? (
-            <div className="flex items-center justify-center gap-2 p-4 text-gray-600 dark:text-gray-400">
+            <div className="flex items-center justify-center gap-2 p-4 text-zinc-400">
               <Loader className="h-4 w-4 animate-spin" />
               <span className="text-sm">Buscando...</span>
             </div>
           ) : results.length > 0 ? (
-            <div className="max-h-96 overflow-y-auto">
+            <div className="max-h-96 overflow-y-auto" data-scrollbar="nexo">
               {results.map((result) => (
                 <button
                   key={`${result.type}-${result.id}`}
                   type="button"
                   onClick={() => handleSelectResult(result)}
-                  className="flex w-full items-center gap-3 border-b border-gray-100 px-4 py-3 text-left transition-colors hover:bg-gray-50 last:border-b-0 dark:border-gray-700 dark:hover:bg-gray-700"
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-white/8"
                 >
-                  <div className="flex-shrink-0 text-gray-400 dark:text-gray-600">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-zinc-400">
                     {getResultIcon(result.type)}
                   </div>
 
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-gray-900 dark:text-white">
+                    <p className="truncate text-sm font-medium text-zinc-100">
                       {result.title}
                     </p>
 
                     {result.subtitle && (
-                      <p className="truncate text-xs text-gray-500 dark:text-gray-400">
+                      <p className="truncate text-xs text-zinc-400">
                         {result.subtitle}
                       </p>
                     )}
@@ -183,7 +183,7 @@ export function GlobalSearch() {
               ))}
             </div>
           ) : query.trim().length >= 2 ? (
-            <div className="p-4 text-center text-sm text-gray-500 dark:text-gray-400">
+            <div className="p-4 text-center text-sm text-zinc-400">
               Nenhum resultado encontrado
             </div>
           ) : null}
