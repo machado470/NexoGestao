@@ -26,7 +26,7 @@ function getSeverityClasses(severity: OperationalDecision["severity"]) {
     return "border-amber-300 bg-amber-50/80 dark:border-amber-900/60 dark:bg-amber-950/20";
   }
 
-  return "border-zinc-200 bg-zinc-50/80 dark:border-zinc-800 dark:bg-zinc-900/40";
+  return "border-[var(--border-subtle)] bg-zinc-50/80 dark:border-zinc-800 dark:bg-[var(--surface-base)]/40";
 }
 
 function getSeverityLabel(severity: OperationalDecision["severity"]) {
@@ -175,10 +175,10 @@ export function OperationalCard({ decision, source, riskOperationalState }: Oper
   return (
     <article className={`rounded-xl border p-4 ${getSeverityClasses(decision.severity)}`}>
       <div className="flex flex-wrap items-center gap-2">
-        <span className="inline-flex rounded-full border border-black/10 bg-white/80 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-700 dark:border-white/15 dark:bg-zinc-950/60 dark:text-zinc-200">
+        <span className="inline-flex rounded-full border border-black/10 bg-white/80 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-secondary)] dark:border-white/15 dark:bg-zinc-950/60 dark:text-[var(--text-primary)]">
           {getSeverityLabel(decision.severity)}
         </span>
-        <span className="inline-flex rounded-full border border-black/10 bg-white/80 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-700 dark:border-white/15 dark:bg-zinc-950/60 dark:text-zinc-200">
+        <span className="inline-flex rounded-full border border-black/10 bg-white/80 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-secondary)] dark:border-white/15 dark:bg-zinc-950/60 dark:text-[var(--text-primary)]">
           {getStateLabel(decision.state)}
         </span>
         {hasAutomaticAction ? (
@@ -187,7 +187,7 @@ export function OperationalCard({ decision, source, riskOperationalState }: Oper
           </span>
         ) : null}
         {hasManualOnly ? (
-          <span className="inline-flex rounded-full border border-zinc-500/30 bg-zinc-500/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-700 dark:text-zinc-300">
+          <span className="inline-flex rounded-full border border-zinc-500/30 bg-zinc-500/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-secondary)] dark:text-[var(--text-secondary)]">
             Manual
           </span>
         ) : null}
@@ -220,11 +220,11 @@ export function OperationalCard({ decision, source, riskOperationalState }: Oper
         ) : null}
       </div>
 
-      <h3 className="mt-3 text-base font-semibold text-zinc-900 dark:text-zinc-100">
+      <h3 className="mt-3 text-base font-semibold text-[var(--text-primary)] dark:text-[var(--text-primary)]">
         {decision.title}
       </h3>
-      <p className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">{decision.summary}</p>
-      <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
+      <p className="mt-1 text-sm text-[var(--text-secondary)] dark:text-[var(--text-secondary)]">{decision.summary}</p>
+      <p className="mt-1 text-xs text-[var(--text-secondary)] dark:text-[var(--text-muted)]">
         Impacto {decision.impactScore ?? 0}/100 • urgência {decision.urgencyScore ?? 0}/100 • prioridade {decision.contextualPriority ?? "low"}
       </p>
       {autoAction ? (
@@ -261,7 +261,7 @@ export function OperationalCard({ decision, source, riskOperationalState }: Oper
         </p>
       ) : null}
       {lastMessage ? (
-        <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">{lastMessage}</p>
+        <p className="mt-1 text-xs text-[var(--text-secondary)] dark:text-[var(--text-muted)]">{lastMessage}</p>
       ) : null}
 
       <div className="mt-4 flex flex-wrap gap-2">

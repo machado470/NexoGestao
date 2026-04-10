@@ -6,7 +6,7 @@ import {
   getQueryUiState,
   normalizeArrayPayload,
 } from "@/lib/query-helpers";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/design-system";
 import {
   History,
   RefreshCcw,
@@ -391,7 +391,7 @@ export default function TimelinePage() {
           title="Timeline"
           description="Carregando rastreabilidade operacional para sugerir a próxima ação."
         />
-        <SurfaceSection className="flex min-h-[180px] items-center justify-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
+        <SurfaceSection className="flex min-h-[180px] items-center justify-center gap-2 text-sm text-[var(--text-muted)] dark:text-[var(--text-muted)]">
           <Loader2 className="h-4 w-4 animate-spin" />
           Carregando timeline...
         </SurfaceSection>
@@ -779,7 +779,7 @@ export default function TimelinePage() {
                     </div>
 
                     {showMetadata && event.metadata ? (
-                      <pre className="mt-4 overflow-x-auto rounded-lg bg-slate-50 p-3 text-xs text-gray-700 dark:bg-gray-900 dark:text-gray-300">
+                      <pre className="mt-4 overflow-x-auto rounded-lg bg-[var(--surface-base)] p-3 text-xs text-gray-700 dark:bg-gray-900 dark:text-gray-300">
                         {JSON.stringify(event.metadata, null, 2)}
                       </pre>
                     ) : null}

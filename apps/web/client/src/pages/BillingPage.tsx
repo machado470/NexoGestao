@@ -5,7 +5,7 @@ import { trpc } from "@/lib/trpc";
 import { useProductAnalytics } from "@/hooks/useProductAnalytics";
 import { PageHero, PageShell, SmartPage, SurfaceSection } from "@/components/PagePattern";
 import { EmptyState } from "@/components/EmptyState";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/design-system";
 import { getQueryUiState, normalizeArrayPayload } from "@/lib/query-helpers";
 
 type PlanName = "STARTER" | "PRO" | "SCALE" | "FREE";
@@ -199,10 +199,10 @@ export default function BillingPage() {
       />
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-        <div className="nexo-card-kpi p-4"><p className="text-xs uppercase tracking-wide text-zinc-500">Plano atual</p><p className="relative mt-2 text-2xl font-bold tracking-tight">{currentPlan}</p></div>
-        <div className="nexo-card-kpi p-4"><p className="text-xs uppercase tracking-wide text-zinc-500">Limites em risco</p><p className="relative mt-2 text-2xl font-bold tracking-tight">{blockedItems.length}</p></div>
-        <div className="nexo-card-kpi p-4"><p className="text-xs uppercase tracking-wide text-zinc-500">Modo</p><p className="relative mt-2 text-2xl font-bold tracking-tight">{isTrial ? "Trial" : "Ativo"}</p></div>
-        <div className="nexo-card-kpi p-4"><p className="text-xs uppercase tracking-wide text-zinc-500">Próxima ação</p><p className="relative mt-2 text-xl font-bold tracking-tight">{blockedItems.length > 0 ? "Upgrade urgente" : "Revisar limites"}</p></div>
+        <div className="nexo-card-kpi p-4"><p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Plano atual</p><p className="relative mt-2 text-2xl font-bold tracking-tight">{currentPlan}</p></div>
+        <div className="nexo-card-kpi p-4"><p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Limites em risco</p><p className="relative mt-2 text-2xl font-bold tracking-tight">{blockedItems.length}</p></div>
+        <div className="nexo-card-kpi p-4"><p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Modo</p><p className="relative mt-2 text-2xl font-bold tracking-tight">{isTrial ? "Trial" : "Ativo"}</p></div>
+        <div className="nexo-card-kpi p-4"><p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Próxima ação</p><p className="relative mt-2 text-xl font-bold tracking-tight">{blockedItems.length > 0 ? "Upgrade urgente" : "Revisar limites"}</p></div>
       </div>
       {!stripeConfigured ? (
         <SurfaceSection className="border-amber-300/60 bg-amber-50 text-amber-900 dark:border-amber-600/50 dark:bg-amber-900/20 dark:text-amber-200">
@@ -283,7 +283,7 @@ export default function BillingPage() {
       ) : null}
 
       {queryState.isInitialLoading ? (
-        <SurfaceSection className="p-8 text-sm text-zinc-500 dark:text-zinc-400">
+        <SurfaceSection className="p-8 text-sm text-[var(--text-muted)] dark:text-[var(--text-muted)]">
           <Loader2 className="mr-2 inline h-4 w-4 animate-spin" />
           Carregando status de assinatura...
         </SurfaceSection>
@@ -299,10 +299,10 @@ export default function BillingPage() {
             return (
               <article key={name} className={`nexo-card-operational ${planTone(currentPlan, name)}`}>
                 <h2 className="text-base font-semibold">{name}</h2>
-                <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                <p className="mt-1 text-sm text-[var(--text-muted)] dark:text-[var(--text-muted)]">
                   {formatCurrency(PLAN_BASE_PRICE_CENTS[name as PlanName] ?? 0)} / mês
                 </p>
-                <p className="mt-2 text-xs text-zinc-600 dark:text-zinc-300">{PLAN_GAIN[name as PlanName]}</p>
+                <p className="mt-2 text-xs text-[var(--text-secondary)] dark:text-[var(--text-secondary)]">{PLAN_GAIN[name as PlanName]}</p>
                 <div className="mt-4 space-y-2 text-xs">
                   <p>Clientes: {limits?.limits?.customers ?? "—"}</p>
                   <p>Agendamentos: {limits?.limits?.appointments ?? "—"}</p>
@@ -336,7 +336,7 @@ export default function BillingPage() {
       <SurfaceSection className="space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-300">
+            <p className="mt-1 text-xs text-[var(--text-secondary)] dark:text-[var(--text-secondary)]">
               Seu upgrade libera mais execução, mais cobranças e mais receita confirmada sem bloqueio.
             </p>
           </div>

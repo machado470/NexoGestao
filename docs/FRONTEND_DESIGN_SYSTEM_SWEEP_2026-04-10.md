@@ -1,0 +1,112 @@
+# Frontend Design System Sweep Report
+
+## Remaining occurrences by pattern
+- `text-zinc`: 0 ocorrência(s)
+- `bg-zinc`: 0 ocorrência(s)
+- `bg-slate`: 0 ocorrência(s)
+- `text-slate`: 0 ocorrência(s)
+- `bg-gray`: 0 ocorrência(s)
+- `text-gray`: 0 ocorrência(s)
+- `ui/button`: 0 ocorrência(s)
+- `className="bg-`: 0 ocorrência(s)
+- `className="text-`: 0 ocorrência(s)
+- `shadow-lg`: 0 ocorrência(s)
+- `shadow-xl`: 0 ocorrência(s)
+- `backdrop-blur`: 0 ocorrência(s)
+- `#[0-9A-Fa-f]{3,8}`: 0 ocorrência(s)
+
+## Files changed in this sweep
+- `apps/web/client/src/App.tsx`
+- `apps/web/client/src/components/AIChatBox.tsx`
+- `apps/web/client/src/components/ArchitectureCard.tsx`
+- `apps/web/client/src/components/AuthMarketingShell.tsx`
+- `apps/web/client/src/components/Breadcrumbs.tsx`
+- `apps/web/client/src/components/ConfirmDeleteModal.tsx`
+- `apps/web/client/src/components/ConsentBanner.tsx`
+- `apps/web/client/src/components/ContactHistoryModal.tsx`
+- `apps/web/client/src/components/CreateAppointmentModal.tsx`
+- `apps/web/client/src/components/CreateChargeModal.tsx`
+- `apps/web/client/src/components/CreateCustomerModal.tsx`
+- `apps/web/client/src/components/CreateExpenseModal.tsx`
+- `apps/web/client/src/components/CreateLaunchModal.tsx`
+- `apps/web/client/src/components/CreatePersonModal.tsx`
+- `apps/web/client/src/components/CreateServiceOrderModal.tsx`
+- `apps/web/client/src/components/CriticalActionOverlay.tsx`
+- `apps/web/client/src/components/DataTable.tsx`
+- `apps/web/client/src/components/DemoEnvironmentCta.tsx`
+- `apps/web/client/src/components/DetailModal.tsx`
+- `apps/web/client/src/components/EditChargeModal.tsx`
+- `apps/web/client/src/components/EditCustomerModal.tsx`
+- `apps/web/client/src/components/EditPersonModal.tsx`
+- `apps/web/client/src/components/EditServiceOrderModal.tsx`
+- `apps/web/client/src/components/EmptyState.tsx`
+- `apps/web/client/src/components/GoogleOAuthButton.tsx`
+- `apps/web/client/src/components/ManusDialog.tsx`
+- `apps/web/client/src/components/MarketingLayout.tsx`
+- `apps/web/client/src/components/ModalFlowShell.tsx`
+- `apps/web/client/src/components/NotificationCenter.tsx`
+- `apps/web/client/src/components/OnboardingTooltip.tsx`
+- `apps/web/client/src/components/PagePattern.tsx`
+- `apps/web/client/src/components/QueryStateBoundary.tsx`
+- `apps/web/client/src/components/SearchCommand.tsx`
+- `apps/web/client/src/components/TermsModal.tsx`
+- `apps/web/client/src/components/design-system.tsx`
+- `apps/web/client/src/components/operating-system/ActionBar.tsx`
+- `apps/web/client/src/components/operating-system/ActionFeed.tsx`
+- `apps/web/client/src/components/operating-system/ActionFeedbackButton.tsx`
+- `apps/web/client/src/components/operating-system/AlertStrip.tsx`
+- `apps/web/client/src/components/operating-system/NextActionCell.tsx`
+- `apps/web/client/src/components/operating-system/PageHeader.tsx`
+- `apps/web/client/src/components/operating-system/PipelineStage.tsx`
+- `apps/web/client/src/components/operating-system/RowActions.tsx`
+- `apps/web/client/src/components/operating-system/SeverityBadge.tsx`
+- `apps/web/client/src/components/operations/ExecutionOperationsPanel.tsx`
+- `apps/web/client/src/components/operations/OperationalActionFeed.tsx`
+- `apps/web/client/src/components/operations/OperationalCard.tsx`
+- `apps/web/client/src/components/service-orders/ServiceOrderCard.tsx`
+- `apps/web/client/src/components/service-orders/ServiceOrderDetailsPanel.tsx`
+- `apps/web/client/src/components/ui/alert-dialog.tsx`
+- `apps/web/client/src/components/ui/calendar.tsx`
+- `apps/web/client/src/components/ui/carousel.tsx`
+- `apps/web/client/src/components/ui/chart.tsx`
+- `apps/web/client/src/components/ui/context-menu.tsx`
+- `apps/web/client/src/components/ui/input-group.tsx`
+- `apps/web/client/src/components/ui/input.tsx`
+- `apps/web/client/src/components/ui/menubar.tsx`
+- `apps/web/client/src/components/ui/pagination.tsx`
+- `apps/web/client/src/components/ui/select.tsx`
+- `apps/web/client/src/components/ui/sheet.tsx`
+- `apps/web/client/src/components/ui/sidebar.tsx`
+- `apps/web/client/src/components/ui/tabs.tsx`
+- `apps/web/client/src/components/ui/textarea.tsx`
+- `apps/web/client/src/index.css`
+- `apps/web/client/src/lib/operations/operational-intelligence.ts`
+- `apps/web/client/src/pages/About.tsx`
+- `apps/web/client/src/pages/AcceptInvitePage.tsx`
+- `apps/web/client/src/pages/AppointmentsPage.tsx`
+- `apps/web/client/src/pages/AuthCallbackPage.tsx`
+- `apps/web/client/src/pages/BillingPage.tsx`
+- `apps/web/client/src/pages/CalendarPage.tsx`
+- `apps/web/client/src/pages/ConfirmEmailPage.tsx`
+- `apps/web/client/src/pages/ContactPage.tsx`
+- `apps/web/client/src/pages/CustomersPage.tsx`
+- `apps/web/client/src/pages/ExecutiveDashboardNew.tsx`
+- `apps/web/client/src/pages/FinancesPage.tsx`
+- `apps/web/client/src/pages/ForgotPasswordPage.tsx`
+- `apps/web/client/src/pages/FunctionalitiesPage.tsx`
+- `apps/web/client/src/pages/GovernancePage.tsx`
+- `apps/web/client/src/pages/Landing.tsx`
+- `apps/web/client/src/pages/Login.tsx`
+- `apps/web/client/src/pages/NotFound.tsx`
+- `apps/web/client/src/pages/Onboarding.tsx`
+- `apps/web/client/src/pages/PeoplePage.tsx`
+- `apps/web/client/src/pages/PricingPage.tsx`
+- `apps/web/client/src/pages/PrivacyPolicy.tsx`
+- `apps/web/client/src/pages/ProductPage.tsx`
+- `apps/web/client/src/pages/Register.tsx`
+- `apps/web/client/src/pages/ResetPasswordPage.tsx`
+- `apps/web/client/src/pages/ServiceOrdersPage.tsx`
+- `apps/web/client/src/pages/SettingsPage.tsx`
+- `apps/web/client/src/pages/TermsOfService.tsx`
+- `apps/web/client/src/pages/TimelinePage.tsx`
+- `apps/web/client/src/pages/WhatsAppPage.tsx`

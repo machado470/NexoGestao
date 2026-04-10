@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Search, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
+import { Button } from '@/components/design-system';
 
 interface SearchResult {
   id: string;
@@ -86,7 +86,7 @@ export function SearchCommand({ results, onSearch, isLoading = false }: SearchCo
 
       {/* Search Dialog */}
       <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-lg">
-        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
+        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
           {/* Search Input */}
           <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2">
             <Search className="w-5 h-5 text-gray-400" />

@@ -126,7 +126,7 @@ export function Breadcrumbs() {
   const all = [{ label: "Início", href: "/executive-dashboard" }, ...breadcrumbs];
 
   return (
-    <nav className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
+    <nav className="flex items-center gap-2 text-xs text-[var(--text-muted)] dark:text-[var(--text-muted)]">
       {all.map((crumb, index) => {
         const isLast = index === all.length - 1;
 
@@ -138,14 +138,14 @@ export function Breadcrumbs() {
               <button
                 type="button"
                 onClick={() => navigate(crumb.href!)}
-                className="transition-colors hover:text-zinc-800 dark:hover:text-zinc-100"
+                className="transition-colors hover:text-[var(--text-primary)] dark:hover:text-[var(--text-primary)]"
               >
                 {index === 0 ? <Home className="h-3.5 w-3.5" /> : crumb.label}
               </button>
             ) : (
               <span
                 className={
-                  isLast ? "font-medium text-zinc-700 dark:text-zinc-200" : undefined
+                  isLast ? "font-medium text-[var(--text-secondary)] dark:text-[var(--text-primary)]" : undefined
                 }
               >
                 {crumb.label}

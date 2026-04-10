@@ -36,8 +36,8 @@ export function AuthMarketingShell({
   return (
     <div className="landing-root min-h-screen text-slate-900">
       <main className="container py-6 sm:py-10">
-        <div className="grid min-h-[calc(100vh-5rem)] overflow-hidden rounded-[2rem] border border-slate-200/70 bg-white/80 shadow-[0_25px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl lg:grid-cols-[1.05fr_0.95fr]">
-          <section className="relative hidden border-r border-slate-200/80 bg-white/70 lg:block">
+        <div className="grid min-h-[calc(100vh-5rem)] overflow-hidden rounded-[2rem] border border-[var(--border-subtle)] bg-white/80 shadow-[0_25px_60px_rgba(15,23,42,0.08)] backdrop-blur-sm lg:grid-cols-[1.05fr_0.95fr]">
+          <section className="relative hidden border-r border-[var(--border-subtle)] bg-white/70 lg:block">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.16),transparent_35%),radial-gradient(circle_at_bottom_right,rgba(59,130,246,0.12),transparent_30%)]" />
             <div className="relative flex h-full flex-col justify-between p-10 xl:p-14">
               <div>
@@ -77,7 +77,7 @@ export function AuthMarketingShell({
                 <p className="text-sm font-semibold text-slate-900">{bottomPanelTitle}</p>
                 <div className="mt-3 grid gap-3 sm:grid-cols-3">
                   {bottomPanelSteps.map((step) => (
-                    <div key={step.label} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                    <div key={step.label} className="rounded-xl border border-slate-200 bg-[var(--surface-base)] p-3">
                       <p className="text-xs text-slate-500">{step.label}</p>
                       <p className="mt-1 text-sm font-semibold text-slate-900">{step.value}</p>
                       <p className="mt-1 text-xs text-slate-500">{step.description}</p>
@@ -100,7 +100,7 @@ export function AuthMarketingShell({
               </button>
 
               <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_20px_45px_rgba(15,23,42,0.08)] sm:p-7">
-                <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-700">
+                <span className="inline-flex rounded-full border border-slate-200 bg-[var(--surface-base)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-700">
                   {badge}
                 </span>
                 <h2 className="mt-4 text-2xl font-semibold text-slate-900">{title}</h2>

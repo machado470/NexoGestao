@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/design-system";
 import {
   MessageCircle,
   RefreshCw,
@@ -193,7 +193,7 @@ export default function WhatsAppPage() {
     return (
       <PageShell>
         <PageHero eyebrow="WhatsApp" title="Canal de execução • WhatsApp" description="Preparando contexto da conversa para você agir em segundos." />
-        <SurfaceSection className="flex min-h-[180px] items-center justify-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
+        <SurfaceSection className="flex min-h-[180px] items-center justify-center gap-2 text-sm text-[var(--text-muted)] dark:text-[var(--text-muted)]">
           <RefreshCw className="h-4 w-4 animate-spin" />
           Carregando conversa e próxima ação...
         </SurfaceSection>
@@ -331,7 +331,7 @@ export default function WhatsAppPage() {
         ) : (
           <div data-scrollbar="nexo" className="max-h-[300px] space-y-2 overflow-y-auto pr-1">
             {messages.map((msg) => (
-              <div key={msg.id} className="nexo-text-wrap rounded-xl border border-zinc-200/80 bg-white/80 p-3 text-sm dark:border-white/10 dark:bg-zinc-900/60">
+              <div key={msg.id} className="nexo-text-wrap rounded-xl border border-[var(--border-subtle)]/80 bg-white/80 p-3 text-sm dark:border-white/10 dark:bg-[var(--surface-base)]/60">
                 {msg.content}
               </div>
             ))}

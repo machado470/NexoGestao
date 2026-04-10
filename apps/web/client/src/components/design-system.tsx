@@ -1,5 +1,33 @@
 import type { ComponentProps, ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { cva, type VariantProps } from "class-variance-authority";
+
+const buttonVariants = cva(
+  "inline-flex items-center justify-center gap-2 rounded-xl text-sm font-semibold transition disabled:pointer-events-none disabled:opacity-50",
+  {
+    variants: {
+      variant: {
+        default: "nexo-cta-primary",
+        secondary: "nexo-cta-secondary",
+        outline: "nexo-cta-secondary",
+        ghost:
+          "h-10 px-3 text-[var(--text-secondary)] hover:bg-[color-mix(in_srgb,var(--surface-base)_88%,transparent)] hover:text-[var(--text-primary)]",
+        destructive: "nexo-cta-primary",
+        link: "h-auto px-0 text-[var(--accent)] underline-offset-4 hover:underline",
+      },
+      size: {
+        default: "h-10 px-4",
+        sm: "h-9 px-3 text-xs",
+        lg: "h-11 px-6",
+        icon: "size-10 px-0",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+      size: "default",
+    },
+  }
+);
 
 export function AppShell({
   children,
@@ -199,6 +227,22 @@ export function GhostButton({ className, ...props }: ComponentProps<"button">) {
     />
   );
 }
+
+export function Button({
+  className,
+  variant,
+  size,
+  ...props
+}: ComponentProps<"button"> & VariantProps<typeof buttonVariants>) {
+  return (
+    <button
+      {...props}
+      className={cn(buttonVariants({ variant, size }), className)}
+    />
+  );
+}
+
+export { buttonVariants };
 
 export function EmptyState({
   title,

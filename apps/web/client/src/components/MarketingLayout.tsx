@@ -54,7 +54,7 @@ export function MarketingLayout({ children }: MarketingLayoutProps) {
 
   return (
     <div className="landing-root min-h-screen">
-      <header className="sticky top-0 z-50 border-b border-slate-200/70 bg-[#f8f9fb]/90 backdrop-blur-xl">
+      <header className="sticky top-0 z-50 border-b border-[var(--border-subtle)] bg-[#f8f9fb]/90 backdrop-blur-sm">
         <div className="container flex h-20 items-center justify-between gap-4">
           <button
             type="button"

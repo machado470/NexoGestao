@@ -1,4 +1,4 @@
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/design-system";
 import { AlertCircle, Loader2 } from "lucide-react";
 import {
   Dialog,
@@ -32,7 +32,7 @@ export function ConfirmDeleteModal({
     <Dialog open={isOpen} onOpenChange={(open) => (!open ? onCancel() : null)}>
       <DialogContent
         showCloseButton={false}
-        className="max-w-md border-zinc-800/80 bg-white p-0 shadow-lg dark:bg-gray-800"
+        className="max-w-md border-[var(--border-subtle)] bg-white p-0 shadow-sm dark:bg-gray-800"
       >
         <DialogHeader className="border-b border-gray-200 p-6 dark:border-gray-700">
           <DialogTitle className="flex items-start gap-3 text-lg text-gray-900 dark:text-white">

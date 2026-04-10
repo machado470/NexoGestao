@@ -1,6 +1,6 @@
 import { useLocation } from "wouter";
 import { Loader2, Sparkles } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/design-system";
 import { useDemoEnvironment } from "@/hooks/useDemoEnvironment";
 
 type Props = {

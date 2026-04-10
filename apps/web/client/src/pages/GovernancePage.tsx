@@ -6,7 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { SurfaceSection } from "@/components/PagePattern";
 import { EmptyState } from "@/components/EmptyState";
 import { Loader2, ShieldAlert } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/design-system";
 import { DemoEnvironmentCta } from "@/components/DemoEnvironmentCta";
 import { ActionBarWrapper, PageWrapper } from "@/components/operating-system/Wrappers";
 import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedbackButton";
@@ -189,15 +189,15 @@ export default function GovernancePage() {
   };
 
   if (isInitializing) {
-    return <PageWrapper title="Governança" subtitle="Validando sessão e permissões."><SurfaceSection className="flex min-h-[180px] items-center justify-center gap-2 text-sm text-zinc-500 dark:text-zinc-400"><Loader2 className="h-4 w-4 animate-spin" />Carregando sessão...</SurfaceSection></PageWrapper>;
+    return <PageWrapper title="Governança" subtitle="Validando sessão e permissões."><SurfaceSection className="flex min-h-[180px] items-center justify-center gap-2 text-sm text-[var(--text-muted)] dark:text-[var(--text-muted)]"><Loader2 className="h-4 w-4 animate-spin" />Carregando sessão...</SurfaceSection></PageWrapper>;
   }
 
   if (!isAuthenticated) {
-    return <PageWrapper title="Governança" subtitle="Sua sessão não está ativa."><SurfaceSection className="text-sm text-zinc-500 dark:text-zinc-400">Faça login para acessar governança.</SurfaceSection></PageWrapper>;
+    return <PageWrapper title="Governança" subtitle="Sua sessão não está ativa."><SurfaceSection className="text-sm text-[var(--text-muted)] dark:text-[var(--text-muted)]">Faça login para acessar governança.</SurfaceSection></PageWrapper>;
   }
 
   if (queryState.isInitialLoading) {
-    return <PageWrapper title="Governança" subtitle="Montando leitura institucional de risco."><SurfaceSection className="flex min-h-[180px] items-center justify-center gap-2 text-sm text-zinc-500 dark:text-zinc-400"><Loader2 className="h-4 w-4 animate-spin" />Carregando governança...</SurfaceSection></PageWrapper>;
+    return <PageWrapper title="Governança" subtitle="Montando leitura institucional de risco."><SurfaceSection className="flex min-h-[180px] items-center justify-center gap-2 text-sm text-[var(--text-muted)] dark:text-[var(--text-muted)]"><Loader2 className="h-4 w-4 animate-spin" />Carregando governança...</SurfaceSection></PageWrapper>;
   }
 
   if (queryState.shouldBlockForError) {
@@ -232,7 +232,7 @@ export default function GovernancePage() {
         <div className="space-y-2">
           {autoProblems.map((problem) => (
             <div key={problem.id} className={`nexo-subtle-surface border flex flex-col gap-3 p-3 md:flex-row md:items-center md:justify-between ${getSeverityClass(problem.severity)}`}>
-              <p className="text-sm font-medium text-zinc-800 dark:text-zinc-100">{problem.message}</p>
+              <p className="text-sm font-medium text-[var(--text-primary)] dark:text-[var(--text-primary)]">{problem.message}</p>
               <Button className="min-h-11 w-full md:w-auto" onClick={() => navigate(problem.route)}>
                 {problem.cta}
               </Button>
@@ -252,9 +252,9 @@ export default function GovernancePage() {
               : "border-emerald-200 bg-emerald-50 dark:border-emerald-900/40 dark:bg-emerald-950/20"
         }`}
       >
-        <p className="text-xs uppercase tracking-[0.18em] text-zinc-600 dark:text-zinc-300">Score institucional</p>
-        <p className="mt-2 text-5xl font-bold text-zinc-900 dark:text-zinc-100">{institutionalRiskScore}</p>
-        <p className="mt-2 text-sm text-zinc-700 dark:text-zinc-300">
+        <p className="text-xs uppercase tracking-[0.18em] text-[var(--text-secondary)] dark:text-[var(--text-secondary)]">Score institucional</p>
+        <p className="mt-2 text-5xl font-bold text-[var(--text-primary)] dark:text-[var(--text-primary)]">{institutionalRiskScore}</p>
+        <p className="mt-2 text-sm text-[var(--text-secondary)] dark:text-[var(--text-secondary)]">
           {scoreTone === "critical"
             ? "Risco alto: trate gargalos críticos agora para proteger caixa e operação."
             : scoreTone === "attention"
@@ -264,14 +264,14 @@ export default function GovernancePage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <SurfaceSection><p className="text-xs uppercase text-zinc-500">Financeiro</p><p className="mt-1 text-3xl font-bold">{financialScore}</p></SurfaceSection>
-        <SurfaceSection><p className="text-xs uppercase text-zinc-500">Operação</p><p className="mt-1 text-3xl font-bold">{operationScore}</p></SurfaceSection>
-        <SurfaceSection><p className="text-xs uppercase text-zinc-500">Comunicação</p><p className="mt-1 text-3xl font-bold">{communicationScore}</p></SurfaceSection>
+        <SurfaceSection><p className="text-xs uppercase text-[var(--text-muted)]">Financeiro</p><p className="mt-1 text-3xl font-bold">{financialScore}</p></SurfaceSection>
+        <SurfaceSection><p className="text-xs uppercase text-[var(--text-muted)]">Operação</p><p className="mt-1 text-3xl font-bold">{operationScore}</p></SurfaceSection>
+        <SurfaceSection><p className="text-xs uppercase text-[var(--text-muted)]">Comunicação</p><p className="mt-1 text-3xl font-bold">{communicationScore}</p></SurfaceSection>
       </div>
 
       <SurfaceSection className="space-y-2">
         <h2 className="font-semibold">O que está acontecendo e por que importa</h2>
-        <ul className="list-disc space-y-1 pl-5 text-sm text-zinc-600 dark:text-zinc-300">
+        <ul className="list-disc space-y-1 pl-5 text-sm text-[var(--text-secondary)] dark:text-[var(--text-secondary)]">
           {whyScore.map((item) => <li key={item}>{item}</li>)}
         </ul>
       </SurfaceSection>
@@ -283,7 +283,7 @@ export default function GovernancePage() {
             <div key={item.id} className="nexo-subtle-surface flex flex-col gap-3 p-3 md:flex-row md:items-center md:justify-between">
               <div>
                 <p className="font-medium">{item.title}</p>
-                <p className="text-sm text-zinc-500 dark:text-zinc-400">{item.description}</p>
+                <p className="text-sm text-[var(--text-muted)] dark:text-[var(--text-muted)]">{item.description}</p>
               </div>
               <Button
                 className="min-h-11 w-full md:w-auto"
@@ -327,14 +327,14 @@ export default function GovernancePage() {
       {displayRuns.length > 1 ? (
         <SurfaceSection className="space-y-2 border-emerald-200 bg-emerald-50/80 dark:border-emerald-900/40 dark:bg-emerald-950/20">
           <h2 className="font-semibold">Antes vs agora</h2>
-          <p className="text-sm text-zinc-700 dark:text-zinc-300">
+          <p className="text-sm text-[var(--text-secondary)] dark:text-[var(--text-secondary)]">
             Antes: operação desorganizada e decisões reativas. Agora: fluxo completo, cobrança ativa e controle institucional visível no score.
           </p>
         </SurfaceSection>
       ) : null}
 
       {displayAlerts?.total ? (
-        <SurfaceSection className="text-sm text-zinc-500 dark:text-zinc-400">
+        <SurfaceSection className="text-sm text-[var(--text-muted)] dark:text-[var(--text-muted)]">
           Alertas monitorados: {Number(displayAlerts.total ?? 0)}
         </SurfaceSection>
       ) : null}

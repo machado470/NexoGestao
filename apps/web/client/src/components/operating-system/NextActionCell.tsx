@@ -7,8 +7,8 @@ export function NextActionCell({ entity, item }: { entity: "service_order" | "ch
   return (
     <div className="space-y-1">
       <SeverityBadge severity={next.severity} />
-      <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{next.label}</p>
-      <p className="text-xs text-zinc-600 dark:text-zinc-400">{next.reason}</p>
+      <p className="text-sm font-medium text-[var(--text-primary)] dark:text-[var(--text-primary)]">{next.label}</p>
+      <p className="text-xs text-[var(--text-secondary)] dark:text-[var(--text-muted)]">{next.reason}</p>
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { ArrowLeft, Loader2, LockKeyhole, Mail, UserRound } from "lucide-react";
 
 import { trpc } from "@/lib/trpc";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/design-system";
 import {
   Card,
   CardContent,
@@ -114,7 +114,7 @@ export default function AcceptInvitePage() {
             Ir para login
           </button>
 
-          <Card className="border-border/80 bg-card/95 shadow-xl">
+          <Card className="border-border/80 bg-card/95 shadow-sm">
             <CardHeader className="space-y-3">
               <Badge variant="outline" className="w-fit">
                 Convite de equipe

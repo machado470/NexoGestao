@@ -19,7 +19,7 @@ export function PipelineStage({
             onClick={() => onStageSelect?.(selectedStage === stage.label ? null : stage.label)}
             className={`rounded-lg border p-2 text-center transition ${selectedStage === stage.label ? "border-orange-400 ring-2 ring-orange-200 dark:ring-orange-900/40" : ""} ${stage.value === bottleneckValue && bottleneckValue > 0 ? "border-red-300 bg-red-50/50 dark:border-red-900/40 dark:bg-red-950/20" : ""}`}
           >
-            <p className="text-[11px] uppercase tracking-wide text-zinc-500">{stage.label}</p>
+            <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">{stage.label}</p>
             <p className="text-lg font-semibold">{stage.value}</p>
             {stage.value === bottleneckValue && bottleneckValue > 0 ? (
               <p className="text-[10px] uppercase tracking-wide text-red-600 dark:text-red-300">Gargalo</p>

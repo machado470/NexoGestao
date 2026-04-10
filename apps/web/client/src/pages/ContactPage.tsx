@@ -194,7 +194,7 @@ export default function ContactPage() {
       </section>
 
       <section className="container pb-16 md:pb-20">
-        <article className="rounded-3xl border border-slate-200 bg-slate-50 p-8 md:p-10">
+        <article className="rounded-3xl border border-slate-200 bg-[var(--surface-base)] p-8 md:p-10">
           <h2 className="text-2xl font-semibold text-slate-900">
             Contexto institucional
           </h2>

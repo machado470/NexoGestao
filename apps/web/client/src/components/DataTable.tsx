@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { ChevronDown, ChevronRight, ChevronUp, Search } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/design-system";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -154,7 +154,7 @@ export function DataTable<T extends { id?: number | string }>({
                   onClick={() => setExpandedRow(expandedRow === row.id ? null : (row.id ?? null))}
                   className="flex w-full items-center justify-between px-4 py-3"
                 >
-                  <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                  <span className="text-sm font-semibold text-[var(--text-primary)] dark:text-[var(--text-primary)]">
                     {primaryColumn?.render
                       ? primaryColumn.render(row[primaryColumn.key], row)
                       : String(row[primaryColumn?.key as keyof T] ?? "—")}
@@ -162,11 +162,11 @@ export function DataTable<T extends { id?: number | string }>({
                   <ChevronRight className={`h-4 w-4 transition-transform ${expandedRow === row.id ? "rotate-90" : ""}`} />
                 </button>
                 {expandedRow === row.id ? (
-                  <div className="space-y-2 border-t border-slate-200/70 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/[0.02]">
+                  <div className="space-y-2 border-t border-[var(--border-subtle)] bg-[var(--surface-base)] p-4 dark:border-white/10 dark:bg-white/[0.02]">
                     {visibleColumns.slice(1).map((column) => (
                       <div key={String(column.key)} className="flex items-start justify-between gap-2">
-                        <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">{column.label}</span>
-                        <span className="text-sm text-right text-zinc-800 dark:text-zinc-200">
+                        <span className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">{column.label}</span>
+                        <span className="text-sm text-right text-[var(--text-primary)] dark:text-[var(--text-primary)]">
                           {column.render ? column.render(row[column.key], row) : String(row[column.key] ?? "—")}
                         </span>
                       </div>

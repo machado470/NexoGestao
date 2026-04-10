@@ -42,7 +42,7 @@ export default function ArchitectureCard({
       viewport={{ once: true }}
       whileHover={{ scale: 1.05, y: -5 }}
       onClick={onClick}
-      className={`relative overflow-hidden rounded-xl border backdrop-blur-md bg-gradient-to-br p-6 transition-all duration-300 cursor-pointer group ${colorMap[color]}`}
+      className={`relative overflow-hidden rounded-xl border backdrop-blur-sm bg-gradient-to-br p-6 transition-all duration-300 cursor-pointer group ${colorMap[color]}`}
     >
       {/* Background gradient effect */}
       <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">

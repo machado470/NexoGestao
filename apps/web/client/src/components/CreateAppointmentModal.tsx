@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/design-system";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -137,10 +137,10 @@ export function CreateAppointmentModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(nextOpen) => (!nextOpen ? handleClose() : undefined)}>
-      <DialogContent className="max-w-xl border-zinc-800/80 bg-zinc-950/95 p-0 text-zinc-100 shadow-2xl backdrop-blur">
+      <DialogContent className="max-w-xl border-[var(--border-subtle)] bg-[var(--card-bg)] p-0 text-[var(--text-primary)] shadow-2xl backdrop-blur">
         <DialogHeader className="border-b border-zinc-800/90 px-6 py-5">
           <DialogTitle className="text-xl font-semibold">Novo Agendamento</DialogTitle>
-          <DialogDescription className="text-zinc-400">
+          <DialogDescription className="text-[var(--text-muted)]">
             Agende compromissos no mesmo padrão visual das páginas modernas.
           </DialogDescription>
         </DialogHeader>
@@ -153,7 +153,7 @@ export function CreateAppointmentModal({
               onChange={(e) =>
                 setFormData({ ...formData, customerId: e.target.value })
               }
-              className="h-9 w-full rounded-md border border-zinc-700 bg-zinc-900/80 px-3 py-2 text-sm text-zinc-100 outline-none ring-offset-zinc-950 focus-visible:border-orange-400 focus-visible:ring-2 focus-visible:ring-orange-500/50"
+              className="h-9 w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none ring-offset-zinc-950 focus-visible:border-orange-400 focus-visible:ring-2 focus-visible:ring-orange-500/50"
             >
               <option value="">Selecione um cliente</option>
               {customers.map((customer) => (
@@ -170,7 +170,7 @@ export function CreateAppointmentModal({
               type="datetime-local"
               value={formData.startsAt}
               onChange={(e) => setFormData({ ...formData, startsAt: e.target.value })}
-              className="border-zinc-700 bg-zinc-900/80"
+              className="border-[var(--border-subtle)] bg-[var(--surface-base)]"
             />
           </div>
 
@@ -180,7 +180,7 @@ export function CreateAppointmentModal({
               type="datetime-local"
               value={formData.endsAt}
               onChange={(e) => setFormData({ ...formData, endsAt: e.target.value })}
-              className="border-zinc-700 bg-zinc-900/80"
+              className="border-[var(--border-subtle)] bg-[var(--surface-base)]"
             />
           </div>
 
@@ -194,7 +194,7 @@ export function CreateAppointmentModal({
                   status: e.target.value as AppointmentStatus,
                 })
               }
-              className="h-9 w-full rounded-md border border-zinc-700 bg-zinc-900/80 px-3 py-2 text-sm text-zinc-100 outline-none ring-offset-zinc-950 focus-visible:border-orange-400 focus-visible:ring-2 focus-visible:ring-orange-500/50"
+              className="h-9 w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none ring-offset-zinc-950 focus-visible:border-orange-400 focus-visible:ring-2 focus-visible:ring-orange-500/50"
             >
               <option value="SCHEDULED">Agendado</option>
               <option value="CONFIRMED">Confirmado</option>
@@ -209,7 +209,7 @@ export function CreateAppointmentModal({
             <Textarea
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              className="border-zinc-700 bg-zinc-900/80"
+              className="border-[var(--border-subtle)] bg-[var(--surface-base)]"
               placeholder="Observações"
               rows={3}
             />

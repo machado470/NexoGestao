@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button } from '@/components/ui/button';
+import { Button } from '@/components/design-system';
 import { ChevronRight, X } from 'lucide-react';
 
 interface OnboardingTooltipProps {
@@ -90,7 +90,7 @@ export function OnboardingTooltip({
 
       {/* Tooltip */}
       <div
-        className="fixed z-50 bg-white dark:bg-gray-900 rounded-lg shadow-lg p-4 w-80 border border-gray-200 dark:border-gray-700"
+        className="fixed z-50 bg-white dark:bg-gray-900 rounded-lg shadow-sm p-4 w-80 border border-gray-200 dark:border-gray-700"
         style={{
           top: `${tooltipPosition.top}px`,
           left: `${tooltipPosition.left}px`,

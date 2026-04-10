@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/design-system";
 import {
   getConcurrencyErrorMessage,
   isConcurrentConflictError,
@@ -194,13 +194,13 @@ export default function EditPersonModal({
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => (!nextOpen ? onClose() : undefined)}>
-      <DialogContent className="max-w-xl border-zinc-800/80 bg-zinc-950/95 p-0 text-zinc-100 shadow-2xl backdrop-blur">
+      <DialogContent className="max-w-xl border-[var(--border-subtle)] bg-[var(--card-bg)] p-0 text-[var(--text-primary)] shadow-2xl backdrop-blur">
         <DialogHeader className="border-b border-zinc-800/90 px-6 py-5">
           <DialogTitle className="flex items-center gap-2 text-xl font-semibold">
             <Pencil className="h-5 w-5 text-orange-500" />
             Editar pessoa
           </DialogTitle>
-          <DialogDescription className="text-zinc-400">
+          <DialogDescription className="text-[var(--text-muted)]">
             Atualize dados de equipe sem romper o padrão visual do produto.
           </DialogDescription>
         </DialogHeader>
@@ -229,7 +229,7 @@ export default function EditPersonModal({
                 id="edit-person-name"
                 value={formData.name}
                 onChange={(e) => handleChange("name", e.target.value)}
-                className="border-zinc-700 bg-zinc-900/80"
+                className="border-[var(--border-subtle)] bg-[var(--surface-base)]"
                 placeholder="Nome da pessoa"
               />
             </div>
@@ -240,7 +240,7 @@ export default function EditPersonModal({
                 id="edit-person-role"
                 value={formData.role}
                 onChange={(e) => handleChange("role", e.target.value)}
-                className="border-zinc-700 bg-zinc-900/80"
+                className="border-[var(--border-subtle)] bg-[var(--surface-base)]"
                 placeholder="Cargo ou papel"
               />
             </div>
@@ -252,12 +252,12 @@ export default function EditPersonModal({
                 type="email"
                 value={formData.email}
                 onChange={(e) => handleChange("email", e.target.value)}
-                className="border-zinc-700 bg-zinc-900/80"
+                className="border-[var(--border-subtle)] bg-[var(--surface-base)]"
                 placeholder="Email"
               />
             </div>
 
-            <label className="flex items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/60 p-3 text-sm">
+            <label className="flex items-center gap-2 rounded-lg border border-zinc-800 bg-[var(--surface-base)]/60 p-3 text-sm">
               <input
                 type="checkbox"
                 checked={formData.active}
@@ -267,7 +267,7 @@ export default function EditPersonModal({
             </label>
 
             <DialogFooter className="border-t border-zinc-800/90 pt-4">
-              <span className="mr-auto text-xs text-zinc-500">
+              <span className="mr-auto text-xs text-[var(--text-muted)]">
                 {hasChanges ? "Alterações pendentes" : "Nada para salvar"}
               </span>
 

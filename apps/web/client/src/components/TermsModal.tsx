@@ -1,5 +1,5 @@
 import { X } from "lucide-react";
-import { Button } from "./ui/button";
+import { Button } from "@/components/design-system";
 import { Dialog, DialogContent } from "./ui/dialog";
 
 interface TermsModalProps {
@@ -13,7 +13,7 @@ export function TermsModal({ isOpen, onClose, type }: TermsModalProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={open => !open && onClose()}>
-      <DialogContent className="max-w-2xl overflow-hidden border-zinc-800/80 bg-white p-0 shadow-xl dark:bg-gray-800">
+      <DialogContent className="max-w-2xl overflow-hidden border-[var(--border-subtle)] bg-white p-0 shadow-sm dark:bg-gray-800">
         <div className="flex max-h-[90vh] flex-col">
           {/* Header */}
           <div className="flex flex-shrink-0 items-center justify-between border-b border-gray-200 p-6 dark:border-gray-700">

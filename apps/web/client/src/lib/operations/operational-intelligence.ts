@@ -100,7 +100,7 @@ export function getOperationalSeverityClasses(severity: OperationalSeverity) {
   if (severity === "pending") {
     return "border-amber-200 bg-amber-50/90 dark:border-amber-900/40 dark:bg-amber-950/20";
   }
-  return "border-zinc-200 bg-zinc-50/80 dark:border-zinc-800 dark:bg-zinc-900/40";
+  return "border-[var(--border-subtle)] bg-zinc-50/80 dark:border-zinc-800 dark:bg-[var(--surface-base)]/40";
 }
 
 export function getOperationalSeverityLabel(severity: OperationalSeverity) {

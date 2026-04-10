@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/contexts/AuthContext";
 import { Loader2, Users, Plus } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/design-system";
 import { SmartPage, SurfaceSection } from "@/components/PagePattern";
 import { EmptyState } from "@/components/EmptyState";
 import {
@@ -192,7 +192,7 @@ export default function PeoplePage() {
     return (
       <PageWrapper title="Pessoas" subtitle="Carregando sessão...">
         <SurfaceSection className="flex min-h-[180px] items-center justify-center">
-          <div className="inline-flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
+          <div className="inline-flex items-center gap-2 text-sm text-[var(--text-muted)] dark:text-[var(--text-muted)]">
             <Loader2 className="h-4 w-4 animate-spin" />
             Carregando sessão...
           </div>
@@ -204,7 +204,7 @@ export default function PeoplePage() {
   if (!isAuthenticated) {
     return (
       <PageWrapper title="Pessoas" subtitle="Sua sessão não está ativa.">
-        <SurfaceSection className="text-sm text-zinc-500 dark:text-zinc-400">Faça login para acessar pessoas.</SurfaceSection>
+        <SurfaceSection className="text-sm text-[var(--text-muted)] dark:text-[var(--text-muted)]">Faça login para acessar pessoas.</SurfaceSection>
       </PageWrapper>
     );
   }
@@ -213,7 +213,7 @@ export default function PeoplePage() {
     return (
       <PageWrapper title="Pessoas" subtitle="Carregando base de pessoas...">
         <SurfaceSection className="flex min-h-[220px] items-center justify-center">
-          <div className="inline-flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
+          <div className="inline-flex items-center gap-2 text-sm text-[var(--text-muted)] dark:text-[var(--text-muted)]">
             <Loader2 className="h-4 w-4 animate-spin" />
             Carregando base de pessoas...
           </div>
@@ -283,14 +283,14 @@ export default function PeoplePage() {
       ) : null}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-        <div className="nexo-kpi-card p-4"><p className="text-xs text-zinc-500">Pessoas vinculadas</p><p className="text-2xl font-bold">{linkedStats?.count ?? 0}</p></div>
-        <div className="nexo-kpi-card p-4"><p className="text-xs text-zinc-500">Ativas</p><p className="text-2xl font-bold">{activePeople}</p></div>
-        <div className="nexo-kpi-card p-4"><p className="text-xs text-zinc-500">Com atenção</p><p className="text-2xl font-bold">{warningPeople}</p></div>
-        <div className="nexo-kpi-card p-4"><p className="text-xs text-zinc-500">O.S. sem responsável</p><p className="text-2xl font-bold">{unassignedOrders}</p></div>
+        <div className="nexo-kpi-card p-4"><p className="text-xs text-[var(--text-muted)]">Pessoas vinculadas</p><p className="text-2xl font-bold">{linkedStats?.count ?? 0}</p></div>
+        <div className="nexo-kpi-card p-4"><p className="text-xs text-[var(--text-muted)]">Ativas</p><p className="text-2xl font-bold">{activePeople}</p></div>
+        <div className="nexo-kpi-card p-4"><p className="text-xs text-[var(--text-muted)]">Com atenção</p><p className="text-2xl font-bold">{warningPeople}</p></div>
+        <div className="nexo-kpi-card p-4"><p className="text-xs text-[var(--text-muted)]">O.S. sem responsável</p><p className="text-2xl font-bold">{unassignedOrders}</p></div>
       </div>
 
       <SurfaceSection>
-        <p className="text-sm text-zinc-600 dark:text-zinc-300">
+        <p className="text-sm text-[var(--text-secondary)] dark:text-[var(--text-secondary)]">
           Bloco analítico: distribua carga da equipe para evitar gargalos de execução e reduzir riscos operacionais.
         </p>
       </SurfaceSection>
@@ -300,9 +300,9 @@ export default function PeoplePage() {
         {queue.length > 0 ? queue.map((item) => (
           <div key={item.person.id} className="nexo-subtle-surface flex items-center justify-between p-3">
             <span>{item.person.name}</span>
-            <span className="text-sm text-zinc-500">{item.workload} O.S.</span>
+            <span className="text-sm text-[var(--text-muted)]">{item.workload} O.S.</span>
           </div>
-        )) : <p className="text-sm text-zinc-500">Sem carga operacional registrada.</p>}
+        )) : <p className="text-sm text-[var(--text-muted)]">Sem carga operacional registrada.</p>}
       </SurfaceSection>
 
       {people.length === 0 ? (

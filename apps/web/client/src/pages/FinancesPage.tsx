@@ -16,7 +16,7 @@ import {
   normalizeStatus,
 } from "@/lib/operations/operations.utils";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/design-system";
 import FinanceOverviewAreaChart from "@/components/finance/FinanceOverviewAreaChart";
 import { Receipt } from "lucide-react";
 import { SmartPage, SurfaceSection } from "@/components/PagePattern";
@@ -602,7 +602,7 @@ export default function FinancesPage() {
         subtitle="Sua sessão não está ativa."
         breadcrumb={[{ label: "Operação" }, { label: "Financeiro" }]}
       >
-        <SurfaceSection className="text-sm text-zinc-500 dark:text-zinc-400">
+        <SurfaceSection className="text-sm text-[var(--text-muted)] dark:text-[var(--text-muted)]">
           Faça login para acessar o módulo financeiro.
         </SurfaceSection>
       </PageWrapper>
@@ -714,13 +714,13 @@ export default function FinancesPage() {
       >
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-700 dark:text-zinc-200">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)] dark:text-[var(--text-primary)]">
               Próxima ação • {getOperationalSeverityLabel(nextAction.severity)}
             </p>
-            <p className="mt-1 font-medium text-zinc-900 dark:text-zinc-100">
+            <p className="mt-1 font-medium text-[var(--text-primary)] dark:text-[var(--text-primary)]">
               {nextAction.title}
             </p>
-            <p className="text-sm text-zinc-700 dark:text-zinc-300">
+            <p className="text-sm text-[var(--text-secondary)] dark:text-[var(--text-secondary)]">
               {nextAction.description}
             </p>
           </div>
@@ -765,13 +765,13 @@ export default function FinancesPage() {
         <SurfaceSection className="border-2 border-orange-300 bg-gradient-to-r from-orange-50 via-white to-red-50 dark:border-orange-800/60 dark:from-orange-950/30 dark:via-zinc-900 dark:to-red-950/20">
           <div className="grid gap-4 md:grid-cols-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-300">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)] dark:text-[var(--text-secondary)]">
                 Você tem em aberto
               </p>
               <p className="mt-1 text-2xl font-extrabold text-zinc-950 dark:text-white">
                 {formatCurrencyFromCents(totalOpenAmountInQueue)}
               </p>
-              <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-300">
+              <p className="mt-1 text-xs text-[var(--text-secondary)] dark:text-[var(--text-secondary)]">
                 Cada dia sem ação aumenta risco de perda e tempo de recebimento.
               </p>
             </div>
@@ -820,7 +820,7 @@ export default function FinancesPage() {
                 className={`nexo-surface ${getOperationalSeverityClasses(chargeSeverity)}`}
               >
                 <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-4">
-                  <div className="w-full text-xs font-medium text-zinc-600 dark:text-zinc-300">
+                  <div className="w-full text-xs font-medium text-[var(--text-secondary)] dark:text-[var(--text-secondary)]">
                     Severidade: {getOperationalSeverityLabel(chargeSeverity)} •
                     Próxima ação: {chargeNextAction.label}
                   </div>
@@ -939,7 +939,7 @@ export default function FinancesPage() {
                 onClick={() => setSelectedChargeId(c.id)}
               >
                 <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-4">
-                  <div className="w-full text-xs font-medium text-zinc-600 dark:text-zinc-300">
+                  <div className="w-full text-xs font-medium text-[var(--text-secondary)] dark:text-[var(--text-secondary)]">
                     Severidade: {getOperationalSeverityLabel(chargeSeverity)}
                   </div>
                   <div className="w-full">

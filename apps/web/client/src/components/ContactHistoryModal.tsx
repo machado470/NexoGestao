@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/design-system";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import {
@@ -125,7 +125,7 @@ function getContactTypeColor(type: ContactType) {
     case "in_person":
       return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300";
     default:
-      return "bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-300";
+      return "bg-[var(--surface-base)] text-[var(--text-primary)] dark:bg-[var(--surface-base)] dark:text-[var(--text-secondary)]";
   }
 }
 

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/design-system";
 import {
   Plus,
   Calendar,
@@ -926,8 +926,8 @@ export default function AppointmentsPage() {
             onClick={() => setFocusWindow(value)}
             className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${
               focusWindow === value
-                ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                ? "bg-[var(--surface-base)] text-white dark:bg-[var(--surface-base)] dark:text-[var(--text-primary)]"
+                : "bg-[var(--surface-base)] text-[var(--text-secondary)] hover:bg-zinc-200 dark:bg-[var(--surface-base)] dark:text-[var(--text-secondary)] dark:hover:bg-zinc-700"
             }`}
           >
             {label}
@@ -1001,7 +1001,7 @@ export default function AppointmentsPage() {
                             : "Cancelar";
 
                   return (
-                    <tr key={`exec-${appointment.id}`} className="border-t border-zinc-200/70 dark:border-zinc-800/70">
+                    <tr key={`exec-${appointment.id}`} className="border-t border-[var(--border-subtle)]/70 dark:border-zinc-800/70">
                       <td className="px-4 py-3">{appointment.customer?.name ?? "Cliente não identificado"}</td>
                       <td className="px-4 py-3">{formatDateTime(appointment.startsAt)}</td>
                       <td className="px-4 py-3">

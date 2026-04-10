@@ -1,4 +1,4 @@
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/design-system";
 import { Pencil, AlertCircle, MessageCircle, Eye } from "lucide-react";
 
 import type { ServiceOrder, StageTone } from "./service-order.types";

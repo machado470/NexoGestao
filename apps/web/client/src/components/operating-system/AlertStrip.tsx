@@ -19,7 +19,7 @@ export function AlertStrip({
         <div>
           <SeverityBadge severity={severity} />
           <p className="mt-2 text-sm font-semibold">{title}</p>
-          <p className="text-xs text-zinc-600 dark:text-zinc-400">{description}</p>
+          <p className="text-xs text-[var(--text-secondary)] dark:text-[var(--text-muted)]">{description}</p>
         </div>
         {action}
       </div>

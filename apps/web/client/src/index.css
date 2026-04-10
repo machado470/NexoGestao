@@ -353,11 +353,11 @@
   }
 
   .glass-card {
-    @apply rounded-lg border border-white/20 bg-white/10 backdrop-blur-md;
+    @apply rounded-lg border border-white/20 bg-white/10 backdrop-blur-sm;
   }
 
   .glass-card-dark {
-    @apply rounded-lg border border-slate-700/30 bg-slate-900/20 backdrop-blur-md;
+    @apply rounded-lg border border-slate-700/30 bg-slate-900/20 backdrop-blur-sm;
   }
 
   .nexo-gradient {
@@ -369,7 +369,7 @@
   }
 
   .architecture-card {
-    @apply relative overflow-hidden rounded-2xl border border-slate-200/50 bg-white/80 backdrop-blur-sm shadow-lg transition-all duration-300 hover:border-slate-300/80 hover:shadow-xl;
+    @apply relative overflow-hidden rounded-2xl border border-slate-200/50 bg-white/80 backdrop-blur-sm shadow-sm transition-all duration-300 hover:border-slate-300/80 hover:shadow-sm;
   }
 
   .architecture-card:hover {
@@ -411,7 +411,7 @@
   }
 
   .nexo-sidebar-item {
-    @apply flex w-full items-center gap-2.5 rounded-xl border border-transparent px-3 py-2.5 text-left text-zinc-300 transition-all duration-200 hover:border-white/10 hover:bg-white/8 hover:text-white;
+    @apply flex w-full items-center gap-2.5 rounded-xl border border-transparent px-3 py-2.5 text-left text-[var(--text-secondary)] transition-all duration-200 hover:border-white/10 hover:bg-white/8 hover:text-white;
   }
 
   .nexo-sidebar-item-active {
@@ -430,7 +430,7 @@
   }
 
   .nexo-topbar-control {
-    @apply inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-zinc-200 transition-all duration-200 hover:-translate-y-0.5 hover:bg-white/10;
+    @apply inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-[var(--text-primary)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-white/10;
   }
 
   .nexo-floating-panel {
@@ -441,11 +441,11 @@
   }
 
   .nexo-app-panel {
-    @apply rounded-[1.35rem] border border-slate-200/70 bg-white/80 backdrop-blur-md shadow-sm dark:border-white/6 dark:bg-white/[0.03] dark:shadow-[0_12px_40px_rgba(0,0,0,0.35)];
+    @apply rounded-[1.35rem] border border-[var(--border-subtle)] bg-white/80 backdrop-blur-sm shadow-sm dark:border-white/6 dark:bg-white/[0.03] dark:shadow-[0_12px_40px_rgba(0,0,0,0.35)];
   }
 
   .nexo-app-panel-strong {
-    @apply backdrop-blur-xl;
+    @apply backdrop-blur-sm;
     border-radius: var(--radius-panel);
     border: 1px solid var(--nexo-border-soft);
     background: var(--nexo-surface-1);
@@ -576,11 +576,11 @@
   }
 
   .nexo-section-description {
-    @apply text-sm text-zinc-500 dark:text-zinc-400;
+    @apply text-sm text-[var(--text-muted)] dark:text-[var(--text-muted)];
   }
 
   .nexo-list-row {
-    @apply flex items-center justify-between rounded-xl border border-slate-200/70 bg-white/70 px-3 py-3 text-sm transition-colors hover:bg-white dark:border-white/8 dark:bg-white/[0.03] dark:hover:bg-white/[0.05];
+    @apply flex items-center justify-between rounded-xl border border-[var(--border-subtle)] bg-white/70 px-3 py-3 text-sm transition-colors hover:bg-white dark:border-white/8 dark:bg-white/[0.03] dark:hover:bg-white/[0.05];
   }
 
   .nexo-list-row-high {
@@ -592,12 +592,12 @@
   }
 
   .nexo-cta-primary {
-    @apply inline-flex h-10 items-center justify-center rounded-xl bg-orange-500 px-4 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-orange-600 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400/60;
+    @apply inline-flex h-10 items-center justify-center rounded-xl bg-orange-500 px-4 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-orange-600 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400/60;
     box-shadow: 0 10px 22px rgba(251, 146, 60, 0.28);
   }
 
   .nexo-cta-secondary {
-    @apply inline-flex h-10 items-center justify-center rounded-xl border border-zinc-300 px-4 text-sm font-semibold text-zinc-700 transition-all duration-200 hover:-translate-y-0.5 hover:bg-zinc-100 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-300/50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800;
+    @apply inline-flex h-10 items-center justify-center rounded-xl border border-zinc-300 px-4 text-sm font-semibold text-[var(--text-secondary)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[var(--surface-base)] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-300/50 dark:border-[var(--border-subtle)] dark:text-[var(--text-primary)] dark:hover:bg-[var(--surface-base)];
   }
 
   .nexo-hero-operational {
@@ -630,7 +630,7 @@
   }
 
   .nexo-zone-title {
-    @apply text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-500 dark:text-zinc-400;
+    @apply text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)] dark:text-[var(--text-muted)];
   }
 
   .nexo-cta-dominant {
@@ -659,7 +659,7 @@
   }
 
   .nexo-skeleton-panel {
-    @apply rounded-2xl border border-slate-200/80 bg-white/85 p-4 dark:border-white/8 dark:bg-white/[0.03];
+    @apply rounded-2xl border border-[var(--border-subtle)] bg-white/85 p-4 dark:border-white/8 dark:bg-white/[0.03];
   }
 
   .nexo-fade-in {
@@ -684,7 +684,7 @@
   }
 
   .nexo-page-header-description {
-    @apply mt-2 max-w-3xl text-sm leading-6 text-zinc-600 dark:text-zinc-400;
+    @apply mt-2 max-w-3xl text-sm leading-6 text-[var(--text-secondary)] dark:text-[var(--text-muted)];
   }
 
   .nexo-surface-operational {
@@ -730,7 +730,7 @@
   }
 
   .nexo-data-table thead {
-    @apply bg-slate-50/90 dark:bg-slate-900/50;
+    @apply bg-[var(--surface-base)]/90 dark:bg-slate-900/50;
   }
 
   .nexo-data-table th {
@@ -742,7 +742,7 @@
   }
 
   .nexo-data-table tbody tr {
-    @apply border-t border-slate-200/70 transition-colors dark:border-white/10;
+    @apply border-t border-[var(--border-subtle)] transition-colors dark:border-white/10;
   }
 
   .nexo-data-table tbody tr:hover {

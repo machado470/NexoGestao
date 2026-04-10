@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/design-system";
 import { saveConsent, type ConsentPreferences } from "./ConsentBanner.logic";
 import { persistLocalConsent, readStoredConsent } from "./ConsentBanner.storage";
 
@@ -74,7 +74,7 @@ export function ConsentBanner() {
 
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-3 z-50 px-3 sm:bottom-4 sm:px-5">
-      <div className="pointer-events-auto mx-auto max-w-4xl rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-[0_18px_42px_rgba(15,23,42,0.14)] backdrop-blur-xl sm:p-5">
+      <div className="pointer-events-auto mx-auto max-w-4xl rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-[0_18px_42px_rgba(15,23,42,0.14)] backdrop-blur-sm sm:p-5">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-sm font-semibold text-slate-900">
@@ -106,7 +106,7 @@ export function ConsentBanner() {
 
         {isCustomizing ? (
           <div className="mt-4 grid gap-2 sm:grid-cols-3">
-            <label className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+            <label className="rounded-xl border border-slate-200 bg-[var(--surface-base)] p-3 text-sm text-slate-700">
               <input
                 type="checkbox"
                 checked
@@ -115,7 +115,7 @@ export function ConsentBanner() {
               />
               Essenciais (obrigatório)
             </label>
-            <label className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+            <label className="rounded-xl border border-slate-200 bg-[var(--surface-base)] p-3 text-sm text-slate-700">
               <input
                 type="checkbox"
                 checked={preferences.analytics}
@@ -129,7 +129,7 @@ export function ConsentBanner() {
               />
               Analytics e performance
             </label>
-            <label className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+            <label className="rounded-xl border border-slate-200 bg-[var(--surface-base)] p-3 text-sm text-slate-700">
               <input
                 type="checkbox"
                 checked={preferences.marketing}

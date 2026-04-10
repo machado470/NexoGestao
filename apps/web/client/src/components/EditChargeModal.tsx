@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/design-system";
 import {
   Dialog,
   DialogContent,
@@ -229,7 +229,7 @@ export function EditChargeModal({
     <Dialog open={isOpen} onOpenChange={(open) => (!open ? onClose() : null)}>
       <DialogContent
         showCloseButton={false}
-        className="max-h-[90vh] max-w-2xl overflow-hidden border-zinc-800/80 bg-white p-0 shadow-xl dark:bg-zinc-900"
+        className="max-h-[90vh] max-w-2xl overflow-hidden border-[var(--border-subtle)] bg-white p-0 shadow-sm dark:bg-[var(--surface-base)]"
       >
         <DialogHeader className="border-b border-gray-200 px-6 py-6 dark:border-zinc-800">
           <DialogTitle className="flex items-center gap-2 text-xl text-gray-900 dark:text-white">
@@ -413,7 +413,7 @@ export function EditChargeModal({
               </section>
             )}
 
-            <section className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-4 dark:border-zinc-800 dark:bg-zinc-950/40">
+            <section className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-4 dark:border-zinc-800 dark:bg-[var(--surface-base)]">
               <div className="mb-3 flex items-center gap-2">
                 <AlertCircle className="h-4 w-4 text-orange-500" />
                 <h3 className="text-sm font-semibold text-gray-900 dark:text-white">

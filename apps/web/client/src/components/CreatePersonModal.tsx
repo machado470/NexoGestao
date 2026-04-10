@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/design-system";
 import { registerActionFlowEvent } from "@/lib/actionFlow";
 
 type Props = {
@@ -88,13 +88,13 @@ export default function CreatePersonModal({ open, onClose, onSaved }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => (!nextOpen ? onClose() : undefined)}>
-      <DialogContent className="max-w-xl border-zinc-800/80 bg-zinc-950/95 p-0 text-zinc-100 shadow-2xl backdrop-blur">
+      <DialogContent className="max-w-xl border-[var(--border-subtle)] bg-[var(--card-bg)] p-0 text-[var(--text-primary)] shadow-2xl backdrop-blur">
         <DialogHeader className="border-b border-zinc-800/90 px-6 py-5">
           <DialogTitle className="flex items-center gap-2 text-xl font-semibold">
             <UserPlus className="h-5 w-5 text-orange-500" />
             Nova pessoa
           </DialogTitle>
-          <DialogDescription className="text-zinc-400">Cadastre colaboradores mantendo a experiência visual unificada.</DialogDescription>
+          <DialogDescription className="text-[var(--text-muted)]">Cadastre colaboradores mantendo a experiência visual unificada.</DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 px-6 py-5">
@@ -104,7 +104,7 @@ export default function CreatePersonModal({ open, onClose, onSaved }: Props) {
               id="person-name"
               value={formData.name}
               onChange={(e) => handleChange("name", e.target.value)}
-              className="border-zinc-700 bg-zinc-900/80"
+              className="border-[var(--border-subtle)] bg-[var(--surface-base)]"
               placeholder="Ex: João da Silva"
             />
           </div>
@@ -115,7 +115,7 @@ export default function CreatePersonModal({ open, onClose, onSaved }: Props) {
               id="person-role"
               value={formData.role}
               onChange={(e) => handleChange("role", e.target.value)}
-              className="border-zinc-700 bg-zinc-900/80"
+              className="border-[var(--border-subtle)] bg-[var(--surface-base)]"
               placeholder="Ex: Técnico, Supervisor, Administrativo"
             />
           </div>
@@ -127,7 +127,7 @@ export default function CreatePersonModal({ open, onClose, onSaved }: Props) {
               type="email"
               value={formData.email}
               onChange={(e) => handleChange("email", e.target.value)}
-              className="border-zinc-700 bg-zinc-900/80"
+              className="border-[var(--border-subtle)] bg-[var(--surface-base)]"
               placeholder="Ex: pessoa@empresa.com"
             />
           </div>

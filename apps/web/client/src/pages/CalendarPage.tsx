@@ -13,7 +13,7 @@ import type {
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/design-system";
 import {
   CalendarDays,
   Plus,
@@ -169,40 +169,40 @@ function EventDetailModal({
 
   return (
     <Dialog open={state.open} onOpenChange={(open) => (!open ? onClose() : undefined)}>
-      <DialogContent className="max-w-sm border-zinc-800/80 bg-zinc-950/95 p-0 text-zinc-100 shadow-2xl backdrop-blur">
+      <DialogContent className="max-w-sm border-[var(--border-subtle)] bg-[var(--card-bg)] p-0 text-[var(--text-primary)] shadow-2xl backdrop-blur">
         <DialogHeader className="border-b border-zinc-800/90 px-6 py-5">
           <DialogTitle className="pr-2 text-lg font-semibold">
             Detalhes do Agendamento
           </DialogTitle>
-          <DialogDescription className="text-zinc-400">
+          <DialogDescription className="text-[var(--text-muted)]">
             Atualize o status ou siga para execução e atendimento no WhatsApp.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3 px-6 py-5">
           <div>
-            <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+            <span className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
               Cliente
             </span>
-            <p className="mt-0.5 text-sm text-zinc-100">
+            <p className="mt-0.5 text-sm text-[var(--text-primary)]">
               {event.customer?.name ?? "Cliente não identificado"}
             </p>
           </div>
 
           <div>
-            <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+            <span className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
               Início
             </span>
-            <p className="mt-0.5 text-sm text-zinc-100">
+            <p className="mt-0.5 text-sm text-[var(--text-primary)]">
               {new Date(event.startsAt).toLocaleString("pt-BR")}
             </p>
           </div>
 
           <div>
-            <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+            <span className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
               Fim
             </span>
-            <p className="mt-0.5 text-sm text-zinc-100">
+            <p className="mt-0.5 text-sm text-[var(--text-primary)]">
               {event.endsAt
                 ? new Date(event.endsAt).toLocaleString("pt-BR")
                 : "—"}
@@ -210,7 +210,7 @@ function EventDetailModal({
           </div>
 
           <div>
-            <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+            <span className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
               Status
             </span>
             <div className="mt-1.5">
@@ -222,7 +222,7 @@ function EventDetailModal({
                   )
                 }
                 disabled={updateMutation.isPending}
-                className="h-9 w-full rounded-md border border-zinc-700 bg-zinc-900/80 px-3 py-2 text-sm text-zinc-100 outline-none ring-offset-zinc-950 focus-visible:border-orange-400 focus-visible:ring-2 focus-visible:ring-orange-500/50"
+                className="h-9 w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none ring-offset-zinc-950 focus-visible:border-orange-400 focus-visible:ring-2 focus-visible:ring-orange-500/50"
               >
                 <option value="SCHEDULED">Agendado</option>
                 <option value="CONFIRMED">Confirmado</option>
@@ -234,10 +234,10 @@ function EventDetailModal({
           </div>
 
           <div>
-            <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+            <span className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
               Observações
             </span>
-            <p className="mt-0.5 text-sm text-zinc-100">
+            <p className="mt-0.5 text-sm text-[var(--text-primary)]">
               {event.notes?.trim() ? event.notes : "—"}
             </p>
           </div>

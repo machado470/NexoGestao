@@ -122,7 +122,7 @@ export default function Landing() {
                 </button>
                 <a
                   href="#fluxo"
-                  className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-6 py-3 font-semibold text-slate-700 transition hover:bg-slate-50"
+                  className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-6 py-3 font-semibold text-slate-700 transition hover:bg-[var(--surface-base)]"
                 >
                   Ver como funciona
                 </a>
@@ -238,7 +238,7 @@ export default function Landing() {
           </div>
         </section>
 
-        <section className="border-y border-slate-200/70 bg-white/70 py-10">
+        <section className="border-y border-[var(--border-subtle)] bg-white/70 py-10">
           <div className="container grid gap-6 text-center md:grid-cols-3">
             {[
               ["O.S. PROCESSADAS", "1.2M+"],
@@ -287,7 +287,7 @@ export default function Landing() {
 
         <section
           id="fluxo"
-          className="border-y border-slate-200/70 bg-white/80 py-16 md:py-20"
+          className="border-y border-[var(--border-subtle)] bg-white/80 py-16 md:py-20"
         >
           <div className="container">
             <h2 className="text-3xl font-semibold text-slate-900 md:text-4xl">
@@ -358,19 +358,19 @@ export default function Landing() {
               </p>
             </div>
             <div className="mt-5 grid gap-4 md:grid-cols-3">
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div className="rounded-xl border border-slate-200 bg-[var(--surface-base)] p-4">
                 <p className="text-xs text-slate-500">STATUS</p>
                 <p className="mt-1 text-lg font-semibold text-blue-600">
                   Em execução
                 </p>
               </div>
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div className="rounded-xl border border-slate-200 bg-[var(--surface-base)] p-4">
                 <p className="text-xs text-slate-500">COBRANÇA</p>
                 <p className="mt-1 text-lg font-semibold text-slate-900">
                   R$ 2.450 • enviada
                 </p>
               </div>
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div className="rounded-xl border border-slate-200 bg-[var(--surface-base)] p-4">
                 <p className="text-xs text-slate-500">PAGAMENTO</p>
                 <p className="mt-1 text-lg font-semibold text-emerald-600">
                   PIX confirmado
@@ -486,7 +486,7 @@ export default function Landing() {
                 return (
                   <div
                     key={item}
-                    className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                    className="rounded-2xl border border-slate-200 bg-[var(--surface-base)] p-4"
                   >
                     <p className="text-xs font-semibold tracking-[0.12em] text-orange-600">
                       {month}
@@ -499,7 +499,7 @@ export default function Landing() {
           </article>
         </section>
 
-        <section className="border-y border-slate-200/70 bg-white py-16 text-center md:py-20">
+        <section className="border-y border-[var(--border-subtle)] bg-white py-16 text-center md:py-20">
           <div className="container">
             <h2 className="mx-auto max-w-4xl text-3xl font-semibold text-slate-900 md:text-5xl">
               Ou você organiza sua operação… ou continua no improviso.
@@ -520,7 +520,7 @@ export default function Landing() {
               </button>
               <a
                 href="#fluxo"
-                className="rounded-xl border border-slate-200 bg-white px-6 py-3 font-semibold text-slate-700 transition hover:bg-slate-50"
+                className="rounded-xl border border-slate-200 bg-white px-6 py-3 font-semibold text-slate-700 transition hover:bg-[var(--surface-base)]"
               >
                 Ver como funciona
               </a>
