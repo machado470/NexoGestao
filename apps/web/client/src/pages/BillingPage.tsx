@@ -3,10 +3,12 @@ import { AlertTriangle, CheckCircle2, CreditCard, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { useProductAnalytics } from "@/hooks/useProductAnalytics";
-import { PageHero, PageShell, SmartPage, SurfaceSection } from "@/components/PagePattern";
+import { SmartPage, SurfaceSection } from "@/components/PagePattern";
 import { EmptyState } from "@/components/EmptyState";
 import { Button } from "@/components/design-system";
 import { getQueryUiState, normalizeArrayPayload } from "@/lib/query-helpers";
+import { PageWrapper } from "@/components/operating-system/Wrappers";
+import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 
 type PlanName = "STARTER" | "PRO" | "SCALE" | "FREE";
 
@@ -182,12 +184,25 @@ export default function BillingPage() {
   const heroPrimaryAction: PlanName = blockedItems.length > 0 ? "PRO" : "STARTER";
 
   return (
-    <PageShell>
-      <PageHero
-        eyebrow="Billing"
+    <PageWrapper
+      title="Billing"
+      subtitle="Controle plano, limites e upgrade com fluxo orientado a receita sem sair da operação."
+    >
+      <OperationalTopCard
+        contextLabel="Billing"
         title="Plano e faturamento"
         description="Controle trial, limites e upgrade com fluxo orientado a receita e sem sair da operação."
-        actions={
+        chips={
+          <>
+            <span className="rounded-full border px-3 py-1 text-xs text-[var(--text-secondary)]">
+              Plano: {currentPlan}
+            </span>
+            <span className="rounded-full border px-3 py-1 text-xs text-[var(--text-secondary)]">
+              Limites em risco: {blockedItems.length}
+            </span>
+          </>
+        }
+        primaryAction={
           <Button
             type="button"
             disabled={checkoutMutation.isPending || !stripeConfigured}
@@ -396,6 +411,6 @@ export default function BillingPage() {
           </Button>
         ) : null}
       </SurfaceSection>
-    </PageShell>
+    </PageWrapper>
   );
 }
