@@ -126,8 +126,8 @@ export default function CreateExpenseModal({
 
   return (
     <Dialog open={open} onOpenChange={nextOpen => !nextOpen && onClose()}>
-      <DialogContent className="max-w-2xl border-zinc-800/80 bg-white p-0 shadow-xl dark:bg-zinc-950">
-        <div className="w-full rounded-2xl border bg-white shadow-xl dark:border-zinc-800 dark:bg-zinc-950">
+      <DialogContent className="max-w-2xl border-[var(--border-subtle)] bg-white p-0 shadow-sm dark:bg-zinc-950">
+        <div className="w-full rounded-2xl border bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
           <div className="flex items-center justify-between border-b p-4 dark:border-zinc-800">
             <div className="flex items-center gap-2">
               <Receipt className="h-5 w-5 text-orange-500" />
@@ -137,7 +137,7 @@ export default function CreateExpenseModal({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg p-2 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-900"
+              className="rounded-lg p-2 transition-colors hover:bg-[var(--surface-base)] dark:hover:bg-[var(--surface-base)]"
               disabled={createMutation.isPending}
             >
               <X className="h-4 w-4" />
@@ -213,7 +213,7 @@ export default function CreateExpenseModal({
                 type="button"
                 onClick={onClose}
                 disabled={createMutation.isPending}
-                className="rounded-md border px-4 py-2 text-sm font-medium transition-colors hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
+                className="rounded-md border px-4 py-2 text-sm font-medium transition-colors hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-800 dark:hover:bg-[var(--surface-base)]"
               >
                 Cancelar
               </button>

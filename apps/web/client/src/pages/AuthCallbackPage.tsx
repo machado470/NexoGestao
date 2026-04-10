@@ -77,7 +77,7 @@ export default function AuthCallbackPage() {
         <h1 className="mt-4 text-lg font-semibold text-zinc-950 dark:text-white">
           Confirmando autenticação
         </h1>
-        <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+        <p className="mt-2 text-sm text-[var(--text-muted)] dark:text-[var(--text-muted)]">
           Estamos finalizando sua sessão com segurança.
         </p>
       </div>

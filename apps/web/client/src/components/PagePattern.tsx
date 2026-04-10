@@ -215,7 +215,7 @@ export function SmartPage({
         </div>
       </TimelineList>
 
-      <div className="sticky bottom-3 z-20 rounded-2xl border border-[var(--accent-soft)] bg-[var(--nexo-card-surface)] p-2 shadow-lg md:static md:border-none md:bg-transparent md:p-0 md:shadow-none">
+      <div className="sticky bottom-3 z-20 rounded-2xl border border-[var(--accent-soft)] bg-[var(--nexo-card-surface)] p-2 shadow-sm md:static md:border-none md:bg-transparent md:p-0 md:shadow-none">
         <PrimaryButton
           type="button"
           className="nexo-cta-dominant nexo-state-transition min-h-12 w-full gap-2"

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/design-system";
 import { customerSchema } from "@/lib/validations";
 import {
   Dialog,
@@ -220,18 +220,18 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
         onInteractOutside={(event) => {
           if (updateMutation.isPending) event.preventDefault();
         }}
-        className="max-w-2xl border-zinc-800/80 bg-zinc-950/95 p-0 text-zinc-100 shadow-2xl backdrop-blur"
+        className="max-w-2xl border-[var(--border-subtle)] bg-[var(--card-bg)] p-0 text-[var(--text-primary)] shadow-2xl backdrop-blur"
       >
         <DialogHeader className="border-b border-zinc-800/90 px-6 py-5">
           <DialogTitle className="text-xl font-semibold">Editar Cliente</DialogTitle>
-          <DialogDescription className="text-zinc-400">
+          <DialogDescription className="text-[var(--text-muted)]">
             Atualize os dados mantendo consistência com o padrão visual moderno.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 px-6 py-5">
           {customerQuery.isLoading && !customer ? (
-            <div className="flex items-center justify-center py-8 text-sm text-zinc-400">
+            <div className="flex items-center justify-center py-8 text-sm text-[var(--text-muted)]">
               <Loader2 className="mr-2 h-5 w-5 animate-spin text-orange-500" />
               Carregando...
               {loadingTimedOut ? (
@@ -260,7 +260,7 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
                   id="edit-customer-name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="border-zinc-700 bg-zinc-900/80"
+                  className="border-[var(--border-subtle)] bg-[var(--surface-base)]"
                   placeholder="Ex: Cliente Demo"
                 />
               </div>
@@ -271,7 +271,7 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
                   id="edit-customer-phone"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  className="border-zinc-700 bg-zinc-900/80"
+                  className="border-[var(--border-subtle)] bg-[var(--surface-base)]"
                   placeholder="Ex: +5547999999999"
                 />
               </div>
@@ -282,7 +282,7 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
                   id="edit-customer-email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="border-zinc-700 bg-zinc-900/80"
+                  className="border-[var(--border-subtle)] bg-[var(--surface-base)]"
                   placeholder="cliente@demo.com"
                   type="email"
                 />
@@ -294,23 +294,23 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
                   id="edit-customer-notes"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  className="border-zinc-700 bg-zinc-900/80"
+                  className="border-[var(--border-subtle)] bg-[var(--surface-base)]"
                   placeholder="Informações úteis sobre o cliente"
                   rows={4}
                 />
               </div>
 
-              <div className="flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-900/60 px-4 py-3">
+              <div className="flex items-center justify-between rounded-xl border border-zinc-800 bg-[var(--surface-base)]/60 px-4 py-3">
                 <div>
-                  <p className="text-sm font-medium text-zinc-100">Cliente ativo</p>
-                  <p className="text-xs text-zinc-400">Desative para tirar o cliente do fluxo sem apagar histórico.</p>
+                  <p className="text-sm font-medium text-[var(--text-primary)]">Cliente ativo</p>
+                  <p className="text-xs text-[var(--text-muted)]">Desative para tirar o cliente do fluxo sem apagar histórico.</p>
                 </div>
 
                 <button
                   type="button"
                   onClick={() => setActive((prev) => !prev)}
                   className={`inline-flex min-w-[88px] items-center justify-center rounded-full px-3 py-2 text-xs font-medium transition-colors ${
-                    active ? "bg-green-900/40 text-green-300" : "bg-zinc-800 text-zinc-300"
+                    active ? "bg-green-900/40 text-green-300" : "bg-[var(--surface-base)] text-[var(--text-secondary)]"
                   }`}
                 >
                   {active ? "Ativo" : "Inativo"}

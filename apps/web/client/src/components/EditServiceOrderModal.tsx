@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/design-system";
 import {
   Dialog,
   DialogContent,
@@ -461,7 +461,7 @@ export default function EditServiceOrderModal({
         onInteractOutside={(event) => {
           if (updateServiceOrder.isPending) event.preventDefault();
         }}
-        className="max-h-[90vh] max-w-2xl overflow-hidden border-zinc-800/80 bg-white p-0 shadow-xl dark:bg-zinc-900"
+        className="max-h-[90vh] max-w-2xl overflow-hidden border-[var(--border-subtle)] bg-white p-0 shadow-sm dark:bg-[var(--surface-base)]"
       >
         <DialogHeader className="border-b border-gray-200 px-6 py-6 dark:border-zinc-800">
           <DialogTitle className="flex items-center gap-2 text-xl text-gray-900 dark:text-white">
@@ -579,7 +579,7 @@ export default function EditServiceOrderModal({
                     Título *
                   </label>
                   <input
-                    className="w-full rounded-lg border border-gray-300 bg-white p-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-white"
+                    className="w-full rounded-lg border border-gray-300 bg-white p-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-[var(--border-subtle)] dark:bg-zinc-950 dark:text-white"
                     value={formData.title}
                     onChange={(e) =>
                       setFormData((state) => ({ ...state, title: e.target.value }))
@@ -593,7 +593,7 @@ export default function EditServiceOrderModal({
                     Descrição
                   </label>
                   <textarea
-                    className="w-full rounded-lg border border-gray-300 bg-white p-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-white"
+                    className="w-full rounded-lg border border-gray-300 bg-white p-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-[var(--border-subtle)] dark:bg-zinc-950 dark:text-white"
                     rows={4}
                     value={formData.description}
                     onChange={(e) =>
@@ -613,7 +613,7 @@ export default function EditServiceOrderModal({
                       Prioridade
                     </label>
                     <select
-                      className="w-full rounded-lg border border-gray-300 bg-white p-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-white"
+                      className="w-full rounded-lg border border-gray-300 bg-white p-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-[var(--border-subtle)] dark:bg-zinc-950 dark:text-white"
                       value={formData.priority}
                       onChange={(e) =>
                         setFormData((state) => ({
@@ -641,7 +641,7 @@ export default function EditServiceOrderModal({
                     </label>
                     <input
                       type="datetime-local"
-                      className="w-full rounded-lg border border-gray-300 bg-white p-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-white"
+                      className="w-full rounded-lg border border-gray-300 bg-white p-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-[var(--border-subtle)] dark:bg-zinc-950 dark:text-white"
                       value={formData.scheduledFor}
                       onChange={(e) =>
                         setFormData((state) => ({
@@ -747,7 +747,7 @@ export default function EditServiceOrderModal({
                 />
 
                 <textarea
-                  className="w-full rounded-lg border border-gray-300 bg-white p-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-white"
+                  className="w-full rounded-lg border border-gray-300 bg-white p-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-[var(--border-subtle)] dark:bg-zinc-950 dark:text-white"
                   rows={4}
                   value={formData.cancellationReason}
                   onChange={(e) =>
@@ -774,7 +774,7 @@ export default function EditServiceOrderModal({
                 />
 
                 <textarea
-                  className="w-full rounded-lg border border-gray-300 bg-white p-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-white"
+                  className="w-full rounded-lg border border-gray-300 bg-white p-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-[var(--border-subtle)] dark:bg-zinc-950 dark:text-white"
                   rows={5}
                   value={formData.outcomeSummary}
                   onChange={(e) =>
@@ -806,7 +806,7 @@ export default function EditServiceOrderModal({
                   </label>
                   <input
                     inputMode="decimal"
-                    className="w-full rounded-lg border border-gray-300 bg-white p-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-white"
+                    className="w-full rounded-lg border border-gray-300 bg-white p-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-[var(--border-subtle)] dark:bg-zinc-950 dark:text-white"
                     value={formData.amount}
                     onChange={(e) =>
                       setFormData((state) => ({ ...state, amount: e.target.value }))
@@ -825,7 +825,7 @@ export default function EditServiceOrderModal({
                   </label>
                   <input
                     type="datetime-local"
-                    className="w-full rounded-lg border border-gray-300 bg-white p-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-white"
+                    className="w-full rounded-lg border border-gray-300 bg-white p-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-[var(--border-subtle)] dark:bg-zinc-950 dark:text-white"
                     value={formData.dueDate}
                     onChange={(e) =>
                       setFormData((state) => ({ ...state, dueDate: e.target.value }))
@@ -836,7 +836,7 @@ export default function EditServiceOrderModal({
               </div>
             </section>
 
-            <section className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-4 dark:border-zinc-800 dark:bg-zinc-950/40">
+            <section className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-4 dark:border-zinc-800 dark:bg-[var(--surface-base)]">
               <div className="mb-3 flex items-center gap-2">
                 <AlertCircle className="h-4 w-4 text-orange-500" />
                 <h3 className="text-sm font-semibold text-gray-900 dark:text-white">

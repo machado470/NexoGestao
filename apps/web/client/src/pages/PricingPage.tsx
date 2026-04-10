@@ -143,7 +143,7 @@ export default function PricingPage() {
 
               <Link
                 href={plan.href}
-                className={`mt-6 inline-flex w-full justify-center rounded-xl px-4 py-2.5 text-sm font-semibold transition ${plan.featured ? "bg-orange-500 text-white hover:bg-orange-600" : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"}`}
+                className={`mt-6 inline-flex w-full justify-center rounded-xl px-4 py-2.5 text-sm font-semibold transition ${plan.featured ? "bg-orange-500 text-white hover:bg-orange-600" : "border border-slate-200 bg-white text-slate-700 hover:bg-[var(--surface-base)]"}`}
               >
                 {plan.cta}
               </Link>
@@ -172,7 +172,7 @@ export default function PricingPage() {
       </section>
 
       <section className="container pb-16 md:pb-20">
-        <article className="rounded-3xl border border-slate-200 bg-slate-50 p-8 md:p-10">
+        <article className="rounded-3xl border border-slate-200 bg-[var(--surface-base)] p-8 md:p-10">
           <h2 className="text-2xl font-semibold text-slate-900">
             Transparência comercial
           </h2>

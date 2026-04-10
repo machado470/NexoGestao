@@ -76,7 +76,7 @@ function FullScreenLoader() {
     <div className="nexo-app-shell flex min-h-screen items-center justify-center px-6">
       <div className="nexo-app-panel-strong flex w-full max-w-md items-center gap-3 p-6">
         <Loader className="h-5 w-5 animate-spin text-orange-500" />
-        <p className="text-sm text-zinc-600 dark:text-zinc-300">
+        <p className="text-sm text-[var(--text-secondary)] dark:text-[var(--text-secondary)]">
           Carregando ambiente...
         </p>
       </div>
@@ -87,7 +87,7 @@ function FullScreenLoader() {
 function AuthRouteLoader() {
   return (
     <div className="pointer-events-none fixed inset-0 z-10 flex items-start justify-center pt-5">
-      <div className="inline-flex items-center gap-2 rounded-full border border-orange-200/70 bg-white/90 px-3 py-1.5 text-xs text-zinc-600 shadow-sm backdrop-blur dark:border-orange-500/20 dark:bg-zinc-900/90 dark:text-zinc-300">
+      <div className="inline-flex items-center gap-2 rounded-full border border-orange-200/70 bg-white/90 px-3 py-1.5 text-xs text-[var(--text-secondary)] shadow-sm backdrop-blur dark:border-orange-500/20 dark:bg-[var(--surface-base)] dark:text-[var(--text-secondary)]">
         <Loader className="h-3.5 w-3.5 animate-spin text-orange-500" />
         Sincronizando autenticação...
       </div>
@@ -112,7 +112,7 @@ function FullScreenMessage({
         <h1 className="text-xl font-semibold text-zinc-950 dark:text-white">
           {title}
         </h1>
-        <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+        <p className="mt-2 text-sm text-[var(--text-muted)] dark:text-[var(--text-muted)]">
           {description}
         </p>
 

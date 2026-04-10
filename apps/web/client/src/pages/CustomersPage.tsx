@@ -32,7 +32,7 @@ import {
 } from "lucide-react";
 import CreateCustomerModal from "@/components/CreateCustomerModal";
 import EditCustomerModal from "@/components/EditCustomerModal";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/design-system";
 import {
   Dialog,
   DialogContent,
@@ -272,7 +272,7 @@ function SectionCard({
     <div className="nexo-surface-operational">
       <div className="mb-3 flex items-center gap-2">
         <Icon className="h-4 w-4 text-orange-500" />
-        <h3 className="text-sm font-semibold text-zinc-900 dark:text-white">
+        <h3 className="text-sm font-semibold text-[var(--text-primary)] dark:text-white">
           {title}
         </h3>
       </div>
@@ -280,7 +280,7 @@ function SectionCard({
       {hasContent ? (
         <div className="space-y-3">{children}</div>
       ) : (
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">{emptyText}</p>
+        <p className="text-sm text-[var(--text-muted)] dark:text-[var(--text-muted)]">{emptyText}</p>
       )}
     </div>
   );
@@ -301,16 +301,16 @@ function SummaryCard({
     tone === "success"
       ? "border-green-200 bg-green-50 dark:border-green-900/40 dark:bg-green-950/20"
       : tone === "muted"
-        ? "border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-white/[0.03]"
+        ? "border-slate-200 bg-[var(--surface-base)] dark:border-white/10 dark:bg-white/[0.03]"
         : "border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.04]";
 
   return (
     <div className={`rounded-xl border p-4 ${toneClass}`}>
-      <p className="text-sm text-zinc-600 dark:text-zinc-400">{title}</p>
-      <p className="mt-1 text-2xl font-bold text-zinc-900 dark:text-white">
+      <p className="text-sm text-[var(--text-secondary)] dark:text-[var(--text-muted)]">{title}</p>
+      <p className="mt-1 text-2xl font-bold text-[var(--text-primary)] dark:text-white">
         {value}
       </p>
-      <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+      <p className="mt-1 text-xs text-[var(--text-muted)] dark:text-[var(--text-muted)]">
         {subtitle}
       </p>
     </div>
@@ -1138,13 +1138,13 @@ export default function CustomersPage() {
         </SurfaceSection>
 
         <SurfaceSection className="nexo-data-table p-0">
-          <div className="border-b border-slate-200/80 px-4 py-3 dark:border-white/10">
+          <div className="border-b border-[var(--border-subtle)] px-4 py-3 dark:border-white/10">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-medium text-zinc-900 dark:text-white">
+                <p className="text-sm font-medium text-[var(--text-primary)] dark:text-white">
                   Base que gera receita
                 </p>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                <p className="text-xs text-[var(--text-muted)] dark:text-[var(--text-muted)]">
                   Abra um workspace para entender o contexto, o impacto e a ação
                   imediata por cliente.
                 </p>
@@ -1251,7 +1251,7 @@ export default function CustomersPage() {
                         } ${highlightedCustomerId === customer.id ? "ring-2 ring-orange-400" : ""}`}
                         onClick={() => openWorkspace(customer.id)}
                       >
-                        <td className="px-4 py-3 text-zinc-900 dark:text-white">
+                        <td className="px-4 py-3 text-[var(--text-primary)] dark:text-white">
                           <div className="flex items-center gap-2">
                             <span className="font-medium">{customer.name}</span>
                             {isOpen ? (
@@ -1262,21 +1262,21 @@ export default function CustomersPage() {
                           </div>
                         </td>
 
-                        <td className="px-4 py-3 text-zinc-700 dark:text-zinc-300">
+                        <td className="px-4 py-3 text-[var(--text-secondary)] dark:text-[var(--text-secondary)]">
                           <p>{operational.openServiceOrders} O.S. abertas</p>
-                          <p className="text-xs text-zinc-500">
+                          <p className="text-xs text-[var(--text-muted)]">
                             {customer.active ? "Cliente ativo" : "Cliente inativo"}
                           </p>
                         </td>
 
-                        <td className="px-4 py-3 text-zinc-700 dark:text-zinc-300">
+                        <td className="px-4 py-3 text-[var(--text-secondary)] dark:text-[var(--text-secondary)]">
                           <p>{operational.pendingCharges} pendente(s)</p>
-                          <p className="text-xs text-zinc-500">
+                          <p className="text-xs text-[var(--text-muted)]">
                             {operational.overdueCharges} vencida(s)
                           </p>
                         </td>
 
-                        <td className="px-4 py-3 text-zinc-700 dark:text-zinc-300">
+                        <td className="px-4 py-3 text-[var(--text-secondary)] dark:text-[var(--text-secondary)]">
                           {formatDateTime(operational.lastInteractionAt)}
                         </td>
 
@@ -1366,16 +1366,16 @@ export default function CustomersPage() {
         open={false}
         onOpenChange={() => undefined}
       >
-        <DialogContent className="left-auto right-0 top-0 h-screen w-full max-h-screen max-w-2xl translate-x-0 translate-y-0 overflow-y-auto rounded-none border-l border-slate-200/80 bg-slate-50 p-0 shadow-2xl dark:border-white/10 dark:bg-[#0b1017]">
-          <DialogHeader className="sticky top-0 z-10 border-b border-slate-200/80 bg-white/95 px-5 py-4 backdrop-blur dark:border-white/10 dark:bg-[#111722]/95">
+        <DialogContent className="left-auto right-0 top-0 h-screen w-full max-h-screen max-w-2xl translate-x-0 translate-y-0 overflow-y-auto rounded-none border-l border-[var(--border-subtle)] bg-[var(--surface-base)] p-0 shadow-2xl dark:border-white/10 dark:bg-[#0b1017]">
+          <DialogHeader className="sticky top-0 z-10 border-b border-[var(--border-subtle)] bg-white/95 px-5 py-4 backdrop-blur dark:border-white/10 dark:bg-[#111722]/95">
             <div>
               <p className="text-xs font-medium uppercase tracking-wide text-orange-500">
                 Workspace do cliente
               </p>
-              <DialogTitle className="mt-1 text-left text-xl font-semibold text-zinc-900 dark:text-white">
+              <DialogTitle className="mt-1 text-left text-xl font-semibold text-[var(--text-primary)] dark:text-white">
                 {workspace?.customer?.name ?? "Carregando..."}
               </DialogTitle>
-              <DialogDescription className="mt-1 text-left text-sm text-zinc-600 dark:text-zinc-400">
+              <DialogDescription className="mt-1 text-left text-sm text-[var(--text-secondary)] dark:text-[var(--text-muted)]">
                 Hub lateral de contexto, histórico e próxima ação.
               </DialogDescription>
               <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-gray-400">

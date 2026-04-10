@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/design-system";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -408,7 +408,7 @@ export default function ServiceOrdersPage() {
     nextAction.severity === "critical"
       ? "text-red-700 dark:text-red-300"
       : nextAction.severity === "healthy"
-        ? "text-zinc-700 dark:text-zinc-300"
+        ? "text-[var(--text-secondary)] dark:text-[var(--text-secondary)]"
         : "text-amber-700 dark:text-amber-300";
 
   const smartPriorities = useMemo(
@@ -603,7 +603,7 @@ export default function ServiceOrdersPage() {
         searchPlaceholder="Buscar por título, cliente, responsável ou status"
         searchSlot={
           <div className="relative w-full">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
             <Input
               value={search}
               onChange={event => setSearch(event.target.value)}
@@ -774,10 +774,10 @@ export default function ServiceOrdersPage() {
                   className={`${isActive ? "rounded-2xl ring-2 ring-orange-300" : ""} ${getOperationalSeverityClasses(itemSeverity)}`}
                 >
                   <div className="mb-2 flex items-center justify-between px-1">
-                    <span className="text-xs font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-300">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)] dark:text-[var(--text-secondary)]">
                       Severidade: {getOperationalSeverityLabel(itemSeverity)}
                     </span>
-                    <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                    <span className="text-xs text-[var(--text-muted)] dark:text-[var(--text-muted)]">
                       Próxima ação: {itemNextAction.label}
                     </span>
                   </div>

@@ -4,7 +4,7 @@ import { trpc } from "@/lib/trpc";
 import { getPayloadValue, normalizeArrayPayload } from "@/lib/query-helpers";
 import { useAuth } from "@/contexts/AuthContext";
 import { can } from "@/lib/rbac";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/design-system";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -71,7 +71,7 @@ function toneFromStatus(status?: string) {
   if (status === "failed") return "border-red-500/40 bg-red-500/10 text-red-300";
   if (status === "throttled") return "border-orange-500/40 bg-orange-500/10 text-orange-300";
   if (status === "blocked" || status === "requires_confirmation") return "border-amber-500/40 bg-amber-500/10 text-amber-300";
-  return "border-zinc-500/40 bg-zinc-500/10 text-zinc-300";
+  return "border-zinc-500/40 bg-zinc-500/10 text-[var(--text-secondary)]";
 }
 
 export function ExecutionOperationsPanel() {
@@ -166,22 +166,22 @@ export function ExecutionOperationsPanel() {
         <div className="rounded-lg border border-orange-400/40 bg-orange-500/10 px-3 py-2 text-sm text-orange-200">Modo atual: <strong>{modeLabel(modePayload.mode)}</strong></div>
       </div>
 
-      {isLoading ? <div className="flex min-h-[120px] items-center justify-center gap-2 text-sm text-zinc-400"><Loader2 className="h-4 w-4 animate-spin" /> Carregando execution...</div> : null}
+      {isLoading ? <div className="flex min-h-[120px] items-center justify-center gap-2 text-sm text-[var(--text-muted)]"><Loader2 className="h-4 w-4 animate-spin" /> Carregando execution...</div> : null}
 
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-        <div className="rounded-lg border border-zinc-700 bg-zinc-900/40 p-3 text-sm">Pending: <strong>{Number(summary.pending ?? 0)}</strong></div>
+        <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/40 p-3 text-sm">Pending: <strong>{Number(summary.pending ?? 0)}</strong></div>
         <div className="rounded-lg border border-emerald-700/60 bg-emerald-900/20 p-3 text-sm">Executed: <strong>{Number(summary.executed ?? 0)}</strong></div>
         <div className="rounded-lg border border-red-700/60 bg-red-900/20 p-3 text-sm">Failed: <strong>{Number(summary.failed ?? 0)}</strong></div>
         <div className="rounded-lg border border-amber-700/60 bg-amber-900/20 p-3 text-sm">Blocked: <strong>{Number(summary.blocked ?? 0)}</strong></div>
         <div className="rounded-lg border border-orange-700/60 bg-orange-900/20 p-3 text-sm">Throttled: <strong>{Number(summary.throttled ?? 0)}</strong></div>
       </div>
 
-      <div className="rounded-xl border border-zinc-700 bg-zinc-900/40 p-4 space-y-3">
-        <div className="rounded-lg border border-zinc-700/70 bg-zinc-950/30 p-3 text-xs text-zinc-300">
+      <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/40 p-4 space-y-3">
+        <div className="rounded-lg border border-[var(--border-subtle)]/70 bg-[var(--surface-base)] p-3 text-xs text-[var(--text-secondary)]">
           <p><strong>Config atual:</strong> mode {modeLabel(modePayload.mode)} · retries {Number(draftPolicy.maxRetries ?? defaultPolicy.maxRetries)} · throttle {Number(draftPolicy.throttleWindowMs ?? defaultPolicy.throttleWindowMs)}ms</p>
           <p className="mt-1"><strong>Default/fallback:</strong> mode Manual · retries {defaultPolicy.maxRetries} · throttle {defaultPolicy.throttleWindowMs}ms</p>
         </div>
-        <div className="flex items-center justify-between gap-2"><h3 className="text-sm font-semibold text-zinc-100">Administração de mode/policy</h3>{!canEdit ? <span className="text-xs text-zinc-400">Sem permissão de edição</span> : null}</div>
+        <div className="flex items-center justify-between gap-2"><h3 className="text-sm font-semibold text-[var(--text-primary)]">Administração de mode/policy</h3>{!canEdit ? <span className="text-xs text-[var(--text-muted)]">Sem permissão de edição</span> : null}</div>
         <div className="grid gap-3 md:grid-cols-3">
           <Select value={draftMode} onValueChange={(v) => setDraftMode(v as ExecutionMode)} disabled={!canEdit || updateMode.isPending}>
             <SelectTrigger><SelectValue placeholder="Modo" /></SelectTrigger>
@@ -204,7 +204,7 @@ export function ExecutionOperationsPanel() {
             ["allowChargeFollowupCreation", "Criar follow-up cobrança"],
             ["allowRiskReviewEscalation", "Escalar revisão de risco"],
           ] as [PolicyBooleanKey, string][]).map(([key, label]) => (
-            <label key={key} className="rounded-lg border border-zinc-700 p-2 flex items-center justify-between gap-2">
+            <label key={key} className="rounded-lg border border-[var(--border-subtle)] p-2 flex items-center justify-between gap-2">
               <span>{label}</span>
               <Switch
                 checked={Boolean(draftPolicy[key])}
@@ -214,8 +214,8 @@ export function ExecutionOperationsPanel() {
             </label>
           ))}
         </div>
-        <div className="rounded-lg border border-zinc-700/70 bg-zinc-950/30 p-3 text-xs text-zinc-300">
-          <p className="font-semibold text-zinc-100">Overrides ativos vs default</p>
+        <div className="rounded-lg border border-[var(--border-subtle)]/70 bg-[var(--surface-base)] p-3 text-xs text-[var(--text-secondary)]">
+          <p className="font-semibold text-[var(--text-primary)]">Overrides ativos vs default</p>
           <ul className="mt-2 space-y-1">
             {(Object.keys(defaultPolicy) as (keyof ExecutionPolicy)[])
               .filter((key) => draftPolicy[key] !== undefined && draftPolicy[key] !== defaultPolicy[key])
@@ -227,13 +227,13 @@ export function ExecutionOperationsPanel() {
         <div className="flex justify-end"><Button onClick={() => void saveConfig()} disabled={!canEdit || updateMode.isPending}>{updateMode.isPending ? "Salvando..." : "Salvar configuração"}</Button></div>
       </div>
 
-      <div className="rounded-xl border border-zinc-700 bg-zinc-900/40 p-4 space-y-3">
-        <h3 className="text-sm font-semibold text-zinc-100">Histórico auditável de configuração</h3>
+      <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/40 p-4 space-y-3">
+        <h3 className="text-sm font-semibold text-[var(--text-primary)]">Histórico auditável de configuração</h3>
         {modeHistory.length === 0 ? (
-          <p className="text-xs text-zinc-500">Sem alterações recentes de mode/policy.</p>
+          <p className="text-xs text-[var(--text-muted)]">Sem alterações recentes de mode/policy.</p>
         ) : (
           modeHistory.map((entry) => (
-            <div key={entry.id} className="rounded-lg border border-zinc-700/80 bg-zinc-950/40 p-3 text-xs text-zinc-300">
+            <div key={entry.id} className="rounded-lg border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-3 text-xs text-[var(--text-secondary)]">
               <p>{formatTimestamp(entry.changedAt)} · por <strong>{entry.actorEmail || "sistema"}</strong> · fonte {entry.source || "—"}</p>
               <p className="mt-1">Contexto: {entry.context || "—"}</p>
               <p className="mt-1">Before: {JSON.stringify(entry.before ?? {})}</p>
@@ -243,8 +243,8 @@ export function ExecutionOperationsPanel() {
         )}
       </div>
 
-      <div className="rounded-xl border border-zinc-700 bg-zinc-900/40 p-4 space-y-3">
-        <h3 className="text-sm font-semibold text-zinc-100">Timeline operacional</h3>
+      <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/40 p-4 space-y-3">
+        <h3 className="text-sm font-semibold text-[var(--text-primary)]">Timeline operacional</h3>
         <div className="grid gap-2 md:grid-cols-4">
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
@@ -271,18 +271,18 @@ export function ExecutionOperationsPanel() {
 
         <div className="space-y-2">
           {events.length === 0 ? (
-            <p className="text-sm text-zinc-500">Sem eventos recentes da execution.</p>
+            <p className="text-sm text-[var(--text-muted)]">Sem eventos recentes da execution.</p>
           ) : (
             events.map((event) => (
-              <div key={event.id} className="rounded-lg border border-zinc-700/80 bg-zinc-950/40 p-3">
+              <div key={event.id} className="rounded-lg border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-sm font-medium text-zinc-100">{event.actionId || "ação_não_informada"}</p>
+                  <p className="text-sm font-medium text-[var(--text-primary)]">{event.actionId || "ação_não_informada"}</p>
                   <span className={`rounded-full border px-2 py-1 text-xs font-semibold ${toneFromStatus(event.status)}`}>{event.status || "pending"}</span>
                 </div>
-                <div className="mt-1 text-xs text-zinc-300">Entidade: <strong>{event.entityType || "—"}</strong> · {event.entityId || "—"}</div>
-                <div className="mt-1 text-xs text-zinc-400">Motivo (reasonCode): <strong>{event.reasonCode || "—"}</strong> · {formatTimestamp(event.timestamp)}</div>
-                <div className="mt-1 text-[11px] text-zinc-500">Diagnóstico: executionKey {event.diagnostics?.executionKey ?? "—"}</div>
-                {event.diagnostics?.explanation ? <div className="mt-1 text-[11px] text-zinc-500">Explicação: {JSON.stringify(event.diagnostics.explanation)}</div> : null}
+                <div className="mt-1 text-xs text-[var(--text-secondary)]">Entidade: <strong>{event.entityType || "—"}</strong> · {event.entityId || "—"}</div>
+                <div className="mt-1 text-xs text-[var(--text-muted)]">Motivo (reasonCode): <strong>{event.reasonCode || "—"}</strong> · {formatTimestamp(event.timestamp)}</div>
+                <div className="mt-1 text-[11px] text-[var(--text-muted)]">Diagnóstico: executionKey {event.diagnostics?.executionKey ?? "—"}</div>
+                {event.diagnostics?.explanation ? <div className="mt-1 text-[11px] text-[var(--text-muted)]">Explicação: {JSON.stringify(event.diagnostics.explanation)}</div> : null}
               </div>
             ))
           )}

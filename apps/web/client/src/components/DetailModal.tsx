@@ -40,7 +40,7 @@ export default function DetailModal({
 }: DetailModalProps) {
   return (
     <Dialog open={isOpen} onOpenChange={(open) => (!open ? onClose() : undefined)}>
-      <DialogContent className="max-w-2xl overflow-hidden border border-slate-200/50 bg-white/95 p-0 backdrop-blur-md shadow-2xl dark:border-slate-700/50 dark:bg-slate-900/95">
+      <DialogContent className="max-w-2xl overflow-hidden border border-slate-200/50 bg-white/95 p-0 backdrop-blur-sm shadow-2xl dark:border-slate-700/50 dark:bg-slate-900/95">
         <DialogHeader
           className={`border-b border-slate-200/50 bg-gradient-to-r ${colorMap[color]} px-8 py-6 dark:border-slate-700/50`}
         >
@@ -67,7 +67,7 @@ export default function DetailModal({
             <h3 className="mb-4 text-lg font-semibold text-slate-900 dark:text-white">Detalhes</h3>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {details.map((detail, index) => (
-                <div key={index} className="rounded-lg bg-slate-50/50 p-4 dark:bg-slate-800/50">
+                <div key={index} className="rounded-lg bg-[var(--surface-base)]/50 p-4 dark:bg-slate-800/50">
                   <p className="text-xs font-semibold uppercase text-slate-600 dark:text-slate-400">
                     {detail.label}
                   </p>
@@ -94,7 +94,7 @@ export default function DetailModal({
           </div>
         </div>
 
-        <DialogFooter className="border-t border-slate-200/50 bg-slate-50/50 px-8 py-4 dark:border-slate-700/50 dark:bg-slate-800/50">
+        <DialogFooter className="border-t border-slate-200/50 bg-[var(--surface-base)]/50 px-8 py-4 dark:border-slate-700/50 dark:bg-slate-800/50">
           <button
             onClick={onClose}
             className="rounded-lg bg-primary px-6 py-2 font-medium text-primary-foreground transition-colors hover:bg-primary/90"

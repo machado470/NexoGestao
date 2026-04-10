@@ -125,7 +125,7 @@ export default function ProductPage() {
             </Link>
             <Link
               href="/funcionalidades"
-              className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-6 py-3 font-semibold text-slate-700 transition hover:bg-slate-50"
+              className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-6 py-3 font-semibold text-slate-700 transition hover:bg-[var(--surface-base)]"
             >
               Explorar funcionalidades
             </Link>
@@ -133,7 +133,7 @@ export default function ProductPage() {
         </div>
       </section>
 
-      <section className="border-y border-slate-200/70 bg-white/80 py-16 md:py-20">
+      <section className="border-y border-[var(--border-subtle)] bg-white/80 py-16 md:py-20">
         <div className="container">
           <h2 className="text-3xl font-semibold text-slate-900 md:text-4xl">
             Módulos integrados do sistema
@@ -195,7 +195,7 @@ export default function ProductPage() {
             {benefits.map(item => (
               <div
                 key={item}
-                className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700"
+                className="rounded-2xl border border-slate-200 bg-[var(--surface-base)] p-4 text-sm text-slate-700"
               >
                 • {item}
               </div>
@@ -210,7 +210,7 @@ export default function ProductPage() {
             </Link>
             <Link
               href="/register"
-              className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-6 py-3 font-semibold text-slate-700 transition hover:bg-slate-50"
+              className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-6 py-3 font-semibold text-slate-700 transition hover:bg-[var(--surface-base)]"
             >
               Começar avaliação
             </Link>
@@ -218,7 +218,7 @@ export default function ProductPage() {
         </article>
       </section>
 
-      <section className="border-t border-slate-200/70 bg-white/80 py-16 md:py-20">
+      <section className="border-t border-[var(--border-subtle)] bg-white/80 py-16 md:py-20">
         <div className="container">
           <h2 className="text-3xl font-semibold text-slate-900 md:text-4xl">
             Estrutura para operação com padrão institucional

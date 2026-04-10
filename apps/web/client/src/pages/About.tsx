@@ -75,7 +75,7 @@ export default function About() {
 
       <section className="container pb-16 md:pb-20">
         <article className="rounded-3xl border border-slate-200 bg-white p-8 shadow-[0_20px_45px_rgba(15,23,42,0.08)] md:p-10">
-          <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
+          <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-[var(--surface-base)] px-3 py-1 text-xs font-semibold text-slate-700">
             <Users2 className="size-3.5" /> Diretrizes institucionais
           </div>
           <h2 className="mt-4 text-3xl font-semibold text-slate-900">Como pensamos produto e relacionamento</h2>
@@ -93,7 +93,7 @@ export default function About() {
             </Link>
             <Link
               href="/produto"
-              className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-6 py-3 font-semibold text-slate-700 transition hover:bg-slate-50"
+              className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-6 py-3 font-semibold text-slate-700 transition hover:bg-[var(--surface-base)]"
             >
               Conhecer o produto
             </Link>

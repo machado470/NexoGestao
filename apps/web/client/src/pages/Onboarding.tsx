@@ -14,7 +14,7 @@ import {
 
 import { useAuth } from "@/contexts/AuthContext";
 import { trpc } from "@/lib/trpc";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/design-system";
 import { useDemoEnvironment } from "@/hooks/useDemoEnvironment";
 import { useProductAnalytics } from "@/hooks/useProductAnalytics";
 
@@ -276,7 +276,7 @@ export default function Onboarding() {
   if (!isAuthenticated) {
     return (
       <div className="space-y-6 p-6">
-        <div className="rounded-xl border p-4 text-sm text-zinc-500 dark:border-zinc-800">
+        <div className="rounded-xl border p-4 text-sm text-[var(--text-muted)] dark:border-zinc-800">
           Faça login para continuar o onboarding.
         </div>
       </div>
@@ -285,7 +285,7 @@ export default function Onboarding() {
 
   return (
     <div className="space-y-6 p-6">
-      <section className="relative overflow-hidden rounded-[1.8rem] border border-slate-200/80 bg-white/90 px-6 py-6 shadow-sm dark:border-white/8 dark:bg-[linear-gradient(135deg,rgba(19,22,30,0.98),rgba(12,14,20,0.96))] dark:shadow-[0_24px_60px_rgba(0,0,0,0.42)]">
+      <section className="relative overflow-hidden rounded-[1.8rem] border border-[var(--border-subtle)] bg-white/90 px-6 py-6 shadow-sm dark:border-white/8 dark:bg-[linear-gradient(135deg,rgba(19,22,30,0.98),rgba(12,14,20,0.96))] dark:shadow-[0_24px_60px_rgba(0,0,0,0.42)]">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.14),transparent_28%),radial-gradient(circle_at_top_right,rgba(59,130,246,0.08),transparent_24%)] dark:bg-[radial-gradient(circle_at_top_left,rgba(251,146,60,0.14),transparent_28%),radial-gradient(circle_at_top_right,rgba(96,165,250,0.08),transparent_24%)]" />
 
         <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
@@ -299,15 +299,15 @@ export default function Onboarding() {
               Entregue o primeiro valor em 4 passos guiados
             </h1>
 
-            <p className="mt-3 max-w-xl text-sm leading-6 text-zinc-600 dark:text-zinc-400">
+            <p className="mt-3 max-w-xl text-sm leading-6 text-[var(--text-secondary)] dark:text-[var(--text-muted)]">
               O produto conduz automaticamente o caminho oficial: cliente → agendamento
               → serviço concluído → cobrança gerada.
             </p>
           </div>
 
-          <div className="min-w-[220px] rounded-2xl border border-slate-200/80 bg-white/80 p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.03]">
+          <div className="min-w-[220px] rounded-2xl border border-[var(--border-subtle)] bg-white/80 p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.03]">
             <div className="flex items-center justify-between text-sm">
-              <span className="font-medium text-zinc-700 dark:text-zinc-200">Progresso</span>
+              <span className="font-medium text-[var(--text-secondary)] dark:text-[var(--text-primary)]">Progresso</span>
               <span className="font-semibold text-zinc-950 dark:text-white">{percent}%</span>
             </div>
 
@@ -315,7 +315,7 @@ export default function Onboarding() {
               <div className="h-full rounded-full bg-orange-500 transition-all" style={{ width: `${percent}%` }} />
             </div>
 
-            <p className="mt-3 text-xs text-zinc-500 dark:text-zinc-400">
+            <p className="mt-3 text-xs text-[var(--text-muted)] dark:text-[var(--text-muted)]">
               {completedCount} de {STEP_META.length} etapas concluídas
             </p>
           </div>
@@ -395,16 +395,16 @@ export default function Onboarding() {
             return (
               <div key={step.key} className={`rounded-2xl border p-4 transition-colors ${done ? "border-emerald-200 bg-emerald-50 dark:border-emerald-900/40 dark:bg-emerald-950/20" : enabled ? "border-orange-200 bg-orange-50 dark:border-orange-900/40 dark:bg-orange-950/20" : "border-slate-200 bg-white dark:border-white/8 dark:bg-white/[0.02]"}`}>
                 <div className="flex items-start gap-3">
-                  <div className={`mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl ${done ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" : enabled ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300" : "bg-zinc-100 text-zinc-500 dark:bg-zinc-900 dark:text-zinc-400"}`}>
+                  <div className={`mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl ${done ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" : enabled ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300" : "bg-[var(--surface-base)] text-[var(--text-muted)] dark:bg-[var(--surface-base)] dark:text-[var(--text-muted)]"}`}>
                     {done ? <CheckCircle2 className="h-5 w-5" /> : <Icon className="h-5 w-5" />}
                   </div>
                   <div className="min-w-0">
-                    <span className="text-xs font-semibold uppercase tracking-[0.12em] text-zinc-500 dark:text-zinc-400">
+                    <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)] dark:text-[var(--text-muted)]">
                       Etapa {index + 1}
                     </span>
                     <h3 className="mt-1 font-semibold text-zinc-950 dark:text-white">{step.title}</h3>
-                    <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{step.description}</p>
-                    <p className="mt-2 text-xs font-medium text-zinc-500 dark:text-zinc-400">{getStepStatusLabel(done, enabled)}</p>
+                    <p className="mt-1 text-sm text-[var(--text-secondary)] dark:text-[var(--text-muted)]">{step.description}</p>
+                    <p className="mt-2 text-xs font-medium text-[var(--text-muted)] dark:text-[var(--text-muted)]">{getStepStatusLabel(done, enabled)}</p>
                   </div>
                 </div>
               </div>

@@ -1,5 +1,5 @@
 import { ReactNode } from 'react';
-import { Button } from '@/components/ui/button';
+import { Button } from '@/components/design-system';
 
 interface EmptyStateProps {
   icon: ReactNode;
@@ -28,13 +28,13 @@ export function EmptyState({
         Próxima ação recomendada
       </div>
 
-      <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl border border-slate-200/80 bg-slate-100 text-slate-500 dark:border-white/12 dark:bg-white/[0.04] dark:text-slate-300">
+      <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-slate-100 text-slate-500 dark:border-white/12 dark:bg-white/[0.04] dark:text-slate-300">
         {icon}
       </div>
 
-      <h3 className="nexo-text-wrap mb-2 text-lg font-semibold text-zinc-900 dark:text-white">{title}</h3>
+      <h3 className="nexo-text-wrap mb-2 text-lg font-semibold text-[var(--text-primary)] dark:text-white">{title}</h3>
 
-      <p className="nexo-text-wrap mb-5 max-w-xl text-sm text-zinc-600 dark:text-zinc-400">{description}</p>
+      <p className="nexo-text-wrap mb-5 max-w-xl text-sm text-[var(--text-secondary)] dark:text-[var(--text-muted)]">{description}</p>
 
       <div className="flex flex-wrap justify-center gap-2.5">
         {action && (

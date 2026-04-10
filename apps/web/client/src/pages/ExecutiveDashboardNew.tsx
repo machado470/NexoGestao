@@ -101,7 +101,7 @@ function MetricCard({
     <div className="nexo-card-kpi nexo-fade-in">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <p className="nexo-text-wrap text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500 dark:text-zinc-400">
+          <p className="nexo-text-wrap text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)] dark:text-[var(--text-muted)]">
             {label}
           </p>
           <div className="relative mt-3 min-h-10 text-5xl font-black tracking-tight text-zinc-950 dark:text-white">
@@ -112,7 +112,7 @@ function MetricCard({
             )}
           </div>
           {description ? (
-            <p className="nexo-text-wrap mt-2 min-h-4 text-xs text-zinc-500 dark:text-zinc-400">
+            <p className="nexo-text-wrap mt-2 min-h-4 text-xs text-[var(--text-muted)] dark:text-[var(--text-muted)]">
               {loading ? (
                 <span className="nexo-skeleton inline-block h-4 w-44 rounded" />
               ) : (
@@ -143,7 +143,7 @@ function OperationalHealthView({
 }) {
   return (
     <section className="nexo-card-operational nexo-cockpit-zone">
-      <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+      <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
         Operational health
       </p>
       <div className="mt-2 grid gap-2 sm:grid-cols-4">
@@ -936,7 +936,7 @@ export default function ExecutiveDashboardNew() {
           <h1 className="text-3xl font-semibold tracking-tight text-zinc-950 dark:text-white md:text-4xl">
             Dashboard Executivo
           </h1>
-          <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">
+          <p className="mt-3 text-sm text-[var(--text-secondary)] dark:text-[var(--text-muted)]">
             Preparando sessão e carregando contexto.
           </p>
         </section>
@@ -946,7 +946,7 @@ export default function ExecutiveDashboardNew() {
 
   if (!isAuthenticated) {
     return (
-      <div className="p-6 text-sm text-zinc-500">
+      <div className="p-6 text-sm text-[var(--text-muted)]">
         Sua sessão não está ativa.
       </div>
     );
@@ -981,7 +981,7 @@ export default function ExecutiveDashboardNew() {
                 {overdueCharges} cobranças vencidas • {nonBilledServices}{" "}
                 serviços sem faturamento.
               </p>
-              <p className="nexo-text-wrap mt-2 text-sm text-zinc-700 dark:text-zinc-300">
+              <p className="nexo-text-wrap mt-2 text-sm text-[var(--text-secondary)] dark:text-[var(--text-secondary)]">
                 Próxima ação dominante: <strong>{dominantProblem.title}</strong>
                 . {dominantProblem.helperText}
               </p>
@@ -1038,10 +1038,10 @@ export default function ExecutiveDashboardNew() {
         />
         <div className="mt-3 grid gap-3 xl:grid-cols-3">
           <div className="nexo-card-informative p-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
               Operation mode control
             </p>
-            <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-300">
+            <p className="mt-1 text-xs text-[var(--text-secondary)] dark:text-[var(--text-secondary)]">
               Organização em <strong>{orgOperationMode}</strong> • efetivo em{" "}
               <strong>{effectiveGlobalMode}</strong>
             </p>
@@ -1056,7 +1056,7 @@ export default function ExecutiveDashboardNew() {
                   className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
                     userOperationMode === mode
                       ? "border-orange-400 bg-orange-100 text-orange-700 dark:bg-orange-950/30 dark:text-orange-300"
-                      : "border-zinc-300 text-zinc-600 dark:border-zinc-700 dark:text-zinc-300"
+                      : "border-zinc-300 text-[var(--text-secondary)] dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)]"
                   }`}
                 >
                   {mode}
@@ -1064,7 +1064,7 @@ export default function ExecutiveDashboardNew() {
               ))}
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              <span className="text-[10px] uppercase tracking-wide text-zinc-500">
+              <span className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
                 Financeiro:
               </span>
               {(["manual", "semi_automatic", "automatic"] as const).map(
@@ -1081,7 +1081,7 @@ export default function ExecutiveDashboardNew() {
                     className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
                       actionTypeOverrides.finance === mode
                         ? "border-blue-400 bg-blue-100 text-blue-700 dark:bg-blue-950/30 dark:text-blue-300"
-                        : "border-zinc-300 text-zinc-500 dark:border-zinc-700 dark:text-zinc-300"
+                        : "border-zinc-300 text-[var(--text-muted)] dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)]"
                     }`}
                   >
                     {mode}
@@ -1091,7 +1091,7 @@ export default function ExecutiveDashboardNew() {
             </div>
           </div>
           <div className="nexo-card-informative p-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
               Safety limits
             </p>
             <p className="mt-1 flex items-center gap-2 text-xs">
@@ -1107,20 +1107,20 @@ export default function ExecutiveDashboardNew() {
                 </>
               )}
             </p>
-            <p className="mt-1 text-[11px] text-zinc-500">
+            <p className="mt-1 text-[11px] text-[var(--text-muted)]">
               Financeiro {safetyState.remainingByActionType.finance} • O.S.{" "}
               {safetyState.remainingByActionType.service_order} • Comunicação{" "}
               {safetyState.remainingByActionType.communication}
             </p>
           </div>
           <div className="nexo-card-informative p-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
               Cross-entity context
             </p>
             <p className="mt-1 text-xs font-medium">
               {crossEntitySignals.label}
             </p>
-            <p className="mt-1 text-[11px] text-zinc-500">
+            <p className="mt-1 text-[11px] text-[var(--text-muted)]">
               Risco {crossEntitySignals.riskScore}/100 • Carga{" "}
               {crossEntitySignals.loadScore}/100 • Prioridade{" "}
               {crossEntitySignals.priorityScore}/100
@@ -1183,7 +1183,7 @@ export default function ExecutiveDashboardNew() {
               onStageSelect={setSelectedPipelineStage}
             />
             {selectedPipelineStage ? (
-              <p className="text-xs text-zinc-500">
+              <p className="text-xs text-[var(--text-muted)]">
                 Filtro ativo no pipeline:{" "}
                 <strong>{selectedPipelineStage}</strong>.
               </p>
@@ -1197,7 +1197,7 @@ export default function ExecutiveDashboardNew() {
         <div className="grid gap-5 xl:grid-cols-2">
           <article className="nexo-card-operational">
             <h3 className="text-sm font-semibold">Executive summary</h3>
-            <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-300">
+            <p className="mt-1 text-xs text-[var(--text-secondary)] dark:text-[var(--text-secondary)]">
               Gargalos, risco financeiro e volume travado para decisão rápida.
             </p>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
@@ -1242,19 +1242,19 @@ export default function ExecutiveDashboardNew() {
                 >
                   <p className="text-xs font-semibold">
                     {log.actionLabel}{" "}
-                    <span className="text-zinc-500">• {log.actionType}</span>
+                    <span className="text-[var(--text-muted)]">• {log.actionType}</span>
                   </p>
-                  <p className="text-[11px] text-zinc-600 dark:text-zinc-300">
+                  <p className="text-[11px] text-[var(--text-secondary)] dark:text-[var(--text-secondary)]">
                     {log.reason}
                   </p>
-                  <p className="mt-1 text-[10px] uppercase tracking-wide text-zinc-500">
+                  <p className="mt-1 text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
                     regra {log.ruleApplied} • origem {log.origin} • modo{" "}
                     {log.mode}
                   </p>
                 </div>
               ))}
               {decisionAuditLog.length === 0 ? (
-                <p className="text-xs text-zinc-500">
+                <p className="text-xs text-[var(--text-muted)]">
                   Sem decisões no momento.
                 </p>
               ) : null}
@@ -1267,7 +1267,7 @@ export default function ExecutiveDashboardNew() {
         <p className="flex items-center gap-2 text-sm font-semibold">
           <Bot className="h-4 w-4" /> Background automation prep
         </p>
-        <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-300">
+        <p className="mt-1 text-xs text-[var(--text-secondary)] dark:text-[var(--text-secondary)]">
           Execução fora da UI pronta para eventos (cobrança vencida, O.S.
           concluída, risco elevado) com notificações inteligentes e trilha de
           auditoria.
@@ -1516,10 +1516,10 @@ export default function ExecutiveDashboardNew() {
                   className={`nexo-list-row ${item.severity === "critical" ? "nexo-list-row-critical" : "nexo-list-row-high"}`}
                 >
                   <div className="min-w-0">
-                    <p className="nexo-text-wrap font-semibold text-zinc-900 dark:text-zinc-100">
+                    <p className="nexo-text-wrap font-semibold text-[var(--text-primary)] dark:text-[var(--text-primary)]">
                       {item.label}
                     </p>
-                    <p className="nexo-text-wrap text-xs text-zinc-600 dark:text-zinc-300">
+                    <p className="nexo-text-wrap text-xs text-[var(--text-secondary)] dark:text-[var(--text-secondary)]">
                       <span className="mr-1.5 inline-block rounded-full bg-black/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide dark:bg-white/10">
                         {item.severity === "critical" ? "Crítico" : "Alto"}
                       </span>
@@ -1540,13 +1540,13 @@ export default function ExecutiveDashboardNew() {
               revenueQuery.isFetching ||
               serviceOrdersStatusQuery.isFetching ||
               chargesStatusQuery.isFetching) && (
-              <div className="mt-3 inline-flex items-center gap-2 text-xs text-zinc-500">
+              <div className="mt-3 inline-flex items-center gap-2 text-xs text-[var(--text-muted)]">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 Atualizando blocos sem interromper sua leitura...
               </div>
             )}
             {lastUpdatedAt ? (
-              <p className="mt-2 text-xs text-zinc-400 dark:text-zinc-500">
+              <p className="mt-2 text-xs text-[var(--text-muted)] dark:text-[var(--text-muted)]">
                 Última atualização: {lastUpdatedAt.toLocaleTimeString("pt-BR")}
               </p>
             ) : null}
@@ -1584,10 +1584,10 @@ export default function ExecutiveDashboardNew() {
                   </p>
                   <div className="mt-1 flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="nexo-text-wrap font-semibold text-zinc-900 dark:text-zinc-100">
+                      <p className="nexo-text-wrap font-semibold text-[var(--text-primary)] dark:text-[var(--text-primary)]">
                         {problem.title}
                       </p>
-                      <p className="text-xs text-zinc-600 dark:text-zinc-300">
+                      <p className="text-xs text-[var(--text-secondary)] dark:text-[var(--text-secondary)]">
                         {problem.count} itens •{" "}
                         {formatCurrency(problem.impactCents)} de impacto
                       </p>
@@ -1626,10 +1626,10 @@ export default function ExecutiveDashboardNew() {
             </article>
           ) : (
             <article className="nexo-card-informative">
-              <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+              <h3 className="text-lg font-semibold text-[var(--text-primary)] dark:text-[var(--text-primary)]">
                 Fluxo automático de ação
               </h3>
-              <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-300">
+              <p className="mt-1 text-sm text-[var(--text-secondary)] dark:text-[var(--text-secondary)]">
                 Assim que você criar Cliente, O.S. ou Cobrança, a próxima ação
                 aparece aqui sem precisar interpretar.
               </p>

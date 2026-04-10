@@ -165,7 +165,7 @@ export default function SettingsPage() {
   if (isInitializing) {
     return (
       <PageWrapper title="Configurações" subtitle="Validando sessão atual.">
-        <SurfaceSection className="flex min-h-[180px] items-center justify-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
+        <SurfaceSection className="flex min-h-[180px] items-center justify-center gap-2 text-sm text-[var(--text-muted)] dark:text-[var(--text-muted)]">
           <Loader2 className="h-4 w-4 animate-spin" />
           Carregando sessão...
         </SurfaceSection>
@@ -176,7 +176,7 @@ export default function SettingsPage() {
   if (!isAuthenticated) {
     return (
       <PageWrapper title="Configurações" subtitle="Sua sessão não está ativa.">
-        <SurfaceSection className="text-sm text-zinc-500 dark:text-zinc-400">Faça login para acessar configurações.</SurfaceSection>
+        <SurfaceSection className="text-sm text-[var(--text-muted)] dark:text-[var(--text-muted)]">Faça login para acessar configurações.</SurfaceSection>
       </PageWrapper>
     );
   }
@@ -184,7 +184,7 @@ export default function SettingsPage() {
   if (queryState.isInitialLoading) {
     return (
       <PageWrapper title="Configurações" subtitle="Carregando dados da organização.">
-        <SurfaceSection className="flex min-h-[180px] items-center justify-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
+        <SurfaceSection className="flex min-h-[180px] items-center justify-center gap-2 text-sm text-[var(--text-muted)] dark:text-[var(--text-muted)]">
           <Loader2 className="h-4 w-4 animate-spin" />
           Preparando configurações...
         </SurfaceSection>
@@ -247,14 +247,14 @@ export default function SettingsPage() {
       ) : null}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-        <div className="nexo-kpi-card p-4"><p className="text-xs text-zinc-500">Organização</p><p className="text-lg font-semibold">{settings?.name || "—"}</p></div>
-        <div className="nexo-kpi-card p-4"><p className="text-xs text-zinc-500">Timezone</p><p className="text-lg font-semibold">{form.timezone}</p></div>
-        <div className="nexo-kpi-card p-4"><p className="text-xs text-zinc-500">Moeda</p><p className="text-lg font-semibold">{form.currency}</p></div>
-        <div className="nexo-kpi-card p-4"><p className="text-xs text-zinc-500">Status</p><p className="text-lg font-semibold">{hasChanges ? "Com alterações" : "Sincronizado"}</p></div>
+        <div className="nexo-kpi-card p-4"><p className="text-xs text-[var(--text-muted)]">Organização</p><p className="text-lg font-semibold">{settings?.name || "—"}</p></div>
+        <div className="nexo-kpi-card p-4"><p className="text-xs text-[var(--text-muted)]">Timezone</p><p className="text-lg font-semibold">{form.timezone}</p></div>
+        <div className="nexo-kpi-card p-4"><p className="text-xs text-[var(--text-muted)]">Moeda</p><p className="text-lg font-semibold">{form.currency}</p></div>
+        <div className="nexo-kpi-card p-4"><p className="text-xs text-[var(--text-muted)]">Status</p><p className="text-lg font-semibold">{hasChanges ? "Com alterações" : "Sincronizado"}</p></div>
       </div>
 
       <SurfaceSection>
-        <p className="text-sm text-zinc-600 dark:text-zinc-300">
+        <p className="text-sm text-[var(--text-secondary)] dark:text-[var(--text-secondary)]">
           Bloco analítico: padronização institucional consistente reduz erro de operação, relatórios e faturamento.
         </p>
       </SurfaceSection>

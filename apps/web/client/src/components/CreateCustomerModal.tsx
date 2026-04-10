@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/design-system";
 import { Loader2 } from "lucide-react";
 import { customerSchema } from "@/lib/validations";
 import { Input } from "@/components/ui/input";
@@ -254,23 +254,23 @@ export default function CreateCustomerModal({ open, onOpenChange, onCreated }: P
           <>
             <div className="space-y-2">
               <Label htmlFor="customer-name">Nome *</Label>
-              <Input id="customer-name" value={name} onChange={(e) => setName(e.target.value)} className="border-zinc-700 bg-zinc-900/80" placeholder="Ex: Cliente Demo" />
+              <Input id="customer-name" value={name} onChange={(e) => setName(e.target.value)} className="border-[var(--border-subtle)] bg-[var(--surface-base)]" placeholder="Ex: Cliente Demo" />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="customer-phone">Telefone / WhatsApp *</Label>
-              <Input id="customer-phone" value={phone} onChange={(e) => setPhone(e.target.value)} className="border-zinc-700 bg-zinc-900/80" placeholder="Ex: +5547999999999" />
-              <p className="text-xs text-zinc-500">Pode mandar com +55 ou só números. O backend normaliza.</p>
+              <Input id="customer-phone" value={phone} onChange={(e) => setPhone(e.target.value)} className="border-[var(--border-subtle)] bg-[var(--surface-base)]" placeholder="Ex: +5547999999999" />
+              <p className="text-xs text-[var(--text-muted)]">Pode mandar com +55 ou só números. O backend normaliza.</p>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="customer-email">Email</Label>
-              <Input id="customer-email" value={email} onChange={(e) => setEmail(e.target.value)} className="border-zinc-700 bg-zinc-900/80" placeholder="cliente@demo.com" type="email" />
+              <Input id="customer-email" value={email} onChange={(e) => setEmail(e.target.value)} className="border-[var(--border-subtle)] bg-[var(--surface-base)]" placeholder="cliente@demo.com" type="email" />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="customer-notes">Observações</Label>
-              <Textarea id="customer-notes" value={notes} onChange={(e) => setNotes(e.target.value)} className="border-zinc-700 bg-zinc-900/80" placeholder="Informações úteis sobre o cliente" rows={4} />
+              <Textarea id="customer-notes" value={notes} onChange={(e) => setNotes(e.target.value)} className="border-[var(--border-subtle)] bg-[var(--surface-base)]" placeholder="Informações úteis sobre o cliente" rows={4} />
             </div>
           </>
         ) : null}

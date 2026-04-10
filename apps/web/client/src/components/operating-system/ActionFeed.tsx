@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { CheckCircle2, EyeOff, Sparkles } from "lucide-react";
 import { SeverityBadge } from "@/components/operating-system/SeverityBadge";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/design-system";
 import type { ActionSeverity } from "@/lib/operations/next-action";
 import type { OperationMode } from "@/lib/operations/automation-control";
 import { cn } from "@/lib/utils";
@@ -68,7 +68,7 @@ export function ActionFeed({
     <div className="rounded-xl border p-4">
       <div className="flex items-center justify-between gap-3">
         <h3 className="text-sm font-semibold">Fila operacional</h3>
-        <span className="rounded-full border border-zinc-200 px-2 py-1 text-[11px] font-semibold text-zinc-600 dark:border-zinc-800 dark:text-zinc-300">
+        <span className="rounded-full border border-[var(--border-subtle)] px-2 py-1 text-[11px] font-semibold text-[var(--text-secondary)] dark:border-zinc-800 dark:text-[var(--text-secondary)]">
           {visibleFeed.length} pendente{visibleFeed.length === 1 ? "" : "s"}
         </span>
       </div>
@@ -87,7 +87,7 @@ export function ActionFeed({
         ) : null}
         {Object.entries(groupedFiltered).map(([group, groupItems]) => (
           <div key={group} className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
               {group}
             </p>
             {groupItems.map(item => (
@@ -103,8 +103,8 @@ export function ActionFeed({
                     {nextPriorityId === item.id ? <Sparkles className="h-3.5 w-3.5 text-orange-500" /> : null}
                     {item.entity}
                   </p>
-                  <p className="text-xs text-zinc-600 dark:text-zinc-400">{item.reason} {item.amountLabel ? `• ${item.amountLabel}` : ""}</p>
-                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                  <p className="text-xs text-[var(--text-secondary)] dark:text-[var(--text-muted)]">{item.reason} {item.amountLabel ? `• ${item.amountLabel}` : ""}</p>
+                  <p className="text-[11px] text-[var(--text-muted)] dark:text-[var(--text-muted)]">
                     impacto {item.impactScore ?? 50}/100 • urgência {item.urgencyScore ?? 50}/100
                   </p>
                 </div>
@@ -137,7 +137,7 @@ export function ActionFeed({
           </div>
         ))}
         {visibleFeed.length === 0 ? (
-          <p className="text-xs text-zinc-500">Sem ações pendentes no momento.</p>
+          <p className="text-xs text-[var(--text-muted)]">Sem ações pendentes no momento.</p>
         ) : null}
       </div>
     </div>

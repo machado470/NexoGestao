@@ -8,7 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/design-system";
 
 type Props = {
   open: boolean;
@@ -71,7 +71,7 @@ export default function ModalFlowShell({
         onInteractOutside={(event) => {
           if (closeBlocked || isSubmitting) event.preventDefault();
         }}
-        className="max-h-[90vh] max-w-2xl overflow-hidden border-zinc-800/80 bg-white p-0 shadow-xl dark:bg-zinc-900"
+        className="max-h-[90vh] max-w-2xl overflow-hidden border-[var(--border-subtle)] bg-white p-0 shadow-sm dark:bg-[var(--surface-base)]"
       >
         <DialogHeader className="border-b border-gray-200 px-6 py-5 dark:border-zinc-800">
           <DialogTitle className="text-xl font-semibold text-gray-900 dark:text-white">
@@ -86,7 +86,7 @@ export default function ModalFlowShell({
 
         <div className="max-h-[68vh] overflow-y-auto p-6">
           {isLoading ? (
-            <div className="space-y-3 rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600 dark:border-zinc-800 dark:bg-zinc-900/60 dark:text-gray-300">
+            <div className="space-y-3 rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600 dark:border-zinc-800 dark:bg-[var(--surface-base)]/60 dark:text-gray-300">
               <p className="inline-flex items-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin text-orange-500" />
                 Carregando dados do fluxo...

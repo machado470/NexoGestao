@@ -58,7 +58,7 @@ export function OperationalActionFeed({ plan, riskOperationalState }: Operationa
         <span className="inline-flex rounded-full border border-orange-500/40 bg-orange-500/10 px-2 py-1 text-orange-700 dark:text-orange-300">
           Throttled: {executionState.throttled}
         </span>
-        <span className="inline-flex rounded-full border border-zinc-500/30 bg-zinc-500/10 px-2 py-1 text-zinc-700 dark:text-zinc-300">
+        <span className="inline-flex rounded-full border border-zinc-500/30 bg-zinc-500/10 px-2 py-1 text-[var(--text-secondary)] dark:text-[var(--text-secondary)]">
           Pendentes: {executionState.pending}
         </span>
       </div>
