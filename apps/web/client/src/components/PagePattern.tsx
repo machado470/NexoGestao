@@ -49,8 +49,8 @@ export function PageHero({
       title={
         <div className="max-w-3xl">
           {eyebrow ? (
-            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[var(--border-soft)] bg-[color-mix(in_srgb,var(--accent-primary)_20%,transparent)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent-primary)]">
-              <Sparkles className="h-3.5 w-3.5" />
+            <div className="mb-2 inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-secondary)]">
+              <Sparkles className="h-3.5 w-3.5 text-[var(--accent-primary)]" />
               {eyebrow}
             </div>
           ) : null}
@@ -215,10 +215,10 @@ export function SmartPage({
         </div>
       </TimelineList>
 
-      <div className="sticky bottom-3 z-20 rounded-2xl border border-[var(--accent-soft)] bg-[var(--nexo-card-surface)] p-2 shadow-sm md:static md:border-none md:bg-transparent md:p-0 md:shadow-none">
+      <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-surface)] p-2 md:border-none md:bg-transparent md:p-0">
         <PrimaryButton
           type="button"
-          className="nexo-cta-dominant nexo-state-transition min-h-12 w-full gap-2"
+          className="nexo-cta-dominant nexo-state-transition min-h-10 w-full gap-2"
           onClick={() => {
             registerActionFlowEvent("page_primary_cta_clicked", {
               pageContext,
