@@ -13,8 +13,9 @@ import {
 } from "@/lib/query-helpers";
 import CreatePersonModal from "@/components/CreatePersonModal";
 import EditPersonModal from "@/components/EditPersonModal";
-import { ActionBarWrapper, DataTableWrapper, PageWrapper } from "@/components/operating-system/Wrappers";
+import { DataTableWrapper, PageWrapper } from "@/components/operating-system/Wrappers";
 import { RowActions } from "@/components/operating-system/RowActions";
+import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 
 /* ================= TYPES ================= */
 
@@ -235,7 +236,15 @@ export default function PeoplePage() {
       title="Pessoas"
       subtitle="Base de pessoas conectada à operação, com a mesma leitura visual do dashboard executivo."
     >
-      <ActionBarWrapper
+      <OperationalTopCard
+        contextLabel="Direção da equipe"
+        title={unassignedOrders > 0 ? "Ordens sem responsável" : "Monitorar equipe em atenção"}
+        description={`${unassignedOrders} O.S. podem travar por falta de responsável.`}
+        chips={smartPriorities.slice(0, 3).map(priority => (
+          <span key={priority.id} className="rounded-full border px-3 py-1 text-xs text-[var(--text-secondary)]">
+            {priority.title}: {priority.count}
+          </span>
+        ))}
         secondaryActions={(
           <>
             <Button type="button" variant="outline" onClick={() => navigate("/service-orders")}>Ir para O.S.</Button>
@@ -243,48 +252,26 @@ export default function PeoplePage() {
           </>
         )}
         primaryAction={(
-          <Button type="button" className="min-h-12 gap-2" onClick={() => setIsCreateOpen(true)}>
-            <Plus className="h-4 w-4" />
-            Nova pessoa
-          </Button>
+          <>
+            <Button
+              type="button"
+              onClick={() => {
+                if (unassignedOrders > 0) {
+                  navigate("/service-orders");
+                  return;
+                }
+                setIsCreateOpen(true);
+              }}
+            >
+              {unassignedOrders > 0 ? "Distribuir ordens" : "Nova pessoa"}
+            </Button>
+            <Button type="button" className="min-h-12 gap-2" onClick={() => setIsCreateOpen(true)}>
+              <Plus className="h-4 w-4" />
+              Nova pessoa
+            </Button>
+          </>
         )}
       />
-
-
-      <SurfaceSection className="space-y-3">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-              Direção da equipe
-            </p>
-            <p className="mt-1 font-medium text-[var(--text-primary)]">
-              {unassignedOrders > 0 ? "Ordens sem responsável" : "Monitorar equipe em atenção"}
-            </p>
-            <p className="text-sm text-[var(--text-secondary)]">
-              {unassignedOrders} O.S. podem travar por falta de responsável.
-            </p>
-          </div>
-          <Button
-            type="button"
-            onClick={() => {
-              if (unassignedOrders > 0) {
-                navigate("/service-orders");
-                return;
-              }
-              setIsCreateOpen(true);
-            }}
-          >
-            {unassignedOrders > 0 ? "Distribuir ordens" : "Nova pessoa"}
-          </Button>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {smartPriorities.slice(0, 3).map(priority => (
-            <span key={priority.id} className="rounded-full border px-3 py-1 text-xs text-[var(--text-secondary)]">
-              {priority.title}: {priority.count}
-            </span>
-          ))}
-        </div>
-      </SurfaceSection>
 
       {queryState.hasBackgroundUpdate ? (
         <SurfaceSection className="nexo-info-banner text-sm">

@@ -39,12 +39,12 @@ import {
   CHARGE_STATUS_BADGE,
   CHARGE_STATUS_LABEL,
 } from "@shared/types/api";
-import { ActionBarWrapper } from "@/components/operating-system/ActionBar";
 import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedbackButton";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { NextActionCell } from "@/components/operating-system/NextActionCell";
 import { PrimaryActionButton } from "@/components/operating-system/PrimaryActionButton";
 import { ContextPanel } from "@/components/operating-system/ContextPanel";
+import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import { runFlowChain } from "@/lib/operations/flowChain";
 import { getChargeExplainLayer } from "@/lib/operations/explain-layer";
 
@@ -649,7 +649,19 @@ export default function FinancesPage() {
       subtitle="Veja o que está acontecendo no caixa, por que isso importa para sua venda e qual ação executar agora."
       breadcrumb={[{ label: "Operação" }, { label: "Financeiro" }]}
     >
-      <ActionBarWrapper
+      <OperationalTopCard
+        contextLabel="Direção financeira"
+        title={nextAction.title}
+        description={
+          billingQueue.length > 0
+            ? `${billingQueue.length} cobranças na fila de priorização.`
+            : "Sem pressão crítica agora."
+        }
+        chips={smartPriorities.slice(0, 3).map(priority => (
+          <span key={priority.id} className="rounded-full border px-3 py-1 text-xs text-[var(--text-secondary)]">
+            {priority.title}: {priority.count}
+          </span>
+        ))}
         secondaryActions={
           <Button
             type="button"
@@ -660,45 +672,24 @@ export default function FinancesPage() {
           </Button>
         }
         primaryAction={
-          <ActionFeedbackButton
-            state="idle"
-            idleLabel="Priorizar cobranças"
-            onClick={() => {
-              track("cta_click", {
-                screen: "finances",
-                ctaId: "hero_prioritize_charges",
-              });
-              navigate("/finances");
-            }}
-          />
+          <>
+            <Button type="button" onClick={nextActionButtons[0]?.onClick}>
+              {nextAction.primaryAction.label}
+            </Button>
+            <ActionFeedbackButton
+              state="idle"
+              idleLabel="Priorizar cobranças"
+              onClick={() => {
+                track("cta_click", {
+                  screen: "finances",
+                  ctaId: "hero_prioritize_charges",
+                });
+                navigate("/finances");
+              }}
+            />
+          </>
         }
       />
-
-      <SurfaceSection className="space-y-3">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-              Direção financeira
-            </p>
-            <p className="mt-1 font-medium text-[var(--text-primary)]">{nextAction.title}</p>
-            <p className="text-sm text-[var(--text-secondary)]">
-              {billingQueue.length > 0
-                ? `${billingQueue.length} cobranças na fila de priorização.`
-                : "Sem pressão crítica agora."}
-            </p>
-          </div>
-          <Button type="button" onClick={nextActionButtons[0]?.onClick}>
-            {nextAction.primaryAction.label}
-          </Button>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {smartPriorities.slice(0, 3).map(priority => (
-            <span key={priority.id} className="rounded-full border px-3 py-1 text-xs text-[var(--text-secondary)]">
-              {priority.title}: {priority.count}
-            </span>
-          ))}
-        </div>
-      </SurfaceSection>
 
       {queryState.hasBackgroundUpdate ? (
         <SurfaceSection className="nexo-info-banner text-sm">

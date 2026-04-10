@@ -62,9 +62,9 @@ import { useCriticalActionStore } from "@/stores/criticalActionStore";
 import { invalidateOperationalGraph } from "@/lib/operationalConsistency";
 import { useProductAnalytics } from "@/hooks/useProductAnalytics";
 import { generateCustomerActions } from "@/lib/smartActions";
-import { ActionBarWrapper } from "@/components/operating-system/ActionBar";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { NextActionCell } from "@/components/operating-system/NextActionCell";
+import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import {
   getCustomerDecision,
   getCustomerSeverity,
@@ -978,7 +978,19 @@ export default function CustomersPage() {
       breadcrumb={[{ label: "Operação" }, { label: "Clientes" }]}
     >
 
-      <ActionBarWrapper
+      <OperationalTopCard
+        contextLabel="Direção operacional"
+        title={nextActionLabel}
+        description={
+          workspace
+            ? `${workspacePendingCharges} pendências financeiras em aberto para o cliente em foco.`
+            : "Sem cliente em foco. Selecione um registro para abrir o workspace completo."
+        }
+        chips={smartPriorities.slice(0, 3).map((priority) => (
+          <span key={priority.id} className="rounded-full border px-3 py-1 text-xs text-[var(--text-secondary)]">
+            {priority.title}: {priority.count}
+          </span>
+        ))}
         secondaryActions={(
           <Button
             type="button"
@@ -992,62 +1004,39 @@ export default function CustomersPage() {
           </Button>
         )}
         primaryAction={(
-          <Button
-            type="button"
-            onClick={() => {
-              track("cta_click", {
-                screen: "customers",
-                ctaId: "hero_new_customer",
-              });
-              setIsCreateOpen(true);
-            }}
-            className="min-h-12 flex items-center gap-2 bg-orange-500 text-white"
-            disabled={interactionBlocked}
-          >
-            <Plus className="h-4 w-4" />
-            Novo Cliente
-          </Button>
+          <>
+            <Button
+              type="button"
+              onClick={() => {
+                track("cta_click", {
+                  screen: "customers",
+                  ctaId: "customers_primary_direction",
+                  hasWorkspace: Boolean(workspace),
+                });
+                if (workspace) navigate(`/service-orders?customerId=${workspace.customer.id}`);
+                else setIsCreateOpen(true);
+              }}
+            >
+              {workspace ? "Abrir execução do cliente" : "Cadastrar cliente"}
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                track("cta_click", {
+                  screen: "customers",
+                  ctaId: "hero_new_customer",
+                });
+                setIsCreateOpen(true);
+              }}
+              className="min-h-12 flex items-center gap-2 bg-orange-500 text-white"
+              disabled={interactionBlocked}
+            >
+              <Plus className="h-4 w-4" />
+              Novo Cliente
+            </Button>
+          </>
         )}
       />
-
-      <SurfaceSection className="space-y-3">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-              Direção operacional
-            </p>
-            <p className="mt-1 font-medium text-[var(--text-primary)]">
-              {nextActionLabel}
-            </p>
-            <p className="text-sm text-[var(--text-secondary)]">
-              {workspace
-                ? `${workspacePendingCharges} pendências financeiras em aberto para o cliente em foco.`
-                : "Sem cliente em foco. Selecione um registro para abrir o workspace completo."}
-            </p>
-          </div>
-          <Button
-            type="button"
-            onClick={() => {
-              track("cta_click", {
-                screen: "customers",
-                ctaId: "customers_primary_direction",
-                hasWorkspace: Boolean(workspace),
-              });
-              if (workspace) navigate(`/service-orders?customerId=${workspace.customer.id}`);
-              else setIsCreateOpen(true);
-            }}
-          >
-            {workspace ? "Abrir execução do cliente" : "Cadastrar cliente"}
-          </Button>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {smartPriorities.slice(0, 3).map((priority) => (
-            <span key={priority.id} className="rounded-full border px-3 py-1 text-xs text-[var(--text-secondary)]">
-              {priority.title}: {priority.count}
-            </span>
-          ))}
-        </div>
-      </SurfaceSection>
 
       {queryState.hasBackgroundUpdate ? (
         <SurfaceSection className="nexo-info-banner text-sm">

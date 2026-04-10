@@ -61,6 +61,7 @@ import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedba
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { NextActionCell } from "@/components/operating-system/NextActionCell";
 import { ContextPanel } from "@/components/operating-system/ContextPanel";
+import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import { runFlowChain, type ExecutionSnapshot } from "@/lib/operations/flowChain";
 import { getServiceOrderExplainLayer } from "@/lib/operations/explain-layer";
 
@@ -491,7 +492,15 @@ export default function ServiceOrdersPage() {
       subtitle="Veja o que está parado na operação, por que isso impacta sua conversão e qual próximo passo deve acontecer agora."
       breadcrumb={[{ label: "Operação" }, { label: "Ordens de Serviço" }]}
     >
-      <ActionBarWrapper
+      <OperationalTopCard
+        contextLabel="Direção de execução"
+        title={nextAction.title}
+        description={`${totalWithUrgency} itens com impacto imediato no fluxo operacional e financeiro.`}
+        chips={smartPriorities.slice(0, 3).map((priority) => (
+          <span key={priority.id} className="rounded-full border px-3 py-1 text-xs text-[var(--text-secondary)]">
+            {priority.title}: {priority.count}
+          </span>
+        ))}
         secondaryActions={
           <>
             {activeId ? (
@@ -512,44 +521,25 @@ export default function ServiceOrdersPage() {
           </>
         }
         primaryAction={
-          <ActionFeedbackButton
-            state="idle"
-            idleLabel="Nova O.S."
-            onClick={() => {
-              track("cta_click", {
-                screen: "service-orders",
-                ctaId: "hero_new_service_order",
-              });
-              setIsCreateOpen(true);
-            }}
-            icon={<Plus className="h-4 w-4" />}
-          />
+          <>
+            <Button type="button" onClick={nextActionButtons[0]?.onClick}>
+              {nextAction.primaryAction.label}
+            </Button>
+            <ActionFeedbackButton
+              state="idle"
+              idleLabel="Nova O.S."
+              onClick={() => {
+                track("cta_click", {
+                  screen: "service-orders",
+                  ctaId: "hero_new_service_order",
+                });
+                setIsCreateOpen(true);
+              }}
+              icon={<Plus className="h-4 w-4" />}
+            />
+          </>
         }
       />
-
-      <SurfaceSection className="space-y-3">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-              Direção de execução
-            </p>
-            <p className="mt-1 font-medium text-[var(--text-primary)]">{nextAction.title}</p>
-            <p className="text-sm text-[var(--text-secondary)]">
-              {totalWithUrgency} itens com impacto imediato no fluxo operacional e financeiro.
-            </p>
-          </div>
-          <Button type="button" onClick={nextActionButtons[0]?.onClick}>
-            {nextAction.primaryAction.label}
-          </Button>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {smartPriorities.slice(0, 3).map((priority) => (
-            <span key={priority.id} className="rounded-full border px-3 py-1 text-xs text-[var(--text-secondary)]">
-              {priority.title}: {priority.count}
-            </span>
-          ))}
-        </div>
-      </SurfaceSection>
 
       {activeId && (
         <div className="nexo-surface-operational border-orange-200 bg-orange-50/85 p-3 text-sm text-orange-800 dark:border-orange-500/30 dark:bg-orange-500/10 dark:text-orange-300">

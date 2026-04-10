@@ -51,10 +51,10 @@ import {
   getOperationalSeverityClasses,
   getOperationalSeverityLabel,
 } from "@/lib/operations/operational-intelligence";
-import { ActionBarWrapper } from "@/components/operating-system/ActionBar";
 import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedbackButton";
 import { NextActionCell } from "@/components/operating-system/NextActionCell";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
+import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import {
   getConcurrencyErrorMessage,
   isConcurrentConflictError,
@@ -772,7 +772,19 @@ export default function AppointmentsPage() {
       subtitle="Aqui o cliente vira operação: confirme presença, puxe O.S. e mantenha o financeiro conectado sem depender de contexto interno."
       breadcrumb={[{ label: "Operação" }, { label: "Agendamentos" }]}
     >
-      <ActionBarWrapper
+      <OperationalTopCard
+        contextLabel="Direção da agenda"
+        title={
+          appointmentsWithoutOperations > 0
+            ? "Agendamentos sem O.S. ativa"
+            : "Agenda com foco em confirmação e execução"
+        }
+        description={`${appointmentsWithoutOperations} agendamentos ainda sem execução vinculada.`}
+        chips={smartPriorities.slice(0, 3).map(priority => (
+          <span key={priority.id} className="rounded-full border px-3 py-1 text-xs text-[var(--text-secondary)]">
+            {priority.title}: {priority.count}
+          </span>
+        ))}
         secondaryActions={
           <Button
             type="button"
@@ -791,50 +803,27 @@ export default function AppointmentsPage() {
           </Button>
         }
         primaryAction={
-          <ActionFeedbackButton
-            state="idle"
-            idleLabel="Novo Agendamento"
-            onClick={() => setShowCreateModal(true)}
-            icon={<Plus className="h-4 w-4" />}
-          />
+          <>
+            <Button
+              type="button"
+              onClick={() => {
+                const target =
+                  filteredAppointments.find(item => item.status === "SCHEDULED") ??
+                  filteredAppointments[0];
+                if (target) handleOpenDeepLink(target.id);
+              }}
+            >
+              {appointmentsWithoutOperations > 0 ? "Abrir próximo gargalo" : "Abrir próximo agendamento"}
+            </Button>
+            <ActionFeedbackButton
+              state="idle"
+              idleLabel="Novo Agendamento"
+              onClick={() => setShowCreateModal(true)}
+              icon={<Plus className="h-4 w-4" />}
+            />
+          </>
         }
       />
-
-      <SurfaceSection className="space-y-3">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-              Direção da agenda
-            </p>
-            <p className="mt-1 font-medium text-[var(--text-primary)]">
-              {appointmentsWithoutOperations > 0
-                ? "Agendamentos sem O.S. ativa"
-                : "Agenda com foco em confirmação e execução"}
-            </p>
-            <p className="text-sm text-[var(--text-secondary)]">
-              {appointmentsWithoutOperations} agendamentos ainda sem execução vinculada.
-            </p>
-          </div>
-          <Button
-            type="button"
-            onClick={() => {
-              const target =
-                filteredAppointments.find(item => item.status === "SCHEDULED") ??
-                filteredAppointments[0];
-              if (target) handleOpenDeepLink(target.id);
-            }}
-          >
-            {appointmentsWithoutOperations > 0 ? "Abrir próximo gargalo" : "Abrir próximo agendamento"}
-          </Button>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {smartPriorities.slice(0, 3).map(priority => (
-            <span key={priority.id} className="rounded-full border px-3 py-1 text-xs text-[var(--text-secondary)]">
-              {priority.title}: {priority.count}
-            </span>
-          ))}
-        </div>
-      </SurfaceSection>
 
       <div className="grid gap-3 md:grid-cols-[1fr_auto_auto]">
         <div className="relative">
