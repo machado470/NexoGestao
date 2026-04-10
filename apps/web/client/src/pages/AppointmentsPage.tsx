@@ -5,7 +5,6 @@ import { Button } from "@/components/design-system";
 import {
   Plus,
   Calendar,
-  RefreshCcw,
   CheckCircle2,
   Ban,
   Clock3,
@@ -789,39 +788,24 @@ export default function AppointmentsPage() {
           <Button
             type="button"
             variant="outline"
-            onClick={() =>
-              Promise.all([
-                listAppointments.refetch(),
-                listServiceOrders.refetch(),
-                listCustomers.refetch(),
-              ])
-            }
-            className="gap-2"
+            onClick={() => {
+              const target =
+                filteredAppointments.find(item => item.status === "SCHEDULED") ??
+                filteredAppointments[0];
+              if (target) handleOpenDeepLink(target.id);
+            }}
+            disabled={filteredAppointments.length === 0}
           >
-            <RefreshCcw className="h-4 w-4" />
-            Atualizar
+            Abrir próximo gargalo
           </Button>
         }
         primaryAction={
-          <>
-            <Button
-              type="button"
-              onClick={() => {
-                const target =
-                  filteredAppointments.find(item => item.status === "SCHEDULED") ??
-                  filteredAppointments[0];
-                if (target) handleOpenDeepLink(target.id);
-              }}
-            >
-              {appointmentsWithoutOperations > 0 ? "Abrir próximo gargalo" : "Abrir próximo agendamento"}
-            </Button>
-            <ActionFeedbackButton
-              state="idle"
-              idleLabel="Novo Agendamento"
-              onClick={() => setShowCreateModal(true)}
-              icon={<Plus className="h-4 w-4" />}
-            />
-          </>
+          <ActionFeedbackButton
+            state="idle"
+            idleLabel="Novo agendamento"
+            onClick={() => setShowCreateModal(true)}
+            icon={<Plus className="h-4 w-4" />}
+          />
         }
       />
 

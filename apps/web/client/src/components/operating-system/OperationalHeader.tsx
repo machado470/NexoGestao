@@ -19,8 +19,8 @@ export function OperationalHeader({
   className,
 }: OperationalHeaderProps) {
   return (
-    <section className={cn("nexo-page-header px-1 py-1", className)}>
-      <div className="relative z-10 space-y-2.5">
+    <section className={cn("px-1 py-0.5", className)}>
+      <div className="relative z-10 space-y-2">
         {breadcrumb && breadcrumb.length > 0 ? (
           <nav
             aria-label="Breadcrumb"
@@ -47,7 +47,7 @@ export function OperationalHeader({
           </nav>
         ) : null}
 
-        <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
             {description ? (
               <p className="nexo-page-header-description">{description}</p>

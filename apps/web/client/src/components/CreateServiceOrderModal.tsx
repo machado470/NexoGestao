@@ -340,19 +340,19 @@ export default function CreateServiceOrderModal({
         onInteractOutside={(event) => {
           if (createMutation.isPending) event.preventDefault();
         }}
-        className="max-h-[90vh] max-w-2xl overflow-hidden border-[var(--border-subtle)] bg-white p-0 shadow-sm dark:bg-[var(--surface-base)]"
+        className="nexo-modal-content max-h-[90vh] max-w-4xl overflow-hidden p-0"
       >
-        <DialogHeader className="border-b border-gray-200 px-6 py-6 dark:border-zinc-800">
-          <DialogTitle className="flex items-center gap-2 text-xl text-gray-900 dark:text-white">
+        <DialogHeader className="border-b border-[var(--border-soft)] px-6 py-6">
+          <DialogTitle className="flex items-center gap-2 text-xl text-[var(--text-primary)]">
             <ClipboardList className="h-5 w-5 text-orange-500" />
             Nova Ordem de Serviço
           </DialogTitle>
-          <DialogDescription className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          <DialogDescription className="mt-1 text-sm text-[var(--text-muted)]">
             Cadastre a execução operacional e, se quiser, já deixe a base financeira preparada.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="max-h-[70vh] overflow-y-auto p-6">
+        <div className="nexo-modal-body max-h-[calc(90vh-152px)] overflow-y-auto p-6">
           {createdServiceOrder ? (
             <section className="space-y-4 rounded-xl border border-emerald-200 bg-emerald-50 p-5 dark:border-emerald-900/40 dark:bg-emerald-950/20">
               <h3 className="text-base font-semibold text-emerald-900 dark:text-emerald-200">
@@ -636,7 +636,7 @@ export default function CreateServiceOrderModal({
           ) : null}
         </div>
 
-        <DialogFooter className="flex gap-2 border-t border-gray-200 p-6 sm:justify-start dark:border-zinc-800">
+        <DialogFooter className="nexo-modal-footer flex gap-2 p-6 sm:justify-start">
           {createdServiceOrder ? (
             <>
               <Button

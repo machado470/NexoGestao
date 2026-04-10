@@ -367,7 +367,6 @@ export default function CustomersPage() {
   const [workspaceCustomerId, setWorkspaceCustomerId] = useState<string | null>(
     () => getCustomerIdFromUrl()
   );
-  const [nextActionRouting, setNextActionRouting] = useState(false);
   const [highlightedCustomerId, setHighlightedCustomerId] = useState<
     string | null
   >(null);
@@ -902,15 +901,6 @@ export default function CustomersPage() {
           : workspaceAppointmentsCount > 0
             ? "Preparar atendimento agendado"
             : "Iniciar relacionamento com este cliente";
-  const nextActionSeverity = !workspace
-    ? "attention"
-    : workspaceSuggestions[0]?.tone === "critical"
-      ? "critical"
-      : workspaceSuggestions[0]?.tone === "attention"
-        ? "attention"
-        : workspacePendingCharges > 0
-          ? "critical"
-        : "healthy";
   const workspaceWhatsAppRoute = useMemo(() => {
     if (!workspace) return null;
     const mainCharge = workspace.charges.find(c => c.status === "OVERDUE")
@@ -1004,37 +994,21 @@ export default function CustomersPage() {
           </Button>
         )}
         primaryAction={(
-          <>
-            <Button
-              type="button"
-              onClick={() => {
-                track("cta_click", {
-                  screen: "customers",
-                  ctaId: "customers_primary_direction",
-                  hasWorkspace: Boolean(workspace),
-                });
-                if (workspace) navigate(`/service-orders?customerId=${workspace.customer.id}`);
-                else setIsCreateOpen(true);
-              }}
-            >
-              {workspace ? "Abrir execução do cliente" : "Cadastrar cliente"}
-            </Button>
-            <Button
-              type="button"
-              onClick={() => {
-                track("cta_click", {
-                  screen: "customers",
-                  ctaId: "hero_new_customer",
-                });
-                setIsCreateOpen(true);
-              }}
-              className="min-h-12 flex items-center gap-2 bg-orange-500 text-white"
-              disabled={interactionBlocked}
-            >
-              <Plus className="h-4 w-4" />
-              Novo Cliente
-            </Button>
-          </>
+          <Button
+            type="button"
+            onClick={() => {
+              track("cta_click", {
+                screen: "customers",
+                ctaId: "hero_new_customer",
+              });
+              setIsCreateOpen(true);
+            }}
+            className="min-h-12 flex items-center gap-2 bg-orange-500 text-white"
+            disabled={interactionBlocked}
+          >
+            <Plus className="h-4 w-4" />
+            Novo cliente
+          </Button>
         )}
       />
 
@@ -1069,68 +1043,6 @@ export default function CustomersPage() {
             tone="muted"
           />
         </div>
-
-        <SurfaceSection
-          className={
-            nextActionSeverity === "critical"
-              ? "border-red-200 bg-red-50/80 dark:border-red-900/40 dark:bg-red-950/20"
-              : nextActionSeverity === "healthy"
-                ? "border-emerald-200 bg-emerald-50/80 dark:border-emerald-900/40 dark:bg-emerald-950/20"
-                : "border-amber-200 bg-amber-50/80 dark:border-amber-900/40 dark:bg-amber-950/20"
-          }
-        >
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-orange-600 dark:text-orange-300">
-                Próxima ação
-              </p>
-              <p className="mt-1 font-medium text-orange-900 dark:text-orange-100">
-                {nextActionLabel}
-              </p>
-              <p className="text-sm text-orange-700 dark:text-orange-300">
-                {workspace
-                  ? "O sistema já leu o contexto do cliente em foco e direcionou o melhor próximo passo."
-                  : "Abra um workspace para condução personalizada por cliente."}
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                onClick={() => {
-                  track("cta_click", {
-                    screen: "customers",
-                    ctaId: "next_action_primary",
-                    hasWorkspace: Boolean(workspace),
-                  });
-                  setNextActionRouting(true);
-                  if (workspace)
-                    navigate(
-                      `/service-orders?customerId=${workspace.customer.id}`
-                    );
-                  else setIsCreateOpen(true);
-                  setTimeout(() => setNextActionRouting(false), 1200);
-                }}
-              >
-                {nextActionRouting
-                  ? "Ação iniciada"
-                  : workspace
-                    ? "Executar próxima ação"
-                    : "Novo cliente"}
-              </Button>
-              {workspace ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() =>
-                    navigate(`/whatsapp?customerId=${workspace.customer.id}`)
-                  }
-                >
-                  WhatsApp
-                </Button>
-              ) : null}
-            </div>
-          </div>
-        </SurfaceSection>
 
         <SurfaceSection className="nexo-data-table p-0">
           <div className="border-b border-[var(--border-subtle)] px-4 py-3 dark:border-white/10">

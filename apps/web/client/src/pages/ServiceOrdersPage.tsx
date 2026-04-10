@@ -502,42 +502,36 @@ export default function ServiceOrdersPage() {
           </span>
         ))}
         secondaryActions={
-          <>
-            {activeId ? (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={closeActivePanel}
-                className="gap-2"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Voltar para a lista
-              </Button>
-            ) : null}
+          activeId ? (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={closeActivePanel}
+              className="gap-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Voltar para a lista
+            </Button>
+          ) : (
             <Button variant="outline" onClick={() => void refreshAll()}>
               <RefreshCw className="mr-2 h-4 w-4" />
               Atualizar
             </Button>
-          </>
+          )
         }
         primaryAction={
-          <>
-            <Button type="button" onClick={nextActionButtons[0]?.onClick}>
-              {nextAction.primaryAction.label}
-            </Button>
-            <ActionFeedbackButton
-              state="idle"
-              idleLabel="Nova O.S."
-              onClick={() => {
-                track("cta_click", {
-                  screen: "service-orders",
-                  ctaId: "hero_new_service_order",
-                });
-                setIsCreateOpen(true);
-              }}
-              icon={<Plus className="h-4 w-4" />}
-            />
-          </>
+          <ActionFeedbackButton
+            state="idle"
+            idleLabel="Nova O.S."
+            onClick={() => {
+              track("cta_click", {
+                screen: "service-orders",
+                ctaId: "hero_new_service_order",
+              });
+              setIsCreateOpen(true);
+            }}
+            icon={<Plus className="h-4 w-4" />}
+          />
         }
       />
 

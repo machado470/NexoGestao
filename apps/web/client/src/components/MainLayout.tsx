@@ -333,7 +333,7 @@ export function MainLayout({ children }: MainLayoutProps) {
               : `fixed inset-y-0 left-0 ${sidebarCollapsed ? "w-[92px]" : "w-[286px]"}`
           }`}
         >
-          <div className="border-b border-[var(--border)] px-4 py-4">
+          <div className="nexo-sidebar-header border-b border-[var(--border)] px-4">
             <div className="flex items-center justify-between gap-3">
               <button
                 type="button"
