@@ -436,8 +436,8 @@ export function MainLayout({ children }: MainLayoutProps) {
           className={`flex min-w-0 flex-1 flex-col overflow-hidden ${!isMobile ? (sidebarCollapsed ? "md:ml-[92px]" : "md:ml-[286px]") : ""}`}
         >
           <Topbar className="z-20 nexo-state-transition">
-            <div className="nexo-topbar-grid gap-3">
-              <div className="grid grid-cols-1 items-center gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
+            <div className="nexo-topbar-grid">
+              <div className="grid grid-cols-1 items-center gap-2 md:grid-cols-[auto_minmax(0,1fr)_auto] md:gap-3">
                 <div className="flex min-w-0 items-center gap-2.5 md:gap-3">
                   {isMobile ? (
                     <button
@@ -453,6 +453,10 @@ export function MainLayout({ children }: MainLayoutProps) {
                       {currentMeta.title}
                     </p>
                   </div>
+                </div>
+
+                <div className="min-w-0 md:px-1">
+                  <GlobalSearch />
                 </div>
 
                 <div className="flex items-center justify-end gap-2">
@@ -539,10 +543,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                         <ChevronDown className="h-4 w-4 text-[var(--text-muted)]" />
                       </button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent
-                      align="end"
-                      className="w-52 nexo-floating-panel p-1"
-                    >
+                      <DropdownMenuContent align="end" className="w-52 p-1">
                       <DropdownMenuLabel className="px-2 py-1.5">
                         <p className="truncate text-xs font-semibold text-[var(--text-primary)]">
                           {user?.name ?? "Usuário"}
@@ -552,10 +553,16 @@ export function MainLayout({ children }: MainLayoutProps) {
                         </p>
                       </DropdownMenuLabel>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem className="h-8 rounded-md px-2 text-sm" onClick={() => navigate("/settings")}>
+                      <DropdownMenuItem
+                        className="h-8 rounded-md px-2 text-sm text-[var(--text-secondary)] focus:text-[var(--text-primary)]"
+                        onClick={() => navigate("/settings")}
+                      >
                         <User className="mr-2 h-4 w-4" /> Perfil
                       </DropdownMenuItem>
-                      <DropdownMenuItem className="h-8 rounded-md px-2 text-sm" onClick={toggleTheme}>
+                      <DropdownMenuItem
+                        className="h-8 rounded-md px-2 text-sm text-[var(--text-secondary)] focus:text-[var(--text-primary)]"
+                        onClick={toggleTheme}
+                      >
                         {theme === "dark" ? (
                           <Sun className="mr-2 h-4 w-4" />
                         ) : (
@@ -573,12 +580,6 @@ export function MainLayout({ children }: MainLayoutProps) {
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 items-center">
-                <div className="min-w-0 lg:justify-self-center lg:w-full lg:max-w-2xl">
-                  <GlobalSearch />
                 </div>
               </div>
             </div>
