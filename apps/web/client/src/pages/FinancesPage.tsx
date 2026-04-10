@@ -40,6 +40,8 @@ import {
 import { ActionBarWrapper } from "@/components/operating-system/ActionBar";
 import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedbackButton";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
+import { NextActionCell } from "@/components/operating-system/NextActionCell";
+import { PrimaryActionButton } from "@/components/operating-system/PrimaryActionButton";
 
 type FinanceCharge = {
   id: string;
@@ -889,7 +891,6 @@ export default function FinancesPage() {
           {finalVisibleCharges.map(c => {
             const normalizedStatus = normalizeChargeStatus(c.status);
             const chargeSeverity = getChargeSeverity(c);
-            const chargeNextAction = getNextActionCharge(c);
             return (
               <Card
                 key={c.id}
@@ -897,8 +898,10 @@ export default function FinancesPage() {
               >
                 <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-4">
                   <div className="w-full text-xs font-medium text-zinc-600 dark:text-zinc-300">
-                    Severidade: {getOperationalSeverityLabel(chargeSeverity)} •
-                    Próxima ação: {chargeNextAction.label}
+                    Severidade: {getOperationalSeverityLabel(chargeSeverity)}
+                  </div>
+                  <div className="w-full">
+                    <NextActionCell entity="charge" item={c} />
                   </div>
                   <div className="min-w-0">
                     <p>{c.customer?.name}</p>
@@ -912,18 +915,8 @@ export default function FinancesPage() {
                       label={getChargeStatusLabel(normalizedStatus)}
                     />
                     {normalizedStatus !== ChargeStatus.PAID && (
-                      <ActionFeedbackButton
-                        state={
-                          isSubmitting && paymentSubmittingId === c.id
-                            ? "loading"
-                            : paymentDoneId === c.id
-                              ? "success"
-                              : "idle"
-                        }
-                        idleLabel="Marcar pago"
-                        loadingLabel="Processando..."
-                        successLabel="Pago registrado"
-                        variant="outline"
+                      <PrimaryActionButton
+                        label="Marcar pago"
                         onClick={() => {
                           void (async () => {
                             try {

@@ -4,6 +4,10 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/contexts/AuthContext";
 import { EmptyState } from "@/components/EmptyState";
 import { OperationalActionFeed } from "@/components/operations/OperationalActionFeed";
+import { AlertStrip } from "@/components/operating-system/AlertStrip";
+import { ActionFeed } from "@/components/operating-system/ActionFeed";
+import { PipelineStage } from "@/components/operating-system/PipelineStage";
+import { PrimaryActionButton } from "@/components/operating-system/PrimaryActionButton";
 import { getLatestActionFlowSuggestion } from "@/lib/actionFlow";
 import { buildDashboardExecutionPlan } from "@/lib/execution/decision-engine";
 import { useExecutionMemory } from "@/lib/execution/execution-memory";
@@ -501,32 +505,39 @@ export default function ExecutiveDashboardNew() {
     }).length;
   }, [appointmentsQuery.data]);
 
+  const doneWithoutChargeCandidate = useMemo(() => {
+    const serviceOrdersRaw = (serviceOrdersQuery.data as any)?.data ?? [];
+    const serviceOrders = Array.isArray(serviceOrdersRaw) ? serviceOrdersRaw : [];
+    return (
+      serviceOrders.find((item: any) => {
+        const status = String(item?.status ?? "").toUpperCase();
+        return status === "DONE" && !item?.financialSummary?.hasCharge;
+      }) ?? null
+    );
+  }, [serviceOrdersQuery.data]);
+
+  const overdueChargeCandidate = useMemo(() => {
+    const chargesRaw = (chargesQuery.data as any)?.data ?? [];
+    const charges = Array.isArray(chargesRaw) ? chargesRaw : [];
+    return (
+      charges
+        .filter((item: any) => String(item?.status ?? "").toUpperCase() === "OVERDUE")
+        .sort(
+          (a: any, b: any) =>
+            Number(b?.amountCents ?? 0) - Number(a?.amountCents ?? 0)
+        )[0] ?? null
+    );
+  }, [chargesQuery.data]);
+
+  const daysOverdue = overdueChargeCandidate?.dueDate
+    ? Math.floor(
+        (Date.now() - new Date(overdueChargeCandidate.dueDate).getTime()) /
+          (1000 * 60 * 60 * 24)
+      )
+    : null;
+
   const executionPlan = useMemo(
     () => {
-      const serviceOrdersRaw = (serviceOrdersQuery.data as any)?.data ?? [];
-      const serviceOrders = Array.isArray(serviceOrdersRaw) ? serviceOrdersRaw : [];
-      const doneWithoutChargeCandidate =
-        serviceOrders.find((item: any) => {
-          const status = String(item?.status ?? "").toUpperCase();
-          return status === "DONE" && !item?.financialSummary?.hasCharge;
-        }) ?? null;
-
-      const chargesRaw = (chargesQuery.data as any)?.data ?? [];
-      const charges = Array.isArray(chargesRaw) ? chargesRaw : [];
-      const overdueChargeCandidate =
-        charges
-          .filter((item: any) => String(item?.status ?? "").toUpperCase() === "OVERDUE")
-          .sort(
-            (a: any, b: any) =>
-              Number(b?.amountCents ?? 0) - Number(a?.amountCents ?? 0)
-          )[0] ?? null;
-
-      const daysOverdue = overdueChargeCandidate?.dueDate
-        ? Math.floor(
-            (Date.now() - new Date(overdueChargeCandidate.dueDate).getTime()) /
-              (1000 * 60 * 60 * 24)
-          )
-        : null;
 
       return buildDashboardExecutionPlan({
         totalCustomers: displayMetrics.totalCustomers,
@@ -557,15 +568,70 @@ export default function ExecutiveDashboardNew() {
       });
     },
     [
-      chargesQuery.data,
       displayMetrics.chargesGenerated,
       displayMetrics.completedOrders,
       displayMetrics.totalCustomers,
       displayMetrics.totalServiceOrders,
+      doneWithoutChargeCandidate,
+      overdueChargeCandidate,
+      daysOverdue,
       logs,
       location,
       overdueCharges,
-      serviceOrdersQuery.data,
+      todayAppointments,
+    ]
+  );
+
+  const operationalActionFeed = useMemo(() => {
+    const actions: Array<{
+      id: string;
+      entity: string;
+      reason: string;
+      priority: "critical" | "warning" | "normal" | "success";
+      nextAction: string;
+      onExecute: () => void;
+      amountLabel?: string;
+    }> = [];
+
+    if (overdueChargeCandidate) {
+      actions.push({
+        id: `charge-${overdueChargeCandidate.id}`,
+        entity: String(overdueChargeCandidate?.customer?.name ?? "Cliente sem nome"),
+        reason: `Cobrança vencida há ${Math.max(daysOverdue ?? 0, 0)} dias`,
+        priority: "critical",
+        nextAction: "Cobrar agora",
+        onExecute: () => navigate(`/finances?chargeId=${overdueChargeCandidate.id}`),
+        amountLabel: formatCurrency(Number(overdueChargeCandidate.amountCents ?? 0)),
+      });
+    }
+
+    if (doneWithoutChargeCandidate) {
+      actions.push({
+        id: `os-${doneWithoutChargeCandidate.id}`,
+        entity: `O.S. #${doneWithoutChargeCandidate.id}`,
+        reason: "Concluída sem cobrança vinculada",
+        priority: "warning",
+        nextAction: "Gerar cobrança",
+        onExecute: () => navigate(`/finances?serviceOrderId=${doneWithoutChargeCandidate.id}`),
+      });
+    }
+
+    return actions;
+  }, [doneWithoutChargeCandidate, overdueChargeCandidate, daysOverdue, navigate]);
+
+  const pipelineStages = useMemo(
+    () => [
+      { label: "Agendado", value: todayAppointments },
+      { label: "O.S.", value: displayMetrics.totalServiceOrders },
+      { label: "Concluído", value: displayMetrics.completedOrders },
+      { label: "Cobrado", value: displayMetrics.chargesGenerated },
+      { label: "Pago", value: paidCharges },
+    ],
+    [
+      displayMetrics.chargesGenerated,
+      displayMetrics.completedOrders,
+      displayMetrics.totalServiceOrders,
+      paidCharges,
       todayAppointments,
     ]
   );
@@ -756,6 +822,40 @@ export default function ExecutiveDashboardNew() {
             para continuar crescendo sem bloqueios.
           </div>
         ) : null}
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-2">
+        <AlertStrip
+          severity={overdueCharges > 0 ? "critical" : "normal"}
+          title="Atenção operacional imediata"
+          description={
+            overdueCharges > 0
+              ? `${overdueCharges} cobranças vencidas impactando caixa agora.`
+              : "Sem bloqueio crítico de cobrança no momento."
+          }
+          action={
+            <PrimaryActionButton
+              label={overdueCharges > 0 ? "Atacar vencidas" : "Abrir financeiro"}
+              onClick={() => navigate("/finances")}
+            />
+          }
+        />
+        <AlertStrip
+          severity={displayMetrics.delayedOrders > 0 ? "warning" : "success"}
+          title="Pendências da execução"
+          description={`${displayMetrics.delayedOrders} O.S. com risco de travamento operacional.`}
+          action={
+            <PrimaryActionButton
+              label="Abrir Service Orders"
+              onClick={() => navigate("/service-orders")}
+            />
+          }
+        />
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-2">
+        <ActionFeed items={operationalActionFeed} />
+        <PipelineStage stages={pipelineStages} />
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

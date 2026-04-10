@@ -58,6 +58,7 @@ import {
 import { ActionBarWrapper } from "@/components/operating-system/ActionBar";
 import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedbackButton";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
+import { NextActionCell } from "@/components/operating-system/NextActionCell";
 
 const FINANCIAL_FILTERS: Array<{
   value: FinancialFilter;
@@ -722,6 +723,9 @@ export default function ServiceOrdersPage() {
                     <span className="text-xs text-zinc-500 dark:text-zinc-400">
                       Próxima ação: {itemNextAction.label}
                     </span>
+                  </div>
+                  <div className="mb-2 px-1">
+                    <NextActionCell entity="service_order" item={os} />
                   </div>
                   <ServiceOrderCard
                     os={os}
