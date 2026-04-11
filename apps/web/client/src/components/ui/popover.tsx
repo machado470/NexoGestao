@@ -28,7 +28,7 @@ function PopoverContent({
         align={align}
         sideOffset={sideOffset}
         className={cn(
-          "nexo-floating-panel text-popover-foreground nexo-motion-panel z-50 w-72 origin-(--radix-popover-content-transform-origin) rounded-[var(--radius-surface)] p-4 outline-hidden",
+          "nexo-floating-panel border-[var(--app-overlay-border)] bg-[var(--app-overlay-bg)] text-[var(--app-overlay-text)] shadow-[var(--app-overlay-shadow)] nexo-motion-panel z-50 w-72 origin-(--radix-popover-content-transform-origin) rounded-[var(--radius-surface)] border p-4 outline-hidden",
           className
         )}
         {...props}
