@@ -328,7 +328,7 @@ export function MainLayout({ children }: MainLayoutProps) {
   return (
     <AppShell>
       <NexoAppShell
-        className={`nexo-app app-root ${theme === "dark" ? "dark" : ""} h-screen overflow-hidden text-[var(--text-primary)]`}
+        className={`nexo-app app-root ${theme === "dark" ? "dark" : ""} min-h-screen text-[var(--text-primary)]`}
         data-theme={theme}
       >
       {isMobile && mobileMenuOpen ? (
@@ -340,7 +340,7 @@ export function MainLayout({ children }: MainLayoutProps) {
         />
       ) : null}
 
-      <div className="flex h-full w-full">
+        <div className="flex min-h-screen w-full">
         <NexoSidebar
           data-scrollbar="nexo"
           className={`nexo-sidebar z-40 flex shrink-0 flex-col overflow-hidden nexo-state-transition ${
@@ -449,7 +449,7 @@ export function MainLayout({ children }: MainLayoutProps) {
         </NexoSidebar>
 
         <div
-          className={`flex min-w-0 flex-1 flex-col overflow-hidden ${!isMobile ? (sidebarCollapsed ? "md:ml-[92px]" : "md:ml-[286px]") : ""}`}
+          className={`flex min-w-0 flex-1 flex-col ${!isMobile ? (sidebarCollapsed ? "md:ml-[92px]" : "md:ml-[286px]") : ""}`}
         >
           <NexoTopbar className="z-20 nexo-state-transition">
             <div className="nexo-topbar-grid">

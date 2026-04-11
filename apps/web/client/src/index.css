@@ -1556,7 +1556,7 @@ html {
     font-family: var(--nexo-body-font);
     width: 100%;
     min-height: 100vh;
-    overflow: hidden;
+    overflow: visible;
   }
 
   .nexo-sidebar {
@@ -1635,7 +1635,7 @@ html {
     box-shadow: none;
     min-width: 0;
     max-width: 100%;
-    overflow-x: hidden;
+    overflow-x: visible;
   }
 
   .nexo-page-shell {
@@ -1650,14 +1650,6 @@ html {
 
   .nexo-page-shell > * {
     min-width: 0;
-    max-width: 100%;
-  }
-
-  .app-root img,
-  .app-root video,
-  .app-root canvas,
-  .app-root iframe,
-  .app-root svg {
     max-width: 100%;
   }
 
@@ -2762,5 +2754,21 @@ html {
   .app-root.dark [data-scrollbar="nexo"],
   .app-root[data-theme="dark"] [data-scrollbar="nexo"] {
     scrollbar-color: rgba(251, 146, 60, 0.58) transparent;
+  }
+}
+
+/* Render stability hotfix: remove global compositor effects from root wrappers. */
+@layer components {
+  .app-root .nexo-app-shell,
+  .app-root .nexo-app-content,
+  .app-root .nexo-page-shell,
+  .app-root .nexo-section-reveal {
+    transform: none !important;
+    filter: none !important;
+    backdrop-filter: none !important;
+  }
+
+  .app-root .nexo-section-reveal {
+    animation: none !important;
   }
 }
