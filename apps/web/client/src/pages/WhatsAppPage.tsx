@@ -37,6 +37,12 @@ import {
   NexoMessageBubble,
   NexoMetricCard,
 } from "@/components/operating-system/InternalBlocks";
+import {
+  AppEntityContextPanel,
+  AppNextActionList,
+  AppSectionCard,
+  AppToolbar,
+} from "@/components/app-system";
 
 function getMessageTypeFromContext(context: string) {
   if (context === "overdue_charge") return "PAYMENT_REMINDER";
@@ -288,6 +294,52 @@ export default function WhatsAppPage() {
         priorities={smartPriorities}
       />
 
+      <section className="grid gap-3 lg:grid-cols-2">
+        <AppSectionCard>
+          <AppToolbar className="mb-3 p-0">
+            <p className="text-sm font-semibold text-[var(--text-primary)]">
+              Próximas ações do canal
+            </p>
+          </AppToolbar>
+          <AppNextActionList
+            actions={[
+              {
+                id: "wa-send",
+                title: "Enviar mensagem contextual",
+                description:
+                  "Dispare contato com contexto completo para destravar a etapa seguinte.",
+                severity: canSend ? "pending" : "critical",
+                onRun: () => {
+                  const button = document.querySelector(
+                    "button[data-whatsapp-send='true']"
+                  ) as HTMLButtonElement | null;
+                  button?.focus();
+                },
+              },
+              {
+                id: "wa-orders",
+                title: "Revisar execução relacionada",
+                description:
+                  "Confira O.S. vinculada para alinhar conversa e próxima decisão.",
+                severity: route.serviceOrderId ? "pending" : "healthy",
+                href: route.serviceOrderId
+                  ? buildServiceOrdersDeepLink(route.serviceOrderId, "operations")
+                  : "/service-orders",
+              },
+            ]}
+          />
+        </AppSectionCard>
+        <AppEntityContextPanel
+          title="Bridge operacional"
+          links={[
+            { id: "customer", label: "Cliente", href: `/customers?customerId=${route.customerId}`, active: true },
+            { id: "appointments", label: "Agenda", href: `/appointments?customerId=${route.customerId}` },
+            { id: "service-orders", label: "O.S.", href: route.serviceOrderId ? buildServiceOrdersDeepLink(route.serviceOrderId, "operations") : "/service-orders" },
+            { id: "finances", label: "Financeiro", href: route.chargeId ? buildFinanceChargeUrl(route.chargeId) : "/finances" },
+          ]}
+        />
+      </section>
+
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
         <NexoMetricCard
           label="Mensagens em histórico"
@@ -331,16 +383,16 @@ export default function WhatsAppPage() {
       />
 
       {queryState.hasBackgroundUpdate ? (
-        <SurfaceSection className="nexo-info-banner text-sm">
+        <AppSectionCard className="nexo-info-banner text-sm">
           Atualizando histórico de mensagens em segundo plano...
-        </SurfaceSection>
+        </AppSectionCard>
       ) : null}
 
       {(customerQuery.isError || messagesQuery.isError) &&
       !queryState.shouldBlockForError ? (
-        <SurfaceSection className="border-amber-500/30 bg-amber-500/10 text-sm text-amber-200">
+        <AppSectionCard className="border-amber-500/30 bg-amber-500/10 text-sm text-amber-200">
           {nonBlockingErrorMessage}
-        </SurfaceSection>
+        </AppSectionCard>
       ) : null}
 
       {!hasCustomer ? (

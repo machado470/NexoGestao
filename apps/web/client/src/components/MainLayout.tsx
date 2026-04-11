@@ -116,6 +116,10 @@ const pageMeta: Record<string, { title: string; subtitle: string }> = {
     title: "Configurações",
     subtitle: "Parâmetros globais da organização e preferências.",
   },
+  "/profile": {
+    title: "Perfil",
+    subtitle: "Identidade, permissões e contexto operacional do usuário.",
+  },
 };
 
 function getPageMeta(location: string) {
@@ -247,6 +251,12 @@ export function MainLayout({ children }: MainLayoutProps) {
           route: "/people",
           icon: Building2,
           permissions: ["people:manage"],
+        },
+        {
+          id: "profile",
+          label: "Perfil",
+          route: "/profile",
+          icon: User,
         },
         {
           id: "settings",
@@ -566,7 +576,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
                         className="h-8 rounded-md px-2 text-sm text-[var(--text-secondary)] focus:text-[var(--text-primary)]"
-                        onClick={() => navigate("/settings")}
+                        onClick={() => navigate("/profile")}
                       >
                         <User className="mr-2 h-4 w-4" /> Perfil
                       </DropdownMenuItem>

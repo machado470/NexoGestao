@@ -3,14 +3,23 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { getQueryUiState, normalizeObjectPayload } from "@/lib/query-helpers";
-import { SurfaceSection } from "@/components/PagePattern";
-import { EmptyState } from "@/components/EmptyState";
-import { Loader2, Settings2 } from "lucide-react";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
+import { Loader2 } from "lucide-react";
 import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedbackButton";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
+import {
+  AppEmptyState,
+  AppErrorState,
+  AppField,
+  AppForm,
+  AppFormActions,
+  AppInput,
+  AppPageHeader,
+  AppPageShell,
+  AppSectionCard,
+  AppStatusBadge,
+  AppToolbar,
+} from "@/components/app-system";
 
 type SettingsFormData = {
   name: string;
@@ -166,10 +175,10 @@ export default function SettingsPage() {
   if (isInitializing) {
     return (
       <PageWrapper title="Configurações" subtitle="Validando sessão atual.">
-        <SurfaceSection className="flex min-h-[180px] items-center justify-center gap-2 text-sm text-[var(--text-muted)] dark:text-[var(--text-muted)]">
+        <AppSectionCard className="flex min-h-[180px] items-center justify-center gap-2 text-sm text-[var(--text-muted)] dark:text-[var(--text-muted)]">
           <Loader2 className="h-4 w-4 animate-spin" />
           Carregando sessão...
-        </SurfaceSection>
+        </AppSectionCard>
       </PageWrapper>
     );
   }
@@ -177,7 +186,9 @@ export default function SettingsPage() {
   if (!isAuthenticated) {
     return (
       <PageWrapper title="Configurações" subtitle="Sua sessão não está ativa.">
-        <SurfaceSection className="text-sm text-[var(--text-muted)] dark:text-[var(--text-muted)]">Faça login para acessar configurações.</SurfaceSection>
+        <AppSectionCard className="text-sm text-[var(--text-muted)] dark:text-[var(--text-muted)]">
+          Faça login para acessar configurações.
+        </AppSectionCard>
       </PageWrapper>
     );
   }
@@ -185,10 +196,10 @@ export default function SettingsPage() {
   if (queryState.isInitialLoading) {
     return (
       <PageWrapper title="Configurações" subtitle="Carregando dados da organização.">
-        <SurfaceSection className="flex min-h-[180px] items-center justify-center gap-2 text-sm text-[var(--text-muted)] dark:text-[var(--text-muted)]">
+        <AppSectionCard className="flex min-h-[180px] items-center justify-center gap-2 text-sm text-[var(--text-muted)] dark:text-[var(--text-muted)]">
           <Loader2 className="h-4 w-4 animate-spin" />
           Preparando configurações...
-        </SurfaceSection>
+        </AppSectionCard>
       </PageWrapper>
     );
   }
@@ -196,9 +207,9 @@ export default function SettingsPage() {
   if (queryState.shouldBlockForError) {
     return (
       <PageWrapper title="Configurações" subtitle="Não foi possível carregar as configurações.">
-        <SurfaceSection className="border-red-200 text-red-700 dark:border-red-900/40 dark:text-red-300">
+        <AppSectionCard className="border-red-200 text-red-700 dark:border-red-900/40 dark:text-red-300">
           {query.error?.message || "Erro ao carregar configurações"}
-        </SurfaceSection>
+        </AppSectionCard>
       </PageWrapper>
     );
   }
@@ -208,114 +219,134 @@ export default function SettingsPage() {
       title="Configurações"
       subtitle="Parâmetros institucionais que sustentam operação, financeiro e governança."
     >
-      <OperationalTopCard
-        contextLabel="Direção institucional"
-        title={hasChanges ? "Existem alterações pendentes de sincronização" : "Configurações sincronizadas"}
-        description="Padronize nome, timezone e moeda em um único bloco para sustentar operação, financeiro e governança."
-        chips={(
-          <>
-            <span className="rounded-full border px-3 py-1 text-xs text-[var(--text-secondary)]">Timezone: {form.timezone || "—"}</span>
-            <span className="rounded-full border px-3 py-1 text-xs text-[var(--text-secondary)]">Moeda: {form.currency || "—"}</span>
-          </>
-        )}
-        secondaryActions={(
-          <ActionFeedbackButton
-            state={query.isFetching ? "loading" : "idle"}
-            idleLabel="Atualizar leitura"
-            loadingLabel="Atualizando..."
-            variant="outline"
-            onClick={() => void query.refetch()}
-          />
-        )}
-      />
+      <AppPageShell>
+        <OperationalTopCard
+          contextLabel="Direção institucional"
+          title={
+            hasChanges
+              ? "Existem alterações pendentes de sincronização"
+              : "Configurações sincronizadas"
+          }
+          description="Padronize nome, timezone e moeda em um único bloco para sustentar operação, financeiro e governança."
+          chips={(
+            <>
+              <span className="rounded-full border px-3 py-1 text-xs text-[var(--text-secondary)]">Timezone: {form.timezone || "—"}</span>
+              <span className="rounded-full border px-3 py-1 text-xs text-[var(--text-secondary)]">Moeda: {form.currency || "—"}</span>
+            </>
+          )}
+          secondaryActions={(
+            <ActionFeedbackButton
+              state={query.isFetching ? "loading" : "idle"}
+              idleLabel="Atualizar leitura"
+              loadingLabel="Atualizando..."
+              variant="outline"
+              onClick={() => void query.refetch()}
+            />
+          )}
+        />
 
-      {!hasData ? (
-        <SurfaceSection>
-          <EmptyState
-            icon={<Settings2 className="h-7 w-7" />}
+        <AppPageHeader>
+          <AppToolbar>
+            <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+              Status atual:
+              <AppStatusBadge
+                tone={hasChanges ? "warning" : "success"}
+                label={hasChanges ? "Com alterações" : "Sincronizado"}
+              />
+            </div>
+          </AppToolbar>
+        </AppPageHeader>
+
+        {!hasData ? (
+          <AppEmptyState
             title="Configurações prontas para personalização"
             description="Defina identidade e padrão institucional para consolidar operação, financeiro e governança em uma mesma base."
-            action={{
-              label: "Atualizar configurações",
-              onClick: () => void query.refetch(),
-            }}
+            action={(
+              <ActionFeedbackButton
+                state={query.isFetching ? "loading" : "idle"}
+                idleLabel="Atualizar configurações"
+                loadingLabel="Atualizando..."
+                onClick={() => void query.refetch()}
+              />
+            )}
           />
-        </SurfaceSection>
-      ) : null}
+        ) : null}
 
-      {queryState.hasBackgroundUpdate ? (
-        <SurfaceSection className="nexo-info-banner text-sm">
-          Atualizando configurações em segundo plano...
-        </SurfaceSection>
-      ) : null}
+        {queryState.hasBackgroundUpdate ? (
+          <AppSectionCard className="nexo-info-banner text-sm">
+            Atualizando configurações em segundo plano...
+          </AppSectionCard>
+        ) : null}
 
-      {hasError && !queryState.shouldBlockForError ? (
-        <SurfaceSection className="border-amber-500/30 bg-amber-500/10 text-sm text-amber-200">
-          {query.error?.message ||
-            "Houve um problema ao recarregar as configurações."}
-        </SurfaceSection>
-      ) : null}
-
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-        <div className="nexo-kpi-card p-4"><p className="text-xs text-[var(--text-muted)]">Organização</p><p className="text-lg font-semibold">{settings?.name || "—"}</p></div>
-        <div className="nexo-kpi-card p-4"><p className="text-xs text-[var(--text-muted)]">Timezone</p><p className="text-lg font-semibold">{form.timezone}</p></div>
-        <div className="nexo-kpi-card p-4"><p className="text-xs text-[var(--text-muted)]">Moeda</p><p className="text-lg font-semibold">{form.currency}</p></div>
-        <div className="nexo-kpi-card p-4"><p className="text-xs text-[var(--text-muted)]">Status</p><p className="text-lg font-semibold">{hasChanges ? "Com alterações" : "Sincronizado"}</p></div>
-      </div>
-
-      <SurfaceSection className="space-y-2">
-        <h2 className="font-semibold">Checklist de configuração</h2>
-        <div className="nexo-subtle-surface p-3 text-sm">1. Validar nome institucional.</div>
-        <div className="nexo-subtle-surface p-3 text-sm">2. Confirmar timezone oficial da operação.</div>
-        <div className="nexo-subtle-surface p-3 text-sm">3. Validar moeda padrão para financeiro e governança.</div>
-      </SurfaceSection>
-
-      <SurfaceSection>
-        <form className="space-y-4" onSubmit={submitForm}>
-          <div className="space-y-2">
-            <Label htmlFor="settings-name">Nome da organização</Label>
-            <Input
-              id="settings-name"
-              value={form.name}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, name: e.target.value }))
-              }
-              placeholder="Nome da organização"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="settings-timezone">Timezone</Label>
-            <Input
-              id="settings-timezone"
-              value={form.timezone}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, timezone: e.target.value }))
-              }
-              placeholder="America/Sao_Paulo"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="settings-currency">Moeda padrão</Label>
-            <Input
-              id="settings-currency"
-              value={form.currency}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, currency: e.target.value }))
-              }
-              placeholder="BRL"
-            />
-          </div>
-
-          <ActionFeedbackButton
-            state={mutation.isPending ? "loading" : "idle"}
-            idleLabel="Salvar alterações"
-            loadingLabel="Salvando..."
-            onClick={handleSave}
+        {hasError && !queryState.shouldBlockForError ? (
+          <AppErrorState
+            message={
+              query.error?.message ||
+              "Houve um problema ao recarregar as configurações."
+            }
           />
-        </form>
-      </SurfaceSection>
+        ) : null}
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+          <AppSectionCard className="p-4"><p className="text-xs text-[var(--text-muted)]">Organização</p><p className="text-lg font-semibold">{settings?.name || "—"}</p></AppSectionCard>
+          <AppSectionCard className="p-4"><p className="text-xs text-[var(--text-muted)]">Timezone</p><p className="text-lg font-semibold">{form.timezone}</p></AppSectionCard>
+          <AppSectionCard className="p-4"><p className="text-xs text-[var(--text-muted)]">Moeda</p><p className="text-lg font-semibold">{form.currency}</p></AppSectionCard>
+          <AppSectionCard className="p-4"><p className="text-xs text-[var(--text-muted)]">Status</p><p className="text-lg font-semibold">{hasChanges ? "Com alterações" : "Sincronizado"}</p></AppSectionCard>
+        </div>
+
+        <AppSectionCard className="space-y-2">
+          <h2 className="font-semibold">Checklist de configuração</h2>
+          <div className="nexo-subtle-surface p-3 text-sm">1. Validar nome institucional.</div>
+          <div className="nexo-subtle-surface p-3 text-sm">2. Confirmar timezone oficial da operação.</div>
+          <div className="nexo-subtle-surface p-3 text-sm">3. Validar moeda padrão para financeiro e governança.</div>
+        </AppSectionCard>
+
+        <AppSectionCard>
+          <AppForm onSubmit={submitForm}>
+            <AppField label="Nome da organização" htmlFor="settings-name">
+              <AppInput
+                id="settings-name"
+                value={form.name}
+                onChange={(e) =>
+                  setForm((prev) => ({ ...prev, name: e.target.value }))
+                }
+                placeholder="Nome da organização"
+              />
+            </AppField>
+
+            <AppField label="Timezone" htmlFor="settings-timezone">
+              <AppInput
+                id="settings-timezone"
+                value={form.timezone}
+                onChange={(e) =>
+                  setForm((prev) => ({ ...prev, timezone: e.target.value }))
+                }
+                placeholder="America/Sao_Paulo"
+              />
+            </AppField>
+
+            <AppField label="Moeda padrão" htmlFor="settings-currency">
+              <AppInput
+                id="settings-currency"
+                value={form.currency}
+                onChange={(e) =>
+                  setForm((prev) => ({ ...prev, currency: e.target.value }))
+                }
+                placeholder="BRL"
+              />
+            </AppField>
+
+            <AppFormActions>
+              <ActionFeedbackButton
+                state={mutation.isPending ? "loading" : "idle"}
+                idleLabel="Salvar alterações"
+                loadingLabel="Salvando..."
+                onClick={handleSave}
+              />
+            </AppFormActions>
+          </AppForm>
+        </AppSectionCard>
+      </AppPageShell>
     </PageWrapper>
   );
 }
