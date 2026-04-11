@@ -2588,3 +2588,156 @@ html {
     background: transparent;
   }
 }
+
+/* Authenticated app shell theme hardening (light/dark split without dark fallback). */
+@layer base {
+  .app-root,
+  .nexo-app.app-root {
+    --app-bg: #f2f6fb;
+    --app-shell: #eef3f9;
+    --app-surface: #f7fafe;
+    --app-panel: #fbfdff;
+    --app-card: #ffffff;
+    --app-border: rgba(70, 102, 136, 0.2);
+    --app-text: #12243f;
+    --app-muted: #5f7796;
+    --app-sidebar: #e9f0f8;
+    --app-topbar: #f5f8fc;
+  }
+
+  .app-root.dark,
+  .app-root[data-theme="dark"] {
+    --app-bg: #080c18;
+    --app-shell: #090f1c;
+    --app-surface: #0d1526;
+    --app-panel: #111d2e;
+    --app-card: #152036;
+    --app-border: rgba(139, 156, 192, 0.22);
+    --app-text: #f0f4ff;
+    --app-muted: #8fa5c8;
+    --app-sidebar: #0b1122;
+    --app-topbar: #101a2d;
+  }
+
+  .app-root,
+  .app-root[data-theme="light"] {
+    --bg-app: var(--app-bg);
+    --nexo-app-bg: var(--app-bg);
+    --background-base: var(--app-bg);
+    --nexo-page-surface: var(--app-shell);
+    --nexo-section-surface: var(--app-surface);
+    --nexo-card-surface: var(--app-card);
+    --nexo-card-muted: var(--app-surface);
+    --bg-surface: var(--app-panel);
+    --surface-base: var(--app-surface);
+    --surface-elevated: var(--app-panel);
+    --border-soft: var(--app-border);
+    --border-subtle: color-mix(in srgb, var(--app-border) 88%, #ffffff);
+    --nexo-border-soft: var(--app-border);
+    --nexo-border-strong: color-mix(in srgb, var(--app-border) 92%, #dce7f3);
+    --text-primary: var(--app-text);
+    --text-secondary: color-mix(in srgb, var(--app-text) 80%, #5d7492);
+    --text-muted: var(--app-muted);
+    --bg-sidebar: var(--app-sidebar);
+    --bg-header: var(--app-topbar);
+    --shadow-soft: 0 8px 20px rgba(17, 40, 68, 0.08);
+    --shadow-medium: 0 14px 30px rgba(17, 40, 68, 0.1);
+  }
+}
+
+@layer components {
+  .app-root,
+  .nexo-app.app-root,
+  .nexo-app .app-root {
+    background: var(--app-bg);
+    color: var(--app-text);
+  }
+
+  .app-root .nexo-app-shell {
+    background: var(--app-shell);
+  }
+
+  .app-root .nexo-sidebar {
+    background: var(--app-sidebar);
+    border-right: 1px solid var(--app-border);
+    box-shadow: 14px 0 28px rgba(44, 74, 108, 0.08);
+  }
+
+  .app-root .nexo-topbar {
+    background: color-mix(in srgb, var(--app-topbar) 94%, #ffffff);
+    border-bottom: 1px solid var(--app-border);
+    box-shadow: 0 6px 18px rgba(42, 66, 98, 0.06);
+  }
+
+  .app-root .nexo-app-content,
+  .app-root .nexo-page-shell {
+    background: var(--app-bg);
+  }
+
+  .app-root .nexo-page-shell {
+    border-radius: 20px;
+  }
+
+  .app-root .nexo-surface,
+  .app-root .nexo-surface-primary,
+  .app-root .nexo-surface-operational,
+  .app-root .nexo-page-header,
+  .app-root .nexo-card-base,
+  .app-root .nexo-card-kpi,
+  .app-root .nexo-card-operational,
+  .app-root .nexo-card-informative,
+  .app-root .nexo-card-alert,
+  .app-root .nexo-card-panel,
+  .app-root .nexo-card-priority,
+  .app-root .nexo-card-timeline,
+  .app-root .nexo-kpi-card,
+  .app-root .nexo-floating-panel {
+    background: var(--app-card);
+    border-color: var(--app-border);
+    box-shadow: var(--shadow-soft);
+  }
+
+  .app-root [data-scrollbar="nexo"] {
+    scrollbar-color: rgba(112, 138, 168, 0.54) rgba(213, 225, 239, 0.5);
+  }
+
+  .app-root [data-scrollbar="nexo"]::-webkit-scrollbar-track {
+    background: rgba(213, 225, 239, 0.5);
+  }
+
+  .app-root [data-scrollbar="nexo"]::-webkit-scrollbar-thumb {
+    background: rgba(112, 138, 168, 0.62);
+    border: 2px solid rgba(213, 225, 239, 0.66);
+  }
+
+  .app-root [data-scrollbar="nexo"]::-webkit-scrollbar-thumb:hover {
+    background: rgba(89, 120, 154, 0.78);
+  }
+
+  .app-root.dark .nexo-app-shell,
+  .app-root[data-theme="dark"] .nexo-app-shell,
+  .app-root.dark .nexo-app-content,
+  .app-root[data-theme="dark"] .nexo-app-content,
+  .app-root.dark .nexo-page-shell,
+  .app-root[data-theme="dark"] .nexo-page-shell {
+    background: var(--app-bg);
+  }
+
+  .app-root.dark .nexo-sidebar,
+  .app-root[data-theme="dark"] .nexo-sidebar {
+    background: var(--app-sidebar);
+    border-right-color: var(--app-border);
+    box-shadow: 18px 0 34px rgba(2, 6, 23, 0.42);
+  }
+
+  .app-root.dark .nexo-topbar,
+  .app-root[data-theme="dark"] .nexo-topbar {
+    background: color-mix(in srgb, var(--app-topbar) 92%, #050814);
+    border-bottom-color: var(--app-border);
+  }
+
+  .app-root.dark [data-scrollbar="nexo"],
+  .app-root[data-theme="dark"] [data-scrollbar="nexo"] {
+    scrollbar-color: rgba(251, 146, 60, 0.58) transparent;
+  }
+}
