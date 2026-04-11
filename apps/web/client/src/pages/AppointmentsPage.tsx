@@ -66,6 +66,7 @@ import {
 import { ContextPanel } from "@/components/operating-system/ContextPanel";
 import { runFlowChain } from "@/lib/operations/flowChain";
 import { getAppointmentExplainLayer } from "@/lib/operations/explain-layer";
+import { NexoMetricCard } from "@/components/operating-system/InternalBlocks";
 
 type CustomerRef = {
   id: string;
@@ -232,34 +233,6 @@ function InfoItem({ label, value }: { label: string; value: string }) {
       </p>
       <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
         {value}
-      </p>
-    </div>
-  );
-}
-
-function SummaryCard({
-  title,
-  value,
-  subtitle,
-  valueClassName,
-}: {
-  title: string;
-  value: string | number;
-  subtitle: string;
-  valueClassName?: string;
-}) {
-  return (
-    <div className="nexo-kpi-card">
-      <p className="text-sm text-gray-600 dark:text-gray-400">{title}</p>
-      <p
-        className={`mt-1 text-2xl font-bold text-gray-900 dark:text-white ${
-          valueClassName ?? ""
-        }`}
-      >
-        {value}
-      </p>
-      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-        {subtitle}
       </p>
     </div>
   );
@@ -929,33 +902,29 @@ export default function AppointmentsPage() {
       </SurfaceSection>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard
-          title="Total"
-          value={total}
-          subtitle="Agendamentos visíveis"
-        />
-        <SummaryCard
-          title="Agendados"
+        <NexoMetricCard label="Total" value={total} hint="Agendamentos visíveis" />
+        <NexoMetricCard
+          label="Agendados"
           value={totalScheduled}
-          subtitle="Ainda sem confirmação"
+          hint="Ainda sem confirmação"
           valueClassName="text-orange-600 dark:text-orange-300"
         />
-        <SummaryCard
-          title="Confirmados"
+        <NexoMetricCard
+          label="Confirmados"
           value={totalConfirmed}
-          subtitle="Prontos para operar"
+          hint="Prontos para operar"
           valueClassName="text-green-600 dark:text-green-400"
         />
-        <SummaryCard
-          title="Concluídos"
+        <NexoMetricCard
+          label="Concluídos"
           value={totalDone}
-          subtitle="Ciclo de agenda encerrado"
+          hint="Ciclo de agenda encerrado"
           valueClassName="text-emerald-600 dark:text-emerald-400"
         />
-        <SummaryCard
-          title="Sem operação"
+        <NexoMetricCard
+          label="Sem operação"
           value={appointmentsWithoutOperations}
-          subtitle="Prioridade para criar O.S."
+          hint="Prioridade para criar O.S."
         />
       </div>
 

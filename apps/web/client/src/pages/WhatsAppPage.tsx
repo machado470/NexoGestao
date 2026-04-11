@@ -30,6 +30,12 @@ import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { getQueryUiState } from "@/lib/query-helpers";
 import { buildIdempotencyKey } from "@/lib/idempotency";
 import { resolveOperationFeedback } from "@/lib/operations/operation-feedback";
+import {
+  NexoContextBlock,
+  NexoEntityRow,
+  NexoMessageBubble,
+  NexoMetricCard,
+} from "@/components/operating-system/InternalBlocks";
 
 function getMessageTypeFromContext(context: string) {
   if (context === "overdue_charge") return "PAYMENT_REMINDER";
@@ -243,23 +249,46 @@ export default function WhatsAppPage() {
       />
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <div className="nexo-kpi-card p-4"><p className="text-xs text-gray-500">Mensagens em histórico</p><p className="text-xl font-semibold">{messages.length}</p></div>
-        <div className="nexo-kpi-card p-4"><p className="text-xs text-gray-500">Mensagens sem conteúdo</p><p className="text-xl font-semibold">{unresolvedMessages}</p></div>
-        <div className="nexo-kpi-card p-4"><p className="text-xs text-gray-500">Vínculo de cobrança</p><p className="text-xl font-semibold">{route.chargeId ? "Ativo" : "Não"}</p></div>
-        <div className="nexo-kpi-card p-4"><p className="text-xs text-gray-500">Valor em contexto</p><p className="text-xl font-semibold nexo-text-wrap">{amountLabel ?? "—"}</p></div>
+        <NexoMetricCard
+          label="Mensagens em histórico"
+          value={messages.length}
+          valueClassName="text-xl font-semibold"
+          className="p-4"
+        />
+        <NexoMetricCard
+          label="Mensagens sem conteúdo"
+          value={unresolvedMessages}
+          valueClassName="text-xl font-semibold"
+          className="p-4"
+        />
+        <NexoMetricCard
+          label="Vínculo de cobrança"
+          value={route.chargeId ? "Ativo" : "Não"}
+          valueClassName="text-xl font-semibold"
+          className="p-4"
+        />
+        <NexoMetricCard
+          label="Valor em contexto"
+          value={amountLabel ?? "—"}
+          valueClassName="nexo-text-wrap text-xl font-semibold"
+          className="p-4"
+        />
       </div>
 
-      <SurfaceSection className="border-orange-200/80 bg-orange-50/70 p-4 dark:border-orange-500/20 dark:bg-orange-500/10">
-        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-          <p className="nexo-text-wrap text-sm font-medium text-orange-800 dark:text-orange-200">
-            Canal pronto para execução: mantenha a mensagem curta, contextual e orientada para próxima decisão.
-          </p>
-          <div className="flex items-center gap-2 text-xs text-orange-700 dark:text-orange-300">
-            <span className="inline-flex items-center gap-1 rounded-full bg-white/85 px-2 py-1 dark:bg-zinc-950/60"><Clock3 className="h-3.5 w-3.5" /> envio imediato</span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-white/85 px-2 py-1 dark:bg-zinc-950/60"><Zap className="h-3.5 w-3.5" /> ação contextual</span>
-          </div>
-        </div>
-      </SurfaceSection>
+      <NexoContextBlock
+        className="border-orange-200/80 bg-orange-50/70 p-4 dark:border-orange-500/20 dark:bg-orange-500/10"
+        text="Canal pronto para execução: mantenha a mensagem curta, contextual e orientada para próxima decisão."
+        badges={
+          <>
+            <span className="inline-flex items-center gap-1 rounded-full bg-white/85 px-2 py-1 text-orange-700 dark:bg-zinc-950/60 dark:text-orange-300">
+              <Clock3 className="h-3.5 w-3.5" /> envio imediato
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-white/85 px-2 py-1 text-orange-700 dark:bg-zinc-950/60 dark:text-orange-300">
+              <Zap className="h-3.5 w-3.5" /> ação contextual
+            </span>
+          </>
+        }
+      />
 
       {queryState.hasBackgroundUpdate ? (
         <SurfaceSection className="nexo-info-banner text-sm">
@@ -317,14 +346,11 @@ export default function WhatsAppPage() {
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">Conversas</p>
           </header>
           <div className="space-y-2 px-3 pb-3">
-            <button
-              type="button"
-              className="w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/70 p-3 text-left"
-            >
-              <p className="truncate text-sm font-semibold text-[var(--text-primary)]">{customerName}</p>
-              <p className="mt-1 text-xs text-[var(--text-secondary)]">{customerPhone}</p>
-              <p className="mt-2 text-xs text-[var(--text-muted)]">{messages.length > 0 ? `${messages.length} mensagens` : "Sem histórico"}</p>
-            </button>
+            <NexoEntityRow
+              title={customerName}
+              subtitle={customerPhone}
+              meta={messages.length > 0 ? `${messages.length} mensagens` : "Sem histórico"}
+            />
           </div>
         </SurfaceSection>
 
@@ -356,10 +382,8 @@ export default function WhatsAppPage() {
                 }}
               />
             ) : (
-              messages.map((msg) => (
-                <div key={msg.id} className="ml-auto max-w-[85%] rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 text-sm text-[var(--text-primary)]">
-                  {msg.content}
-                </div>
+              messages.map(msg => (
+                <NexoMessageBubble key={msg.id}>{msg.content}</NexoMessageBubble>
               ))
             )}
           </div>

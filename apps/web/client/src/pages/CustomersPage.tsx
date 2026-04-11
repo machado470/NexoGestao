@@ -76,6 +76,7 @@ import {
 } from "@/lib/operations/operational-intelligence";
 import { ContextPanel } from "@/components/operating-system/ContextPanel";
 import { getCustomerExplainLayer } from "@/lib/operations/explain-layer";
+import { NexoMetricCard } from "@/components/operating-system/InternalBlocks";
 
 type Customer = {
   id: string;
@@ -284,39 +285,6 @@ function SectionCard({
           {emptyText}
         </p>
       )}
-    </div>
-  );
-}
-
-function SummaryCard({
-  title,
-  value,
-  subtitle,
-  tone = "default",
-}: {
-  title: string;
-  value: string | number;
-  subtitle: string;
-  tone?: "default" | "success" | "muted";
-}) {
-  const toneClass =
-    tone === "success"
-      ? "border-green-200 bg-green-50 dark:border-green-900/40 dark:bg-green-950/20"
-      : tone === "muted"
-        ? "border-slate-200 bg-[var(--surface-base)] dark:border-white/10 dark:bg-white/[0.03]"
-        : "border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.04]";
-
-  return (
-    <div className={`rounded-xl border p-4 ${toneClass}`}>
-      <p className="text-sm text-[var(--text-secondary)] dark:text-[var(--text-muted)]">
-        {title}
-      </p>
-      <p className="mt-1 text-2xl font-bold text-[var(--text-primary)] dark:text-white">
-        {value}
-      </p>
-      <p className="mt-1 text-xs text-[var(--text-muted)] dark:text-[var(--text-muted)]">
-        {subtitle}
-      </p>
     </div>
   );
 }
@@ -1050,22 +1018,23 @@ export default function CustomersPage() {
         </NexoAlertCard>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <SummaryCard
-            title="Total de clientes"
+          <NexoMetricCard
+            label="Total de clientes"
             value={total}
-            subtitle="Base cadastrada e visível"
+            hint="Base cadastrada e visível"
+            className="rounded-xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04]"
           />
-          <SummaryCard
-            title="Clientes ativos"
+          <NexoMetricCard
+            label="Clientes ativos"
             value={totalActive}
-            subtitle="Prontos para operar no fluxo"
-            tone="success"
+            hint="Prontos para operar no fluxo"
+            className="rounded-xl border border-green-200 bg-green-50 p-4 dark:border-green-900/40 dark:bg-green-950/20"
           />
-          <SummaryCard
-            title="Clientes inativos"
+          <NexoMetricCard
+            label="Clientes inativos"
             value={totalInactive}
-            subtitle="Base sem operação ativa no momento"
-            tone="muted"
+            hint="Base sem operação ativa no momento"
+            className="rounded-xl border border-slate-200 bg-[var(--surface-base)] p-4 dark:border-white/10 dark:bg-white/[0.03]"
           />
         </div>
 
@@ -1693,27 +1662,31 @@ export default function CustomersPage() {
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                  <SummaryCard
-                    title="Total financeiro"
+                  <NexoMetricCard
+                    label="Total financeiro"
                     value={formatCurrency(workspaceTotalFinancial)}
-                    subtitle="Toda receita mapeada no cliente"
+                    hint="Toda receita mapeada no cliente"
                   />
-                  <SummaryCard
-                    title="Pendente"
+                  <NexoMetricCard
+                    label="Pendente"
                     value={formatCurrency(workspacePendingAmount)}
-                    subtitle={`${workspacePendingCharges} cobranças esperando ação`}
+                    hint={`${workspacePendingCharges} cobranças esperando ação`}
                   />
-                  <SummaryCard
-                    title="Pago"
+                  <NexoMetricCard
+                    label="Pago"
                     value={formatCurrency(workspacePaidAmount)}
-                    subtitle={`${workspacePaidCharges} cobranças já recebidas`}
-                    tone="success"
+                    hint={`${workspacePaidCharges} cobranças já recebidas`}
+                    className="border border-green-200 bg-green-50 dark:border-green-900/40 dark:bg-green-950/20"
                   />
-                  <SummaryCard
-                    title="Atrasado"
+                  <NexoMetricCard
+                    label="Atrasado"
                     value={formatCurrency(workspaceOverdueAmount)}
-                    subtitle={`${workspaceOverdueCharges} cobranças vencidas`}
-                    tone={workspaceOverdueCharges > 0 ? "default" : "muted"}
+                    hint={`${workspaceOverdueCharges} cobranças vencidas`}
+                    className={
+                      workspaceOverdueCharges > 0
+                        ? undefined
+                        : "border border-slate-200 bg-[var(--surface-base)] dark:border-white/10 dark:bg-white/[0.03]"
+                    }
                   />
                 </div>
 
