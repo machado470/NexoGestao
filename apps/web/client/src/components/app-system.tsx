@@ -37,6 +37,8 @@ import {
   DataTable,
 } from "@/components/design-system";
 import { MoreHorizontal } from "lucide-react";
+import { useActionHandler } from "@/hooks/useActionHandler";
+import type { AppAction } from "@/lib/actions/types";
 
 export function AppPageShell({
   className,
@@ -438,6 +440,7 @@ export type AppNextActionItem = {
   title: string;
   description: string;
   severity: "healthy" | "pending" | "overdue" | "critical";
+  action?: AppAction;
   href?: string;
   onRun?: () => void;
 };
@@ -449,17 +452,31 @@ export function AppNextActionButton({
   action: AppNextActionItem;
   className?: string;
 }) {
-  if (action.href) {
-    return (
-      <a href={action.href} className={cn("nexo-cta-secondary", className)}>
-        Executar
-      </a>
-    );
-  }
+  const { executeAction, isExecuting } = useActionHandler();
 
   return (
-    <Button className={className} variant={action.severity === "critical" ? "default" : "secondary"} onClick={action.onRun}>
-      Executar
+    <Button
+      className={className}
+      variant={action.severity === "critical" ? "default" : "secondary"}
+      disabled={action.action ? isExecuting(action.action.id) : false}
+      onClick={() => {
+        if (action.action) {
+          void executeAction(action.action);
+          return;
+        }
+        if (action.href) {
+          void executeAction({
+            id: `next-action-href-${action.id}`,
+            type: "navigate",
+            payload: { path: action.href },
+          });
+          return;
+        }
+
+        action.onRun?.();
+      }}
+    >
+      {action.action && isExecuting(action.action.id) ? "Executando..." : "Executar"}
     </Button>
   );
 }

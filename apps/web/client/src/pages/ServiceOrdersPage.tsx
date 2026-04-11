@@ -588,7 +588,7 @@ export default function ServiceOrdersPage() {
               title: action.title,
               description: action.description,
               severity: action.severity,
-              onRun: () => navigate(action.href),
+              action: action.executionAction,
             }))}
           />
         </AppSectionCard>

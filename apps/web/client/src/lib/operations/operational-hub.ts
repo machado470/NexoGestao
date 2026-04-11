@@ -1,3 +1,4 @@
+import type { AppAction } from "@/lib/actions/types";
 import { normalizeStatus } from "@/lib/operations/operations.utils";
 
 export type OperationalStateLevel = "NORMAL" | "WARNING" | "RESTRICTED" | "SUSPENDED";
@@ -23,6 +24,7 @@ export type OperationalNextAction = {
     | "resolve"
     | "review";
   href: string;
+  executionAction: AppAction;
   metadata?: Record<string, string | number | boolean | null | undefined>;
 };
 
@@ -122,6 +124,13 @@ export function buildNextActions(params: {
       entityId: String(missingAppointment.id),
       actionType: "confirm",
       href: `/appointments?customerId=${missingAppointment.id}`,
+      executionAction: {
+        id: `open-customer-appointment-${missingAppointment.id}`,
+        type: "navigate",
+        entityType: "customer",
+        entityId: String(missingAppointment.id),
+        payload: { path: `/appointments?customerId=${missingAppointment.id}` },
+      },
     });
   }
 
@@ -142,6 +151,23 @@ export function buildNextActions(params: {
       entityId: String(appointmentToConfirm.id),
       actionType: "confirm",
       href: `/appointments?appointmentId=${appointmentToConfirm.id}`,
+      executionAction: {
+        id: `confirm-appointment-${appointmentToConfirm.id}`,
+        type: "mutation",
+        entityType: "appointment",
+        entityId: String(appointmentToConfirm.id),
+        payload: {
+          mutationKey: "appointment.confirm",
+          data: { appointmentId: String(appointmentToConfirm.id) },
+        },
+        onSuccess: {
+          id: `open-confirmed-appointment-${appointmentToConfirm.id}`,
+          type: "navigate",
+          entityType: "appointment",
+          entityId: String(appointmentToConfirm.id),
+          payload: { path: `/appointments?appointmentId=${appointmentToConfirm.id}` },
+        },
+      },
     });
   }
 
@@ -160,6 +186,33 @@ export function buildNextActions(params: {
       entityId: String(doneWithoutCharge.id),
       actionType: "charge",
       href: `/finances?serviceOrderId=${doneWithoutCharge.id}`,
+      executionAction: {
+        id: `generate-charge-${doneWithoutCharge.id}`,
+        type: "composite",
+        entityType: "service_order",
+        entityId: String(doneWithoutCharge.id),
+        payload: {
+          actions: [
+            {
+              id: `run-generate-charge-${doneWithoutCharge.id}`,
+              type: "mutation",
+              entityType: "service_order",
+              entityId: String(doneWithoutCharge.id),
+              payload: {
+                mutationKey: "service_order.generate_charge",
+                data: { serviceOrderId: String(doneWithoutCharge.id) },
+              },
+            },
+            {
+              id: `open-finance-from-service-order-${doneWithoutCharge.id}`,
+              type: "navigate",
+              entityType: "service_order",
+              entityId: String(doneWithoutCharge.id),
+              payload: { path: `/finances?serviceOrderId=${doneWithoutCharge.id}` },
+            },
+          ],
+        },
+      },
     });
   }
 
@@ -174,6 +227,13 @@ export function buildNextActions(params: {
       entityId: String(overdueCharge.id),
       actionType: "followup",
       href: `/finances?chargeId=${overdueCharge.id}`,
+      executionAction: {
+        id: `follow-up-charge-${overdueCharge.id}`,
+        type: "navigate",
+        entityType: "charge",
+        entityId: String(overdueCharge.id),
+        payload: { path: `/finances?chargeId=${overdueCharge.id}` },
+      },
       metadata: {
         amountCents: Number(overdueCharge.amountCents ?? 0),
       },
@@ -191,6 +251,13 @@ export function buildNextActions(params: {
       entityId: String(whatsappFailure.id),
       actionType: "resolve",
       href: `/whatsapp?customerId=${whatsappFailure.customerId ?? ""}`,
+      executionAction: {
+        id: `resolve-whatsapp-${whatsappFailure.id}`,
+        type: "navigate",
+        entityType: "customer",
+        entityId: String(whatsappFailure.customerId ?? ""),
+        payload: { path: `/whatsapp?customerId=${whatsappFailure.customerId ?? ""}` },
+      },
     });
   }
 
