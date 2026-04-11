@@ -145,7 +145,7 @@ interface MainLayoutProps {
 
 export function MainLayout({ children }: MainLayoutProps) {
   const [location, navigate] = useLocation();
-  const { role, user, logout, isLoggingOut } = useAuth();
+  const { role, user, logout, isLoggingOut, loading, isAuthenticated } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const notifications = useNotificationStore(state => state.notifications);
   const clearNotifications = useNotificationStore(state => state.clear);
@@ -154,6 +154,8 @@ export function MainLayout({ children }: MainLayoutProps) {
   const isMobile = useIsMobile();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const shouldRenderGlobalEngine =
+    !loading && isAuthenticated && Boolean(user?.id);
 
   const sections: MenuSection[] = [
     {
@@ -600,7 +602,7 @@ export function MainLayout({ children }: MainLayoutProps) {
             </NexoTopbar>
 
             <NexoMainContainer>
-              <GlobalActionEngine />
+              {shouldRenderGlobalEngine ? <GlobalActionEngine /> : null}
               {children}
             </NexoMainContainer>
           </div>

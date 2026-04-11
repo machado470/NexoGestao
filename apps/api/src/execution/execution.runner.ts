@@ -17,6 +17,14 @@ import {
 @Injectable()
 export class ExecutionRunner {
   private readonly logger = new Logger(ExecutionRunner.name)
+  private readonly maxExecutionsPerCycle = 5
+  private readonly cycleDelayMs = 1500
+  private nextCycleAt = 0
+
+  private async sleep(ms: number) {
+    await new Promise((resolve) => setTimeout(resolve, ms))
+  }
+
   private hasUsablePhone(phone: string | null | undefined): boolean {
     return typeof phone === 'string' && phone.trim().length > 0
   }
@@ -151,6 +159,16 @@ export class ExecutionRunner {
   }
 
   async runOnce() {
+    const now = Date.now()
+    if (now < this.nextCycleAt) {
+      return {
+        orgs: 0,
+        totalCandidates: 0,
+        executed: 0,
+        delayed: true,
+      }
+    }
+
     const orgs = await this.prisma.organization.findMany({
       select: { id: true },
       take: 200,
@@ -164,10 +182,16 @@ export class ExecutionRunner {
       totalCandidates += candidates.length
 
       for (const candidate of candidates) {
+        if (executed >= this.maxExecutionsPerCycle) break
         const result = await this.processCandidate(candidate)
         if (result === 'executed') executed += 1
       }
+
+      if (executed >= this.maxExecutionsPerCycle) break
     }
+
+    this.nextCycleAt = Date.now() + this.cycleDelayMs
+    await this.sleep(this.cycleDelayMs)
 
     this.logger.log(
       JSON.stringify({
@@ -175,6 +199,8 @@ export class ExecutionRunner {
         orgs: orgs.length,
         totalCandidates,
         executed,
+        maxExecutionsPerCycle: this.maxExecutionsPerCycle,
+        cycleDelayMs: this.cycleDelayMs,
       }),
     )
 
