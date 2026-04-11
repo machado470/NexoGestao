@@ -32,6 +32,7 @@ import { canAny, type Permission } from "@/lib/rbac";
 import { useIsMobile } from "@/hooks/useMobile";
 import { useNotificationStore } from "@/stores/notificationStore";
 import { GlobalSearch } from "@/components/GlobalSearch";
+import { GlobalActionEngine } from "@/components/app";
 import {
   NexoAppShell,
   NexoMainContainer,
@@ -598,7 +599,10 @@ export function MainLayout({ children }: MainLayoutProps) {
               </div>
             </NexoTopbar>
 
-            <NexoMainContainer>{children}</NexoMainContainer>
+            <NexoMainContainer>
+              <GlobalActionEngine />
+              {children}
+            </NexoMainContainer>
           </div>
         </div>
       </NexoAppShell>

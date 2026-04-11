@@ -145,6 +145,33 @@ export default function ExecutiveDashboardNew() {
         </div>
       </AppPageHeader>
 
+      <AppNextActions
+        title="Engine prioritária de execução"
+        engineInput={{
+          customers: customers.map(item => ({ id: item.id, name: item.name, phone: item.phone ?? null, lastContactAt: item.lastContactAt ?? null })),
+          appointments: appointments.map(item => ({
+            id: item.id,
+            customerId: item.customerId,
+            status: item.status,
+            startsAt: item.startsAt,
+          })),
+          serviceOrders: serviceOrders.map(item => ({
+            id: item.id,
+            customerId: item.customerId,
+            status: item.status,
+            delayedMinutes: item.delayedMinutes ?? 0,
+            updatedAt: item.updatedAt,
+          })),
+          charges: charges.map(item => ({
+            id: item.id,
+            customerId: item.customerId,
+            status: item.status,
+            amountCents: item.amountCents,
+            dueDate: item.dueDate,
+          })),
+        }}
+      />
+
       <AppOperationalStatePanel>
         <AppOperationalStateCard
           state={operationalState.level}
@@ -205,32 +232,6 @@ export default function ExecutiveDashboardNew() {
       </section>
 
       <section className="grid gap-3 lg:grid-cols-2">
-        <AppNextActions
-          title="Você precisa fazer isso agora"
-          engineInput={{
-            customers: customers.map(item => ({ id: item.id, name: item.name, phone: item.phone ?? null })),
-            appointments: appointments.map(item => ({
-              id: item.id,
-              customerId: item.customerId,
-              status: item.status,
-              startsAt: item.startsAt,
-            })),
-            serviceOrders: serviceOrders.map(item => ({
-              id: item.id,
-              customerId: item.customerId,
-              status: item.status,
-              delayedMinutes: item.delayedMinutes ?? 0,
-              updatedAt: item.updatedAt,
-            })),
-            charges: charges.map(item => ({
-              id: item.id,
-              customerId: item.customerId,
-              status: item.status,
-              amountCents: item.amountCents,
-              dueDate: item.dueDate,
-            })),
-          }}
-        />
         <AppSectionCard>
           <p className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Operação recente</p>
           <p className="mb-3 text-xs text-[var(--text-muted)]">Resumo curto do que acabou de acontecer na operação.</p>

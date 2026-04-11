@@ -28,6 +28,7 @@ export function AppNextActions({
   const [executedIds, setExecutedIds] = useState<Set<string>>(new Set());
   const [logs, setLogs] = useState<ExecutionLog[]>([]);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [isChainRunning, setIsChainRunning] = useState(false);
 
   const suggestions = useMemo(
     () =>
@@ -101,6 +102,28 @@ export function AppNextActions({
     await executeRecommendation(next);
   };
 
+  const executeChain = async () => {
+    if (isChainRunning) return;
+    setIsChainRunning(true);
+    try {
+      let queue = [...suggestions];
+      let executed = 0;
+      while (queue.length > 0) {
+        const current = queue[0];
+        await executeRecommendation(current);
+        executed += 1;
+        queue = queue.filter(item => item.id !== current.id);
+      }
+      if (executed === 0) {
+        toast.message("Sem ações pendentes para execução contínua.");
+      } else {
+        toast.success(`Execução contínua concluída com ${executed} ação(ões).`);
+      }
+    } finally {
+      setIsChainRunning(false);
+    }
+  };
+
   return (
     <section className="nexo-card-panel min-w-0 p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -108,7 +131,12 @@ export function AppNextActions({
           <h3 className="text-sm font-semibold text-[var(--text-primary)]">{title}</h3>
           <p className="text-xs text-[var(--text-muted)]">Priorize as ações com maior impacto financeiro e operacional.</p>
         </div>
-        <AppPrimaryAction label="Resolver próxima pendência agora" action={executeNext} loadingLabel="Executando sequência..." />
+        <div className="flex items-center gap-2">
+          <AppPrimaryAction label="Executar próxima ação" action={executeNext} loadingLabel="Executando próxima..." />
+          <Button type="button" size="sm" variant="secondary" onClick={() => void executeChain()} isLoading={isChainRunning}>
+            Executar próximas ações
+          </Button>
+        </div>
       </div>
 
       {feedback ? <p className="mt-2 whitespace-pre-line text-xs text-[var(--text-muted)]">{feedback}</p> : null}
@@ -119,6 +147,17 @@ export function AppNextActions({
             <div className="min-w-0">
               <p className="nexo-truncate text-sm font-medium text-[var(--text-primary)]" title={item.label}>{item.label}</p>
               <p className="text-xs text-[var(--text-muted)] nexo-text-wrap">{item.description}</p>
+              <div className="mt-1 flex flex-wrap gap-1 text-[11px]">
+                <span className="rounded bg-[var(--surface-elevated)] px-1.5 py-0.5 text-[var(--text-secondary)]">
+                  Impacto: {item.amountCents ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(item.amountCents / 100) : item.priority === "high" ? "Risco alto" : "Risco moderado"}
+                </span>
+                <span className="rounded bg-[var(--surface-elevated)] px-1.5 py-0.5 text-[var(--text-secondary)]">
+                  Urgência: {item.priority === "high" ? "agora" : item.priority === "medium" ? "hoje" : "planejar"}
+                </span>
+                <span className="rounded bg-[var(--surface-elevated)] px-1.5 py-0.5 text-[var(--text-secondary)]">
+                  Próxima ação: executar
+                </span>
+              </div>
             </div>
             <Button
               type="button"
