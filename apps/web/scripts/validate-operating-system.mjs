@@ -27,6 +27,8 @@ const forbiddenClasses = [
 
 const styleScopeFiles = [
   ...pages,
+  "client/src/pages/ExecutiveDashboard.tsx",
+  "client/src/pages/WhatsAppPage.tsx",
   "client/src/components/ModalFlowShell.tsx",
   "client/src/components/CreateCustomerModal.tsx",
   "client/src/components/CreateAppointmentModal.tsx",
@@ -36,6 +38,16 @@ const statusScopePages = [
   "client/src/pages/AppointmentsPage.tsx",
   "client/src/pages/ServiceOrdersPage.tsx",
   "client/src/pages/FinancesPage.tsx",
+];
+const forbiddenOperationalVisualPatterns = ["shadow-", "ring-", "backdrop-", "blur-"];
+const operationalVisualScopeFiles = [
+  "client/src/pages/ExecutiveDashboard.tsx",
+  "client/src/pages/CustomersPage.tsx",
+  "client/src/pages/AppointmentsPage.tsx",
+  "client/src/pages/ServiceOrdersPage.tsx",
+  "client/src/pages/FinancesPage.tsx",
+  "client/src/pages/WhatsAppPage.tsx",
+  "client/src/pages/TimelinePage.tsx",
 ];
 
 for (const page of pages) {
@@ -104,6 +116,16 @@ for (const file of styleScopeFiles) {
       errors.push(
         `${file}: classe proibida detectada (${forbidden}). Use tokens do app.`
       );
+    }
+  }
+
+  if (operationalVisualScopeFiles.includes(file)) {
+    for (const pattern of forbiddenOperationalVisualPatterns) {
+      if (source.includes(pattern)) {
+        errors.push(
+          `${file}: padrão visual proibido detectado (${pattern}) para elementos operacionais.`
+        );
+      }
     }
   }
 }

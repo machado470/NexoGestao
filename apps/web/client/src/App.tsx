@@ -172,6 +172,37 @@ function readSafeRedirectFromPath(path: string): string | null {
   return raw;
 }
 
+function useOperationalStyleGuard() {
+  useEffect(() => {
+    if (!import.meta.env.DEV || typeof window === "undefined") return;
+
+    const forbidden = ["shadow-", "ring-", "backdrop-", "blur-"];
+
+    const checkNode = (node: Element) => {
+      const className = node.className;
+      if (typeof className !== "string") return;
+
+      if (!forbidden.some(token => className.includes(token))) return;
+      if (node.tagName !== "BUTTON" && !node.closest("[data-operational='true']")) return;
+
+      // eslint-disable-next-line no-console
+      console.warn("[NexoGestao] Classe visual proibida em elemento operacional:", node);
+    };
+
+    document.querySelectorAll("button,[data-operational='true']").forEach(checkNode);
+    const observer = new MutationObserver(mutations => {
+      mutations.forEach(mutation => {
+        if (mutation.type === "attributes" && mutation.target instanceof Element) {
+          checkNode(mutation.target);
+        }
+      });
+    });
+
+    observer.observe(document.body, { attributes: true, subtree: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
+  }, []);
+}
+
 function ProtectedRoute({
   component: Component,
   permissions,
@@ -183,6 +214,7 @@ function ProtectedRoute({
   requireCompletedOnboarding?: boolean;
   onboardingOnly?: boolean;
 }) {
+  useOperationalStyleGuard();
   const { isAuthenticated, isInitializing, payload, role } = useAuth();
   const [location, navigate] = useLocation();
 

@@ -1,10 +1,9 @@
 // Operating-system contract: PageWrapper + NexoActionGroup
 import { Bar, BarChart, CartesianGrid, XAxis } from "recharts";
-import { useState } from "react";
 import { useLocation } from "wouter";
-import { toast } from "sonner";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Button } from "@/components/ui/button";
+import { useRunAction } from "@/hooks/useRunAction";
 import {
   AppChartPanel,
   AppFiltersBar,
@@ -18,21 +17,8 @@ import {
 
 export default function TimelinePage() {
   const [, navigate] = useLocation();
-  const [loadingActionId, setLoadingActionId] = useState<string | null>(null);
+  const { runAction, isRunning } = useRunAction();
   const events = [{ t: "08h", total: 26 }, { t: "10h", total: 34 }, { t: "12h", total: 18 }, { t: "14h", total: 39 }, { t: "16h", total: 28 }];
-
-  const runAction = async (actionId: string, callback: () => void) => {
-    try {
-      setLoadingActionId(actionId);
-      await new Promise(resolve => setTimeout(resolve, 250));
-      callback();
-      toast.success("Fluxo aberto com contexto aplicado.");
-    } catch {
-      toast.error("Falha ao executar a ação do evento.");
-    } finally {
-      setLoadingActionId(null);
-    }
-  };
 
   return (
     <AppPageShell>
@@ -45,7 +31,7 @@ export default function TimelinePage() {
       </div>
       <AppSectionBlock title="Feed de eventos" subtitle="Leitura clara para auditoria">
         <AppFiltersBar><Input placeholder="Filtrar por entidade, tipo, usuário ou período" className="max-w-md" /></AppFiltersBar>
-        <AppListBlock items={[{ title: "[Cobrança] Status alterado para Pago", subtitle: "Cliente Atlas · por Mariana · 16:12", action: <Button size="sm" onClick={() => runAction("open-charge", () => navigate("/finances?status=paid&customer=atlas"))} isLoading={loadingActionId === "open-charge"}>Abrir</Button> }, { title: "[O.S.] #1849 marcada como atrasada", subtitle: "Responsável Equipe Norte · 15:58", action: <Button size="sm" onClick={() => runAction("charge-client", () => navigate("/whatsapp?os=1849&context=delay"))} isLoading={loadingActionId === "charge-client"}>Cobrar cliente</Button> }, { title: "[Agendamento] novo horário confirmado", subtitle: "Cliente Solar Prime · 15:44", action: <Button size="sm" onClick={() => runAction("edit-appointment", () => navigate("/appointments?customer=solar-prime"))} isLoading={loadingActionId === "edit-appointment"}>Editar</Button> }, { title: "[Governança] nível elevado para WARNING", subtitle: "Regra: inadimplência + SLA · 15:30", action: <Button size="sm" onClick={() => runAction("advance-governance", () => navigate("/governance?severity=warning"))} isLoading={loadingActionId === "advance-governance"}>Avançar status</Button> }]} />
+        <AppListBlock items={[{ title: "[Cobrança] Status alterado para Pago", subtitle: "Cliente Atlas · por Mariana · 16:12", action: <Button size="sm" onClick={() => void runAction(async () => navigate("/finances?status=paid&customer=atlas"))} isLoading={isRunning}>Abrir</Button> }, { title: "[O.S.] #1849 marcada como atrasada", subtitle: "Responsável Equipe Norte · 15:58", action: <Button size="sm" onClick={() => void runAction(async () => navigate("/whatsapp?os=1849&context=delay"))} isLoading={isRunning}>Cobrar cliente</Button> }, { title: "[Agendamento] novo horário confirmado", subtitle: "Cliente Solar Prime · 15:44", action: <Button size="sm" onClick={() => void runAction(async () => navigate("/appointments?customer=solar-prime"))} isLoading={isRunning}>Editar</Button> }, { title: "[Governança] nível elevado para WARNING", subtitle: "Regra: inadimplência + SLA · 15:30", action: <Button size="sm" onClick={() => void runAction(async () => navigate("/governance?severity=warning"))} isLoading={isRunning}>Avançar status</Button> }]} />
       </AppSectionBlock>
     </AppPageShell>
   );

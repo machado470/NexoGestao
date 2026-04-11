@@ -1,6 +1,7 @@
 // Operating-system contract: PageWrapper + NexoActionGroup
 // OperationalSeverity compatibility marker
 import { Line, LineChart, CartesianGrid, XAxis } from "recharts";
+import { useLocation } from "wouter";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import {
   AppAlertList,
@@ -13,9 +14,12 @@ import {
   AppSectionBlock,
   AppStatusBadge,
   Input,
+  AppRowActions,
 } from "@/components/internal-page-system";
+import { buildOperationalRoute } from "@/lib/operational";
 
 export default function AppointmentsPage() {
+  const [, navigate] = useLocation();
   const data = [
     { day: "Seg", volume: 18 },
     { day: "Ter", volume: 22 },
@@ -45,7 +49,7 @@ export default function AppointmentsPage() {
 
       <AppSectionBlock title="Fila de agendamentos" subtitle="Execução principal da agenda">
         <AppFiltersBar><Input placeholder="Filtrar por cliente" className="max-w-sm" /></AppFiltersBar>
-        <AppDataTable><table className="w-full text-sm"><thead className="bg-[var(--surface-elevated)] text-xs text-[var(--text-muted)]"><tr><th className="p-3">Data</th><th>Cliente</th><th>Status</th><th>Responsável</th><th>Origem</th><th>Ações</th></tr></thead><tbody>{["08:30", "10:00", "14:20"].map((time, i) => <tr key={time} className="border-t border-[var(--border-subtle)] hover:bg-[var(--surface-base)]/70"><td className="p-3">15/04 {time}</td><td>Cliente {i + 1}</td><td><AppStatusBadge label={i === 1 ? "Pendente" : "Concluído"} /></td><td>Equipe {i + 1}</td><td>{i === 2 ? "WhatsApp" : "Portal"}</td><td className="p-3 text-[var(--brand-primary)]">Abrir</td></tr>)}</tbody></table></AppDataTable>
+        <AppDataTable><table className="w-full text-sm"><thead className="bg-[var(--surface-elevated)] text-xs text-[var(--text-muted)]"><tr><th className="p-3">Data</th><th>Cliente</th><th>Status</th><th>Responsável</th><th>Origem</th><th>Ações</th></tr></thead><tbody>{["08:30", "10:00", "14:20"].map((time, i) => <tr key={time} className="border-t border-[var(--border-subtle)] hover:bg-[var(--surface-base)]/70"><td className="p-3">15/04 {time}</td><td>Cliente {i + 1}</td><td><AppStatusBadge label={i === 1 ? "Pendente" : "Concluído"} /></td><td>Equipe {i + 1}</td><td>{i === 2 ? "WhatsApp" : "Portal"}</td><td className="p-3"><AppRowActions actions={[{ label: "Abrir", onClick: () => navigate(buildOperationalRoute("/appointments", { hour: time })) }]} /></td></tr>)}</tbody></table></AppDataTable>
       </AppSectionBlock>
     </AppPageShell>
   );

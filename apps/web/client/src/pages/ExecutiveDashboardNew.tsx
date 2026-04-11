@@ -17,6 +17,7 @@ import {
 } from "@/components/app-system";
 import { Button } from "@/components/ui/button";
 import { useActionHandler } from "@/hooks/useActionHandler";
+import { AppLoadingState, AppNextActions } from "@/components/app";
 import {
   buildBottleneckGroups,
   buildEntityContextBridge,
@@ -122,6 +123,14 @@ export default function ExecutiveDashboardNew() {
     setIsExecutingNext(false);
   };
 
+  if (metricsQuery.isLoading || governanceSummaryQuery.isLoading) {
+    return (
+      <AppPageShell>
+        <AppLoadingState rows={6} />
+      </AppPageShell>
+    );
+  }
+
   return (
     <AppPageShell>
       <AppPageHeader>
@@ -193,6 +202,17 @@ export default function ExecutiveDashboardNew() {
       </section>
 
       <section className="grid gap-3 lg:grid-cols-2">
+        <AppNextActions
+          items={nextActions.slice(0, 3).map(action => ({
+            id: action.id,
+            title: action.title,
+            impact: action.description,
+            run: async () => {
+              if (!action.executionAction) return;
+              await executeAction(action.executionAction);
+            },
+          }))}
+        />
         <AppSectionCard>
           <p className="mb-3 text-sm font-semibold text-[var(--text-primary)]">Operação recente</p>
           <AppTimeline>

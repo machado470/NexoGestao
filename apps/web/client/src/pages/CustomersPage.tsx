@@ -1,5 +1,6 @@
 // Operating-system contract: PageWrapper + NexoActionGroup
 import { Bar, BarChart, CartesianGrid, XAxis } from "recharts";
+import { useLocation } from "wouter";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import {
   AppChartPanel,
@@ -12,7 +13,9 @@ import {
   AppStatusBadge,
   Input,
   AppAlertList,
+  AppRowActions,
 } from "@/components/internal-page-system";
+import { buildOperationalRoute } from "@/lib/operational";
 
 const growthData = [
   { month: "Jan", base: 240 },
@@ -22,6 +25,7 @@ const growthData = [
 ];
 
 export default function CustomersPage() {
+  const [, navigate] = useLocation();
   return (
     <AppPageShell>
       <AppPageHeader title="Clientes" description="Gestão da base, valor e engajamento operacional." ctaLabel="Novo cliente" />
@@ -58,7 +62,7 @@ export default function CustomersPage() {
             <tbody>
               {["Atlas Engenharia", "Solar Prime", "Condomínio Orion"].map((name, i) => (
                 <tr key={name} className="border-t border-[var(--border-subtle)] hover:bg-[var(--surface-base)]/70">
-                  <td className="p-3 font-medium text-[var(--text-primary)]">{name}</td><td>(11) 98888-12{i}0</td><td><AppStatusBadge label={i === 2 ? "Em risco" : "Concluído"} /></td><td>{i === 0 ? "há 2h" : "há 2 dias"}</td><td>R$ {(38 + i * 7).toFixed(1)}k</td><td className="p-3 text-[var(--brand-primary)]">Ver detalhes</td>
+                  <td className="p-3 font-medium text-[var(--text-primary)]">{name}</td><td>(11) 98888-12{i}0</td><td><AppStatusBadge label={i === 2 ? "Em risco" : "Concluído"} /></td><td>{i === 0 ? "há 2h" : "há 2 dias"}</td><td>R$ {(38 + i * 7).toFixed(1)}k</td><td className="p-3"><AppRowActions actions={[{ label: "Ver detalhes", onClick: () => navigate(buildOperationalRoute("/customers", { customer: name.toLowerCase() })) }]} /></td>
                 </tr>
               ))}
             </tbody>
