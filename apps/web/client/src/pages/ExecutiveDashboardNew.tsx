@@ -203,15 +203,30 @@ export default function ExecutiveDashboardNew() {
 
       <section className="grid gap-3 lg:grid-cols-2">
         <AppNextActions
-          items={nextActions.slice(0, 3).map(action => ({
-            id: action.id,
-            title: action.title,
-            impact: action.description,
-            run: async () => {
-              if (!action.executionAction) return;
-              await executeAction(action.executionAction);
-            },
-          }))}
+          title="Próximas ações"
+          engineInput={{
+            customers: customers.map(item => ({ id: item.id, name: item.name, phone: item.phone ?? null })),
+            appointments: appointments.map(item => ({
+              id: item.id,
+              customerId: item.customerId,
+              status: item.status,
+              startsAt: item.startsAt,
+            })),
+            serviceOrders: serviceOrders.map(item => ({
+              id: item.id,
+              customerId: item.customerId,
+              status: item.status,
+              delayedMinutes: item.delayedMinutes ?? 0,
+              updatedAt: item.updatedAt,
+            })),
+            charges: charges.map(item => ({
+              id: item.id,
+              customerId: item.customerId,
+              status: item.status,
+              amountCents: item.amountCents,
+              dueDate: item.dueDate,
+            })),
+          }}
         />
         <AppSectionCard>
           <p className="mb-3 text-sm font-semibold text-[var(--text-primary)]">Operação recente</p>

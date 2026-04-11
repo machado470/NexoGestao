@@ -15,6 +15,7 @@ import {
   AppStatusBadge,
   AppRowActions,
 } from "@/components/internal-page-system";
+import { AppNextActions } from "@/components/app";
 import { buildOperationalRoute } from "@/lib/operational";
 
 export default function ServiceOrdersPage() {
@@ -23,6 +24,18 @@ export default function ServiceOrdersPage() {
   return (
     <AppPageShell>
       <AppPageHeader title="Ordens de Serviço" description="Central de execução operacional e controle de urgências." ctaLabel="Nova O.S." />
+      <AppNextActions
+        title="Próximas ações"
+        engineInput={{
+          customers: [{ id: "c-atlas", name: "Atlas", phone: "5511988881200" }],
+          charges: [],
+          appointments: [],
+          serviceOrders: [
+            { id: "so-1", customerId: "c-atlas", status: "OVERDUE", delayedMinutes: 360 },
+            { id: "so-2", customerId: "c-atlas", status: "AT_RISK", delayedMinutes: 120 },
+          ],
+        }}
+      />
       <AppKpiRow items={[{ label: "Abertas", value: "34", trend: 6.2, context: "vs ontem" }, { label: "Em execução", value: "27", trend: 4.4, context: "agora" }, { label: "Concluídas", value: "124", trend: 9.1, context: "no mês" }, { label: "Atrasadas", value: "8", trend: -2.3, context: "vs semana passada" }]} />
       <div className="grid gap-3 xl:grid-cols-3">
         <AppChartPanel title="Distribuição por status" description="Mapa de execução das O.S.">

@@ -14,6 +14,7 @@ import {
   AppStatusBadge,
   AppRowActions,
 } from "@/components/internal-page-system";
+import { AppNextActions } from "@/components/app";
 import { buildOperationalRoute } from "@/lib/operational";
 
 export default function FinancesPage() {
@@ -22,6 +23,21 @@ export default function FinancesPage() {
   return (
     <AppPageShell>
       <AppPageHeader title="Financeiro" description="Dinheiro da operação conectado a cliente e O.S." ctaLabel="Nova cobrança" />
+      <AppNextActions
+        title="Próximas ações"
+        engineInput={{
+          customers: [
+            { id: "c-atlas", name: "Atlas", phone: "5511988881200" },
+            { id: "c-orion", name: "Orion", phone: "5511988881210" },
+          ],
+          charges: [
+            { id: "charge-fin-1", customerId: "c-atlas", status: "OVERDUE", amountCents: 845000, dueDate: "2026-03-30T10:00:00Z" },
+            { id: "charge-fin-2", customerId: "c-orion", status: "PENDING", amountCents: 410000, dueDate: "2026-04-20T10:00:00Z" },
+          ],
+          serviceOrders: [],
+          appointments: [],
+        }}
+      />
       <AppKpiRow items={[{ label: "Receita", value: "R$ 284k", trend: 11.4, context: "mês atual" }, { label: "A receber", value: "R$ 94k", trend: -2.8, context: "carteira ativa" }, { label: "Recebido", value: "R$ 190k", trend: 7.1, context: "vs mês anterior" }, { label: "Inadimplência", value: "6,8%", trend: -1.3, context: "últimos 30 dias" }]} />
       <div className="grid gap-3 xl:grid-cols-3">
         <AppChartPanel title="Fluxo recebido vs vencido" description="Saúde de caixa ligada à execução.">

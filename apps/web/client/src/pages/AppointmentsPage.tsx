@@ -16,6 +16,7 @@ import {
   Input,
   AppRowActions,
 } from "@/components/internal-page-system";
+import { AppNextActions } from "@/components/app";
 import { buildOperationalRoute } from "@/lib/operational";
 
 export default function AppointmentsPage() {
@@ -30,6 +31,19 @@ export default function AppointmentsPage() {
   return (
     <AppPageShell>
       <AppPageHeader title="Agendamentos" description="Controle da agenda operacional e distribuição de carga." ctaLabel="Novo agendamento" />
+      <AppNextActions
+        title="Próximas ações"
+        engineInput={{
+          customers: [{ id: "c-1", name: "Cliente 1", phone: "5511988881200" }],
+          charges: [],
+          serviceOrders: [],
+          appointments: [
+            { id: "appt-1", customerId: "c-1", status: "SCHEDULED", startsAt: "2026-04-11T18:00:00Z" },
+            { id: "appt-2", customerId: "c-1", status: "CONFIRMED", startsAt: "2026-04-12T12:00:00Z" },
+          ],
+          autoExecute: true,
+        }}
+      />
       <AppKpiRow items={[
         { label: "Hoje", value: "26", trend: 8.2, context: "vs ontem" },
         { label: "Semana", value: "112", trend: 5.1, context: "vs semana passada" },
