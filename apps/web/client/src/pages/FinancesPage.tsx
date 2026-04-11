@@ -5,14 +5,15 @@ import { trpc } from "@/lib/trpc";
 import { CreateChargeModal } from "@/components/CreateChargeModal";
 import { normalizeArrayPayload, normalizeObjectPayload } from "@/lib/query-helpers";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { PageWrapper } from "@/components/operating-system/Wrappers";
+import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
+import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedbackButton";
 import {
   AppChartPanel,
   AppDataTable,
   AppEmptyState,
   AppKpiRow,
   AppLoadingState,
-  AppPageHeader,
-  AppPageShell,
   AppRowActions,
   AppSectionBlock,
   AppStatusBadge,
@@ -20,6 +21,7 @@ import {
 import { buildIdempotencyKey } from "@/lib/idempotency";
 import { toast } from "sonner";
 import { invalidateOperationalGraph } from "@/lib/operationalConsistency";
+import { getChargeSeverity, getOperationalSeverityLabel } from "@/lib/operations/operational-intelligence";
 
 function formatCurrency(cents: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100);
@@ -71,12 +73,14 @@ export default function FinancesPage() {
   }
 
   return (
-    <AppPageShell>
-      <AppPageHeader
-        title="Financeiro"
+    <PageWrapper title="Financeiro" subtitle="Cobranças com execução padronizada de ações e invalidação consistente.">
+      <OperationalTopCard
+        contextLabel="Direção de receita"
+        title="Fluxo cobrança → pagamento"
         description="Cobranças e pagamentos reais com atualização automática do caixa."
-        ctaLabel="Criar cobrança agora"
-        onCta={() => setOpenCreate(true)}
+        primaryAction={(
+          <ActionFeedbackButton state="idle" idleLabel="Criar cobrança agora" onClick={() => setOpenCreate(true)} />
+        )}
       />
 
       <AppKpiRow items={[
@@ -123,7 +127,7 @@ export default function FinancesPage() {
                   <tr key={String(charge?.id)} className="border-t border-[var(--border-subtle)]">
                     <td className="p-3">{String(charge?.customer?.name ?? "—")}</td>
                     <td>{formatCurrency(Number(charge?.amountCents ?? 0))}</td>
-                    <td><AppStatusBadge label={String(charge?.status ?? "Pendente")} /></td>
+                    <td><AppStatusBadge label={getOperationalSeverityLabel(getChargeSeverity(charge))} /></td>
                     <td>{charge?.dueDate ? new Date(String(charge.dueDate)).toLocaleDateString("pt-BR") : "—"}</td>
                     <td className="p-3">
                       <AppRowActions actions={[
@@ -146,6 +150,6 @@ export default function FinancesPage() {
           void Promise.all([chargesQuery.refetch(), statsQuery.refetch(), revenueQuery.refetch()]);
         }}
       />
-    </AppPageShell>
+    </PageWrapper>
   );
 }

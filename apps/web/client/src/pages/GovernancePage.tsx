@@ -3,13 +3,14 @@ import { Line, LineChart, CartesianGrid, XAxis } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { trpc } from "@/lib/trpc";
 import { normalizeArrayPayload, normalizeObjectPayload } from "@/lib/query-helpers";
+import { PageWrapper } from "@/components/operating-system/Wrappers";
+import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
+import { Button } from "@/components/design-system";
 import {
   AppChartPanel,
   AppEmptyState,
   AppKpiRow,
   AppLoadingState,
-  AppPageHeader,
-  AppPageShell,
   AppSectionBlock,
   AppStatusBadge,
 } from "@/components/internal-page-system";
@@ -43,8 +44,23 @@ export default function GovernancePage() {
   const recommendations = normalizeArrayPayload<any>(summary.recommendations ?? summary.nextActions ?? []);
 
   return (
-    <AppPageShell>
-      <AppPageHeader title="Governança e Risco" description="Sinais reais de risco e ações de contenção operacional." />
+    <PageWrapper title="Governança e Risco" subtitle="Leitura de risco e contenção com o mesmo contrato operacional das demais telas.">
+      <OperationalTopCard
+        contextLabel="Direção de governança"
+        title="Risco e contenção operacional"
+        description="Sinais reais de risco e ações de contenção operacional."
+        primaryAction={(
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              void Promise.all([summaryQuery.refetch(), runsQuery.refetch()]);
+            }}
+          >
+            Recarregar sinais
+          </Button>
+        )}
+      />
 
       <AppKpiRow
         items={[
@@ -112,6 +128,6 @@ export default function GovernancePage() {
           )}
         </AppSectionBlock>
       </div>
-    </AppPageShell>
+    </PageWrapper>
   );
 }

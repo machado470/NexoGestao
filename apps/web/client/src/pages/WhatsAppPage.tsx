@@ -4,15 +4,15 @@ import { trpc } from "@/lib/trpc";
 import { normalizeArrayPayload } from "@/lib/query-helpers";
 import { buildIdempotencyKey } from "@/lib/idempotency";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/design-system";
 import { Input } from "@/components/ui/input";
+import { PageWrapper } from "@/components/operating-system/Wrappers";
+import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import {
   AppDataTable,
   AppEmptyState,
   AppKpiRow,
   AppLoadingState,
-  AppPageHeader,
-  AppPageShell,
   AppSectionBlock,
   AppStatusBadge,
 } from "@/components/internal-page-system";
@@ -71,12 +71,16 @@ export default function WhatsAppPage() {
   }
 
   return (
-    <AppPageShell>
-      <AppPageHeader
-        title="WhatsApp Operacional"
+    <PageWrapper title="WhatsApp Operacional" subtitle="Comunicação operacional no mesmo contrato de ação das demais áreas.">
+      <OperationalTopCard
+        contextLabel="Direção de comunicação"
+        title="Envio e rastreio de mensagens"
         description="Envio real de mensagens com histórico de entrega e falhas."
-        ctaLabel="Enviar mensagem"
-        onCta={() => void sendMessage()}
+        primaryAction={(
+          <Button type="button" onClick={() => void sendMessage()} disabled={sendMutation.isPending}>
+            Enviar mensagem
+          </Button>
+        )}
       />
 
       <AppKpiRow
@@ -140,6 +144,6 @@ export default function WhatsAppPage() {
           </AppDataTable>
         )}
       </AppSectionBlock>
-    </AppPageShell>
+    </PageWrapper>
   );
 }
