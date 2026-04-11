@@ -1,10 +1,18 @@
 import type { ComponentProps, ReactNode } from "react";
-import { ArrowDownRight, ArrowUpRight, TriangleAlert } from "lucide-react";
+import { TriangleAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { AppPageShell, AppSectionCard, AppSkeleton as BaseSkeleton } from "@/components/app-system";
+import {
+  AppActionCard,
+  AppCardCTA,
+  AppEmptyState as AppBaseEmptyState,
+  AppLoadingState,
+  AppRowActions,
+  AppTrendIndicator,
+} from "@/components/app";
 
 export function AppPageHeader({
   title,
@@ -35,17 +43,6 @@ export function AppPageHeader({
   );
 }
 
-export function AppTrendIndicator({ value }: { value: number }) {
-  const positive = value >= 0;
-  return (
-    <span className={cn("inline-flex items-center gap-1 text-xs font-semibold", positive ? "text-emerald-500" : "text-rose-500")}>
-      {positive ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
-      {positive ? "+" : ""}
-      {value.toFixed(1)}%
-    </span>
-  );
-}
-
 export function AppKpiCard({
   label,
   value,
@@ -60,20 +57,13 @@ export function AppKpiCard({
   onClick?: () => void;
 }) {
   return (
-    <AppSectionCard
-      className={cn("p-3 md:p-4", onClick ? "cursor-pointer hover:brightness-[0.99]" : "")}
-      onClick={onClick}
-      role={onClick ? "button" : undefined}
-      tabIndex={onClick ? 0 : undefined}
-      onKeyDown={onClick ? (event) => (event.key === "Enter" || event.key === " ") && onClick() : undefined}
-    >
-      <p className="text-xs font-medium text-[var(--text-secondary)]">{label}</p>
-      <p className="mt-1 text-xl font-bold text-[var(--text-primary)]">{value}</p>
-      <div className="mt-2 flex items-center justify-between gap-2">
+    <AppActionCard title={label} description={context} onClick={onClick ?? (() => undefined)}>
+      <p className="text-xl font-bold text-[var(--text-primary)]">{value}</p>
+      <div className="flex items-center gap-2">
         <AppTrendIndicator value={trend} />
-        <span className="text-xs text-[var(--text-muted)]">{context}</span>
+        {onClick ? <AppCardCTA label="Abrir" onClick={onClick} /> : null}
       </div>
-    </AppSectionCard>
+    </AppActionCard>
   );
 }
 
@@ -222,12 +212,14 @@ export function AppInsightPanel({ children }: { children: ReactNode }) {
 }
 
 export function AppEmptyState({ title, description }: { title: string; description: string }) {
-  return <div className="rounded-lg border border-dashed border-[var(--border-subtle)] p-6 text-center"><p className="text-sm font-semibold text-[var(--text-primary)]">{title}</p><p className="mt-1 text-xs text-[var(--text-muted)]">{description}</p></div>;
+  return <AppBaseEmptyState title={title} description={description} />;
 }
 
 export function AppSkeleton(props: ComponentProps<typeof BaseSkeleton>) {
   return <BaseSkeleton {...props} />;
 }
+
+export { AppLoadingState, AppRowActions, AppTrendIndicator };
 
 export function AppFiltersBar({ children }: { children: ReactNode }) {
   return <div className="nexo-card-informative flex flex-wrap items-center gap-2 p-3">{children}</div>;

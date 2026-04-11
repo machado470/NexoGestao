@@ -1,9 +1,8 @@
 import { Area, AreaChart, CartesianGrid, XAxis } from "recharts";
-import { useState } from "react";
 import { useLocation } from "wouter";
-import { toast } from "sonner";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Button } from "@/components/ui/button";
+import { useRunAction } from "@/hooks/useRunAction";
 import {
   AppAlertList,
   AppChartPanel,
@@ -27,20 +26,7 @@ const chartData = [
 
 export default function ExecutiveDashboard() {
   const [, navigate] = useLocation();
-  const [loadingActionId, setLoadingActionId] = useState<string | null>(null);
-
-  const runAction = async (actionId: string, callback: () => void) => {
-    try {
-      setLoadingActionId(actionId);
-      await new Promise(resolve => setTimeout(resolve, 300));
-      callback();
-      toast.success("Ação executada com sucesso.");
-    } catch {
-      toast.error("Não foi possível executar a ação agora.");
-    } finally {
-      setLoadingActionId(null);
-    }
-  };
+  const { runAction, isRunning } = useRunAction();
 
   return (
     <AppPageShell>
@@ -48,7 +34,7 @@ export default function ExecutiveDashboard() {
         title="Centro de decisão operacional"
         description="Visão executiva do fluxo Cliente → Agendamento → O.S. → Cobrança → Pagamento."
         ctaLabel="Executar próxima ação"
-        onCta={() => runAction("dashboard-next-action", () => navigate("/dashboard/operations"))}
+        onCta={() => void runAction(async () => navigate("/dashboard/operations"))}
       />
 
       <AppKpiRow
@@ -94,9 +80,9 @@ export default function ExecutiveDashboard() {
       <AppSectionBlock title="Ordens críticas" subtitle="Foco operacional dominante">
         <AppListBlock
           items={[
-            { title: "O.S. #1851 · Instalação comercial", subtitle: "Cliente Atlas · Prazo hoje 17:00", right: <AppStatusBadge label="Urgente" />, action: <Button size="sm" onClick={() => runAction("open-1851", () => navigate("/service-orders?os=1851"))} isLoading={loadingActionId === "open-1851"}>Abrir</Button> },
-            { title: "O.S. #1849 · Manutenção preventiva", subtitle: "Equipe Norte · 2h de atraso", right: <AppStatusBadge label="Atrasado" />, action: <Button size="sm" onClick={() => runAction("advance-1849", () => navigate("/service-orders?os=1849&action=advance-status"))} isLoading={loadingActionId === "advance-1849"}>Avançar status</Button> },
-            { title: "O.S. #1844 · Retorno técnico", subtitle: "Risco de multa contratual", right: <AppStatusBadge label="Em risco" />, action: <Button size="sm" onClick={() => runAction("charge-1844", () => navigate("/whatsapp?customer=atlas&context=charge"))} isLoading={loadingActionId === "charge-1844"}>Cobrar</Button> },
+            { title: "O.S. #1851 · Instalação comercial", subtitle: "Cliente Atlas · Prazo hoje 17:00", right: <AppStatusBadge label="Urgente" />, action: <Button size="sm" onClick={() => void runAction(async () => navigate("/service-orders?os=1851"))} isLoading={isRunning}>Abrir</Button> },
+            { title: "O.S. #1849 · Manutenção preventiva", subtitle: "Equipe Norte · 2h de atraso", right: <AppStatusBadge label="Atrasado" />, action: <Button size="sm" onClick={() => void runAction(async () => navigate("/service-orders?os=1849&action=advance-status"))} isLoading={isRunning}>Avançar status</Button> },
+            { title: "O.S. #1844 · Retorno técnico", subtitle: "Risco de multa contratual", right: <AppStatusBadge label="Em risco" />, action: <Button size="sm" onClick={() => void runAction(async () => navigate("/whatsapp?customer=atlas&context=charge"))} isLoading={isRunning}>Cobrar</Button> },
           ]}
         />
       </AppSectionBlock>
@@ -107,12 +93,12 @@ export default function ExecutiveDashboard() {
             {
               title: "Cliente Atlas com pagamento atrasado",
               subtitle: "Cobrança vencida há 2 dias",
-              action: <Button size="sm" onClick={() => runAction("resolve-atlas", () => navigate("/finances?status=overdue&customer=atlas"))} isLoading={loadingActionId === "resolve-atlas"}>Resolver agora</Button>,
+              action: <Button size="sm" onClick={() => void runAction(async () => navigate("/finances?status=overdue&customer=atlas"))} isLoading={isRunning}>Resolver agora</Button>,
             },
             {
               title: "O.S. #1849 atrasada",
               subtitle: "Equipe Norte · SLA em risco",
-              action: <Button size="sm" onClick={() => runAction("resolve-os1849", () => navigate("/service-orders?os=1849&status=delayed"))} isLoading={loadingActionId === "resolve-os1849"}>Resolver agora</Button>,
+              action: <Button size="sm" onClick={() => void runAction(async () => navigate("/service-orders?os=1849&status=delayed"))} isLoading={isRunning}>Resolver agora</Button>,
             },
           ]}
         />

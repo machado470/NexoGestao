@@ -1,6 +1,7 @@
 // Operating-system contract: PageWrapper + NexoActionGroup
 // OperationalSeverity compatibility marker
 import { Area, AreaChart, CartesianGrid, XAxis } from "recharts";
+import { useLocation } from "wouter";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import {
   AppAlertList,
@@ -11,9 +12,12 @@ import {
   AppPageShell,
   AppSectionBlock,
   AppStatusBadge,
+  AppRowActions,
 } from "@/components/internal-page-system";
+import { buildOperationalRoute } from "@/lib/operational";
 
 export default function FinancesPage() {
+  const [, navigate] = useLocation();
   const flow = [{ week: "S1", recebido: 58, vencido: 12 }, { week: "S2", recebido: 63, vencido: 17 }, { week: "S3", recebido: 69, vencido: 15 }, { week: "S4", recebido: 74, vencido: 11 }];
   return (
     <AppPageShell>
@@ -30,7 +34,7 @@ export default function FinancesPage() {
         </AppSectionBlock>
       </div>
       <AppSectionBlock title="Cobranças e pagamentos" subtitle="Tabela dominante com origem operacional">
-        <AppDataTable><table className="w-full text-sm"><thead className="bg-[var(--surface-elevated)] text-xs text-[var(--text-muted)]"><tr><th className="p-3">Cliente</th><th>Valor</th><th>Status</th><th>Vencimento</th><th>Origem operacional</th><th>Ações</th></tr></thead><tbody>{[{n:"Atlas",v:"R$ 8.450",s:"Pendente",o:"O.S. #1851"},{n:"Orion",v:"R$ 4.100",s:"Atrasado",o:"O.S. #1832"},{n:"Prime",v:"R$ 2.980",s:"Pago",o:"Agendamento #901"}].map((r)=><tr key={r.n+r.v} className="border-t border-[var(--border-subtle)] hover:bg-[var(--surface-base)]/70"><td className="p-3">{r.n}</td><td>{r.v}</td><td><AppStatusBadge label={r.s} /></td><td>20/04/2026</td><td>{r.o}</td><td className="p-3 text-[var(--brand-primary)]">Cobrar</td></tr>)}</tbody></table></AppDataTable>
+        <AppDataTable><table className="w-full text-sm"><thead className="bg-[var(--surface-elevated)] text-xs text-[var(--text-muted)]"><tr><th className="p-3">Cliente</th><th>Valor</th><th>Status</th><th>Vencimento</th><th>Origem operacional</th><th>Ações</th></tr></thead><tbody>{[{n:"Atlas",v:"R$ 8.450",s:"Pendente",o:"O.S. #1851"},{n:"Orion",v:"R$ 4.100",s:"Atrasado",o:"O.S. #1832"},{n:"Prime",v:"R$ 2.980",s:"Pago",o:"Agendamento #901"}].map((r)=><tr key={r.n+r.v} className="border-t border-[var(--border-subtle)] hover:bg-[var(--surface-base)]/70"><td className="p-3">{r.n}</td><td>{r.v}</td><td><AppStatusBadge label={r.s} /></td><td>20/04/2026</td><td>{r.o}</td><td className="p-3"><AppRowActions actions={[{ label: "Cobrar", onClick: () => navigate(buildOperationalRoute("/finances", { customer: r.n.toLowerCase(), status: r.s.toLowerCase() })) }]} /></td></tr>)}</tbody></table></AppDataTable>
       </AppSectionBlock>
     </AppPageShell>
   );
