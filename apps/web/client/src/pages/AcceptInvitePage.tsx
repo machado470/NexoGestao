@@ -6,12 +6,12 @@ import { trpc } from "@/lib/trpc";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/design-system";
 import {
-  Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { AuthCard } from "@/components/ui/context-cards";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -114,7 +114,7 @@ export default function AcceptInvitePage() {
             Ir para login
           </button>
 
-          <Card className="border-border/80 bg-card/95 shadow-sm">
+          <AuthCard className="border-border/80 bg-card/95 shadow-sm">
             <CardHeader className="space-y-3">
               <Badge variant="outline" className="w-fit">
                 Convite de equipe
@@ -206,7 +206,7 @@ export default function AcceptInvitePage() {
                 </Button>
               </form>
             </CardContent>
-          </Card>
+          </AuthCard>
         </div>
       </div>
     </div>

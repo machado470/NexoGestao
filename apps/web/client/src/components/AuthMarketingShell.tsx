@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { BrandSignature } from "@/components/BrandSignature";
 
 import "@/pages/landing.css";
+import { AuthCard, PublicCard } from "@/components/ui/context-cards";
 
 type AuthMarketingShellProps = {
   badge: string;
@@ -35,7 +36,7 @@ export function AuthMarketingShell({
   const [, navigate] = useLocation();
 
   return (
-    <div className="landing-root min-h-screen text-slate-900">
+    <div className="nexo-auth landing-root min-h-screen text-slate-900">
       <main className="container py-6 sm:py-10">
         <div className="grid min-h-[calc(100vh-5rem)] overflow-hidden rounded-[2rem] border border-[var(--border-subtle)] bg-white/80 shadow-[0_25px_60px_rgba(15,23,42,0.08)] backdrop-blur-sm lg:grid-cols-[1.05fr_0.95fr]">
           <section className="relative hidden border-r border-[var(--border-subtle)] bg-white/70 lg:block">
@@ -66,7 +67,7 @@ export function AuthMarketingShell({
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_14px_30px_rgba(15,23,42,0.06)]">
+              <PublicCard className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_14px_30px_rgba(15,23,42,0.06)]">
                 <p className="text-sm font-semibold text-slate-900">{bottomPanelTitle}</p>
                 <div className="mt-3 grid gap-3 sm:grid-cols-3">
                   {bottomPanelSteps.map((step) => (
@@ -77,7 +78,7 @@ export function AuthMarketingShell({
                     </div>
                   ))}
                 </div>
-              </div>
+              </PublicCard>
             </div>
           </section>
 
@@ -92,7 +93,7 @@ export function AuthMarketingShell({
                 {backLabel}
               </button>
 
-              <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_20px_45px_rgba(15,23,42,0.08)] sm:p-7">
+              <AuthCard className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_20px_45px_rgba(15,23,42,0.08)] sm:p-7">
                 <span className="inline-flex rounded-full border border-slate-200 bg-[var(--surface-base)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-700">
                   {badge}
                 </span>
@@ -100,7 +101,7 @@ export function AuthMarketingShell({
                 <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
 
                 <div className="mt-6">{children}</div>
-              </article>
+              </AuthCard>
 
               <div className="mt-5 flex flex-wrap items-center gap-4 text-xs text-slate-500">
                 <Link href="/" className="hover:text-slate-800">Home</Link>

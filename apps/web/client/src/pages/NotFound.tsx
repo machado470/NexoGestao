@@ -1,5 +1,6 @@
 import { Button } from "@/components/design-system";
-import { Card, CardContent } from "@/components/ui/card";
+import { CardContent } from "@/components/ui/card";
+import { PublicCard } from "@/components/ui/context-cards";
 import { AlertCircle, Home } from "lucide-react";
 import { useLocation } from "wouter";
 
@@ -12,7 +13,7 @@ export default function NotFound() {
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
-      <Card className="w-full max-w-lg mx-4 shadow-sm border-0 bg-white/80 backdrop-blur-sm">
+      <PublicCard className="w-full max-w-lg mx-4 shadow-sm border-0 bg-white/80 backdrop-blur-sm">
         <CardContent className="pt-8 pb-8 text-center">
           <div className="flex justify-center mb-6">
             <div className="relative">
@@ -46,7 +47,7 @@ export default function NotFound() {
             </Button>
           </div>
         </CardContent>
-      </Card>
+      </PublicCard>
     </div>
   );
 }

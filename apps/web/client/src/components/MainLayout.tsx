@@ -39,6 +39,7 @@ import {
   NexoTopbar,
 } from "@/components/design-system";
 import { BrandSignature } from "@/components/BrandSignature";
+import { AppShell } from "@/components/AppShell";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -315,10 +316,11 @@ export function MainLayout({ children }: MainLayoutProps) {
   };
 
   return (
-    <NexoAppShell
-      className={`app-root ${theme === "dark" ? "dark" : ""} h-screen overflow-hidden text-[var(--text-primary)]`}
-      data-theme={theme}
-    >
+    <AppShell>
+      <NexoAppShell
+        className={`nexo-app app-root ${theme === "dark" ? "dark" : ""} h-screen overflow-hidden text-[var(--text-primary)]`}
+        data-theme={theme}
+      >
       {isMobile && mobileMenuOpen ? (
         <button
           type="button"
@@ -598,5 +600,6 @@ export function MainLayout({ children }: MainLayoutProps) {
         </div>
       </div>
     </NexoAppShell>
+    </AppShell>
   );
 }

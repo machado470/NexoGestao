@@ -2470,3 +2470,117 @@ html {
     border: 1px dashed color-mix(in srgb, var(--nexo-border-soft) 82%, #b3c5db);
   }
 }
+
+/* Context isolation: public/auth/app visual namespaces */
+@layer base {
+  body {
+    background: #f8f9fb;
+    color: #0f172a;
+  }
+
+  .nexo-public,
+  .nexo-auth {
+    --bg-page: #f8f9fb;
+    --bg-app: #f8f9fb;
+    --background: #f8f9fb;
+    --foreground: #0f172a;
+    --surface-base: #f1f5f9;
+    --surface-elevated: #ffffff;
+    --bg-surface: #ffffff;
+    --bg-card: #ffffff;
+    --card-bg: #ffffff;
+    --card: #ffffff;
+    --card-foreground: #0f172a;
+    --popover: #ffffff;
+    --popover-foreground: #0f172a;
+    --border: #dbe3ee;
+    --border-subtle: #dbe3ee;
+    --border-soft: rgba(100, 116, 139, 0.25);
+    --input: #ffffff;
+    --ring: rgba(249, 115, 22, 0.28);
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --text-muted: #64748b;
+    --accent-primary: #f97316;
+    --accent-primary-hover: #ea580c;
+    --nexo-app-bg: #f8f9fb;
+    --nexo-card-surface: #ffffff;
+    --nexo-card-muted: #f8fafc;
+  }
+
+  .nexo-app,
+  .nexo-app.app-root,
+  .nexo-app .app-root {
+    --bg-page: var(--nexo-app-bg);
+  }
+}
+
+@layer components {
+  .app-card {
+    border-color: var(--border-subtle);
+    background: var(--card-bg);
+    box-shadow: var(--nexo-shadow-elev-1);
+  }
+
+  .nexo-public .app-card,
+  .nexo-auth .app-card {
+    border-color: #dbe3ee;
+    background: #ffffff;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+  }
+
+  .public-card {
+    border: 1px solid #dbe3ee;
+    background: #ffffff;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+  }
+
+  .auth-card {
+    border: 1px solid #dbe3ee;
+    background: #ffffff;
+    box-shadow: 0 20px 45px rgba(15, 23, 42, 0.08);
+  }
+
+  .nexo-public :where(input:not([type="checkbox"]):not([type="radio"]), textarea),
+  .nexo-auth :where(input:not([type="checkbox"]):not([type="radio"]), textarea) {
+    background: #ffffff;
+    border-color: #dbe3ee;
+    color: #0f172a;
+  }
+
+  .nexo-public [data-slot="select-trigger"],
+  .nexo-auth [data-slot="select-trigger"],
+  .nexo-public [data-slot="select-content"],
+  .nexo-auth [data-slot="select-content"] {
+    background: #ffffff;
+    border-color: #dbe3ee;
+    color: #0f172a;
+  }
+
+  .nexo-public .nexo-modal-content,
+  .nexo-auth .nexo-modal-content {
+    border: 1px solid #dbe3ee;
+    background: #ffffff;
+    color: #0f172a;
+    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.18);
+  }
+
+  .nexo-public .nexo-modal-header,
+  .nexo-auth .nexo-modal-header,
+  .nexo-public .nexo-modal-footer,
+  .nexo-auth .nexo-modal-footer {
+    border-color: #dbe3ee;
+    background: #ffffff;
+  }
+
+  .nexo-public .nexo-modal-body,
+  .nexo-auth .nexo-modal-body {
+    background: #ffffff;
+    color: #475569;
+  }
+
+  .nexo-public .nexo-app-shell,
+  .nexo-auth .nexo-app-shell {
+    background: transparent;
+  }
+}
