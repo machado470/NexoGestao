@@ -32,6 +32,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { SurfaceSection } from "@/components/PagePattern";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
+import { NexoMetricCard } from "@/components/operating-system/InternalBlocks";
 import {
   formatDateTime,
   getTimelineEventDescription,
@@ -177,32 +178,6 @@ function mapCustomerOptions(payload: unknown): CustomerOption[] {
 function mapTimelineEvents(payload: unknown): TimelineEvent[] {
   return normalizeArrayPayload<TimelineEvent>(payload).filter(
     (event) => Boolean(event?.id)
-  );
-}
-
-function SummaryCard({
-  title,
-  value,
-  subtitle,
-  valueClassName,
-}: {
-  title: string;
-  value: string | number;
-  subtitle: string;
-  valueClassName?: string;
-}) {
-  return (
-    <div className="nexo-kpi-card">
-      <p className="text-sm text-gray-500 dark:text-gray-400">{title}</p>
-      <p
-        className={`mt-1 text-2xl font-bold text-gray-900 dark:text-white ${
-          valueClassName ?? ""
-        }`}
-      >
-        {value}
-      </p>
-      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{subtitle}</p>
-    </div>
   );
 }
 
@@ -469,29 +444,29 @@ export default function TimelinePage() {
       ) : null}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
-        <SummaryCard title="Eventos" value={stats.total} subtitle="Histórico visível" />
-        <SummaryCard
-          title="Agendamentos"
+        <NexoMetricCard label="Eventos" value={stats.total} hint="Histórico visível" />
+        <NexoMetricCard
+          label="Agendamentos"
           value={stats.appointments}
-          subtitle="Entrada do fluxo"
+          hint="Entrada do fluxo"
           valueClassName="text-orange-600 dark:text-orange-300"
         />
-        <SummaryCard
-          title="Execução"
+        <NexoMetricCard
+          label="Execução"
           value={stats.serviceOrders}
-          subtitle="O.S. e operação"
+          hint="O.S. e operação"
           valueClassName="text-orange-600 dark:text-orange-400"
         />
-        <SummaryCard
-          title="Financeiro"
+        <NexoMetricCard
+          label="Financeiro"
           value={stats.financial}
-          subtitle="Cobrança e pagamento"
+          hint="Cobrança e pagamento"
           valueClassName="text-green-600 dark:text-green-400"
         />
-        <SummaryCard
-          title="Risco e governança"
+        <NexoMetricCard
+          label="Risco e governança"
           value={stats.governance}
-          subtitle="Leitura de controle"
+          hint="Leitura de controle"
           valueClassName="text-red-600 dark:text-red-400"
         />
       </div>
