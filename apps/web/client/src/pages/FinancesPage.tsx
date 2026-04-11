@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useLocation } from "wouter";
 import { Area, AreaChart, CartesianGrid, XAxis } from "recharts";
 import { trpc } from "@/lib/trpc";
 import { CreateChargeModal } from "@/components/CreateChargeModal";
@@ -18,12 +19,14 @@ import {
 } from "@/components/internal-page-system";
 import { buildIdempotencyKey } from "@/lib/idempotency";
 import { toast } from "sonner";
+import { invalidateOperationalGraph } from "@/lib/operationalConsistency";
 
 function formatCurrency(cents: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100);
 }
 
 export default function FinancesPage() {
+  const [, navigate] = useLocation();
   const [openCreate, setOpenCreate] = useState(false);
   const utils = trpc.useUtils();
 
@@ -43,6 +46,11 @@ export default function FinancesPage() {
   }, [revenueQuery.data]);
 
   async function registerPayment(charge: any) {
+    if (payCharge.isPending) return;
+    if (String(charge?.status ?? "").toUpperCase() === "PAID") {
+      toast.error("Esta cobrança já está paga.");
+      return;
+    }
     try {
       await payCharge.mutateAsync({
         chargeId: String(charge.id),
@@ -51,7 +59,12 @@ export default function FinancesPage() {
         idempotencyKey: buildIdempotencyKey("finance.pay_charge", String(charge.id)),
       });
       toast.success("Pagamento registrado com sucesso");
-      await Promise.all([chargesQuery.refetch(), statsQuery.refetch(), utils.dashboard.kpis.invalidate()]);
+      await Promise.all([
+        chargesQuery.refetch(),
+        statsQuery.refetch(),
+        utils.dashboard.kpis.invalidate(),
+        invalidateOperationalGraph(utils, String(charge?.customerId ?? "")),
+      ]);
     } catch (error: any) {
       toast.error(error?.message || "Erro ao registrar pagamento");
     }
@@ -115,7 +128,7 @@ export default function FinancesPage() {
                     <td className="p-3">
                       <AppRowActions actions={[
                         { label: "Registrar pagamento", onClick: () => void registerPayment(charge) },
-                        { label: "Enviar WhatsApp", onClick: () => window.location.assign(`/whatsapp?customerId=${charge.customerId}&chargeId=${charge.id}`) },
+                        { label: "Enviar WhatsApp", onClick: () => navigate(`/whatsapp?customerId=${charge.customerId}&chargeId=${charge.id}`) },
                       ]} />
                     </td>
                   </tr>
