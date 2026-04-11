@@ -23,13 +23,6 @@ export function useTheme() {
     const isDarkMode = effectiveTheme === 'dark';
     setIsDark(isDarkMode);
 
-    // Update HTML element
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-
     // Save preference
     localStorage.setItem(THEME_KEY, theme);
   }, [theme]);
@@ -41,11 +34,6 @@ export function useTheme() {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handleChange = () => {
       setIsDark(mediaQuery.matches);
-      if (mediaQuery.matches) {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-      }
     };
 
     mediaQuery.addEventListener('change', handleChange);

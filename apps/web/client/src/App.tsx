@@ -11,16 +11,13 @@ import { Loader } from "lucide-react";
 
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { CriticalActionOverlay } from "@/components/CriticalActionOverlay";
 import { ConsentBanner } from "@/components/ConsentBanner";
 
 import ErrorBoundary from "./components/ErrorBoundary";
 import { AppLayout } from "./components/AppLayout";
-import { PublicMarketingShell } from "./components/PublicMarketingShell";
-import { AuthShell } from "./components/AuthShell";
-import { NotificationCenter } from "./components/NotificationCenter";
+import { PublicLayout } from "./components/PublicLayout";
+import { AuthLayout } from "./components/AuthLayout";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
-import { ThemeProvider } from "./contexts/ThemeContext";
 import { canAny, type Permission } from "./lib/rbac";
 
 import CustomersPage from "./pages/CustomersPage";
@@ -273,9 +270,9 @@ function AuthRoute({ component: Component }: { component: ComponentType }) {
   }
 
   return (
-    <AuthShell>
+    <AuthLayout>
       <Component />
-    </AuthShell>
+    </AuthLayout>
   );
 }
 
@@ -285,9 +282,9 @@ function MarketingRoute({
   component: ComponentType;
 }) {
   return (
-    <PublicMarketingShell>
+    <PublicLayout>
       <Component />
-    </PublicMarketingShell>
+    </PublicLayout>
   );
 }
 
@@ -590,15 +587,11 @@ function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <ThemeProvider defaultTheme="light">
-          <TooltipProvider>
-            <Toaster />
-            <Router />
-            <NotificationCenter />
-            <CriticalActionOverlay />
-            <ConsentBanner />
-          </TooltipProvider>
-        </ThemeProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Router />
+          <ConsentBanner />
+        </TooltipProvider>
       </AuthProvider>
     </ErrorBoundary>
   );
