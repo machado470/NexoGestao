@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { registerActionFlowEvent } from "@/lib/actionFlow";
 import { FormModal } from "@/components/app-modal-system";
 import { AppField, AppForm, AppSelect } from "@/components/app-system";
+import { invalidateOperationalGraph } from "@/lib/operationalConsistency";
 
 interface CreateAppointmentModalProps {
   isOpen: boolean;
@@ -132,6 +133,10 @@ export function CreateAppointmentModal({
         });
         toast.success("Agendamento criado com sucesso!");
         setFormData(INITIAL_FORM);
+        void invalidateOperationalGraph(
+          utils,
+          String((created as any)?.customerId ?? payload.customerId ?? "")
+        );
         onSuccess();
         onClose();
       },

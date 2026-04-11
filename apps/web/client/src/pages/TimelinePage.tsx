@@ -1,37 +1,131 @@
-// Operating-system contract: PageWrapper + NexoActionGroup
+import { useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, XAxis } from "recharts";
-import { useLocation } from "wouter";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { Button } from "@/components/ui/button";
-import { useRunAction } from "@/hooks/useRunAction";
+import { trpc } from "@/lib/trpc";
+import { normalizeArrayPayload } from "@/lib/query-helpers";
 import {
   AppChartPanel,
+  AppEmptyState,
   AppFiltersBar,
   AppKpiRow,
-  AppListBlock,
+  AppLoadingState,
   AppPageHeader,
   AppPageShell,
   AppSectionBlock,
   Input,
 } from "@/components/internal-page-system";
 
+function toLabel(value: unknown, fallback: string) {
+  const text = String(value ?? "").trim();
+  return text.length > 0 ? text : fallback;
+}
+
 export default function TimelinePage() {
-  const [, navigate] = useLocation();
-  const { runAction, isRunning } = useRunAction();
-  const events = [{ t: "08h", total: 26 }, { t: "10h", total: 34 }, { t: "12h", total: 18 }, { t: "14h", total: 39 }, { t: "16h", total: 28 }];
+  const [filter, setFilter] = useState("");
+  const timelineQuery = trpc.nexo.timeline.listByOrg.useQuery({ limit: 200 }, { retry: false });
+  const events = useMemo(() => normalizeArrayPayload<any>(timelineQuery.data), [timelineQuery.data]);
+
+  const filteredEvents = useMemo(() => {
+    const q = filter.trim().toLowerCase();
+    if (!q) return events;
+    return events.filter((event) => {
+      const text = [
+        event?.action,
+        event?.type,
+        event?.entityType,
+        event?.entityId,
+        event?.actorName,
+        event?.title,
+        event?.description,
+      ]
+        .map((value) => String(value ?? "").toLowerCase())
+        .join(" ");
+      return text.includes(q);
+    });
+  }, [events, filter]);
+
+  const chartData = useMemo(() => {
+    const buckets = new Map<string, number>();
+    filteredEvents.forEach((event) => {
+      const createdAt = event?.createdAt ? new Date(String(event.createdAt)) : null;
+      if (!createdAt || Number.isNaN(createdAt.getTime())) return;
+      const label = `${String(createdAt.getHours()).padStart(2, "0")}h`;
+      buckets.set(label, (buckets.get(label) ?? 0) + 1);
+    });
+    return [...buckets.entries()]
+      .map(([hour, total]) => ({ hour, total }))
+      .sort((a, b) => a.hour.localeCompare(b.hour));
+  }, [filteredEvents]);
+
+  const criticalEvents = filteredEvents.filter((event) =>
+    ["critical", "error", "failed"].includes(String(event?.severity ?? event?.status ?? "").toLowerCase())
+  ).length;
+  const uniqueEntities = new Set(filteredEvents.map((event) => String(event?.entityId ?? "")).filter(Boolean)).size;
+  const uniqueActors = new Set(filteredEvents.map((event) => String(event?.actorId ?? event?.actorName ?? "")).filter(Boolean)).size;
 
   return (
     <AppPageShell>
-      <AppPageHeader title="Timeline Auditável" description="Histórico operacional com rastreabilidade por entidade e usuário." />
-      <AppKpiRow items={[{ label: "Eventos hoje", value: "214", trend: 7.4, context: "+16 hoje · vs ontem", onClick: () => navigate("/timeline?period=today") }, { label: "Eventos críticos", value: "12", trend: -2.2, context: "-1 hoje · últimas 24h", onClick: () => navigate("/timeline?severity=critical&period=24h") }, { label: "Entidades auditadas", value: "97", trend: 3.1, context: "+3 na semana · base ativa", onClick: () => navigate("/timeline?groupBy=entity&period=7d") }, { label: "Usuários ativos", value: "18", trend: 4.6, context: "↑ uso · período atual", onClick: () => navigate("/timeline?groupBy=user&period=7d") }]} />
+      <AppPageHeader
+        title="Timeline Auditável"
+        description="Histórico operacional real com rastreabilidade por entidade e ação."
+      />
+
+      <AppKpiRow
+        items={[
+          { label: "Eventos", value: String(filteredEvents.length), trend: 0, context: "janela atual" },
+          { label: "Críticos", value: String(criticalEvents), trend: 0, context: "pedem intervenção" },
+          { label: "Entidades", value: String(uniqueEntities), trend: 0, context: "impactadas" },
+          { label: "Usuários", value: String(uniqueActors), trend: 0, context: "com ação registrada" },
+        ]}
+      />
+
       <div className="grid gap-3 xl:grid-cols-3">
-        <AppChartPanel title="Volume de eventos por hora" description="Padrão de atividade e auditoria." trendValue={7.1} trendLabel="↑ +7,1% · últimas 24h" onCtaClick={() => navigate("/timeline?chart=events_by_hour&period=24h")}>
-          <ChartContainer className="h-[220px] w-full" config={{ total: { label: "Eventos" } }}><BarChart data={events}><CartesianGrid vertical={false} /><XAxis dataKey="t" tickLine={false} axisLine={false} /><ChartTooltip content={<ChartTooltipContent />} /><Bar dataKey="total" fill="var(--brand-primary)" /></BarChart></ChartContainer>
+        <AppChartPanel title="Volume de eventos por hora" description="Distribuição real dos eventos retornados pelo backend.">
+          {timelineQuery.isLoading ? (
+            <AppLoadingState rows={2} />
+          ) : chartData.length === 0 ? (
+            <AppEmptyState title="Nenhum dado disponível ainda" description="Ação recomendada: executar uma operação e voltar nesta tela." />
+          ) : (
+            <ChartContainer className="h-[220px] w-full" config={{ total: { label: "Eventos" } }}>
+              <BarChart data={chartData}>
+                <CartesianGrid vertical={false} />
+                <XAxis dataKey="hour" tickLine={false} axisLine={false} />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Bar dataKey="total" fill="var(--brand-primary)" />
+              </BarChart>
+            </ChartContainer>
+          )}
         </AppChartPanel>
       </div>
-      <AppSectionBlock title="Feed de eventos" subtitle="Leitura clara para auditoria">
-        <AppFiltersBar><Input placeholder="Filtrar por entidade, tipo, usuário ou período" className="max-w-md" /></AppFiltersBar>
-        <AppListBlock items={[{ title: "[Cobrança] Status alterado para Pago", subtitle: "Cliente Atlas · por Mariana · 16:12", action: <Button size="sm" onClick={() => void runAction(async () => navigate("/finances?status=paid&customer=atlas"))} isLoading={isRunning}>Abrir</Button> }, { title: "[O.S.] #1849 marcada como atrasada", subtitle: "Responsável Equipe Norte · 15:58", action: <Button size="sm" onClick={() => void runAction(async () => navigate("/whatsapp?os=1849&context=delay"))} isLoading={isRunning}>Cobrar cliente</Button> }, { title: "[Agendamento] novo horário confirmado", subtitle: "Cliente Solar Prime · 15:44", action: <Button size="sm" onClick={() => void runAction(async () => navigate("/appointments?customer=solar-prime"))} isLoading={isRunning}>Editar</Button> }, { title: "[Governança] nível elevado para WARNING", subtitle: "Regra: inadimplência + SLA · 15:30", action: <Button size="sm" onClick={() => void runAction(async () => navigate("/governance?severity=warning"))} isLoading={isRunning}>Avançar status</Button> }]} />
+
+      <AppSectionBlock title="Feed de eventos" subtitle="Sem placeholders: somente eventos reais.">
+        <AppFiltersBar>
+          <Input
+            placeholder="Filtrar por entidade, ação, tipo ou usuário"
+            className="max-w-md"
+            value={filter}
+            onChange={(event) => setFilter(event.target.value)}
+          />
+        </AppFiltersBar>
+
+        {timelineQuery.isLoading ? (
+          <AppLoadingState rows={5} />
+        ) : filteredEvents.length === 0 ? (
+          <AppEmptyState title="Nenhum evento encontrado" description="Ajuste o filtro ou execute ações operacionais para gerar histórico." />
+        ) : (
+          <ul className="space-y-2">
+            {filteredEvents.map((event) => (
+              <li key={String(event?.id ?? `${event?.entityId}-${event?.createdAt}`)} className="rounded-lg border border-[var(--border-subtle)] p-3">
+                <p className="text-sm font-medium text-[var(--text-primary)]">
+                  {toLabel(event?.title ?? event?.action ?? event?.type, "Evento operacional")}
+                </p>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                  {toLabel(event?.entityType, "Entidade")} #{toLabel(event?.entityId, "—")} · {toLabel(event?.actorName, "Sistema")} · {event?.createdAt ? new Date(String(event.createdAt)).toLocaleString("pt-BR") : "sem data"}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
       </AppSectionBlock>
     </AppPageShell>
   );

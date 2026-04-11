@@ -13,6 +13,7 @@ import { useCriticalActionGuard } from "@/hooks/useCriticalActionGuard";
 import { invalidateOperationalGraph } from "@/lib/operationalConsistency";
 import { useProductAnalytics } from "@/hooks/useProductAnalytics";
 import { notify } from "@/stores/notificationStore";
+import { useLocation } from "wouter";
 
 type Props = {
   open: boolean;
@@ -28,6 +29,7 @@ export default function CreateCustomerModal({
   onOpenChange,
   onCreated,
 }: Props) {
+  const [, navigate] = useLocation();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -151,7 +153,7 @@ export default function CreateCustomerModal({
         {
           label: "Criar O.S.",
           onClick: () => {
-            window.location.assign(`/service-orders?customerId=${createdId}`);
+            navigate(`/service-orders?customerId=${createdId}`);
           },
         }
       );
@@ -233,7 +235,7 @@ export default function CreateCustomerModal({
                   id: createdCustomer.id,
                   name: createdCustomer.name,
                 });
-                window.location.assign(
+                navigate(
                   `/service-orders?customerId=${createdCustomer.id}&source=customer_created`
                 );
               }}

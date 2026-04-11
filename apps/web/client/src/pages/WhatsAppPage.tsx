@@ -16,9 +16,11 @@ import {
   AppSectionBlock,
   AppStatusBadge,
 } from "@/components/internal-page-system";
+import { invalidateOperationalGraph } from "@/lib/operationalConsistency";
 
 export default function WhatsAppPage() {
   const [location] = useLocation();
+  const utils = trpc.useUtils();
   const search = new URLSearchParams(location.split("?")[1] ?? "");
   const queryCustomerId = search.get("customerId") ?? "";
 
@@ -28,6 +30,7 @@ export default function WhatsAppPage() {
   const [content, setContent] = useState("");
 
   const selectedCustomerId = customerId || String(customers[0]?.id ?? "");
+  const selectedCustomer = customers.find((item) => String(item?.id) === selectedCustomerId);
 
   const messagesQuery = trpc.nexo.whatsapp.messages.useQuery(
     { customerId: selectedCustomerId },
@@ -44,6 +47,11 @@ export default function WhatsAppPage() {
       toast.error("Falha ao enviar mensagem: selecione cliente e preencha o conteúdo");
       return;
     }
+    const phone = String(selectedCustomer?.phone ?? "").replace(/\D/g, "");
+    if (phone.length < 10) {
+      toast.error("Cliente sem número válido para WhatsApp");
+      return;
+    }
 
     try {
       await sendMutation.mutateAsync({
@@ -53,7 +61,10 @@ export default function WhatsAppPage() {
       });
       setContent("");
       toast.success("Mensagem enviada com sucesso");
-      await messagesQuery.refetch();
+      await Promise.all([
+        messagesQuery.refetch(),
+        invalidateOperationalGraph(utils, selectedCustomerId),
+      ]);
     } catch (error: any) {
       toast.error(error?.message || "Falha ao enviar mensagem");
     }
