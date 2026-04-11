@@ -386,8 +386,8 @@
   html,
   body {
     min-height: 100vh;
-    background-color: var(--bg-page);
-    color: var(--text-primary);
+    background-color: #f8f9fb;
+    color: #172033;
     overscroll-behavior-x: none;
   }
 
@@ -406,9 +406,13 @@
 
   body {
     font-family: var(--nexo-body-font);
-    background: var(--bg-page);
+    background: #f8f9fb;
     scrollbar-width: thin;
     scrollbar-color: rgba(249, 115, 22, 0.6) transparent;
+  }
+
+  body[data-visual-context="app"] {
+    background: #eef3fa;
   }
 
   button:not(:disabled),

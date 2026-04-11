@@ -35,12 +35,6 @@ export function ThemeProvider({
     }
   }, [theme, switchable]);
 
-  useEffect(() => {
-    if (typeof document === "undefined") return;
-    document.documentElement.dataset.theme = theme;
-    document.body.dataset.appTheme = theme;
-  }, [theme]);
-
   const toggleTheme = switchable
     ? () => {
         setTheme(prev => (prev === "light" ? "dark" : "light"));
