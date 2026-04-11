@@ -2,6 +2,7 @@ import type { ComponentProps, ReactNode } from "react";
 import { Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { cva, type VariantProps } from "class-variance-authority";
+import { sanitizeRootWrapperStyle } from "@/components/LayoutProtectionGuard";
 
 const buttonVariants = cva(
   "inline-flex items-center justify-center gap-2 rounded-[12px] text-sm font-semibold transition disabled:pointer-events-none disabled:opacity-50",
@@ -33,12 +34,17 @@ const buttonVariants = cva(
 export function AppShell({
   children,
   className,
+  style,
   ...props
 }: ComponentProps<"div"> & {
   children: ReactNode;
 }) {
   return (
-    <div className={cn("nexo-app-shell", className)} {...props}>
+    <div
+      className={cn("nexo-app-shell", className)}
+      style={sanitizeRootWrapperStyle(style)}
+      {...props}
+    >
       {children}
     </div>
   );

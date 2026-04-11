@@ -39,3 +39,9 @@ Garantir isolamento visual estrutural entre páginas públicas, autenticação e
 6. Dropdown de ação por linha deve usar `AppRowActionsDropdown` ou `AppDropdown`.
 7. Evitar hardcodes proibidos: `bg-zinc-900`, `bg-slate-900`, `bg-black` (incluindo variantes `dark:*`).
 8. Componentes novos do app devem usar tokens do contexto operacional (`var(--text-*)`, `var(--border-*)`, `var(--surface-*)`, etc.).
+
+## Proteção de layout global (2026-04-11)
+
+- Consultar `docs/LAYOUT_GLOBAL_PROTECTION.md` antes de alterar wrappers raiz.
+- Efeitos visuais (`transform`, `filter`, `backdrop-filter`) devem ficar em componentes isolados.
+- Não usar `overflow: hidden` global no root do app.

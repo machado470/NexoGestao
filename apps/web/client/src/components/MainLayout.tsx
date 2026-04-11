@@ -292,14 +292,6 @@ export function MainLayout({ children }: MainLayoutProps) {
     }
   }, [isMobile, location]);
 
-  useEffect(() => {
-    if (typeof document === "undefined" || !isMobile) return;
-    document.body.style.overflow = mobileMenuOpen ? "hidden" : "";
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [isMobile, mobileMenuOpen]);
-
   const handleNavigate = (route: string) => {
     navigate(route);
     if (isMobile) setMobileMenuOpen(false);
@@ -331,285 +323,285 @@ export function MainLayout({ children }: MainLayoutProps) {
         className={`nexo-app app-root ${theme === "dark" ? "dark" : ""} min-h-screen text-[var(--text-primary)]`}
         data-theme={theme}
       >
-      {isMobile && mobileMenuOpen ? (
-        <button
-          type="button"
-          aria-label="Fechar menu"
-          className="fixed inset-0 z-30 bg-[color-mix(in_srgb,var(--background-base)_84%,black)]/70 backdrop-blur-sm nexo-state-transition"
-          onClick={() => setMobileMenuOpen(false)}
-        />
-      ) : null}
+        {isMobile && mobileMenuOpen ? (
+          <button
+            type="button"
+            aria-label="Fechar menu"
+            className="fixed inset-0 z-30 bg-[color-mix(in_srgb,var(--background-base)_84%,black)]/70 backdrop-blur-sm nexo-state-transition"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+        ) : null}
 
         <div className="flex min-h-screen w-full">
-        <NexoSidebar
-          data-scrollbar="nexo"
-          className={`nexo-sidebar z-40 flex shrink-0 flex-col overflow-hidden nexo-state-transition ${
-            isMobile
-              ? `fixed inset-y-0 left-0 w-[304px] ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full"}`
-              : `fixed inset-y-0 left-0 ${sidebarCollapsed ? "w-[92px]" : "w-[286px]"}`
-          }`}
-        >
-          <div className="nexo-sidebar-header border-b border-[var(--border)] px-4">
-            <div className="flex items-center justify-between gap-3">
+          <NexoSidebar
+            data-scrollbar="nexo"
+            className={`nexo-sidebar z-40 flex shrink-0 flex-col overflow-hidden nexo-state-transition ${
+              isMobile
+                ? `fixed inset-y-0 left-0 w-[304px] ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full"}`
+                : `fixed inset-y-0 left-0 ${sidebarCollapsed ? "w-[92px]" : "w-[286px]"}`
+            }`}
+          >
+            <div className="nexo-sidebar-header border-b border-[var(--border)] px-4">
+              <div className="flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => handleNavigate("/executive-dashboard")}
+                  className={`flex min-w-0 items-center ${sidebarCollapsed && !isMobile ? "justify-center" : ""}`}
+                >
+                  <BrandSignature compact={sidebarCollapsed && !isMobile} />
+                </button>
+
+                {!isMobile ? (
+                  <button
+                    type="button"
+                    onClick={() => setSidebarCollapsed(prev => !prev)}
+                    className="rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-muted)] transition hover:bg-[var(--accent-soft)] hover:text-[var(--text-primary)]"
+                  >
+                    {sidebarCollapsed ? (
+                      <ChevronRight className="h-4 w-4" />
+                    ) : (
+                      <ChevronLeft className="h-4 w-4" />
+                    )}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-muted)] transition hover:bg-[var(--accent-soft)] hover:text-[var(--text-primary)]"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+              <div className="space-y-5">
+                {visibleSections.map(section => (
+                  <section key={section.id} className="space-y-2">
+                    {!sidebarCollapsed || isMobile ? (
+                      <p className="px-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--text-muted)]">
+                        {section.label}
+                      </p>
+                    ) : null}
+                    <div className="space-y-1">
+                      {section.items.map(item => {
+                        const active = isRouteActive(location, item.route);
+                        const Icon = item.icon;
+
+                        return (
+                          <button
+                            key={item.id}
+                            type="button"
+                            title={item.label}
+                            onClick={() => handleNavigate(item.route)}
+                            className={`nexo-sidebar-item group nexo-state-transition ${active ? "nexo-sidebar-item-active" : ""} ${
+                              sidebarCollapsed && !isMobile
+                                ? "justify-center px-2"
+                                : ""
+                            }`}
+                          >
+                            <Icon
+                              className={`h-4 w-4 shrink-0 ${
+                                active
+                                  ? "text-[var(--text-primary)]"
+                                  : "text-[var(--text-muted)] group-hover:text-[var(--text-secondary)]"
+                              }`}
+                            />
+                            {!sidebarCollapsed || isMobile ? (
+                              <span className="truncate text-sm font-medium">
+                                {item.label}
+                              </span>
+                            ) : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            </nav>
+
+            <div className="border-t border-[var(--border)] p-3">
               <button
                 type="button"
-                onClick={() => handleNavigate("/executive-dashboard")}
-                className={`flex min-w-0 items-center ${sidebarCollapsed && !isMobile ? "justify-center" : ""}`}
+                onClick={toggleTheme}
+                className={`nexo-sidebar-item w-full ${sidebarCollapsed && !isMobile ? "justify-center px-2" : ""}`}
               >
-                <BrandSignature compact={sidebarCollapsed && !isMobile} />
+                {theme === "dark" ? (
+                  <Sun className="h-4 w-4" />
+                ) : (
+                  <Moon className="h-4 w-4" />
+                )}
+                {!sidebarCollapsed || isMobile ? (
+                  <span>{theme === "dark" ? "Tema claro" : "Tema escuro"}</span>
+                ) : null}
               </button>
-
-              {!isMobile ? (
-                <button
-                  type="button"
-                  onClick={() => setSidebarCollapsed(prev => !prev)}
-                  className="rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-muted)] transition hover:bg-[var(--accent-soft)] hover:text-[var(--text-primary)]"
-                >
-                  {sidebarCollapsed ? (
-                    <ChevronRight className="h-4 w-4" />
-                  ) : (
-                    <ChevronLeft className="h-4 w-4" />
-                  )}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-muted)] transition hover:bg-[var(--accent-soft)] hover:text-[var(--text-primary)]"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
             </div>
-          </div>
+          </NexoSidebar>
 
-          <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
-            <div className="space-y-5">
-              {visibleSections.map(section => (
-                <section key={section.id} className="space-y-2">
-                  {!sidebarCollapsed || isMobile ? (
-                    <p className="px-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--text-muted)]">
-                      {section.label}
-                    </p>
-                  ) : null}
-                  <div className="space-y-1">
-                    {section.items.map(item => {
-                      const active = isRouteActive(location, item.route);
-                      const Icon = item.icon;
+          <div
+            className={`flex min-w-0 flex-1 flex-col ${!isMobile ? (sidebarCollapsed ? "md:ml-[92px]" : "md:ml-[286px]") : ""}`}
+          >
+            <NexoTopbar className="z-20 nexo-state-transition">
+              <div className="nexo-topbar-grid">
+                <div className="grid grid-cols-1 items-center gap-2 md:grid-cols-[auto_minmax(0,1fr)_auto] md:gap-3">
+                  <div className="flex min-w-0 items-center gap-2.5 md:gap-3">
+                    {isMobile ? (
+                      <button
+                        type="button"
+                        onClick={() => setMobileMenuOpen(prev => !prev)}
+                        className="nexo-topbar-control"
+                      >
+                        <Menu className="h-5 w-5" />
+                      </button>
+                    ) : null}
+                    <div className="nexo-topbar-meta min-w-0">
+                      <p className="truncate text-base font-semibold tracking-tight text-[var(--text-primary)] md:text-lg">
+                        {currentMeta.title}
+                      </p>
+                      {currentMeta.subtitle ? (
+                        <p className="truncate text-xs text-[var(--text-muted)]">
+                          {currentMeta.subtitle}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
 
-                      return (
+                  <div className="min-w-0 md:px-1">
+                    <GlobalSearch />
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
                         <button
-                          key={item.id}
                           type="button"
-                          title={item.label}
-                          onClick={() => handleNavigate(item.route)}
-                          className={`nexo-sidebar-item group nexo-state-transition ${active ? "nexo-sidebar-item-active" : ""} ${
-                            sidebarCollapsed && !isMobile
-                              ? "justify-center px-2"
-                              : ""
-                          }`}
+                          className="nexo-topbar-control relative"
+                          aria-label="Notificações"
                         >
-                          <Icon
-                            className={`h-4 w-4 shrink-0 ${
-                              active
-                                ? "text-[var(--text-primary)]"
-                                : "text-[var(--text-muted)] group-hover:text-[var(--text-secondary)]"
-                            }`}
-                          />
-                          {!sidebarCollapsed || isMobile ? (
-                            <span className="truncate text-sm font-medium">
-                              {item.label}
+                          <Bell className="h-4 w-4" />
+                          {notifications.length > 0 ? (
+                            <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--accent)] px-1 text-[10px] font-semibold text-[var(--text-primary)]">
+                              {Math.min(notifications.length, 9)}
                             </span>
                           ) : null}
                         </button>
-                      );
-                    })}
-                  </div>
-                </section>
-              ))}
-            </div>
-          </nav>
-
-          <div className="border-t border-[var(--border)] p-3">
-            <button
-              type="button"
-              onClick={toggleTheme}
-              className={`nexo-sidebar-item w-full ${sidebarCollapsed && !isMobile ? "justify-center px-2" : ""}`}
-            >
-              {theme === "dark" ? (
-                <Sun className="h-4 w-4" />
-              ) : (
-                <Moon className="h-4 w-4" />
-              )}
-              {!sidebarCollapsed || isMobile ? (
-                <span>{theme === "dark" ? "Tema claro" : "Tema escuro"}</span>
-              ) : null}
-            </button>
-          </div>
-        </NexoSidebar>
-
-        <div
-          className={`flex min-w-0 flex-1 flex-col ${!isMobile ? (sidebarCollapsed ? "md:ml-[92px]" : "md:ml-[286px]") : ""}`}
-        >
-          <NexoTopbar className="z-20 nexo-state-transition">
-            <div className="nexo-topbar-grid">
-              <div className="grid grid-cols-1 items-center gap-2 md:grid-cols-[auto_minmax(0,1fr)_auto] md:gap-3">
-                <div className="flex min-w-0 items-center gap-2.5 md:gap-3">
-                  {isMobile ? (
-                    <button
-                      type="button"
-                      onClick={() => setMobileMenuOpen(prev => !prev)}
-                      className="nexo-topbar-control"
-                    >
-                      <Menu className="h-5 w-5" />
-                    </button>
-                  ) : null}
-                  <div className="nexo-topbar-meta min-w-0">
-                    <p className="truncate text-base font-semibold tracking-tight text-[var(--text-primary)] md:text-lg">
-                      {currentMeta.title}
-                    </p>
-                    {currentMeta.subtitle ? (
-                      <p className="truncate text-xs text-[var(--text-muted)]">
-                        {currentMeta.subtitle}
-                      </p>
-                    ) : null}
-                  </div>
-                </div>
-
-                <div className="min-w-0 md:px-1">
-                  <GlobalSearch />
-                </div>
-
-                <div className="flex items-center justify-end gap-2">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button
-                        type="button"
-                        className="nexo-topbar-control relative"
-                        aria-label="Notificações"
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent
+                        align="end"
+                        className="w-[360px] nexo-floating-panel"
                       >
-                        <Bell className="h-4 w-4" />
-                        {notifications.length > 0 ? (
-                          <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--accent)] px-1 text-[10px] font-semibold text-[var(--text-primary)]">
-                            {Math.min(notifications.length, 9)}
-                          </span>
-                        ) : null}
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent
-                      align="end"
-                      className="w-[360px] nexo-floating-panel"
-                    >
-                      <DropdownMenuLabel className="flex items-center justify-between px-3 py-2">
-                        <span>Notificações</span>
-                        {notifications.length > 0 ? (
-                          <button
-                            type="button"
-                            onClick={clearNotifications}
-                            className="text-xs font-medium text-[var(--accent)] hover:text-[var(--accent-hover)]"
-                          >
-                            Limpar
-                          </button>
-                        ) : null}
-                      </DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      {notifications.length === 0 ? (
-                        <div className="px-3 py-8 text-center">
-                          <Bell className="mx-auto h-5 w-5 text-[var(--text-muted)]" />
-                          <p className="mt-2 text-sm text-[var(--text-muted)]">
-                            Nenhuma notificação no momento.
-                          </p>
-                        </div>
-                      ) : (
-                        notifications
-                          .slice()
-                          .reverse()
-                          .slice(0, 6)
-                          .map(item => (
-                            <DropdownMenuItem
-                              key={item.id}
-                              className="flex cursor-pointer flex-col items-start gap-1 rounded-xl px-3 py-2"
-                              onSelect={evt => {
-                                evt.preventDefault();
-                                item.action?.onClick();
-                                removeNotification(item.id);
-                              }}
+                        <DropdownMenuLabel className="flex items-center justify-between px-3 py-2">
+                          <span>Notificações</span>
+                          {notifications.length > 0 ? (
+                            <button
+                              type="button"
+                              onClick={clearNotifications}
+                              className="text-xs font-medium text-[var(--accent)] hover:text-[var(--accent-hover)]"
                             >
-                              <p className="text-sm font-medium text-[var(--text-primary)]">
-                                {item.title}
-                              </p>
-                              {item.description ? (
-                                <p className="line-clamp-2 text-xs text-[var(--text-muted)]">
-                                  {item.description}
-                                </p>
-                              ) : null}
-                            </DropdownMenuItem>
-                          ))
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button
-                        type="button"
-                        className="nexo-topbar-control h-9 px-2"
-                      >
-                        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--surface-elevated)] text-[var(--text-primary)]">
-                          <User className="h-4 w-4" />
-                        </div>
-                        <span className="hidden max-w-28 truncate md:block">
-                          {user?.name ?? "Usuário"}
-                        </span>
-                        <ChevronDown className="h-4 w-4 text-[var(--text-muted)]" />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-52 p-1">
-                      <DropdownMenuLabel className="px-2 py-1.5">
-                        <p className="truncate text-xs font-semibold text-[var(--text-primary)]">
-                          {user?.name ?? "Usuário"}
-                        </p>
-                        <p className="truncate text-[11px] text-[var(--text-muted)]">
-                          {user?.email ?? "Sem e-mail"}
-                        </p>
-                      </DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        className="h-8 rounded-md px-2 text-sm text-[var(--text-secondary)] focus:text-[var(--text-primary)]"
-                        onClick={() => navigate("/profile")}
-                      >
-                        <User className="mr-2 h-4 w-4" /> Perfil
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="h-8 rounded-md px-2 text-sm text-[var(--text-secondary)] focus:text-[var(--text-primary)]"
-                        onClick={toggleTheme}
-                      >
-                        {theme === "dark" ? (
-                          <Sun className="mr-2 h-4 w-4" />
+                              Limpar
+                            </button>
+                          ) : null}
+                        </DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        {notifications.length === 0 ? (
+                          <div className="px-3 py-8 text-center">
+                            <Bell className="mx-auto h-5 w-5 text-[var(--text-muted)]" />
+                            <p className="mt-2 text-sm text-[var(--text-muted)]">
+                              Nenhuma notificação no momento.
+                            </p>
+                          </div>
                         ) : (
-                          <Moon className="mr-2 h-4 w-4" />
-                        )}{" "}
-                        Tema
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        onClick={() => void handleLogout()}
-                        disabled={isLoggingOut}
-                        className="h-8 rounded-md px-2 text-sm text-[var(--danger)] focus:text-[var(--danger)]"
-                      >
-                        <LogOut className="mr-2 h-4 w-4" /> Sair
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                          notifications
+                            .slice()
+                            .reverse()
+                            .slice(0, 6)
+                            .map(item => (
+                              <DropdownMenuItem
+                                key={item.id}
+                                className="flex cursor-pointer flex-col items-start gap-1 rounded-xl px-3 py-2"
+                                onSelect={evt => {
+                                  evt.preventDefault();
+                                  item.action?.onClick();
+                                  removeNotification(item.id);
+                                }}
+                              >
+                                <p className="text-sm font-medium text-[var(--text-primary)]">
+                                  {item.title}
+                                </p>
+                                {item.description ? (
+                                  <p className="line-clamp-2 text-xs text-[var(--text-muted)]">
+                                    {item.description}
+                                  </p>
+                                ) : null}
+                              </DropdownMenuItem>
+                            ))
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          className="nexo-topbar-control h-9 px-2"
+                        >
+                          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--surface-elevated)] text-[var(--text-primary)]">
+                            <User className="h-4 w-4" />
+                          </div>
+                          <span className="hidden max-w-28 truncate md:block">
+                            {user?.name ?? "Usuário"}
+                          </span>
+                          <ChevronDown className="h-4 w-4 text-[var(--text-muted)]" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-52 p-1">
+                        <DropdownMenuLabel className="px-2 py-1.5">
+                          <p className="truncate text-xs font-semibold text-[var(--text-primary)]">
+                            {user?.name ?? "Usuário"}
+                          </p>
+                          <p className="truncate text-[11px] text-[var(--text-muted)]">
+                            {user?.email ?? "Sem e-mail"}
+                          </p>
+                        </DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="h-8 rounded-md px-2 text-sm text-[var(--text-secondary)] focus:text-[var(--text-primary)]"
+                          onClick={() => navigate("/profile")}
+                        >
+                          <User className="mr-2 h-4 w-4" /> Perfil
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="h-8 rounded-md px-2 text-sm text-[var(--text-secondary)] focus:text-[var(--text-primary)]"
+                          onClick={toggleTheme}
+                        >
+                          {theme === "dark" ? (
+                            <Sun className="mr-2 h-4 w-4" />
+                          ) : (
+                            <Moon className="mr-2 h-4 w-4" />
+                          )}{" "}
+                          Tema
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => void handleLogout()}
+                          disabled={isLoggingOut}
+                          className="h-8 rounded-md px-2 text-sm text-[var(--danger)] focus:text-[var(--danger)]"
+                        >
+                          <LogOut className="mr-2 h-4 w-4" /> Sair
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </div>
               </div>
-            </div>
-          </NexoTopbar>
+            </NexoTopbar>
 
-          <NexoMainContainer>{children}</NexoMainContainer>
+            <NexoMainContainer>{children}</NexoMainContainer>
+          </div>
         </div>
-      </div>
-    </NexoAppShell>
+      </NexoAppShell>
     </AppShell>
   );
 }
