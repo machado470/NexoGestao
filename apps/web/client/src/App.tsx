@@ -30,6 +30,7 @@ import ExecutiveDashboard from "./pages/ExecutiveDashboard";
 import WhatsAppPage from "./pages/WhatsAppPage";
 import CalendarPage from "./pages/CalendarPage";
 import SettingsPage from "./pages/SettingsPage";
+import ProfilePage from "./pages/ProfilePage";
 import TimelinePage from "./pages/TimelinePage";
 import BillingPage from "./pages/BillingPage";
 import Landing from "./pages/Landing";
@@ -399,6 +400,9 @@ const CalendarRoute = protectedPage(CalendarPage, {
 const SettingsRoute = protectedPage(SettingsPage, {
   requireCompletedOnboarding: true,
 });
+const ProfileRoute = protectedPage(ProfilePage, {
+  requireCompletedOnboarding: true,
+});
 
 const TimelineRoute = protectedPage(TimelinePage, {
   permissions: ["reports:read"],
@@ -543,6 +547,7 @@ function Router() {
       />
       <Route path="/calendar" component={CalendarRoute} />
       <Route path="/settings" component={SettingsRoute} />
+      <Route path="/profile" component={ProfileRoute} />
       <Route path="/timeline" component={TimelineRoute} />
       <Route path="/billing" component={BillingRoute} />
       <Route

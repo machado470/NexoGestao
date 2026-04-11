@@ -29,10 +29,17 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/EmptyState";
-import { SurfaceSection } from "@/components/PagePattern";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import { NexoMetricCard } from "@/components/operating-system/InternalBlocks";
+import {
+  AppEntityContextPanel,
+  AppInput,
+  AppSectionCard,
+  AppTimeline,
+  AppTimelineItem,
+  AppToolbar,
+} from "@/components/app-system";
 import {
   formatDateTime,
   getTimelineEventDescription,
@@ -365,10 +372,10 @@ export default function TimelinePage() {
         title="Timeline"
         subtitle="Carregando rastreabilidade operacional para sugerir a próxima ação."
       >
-        <SurfaceSection className="flex min-h-[180px] items-center justify-center gap-2 text-sm text-[var(--text-muted)] dark:text-[var(--text-muted)]">
+        <AppSectionCard className="flex min-h-[180px] items-center justify-center gap-2 text-sm text-[var(--text-muted)] dark:text-[var(--text-muted)]">
           <Loader2 className="h-4 w-4 animate-spin" />
           Carregando timeline...
-        </SurfaceSection>
+        </AppSectionCard>
       </PageWrapper>
     );
   }
@@ -438,9 +445,9 @@ export default function TimelinePage() {
       ) : null}
 
       {queryState.hasBackgroundUpdate ? (
-        <SurfaceSection className="nexo-info-banner text-sm">
+        <AppSectionCard className="nexo-info-banner text-sm">
           Atualizando timeline em segundo plano...
-        </SurfaceSection>
+        </AppSectionCard>
       ) : null}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
@@ -473,13 +480,13 @@ export default function TimelinePage() {
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[340px_1fr]">
         <div className="space-y-4">
-          <div className="nexo-kpi-card">
-            <div className="mb-4 flex items-center gap-2">
+          <AppSectionCard>
+            <AppToolbar className="mb-4 p-0">
               <Filter className="h-4 w-4 text-orange-500" />
               <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
                 Escopo e filtros
               </h2>
-            </div>
+            </AppToolbar>
 
             <div className="space-y-4">
               <div>
@@ -521,7 +528,7 @@ export default function TimelinePage() {
 
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                  <input
+                  <AppInput
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="O.S., cobrança, risco, governança..."
@@ -569,9 +576,19 @@ export default function TimelinePage() {
                 </p>
               </div>
             </div>
-          </div>
+          </AppSectionCard>
 
-          <div className="nexo-kpi-card">
+          <AppEntityContextPanel
+            title="Leitura rápida"
+            links={[
+              { id: "appointments", label: "Agenda", href: "/appointments" },
+              { id: "service-orders", label: "Execução", href: "/service-orders" },
+              { id: "finances", label: "Financeiro", href: "/finances" },
+              { id: "governance", label: "Governança", href: "/governance" },
+            ]}
+          />
+
+          <AppSectionCard>
             <div className="mb-3 flex items-center gap-2">
               <ArrowRight className="h-4 w-4 text-orange-500" />
               <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
@@ -610,10 +627,10 @@ export default function TimelinePage() {
                 </p>
               </div>
             </div>
-          </div>
+          </AppSectionCard>
         </div>
 
-        <div className="nexo-kpi-card">
+        <AppSectionCard>
           <div className="mb-4 flex items-center gap-2">
             <CalendarDays className="h-4 w-4 text-orange-500" />
             <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
@@ -648,7 +665,7 @@ export default function TimelinePage() {
 
             </div>
           ) : (
-            <div className="space-y-4">
+            <AppTimeline>
               {filteredEvents.map((event) => {
                 const Icon = getEventIcon(event);
                 const summary = getTimelineEventSummary(event);
@@ -658,7 +675,7 @@ export default function TimelinePage() {
                 const secondaryLinks = getTimelineEventSecondaryLinks(event);
 
                 return (
-                  <div
+                  <AppTimelineItem
                     key={event.id}
                     className={`nexo-subtle-surface border p-4 ${getEventCardClass(event)}`}
                   >
@@ -762,12 +779,12 @@ export default function TimelinePage() {
                         {JSON.stringify(event.metadata, null, 2)}
                       </pre>
                     ) : null}
-                  </div>
+                  </AppTimelineItem>
                 );
               })}
-            </div>
+            </AppTimeline>
           )}
-        </div>
+        </AppSectionCard>
       </div>
     </PageWrapper>
   );
