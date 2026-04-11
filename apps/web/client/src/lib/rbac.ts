@@ -65,6 +65,7 @@ const rolePermissions: Record<Role, Permission[]> = {
     'governance:read',
     'reports:read',
     'reports:export',
+    'settings:manage',
   ],
   STAFF: [
     'customers:read',

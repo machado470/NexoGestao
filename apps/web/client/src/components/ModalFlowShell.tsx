@@ -71,20 +71,20 @@ export default function ModalFlowShell({
         onInteractOutside={(event) => {
           if (closeBlocked || isSubmitting) event.preventDefault();
         }}
-        className="max-h-[90vh] max-w-2xl overflow-hidden border-[var(--border-subtle)] bg-white p-0 shadow-sm dark:bg-[var(--surface-base)]"
+        className="flex max-h-[90vh] max-w-2xl flex-col overflow-hidden border-[var(--border-subtle)] bg-[var(--bg-surface)] p-0 shadow-sm"
       >
-        <DialogHeader className="border-b border-gray-200 px-6 py-5 dark:border-zinc-800">
-          <DialogTitle className="text-xl font-semibold text-gray-900 dark:text-white">
+        <DialogHeader className="border-b border-[var(--border-subtle)] px-6 py-5">
+          <DialogTitle className="text-xl font-semibold text-[var(--text-primary)]">
             {title}
           </DialogTitle>
           {description ? (
-            <DialogDescription className="text-sm text-gray-500 dark:text-gray-400">
+            <DialogDescription className="text-sm text-[var(--text-secondary)]">
               {description}
             </DialogDescription>
           ) : null}
         </DialogHeader>
 
-        <div className="max-h-[68vh] overflow-y-auto p-6">
+        <div className="nexo-modal-body min-h-0 flex-1 overflow-y-auto p-6">
           {isLoading ? (
             <div className="space-y-3 rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600 dark:border-zinc-800 dark:bg-[var(--surface-base)]/60 dark:text-gray-300">
               <p className="inline-flex items-center gap-2">
@@ -117,7 +117,7 @@ export default function ModalFlowShell({
           )}
         </div>
 
-        <DialogFooter className="border-t border-gray-200 px-6 py-4 dark:border-zinc-800">
+        <DialogFooter className="border-t border-[var(--border-subtle)] px-6 py-4">
           {footer}
         </DialogFooter>
         {hasDirtyState ? (
