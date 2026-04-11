@@ -14,12 +14,15 @@ type ExecutionStateSummary = {
   blocked?: number;
   blockedRecent?: number;
   failed?: number;
+  skipped?: number;
+  throttled?: number;
 };
 type RunOnceResult = {
   executed?: number;
   blocked?: number;
   blockedRecent?: number;
   failed?: number;
+  skipped?: number;
 };
 
 function normalizeModeLabel(mode?: ExecutionMode) {
@@ -40,6 +43,7 @@ export function ExecutionGlobalBar() {
   const summary = useMemo(() => getPayloadValue<ExecutionStateSummary>(summaryQuery.data) ?? {}, [summaryQuery.data]);
 
   const [nextMode, setNextMode] = useState<ExecutionMode>("manual");
+  const [showRunOnceResult, setShowRunOnceResult] = useState(false);
 
   const updateMode = trpc.nexo.executions.updateMode.useMutation({
     onSuccess: async () => {
@@ -53,6 +57,7 @@ export function ExecutionGlobalBar() {
 
   const runOnce = trpc.nexo.executions.runOnce.useMutation({
     onSuccess: async () => {
+      setShowRunOnceResult(true);
       await Promise.all([
         utils.nexo.executions.stateSummary.invalidate(),
         utils.nexo.executions.events.invalidate(),
@@ -60,24 +65,36 @@ export function ExecutionGlobalBar() {
     },
   });
 
-  const runOnceResult = useMemo(
-    () => getPayloadValue<RunOnceResult>(runOnce.data) ?? {},
-    [runOnce.data]
-  );
+  const runOnceResult = useMemo(() => getPayloadValue<RunOnceResult>(runOnce.data) ?? {}, [runOnce.data]);
 
   const isLoading = modeQuery.isLoading || summaryQuery.isLoading;
-
   const selectedMode = modePayload.mode ?? "manual";
 
   useEffect(() => {
     setNextMode(selectedMode);
   }, [selectedMode]);
 
+  useEffect(() => {
+    if (!showRunOnceResult) return;
+    const timeout = window.setTimeout(() => setShowRunOnceResult(false), 10000);
+    return () => window.clearTimeout(timeout);
+  }, [showRunOnceResult]);
+
+  const systemStatus = useMemo(() => {
+    if (selectedMode === "manual") return "Modo manual";
+    if (Number(summary.blockedRecent ?? 0) > 0) return "Aguardando cooldown";
+    return "Engine ativa";
+  }, [selectedMode, summary.blockedRecent]);
+
   return (
     <div className="border-b border-[var(--border)] bg-[var(--surface-base)]/95 px-4 py-2">
       <div className="flex flex-wrap items-center gap-2 text-xs">
         <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-2 py-1">
           Modo atual: <strong>{normalizeModeLabel(selectedMode)}</strong>
+        </div>
+
+        <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-2 py-1">
+          Sistema: <strong>{systemStatus}</strong>
         </div>
 
         <Select value={nextMode} onValueChange={(value) => setNextMode(value as ExecutionMode)} disabled={!canEditMode || updateMode.isPending || isLoading}>
@@ -108,15 +125,37 @@ export function ExecutionGlobalBar() {
           <span className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-1 text-emerald-700 dark:text-emerald-300">Executadas: {Number(summary.executed ?? 0)}</span>
           <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-amber-700 dark:text-amber-300">Bloqueadas: {Number(summary.blocked ?? 0)}</span>
           <span className="rounded-full border border-orange-500/40 bg-orange-500/10 px-2 py-1 text-orange-700 dark:text-orange-300">Bloq. cooldown: {Number(summary.blockedRecent ?? 0)}</span>
+          <span className="rounded-full border border-slate-500/40 bg-slate-500/10 px-2 py-1 text-slate-700 dark:text-slate-300">Ignoradas: {Number(summary.skipped ?? 0)}</span>
           <span className="rounded-full border border-red-500/40 bg-red-500/10 px-2 py-1 text-red-700 dark:text-red-300">Falhas: {Number(summary.failed ?? 0)}</span>
         </div>
       </div>
 
-      {runOnce.data ? (
-        <div className="mt-2 flex flex-wrap gap-2 text-xs text-[var(--text-secondary)]">
-          <span className="rounded-md border border-[var(--border-subtle)] px-2 py-1">Run once → executadas: <strong>{Number(runOnceResult.executed ?? 0)}</strong></span>
-          <span className="rounded-md border border-[var(--border-subtle)] px-2 py-1">bloqueadas: <strong>{Number((runOnceResult.blocked ?? 0) + (runOnceResult.blockedRecent ?? 0))}</strong></span>
-          <span className="rounded-md border border-[var(--border-subtle)] px-2 py-1">falhas: <strong>{Number(runOnceResult.failed ?? 0)}</strong></span>
+      {selectedMode === "manual" ? (
+        <div className="mt-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+          A engine não executa automaticamente neste modo.
+        </div>
+      ) : null}
+
+      {Number(summary.executed ?? 0) === 0 && Number(summary.blockedRecent ?? 0) > 0 ? (
+        <div className="mt-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+          O sistema está funcionando, mas as ações recentes estão protegidas por cooldown.
+        </div>
+      ) : null}
+
+      {Number(summary.blockedRecent ?? 0) > 0 ? (
+        <div className="mt-2 text-xs text-[var(--text-secondary)]">Algumas ações estão aguardando cooldown.</div>
+      ) : null}
+
+      {runOnce.data && showRunOnceResult ? (
+        <div className="mt-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/40 p-2 text-xs text-[var(--text-secondary)]">
+          <p className="font-semibold text-[var(--text-primary)]">Execução concluída</p>
+          <div className="mt-1 flex flex-wrap gap-2">
+            <span>• {Number(runOnceResult.executed ?? 0)} executadas</span>
+            <span>• {Number(runOnceResult.blocked ?? 0)} bloqueadas</span>
+            <span>• {Number(runOnceResult.failed ?? 0)} falhas</span>
+            <span>• {Number(runOnceResult.blockedRecent ?? 0)} ignoradas por cooldown</span>
+            <span>• {Number(runOnceResult.skipped ?? 0)} ignoradas</span>
+          </div>
         </div>
       ) : null}
     </div>

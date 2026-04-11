@@ -8,6 +8,8 @@ import { Button } from "@/components/design-system";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { ExecutionStatusBadge } from "@/components/execution/ExecutionStatusBadge";
+import { formatRemainingCooldown, reasonCodeToHuman } from "@/lib/execution/ui";
 
 type ExecutionMode = "manual" | "semi_automatic" | "automatic";
 
@@ -32,7 +34,15 @@ type PolicyBooleanKey =
   | "allowRiskReviewEscalation";
 
 type ModePayload = { mode?: ExecutionMode; policy?: ExecutionPolicy };
-type ExecutionStateSummary = { pending?: number; executed?: number; failed?: number; blocked?: number; blockedRecent?: number; throttled?: number };
+type ExecutionStateSummary = {
+  pending?: number;
+  executed?: number;
+  failed?: number;
+  blocked?: number;
+  blockedRecent?: number;
+  skipped?: number;
+  throttled?: number;
+};
 type ExecutionEvent = {
   id: string;
   actionId?: string;
@@ -48,6 +58,7 @@ type RunOnceResult = {
   blocked?: number;
   blockedRecent?: number;
   failed?: number;
+  skipped?: number;
 };
 type ConfigHistoryEntry = {
   id: string;
@@ -72,31 +83,6 @@ function formatTimestamp(value?: string) {
   return date.toLocaleString("pt-BR");
 }
 
-
-function formatRemainingCooldown(cooldownUntil?: string | null) {
-  if (!cooldownUntil) return null;
-  const target = new Date(cooldownUntil);
-  if (Number.isNaN(target.getTime())) return null;
-
-  const diffMs = target.getTime() - Date.now();
-  if (diffMs <= 0) return "Disponível agora";
-
-  const seconds = Math.ceil(diffMs / 1000);
-  if (seconds < 60) return `Disponível em ${seconds} segundos`;
-
-  const minutes = Math.ceil(seconds / 60);
-  return `Disponível em ${minutes} minutos`;
-}
-
-function reasonCodeLabel(reasonCode?: string | null) {
-  if (!reasonCode) return "Sem motivo informado";
-  if (reasonCode === "blocked_recent_execution") return "Executado recentemente";
-  if (reasonCode === "mode_manual_explicit_configuration") return "Modo manual ativo";
-  if (reasonCode === "limit_exceeded") return "Limite atingido";
-  return reasonCode;
-}
-
-
 function eventCooldownUntil(event: ExecutionEvent) {
   const explanation = event.diagnostics?.explanation;
   if (!explanation || typeof explanation !== "object") return null;
@@ -104,11 +90,17 @@ function eventCooldownUntil(event: ExecutionEvent) {
   return typeof raw === "string" ? raw : null;
 }
 
-function toneFromStatus(status?: string) {
-  if (status === "executed") return "border-emerald-500/40 bg-emerald-500/10 text-emerald-300";
-  if (status === "failed") return "border-red-500/40 bg-red-500/10 text-red-300";
-  if (status === "blocked" || status === "requires_confirmation" || status === "throttled") return "border-amber-500/40 bg-amber-500/10 text-amber-300";
-  return "border-zinc-500/40 bg-zinc-500/10 text-[var(--text-secondary)]";
+function nextStepByReasonCode(reasonCode?: string | null) {
+  if (reasonCode === "mode_manual_explicit_configuration") {
+    return { type: "switch_to_auto" as const, text: "Altere para automático para liberar execução" };
+  }
+  if (reasonCode === "blocked_recent_execution") {
+    return { type: "wait" as const, text: "Aguarde o cooldown terminar" };
+  }
+  if (reasonCode === "limit_exceeded") {
+    return { type: "limit" as const, text: "A engine atingiu o limite deste ciclo" };
+  }
+  return { type: "none" as const, text: "Revise a política operacional" };
 }
 
 export function ExecutionOperationsPanel() {
@@ -118,6 +110,8 @@ export function ExecutionOperationsPanel() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [actionFilter, setActionFilter] = useState("");
   const [entityFilter, setEntityFilter] = useState<string>("all");
+  const [showRunOnceResult, setShowRunOnceResult] = useState(false);
+  const [nowMs, setNowMs] = useState(Date.now());
 
   const [draftMode, setDraftMode] = useState<ExecutionMode>("manual");
   const [draftPolicy, setDraftPolicy] = useState<ExecutionPolicy>({});
@@ -159,9 +153,9 @@ export function ExecutionOperationsPanel() {
     },
   });
 
-
   const runOnce = trpc.nexo.executions.runOnce.useMutation({
     onSuccess: async () => {
+      setShowRunOnceResult(true);
       await Promise.all([
         utils.nexo.executions.events.invalidate(),
         utils.nexo.executions.stateSummary.invalidate(),
@@ -169,7 +163,7 @@ export function ExecutionOperationsPanel() {
     },
   });
 
-    const modePayload = useMemo(() => getPayloadValue<ModePayload>(modeQuery.data) ?? {}, [modeQuery.data]);
+  const modePayload = useMemo(() => getPayloadValue<ModePayload>(modeQuery.data) ?? {}, [modeQuery.data]);
   const summary = useMemo(() => getPayloadValue<ExecutionStateSummary>(summaryQuery.data) ?? {}, [summaryQuery.data]);
   const events = useMemo(() => normalizeArrayPayload<ExecutionEvent>(eventsQuery.data), [eventsQuery.data]);
   const modeHistory = useMemo(() => normalizeArrayPayload<ConfigHistoryEntry>(modeHistoryQuery.data), [modeHistoryQuery.data]);
@@ -181,6 +175,17 @@ export function ExecutionOperationsPanel() {
     if (modePayload.mode) setDraftMode(modePayload.mode);
     if (modePayload.policy) setDraftPolicy(modePayload.policy);
   }, [modePayload.mode, modePayload.policy]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (!showRunOnceResult) return;
+    const timeout = window.setTimeout(() => setShowRunOnceResult(false), 12000);
+    return () => window.clearTimeout(timeout);
+  }, [showRunOnceResult]);
 
   const saveConfig = async () => {
     const retries = Number(draftPolicy.maxRetries ?? 0);
@@ -204,6 +209,10 @@ export function ExecutionOperationsPanel() {
     });
   };
 
+  const latestCycleTime = events[0]?.timestamp;
+  const oldestVisible = events[events.length - 1]?.timestamp;
+  const visibleDurationMs = latestCycleTime && oldestVisible ? new Date(latestCycleTime).getTime() - new Date(oldestVisible).getTime() : null;
+
   return (
     <section className="nexo-surface p-5 space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -219,18 +228,36 @@ export function ExecutionOperationsPanel() {
 
       {isLoading ? <div className="flex min-h-[120px] items-center justify-center gap-2 text-sm text-[var(--text-muted)]"><Loader2 className="h-4 w-4 animate-spin" /> Carregando execution...</div> : null}
 
-      {runOnce.data ? (
+      {showRunOnceResult && runOnce.data ? (
         <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/40 p-3 text-xs text-[var(--text-secondary)]">
-          Run once: executadas <strong>{Number(runOnceResult.executed ?? 0)}</strong> · bloqueadas <strong>{Number((runOnceResult.blocked ?? 0) + (runOnceResult.blockedRecent ?? 0))}</strong> · falhas <strong>{Number(runOnceResult.failed ?? 0)}</strong>
+          <p className="font-semibold text-[var(--text-primary)]">Execução concluída</p>
+          <p className="mt-1">- {Number(runOnceResult.executed ?? 0)} executadas</p>
+          <p>- {Number(runOnceResult.blocked ?? 0)} bloqueadas</p>
+          <p>- {Number(runOnceResult.blockedRecent ?? 0)} bloqueadas por cooldown</p>
+          <p>- {Number(runOnceResult.failed ?? 0)} falhas</p>
+          <p>- {Number(runOnceResult.skipped ?? 0)} ignoradas</p>
         </div>
       ) : null}
 
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-        <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/40 p-3 text-sm">Pending: <strong>{Number(summary.pending ?? 0)}</strong></div>
-        <div className="rounded-lg border border-emerald-700/60 bg-emerald-900/20 p-3 text-sm">Executed: <strong>{Number(summary.executed ?? 0)}</strong></div>
-        <div className="rounded-lg border border-red-700/60 bg-red-900/20 p-3 text-sm">Failed: <strong>{Number(summary.failed ?? 0)}</strong></div>
-        <div className="rounded-lg border border-amber-700/60 bg-amber-900/20 p-3 text-sm">Blocked: <strong>{Number(summary.blocked ?? 0)}</strong></div>
-        <div className="rounded-lg border border-orange-700/60 bg-orange-900/20 p-3 text-sm">Bloqueadas por cooldown: <strong>{Number(summary.blockedRecent ?? 0)}</strong></div>
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-7">
+        <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/40 p-3 text-sm">Pendentes: <strong>{Number(summary.pending ?? 0)}</strong></div>
+        <div className="rounded-lg border border-emerald-700/60 bg-emerald-900/20 p-3 text-sm">Executadas: <strong>{Number(summary.executed ?? 0)}</strong></div>
+        <div className="rounded-lg border border-red-700/60 bg-red-900/20 p-3 text-sm">Falhas: <strong>{Number(summary.failed ?? 0)}</strong></div>
+        <div className="rounded-lg border border-amber-700/60 bg-amber-900/20 p-3 text-sm">Bloqueadas: <strong>{Number(summary.blocked ?? 0)}</strong></div>
+        <div className="rounded-lg border border-orange-700/60 bg-orange-900/20 p-3 text-sm">Cooldown: <strong>{Number(summary.blockedRecent ?? 0)}</strong></div>
+        <div className="rounded-lg border border-slate-700/60 bg-slate-900/20 p-3 text-sm">Ignoradas: <strong>{Number(summary.skipped ?? 0)}</strong></div>
+        <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/40 p-3 text-sm">Orgs processadas: <strong>{Number((runOnceResult as { orgs?: number })?.orgs ?? 0)}</strong></div>
+      </div>
+
+      <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/40 p-3 text-xs text-[var(--text-secondary)]">
+        <p>Último ciclo visível: <strong>{formatTimestamp(latestCycleTime)}</strong></p>
+        <p>Duração aproximada (janela visível): <strong>{visibleDurationMs && visibleDurationMs > 0 ? `${Math.round(visibleDurationMs / 1000)} s` : "—"}</strong></p>
+        {Number(summary.executed ?? 0) === 0 && Number(summary.blockedRecent ?? 0) > 0 ? (
+          <p className="mt-1 text-amber-300">O sistema está funcionando, mas as ações recentes estão protegidas por cooldown.</p>
+        ) : null}
+        {modePayload.mode === "manual" ? (
+          <p className="mt-1 text-amber-300">O sistema está funcionando em modo manual. Nenhuma ação automática será executada até mudança de modo.</p>
+        ) : null}
       </div>
 
       <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/40 p-4 space-y-3">
@@ -271,37 +298,11 @@ export function ExecutionOperationsPanel() {
             </label>
           ))}
         </div>
-        <div className="rounded-lg border border-[var(--border-subtle)]/70 bg-[var(--surface-base)] p-3 text-xs text-[var(--text-secondary)]">
-          <p className="font-semibold text-[var(--text-primary)]">Overrides ativos vs default</p>
-          <ul className="mt-2 space-y-1">
-            {(Object.keys(defaultPolicy) as (keyof ExecutionPolicy)[])
-              .filter((key) => draftPolicy[key] !== undefined && draftPolicy[key] !== defaultPolicy[key])
-              .map((key) => (
-                <li key={String(key)}>{String(key)}: default={String(defaultPolicy[key])} → atual={String(draftPolicy[key])}</li>
-              ))}
-          </ul>
-        </div>
         <div className="flex justify-end"><Button onClick={() => void saveConfig()} disabled={!canEdit || updateMode.isPending}>{updateMode.isPending ? "Salvando..." : "Salvar configuração"}</Button></div>
       </div>
 
       <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/40 p-4 space-y-3">
-        <h3 className="text-sm font-semibold text-[var(--text-primary)]">Histórico auditável de configuração</h3>
-        {modeHistory.length === 0 ? (
-          <p className="text-xs text-[var(--text-muted)]">Sem alterações recentes de mode/policy.</p>
-        ) : (
-          modeHistory.map((entry) => (
-            <div key={entry.id} className="rounded-lg border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-3 text-xs text-[var(--text-secondary)]">
-              <p>{formatTimestamp(entry.changedAt)} · por <strong>{entry.actorEmail || "sistema"}</strong> · fonte {entry.source || "—"}</p>
-              <p className="mt-1">Contexto: {entry.context || "—"}</p>
-              <p className="mt-1">Before: {JSON.stringify(entry.before ?? {})}</p>
-              <p className="mt-1">After: {JSON.stringify(entry.after ?? {})}</p>
-            </div>
-          ))
-        )}
-      </div>
-
-      <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/40 p-4 space-y-3">
-        <h3 className="text-sm font-semibold text-[var(--text-primary)]">Timeline operacional</h3>
+        <h3 className="text-sm font-semibold text-[var(--text-primary)]">Últimas decisões</h3>
         <div className="grid gap-2 md:grid-cols-4">
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
@@ -330,25 +331,56 @@ export function ExecutionOperationsPanel() {
           {events.length === 0 ? (
             <p className="text-sm text-[var(--text-muted)]">Sem eventos recentes da execution.</p>
           ) : (
-            events.map((event) => (
-              <div key={event.id} className="rounded-lg border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-sm font-medium text-[var(--text-primary)]">{event.actionId || "ação_não_informada"}</p>
-                  <span className={`rounded-full border px-2 py-1 text-xs font-semibold ${toneFromStatus(event.status)}`}>{event.status || "pending"}</span>
-                </div>
-                <div className="mt-1 text-xs text-[var(--text-secondary)]">Entidade: <strong>{event.entityType || "—"}</strong> · {event.entityId || "—"}</div>
-                <div className="mt-1 text-xs text-[var(--text-muted)]">Motivo: <strong>{reasonCodeLabel(event.reasonCode)}</strong> · {formatTimestamp(event.timestamp)}</div>
-                {event.status === "blocked" ? (
-                  <div className="mt-1 text-xs text-amber-300">
-                    {formatRemainingCooldown(eventCooldownUntil(event))}
+            events.map((event) => {
+              const cooldownUntil = eventCooldownUntil(event);
+              const cooldownLabel = formatRemainingCooldown(cooldownUntil, nowMs);
+              const nextStep = nextStepByReasonCode(event.reasonCode);
+
+              return (
+                <div key={event.id} className="rounded-lg border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm font-medium text-[var(--text-primary)]">{event.actionId || "ação_não_informada"}</p>
+                    <ExecutionStatusBadge status={event.status} reasonCode={event.reasonCode} />
                   </div>
-                ) : null}
-                <div className="mt-1 text-[11px] text-[var(--text-muted)]">Diagnóstico: executionKey {event.diagnostics?.executionKey ?? "—"}</div>
-                {event.diagnostics?.explanation ? <div className="mt-1 text-[11px] text-[var(--text-muted)]">Explicação: {JSON.stringify(event.diagnostics.explanation)}</div> : null}
-              </div>
-            ))
+                  <div className="mt-1 text-xs text-[var(--text-secondary)]">Entidade: <strong>{event.entityType || "—"}</strong> · {event.entityId || "—"}</div>
+                  <div className="mt-1 text-xs text-[var(--text-muted)]">Motivo: <strong>{reasonCodeToHuman(event.reasonCode)}</strong></div>
+                  {cooldownLabel ? <div className="mt-1 text-xs text-amber-300">{cooldownLabel}</div> : null}
+                  <div className="mt-1 text-xs text-[var(--text-muted)]">Timestamp: {formatTimestamp(event.timestamp)}</div>
+                  <div className="mt-1 text-xs text-[var(--text-secondary)]">Ação disponível: {nextStep.text}</div>
+                  {nextStep.type === "switch_to_auto" ? (
+                    <div className="mt-2">
+                      <Button
+                        variant="outline"
+                        className="h-7 text-xs"
+                        disabled={!canEdit || updateMode.isPending}
+                        onClick={() => updateMode.mutate({ mode: "automatic" })}
+                      >
+                        Alterar para automático
+                      </Button>
+                    </div>
+                  ) : null}
+                  <div className="mt-1 text-[11px] text-[var(--text-muted)]">Diagnóstico: executionKey {event.diagnostics?.executionKey ?? "—"}</div>
+                </div>
+              );
+            })
           )}
         </div>
+      </div>
+
+      <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/40 p-4 space-y-3">
+        <h3 className="text-sm font-semibold text-[var(--text-primary)]">Histórico auditável de configuração</h3>
+        {modeHistory.length === 0 ? (
+          <p className="text-xs text-[var(--text-muted)]">Sem alterações recentes de mode/policy.</p>
+        ) : (
+          modeHistory.map((entry) => (
+            <div key={entry.id} className="rounded-lg border border-[var(--border-subtle)]/80 bg-[var(--surface-base)] p-3 text-xs text-[var(--text-secondary)]">
+              <p>{formatTimestamp(entry.changedAt)} · por <strong>{entry.actorEmail || "sistema"}</strong> · fonte {entry.source || "—"}</p>
+              <p className="mt-1">Contexto: {entry.context || "—"}</p>
+              <p className="mt-1">Before: {JSON.stringify(entry.before ?? {})}</p>
+              <p className="mt-1">After: {JSON.stringify(entry.after ?? {})}</p>
+            </div>
+          ))
+        )}
       </div>
     </section>
   );
