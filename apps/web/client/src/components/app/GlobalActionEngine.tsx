@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { AppNextActions } from "@/components/app/AppNextActions";
+import { useAuth } from "@/contexts/AuthContext";
 
 function toArray<T>(payload: unknown): T[] {
   const raw = (payload as any)?.data?.data ?? (payload as any)?.data ?? payload;
@@ -8,12 +9,21 @@ function toArray<T>(payload: unknown): T[] {
 }
 
 export function GlobalActionEngine() {
+  const { loading, isAuthenticated, user } = useAuth();
+  const userId = user?.id ?? null;
+  const canMountEngine = !loading && isAuthenticated && Boolean(userId);
+
+  if (!canMountEngine || !userId) {
+    return null;
+  }
+
   const queryOptions = {
     retry: false,
-    staleTime: 60_000,
+    staleTime: 120_000,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
     refetchOnMount: false,
+    enabled: canMountEngine,
   } as const;
 
   const customersQuery = trpc.nexo.customers.list.useQuery(undefined, queryOptions);
@@ -21,10 +31,10 @@ export function GlobalActionEngine() {
   const serviceOrdersQuery = trpc.nexo.serviceOrders.list.useQuery({ page: 1, limit: 100 }, queryOptions);
   const chargesQuery = trpc.finance.charges.list.useQuery({ page: 1, limit: 100 }, queryOptions);
 
-  const customers = useMemo(() => toArray<any>(customersQuery.data), [customersQuery.data]);
-  const appointments = useMemo(() => toArray<any>(appointmentsQuery.data), [appointmentsQuery.data]);
-  const serviceOrders = useMemo(() => toArray<any>(serviceOrdersQuery.data), [serviceOrdersQuery.data]);
-  const charges = useMemo(() => toArray<any>(chargesQuery.data), [chargesQuery.data]);
+  const customers = useMemo(() => toArray<any>(customersQuery.data ?? []), [customersQuery.data]);
+  const appointments = useMemo(() => toArray<any>(appointmentsQuery.data ?? []), [appointmentsQuery.data]);
+  const serviceOrders = useMemo(() => toArray<any>(serviceOrdersQuery.data ?? []), [serviceOrdersQuery.data]);
+  const charges = useMemo(() => toArray<any>(chargesQuery.data ?? []), [chargesQuery.data]);
 
   return (
     <div className="px-3 pb-3 pt-2 md:px-4">

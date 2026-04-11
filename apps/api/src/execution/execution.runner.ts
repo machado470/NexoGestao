@@ -17,9 +17,9 @@ import {
 @Injectable()
 export class ExecutionRunner {
   private readonly logger = new Logger(ExecutionRunner.name)
-  private readonly maxExecutionsPerCycle = 5
-  private readonly cycleDelayMs = 1500
   private nextCycleAt = 0
+  private readonly blockedRecentCooldownMap = new Map<string, number>()
+  private readonly blockedLogSuppression = new Map<string, { until: number; blockedCountDuringWindow: number }>()
 
   private async sleep(ms: number) {
     await new Promise((resolve) => setTimeout(resolve, ms))
@@ -27,6 +27,68 @@ export class ExecutionRunner {
 
   private hasUsablePhone(phone: string | null | undefined): boolean {
     return typeof phone === 'string' && phone.trim().length > 0
+  }
+
+  private buildCooldownKey(candidate: ExecutionActionCandidate): string {
+    return `${candidate.orgId}:${candidate.decisionId}:${candidate.actionId}:${candidate.entityId}`
+  }
+
+  private isCandidateInRecentCooldown(candidate: ExecutionActionCandidate) {
+    const key = this.buildCooldownKey(candidate)
+    const blockedUntil = this.blockedRecentCooldownMap.get(key)
+    if (!blockedUntil) return null
+    if (Date.now() >= blockedUntil) {
+      this.blockedRecentCooldownMap.delete(key)
+      return null
+    }
+    return blockedUntil
+  }
+
+  private markCandidateRecentCooldown(candidate: ExecutionActionCandidate, blockedUntil: number) {
+    const key = this.buildCooldownKey(candidate)
+    this.blockedRecentCooldownMap.set(key, blockedUntil)
+  }
+
+  private shouldSuppressBlockedLog(params: {
+    candidate: ExecutionActionCandidate
+    reasonCode: string
+    status: 'blocked' | 'requires_confirmation' | 'throttled'
+    suppressionWindowMs: number
+  }) {
+    const key = `${this.buildCooldownKey(params.candidate)}:${params.reasonCode}:${params.status}`
+    const current = this.blockedLogSuppression.get(key)
+    const now = Date.now()
+
+    if (current && now < current.until) {
+      current.blockedCountDuringWindow += 1
+      this.blockedLogSuppression.set(key, current)
+      return {
+        suppressed: true as const,
+        suppressedCount: current.blockedCountDuringWindow,
+      }
+    }
+
+    const previousSuppressedCount = current?.blockedCountDuringWindow ?? 0
+    this.blockedLogSuppression.set(key, {
+      until: now + params.suppressionWindowMs,
+      blockedCountDuringWindow: 0,
+    })
+    return {
+      suppressed: false as const,
+      previousSuppressedCount,
+    }
+  }
+
+  private mapExpectedReasonFromError(error: unknown): string | null {
+    const message = error instanceof Error ? error.message : String(error)
+    if (!message) return null
+    if (message === 'charge_followup_already_exists') return 'charge_followup_already_exists'
+    if (message === 'charge_not_eligible_for_payment_link') return 'no_valid_phone'
+    if (message === 'charge_not_eligible_for_overdue_reminder') return 'already_sent_recently'
+    if (message === 'charge_not_eligible_for_followup') return 'already_paid'
+    if (message === 'charge_not_overdue_enough_for_followup') return 'blocked_recent_execution'
+    if (message === 'risk_review_already_escalated_recently') return 'already_sent_recently'
+    return null
   }
 
   constructor(
@@ -176,22 +238,37 @@ export class ExecutionRunner {
 
     let totalCandidates = 0
     let executed = 0
+    let blocked = 0
+    let blockedRecent = 0
+    let failed = 0
+    let skipped = 0
 
     for (const org of orgs) {
-      const candidates = await this.loadActionCandidates(org.id)
+      const allCandidates = await this.loadActionCandidates(org.id)
+      const candidates = allCandidates.filter((candidate) => {
+        const blockedUntil = this.isCandidateInRecentCooldown(candidate)
+        if (!blockedUntil) return true
+        skipped += 1
+        blockedRecent += 1
+        return false
+      })
       totalCandidates += candidates.length
 
       for (const candidate of candidates) {
-        if (executed >= this.maxExecutionsPerCycle) break
+        if (executed >= this.config.getMaxExecutionsPerCycle()) break
         const result = await this.processCandidate(candidate)
         if (result === 'executed') executed += 1
+        else if (result === 'failed') failed += 1
+        else if (result === 'blocked' || result === 'requires_confirmation' || result === 'throttled') blocked += 1
+        else if (result === 'blocked_recent_execution') blockedRecent += 1
       }
 
-      if (executed >= this.maxExecutionsPerCycle) break
+      if (executed >= this.config.getMaxExecutionsPerCycle()) break
     }
 
-    this.nextCycleAt = Date.now() + this.cycleDelayMs
-    await this.sleep(this.cycleDelayMs)
+    const cycleDelayMs = this.config.getCycleDelayMs()
+    this.nextCycleAt = Date.now() + cycleDelayMs
+    await this.sleep(cycleDelayMs)
 
     this.logger.log(
       JSON.stringify({
@@ -199,8 +276,13 @@ export class ExecutionRunner {
         orgs: orgs.length,
         totalCandidates,
         executed,
-        maxExecutionsPerCycle: this.maxExecutionsPerCycle,
-        cycleDelayMs: this.cycleDelayMs,
+        blocked,
+        blockedRecent,
+        failed,
+        skipped,
+        orgsProcessed: orgs.length,
+        maxExecutionsPerCycle: this.config.getMaxExecutionsPerCycle(),
+        cycleDelayMs,
       }),
     )
 
@@ -208,6 +290,10 @@ export class ExecutionRunner {
       orgs: orgs.length,
       totalCandidates,
       executed,
+      blocked,
+      blockedRecent,
+      failed,
+      skipped,
     }
   }
 
@@ -648,12 +734,16 @@ export class ExecutionRunner {
     })
 
     if (alreadyExecuted) {
-      await this.recordBlocked(candidate, executionKey, mode, 'idempotency_recent_execution', 'blocked', {
+      const cooldownMs = this.config.getBlockedRecentCooldownMs()
+      const blockedUntil = Date.now() + cooldownMs
+      this.markCandidateRecentCooldown(candidate, blockedUntil)
+      await this.recordBlocked(candidate, executionKey, mode, 'blocked_recent_execution', 'blocked', {
         ruleId: candidate.decisionId,
         ruleReason: 'idempotency',
+        cooldownUntil: new Date(blockedUntil).toISOString(),
       })
       this.countOperationalStatus('blocked')
-      return 'blocked'
+      return 'blocked_recent_execution'
     }
 
     const failureCount = await this.events.countRecentFailures({
@@ -786,6 +876,16 @@ export class ExecutionRunner {
 
       return 'executed'
     } catch (error) {
+      const expectedReason = this.mapExpectedReasonFromError(error)
+      if (expectedReason) {
+        await this.recordBlocked(candidate, executionKey, mode, expectedReason, 'blocked', {
+          ruleId: candidate.decisionId,
+          ruleReason: 'expected_non_failure',
+        })
+        this.countOperationalStatus('blocked')
+        return 'blocked'
+      }
+
       await this.events.recordEvent(candidate.orgId, {
         eventType: 'EXECUTION_ACTION_FAILED',
         entityType: candidate.entityType,
@@ -844,6 +944,7 @@ export class ExecutionRunner {
       policyKey?: string
       policyValue?: unknown
       governanceReason?: string
+      cooldownUntil?: string
     },
   ) {
     await this.events.recordEvent(candidate.orgId, {
@@ -860,17 +961,30 @@ export class ExecutionRunner {
       explanation,
     })
 
-    this.logger.debug(
-      JSON.stringify({
-        event: 'execution_runner_blocked',
-        orgId: candidate.orgId,
-        actionId: candidate.actionId,
-        decisionId: candidate.decisionId,
-        reasonCode,
-        status,
-        executionKey,
-      }),
-    )
+    const suppressionWindowMs = this.config.getBlockedRecentCooldownMs()
+    const suppression = this.shouldSuppressBlockedLog({
+      candidate,
+      reasonCode,
+      status,
+      suppressionWindowMs,
+    })
+    if (!suppression.suppressed) {
+      this.logger.debug(
+        JSON.stringify({
+          event: 'execution_runner_blocked',
+          orgId: candidate.orgId,
+          actionId: candidate.actionId,
+          decisionId: candidate.decisionId,
+          entityType: candidate.entityType,
+          entityId: candidate.entityId,
+          reasonCode,
+          status,
+          executionKey,
+          suppressedCountFromPreviousWindow: suppression.previousSuppressedCount,
+          cooldownUntil: explanation?.cooldownUntil ?? null,
+        }),
+      )
+    }
   }
 
   private async executeCandidate(candidate: ExecutionActionCandidate) {

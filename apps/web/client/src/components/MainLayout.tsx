@@ -32,7 +32,7 @@ import { canAny, type Permission } from "@/lib/rbac";
 import { useIsMobile } from "@/hooks/useMobile";
 import { useNotificationStore } from "@/stores/notificationStore";
 import { GlobalSearch } from "@/components/GlobalSearch";
-import { GlobalActionEngine } from "@/components/app";
+import { GlobalActionEngine, GlobalActionEngineBoundary } from "@/components/app";
 import {
   NexoAppShell,
   NexoMainContainer,
@@ -602,7 +602,11 @@ export function MainLayout({ children }: MainLayoutProps) {
             </NexoTopbar>
 
             <NexoMainContainer>
-              {shouldRenderGlobalEngine ? <GlobalActionEngine /> : null}
+              {shouldRenderGlobalEngine ? (
+                <GlobalActionEngineBoundary>
+                  <GlobalActionEngine />
+                </GlobalActionEngineBoundary>
+              ) : null}
               {children}
             </NexoMainContainer>
           </div>

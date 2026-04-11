@@ -25,6 +25,15 @@ function normalizeMode(raw: string | undefined): ExecutionMode {
   return 'automatic'
 }
 
+function readPositiveIntEnv(name: string, fallback: number, bounds?: { min?: number; max?: number }): number {
+  const raw = Number(process.env[name])
+  if (!Number.isFinite(raw)) return fallback
+  const normalized = Math.trunc(raw)
+  if (bounds?.min !== undefined && normalized < bounds.min) return fallback
+  if (bounds?.max !== undefined && normalized > bounds.max) return fallback
+  return normalized
+}
+
 @Injectable()
 export class ExecutionConfigService {
   private readonly modeCache = new Map<string, ExecutionMode>()
@@ -37,6 +46,21 @@ export class ExecutionConfigService {
       return 'manual'
     }
     return normalizeMode(process.env.EXECUTION_MODE_DEFAULT)
+  }
+
+  getMaxExecutionsPerCycle(): number {
+    return readPositiveIntEnv('EXECUTION_MAX_PER_CYCLE', 5, { min: 1, max: 200 })
+  }
+
+  getCycleDelayMs(): number {
+    return readPositiveIntEnv('EXECUTION_CYCLE_DELAY_MS', 1_500, { min: 250, max: 60_000 })
+  }
+
+  getBlockedRecentCooldownMs(): number {
+    return readPositiveIntEnv('EXECUTION_BLOCKED_RECENT_COOLDOWN_MS', 60_000, {
+      min: 5_000,
+      max: 60 * 60_000,
+    })
   }
 
   private sanitizePolicy(value: unknown): Partial<ExecutionPolicyConfig> {
