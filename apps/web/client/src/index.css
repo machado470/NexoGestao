@@ -292,8 +292,7 @@
   --nexo-card-muted: #f8fafc;
   --nexo-shadow-elev-1: 0 8px 24px rgba(15, 23, 42, 0.06);
   --nexo-shadow-elev-2: 0 16px 40px rgba(15, 23, 42, 0.11);
-  --nexo-title-font:
-    "Plus Jakarta Sans", "DM Sans", "Inter", system-ui, sans-serif;
+  --nexo-title-font: "DM Sans", "Inter", system-ui, sans-serif;
   --nexo-body-font: "DM Sans", "Inter", system-ui, sans-serif;
 }
 
@@ -419,6 +418,18 @@
     background: #f8f9fb;
     scrollbar-width: thin;
     scrollbar-color: rgba(249, 115, 22, 0.6) transparent;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--nexo-title-font);
   }
 
   body[data-visual-context="app"] {
@@ -495,6 +506,37 @@
     min-width: 0;
     overflow-wrap: anywhere;
     word-break: break-word;
+  }
+
+  .nexo-truncate {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .nexo-card-panel,
+  .nexo-surface-operational,
+  .nexo-kpi-card {
+    min-width: 0;
+  }
+
+  .nexo-data-table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+  }
+
+  .nexo-modal-content {
+    width: min(96vw, 960px);
+  }
+
+  @media (max-width: 640px) {
+    .nexo-modal-content {
+      max-height: 92vh;
+      width: calc(100vw - 1rem);
+      border-radius: 0.9rem;
+    }
   }
 
   @media (min-width: 640px) {

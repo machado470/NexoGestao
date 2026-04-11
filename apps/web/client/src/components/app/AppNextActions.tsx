@@ -97,7 +97,7 @@ export function AppNextActions({
   };
 
   return (
-    <section className="nexo-card-panel p-4">
+    <section className="nexo-card-panel min-w-0 p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <h3 className="text-sm font-semibold text-[var(--text-primary)]">{title}</h3>
         <AppPrimaryAction label="Executar próxima ação" action={executeNext} loadingLabel="Executando sequência..." />
@@ -107,14 +107,15 @@ export function AppNextActions({
 
       <div className="mt-3 space-y-2">
         {suggestions.map(item => (
-          <div key={item.id} className="flex items-center justify-between gap-2 rounded-lg border border-[var(--border-subtle)] p-3">
-            <div>
-              <p className="text-sm font-medium text-[var(--text-primary)]">{item.label}</p>
-              <p className="text-xs text-[var(--text-muted)]">{item.description}</p>
+          <div key={item.id} className="flex min-w-0 items-center justify-between gap-2 rounded-lg border border-[var(--border-subtle)] p-3">
+            <div className="min-w-0">
+              <p className="nexo-truncate text-sm font-medium text-[var(--text-primary)]" title={item.label}>{item.label}</p>
+              <p className="text-xs text-[var(--text-muted)] nexo-text-wrap">{item.description}</p>
             </div>
             <Button
               type="button"
               size="sm"
+              className="shrink-0"
               onClick={() => void executeRecommendation(item)}
               isLoading={item.execution.mode === "app_action" ? isExecuting(item.execution.action.id) : false}
             >
