@@ -400,7 +400,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                           <Icon
                             className={`h-4 w-4 shrink-0 ${
                               active
-                                ? "text-[var(--accent-primary)]"
+                                ? "text-[var(--text-primary)]"
                                 : "text-[var(--text-muted)] group-hover:text-[var(--text-secondary)]"
                             }`}
                           />

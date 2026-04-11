@@ -88,6 +88,7 @@ type MetricCardProps = {
   value: string | number;
   description?: string;
   loading?: boolean;
+  emphasis?: "default" | "important" | "critical";
 };
 
 function MetricCard({
@@ -96,9 +97,17 @@ function MetricCard({
   value,
   description,
   loading,
+  emphasis = "default",
 }: MetricCardProps) {
+  const emphasisClass =
+    emphasis === "critical"
+      ? "nexo-card-kpi--critical"
+      : emphasis === "important"
+        ? "nexo-card-kpi--important"
+        : "nexo-card-kpi--default";
+
   return (
-    <div className="nexo-card-kpi nexo-fade-in">
+    <div className={`nexo-card-kpi nexo-fade-in ${emphasisClass}`}>
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="nexo-text-wrap text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)] dark:text-[var(--text-muted)]">
@@ -968,16 +977,21 @@ export default function ExecutiveDashboardNew() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="max-w-3xl space-y-2">
             <p className="inline-flex items-center gap-2 rounded-full border border-orange-400/30 bg-orange-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-orange-300">
-              <BarChart3 className="h-3.5 w-3.5" /> Estado operacional: {heroState}
+              <BarChart3 className="h-3.5 w-3.5" /> Estado operacional:{" "}
+              {heroState}
             </p>
             <p className="text-sm text-[var(--text-secondary)]">
-              {overdueCharges} cobranças vencidas • {nonBilledServices} serviços sem faturamento • prioridade dominante {dominantProblem?.title ?? "Operação estável"}.
+              {overdueCharges} cobranças vencidas • {nonBilledServices} serviços
+              sem faturamento • prioridade dominante{" "}
+              {dominantProblem?.title ?? "Operação estável"}.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={() => navigate(dominantProblem?.ctaPath ?? "/service-orders")}
+              onClick={() =>
+                navigate(dominantProblem?.ctaPath ?? "/service-orders")
+              }
               className="nexo-cta-dominant min-h-11"
             >
               {dominantProblem?.ctaLabel ?? "Executar prioridades"}
@@ -994,20 +1008,36 @@ export default function ExecutiveDashboardNew() {
 
         <div className="mt-5 grid gap-3 border-t border-[var(--border-soft)] pt-4 md:grid-cols-4">
           <div>
-            <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--text-muted)]">Receita em risco</p>
-            <p className="mt-1 text-lg font-semibold text-[var(--text-primary)]">{formatCurrency(totalPausedRevenue + nonBilledServicesImpact)}</p>
+            <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--text-muted)]">
+              Receita em risco
+            </p>
+            <p className="mt-1 text-lg font-semibold text-[var(--text-primary)]">
+              {formatCurrency(totalPausedRevenue + nonBilledServicesImpact)}
+            </p>
           </div>
           <div>
-            <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--text-muted)]">Gargalos ativos</p>
-            <p className="mt-1 text-lg font-semibold text-[var(--text-primary)]">{bottlenecks.filter(item => item.value > 0).length}</p>
+            <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--text-muted)]">
+              Gargalos ativos
+            </p>
+            <p className="mt-1 text-lg font-semibold text-[var(--text-primary)]">
+              {bottlenecks.filter(item => item.value > 0).length}
+            </p>
           </div>
           <div>
-            <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--text-muted)]">Ações urgentes</p>
-            <p className="mt-1 text-lg font-semibold text-[var(--text-primary)]">{urgentActions}</p>
+            <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--text-muted)]">
+              Ações urgentes
+            </p>
+            <p className="mt-1 text-lg font-semibold text-[var(--text-primary)]">
+              {urgentActions}
+            </p>
           </div>
           <div>
-            <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--text-muted)]">Última atualização</p>
-            <p className="mt-1 text-lg font-semibold text-[var(--text-primary)]">{lastUpdatedAt ? lastUpdatedAt.toLocaleTimeString("pt-BR") : "—"}</p>
+            <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--text-muted)]">
+              Última atualização
+            </p>
+            <p className="mt-1 text-lg font-semibold text-[var(--text-primary)]">
+              {lastUpdatedAt ? lastUpdatedAt.toLocaleTimeString("pt-BR") : "—"}
+            </p>
           </div>
         </div>
       </section>
@@ -1019,6 +1049,7 @@ export default function ExecutiveDashboardNew() {
           value={displayMetrics.createdCustomers}
           loading={metricsQuery.isLoading && metricsQuery.data === undefined}
           description="Base total de clientes cadastrados."
+          emphasis="default"
         />
         <MetricCard
           icon={Briefcase}
@@ -1026,6 +1057,7 @@ export default function ExecutiveDashboardNew() {
           value={displayMetrics.completedServices}
           loading={metricsQuery.isLoading && metricsQuery.data === undefined}
           description="Total de O.S. finalizadas com sucesso."
+          emphasis="important"
         />
         <MetricCard
           icon={DollarSign}
@@ -1033,6 +1065,7 @@ export default function ExecutiveDashboardNew() {
           value={displayMetrics.chargesGenerated}
           loading={metricsQuery.isLoading && metricsQuery.data === undefined}
           description={`${formatCurrency(displayMetrics.paidRevenueInCents)} recebido`}
+          emphasis="important"
         />
         <MetricCard
           icon={AlertTriangle}
@@ -1040,13 +1073,16 @@ export default function ExecutiveDashboardNew() {
           value={formatCurrency(totalPausedRevenue)}
           loading={metricsQuery.isLoading && metricsQuery.data === undefined}
           description={`${overdueCharges} cobranças vencidas`}
+          emphasis="critical"
         />
       </section>
 
       <section className="grid gap-6 xl:grid-cols-3">
         <article className="nexo-surface-primary xl:col-span-2 p-5">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-base font-semibold text-[var(--text-primary)]">Execução prioritária</h2>
+            <h2 className="text-base font-semibold text-[var(--text-primary)]">
+              Execução prioritária
+            </h2>
             <button
               type="button"
               onClick={() => setFocusCriticalOnly(prev => !prev)}
@@ -1055,9 +1091,15 @@ export default function ExecutiveDashboardNew() {
               {focusCriticalOnly ? "Foco crítico" : "Mostrar todas"}
             </button>
           </div>
-          <p className="mt-1 text-xs text-[var(--text-muted)]">Linhas de ação, pipeline e decisão operacional sem empilhar blocos internos.</p>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
+            Linhas de ação, pipeline e decisão operacional sem empilhar blocos
+            internos.
+          </p>
           <div className="mt-4 space-y-4">
-            <ActionFeed items={operationalActionFeed} focusCriticalOnly={focusCriticalOnly} />
+            <ActionFeed
+              items={operationalActionFeed}
+              focusCriticalOnly={focusCriticalOnly}
+            />
             <PipelineStage
               stages={pipelineStages}
               selectedStage={selectedPipelineStage}
@@ -1067,14 +1109,25 @@ export default function ExecutiveDashboardNew() {
         </article>
 
         <article className="nexo-surface-primary p-5">
-          <h2 className="text-base font-semibold text-[var(--text-primary)]">Top prioridades</h2>
-          <p className="mt-1 text-xs text-[var(--text-muted)]">Impacto direto em caixa e velocidade de operação.</p>
+          <h2 className="text-base font-semibold text-[var(--text-primary)]">
+            Top prioridades
+          </h2>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
+            Impacto direto em caixa e velocidade de operação.
+          </p>
           <div className="mt-4 space-y-3">
             {priorityProblems.map((problem, index) => (
               <div key={problem.id} className="nexo-surface-inner p-3">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-orange-300">#{index + 1} prioridade</p>
-                <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">{problem.title}</p>
-                <p className="text-xs text-[var(--text-muted)]">{problem.count} itens • {formatCurrency(problem.impactCents)} de impacto</p>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-orange-300">
+                  #{index + 1} prioridade
+                </p>
+                <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
+                  {problem.title}
+                </p>
+                <p className="text-xs text-[var(--text-muted)]">
+                  {problem.count} itens • {formatCurrency(problem.impactCents)}{" "}
+                  de impacto
+                </p>
               </div>
             ))}
           </div>
@@ -1083,17 +1136,43 @@ export default function ExecutiveDashboardNew() {
 
       <section className="grid gap-6 xl:grid-cols-3">
         <article className="nexo-surface-primary xl:col-span-2 p-5">
-          <h2 className="text-base font-semibold text-[var(--text-primary)]">Receita ao longo do tempo</h2>
+          <h2 className="text-base font-semibold text-[var(--text-primary)]">
+            Receita ao longo do tempo
+          </h2>
           {lineChartData.length === 0 ? (
-            <div className="mt-3 text-sm text-[var(--text-muted)]">Sem série temporal disponível no momento.</div>
+            <div className="mt-3 text-sm text-[var(--text-muted)]">
+              Sem série temporal disponível no momento.
+            </div>
           ) : (
             <div className="mt-4 h-[250px]">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={lineChartData}>
-                  <XAxis dataKey="period" tickLine={false} axisLine={false} tickMargin={8} />
-                  <YAxis tickLine={false} axisLine={false} width={84} tickFormatter={value => formatCurrency(Number(value) * 100)} />
-                  <Tooltip formatter={(value: number) => [formatCurrency(Number(value) * 100), "Receita"]} />
-                  <Line type="monotone" dataKey="value" stroke="#f97316" strokeWidth={3} dot={false} activeDot={{ r: 5, fill: "#f97316" }} />
+                  <XAxis
+                    dataKey="period"
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={8}
+                  />
+                  <YAxis
+                    tickLine={false}
+                    axisLine={false}
+                    width={84}
+                    tickFormatter={value => formatCurrency(Number(value) * 100)}
+                  />
+                  <Tooltip
+                    formatter={(value: number) => [
+                      formatCurrency(Number(value) * 100),
+                      "Receita",
+                    ]}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="value"
+                    stroke="#f97316"
+                    strokeWidth={3}
+                    dot={false}
+                    activeDot={{ r: 5, fill: "#f97316" }}
+                  />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -1101,17 +1180,36 @@ export default function ExecutiveDashboardNew() {
         </article>
 
         <article className="nexo-surface-primary p-5">
-          <h2 className="text-base font-semibold text-[var(--text-primary)]">Distribuição de cobrança</h2>
+          <h2 className="text-base font-semibold text-[var(--text-primary)]">
+            Distribuição de cobrança
+          </h2>
           <div className="mt-4 h-[250px]">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart margin={{ top: 6, right: 10, bottom: 12, left: 10 }}>
-                <Pie data={displayChargesStatus} dataKey="value" nameKey="label" innerRadius={52} outerRadius={86} paddingAngle={3}>
+                <Pie
+                  data={displayChargesStatus}
+                  dataKey="value"
+                  nameKey="label"
+                  innerRadius={52}
+                  outerRadius={86}
+                  paddingAngle={3}
+                >
                   {displayChargesStatus.map((entry, index) => (
-                    <Cell key={entry.key} fill={["#f97316", "#22c55e", "#ef4444", "#3b82f6"][index % 4]} />
+                    <Cell
+                      key={entry.key}
+                      fill={
+                        ["#f97316", "#22c55e", "#ef4444", "#3b82f6"][index % 4]
+                      }
+                    />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value: number, name) => [value, String(name)]} />
-                <Legend verticalAlign="bottom" wrapperStyle={{ paddingTop: 14, fontSize: 12 }} />
+                <Tooltip
+                  formatter={(value: number, name) => [value, String(name)]}
+                />
+                <Legend
+                  verticalAlign="bottom"
+                  wrapperStyle={{ paddingTop: 14, fontSize: 12 }}
+                />
               </PieChart>
             </ResponsiveContainer>
           </div>
@@ -1120,19 +1218,32 @@ export default function ExecutiveDashboardNew() {
 
       <section className="grid gap-6 xl:grid-cols-3">
         <article className="nexo-surface-primary xl:col-span-2 p-5">
-          <h2 className="text-base font-semibold text-[var(--text-primary)]">Automação e próximas ações</h2>
-          <p className="mt-1 text-xs text-[var(--text-muted)]">Execução híbrida com trilha de decisão auditável.</p>
+          <h2 className="text-base font-semibold text-[var(--text-primary)]">
+            Automação e próximas ações
+          </h2>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
+            Execução híbrida com trilha de decisão auditável.
+          </p>
           <div className="mt-4">
-            <OperationalActionFeed plan={executionPlan} riskOperationalState={riskOperationalState} />
+            <OperationalActionFeed
+              plan={executionPlan}
+              riskOperationalState={riskOperationalState}
+            />
           </div>
         </article>
         <article className="nexo-surface-primary p-5">
-          <h2 className="text-base font-semibold text-[var(--text-primary)]">Alertas</h2>
+          <h2 className="text-base font-semibold text-[var(--text-primary)]">
+            Alertas
+          </h2>
           <div className="mt-3 space-y-3 text-sm">
             <div className="nexo-surface-inner p-3">
-              <p className="font-medium text-[var(--text-primary)]">Safety limits</p>
+              <p className="font-medium text-[var(--text-primary)]">
+                Safety limits
+              </p>
               <p className="mt-1 text-xs text-[var(--text-muted)]">
-                {safetyState.shouldFallbackToManual ? "Fallback manual ativado." : "Automação dentro do limite."}
+                {safetyState.shouldFallbackToManual
+                  ? "Fallback manual ativado."
+                  : "Automação dentro do limite."}
               </p>
             </div>
             {quotaWarnings.length > 0 ? (
@@ -1153,7 +1264,11 @@ export default function ExecutiveDashboardNew() {
         </article>
       </section>
 
-      {(metricsQuery.isError || revenueQuery.isError || serviceOrdersStatusQuery.isError || chargesStatusQuery.isError) && !hasAnyCriticalError ? (
+      {(metricsQuery.isError ||
+        revenueQuery.isError ||
+        serviceOrdersStatusQuery.isError ||
+        chargesStatusQuery.isError) &&
+      !hasAnyCriticalError ? (
         <section className="nexo-surface-inner border-amber-400/40 p-4 text-sm text-amber-200">
           Parte dos blocos não foi carregada. Os dados visíveis já são válidos.
         </section>
@@ -1161,7 +1276,8 @@ export default function ExecutiveDashboardNew() {
 
       {isSlowLoading ? (
         <section className="nexo-surface-inner nexo-info-banner p-4 text-sm">
-          A atualização está mais lenta que o normal; continue navegando enquanto os blocos são carregados.
+          A atualização está mais lenta que o normal; continue navegando
+          enquanto os blocos são carregados.
         </section>
       ) : null}
     </div>
