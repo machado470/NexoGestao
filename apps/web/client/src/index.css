@@ -249,6 +249,11 @@
 
   --popover: #ffffff;
   --popover-foreground: #0f172a;
+  --app-overlay-bg: #ffffff;
+  --app-overlay-surface: #ffffff;
+  --app-overlay-border: rgba(70, 102, 136, 0.24);
+  --app-overlay-shadow: 0 18px 44px rgba(17, 40, 68, 0.14);
+  --app-overlay-text: #12243f;
 
   --secondary: #f3f4f6;
   --secondary-foreground: #1f2937;
@@ -322,6 +327,11 @@
 
   --popover: #111318;
   --popover-foreground: #f4f4f5;
+  --app-overlay-bg: #111d2e;
+  --app-overlay-surface: #152036;
+  --app-overlay-border: rgba(139, 156, 192, 0.26);
+  --app-overlay-shadow: 0 24px 60px rgba(2, 6, 23, 0.55);
+  --app-overlay-text: #f0f4ff;
 
   --secondary: #141821;
   --secondary-foreground: #e4e4e7;
@@ -1689,14 +1699,17 @@ html {
   }
 
   .nexo-floating-panel {
-    color: var(--popover-foreground);
+    border-color: var(--app-overlay-border);
+    background: var(--app-overlay-bg);
+    color: var(--app-overlay-text);
+    box-shadow: var(--app-overlay-shadow);
   }
 
   .nexo-modal-content {
-    border: 1px solid var(--border-soft);
-    background: var(--bg-surface);
-    color: var(--text-primary);
-    box-shadow: none;
+    border: 1px solid var(--app-overlay-border);
+    background: var(--app-overlay-surface);
+    color: var(--app-overlay-text);
+    box-shadow: var(--app-overlay-shadow);
   }
 
   .nexo-modal-body {
@@ -2603,6 +2616,11 @@ html {
     --app-muted: #5f7796;
     --app-sidebar: #e9f0f8;
     --app-topbar: #f5f8fc;
+    --app-overlay-bg: #ffffff;
+    --app-overlay-surface: #ffffff;
+    --app-overlay-border: rgba(70, 102, 136, 0.24);
+    --app-overlay-shadow: 0 18px 44px rgba(17, 40, 68, 0.14);
+    --app-overlay-text: #12243f;
   }
 
   .app-root.dark,
@@ -2617,6 +2635,11 @@ html {
     --app-muted: #8fa5c8;
     --app-sidebar: #0b1122;
     --app-topbar: #101a2d;
+    --app-overlay-bg: #111d2e;
+    --app-overlay-surface: #152036;
+    --app-overlay-border: rgba(139, 156, 192, 0.26);
+    --app-overlay-shadow: 0 24px 60px rgba(2, 6, 23, 0.55);
+    --app-overlay-text: #f0f4ff;
   }
 
   .app-root,

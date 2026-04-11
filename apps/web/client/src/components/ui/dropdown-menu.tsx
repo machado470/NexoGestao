@@ -40,7 +40,7 @@ function DropdownMenuContent({
         data-slot="dropdown-menu-content"
         sideOffset={sideOffset}
         className={cn(
-          "nexo-floating-panel text-popover-foreground nexo-motion-panel z-50 max-h-(--radix-dropdown-menu-content-available-height) min-w-[8rem] origin-(--radix-dropdown-menu-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-[var(--radius-surface)] p-1.5",
+          "nexo-floating-panel border-[var(--app-overlay-border)] bg-[var(--app-overlay-bg)] text-[var(--app-overlay-text)] shadow-[var(--app-overlay-shadow)] nexo-motion-panel z-50 max-h-(--radix-dropdown-menu-content-available-height) min-w-[8rem] origin-(--radix-dropdown-menu-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-[var(--radius-surface)] border p-1.5",
           className
         )}
         {...props}
