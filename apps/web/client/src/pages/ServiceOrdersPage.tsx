@@ -3,13 +3,15 @@ import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { normalizeArrayPayload } from "@/lib/query-helpers";
 import CreateServiceOrderModal from "@/components/CreateServiceOrderModal";
+import { PageWrapper } from "@/components/operating-system/Wrappers";
+import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
+import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedbackButton";
+import { getOperationalSeverityLabel, getServiceOrderSeverity } from "@/lib/operations/operational-intelligence";
 import {
   AppDataTable,
   AppEmptyState,
   AppKpiRow,
   AppLoadingState,
-  AppPageHeader,
-  AppPageShell,
   AppPriorityBadge,
   AppRowActions,
   AppSectionBlock,
@@ -31,12 +33,14 @@ export default function ServiceOrdersPage() {
   const done = orders.filter((item) => String(item?.status ?? "").toUpperCase() === "DONE").length;
 
   return (
-    <AppPageShell>
-      <AppPageHeader
-        title="Ordens de Serviço"
+    <PageWrapper title="Ordens de Serviço" subtitle="Pipeline operacional sem desvio de contrato entre módulos.">
+      <OperationalTopCard
+        contextLabel="Direção de execução"
+        title="Pipeline de ordens de serviço"
         description="Execução real conectada ao backend com próximos passos de cobrança e WhatsApp."
-        ctaLabel="Criar nova O.S. agora"
-        onCta={() => setOpenCreate(true)}
+        primaryAction={(
+          <ActionFeedbackButton state="idle" idleLabel="Criar nova O.S. agora" onClick={() => setOpenCreate(true)} />
+        )}
       />
 
       <AppKpiRow
@@ -70,7 +74,7 @@ export default function ServiceOrdersPage() {
                   <tr key={String(order?.id)} className="border-t border-[var(--border-subtle)]">
                     <td className="p-3">{String(order?.title ?? "Sem título")}</td>
                     <td>{String(order?.customer?.name ?? "—")}</td>
-                    <td><AppStatusBadge label={String(order?.status ?? "Pendente")} /></td>
+                    <td><AppStatusBadge label={getOperationalSeverityLabel(getServiceOrderSeverity(order))} /></td>
                     <td><AppPriorityBadge label={`P${String(order?.priority ?? 2)}`} /></td>
                     <td className="p-3">
                       <AppRowActions actions={[
@@ -95,6 +99,6 @@ export default function ServiceOrdersPage() {
         customers={customers.map((item) => ({ id: String(item.id), name: String(item.name ?? "Cliente") }))}
         people={people.map((item) => ({ id: String(item.id), name: String(item.name ?? "Pessoa") }))}
       />
-    </AppPageShell>
+    </PageWrapper>
   );
 }

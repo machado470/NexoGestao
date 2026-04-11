@@ -3,14 +3,15 @@ import { Bar, BarChart, CartesianGrid, XAxis } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { trpc } from "@/lib/trpc";
 import { normalizeArrayPayload } from "@/lib/query-helpers";
+import { PageWrapper } from "@/components/operating-system/Wrappers";
+import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
+import { Button } from "@/components/design-system";
 import {
   AppChartPanel,
   AppEmptyState,
   AppFiltersBar,
   AppKpiRow,
   AppLoadingState,
-  AppPageHeader,
-  AppPageShell,
   AppSectionBlock,
   Input,
 } from "@/components/internal-page-system";
@@ -64,10 +65,16 @@ export default function TimelinePage() {
   const uniqueActors = new Set(filteredEvents.map((event) => String(event?.actorId ?? event?.actorName ?? "")).filter(Boolean)).size;
 
   return (
-    <AppPageShell>
-      <AppPageHeader
-        title="Timeline Auditável"
+    <PageWrapper title="Timeline Auditável" subtitle="Rastreabilidade operacional padronizada entre módulos.">
+      <OperationalTopCard
+        contextLabel="Direção de auditoria"
+        title="Histórico operacional rastreável"
         description="Histórico operacional real com rastreabilidade por entidade e ação."
+        primaryAction={(
+          <Button type="button" variant="outline" onClick={() => void timelineQuery.refetch()}>
+            Atualizar timeline
+          </Button>
+        )}
       />
 
       <AppKpiRow
@@ -127,6 +134,6 @@ export default function TimelinePage() {
           </ul>
         )}
       </AppSectionBlock>
-    </AppPageShell>
+    </PageWrapper>
   );
 }

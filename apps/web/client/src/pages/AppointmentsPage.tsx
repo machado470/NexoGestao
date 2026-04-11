@@ -3,13 +3,15 @@ import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { normalizeArrayPayload } from "@/lib/query-helpers";
 import { CreateAppointmentModal } from "@/components/CreateAppointmentModal";
+import { PageWrapper } from "@/components/operating-system/Wrappers";
+import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
+import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedbackButton";
+import { getAppointmentSeverity, getOperationalSeverityLabel } from "@/lib/operations/operational-intelligence";
 import {
   AppDataTable,
   AppEmptyState,
   AppKpiRow,
   AppLoadingState,
-  AppPageHeader,
-  AppPageShell,
   AppRowActions,
   AppSectionBlock,
   AppStatusBadge,
@@ -29,12 +31,14 @@ export default function AppointmentsPage() {
   const confirmed = appointments.filter((item) => String(item?.status ?? "").toUpperCase() === "CONFIRMED").length;
 
   return (
-    <AppPageShell>
-      <AppPageHeader
-        title="Agendamentos"
+    <PageWrapper title="Agendamentos" subtitle="Agenda operacional com ações padronizadas e rastreáveis.">
+      <OperationalTopCard
+        contextLabel="Direção de agenda"
+        title="Fila de agendamentos"
         description="Agendamentos reais com atualização automática após cada criação."
-        ctaLabel="Criar agendamento agora"
-        onCta={() => setOpenCreate(true)}
+        primaryAction={(
+          <ActionFeedbackButton state="idle" idleLabel="Criar agendamento agora" onClick={() => setOpenCreate(true)} />
+        )}
       />
 
       <AppKpiRow
@@ -68,7 +72,7 @@ export default function AppointmentsPage() {
                   <tr key={String(appointment?.id)} className="border-t border-[var(--border-subtle)]">
                     <td className="p-3">{new Date(String(appointment?.startsAt)).toLocaleString("pt-BR")}</td>
                     <td>{String(appointment?.customer?.name ?? "Cliente")}</td>
-                    <td><AppStatusBadge label={String(appointment?.status ?? "Pendente")} /></td>
+                    <td><AppStatusBadge label={getOperationalSeverityLabel(getAppointmentSeverity(appointment))} /></td>
                     <td>{appointment?.endsAt ? new Date(String(appointment.endsAt)).toLocaleString("pt-BR") : "—"}</td>
                     <td className="p-3">
                       <AppRowActions
@@ -94,6 +98,6 @@ export default function AppointmentsPage() {
         }}
         customers={customers.map((item) => ({ id: String(item.id), name: String(item.name ?? "Cliente") }))}
       />
-    </AppPageShell>
+    </PageWrapper>
   );
 }

@@ -3,13 +3,14 @@ import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import CreateCustomerModal from "@/components/CreateCustomerModal";
 import { normalizeArrayPayload } from "@/lib/query-helpers";
+import { Button } from "@/components/design-system";
+import { PageWrapper } from "@/components/operating-system/Wrappers";
+import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import {
   AppDataTable,
   AppEmptyState,
   AppKpiRow,
   AppLoadingState,
-  AppPageHeader,
-  AppPageShell,
   AppRowActions,
   AppSectionBlock,
   AppStatusBadge,
@@ -33,12 +34,22 @@ export default function CustomersPage() {
   );
 
   return (
-    <AppPageShell>
-      <AppPageHeader
-        title="Clientes"
+    <PageWrapper title="Clientes" subtitle="Cadastre clientes reais e avance o fluxo operacional sem rupturas.">
+      <OperationalTopCard
+        contextLabel="Direção comercial"
+        title="Base de clientes operacional"
         description="Cadastre clientes reais, acompanhe status e siga para os próximos passos da operação."
-        ctaLabel="Criar cliente agora"
-        onCta={() => setCreateOpen(true)}
+        chips={(
+          <>
+            <span className="rounded-full border border-[var(--border-subtle)] px-3 py-1 text-xs text-[var(--text-secondary)]">Ativos: {activeCustomers}</span>
+            <span className="rounded-full border border-[var(--border-subtle)] px-3 py-1 text-xs text-[var(--text-secondary)]">Em risco: {customersWithOverdue.size}</span>
+          </>
+        )}
+        primaryAction={(
+          <Button type="button" onClick={() => setCreateOpen(true)}>
+            Criar cliente agora
+          </Button>
+        )}
       />
 
       <AppKpiRow
@@ -102,6 +113,6 @@ export default function CustomersPage() {
           if (created?.id) navigate(`/appointments?customerId=${created.id}`);
         }}
       />
-    </AppPageShell>
+    </PageWrapper>
   );
 }
