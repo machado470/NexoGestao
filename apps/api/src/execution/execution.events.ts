@@ -96,6 +96,8 @@ export class ExecutionEventsService {
       executed: 0,
       failed: 0,
       blocked: 0,
+      blockedRecent: 0,
+      skipped: 0,
       throttled: 0,
     }
 
@@ -105,7 +107,11 @@ export class ExecutionEventsService {
 
       if (status === 'executed') summary.executed += 1
       else if (status === 'failed') summary.failed += 1
-      else if (status === 'blocked' || status === 'requires_confirmation') summary.blocked += 1
+      else if (status === 'blocked' || status === 'requires_confirmation') {
+        const reasonCode = String(metadata.reasonCode ?? '')
+        if (reasonCode === 'blocked_recent_execution') summary.blockedRecent += 1
+        else summary.blocked += 1
+      }
       else if (status === 'throttled') summary.throttled += 1
       else summary.pending += 1
     }

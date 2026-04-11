@@ -17,6 +17,8 @@ export type ExecutionStateSummary = {
   executed: number
   failed: number
   blocked: number
+  blockedRecent: number
+  skipped: number
   throttled: number
 }
 
@@ -63,6 +65,7 @@ export type ExecutionEventPayload = {
     policyKey?: string
     policyValue?: unknown
     governanceReason?: string
+    cooldownUntil?: string
   }
   metadata?: Record<string, unknown>
 }
