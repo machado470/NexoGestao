@@ -352,7 +352,7 @@ export default function CreateServiceOrderModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="nexo-modal-body max-h-[calc(90vh-152px)] overflow-y-auto p-6">
+        <div className="nexo-modal-body p-6 pb-28">
           {createdServiceOrder ? (
             <section className="space-y-4 rounded-xl border border-emerald-200 bg-emerald-50 p-5 dark:border-emerald-900/40 dark:bg-emerald-950/20">
               <h3 className="text-base font-semibold text-emerald-900 dark:text-emerald-200">

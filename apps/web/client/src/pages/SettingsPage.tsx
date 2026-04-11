@@ -36,7 +36,7 @@ function sanitizeSettings(payload: unknown): SettingsResponse | null {
   const raw = normalizeObjectPayload<Partial<SettingsResponse>>(payload);
   if (!raw || typeof raw !== "object") return null;
 
-  const id = String(raw.id ?? "").trim();
+  const id = String(raw.id ?? raw.slug ?? "settings").trim();
   if (!id) return null;
 
   return {
@@ -70,7 +70,7 @@ function formsAreEqual(a: SettingsFormData, b: SettingsFormData) {
 
 export default function SettingsPage() {
   const { isAuthenticated, isInitializing } = useAuth();
-  const canLoad = isAuthenticated;
+  const canLoad = isAuthenticated && !isInitializing;
   const utils = trpc.useUtils();
 
   const query = trpc.nexo.settings.get.useQuery(undefined, {

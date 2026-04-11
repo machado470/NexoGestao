@@ -2047,6 +2047,34 @@ html {
     box-shadow: none;
   }
 
+  .app-root.dark .nexo-card-base,
+  .app-root.dark .nexo-card-kpi,
+  .app-root.dark .nexo-card-operational,
+  .app-root.dark .nexo-card-informative,
+  .app-root.dark .nexo-card-alert,
+  .app-root.dark .nexo-kpi-card,
+  .app-root.dark .nexo-surface,
+  .app-root.dark .nexo-surface-primary,
+  .app-root.dark .nexo-surface-operational,
+  .app-root.dark .nexo-page-header,
+  .app-root[data-theme="dark"] .nexo-card-base,
+  .app-root[data-theme="dark"] .nexo-card-kpi,
+  .app-root[data-theme="dark"] .nexo-card-operational,
+  .app-root[data-theme="dark"] .nexo-card-informative,
+  .app-root[data-theme="dark"] .nexo-card-alert,
+  .app-root[data-theme="dark"] .nexo-kpi-card,
+  .app-root[data-theme="dark"] .nexo-surface,
+  .app-root[data-theme="dark"] .nexo-surface-primary,
+  .app-root[data-theme="dark"] .nexo-surface-operational,
+  .app-root[data-theme="dark"] .nexo-page-header {
+    border-color: color-mix(in srgb, #93a6cf 22%, transparent);
+    background:
+      linear-gradient(180deg, rgba(20, 30, 48, 0.94), rgba(11, 18, 31, 0.96));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.04),
+      0 16px 34px rgba(2, 6, 23, 0.36);
+  }
+
   .app-root .nexo-card-base:hover,
   .app-root .nexo-card-kpi:hover,
   .app-root .nexo-card-operational:hover,
@@ -2060,24 +2088,76 @@ html {
     box-shadow: none;
   }
 
+  .app-root.dark .nexo-card-base:hover,
+  .app-root.dark .nexo-card-kpi:hover,
+  .app-root.dark .nexo-card-operational:hover,
+  .app-root.dark .nexo-card-informative:hover,
+  .app-root.dark .nexo-card-alert:hover,
+  .app-root.dark .nexo-kpi-card:hover,
+  .app-root.dark .nexo-surface:hover,
+  .app-root.dark .nexo-surface-primary:hover,
+  .app-root[data-theme="dark"] .nexo-card-base:hover,
+  .app-root[data-theme="dark"] .nexo-card-kpi:hover,
+  .app-root[data-theme="dark"] .nexo-card-operational:hover,
+  .app-root[data-theme="dark"] .nexo-card-informative:hover,
+  .app-root[data-theme="dark"] .nexo-card-alert:hover,
+  .app-root[data-theme="dark"] .nexo-kpi-card:hover,
+  .app-root[data-theme="dark"] .nexo-surface:hover,
+  .app-root[data-theme="dark"] .nexo-surface-primary:hover {
+    border-color: color-mix(in srgb, #a9badf 30%, transparent);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.05),
+      0 18px 38px rgba(2, 6, 23, 0.42);
+  }
+
   .app-root .nexo-card-kpi::before,
   .app-root .nexo-kpi-card::before {
     display: none;
   }
 
   .app-root .nexo-modal-content {
+    display: flex;
+    flex-direction: column;
     border-color: var(--border-subtle);
     background: var(--bg-surface);
   }
 
   .app-root .nexo-modal-body {
+    min-height: 0;
+    flex: 1;
+    overflow-y: auto;
+    padding-bottom: 1.25rem;
     background: var(--bg-surface);
     color: var(--text-secondary);
   }
 
   .app-root .nexo-modal-footer {
-    position: static;
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    margin-top: 0;
     border-top: 1px solid var(--border-subtle);
     background: var(--bg-surface);
+  }
+
+  .app-root:not(.dark) .nexo-sidebar,
+  .app-root:not(.dark) .nexo-topbar,
+  .app-root:not(.dark) .nexo-topbar-control,
+  .app-root:not(.dark) .nexo-sidebar-item,
+  .app-root:not(.dark) .nexo-subtle-surface,
+  .app-root:not(.dark) .nexo-info-banner,
+  .app-root:not(.dark) .nexo-empty-state,
+  .app-root:not(.dark) .nexo-alert-card {
+    color: var(--text-primary);
+    background-color: var(--nexo-card-surface);
+    border-color: var(--nexo-border-soft);
+  }
+
+  .app-root:not(.dark) input,
+  .app-root:not(.dark) textarea,
+  .app-root:not(.dark) select {
+    color: var(--text-primary);
+    background: color-mix(in srgb, var(--nexo-card-surface) 94%, #f4f8ff);
+    border-color: var(--nexo-border-soft);
   }
 }

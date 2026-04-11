@@ -252,7 +252,6 @@ export function MainLayout({ children }: MainLayoutProps) {
           label: "Configurações",
           route: "/settings",
           icon: Settings,
-          permissions: ["settings:manage"],
         },
       ],
     },
