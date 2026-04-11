@@ -124,7 +124,7 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "nexo-modal-content border-[var(--app-overlay-border)] bg-[var(--app-overlay-surface)] text-[var(--app-overlay-text)] shadow-[var(--app-overlay-shadow)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid h-fit max-h-[90vh] w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 overflow-hidden rounded-[1rem] border p-6 duration-200 sm:max-w-lg",
+          "nexo-modal-content border-[var(--app-overlay-border)] bg-[var(--app-overlay-surface)] text-[var(--app-overlay-text)] shadow-[var(--app-overlay-shadow)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid h-fit max-h-[90vh] w-full max-w-[calc(100%-1rem)] translate-x-[-50%] translate-y-[-50%] gap-4 overflow-hidden rounded-[1rem] border p-4 duration-200 sm:max-w-lg sm:p-6",
           className
         )}
         onEscapeKeyDown={handleEscapeKeyDown}
@@ -163,7 +163,7 @@ function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="dialog-footer"
       className={cn(
-        "nexo-modal-footer mt-auto flex flex-col-reverse gap-2 px-0 pt-3 sm:flex-row sm:justify-end",
+        "nexo-modal-footer mt-auto flex flex-col-reverse gap-2 px-0 pt-3 sm:flex-row sm:justify-end sm:gap-3",
         className
       )}
       {...props}

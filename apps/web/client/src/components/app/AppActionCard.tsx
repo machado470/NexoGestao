@@ -16,7 +16,7 @@ export function AppActionCard({
 }) {
   return (
     <article
-      className={cn("nexo-card-panel cursor-pointer p-4", className)}
+      className={cn("nexo-card-panel min-w-0 cursor-pointer p-4", className)}
       role="button"
       tabIndex={0}
       onClick={onClick}
@@ -27,9 +27,9 @@ export function AppActionCard({
         }
       }}
     >
-      <p className="text-xs font-medium text-[var(--text-secondary)]">{title}</p>
-      {description ? <p className="mt-1 text-xs text-[var(--text-muted)]">{description}</p> : null}
-      {children ? <div className="mt-3 flex items-center justify-between gap-2">{children}</div> : null}
+      <p className="nexo-truncate text-xs font-medium text-[var(--text-secondary)]" title={title}>{title}</p>
+      {description ? <p className="mt-1 text-xs text-[var(--text-muted)] nexo-text-wrap">{description}</p> : null}
+      {children ? <div className="mt-3 flex min-w-0 items-center justify-between gap-2">{children}</div> : null}
     </article>
   );
 }

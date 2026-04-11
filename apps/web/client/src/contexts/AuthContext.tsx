@@ -399,7 +399,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const isSubmitting = isAuthenticating;
 
-  /* 🔥 CORREÇÃO AQUI */
   const isInitializing =
     shouldBootstrapSession &&
     !forcedLoggedOut &&

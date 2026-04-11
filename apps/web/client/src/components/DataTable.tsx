@@ -106,8 +106,8 @@ export function DataTable<T extends { id?: number | string }>({
         />
       ) : (
         <>
-          <div className="hidden md:block">
-            <Table>
+          <div className="nexo-data-table-wrap hidden md:block">
+            <Table className="min-w-[760px]">
               <TableHeader>
                 <TableRow>
                   {visibleColumns.map((column) => (
@@ -135,11 +135,13 @@ export function DataTable<T extends { id?: number | string }>({
                 {sortedData.map((row, rowIndex) => (
                   <TableRow key={row.id || rowIndex}>
                     {visibleColumns.map((column) => (
-                      <TableCell key={String(column.key)} className={column.width || ""}>
-                        {column.render ? column.render(row[column.key], row) : String(row[column.key] ?? "—")}
+                      <TableCell key={String(column.key)} className={`min-w-0 ${column.width || ""}`.trim()}>
+                        <span className="block min-w-0 nexo-text-wrap">
+                          {column.render ? column.render(row[column.key], row) : String(row[column.key] ?? "—")}
+                        </span>
                       </TableCell>
                     ))}
-                    {rowActions ? <TableCell>{rowActions(row)}</TableCell> : null}
+                    {rowActions ? <TableCell className="min-w-[120px]">{rowActions(row)}</TableCell> : null}
                   </TableRow>
                 ))}
               </TableBody>
