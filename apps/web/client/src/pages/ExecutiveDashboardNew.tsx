@@ -1,5 +1,6 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
+import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -14,6 +15,8 @@ import {
   AppOperationalStateCard,
   AppOperationalStatePanel,
 } from "@/components/app-system";
+import { Button } from "@/components/ui/button";
+import { useActionHandler } from "@/hooks/useActionHandler";
 import {
   buildBottleneckGroups,
   buildEntityContextBridge,
@@ -43,6 +46,8 @@ function formatCurrency(cents: number) {
 export default function ExecutiveDashboardNew() {
   const { isAuthenticated, isInitializing } = useAuth();
   const [, navigate] = useLocation();
+  const { executeAction } = useActionHandler();
+  const [isExecutingNext, setIsExecutingNext] = useState(false);
   const canQuery = isAuthenticated && !isInitializing;
 
   const metricsQuery = trpc.dashboard.kpis.useQuery(undefined, { enabled: canQuery, retry: false, refetchOnWindowFocus: false });
@@ -93,6 +98,30 @@ export default function ExecutiveDashboardNew() {
     `${metrics.delayedOrders} ordens com atraso operacional`,
   ];
 
+  const executeNextAction = async () => {
+    const nextAction = nextActions[0];
+    if (!nextAction?.executionAction) {
+      toast.message("Sem próxima ação executável no momento.");
+      return;
+    }
+
+    setIsExecutingNext(true);
+    const result = await executeAction(nextAction.executionAction);
+    await Promise.all([
+      metricsQuery.refetch(),
+      appointmentsQuery.refetch(),
+      serviceOrdersQuery.refetch(),
+      chargesQuery.refetch(),
+      customersQuery.refetch(),
+      governanceSummaryQuery.refetch(),
+    ]);
+
+    if (result.ok) {
+      toast.success("Próxima ação executada. Estado operacional recalculado.");
+    }
+    setIsExecutingNext(false);
+  };
+
   return (
     <AppPageShell>
       <AppPageHeader>
@@ -101,6 +130,9 @@ export default function ExecutiveDashboardNew() {
             <h1 className="nexo-page-header-title">Centro de decisão operacional</h1>
             <p className="nexo-page-header-description">Painel executivo do ciclo Cliente → Agendamento → O.S. → Cobrança → Pagamento.</p>
           </div>
+          <Button onClick={() => void executeNextAction()} disabled={isExecutingNext || nextActions.length === 0}>
+            {isExecutingNext ? "Executando fluxo..." : "Executar próxima ação"}
+          </Button>
         </div>
       </AppPageHeader>
 
@@ -138,7 +170,7 @@ export default function ExecutiveDashboardNew() {
               title: action.title,
               description: action.description,
               severity: action.severity,
-              onRun: () => navigate(action.href),
+              action: action.executionAction,
             }))}
           />
         </AppSectionCard>

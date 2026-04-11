@@ -29,6 +29,7 @@ import { TableSkeleton } from "@/components/QueryStateBoundary";
 import { NexoStatusBadge } from "@/components/design-system";
 import { mapFinanceStatus } from "@/lib/status-badge";
 import { useChargeActions } from "@/hooks/useChargeActions";
+import { useActionHandler } from "@/hooks/useActionHandler";
 import { useProductAnalytics } from "@/hooks/useProductAnalytics";
 import { generateFinanceActions } from "@/lib/smartActions";
 import {
@@ -123,6 +124,7 @@ export default function FinancesPage() {
   const canLoadFinance = isAuthenticated;
 
   const [location, navigate] = useLocation();
+  const { executeAction } = useActionHandler();
 
   const searchParams = useMemo(() => {
     const queryString = location.includes("?") ? location.split("?")[1] : "";
@@ -752,7 +754,7 @@ export default function FinancesPage() {
               title: action.title,
               description: action.description,
               severity: action.severity,
-              onRun: () => navigate(action.href),
+              action: action.executionAction,
             }))}
           />
         </AppSectionCard>
@@ -921,8 +923,15 @@ export default function FinancesPage() {
                         const nextPath =
                           buildWhatsAppUrlFromCharge(charge) ??
                           `/whatsapp?returnTo=${encodeURIComponent("/finances")}`;
-                        navigate(nextPath);
-                        setTimeout(() => setWhatsAppOpeningId(null), 1300);
+                        void executeAction({
+                          id: `finance-open-whatsapp-${charge.id}`,
+                          type: "navigate",
+                          entityType: "charge",
+                          entityId: charge.id,
+                          payload: { path: nextPath },
+                        }).finally(() => {
+                          setTimeout(() => setWhatsAppOpeningId(null), 1300);
+                        });
                       }}
                     >
                       {whatsAppOpeningId === charge.id
@@ -944,7 +953,16 @@ export default function FinancesPage() {
                         void (async () => {
                           try {
                             setPaymentSubmittingId(charge.id);
-                            await registerPayment(charge, "CASH");
+                            await executeAction({
+                              id: `finance-mark-paid-${charge.id}`,
+                              type: "mutation",
+                              entityType: "charge",
+                              entityId: charge.id,
+                              payload: {
+                                mutationKey: "finance.charge.mark_paid",
+                                data: { chargeId: charge.id, amountCents: charge.amountCents },
+                              },
+                            });
                             setPaymentDoneId(charge.id);
                             setTimeout(() => setPaymentDoneId(null), 1500);
                             void chargesQuery.refetch();
