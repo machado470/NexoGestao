@@ -15,6 +15,7 @@ import {
   AppAlertList,
   AppRowActions,
 } from "@/components/internal-page-system";
+import { AppNextActions } from "@/components/app";
 import { buildOperationalRoute } from "@/lib/operational";
 
 const growthData = [
@@ -29,6 +30,19 @@ export default function CustomersPage() {
   return (
     <AppPageShell>
       <AppPageHeader title="Clientes" description="Gestão da base, valor e engajamento operacional." ctaLabel="Novo cliente" />
+      <AppNextActions
+        title="Próximas ações"
+        engineInput={{
+          customers: [
+            { id: "c-atlas", name: "Atlas Engenharia", phone: "5511988881200" },
+            { id: "c-solar", name: "Solar Prime", phone: "5511988881210" },
+            { id: "c-orion", name: "Condomínio Orion", phone: "5511988881220" },
+          ],
+          charges: [{ id: "charge-customers-1", customerId: "c-atlas", status: "OVERDUE", amountCents: 20000, dueDate: "2026-04-05T10:00:00Z" }],
+          serviceOrders: [],
+          appointments: [],
+        }}
+      />
       <AppKpiRow items={[
         { label: "Clientes totais", value: "312", trend: 4.8, context: "vs mês anterior" },
         { label: "Ativos", value: "276", trend: 3.3, context: "últimos 30 dias" },
