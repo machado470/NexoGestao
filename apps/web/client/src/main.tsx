@@ -38,18 +38,12 @@ const queryClient = new QueryClient({
       gcTime: 30 * 60_000,
       placeholderData: keepPreviousData,
       refetchOnWindowFocus: false,
-      refetchOnReconnect: true,
+      refetchOnReconnect: false,
       refetchOnMount: false,
-      retry(failureCount, error) {
-        if (shouldRedirectToLogin(error)) return false;
-        return failureCount < 2;
-      },
+      retry: false,
     },
     mutations: {
-      retry(failureCount, error) {
-        if (shouldRedirectToLogin(error)) return false;
-        return failureCount < 1;
-      },
+      retry: false,
     },
   },
 });

@@ -33,6 +33,9 @@ export class ExecutionConfigService {
   constructor(private readonly prisma: PrismaService) {}
 
   getDefaultMode(): ExecutionMode {
+    if (process.env.NODE_ENV === 'development') {
+      return 'manual'
+    }
     return normalizeMode(process.env.EXECUTION_MODE_DEFAULT)
   }
 

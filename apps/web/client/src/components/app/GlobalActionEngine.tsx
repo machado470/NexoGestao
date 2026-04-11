@@ -8,10 +8,18 @@ function toArray<T>(payload: unknown): T[] {
 }
 
 export function GlobalActionEngine() {
-  const customersQuery = trpc.nexo.customers.list.useQuery(undefined, { retry: false, refetchOnWindowFocus: false });
-  const appointmentsQuery = trpc.nexo.appointments.list.useQuery(undefined, { retry: false, refetchOnWindowFocus: false });
-  const serviceOrdersQuery = trpc.nexo.serviceOrders.list.useQuery({ page: 1, limit: 100 }, { retry: false, refetchOnWindowFocus: false });
-  const chargesQuery = trpc.finance.charges.list.useQuery({ page: 1, limit: 100 }, { retry: false, refetchOnWindowFocus: false });
+  const queryOptions = {
+    retry: false,
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
+  } as const;
+
+  const customersQuery = trpc.nexo.customers.list.useQuery(undefined, queryOptions);
+  const appointmentsQuery = trpc.nexo.appointments.list.useQuery(undefined, queryOptions);
+  const serviceOrdersQuery = trpc.nexo.serviceOrders.list.useQuery({ page: 1, limit: 100 }, queryOptions);
+  const chargesQuery = trpc.finance.charges.list.useQuery({ page: 1, limit: 100 }, queryOptions);
 
   const customers = useMemo(() => toArray<any>(customersQuery.data), [customersQuery.data]);
   const appointments = useMemo(() => toArray<any>(appointmentsQuery.data), [appointmentsQuery.data]);
