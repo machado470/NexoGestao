@@ -15,6 +15,23 @@ const pages = [
 ];
 
 const errors = [];
+
+const forbiddenClasses = [
+  "bg-zinc-900",
+  "bg-slate-900",
+  "bg-black",
+  "dark:bg-black",
+  "dark:bg-zinc-900",
+  "dark:bg-slate-900",
+];
+
+const styleScopeFiles = [
+  ...pages,
+  "client/src/components/ModalFlowShell.tsx",
+  "client/src/components/CreateCustomerModal.tsx",
+  "client/src/components/CreateAppointmentModal.tsx",
+  "client/src/components/CreateServiceOrderModal.tsx",
+];
 const statusScopePages = [
   "client/src/pages/AppointmentsPage.tsx",
   "client/src/pages/ServiceOrdersPage.tsx",
@@ -34,8 +51,7 @@ for (const page of pages) {
 
   const hasLegacyActionBar = /\bActionBarWrapper\b/.test(source);
   const hasNexoActionContract =
-    /\bOperationalTopCard\b/.test(source) ||
-    /\bNexoActionGroup\b/.test(source);
+    /\bOperationalTopCard\b/.test(source) || /\bNexoActionGroup\b/.test(source);
   if (!hasLegacyActionBar && !hasNexoActionContract) {
     errors.push(
       `${page}: contrato de ações ausente (esperado ActionBarWrapper legado ou OperationalTopCard/NexoActionGroup do Nexo).`
@@ -76,6 +92,17 @@ for (const page of pages) {
     if (hasPrimaryButtonInActionBar) {
       errors.push(
         `${page}: botão primário em ActionBar deve usar ActionFeedbackButton.`
+      );
+    }
+  }
+}
+
+for (const file of styleScopeFiles) {
+  const source = readFileSync(join(root, file), "utf8");
+  for (const forbidden of forbiddenClasses) {
+    if (source.includes(forbidden)) {
+      errors.push(
+        `${file}: classe proibida detectada (${forbidden}). Use tokens do app.`
       );
     }
   }

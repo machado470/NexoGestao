@@ -3,18 +3,11 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/design-system";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import { registerActionFlowEvent } from "@/lib/actionFlow";
+import { FormModal } from "@/components/app-modal-system";
+import { AppField, AppForm, AppSelect } from "@/components/app-system";
 
 interface CreateAppointmentModalProps {
   isOpen: boolean;
@@ -25,7 +18,12 @@ interface CreateAppointmentModalProps {
   initialEndsAt?: string;
 }
 
-type AppointmentStatus = "SCHEDULED" | "CONFIRMED" | "DONE" | "CANCELED" | "NO_SHOW";
+type AppointmentStatus =
+  | "SCHEDULED"
+  | "CONFIRMED"
+  | "DONE"
+  | "CANCELED"
+  | "NO_SHOW";
 
 const INITIAL_FORM = {
   customerId: "",
@@ -75,7 +73,8 @@ export function CreateAppointmentModal({
 
     if (
       formData.endsAt &&
-      new Date(formData.endsAt).getTime() <= new Date(formData.startsAt).getTime()
+      new Date(formData.endsAt).getTime() <=
+        new Date(formData.startsAt).getTime()
     ) {
       toast.error("Data/hora final deve ser maior que a inicial");
       return;
@@ -89,9 +88,12 @@ export function CreateAppointmentModal({
       notes: formData.notes.trim() || undefined,
     };
 
-    const previousAppointments = utils.nexo.appointments.list.getData(undefined);
+    const previousAppointments =
+      utils.nexo.appointments.list.getData(undefined);
     const tempId = `temp-appointment-${Date.now()}`;
-    const selectedCustomer = customers.find((item) => String(item.id) === payload.customerId);
+    const selectedCustomer = customers.find(
+      item => String(item.id) === payload.customerId
+    );
 
     utils.nexo.appointments.list.setData(undefined, (old: any) => {
       const raw = old as any[] | { data?: any[] } | undefined;
@@ -108,142 +110,133 @@ export function CreateAppointmentModal({
         createdAt: new Date().toISOString(),
       };
       if (Array.isArray(raw)) return [optimistic, ...raw];
-      if (raw && Array.isArray(raw.data)) return { ...raw, data: [optimistic, ...raw.data] };
+      if (raw && Array.isArray(raw.data))
+        return { ...raw, data: [optimistic, ...raw.data] };
       return [optimistic];
     });
 
     createAppointment.mutate(payload, {
-      onSuccess: (created) => {
+      onSuccess: created => {
         utils.nexo.appointments.list.setData(undefined, (old: any) => {
           const raw = old as any[] | { data?: any[] } | undefined;
           const applyReplace = (items: any[]) =>
-            items.map((item) => (String(item?.id) === tempId ? created : item));
+            items.map(item => (String(item?.id) === tempId ? created : item));
           if (Array.isArray(raw)) return applyReplace(raw);
-          if (raw && Array.isArray(raw.data)) return { ...raw, data: applyReplace(raw.data) };
+          if (raw && Array.isArray(raw.data))
+            return { ...raw, data: applyReplace(raw.data) };
           return [created];
         });
-        registerActionFlowEvent("appointment_created", { pageContext: "appointments", ctaPath: "/appointments" });
+        registerActionFlowEvent("appointment_created", {
+          pageContext: "appointments",
+          ctaPath: "/appointments",
+        });
         toast.success("Agendamento criado com sucesso!");
         setFormData(INITIAL_FORM);
         onSuccess();
         onClose();
       },
-      onError: (error) => {
-        utils.nexo.appointments.list.setData(undefined, previousAppointments as any);
+      onError: error => {
+        utils.nexo.appointments.list.setData(
+          undefined,
+          previousAppointments as any
+        );
         toast.error(error.message || "Erro ao criar agendamento");
       },
     });
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(nextOpen) => (!nextOpen ? handleClose() : undefined)}>
-      <DialogContent className="nexo-modal-content max-h-[90vh] max-w-3xl overflow-hidden p-0">
-        <DialogHeader className="nexo-modal-header border-b border-[var(--border-subtle)] px-6 py-5">
-          <DialogTitle className="text-xl font-semibold">Novo Agendamento</DialogTitle>
-          <DialogDescription className="text-[var(--text-muted)]">
-            Agende compromissos no mesmo padrão visual das páginas modernas.
-          </DialogDescription>
-        </DialogHeader>
+    <FormModal
+      open={isOpen}
+      onOpenChange={nextOpen => (!nextOpen ? handleClose() : undefined)}
+      title="Novo Agendamento"
+      description="Crie agendamentos com o mesmo padrão visual operacional do app interno."
+      closeBlocked={createAppointment.isPending}
+      footer={
+        <>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleClose}
+            disabled={createAppointment.isPending}
+          >
+            Cancelar
+          </Button>
+          <Button
+            type="submit"
+            form="create-appointment-form"
+            disabled={createAppointment.isPending}
+          >
+            {createAppointment.isPending ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Criando...
+              </>
+            ) : (
+              "Criar Agendamento"
+            )}
+          </Button>
+        </>
+      }
+    >
+      <AppForm id="create-appointment-form" onSubmit={handleSubmit}>
+        <AppField label="Cliente *">
+          <AppSelect
+            value={formData.customerId}
+            onValueChange={customerId =>
+              setFormData({ ...formData, customerId })
+            }
+            placeholder="Selecione um cliente"
+            options={customers.map(customer => ({
+              value: String(customer.id),
+              label: customer.name,
+            }))}
+          />
+        </AppField>
 
-        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
-          <div className="nexo-modal-body space-y-4 px-6 py-5 pb-28">
-          <div className="space-y-2">
-            <Label>Cliente *</Label>
-            <select
-              value={formData.customerId}
-              onChange={(e) =>
-                setFormData({ ...formData, customerId: e.target.value })
-              }
-              className="h-9 w-full rounded-md border border-[var(--border-subtle)] bg-white px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus-visible:border-[var(--accent-primary)] focus-visible:ring-2 focus-visible:ring-orange-500/40"
-            >
-              <option value="">Selecione um cliente</option>
-              {customers.map((customer) => (
-                <option key={customer.id} value={customer.id}>
-                  {customer.name}
-                </option>
-              ))}
-            </select>
-          </div>
+        <AppField label="Data/Hora Início *">
+          <Input
+            type="datetime-local"
+            value={formData.startsAt}
+            onChange={e =>
+              setFormData({ ...formData, startsAt: e.target.value })
+            }
+          />
+        </AppField>
 
-          <div className="space-y-2">
-            <Label>Data/Hora Início *</Label>
-            <Input
-              type="datetime-local"
-              value={formData.startsAt}
-              onChange={(e) => setFormData({ ...formData, startsAt: e.target.value })}
-              className="border-[var(--border-subtle)] bg-white"
-            />
-          </div>
+        <AppField label="Data/Hora Fim">
+          <Input
+            type="datetime-local"
+            value={formData.endsAt}
+            onChange={e => setFormData({ ...formData, endsAt: e.target.value })}
+          />
+        </AppField>
 
-          <div className="space-y-2">
-            <Label>Data/Hora Fim</Label>
-            <Input
-              type="datetime-local"
-              value={formData.endsAt}
-              onChange={(e) => setFormData({ ...formData, endsAt: e.target.value })}
-              className="border-[var(--border-subtle)] bg-white"
-            />
-          </div>
+        <AppField label="Status">
+          <AppSelect
+            value={formData.status}
+            onValueChange={status =>
+              setFormData({ ...formData, status: status as AppointmentStatus })
+            }
+            options={[
+              { value: "SCHEDULED", label: "Agendado" },
+              { value: "CONFIRMED", label: "Confirmado" },
+              { value: "DONE", label: "Concluído" },
+              { value: "CANCELED", label: "Cancelado" },
+              { value: "NO_SHOW", label: "Não compareceu" },
+            ]}
+          />
+        </AppField>
 
-          <div className="space-y-2">
-            <Label>Status</Label>
-            <select
-              value={formData.status}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  status: e.target.value as AppointmentStatus,
-                })
-              }
-              className="h-9 w-full rounded-md border border-[var(--border-subtle)] bg-white px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus-visible:border-[var(--accent-primary)] focus-visible:ring-2 focus-visible:ring-orange-500/40"
-            >
-              <option value="SCHEDULED">Agendado</option>
-              <option value="CONFIRMED">Confirmado</option>
-              <option value="DONE">Concluído</option>
-              <option value="CANCELED">Cancelado</option>
-              <option value="NO_SHOW">Não compareceu</option>
-            </select>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Observações</Label>
-            <Textarea
-              value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              className="border-[var(--border-subtle)] bg-white"
-              placeholder="Observações"
-              rows={3}
-            />
-          </div>
-
-          </div>
-
-          <DialogFooter className="nexo-modal-footer px-6 py-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleClose}
-              disabled={createAppointment.isPending}
-            >
-              Cancelar
-            </Button>
-            <Button
-              type="submit"
-              disabled={createAppointment.isPending}
-              className="bg-orange-500 text-white hover:bg-orange-600"
-            >
-              {createAppointment.isPending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Criando...
-                </>
-              ) : (
-                "Criar Agendamento"
-              )}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+        <AppField label="Observações">
+          <Textarea
+            value={formData.notes}
+            onChange={e => setFormData({ ...formData, notes: e.target.value })}
+            placeholder="Observações"
+            rows={3}
+          />
+        </AppField>
+      </AppForm>
+    </FormModal>
   );
 }
