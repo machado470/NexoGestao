@@ -390,7 +390,6 @@ const CalendarRoute = protectedPage(CalendarPage, {
 });
 
 const SettingsRoute = protectedPage(SettingsPage, {
-  permissions: ["settings:manage"],
   requireCompletedOnboarding: true,
 });
 
@@ -447,6 +446,19 @@ function Router() {
       prefix => location === prefix || location.startsWith(`${prefix}/`)
     );
     document.body.dataset.visualContext = isAppRoute ? "app" : "landing";
+    document.documentElement.dataset.visualContext = isAppRoute
+      ? "app"
+      : "landing";
+
+    const root = document.documentElement;
+    const activeTheme = root.dataset.theme;
+
+    if (isAppRoute) {
+      root.classList.toggle("dark", activeTheme === "dark");
+      return;
+    }
+
+    root.classList.remove("dark");
   }, [location]);
 
   return (

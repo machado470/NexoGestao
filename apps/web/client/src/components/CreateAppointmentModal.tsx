@@ -145,8 +145,8 @@ export function CreateAppointmentModal({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="flex max-h-[calc(90vh-84px)] flex-col">
-          <div className="nexo-modal-body space-y-4 overflow-y-auto px-6 py-5">
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+          <div className="nexo-modal-body space-y-4 px-6 py-5 pb-24">
           <div className="space-y-2">
             <Label>Cliente *</Label>
             <select

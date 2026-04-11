@@ -11,6 +11,7 @@ import {
   Clock3,
   Zap,
   Phone,
+  CheckCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -74,6 +75,15 @@ type WhatsAppMessage = {
   id: string;
   content: string;
 };
+
+function formatTimeLabel(index: number) {
+  const now = new Date();
+  now.setMinutes(now.getMinutes() - Math.max(1, index * 7));
+  return now.toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
 export default function WhatsAppPage() {
   const [location, navigate] = useLocation();
@@ -343,14 +353,22 @@ export default function WhatsAppPage() {
       <section className="grid grid-cols-1 gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
         <SurfaceSection className="space-y-3 p-0">
           <header className="border-b border-[var(--border-subtle)] px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">Conversas</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">Conversas ativas</p>
           </header>
           <div className="space-y-2 px-3 pb-3">
-            <NexoEntityRow
-              title={customerName}
-              subtitle={customerPhone}
-              meta={messages.length > 0 ? `${messages.length} mensagens` : "Sem histórico"}
-            />
+            <button
+              type="button"
+              className="w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/35 p-2 text-left"
+            >
+              <NexoEntityRow
+                title={customerName}
+                subtitle={customerPhone}
+                meta={messages.length > 0 ? `${messages.length} mensagens` : "Sem histórico"}
+              />
+              <p className="mt-1 text-[11px] text-[var(--text-muted)]">
+                {amountLabel ? `Cobrança em aberto: ${amountLabel}` : "Conversa operacional em andamento"}
+              </p>
+            </button>
           </div>
         </SurfaceSection>
 
@@ -361,11 +379,11 @@ export default function WhatsAppPage() {
               <p className="text-xs text-[var(--text-secondary)]">{getWhatsAppContextLabel(route.context)} • {customerPhone}</p>
             </div>
             <div className="inline-flex items-center gap-1 rounded-full border border-[var(--border-subtle)] px-2 py-1 text-xs text-[var(--text-secondary)]">
-              <Phone className="h-3 w-3" /> WhatsApp
+              <Phone className="h-3 w-3" /> online no WhatsApp
             </div>
           </header>
 
-          <div data-scrollbar="nexo" className="min-h-0 flex-1 space-y-2 overflow-y-auto bg-[var(--bg-app)]/35 p-4">
+          <div data-scrollbar="nexo" className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-[var(--bg-app)]/35 p-4">
             <div className="nexo-text-wrap text-xs text-[var(--text-muted)]">
               <strong>{getWhatsAppContextLabel(route.context)}:</strong> {getWhatsAppContextDescription(route)}
               {amountLabel ? ` • Valor: ${amountLabel}` : ""}
@@ -382,8 +400,13 @@ export default function WhatsAppPage() {
                 }}
               />
             ) : (
-              messages.map(msg => (
-                <NexoMessageBubble key={msg.id}>{msg.content}</NexoMessageBubble>
+              messages.map((msg, idx) => (
+                <div key={msg.id} className="space-y-1">
+                  <NexoMessageBubble>{msg.content}</NexoMessageBubble>
+                  <p className="inline-flex items-center gap-1 pl-3 text-[11px] text-[var(--text-muted)]">
+                    {formatTimeLabel(idx)} <CheckCheck className="h-3 w-3" />
+                  </p>
+                </div>
               ))
             )}
           </div>
@@ -397,7 +420,7 @@ export default function WhatsAppPage() {
         <Input
           value={messageInput}
           onChange={(e) => setMessageInput(e.target.value)}
-          placeholder="Digite a mensagem operacional com contexto"
+          placeholder="Escreva a próxima mensagem com contexto e objetivo claro"
         />
 
         <Button
