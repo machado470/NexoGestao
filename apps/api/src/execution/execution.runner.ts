@@ -525,9 +525,9 @@ export class ExecutionRunner {
     }
 
     if (mode === 'manual') {
-      await this.recordBlocked(candidate, executionKey, mode, 'mode_manual_runner_skip', 'blocked', {
+      await this.recordBlocked(candidate, executionKey, mode, 'mode_manual_explicit_configuration', 'blocked', {
         ruleId: candidate.decisionId,
-        ruleReason: 'runner mode em manual',
+        ruleReason: 'runner mode em manual por configuração explícita',
         eligibility: 'blocked',
       })
       this.countOperationalStatus('blocked')
@@ -561,24 +561,6 @@ export class ExecutionRunner {
       return 'blocked'
     }
 
-    if (candidate.actionId === 'action-send-whatsapp-payment-link' && !policy.allowWhatsAppAuto) {
-      await this.recordBlocked(candidate, executionKey, mode, 'policy_whatsapp_automatic_disabled', 'blocked', {
-        ruleId: candidate.decisionId,
-        policyKey: 'allowWhatsAppAuto',
-        policyValue: policy.allowWhatsAppAuto,
-      })
-      this.countOperationalStatus('blocked')
-      return 'blocked'
-    }
-    if (candidate.actionId === 'action-send-overdue-charge-reminder' && !policy.allowOverdueReminderAuto) {
-      await this.recordBlocked(candidate, executionKey, mode, 'policy_overdue_reminder_disabled', 'blocked', {
-        ruleId: candidate.decisionId,
-        policyKey: 'allowOverdueReminderAuto',
-        policyValue: policy.allowOverdueReminderAuto,
-      })
-      this.countOperationalStatus('blocked')
-      return 'blocked'
-    }
     if (candidate.actionId === 'action-notify-finance-team' && !policy.allowFinanceTeamNotifications) {
       await this.recordBlocked(candidate, executionKey, mode, 'policy_finance_team_notification_disabled', 'blocked', {
         ruleId: candidate.decisionId,
@@ -769,6 +751,7 @@ export class ExecutionRunner {
           entityType: candidate.entityType,
           entityId: candidate.entityId,
           decisionId: candidate.decisionId,
+          result: 'success',
           executionKey,
         }),
       )
@@ -851,7 +834,7 @@ export class ExecutionRunner {
       explanation,
     })
 
-    this.logger.warn(
+    this.logger.debug(
       JSON.stringify({
         event: 'execution_runner_blocked',
         orgId: candidate.orgId,
