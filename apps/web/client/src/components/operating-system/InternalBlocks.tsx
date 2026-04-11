@@ -26,7 +26,9 @@ export function NexoMetricCard({
       >
         {value}
       </p>
-      {hint ? <p className="mt-1 text-xs text-[var(--text-muted)]">{hint}</p> : null}
+      {hint ? (
+        <p className="mt-1 text-xs text-[var(--text-muted)]">{hint}</p>
+      ) : null}
     </div>
   );
 }
@@ -49,7 +51,11 @@ export function NexoContextBlock({
       <p className="nexo-text-wrap text-sm font-medium text-[var(--text-primary)]">
         {text}
       </p>
-      {badges ? <div className="flex flex-wrap items-center gap-2 text-xs">{badges}</div> : null}
+      {badges ? (
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          {badges}
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -72,8 +78,12 @@ export function NexoEntityRow({
       type="button"
       className="w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/70 p-3 text-left"
     >
-      <p className="truncate text-sm font-semibold text-[var(--text-primary)]">{title}</p>
-      {subtitle ? <p className="mt-1 text-xs text-[var(--text-secondary)]">{subtitle}</p> : null}
+      <p className="truncate text-sm font-semibold text-[var(--text-primary)]">
+        {title}
+      </p>
+      {subtitle ? (
+        <p className="mt-1 text-xs text-[var(--text-secondary)]">{subtitle}</p>
+      ) : null}
       <p className="mt-2 flex items-center gap-1 text-xs text-[var(--text-muted)]">
         {icon ?? <MessageCircle className="h-3.5 w-3.5" />}
         {meta ?? "Sem histórico"}
@@ -85,11 +95,23 @@ export function NexoEntityRow({
 type NexoMessageBubbleProps = {
   children: ReactNode;
   className?: string;
+  tone?: "incoming" | "outgoing";
 };
 
-export function NexoMessageBubble({ children, className }: NexoMessageBubbleProps) {
+export function NexoMessageBubble({
+  children,
+  className,
+  tone = "incoming",
+}: NexoMessageBubbleProps) {
+  const toneClass =
+    tone === "outgoing"
+      ? "nexo-message-bubble-outgoing"
+      : "nexo-message-bubble-incoming";
+
   return (
-    <div className={`max-w-[85%] rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 text-sm text-[var(--text-primary)] ${className ?? ""}`.trim()}>
+    <div
+      className={`nexo-message-bubble ${toneClass} max-w-[85%] rounded-2xl border p-3 text-sm text-[var(--text-primary)] ${className ?? ""}`.trim()}
+    >
       {children}
     </div>
   );

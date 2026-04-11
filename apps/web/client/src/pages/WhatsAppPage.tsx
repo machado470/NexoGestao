@@ -123,8 +123,12 @@ export default function WhatsAppPage() {
     return Array.isArray(raw) ? (raw as WhatsAppMessage[]) : [];
   }, [messagesQuery.data]);
 
-  const hasRenderableData = customerQuery.data !== undefined || messagesQuery.data !== undefined;
-  const queryState = getQueryUiState([customerQuery, messagesQuery], hasRenderableData);
+  const hasRenderableData =
+    customerQuery.data !== undefined || messagesQuery.data !== undefined;
+  const queryState = getQueryUiState(
+    [customerQuery, messagesQuery],
+    hasRenderableData
+  );
 
   const canSend =
     Boolean(route.customerId) &&
@@ -137,13 +141,17 @@ export default function WhatsAppPage() {
     route.amountCents !== null ? formatCurrency(route.amountCents) : null;
 
   const dueDateLabel = route.dueDate ? formatDate(route.dueDate) : null;
-  const unresolvedMessages = messages.filter((msg) => !msg.content?.trim()).length;
-  const customerName = typeof (customer as { name?: unknown })?.name === "string"
-    ? (customer as { name: string }).name
-    : "Cliente";
-  const customerPhone = typeof (customer as { phone?: unknown })?.phone === "string"
-    ? (customer as { phone: string }).phone
-    : "Sem telefone";
+  const unresolvedMessages = messages.filter(
+    msg => !msg.content?.trim()
+  ).length;
+  const customerName =
+    typeof (customer as { name?: unknown })?.name === "string"
+      ? (customer as { name: string }).name
+      : "Cliente";
+  const customerPhone =
+    typeof (customer as { phone?: unknown })?.phone === "string"
+      ? (customer as { phone: string }).phone
+      : "Sem telefone";
   const smartPriorities = [
     {
       id: "wa-contact",
@@ -205,17 +213,30 @@ export default function WhatsAppPage() {
             }}
           />
         </SurfaceSection>
-
       </PageWrapper>
     );
   }
 
   if (queryState.isInitialLoading) {
     return (
-      <PageWrapper title="Canal de execução • WhatsApp" subtitle="Preparando contexto da conversa para você agir em segundos.">
-        <SurfaceSection className="flex min-h-[180px] items-center justify-center gap-2 text-sm text-[var(--text-muted)] dark:text-[var(--text-muted)]">
-          <RefreshCw className="h-4 w-4 animate-spin" />
-          Carregando conversa e próxima ação...
+      <PageWrapper
+        title="Canal de execução • WhatsApp"
+        subtitle="Preparando contexto da conversa para você agir em segundos."
+      >
+        <SurfaceSection className="space-y-4 p-5">
+          <div className="flex items-center gap-2 text-xs uppercase tracking-[0.14em] text-[var(--text-muted)]">
+            <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+            Preparando conversa
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="nexo-skeleton h-16 rounded-xl" />
+            <div className="nexo-skeleton h-16 rounded-xl" />
+          </div>
+          <div className="space-y-2">
+            <div className="nexo-skeleton h-12 w-[70%] rounded-2xl" />
+            <div className="ml-auto nexo-skeleton h-12 w-[62%] rounded-2xl" />
+            <div className="nexo-skeleton h-12 w-[75%] rounded-2xl" />
+          </div>
         </SurfaceSection>
       </PageWrapper>
     );
@@ -223,7 +244,10 @@ export default function WhatsAppPage() {
 
   if (queryState.shouldBlockForError) {
     return (
-      <PageWrapper title="Canal de execução • WhatsApp" subtitle="Não foi possível carregar o contexto da conversa.">
+      <PageWrapper
+        title="Canal de execução • WhatsApp"
+        subtitle="Não foi possível carregar o contexto da conversa."
+      >
         <SurfaceSection className="border-red-200 text-red-700 dark:border-red-900/40 dark:text-red-300">
           {nonBlockingErrorMessage}
         </SurfaceSection>
@@ -246,11 +270,17 @@ export default function WhatsAppPage() {
         pageContext="customers"
         headline="Conversa orientada por próxima ação"
         dominantProblem={getWhatsAppContextDescription(route)}
-        dominantImpact={messages.length > 0 ? `${messages.length} mensagens no histórico` : "Sem histórico prévio"}
+        dominantImpact={
+          messages.length > 0
+            ? `${messages.length} mensagens no histórico`
+            : "Sem histórico prévio"
+        }
         dominantCta={{
           label: "Enviar mensagem agora",
           onClick: () => {
-            const button = document.querySelector("button[data-whatsapp-send='true']") as HTMLButtonElement | null;
+            const button = document.querySelector(
+              "button[data-whatsapp-send='true']"
+            ) as HTMLButtonElement | null;
             button?.focus();
           },
           path: "/whatsapp",
@@ -306,7 +336,8 @@ export default function WhatsAppPage() {
         </SurfaceSection>
       ) : null}
 
-      {(customerQuery.isError || messagesQuery.isError) && !queryState.shouldBlockForError ? (
+      {(customerQuery.isError || messagesQuery.isError) &&
+      !queryState.shouldBlockForError ? (
         <SurfaceSection className="border-amber-500/30 bg-amber-500/10 text-sm text-amber-200">
           {nonBlockingErrorMessage}
         </SurfaceSection>
@@ -353,17 +384,28 @@ export default function WhatsAppPage() {
       <section className="grid min-h-[640px] grid-cols-1 gap-0 overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--nexo-card-surface)] shadow-[var(--nexo-depth-subtle)] lg:grid-cols-[300px_minmax(0,1fr)]">
         <aside className="flex min-h-0 flex-col border-r border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface-base)_82%,transparent)]">
           <header className="border-b border-[var(--border-subtle)] px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">Conversas ativas</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+              Conversas ativas
+            </p>
           </header>
-          <div data-scrollbar="nexo" className="min-h-0 flex-1 space-y-2 overflow-y-auto px-3 py-3">
+          <div
+            data-scrollbar="nexo"
+            className="min-h-0 flex-1 space-y-2 overflow-y-auto px-3 py-3"
+          >
             <div className="w-full rounded-xl border border-[var(--border-subtle)] bg-white/75 p-2 text-left shadow-sm dark:bg-white/[0.04]">
               <NexoEntityRow
                 title={customerName}
                 subtitle={customerPhone}
-                meta={messages.length > 0 ? `${messages.length} mensagens` : "Sem histórico"}
+                meta={
+                  messages.length > 0
+                    ? `${messages.length} mensagens`
+                    : "Sem histórico"
+                }
               />
               <p className="mt-1 text-[11px] text-[var(--text-muted)]">
-                {amountLabel ? `Cobrança em aberto: ${amountLabel}` : "Conversa operacional em andamento"}
+                {amountLabel
+                  ? `Cobrança em aberto: ${amountLabel}`
+                  : "Conversa operacional em andamento"}
               </p>
             </div>
           </div>
@@ -372,21 +414,39 @@ export default function WhatsAppPage() {
         <div className="flex min-h-0 flex-col bg-[var(--bg-surface)]">
           <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--bg-surface)_94%,var(--surface-base))] px-5 py-3.5">
             <div>
-              <p className="text-base font-semibold text-[var(--text-primary)]">{customerName}</p>
-              <p className="text-xs text-[var(--text-secondary)]">{getWhatsAppContextLabel(route.context)} • {customerPhone}</p>
+              <p className="text-base font-semibold text-[var(--text-primary)]">
+                {customerName}
+              </p>
+              <p className="text-xs text-[var(--text-secondary)]">
+                {getWhatsAppContextLabel(route.context)} • {customerPhone}
+              </p>
               <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">
-                {amountLabel ? `Valor em aberto ${amountLabel}` : "Sem pendência financeira vinculada"}
+                {amountLabel
+                  ? `Valor em aberto ${amountLabel}`
+                  : "Sem pendência financeira vinculada"}
                 {dueDateLabel ? ` • vence em ${dueDateLabel}` : ""}
               </p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-base)]/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">
+                  Contexto ativo
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-300/50 bg-emerald-50/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-300">
+                  Cliente disponível
+                </span>
+              </div>
             </div>
             <div className="inline-flex items-center gap-1 rounded-full border border-[var(--border-subtle)] px-2 py-1 text-xs text-[var(--text-secondary)]">
               <Phone className="h-3 w-3" /> online no WhatsApp
             </div>
           </header>
 
-          <div data-scrollbar="nexo" className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-[color-mix(in_srgb,var(--bg-app)_40%,var(--bg-surface))] px-5 py-5">
+          <div
+            data-scrollbar="nexo"
+            className="min-h-0 flex-1 space-y-5 overflow-y-auto bg-[color-mix(in_srgb,var(--bg-app)_40%,var(--bg-surface))] px-5 py-5"
+          >
             <div className="nexo-text-wrap rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/55 px-3 py-2 text-xs text-[var(--text-muted)]">
-              <strong>{getWhatsAppContextLabel(route.context)}:</strong> {getWhatsAppContextDescription(route)}
+              <strong>{getWhatsAppContextLabel(route.context)}:</strong>{" "}
+              {getWhatsAppContextDescription(route)}
             </div>
             {messages.length === 0 ? (
               <EmptyState
@@ -402,21 +462,23 @@ export default function WhatsAppPage() {
               messages.map((msg, idx) => (
                 <div
                   key={msg.id}
-                  className={`flex ${idx % 2 === 0 ? "justify-start" : "justify-end"}`}
+                  className={`flex nexo-message-row ${idx % 2 === 0 ? "justify-start" : "justify-end"}`}
+                  style={{ animationDelay: `${Math.min(idx * 24, 180)}ms` }}
                 >
                   <div className="max-w-[82%] space-y-1">
                     <NexoMessageBubble
+                      tone={idx % 2 === 0 ? "incoming" : "outgoing"}
                       className={
-                        idx % 2 === 0
-                          ? "rounded-bl-md"
-                          : "rounded-br-md border-orange-300/45 bg-orange-50/85 dark:border-orange-500/30 dark:bg-orange-500/12"
+                        idx % 2 === 0 ? "rounded-bl-md" : "rounded-br-md"
                       }
                     >
                       {msg.content}
                     </NexoMessageBubble>
-                  <p className={`inline-flex items-center gap-1 text-[11px] text-[var(--text-muted)] ${idx % 2 === 0 ? "pl-3" : "justify-end pr-2"}`}>
-                    {formatTimeLabel(idx)} <CheckCheck className="h-3 w-3" />
-                  </p>
+                    <p
+                      className={`inline-flex items-center gap-1 text-[11px] text-[var(--text-muted)] ${idx % 2 === 0 ? "pl-3" : "justify-end pr-2"}`}
+                    >
+                      {formatTimeLabel(idx)} <CheckCheck className="h-3 w-3" />
+                    </p>
                   </div>
                 </div>
               ))
@@ -424,87 +486,96 @@ export default function WhatsAppPage() {
           </div>
 
           <div className="sticky bottom-0 space-y-3 border-t border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--bg-surface)_95%,transparent)] px-5 py-4 backdrop-blur">
-        {readinessQuery.data?.integrations?.whatsapp !== "configured" ? (
-          <div className="rounded-lg border border-amber-300/70 bg-amber-50/80 p-3 text-xs text-amber-900 dark:border-amber-700/60 dark:bg-amber-900/20 dark:text-amber-200">
-            Integração WhatsApp indisponível. Fallback: copie a mensagem contextual e envie manualmente.
-          </div>
-        ) : null}
-        <div className="flex items-end gap-2">
-          <Input
-            value={messageInput}
-            onChange={(e) => setMessageInput(e.target.value)}
-            placeholder="Escreva a próxima mensagem com contexto e objetivo claro"
-            className="min-h-11 flex-1 rounded-2xl"
-          />
+            {readinessQuery.data?.integrations?.whatsapp !== "configured" ? (
+              <div className="rounded-lg border border-amber-300/70 bg-amber-50/80 p-3 text-xs text-amber-900 dark:border-amber-700/60 dark:bg-amber-900/20 dark:text-amber-200">
+                Integração WhatsApp indisponível. Fallback: copie a mensagem
+                contextual e envie manualmente.
+              </div>
+            ) : null}
+            <div className="flex items-end gap-2">
+              <Input
+                value={messageInput}
+                onChange={e => setMessageInput(e.target.value)}
+                placeholder="Escreva a próxima mensagem com contexto e objetivo claro"
+                className="min-h-11 flex-1 rounded-2xl"
+              />
 
-          <Button
-          data-whatsapp-send="true"
-          onClick={async () => {
-            if (!hasCustomer) {
-              toast.error("Cliente inválido para envio de mensagem");
-              return;
-            }
+              <Button
+                data-whatsapp-send="true"
+                onClick={async () => {
+                  if (!hasCustomer) {
+                    toast.error("Cliente inválido para envio de mensagem");
+                    return;
+                  }
 
-            try {
-              const result = await sendMutation.mutateAsync({
-                customerId: route.customerId!,
-                content: messageInput.trim(),
-                entityType: getEntityType(route),
-                entityId: getEntityId(route) ?? undefined,
-                messageType: getMessageTypeFromContext(route.context),
-                chargeId: route.chargeId ?? undefined,
-                serviceOrderId: route.serviceOrderId ?? undefined,
-                idempotencyKey: buildIdempotencyKey(
-                  "whatsapp.send_message",
-                  getEntityId(route) ?? route.customerId
-                ),
-              });
-              await messagesQuery.refetch();
-              setMessageInput("");
-              const operationStatus = String((result as any)?.operation?.status ?? "").toLowerCase();
-              const executedMessage = operationStatus === "queued" ? "Mensagem enfileirada para envio." : "Mensagem enviada";
-              toast.success(
-                resolveOperationFeedback({
-                  operationStatus,
-                  degradedStatus: null,
-                  executedMessage,
-                  duplicateMessage: "Envio duplicado detectado: mensagem anterior reaproveitada.",
-                  retryScheduledMessage: "Mensagem enfileirada para retry.",
-                  blockedMessage: "Envio bloqueado por política operacional.",
-                })
-              );
-            } catch (error) {
-              const message =
-                error instanceof Error ? error.message : "Erro ao enviar mensagem";
-              toast.error(message);
-            }
-          }}
-          disabled={!canSend}
-          >
-            <Send className="mr-2 h-4 w-4" />
-            {sendMutation.isPending ? "Enviando..." : "Enviar"}
-          </Button>
-        </div>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={async () => {
-            try {
-              await navigator.clipboard.writeText(messageInput.trim());
-              toast.success("Mensagem copiada para envio manual.");
-            } catch {
-              toast.error("Não foi possível copiar automaticamente.");
-            }
-          }}
-          disabled={messageInput.trim().length === 0}
-        >
-          Copiar mensagem
-        </Button>
+                  try {
+                    const result = await sendMutation.mutateAsync({
+                      customerId: route.customerId!,
+                      content: messageInput.trim(),
+                      entityType: getEntityType(route),
+                      entityId: getEntityId(route) ?? undefined,
+                      messageType: getMessageTypeFromContext(route.context),
+                      chargeId: route.chargeId ?? undefined,
+                      serviceOrderId: route.serviceOrderId ?? undefined,
+                      idempotencyKey: buildIdempotencyKey(
+                        "whatsapp.send_message",
+                        getEntityId(route) ?? route.customerId
+                      ),
+                    });
+                    await messagesQuery.refetch();
+                    setMessageInput("");
+                    const operationStatus = String(
+                      (result as any)?.operation?.status ?? ""
+                    ).toLowerCase();
+                    const executedMessage =
+                      operationStatus === "queued"
+                        ? "Mensagem enfileirada para envio."
+                        : "Mensagem enviada";
+                    toast.success(
+                      resolveOperationFeedback({
+                        operationStatus,
+                        degradedStatus: null,
+                        executedMessage,
+                        duplicateMessage:
+                          "Envio duplicado detectado: mensagem anterior reaproveitada.",
+                        retryScheduledMessage:
+                          "Mensagem enfileirada para retry.",
+                        blockedMessage:
+                          "Envio bloqueado por política operacional.",
+                      })
+                    );
+                  } catch (error) {
+                    const message =
+                      error instanceof Error
+                        ? error.message
+                        : "Erro ao enviar mensagem";
+                    toast.error(message);
+                  }
+                }}
+                disabled={!canSend}
+              >
+                <Send className="mr-2 h-4 w-4" />
+                {sendMutation.isPending ? "Enviando..." : "Enviar"}
+              </Button>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(messageInput.trim());
+                  toast.success("Mensagem copiada para envio manual.");
+                } catch {
+                  toast.error("Não foi possível copiar automaticamente.");
+                }
+              }}
+              disabled={messageInput.trim().length === 0}
+            >
+              Copiar mensagem
+            </Button>
           </div>
         </div>
       </section>
-
-
     </PageWrapper>
   );
 }
