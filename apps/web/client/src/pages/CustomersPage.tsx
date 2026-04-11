@@ -29,9 +29,9 @@ export default function CustomersPage() {
   const [, navigate] = useLocation();
   return (
     <AppPageShell>
-      <AppPageHeader title="Clientes" description="Gestão da base, valor e engajamento operacional." ctaLabel="Novo cliente" />
+      <AppPageHeader title="Clientes" description="Veja quem está ativo, quem precisa de contato e onde agir primeiro." ctaLabel="Criar cliente agora" />
       <AppNextActions
-        title="Próximas ações"
+        title="Você precisa fazer isso agora"
         engineInput={{
           customers: [
             { id: "c-atlas", name: "Atlas Engenharia", phone: "5511988881200" },
@@ -61,12 +61,12 @@ export default function CustomersPage() {
             </BarChart>
           </ChartContainer>
         </AppChartPanel>
-        <AppSectionBlock title="Alertas de relacionamento" subtitle="Clientes sem contato recente">
+        <AppSectionBlock title="Alertas de relacionamento" subtitle="Clientes que precisam de contato para evitar perda de receita">
           <AppAlertList alerts={[{ text: "12 clientes sem contato há mais de 15 dias", tone: "warning" }, { text: "3 contas estratégicas em risco de churn", tone: "danger" }]} />
         </AppSectionBlock>
       </div>
 
-      <AppSectionBlock title="Base de clientes" subtitle="Lista operacional dominante">
+      <AppSectionBlock title="Base de clientes" subtitle="Lista principal para agir em cada cliente com clareza">
         <AppFiltersBar>
           <Input placeholder="Buscar por nome, telefone ou e-mail" className="max-w-sm" />
         </AppFiltersBar>
@@ -76,7 +76,7 @@ export default function CustomersPage() {
             <tbody>
               {["Atlas Engenharia", "Solar Prime", "Condomínio Orion"].map((name, i) => (
                 <tr key={name} className="border-t border-[var(--border-subtle)] hover:bg-[var(--surface-base)]/70">
-                  <td className="p-3 font-medium text-[var(--text-primary)]">{name}</td><td>(11) 98888-12{i}0</td><td><AppStatusBadge label={i === 2 ? "Em risco" : "Concluído"} /></td><td>{i === 0 ? "há 2h" : "há 2 dias"}</td><td>R$ {(38 + i * 7).toFixed(1)}k</td><td className="p-3"><AppRowActions actions={[{ label: "Ver detalhes", onClick: () => navigate(buildOperationalRoute("/customers", { customer: name.toLowerCase() })) }]} /></td>
+                  <td className="p-3 font-medium text-[var(--text-primary)]">{name}</td><td>(11) 98888-12{i}0</td><td><AppStatusBadge label={i === 2 ? "Em risco" : "Concluído"} /></td><td>{i === 0 ? "há 2 horas" : "há 2 dias"}</td><td>R$ {(38 + i * 7).toFixed(1)}k</td><td className="p-3"><AppRowActions actions={[{ label: "Ver detalhes do cliente", onClick: () => navigate(buildOperationalRoute("/customers", { customer: name.toLowerCase() })) }]} /></td>
                 </tr>
               ))}
             </tbody>

@@ -19,7 +19,7 @@ type ExecutionLog = {
 
 export function AppNextActions({
   engineInput,
-  title = "Próximas ações",
+  title = "Você precisa fazer isso agora",
 }: {
   engineInput: OperationEngineInput;
   title?: string;
@@ -36,6 +36,11 @@ export function AppNextActions({
         .slice(0, 6),
     [engineInput, executedIds]
   );
+  const hasAnyData =
+    engineInput.customers.length > 0 ||
+    engineInput.appointments.length > 0 ||
+    engineInput.serviceOrders.length > 0 ||
+    engineInput.charges.length > 0;
 
   useEffect(() => {
     if (!engineInput.autoExecute) return;
@@ -99,8 +104,11 @@ export function AppNextActions({
   return (
     <section className="nexo-card-panel min-w-0 p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <h3 className="text-sm font-semibold text-[var(--text-primary)]">{title}</h3>
-        <AppPrimaryAction label="Executar próxima ação" action={executeNext} loadingLabel="Executando sequência..." />
+        <div>
+          <h3 className="text-sm font-semibold text-[var(--text-primary)]">{title}</h3>
+          <p className="text-xs text-[var(--text-muted)]">Priorize as ações com maior impacto financeiro e operacional.</p>
+        </div>
+        <AppPrimaryAction label="Resolver próxima pendência agora" action={executeNext} loadingLabel="Executando sequência..." />
       </div>
 
       {feedback ? <p className="mt-2 whitespace-pre-line text-xs text-[var(--text-muted)]">{feedback}</p> : null}
@@ -119,12 +127,20 @@ export function AppNextActions({
               onClick={() => void executeRecommendation(item)}
               isLoading={item.execution.mode === "app_action" ? isExecuting(item.execution.action.id) : false}
             >
-              Executar
+              {item.label}
             </Button>
           </div>
         ))}
 
-        {suggestions.length === 0 ? <p className="text-xs text-[var(--text-muted)]">Sem ações pendentes no momento.</p> : null}
+        {suggestions.length === 0 && hasAnyData ? (
+          <p className="text-xs text-emerald-600">Está tudo sob controle. Nenhuma ação crítica agora.</p>
+        ) : null}
+        {suggestions.length === 0 && !hasAnyData ? (
+          <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/60 p-3">
+            <p className="text-sm font-medium text-[var(--text-primary)]">Comece criando um cliente</p>
+            <p className="mt-1 text-xs text-[var(--text-muted)]">Depois crie um agendamento para iniciar o fluxo operacional.</p>
+          </div>
+        ) : null}
       </div>
 
       {logs.length > 0 ? (

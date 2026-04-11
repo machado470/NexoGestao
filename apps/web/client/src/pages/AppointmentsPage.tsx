@@ -30,9 +30,9 @@ export default function AppointmentsPage() {
   ];
   return (
     <AppPageShell>
-      <AppPageHeader title="Agendamentos" description="Controle da agenda operacional e distribuição de carga." ctaLabel="Novo agendamento" />
+      <AppPageHeader title="Agendamentos" description="Veja rapidamente quem precisa de confirmação e evite faltas." ctaLabel="Criar agendamento agora" />
       <AppNextActions
-        title="Próximas ações"
+        title="Você precisa fazer isso agora"
         engineInput={{
           customers: [{ id: "c-1", name: "Cliente 1", phone: "5511988881200" }],
           charges: [],
@@ -56,14 +56,14 @@ export default function AppointmentsPage() {
             <LineChart data={data}><CartesianGrid vertical={false} /><XAxis dataKey="day" tickLine={false} axisLine={false} /><ChartTooltip content={<ChartTooltipContent />} /><Line dataKey="volume" stroke="var(--brand-primary)" strokeWidth={3} /></LineChart>
           </ChartContainer>
         </AppChartPanel>
-        <AppSectionBlock title="Alertas de agenda" subtitle="Conflitos e atrasos">
+        <AppSectionBlock title="Alertas de agenda" subtitle="Conflitos que podem gerar atraso no atendimento">
           <AppAlertList alerts={[{ text: "3 conflitos de horário para amanhã", tone: "danger" }, { text: "Equipe Sul com concentração acima de 120%", tone: "warning" }]} />
         </AppSectionBlock>
       </div>
 
-      <AppSectionBlock title="Fila de agendamentos" subtitle="Execução principal da agenda">
+      <AppSectionBlock title="Fila de agendamentos" subtitle="Lista principal para confirmar, concluir e acompanhar horários">
         <AppFiltersBar><Input placeholder="Filtrar por cliente" className="max-w-sm" /></AppFiltersBar>
-        <AppDataTable><table className="w-full text-sm"><thead className="bg-[var(--surface-elevated)] text-xs text-[var(--text-muted)]"><tr><th className="p-3">Data</th><th>Cliente</th><th>Status</th><th>Responsável</th><th>Origem</th><th>Ações</th></tr></thead><tbody>{["08:30", "10:00", "14:20"].map((time, i) => <tr key={time} className="border-t border-[var(--border-subtle)] hover:bg-[var(--surface-base)]/70"><td className="p-3">15/04 {time}</td><td>Cliente {i + 1}</td><td><AppStatusBadge label={i === 1 ? "Pendente" : "Concluído"} /></td><td>Equipe {i + 1}</td><td>{i === 2 ? "WhatsApp" : "Portal"}</td><td className="p-3"><AppRowActions actions={[{ label: "Abrir", onClick: () => navigate(buildOperationalRoute("/appointments", { hour: time })) }]} /></td></tr>)}</tbody></table></AppDataTable>
+        <AppDataTable><table className="w-full text-sm"><thead className="bg-[var(--surface-elevated)] text-xs text-[var(--text-muted)]"><tr><th className="p-3">Data</th><th>Cliente</th><th>Status</th><th>Responsável</th><th>Origem</th><th>Ações</th></tr></thead><tbody>{["08:30", "10:00", "14:20"].map((time, i) => <tr key={time} className="border-t border-[var(--border-subtle)] hover:bg-[var(--surface-base)]/70"><td className="p-3">15/04 {time}</td><td>Cliente {i + 1}</td><td><AppStatusBadge label={i === 1 ? "Pendente" : "Concluído"} /></td><td>Equipe {i + 1}</td><td>{i === 2 ? "WhatsApp" : "Portal"}</td><td className="p-3"><AppRowActions actions={[{ label: i === 1 ? "Confirmar agendamento agora" : "Ver detalhes do agendamento", onClick: () => navigate(buildOperationalRoute("/appointments", { hour: time })) }]} /></td></tr>)}</tbody></table></AppDataTable>
       </AppSectionBlock>
     </AppPageShell>
   );
