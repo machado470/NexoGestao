@@ -138,7 +138,7 @@ export function CreateAppointmentModal({
   return (
     <Dialog open={isOpen} onOpenChange={(nextOpen) => (!nextOpen ? handleClose() : undefined)}>
       <DialogContent className="nexo-modal-content max-h-[90vh] max-w-3xl overflow-hidden p-0">
-        <DialogHeader className="border-b border-[var(--border-soft)] px-6 py-5">
+        <DialogHeader className="nexo-modal-header border-b border-[var(--border-subtle)] px-6 py-5">
           <DialogTitle className="text-xl font-semibold">Novo Agendamento</DialogTitle>
           <DialogDescription className="text-[var(--text-muted)]">
             Agende compromissos no mesmo padrão visual das páginas modernas.
@@ -146,7 +146,7 @@ export function CreateAppointmentModal({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
-          <div className="nexo-modal-body space-y-4 px-6 py-5 pb-24">
+          <div className="nexo-modal-body space-y-4 px-6 py-5 pb-28">
           <div className="space-y-2">
             <Label>Cliente *</Label>
             <select
@@ -154,7 +154,7 @@ export function CreateAppointmentModal({
               onChange={(e) =>
                 setFormData({ ...formData, customerId: e.target.value })
               }
-              className="h-9 w-full rounded-md border border-[var(--border-soft)] bg-[var(--surface-contrast)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus-visible:border-orange-400 focus-visible:ring-2 focus-visible:ring-orange-500/50"
+              className="h-9 w-full rounded-md border border-[var(--border-subtle)] bg-white px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus-visible:border-[var(--accent-primary)] focus-visible:ring-2 focus-visible:ring-orange-500/40"
             >
               <option value="">Selecione um cliente</option>
               {customers.map((customer) => (
@@ -171,7 +171,7 @@ export function CreateAppointmentModal({
               type="datetime-local"
               value={formData.startsAt}
               onChange={(e) => setFormData({ ...formData, startsAt: e.target.value })}
-              className="border-[var(--border-soft)] bg-[var(--surface-contrast)]"
+              className="border-[var(--border-subtle)] bg-white"
             />
           </div>
 
@@ -181,7 +181,7 @@ export function CreateAppointmentModal({
               type="datetime-local"
               value={formData.endsAt}
               onChange={(e) => setFormData({ ...formData, endsAt: e.target.value })}
-              className="border-[var(--border-soft)] bg-[var(--surface-contrast)]"
+              className="border-[var(--border-subtle)] bg-white"
             />
           </div>
 
@@ -195,7 +195,7 @@ export function CreateAppointmentModal({
                   status: e.target.value as AppointmentStatus,
                 })
               }
-              className="h-9 w-full rounded-md border border-[var(--border-soft)] bg-[var(--surface-contrast)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus-visible:border-orange-400 focus-visible:ring-2 focus-visible:ring-orange-500/50"
+              className="h-9 w-full rounded-md border border-[var(--border-subtle)] bg-white px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus-visible:border-[var(--accent-primary)] focus-visible:ring-2 focus-visible:ring-orange-500/40"
             >
               <option value="SCHEDULED">Agendado</option>
               <option value="CONFIRMED">Confirmado</option>
@@ -210,7 +210,7 @@ export function CreateAppointmentModal({
             <Textarea
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              className="border-[var(--border-soft)] bg-[var(--surface-contrast)]"
+              className="border-[var(--border-subtle)] bg-white"
               placeholder="Observações"
               rows={3}
             />

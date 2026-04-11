@@ -342,7 +342,7 @@ export default function CreateServiceOrderModal({
         }}
         className="nexo-modal-content max-h-[90vh] max-w-4xl overflow-hidden p-0"
       >
-        <DialogHeader className="border-b border-[var(--border-soft)] px-6 py-6">
+        <DialogHeader className="nexo-modal-header border-b border-[var(--border-subtle)] px-6 py-6">
           <DialogTitle className="flex items-center gap-2 text-xl text-[var(--text-primary)]">
             <ClipboardList className="h-5 w-5 text-orange-500" />
             Nova Ordem de Serviço
@@ -352,7 +352,7 @@ export default function CreateServiceOrderModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="nexo-modal-body p-6 pb-28">
+        <div className="nexo-modal-body min-h-0 flex-1 p-6 pb-32">
           {createdServiceOrder ? (
             <section className="space-y-4 rounded-xl border border-emerald-200 bg-emerald-50 p-5 dark:border-emerald-900/40 dark:bg-emerald-950/20">
               <h3 className="text-base font-semibold text-emerald-900 dark:text-emerald-200">
@@ -636,7 +636,7 @@ export default function CreateServiceOrderModal({
           ) : null}
         </div>
 
-        <DialogFooter className="nexo-modal-footer flex gap-2 p-6 sm:justify-start">
+        <DialogFooter className="nexo-modal-footer flex gap-2 border-t border-[var(--border-subtle)] p-6 sm:justify-start">
           {createdServiceOrder ? (
             <>
               <Button
