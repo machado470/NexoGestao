@@ -10,6 +10,7 @@ import {
   Send,
   Clock3,
   Zap,
+  Phone,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -121,6 +122,12 @@ export default function WhatsAppPage() {
 
   const dueDateLabel = route.dueDate ? formatDate(route.dueDate) : null;
   const unresolvedMessages = messages.filter((msg) => !msg.content?.trim()).length;
+  const customerName = typeof (customer as { name?: unknown })?.name === "string"
+    ? (customer as { name: string }).name
+    : "Cliente";
+  const customerPhone = typeof (customer as { phone?: unknown })?.phone === "string"
+    ? (customer as { phone: string }).phone
+    : "Sem telefone";
   const smartPriorities = [
     {
       id: "wa-contact",
@@ -304,36 +311,60 @@ export default function WhatsAppPage() {
         )}
       </div>
 
-      <SurfaceSection className="space-y-3">
-        <div className="nexo-text-wrap text-sm text-muted-foreground">
-          <strong>{getWhatsAppContextLabel(route.context)}:</strong>{" "}
-          {getWhatsAppContextDescription(route)}
-          {amountLabel ? ` • Valor: ${amountLabel}` : ""}
-          {dueDateLabel ? ` • Vencimento: ${dueDateLabel}` : ""}
-        </div>
-
-        {messages.length === 0 ? (
-          <EmptyState
-            icon={<MessageCircle className="h-7 w-7" />}
-            title="Nenhuma mensagem nesta conversa"
-            description="Ainda não há mensagens neste contexto. Envie o primeiro contato para destravar a próxima etapa comercial."
-            action={{
-              label: "Atualizar conversa",
-              onClick: () => void messagesQuery.refetch(),
-            }}
-          />
-        ) : (
-          <div data-scrollbar="nexo" className="max-h-[300px] space-y-2 overflow-y-auto pr-1">
-            {messages.map((msg) => (
-              <div key={msg.id} className="nexo-text-wrap rounded-xl border border-[var(--border-subtle)]/80 bg-white/80 p-3 text-sm dark:border-white/10 dark:bg-[var(--surface-base)]/60">
-                {msg.content}
-              </div>
-            ))}
+      <section className="grid grid-cols-1 gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
+        <SurfaceSection className="space-y-3 p-0">
+          <header className="border-b border-[var(--border-subtle)] px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">Conversas</p>
+          </header>
+          <div className="space-y-2 px-3 pb-3">
+            <button
+              type="button"
+              className="w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/70 p-3 text-left"
+            >
+              <p className="truncate text-sm font-semibold text-[var(--text-primary)]">{customerName}</p>
+              <p className="mt-1 text-xs text-[var(--text-secondary)]">{customerPhone}</p>
+              <p className="mt-2 text-xs text-[var(--text-muted)]">{messages.length > 0 ? `${messages.length} mensagens` : "Sem histórico"}</p>
+            </button>
           </div>
-        )}
-      </SurfaceSection>
+        </SurfaceSection>
 
-      <SurfaceSection className="space-y-3">
+        <SurfaceSection className="flex min-h-[560px] flex-col overflow-hidden p-0">
+          <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-subtle)] bg-[var(--surface-base)]/55 px-4 py-3">
+            <div>
+              <p className="text-sm font-semibold text-[var(--text-primary)]">{customerName}</p>
+              <p className="text-xs text-[var(--text-secondary)]">{getWhatsAppContextLabel(route.context)} • {customerPhone}</p>
+            </div>
+            <div className="inline-flex items-center gap-1 rounded-full border border-[var(--border-subtle)] px-2 py-1 text-xs text-[var(--text-secondary)]">
+              <Phone className="h-3 w-3" /> WhatsApp
+            </div>
+          </header>
+
+          <div data-scrollbar="nexo" className="min-h-0 flex-1 space-y-2 overflow-y-auto bg-[var(--bg-app)]/35 p-4">
+            <div className="nexo-text-wrap text-xs text-[var(--text-muted)]">
+              <strong>{getWhatsAppContextLabel(route.context)}:</strong> {getWhatsAppContextDescription(route)}
+              {amountLabel ? ` • Valor: ${amountLabel}` : ""}
+              {dueDateLabel ? ` • Vencimento: ${dueDateLabel}` : ""}
+            </div>
+            {messages.length === 0 ? (
+              <EmptyState
+                icon={<MessageCircle className="h-7 w-7" />}
+                title="Nenhuma mensagem nesta conversa"
+                description="Ainda não há mensagens neste contexto. Envie o primeiro contato para destravar a próxima etapa comercial."
+                action={{
+                  label: "Atualizar conversa",
+                  onClick: () => void messagesQuery.refetch(),
+                }}
+              />
+            ) : (
+              messages.map((msg) => (
+                <div key={msg.id} className="ml-auto max-w-[85%] rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 text-sm text-[var(--text-primary)]">
+                  {msg.content}
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="space-y-3 border-t border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
         {readinessQuery.data?.integrations?.whatsapp !== "configured" ? (
           <div className="rounded-lg border border-amber-300/70 bg-amber-50/80 p-3 text-xs text-amber-900 dark:border-amber-700/60 dark:bg-amber-900/20 dark:text-amber-200">
             Integração WhatsApp indisponível. Fallback: copie a mensagem contextual e envie manualmente.
@@ -407,7 +438,9 @@ export default function WhatsAppPage() {
         >
           Copiar mensagem
         </Button>
-      </SurfaceSection>
+          </div>
+        </SurfaceSection>
+      </section>
 
 
     </PageWrapper>

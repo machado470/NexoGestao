@@ -160,7 +160,7 @@ function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="dialog-footer"
       className={cn(
-        "nexo-modal-footer sticky bottom-0 z-10 flex flex-col-reverse gap-2 px-0 pt-3 sm:flex-row sm:justify-end",
+        "nexo-modal-footer mt-auto flex flex-col-reverse gap-2 px-0 pt-3 sm:flex-row sm:justify-end",
         className
       )}
       {...props}

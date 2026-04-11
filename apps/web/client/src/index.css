@@ -1972,3 +1972,112 @@ html {
   .nexo-alert-warning { border-left: 2px solid var(--warning); }
   .nexo-alert-info { border-left: 2px solid var(--info); }
 }
+
+/* Stabilization patch: theme parity, app/landing isolation, and card/modal consistency. */
+@layer base {
+  body[data-visual-context="app"] {
+    background: var(--nexo-app-bg);
+    color: var(--text-primary);
+  }
+
+  body[data-visual-context="landing"] {
+    background: #f8f9fb;
+    color: #0f172a;
+  }
+
+  .app-root {
+    --bg-app: #f3f7fb;
+    --bg-sidebar: #eaf0f7;
+    --bg-header: #f8fbff;
+    --bg-surface: #ffffff;
+    --surface-base: #eef3f8;
+    --surface-elevated: #f7f9fc;
+    --border-soft: rgba(36, 82, 114, 0.2);
+    --border-subtle: rgba(36, 82, 114, 0.16);
+    --text-primary: #162a4a;
+    --text-secondary: #245272;
+    --text-muted: #6b8baa;
+    --nexo-app-bg: #f3f7fb;
+    --nexo-page-surface: #eff4fa;
+    --nexo-section-surface: #ffffff;
+    --nexo-card-surface: #ffffff;
+    --nexo-card-muted: #f6f9fd;
+    --nexo-border-soft: var(--border-soft);
+    --nexo-border-strong: var(--border-subtle);
+    --nexo-depth-subtle: none;
+    --nexo-depth-hover: none;
+  }
+
+  .app-root.dark,
+  .app-root[data-theme="dark"] {
+    --bg-app: #080c18;
+    --bg-sidebar: #0b1122;
+    --bg-header: #111d2e;
+    --bg-surface: #111d2e;
+    --surface-base: #0f172b;
+    --surface-elevated: #152036;
+    --border-soft: rgba(139, 156, 192, 0.18);
+    --border-subtle: rgba(139, 156, 192, 0.14);
+    --text-primary: #f0f4ff;
+    --text-secondary: #b7c7e6;
+    --text-muted: #8295ba;
+    --nexo-app-bg: #080c18;
+    --nexo-page-surface: #0a0e1a;
+    --nexo-section-surface: #10192b;
+    --nexo-card-surface: #111d2e;
+    --nexo-card-muted: #152036;
+    --nexo-border-soft: var(--border-soft);
+    --nexo-border-strong: var(--border-subtle);
+  }
+}
+
+@layer components {
+  .app-root .nexo-card-base,
+  .app-root .nexo-card-kpi,
+  .app-root .nexo-card-operational,
+  .app-root .nexo-card-informative,
+  .app-root .nexo-card-alert,
+  .app-root .nexo-kpi-card,
+  .app-root .nexo-surface,
+  .app-root .nexo-surface-primary,
+  .app-root .nexo-surface-operational,
+  .app-root .nexo-page-header {
+    border: 1px solid var(--nexo-border-soft);
+    background: var(--nexo-card-surface);
+    box-shadow: none;
+  }
+
+  .app-root .nexo-card-base:hover,
+  .app-root .nexo-card-kpi:hover,
+  .app-root .nexo-card-operational:hover,
+  .app-root .nexo-card-informative:hover,
+  .app-root .nexo-card-alert:hover,
+  .app-root .nexo-kpi-card:hover,
+  .app-root .nexo-surface:hover,
+  .app-root .nexo-surface-primary:hover {
+    transform: none;
+    border-color: var(--nexo-border-soft);
+    box-shadow: none;
+  }
+
+  .app-root .nexo-card-kpi::before,
+  .app-root .nexo-kpi-card::before {
+    display: none;
+  }
+
+  .app-root .nexo-modal-content {
+    border-color: var(--border-subtle);
+    background: var(--bg-surface);
+  }
+
+  .app-root .nexo-modal-body {
+    background: var(--bg-surface);
+    color: var(--text-secondary);
+  }
+
+  .app-root .nexo-modal-footer {
+    position: static;
+    border-top: 1px solid var(--border-subtle);
+    background: var(--bg-surface);
+  }
+}
