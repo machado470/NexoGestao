@@ -37,9 +37,8 @@ export function ThemeProvider({
 
   useEffect(() => {
     if (typeof document === "undefined") return;
-    const root = document.documentElement;
-    root.classList.toggle("dark", theme === "dark");
-    root.dataset.theme = theme;
+    document.documentElement.dataset.theme = theme;
+    document.body.dataset.appTheme = theme;
   }, [theme]);
 
   const toggleTheme = switchable

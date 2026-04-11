@@ -16,6 +16,8 @@ import { ConsentBanner } from "@/components/ConsentBanner";
 
 import ErrorBoundary from "./components/ErrorBoundary";
 import { AppLayout } from "./components/AppLayout";
+import { PublicMarketingShell } from "./components/PublicMarketingShell";
+import { AuthShell } from "./components/AuthShell";
 import { NotificationCenter } from "./components/NotificationCenter";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -270,7 +272,11 @@ function AuthRoute({ component: Component }: { component: ComponentType }) {
     );
   }
 
-  return <Component />;
+  return (
+    <AuthShell>
+      <Component />
+    </AuthShell>
+  );
 }
 
 function MarketingRoute({
@@ -278,7 +284,11 @@ function MarketingRoute({
 }: {
   component: ComponentType;
 }) {
-  return <Component />;
+  return (
+    <PublicMarketingShell>
+      <Component />
+    </PublicMarketingShell>
+  );
 }
 
 function withMainLayout(Page: ComponentType) {
@@ -450,15 +460,6 @@ function Router() {
       ? "app"
       : "landing";
 
-    const root = document.documentElement;
-    const activeTheme = root.dataset.theme;
-
-    if (isAppRoute) {
-      root.classList.toggle("dark", activeTheme === "dark");
-      return;
-    }
-
-    root.classList.remove("dark");
   }, [location]);
 
   return (
