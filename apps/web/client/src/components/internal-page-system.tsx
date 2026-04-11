@@ -51,14 +51,22 @@ export function AppKpiCard({
   value,
   trend,
   context,
+  onClick,
 }: {
   label: string;
   value: string;
   trend: number;
   context: string;
+  onClick?: () => void;
 }) {
   return (
-    <AppSectionCard className="p-3 md:p-4">
+    <AppSectionCard
+      className={cn("p-3 md:p-4", onClick ? "cursor-pointer hover:brightness-[0.99]" : "")}
+      onClick={onClick}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (event) => (event.key === "Enter" || event.key === " ") && onClick() : undefined}
+    >
       <p className="text-xs font-medium text-[var(--text-secondary)]">{label}</p>
       <p className="mt-1 text-xl font-bold text-[var(--text-primary)]">{value}</p>
       <div className="mt-2 flex items-center justify-between gap-2">
@@ -69,28 +77,78 @@ export function AppKpiCard({
   );
 }
 
-export function AppKpiRow({ items }: { items: Array<{ label: string; value: string; trend: number; context: string }> }) {
+export function AppKpiRow({ items }: { items: Array<{ label: string; value: string; trend: number; context: string; onClick?: () => void }> }) {
   return <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">{items.map(item => <AppKpiCard key={item.label} {...item} />)}</section>;
 }
 
-export function AppChartPanel({ title, description, children }: { title: string; description: string; children: ReactNode }) {
+export function AppChartPanel({
+  title,
+  description,
+  children,
+  trendLabel,
+  trendValue,
+  ctaLabel = "Ver detalhes",
+  onCtaClick,
+}: {
+  title: string;
+  description: string;
+  children: ReactNode;
+  trendLabel?: string;
+  trendValue?: number;
+  ctaLabel?: string;
+  onCtaClick?: () => void;
+}) {
   return (
     <AppSectionCard>
-      <div className="mb-3">
+      <div className="mb-3 flex items-start justify-between gap-2">
+        <div>
         <h2 className="text-sm font-semibold text-[var(--text-primary)]">{title}</h2>
         <p className="text-xs text-[var(--text-muted)]">{description}</p>
+        </div>
+        {typeof trendValue === "number" ? <AppTrendIndicator value={trendValue} /> : null}
       </div>
       {children}
+      {(trendLabel || onCtaClick) ? (
+        <div className="mt-3 flex items-center justify-between">
+          <span className="text-xs text-[var(--text-muted)]">{trendLabel}</span>
+          {onCtaClick ? (
+            <Button size="sm" variant="ghost" onClick={onCtaClick}>
+              {ctaLabel}
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
     </AppSectionCard>
   );
 }
 
-export function AppSectionBlock({ title, subtitle, children, className }: { title: string; subtitle?: string; children: ReactNode; className?: string }) {
+export function AppSectionBlock({
+  title,
+  subtitle,
+  children,
+  className,
+  ctaLabel,
+  onCtaClick,
+}: {
+  title: string;
+  subtitle?: string;
+  children: ReactNode;
+  className?: string;
+  ctaLabel?: string;
+  onCtaClick?: () => void;
+}) {
   return (
     <AppSectionCard className={className}>
-      <div className="mb-3">
+      <div className="mb-3 flex items-start justify-between gap-2">
+        <div>
         <h3 className="text-sm font-semibold text-[var(--text-primary)]">{title}</h3>
         {subtitle ? <p className="text-xs text-[var(--text-muted)]">{subtitle}</p> : null}
+        </div>
+        {onCtaClick ? (
+          <Button size="sm" variant="ghost" onClick={onCtaClick}>
+            {ctaLabel ?? "Ver detalhes"}
+          </Button>
+        ) : null}
       </div>
       {children}
     </AppSectionCard>
@@ -101,7 +159,7 @@ export function AppDataTable({ children }: { children: ReactNode }) {
   return <div className="overflow-x-auto rounded-xl border border-[var(--border-subtle)]">{children}</div>;
 }
 
-export function AppListBlock({ items }: { items: Array<{ title: string; subtitle?: string; right?: ReactNode }> }) {
+export function AppListBlock({ items }: { items: Array<{ title: string; subtitle?: string; right?: ReactNode; action?: ReactNode }> }) {
   return (
     <div className="space-y-2">
       {items.map(item => (
@@ -110,7 +168,10 @@ export function AppListBlock({ items }: { items: Array<{ title: string; subtitle
             <p className="text-sm font-medium text-[var(--text-primary)]">{item.title}</p>
             {item.subtitle ? <p className="text-xs text-[var(--text-muted)]">{item.subtitle}</p> : null}
           </div>
-          {item.right}
+          <div className="flex items-center gap-2">
+            {item.action}
+            {item.right}
+          </div>
         </div>
       ))}
     </div>
