@@ -350,16 +350,13 @@ export default function WhatsAppPage() {
         )}
       </div>
 
-      <section className="grid grid-cols-1 gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
-        <SurfaceSection className="space-y-3 p-0">
+      <section className="grid min-h-[640px] grid-cols-1 gap-0 overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--nexo-card-surface)] shadow-[var(--nexo-depth-subtle)] lg:grid-cols-[300px_minmax(0,1fr)]">
+        <aside className="flex min-h-0 flex-col border-r border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface-base)_82%,transparent)]">
           <header className="border-b border-[var(--border-subtle)] px-4 py-3">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">Conversas ativas</p>
           </header>
-          <div className="space-y-2 px-3 pb-3">
-            <button
-              type="button"
-              className="w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/35 p-2 text-left"
-            >
+          <div data-scrollbar="nexo" className="min-h-0 flex-1 space-y-2 overflow-y-auto px-3 py-3">
+            <div className="w-full rounded-xl border border-[var(--border-subtle)] bg-white/75 p-2 text-left shadow-sm dark:bg-white/[0.04]">
               <NexoEntityRow
                 title={customerName}
                 subtitle={customerPhone}
@@ -368,26 +365,28 @@ export default function WhatsAppPage() {
               <p className="mt-1 text-[11px] text-[var(--text-muted)]">
                 {amountLabel ? `Cobrança em aberto: ${amountLabel}` : "Conversa operacional em andamento"}
               </p>
-            </button>
+            </div>
           </div>
-        </SurfaceSection>
+        </aside>
 
-        <SurfaceSection className="flex min-h-[560px] flex-col overflow-hidden p-0">
-          <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-subtle)] bg-[var(--surface-base)]/55 px-4 py-3">
+        <div className="flex min-h-0 flex-col bg-[var(--bg-surface)]">
+          <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--bg-surface)_94%,var(--surface-base))] px-5 py-3.5">
             <div>
-              <p className="text-sm font-semibold text-[var(--text-primary)]">{customerName}</p>
+              <p className="text-base font-semibold text-[var(--text-primary)]">{customerName}</p>
               <p className="text-xs text-[var(--text-secondary)]">{getWhatsAppContextLabel(route.context)} • {customerPhone}</p>
+              <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">
+                {amountLabel ? `Valor em aberto ${amountLabel}` : "Sem pendência financeira vinculada"}
+                {dueDateLabel ? ` • vence em ${dueDateLabel}` : ""}
+              </p>
             </div>
             <div className="inline-flex items-center gap-1 rounded-full border border-[var(--border-subtle)] px-2 py-1 text-xs text-[var(--text-secondary)]">
               <Phone className="h-3 w-3" /> online no WhatsApp
             </div>
           </header>
 
-          <div data-scrollbar="nexo" className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-[var(--bg-app)]/35 p-4">
-            <div className="nexo-text-wrap text-xs text-[var(--text-muted)]">
+          <div data-scrollbar="nexo" className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-[color-mix(in_srgb,var(--bg-app)_40%,var(--bg-surface))] px-5 py-5">
+            <div className="nexo-text-wrap rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/55 px-3 py-2 text-xs text-[var(--text-muted)]">
               <strong>{getWhatsAppContextLabel(route.context)}:</strong> {getWhatsAppContextDescription(route)}
-              {amountLabel ? ` • Valor: ${amountLabel}` : ""}
-              {dueDateLabel ? ` • Vencimento: ${dueDateLabel}` : ""}
             </div>
             {messages.length === 0 ? (
               <EmptyState
@@ -401,29 +400,44 @@ export default function WhatsAppPage() {
               />
             ) : (
               messages.map((msg, idx) => (
-                <div key={msg.id} className="space-y-1">
-                  <NexoMessageBubble>{msg.content}</NexoMessageBubble>
-                  <p className="inline-flex items-center gap-1 pl-3 text-[11px] text-[var(--text-muted)]">
+                <div
+                  key={msg.id}
+                  className={`flex ${idx % 2 === 0 ? "justify-start" : "justify-end"}`}
+                >
+                  <div className="max-w-[82%] space-y-1">
+                    <NexoMessageBubble
+                      className={
+                        idx % 2 === 0
+                          ? "rounded-bl-md"
+                          : "rounded-br-md border-orange-300/45 bg-orange-50/85 dark:border-orange-500/30 dark:bg-orange-500/12"
+                      }
+                    >
+                      {msg.content}
+                    </NexoMessageBubble>
+                  <p className={`inline-flex items-center gap-1 text-[11px] text-[var(--text-muted)] ${idx % 2 === 0 ? "pl-3" : "justify-end pr-2"}`}>
                     {formatTimeLabel(idx)} <CheckCheck className="h-3 w-3" />
                   </p>
+                  </div>
                 </div>
               ))
             )}
           </div>
 
-          <div className="space-y-3 border-t border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
+          <div className="sticky bottom-0 space-y-3 border-t border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--bg-surface)_95%,transparent)] px-5 py-4 backdrop-blur">
         {readinessQuery.data?.integrations?.whatsapp !== "configured" ? (
           <div className="rounded-lg border border-amber-300/70 bg-amber-50/80 p-3 text-xs text-amber-900 dark:border-amber-700/60 dark:bg-amber-900/20 dark:text-amber-200">
             Integração WhatsApp indisponível. Fallback: copie a mensagem contextual e envie manualmente.
           </div>
         ) : null}
-        <Input
-          value={messageInput}
-          onChange={(e) => setMessageInput(e.target.value)}
-          placeholder="Escreva a próxima mensagem com contexto e objetivo claro"
-        />
+        <div className="flex items-end gap-2">
+          <Input
+            value={messageInput}
+            onChange={(e) => setMessageInput(e.target.value)}
+            placeholder="Escreva a próxima mensagem com contexto e objetivo claro"
+            className="min-h-11 flex-1 rounded-2xl"
+          />
 
-        <Button
+          <Button
           data-whatsapp-send="true"
           onClick={async () => {
             if (!hasCustomer) {
@@ -466,10 +480,11 @@ export default function WhatsAppPage() {
             }
           }}
           disabled={!canSend}
-        >
-          <Send className="mr-2 h-4 w-4" />
-          {sendMutation.isPending ? "Enviando..." : "Enviar"}
-        </Button>
+          >
+            <Send className="mr-2 h-4 w-4" />
+            {sendMutation.isPending ? "Enviando..." : "Enviar"}
+          </Button>
+        </div>
         <Button
           type="button"
           variant="outline"
@@ -486,7 +501,7 @@ export default function WhatsAppPage() {
           Copiar mensagem
         </Button>
           </div>
-        </SurfaceSection>
+        </div>
       </section>
 
 

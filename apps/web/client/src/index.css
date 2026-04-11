@@ -1987,25 +1987,25 @@ html {
 
   .app-root {
     --bg-app: #f3f7fb;
-    --bg-sidebar: #eaf0f7;
+    --bg-sidebar: #e8eef7;
     --bg-header: #f8fbff;
-    --bg-surface: #ffffff;
-    --surface-base: #eef3f8;
+    --bg-surface: #fdfefe;
+    --surface-base: #edf3fa;
     --surface-elevated: #f7f9fc;
-    --border-soft: rgba(36, 82, 114, 0.2);
-    --border-subtle: rgba(36, 82, 114, 0.16);
+    --border-soft: rgba(36, 82, 114, 0.22);
+    --border-subtle: rgba(36, 82, 114, 0.18);
     --text-primary: #162a4a;
     --text-secondary: #245272;
     --text-muted: #6b8baa;
     --nexo-app-bg: #f3f7fb;
-    --nexo-page-surface: #eff4fa;
-    --nexo-section-surface: #ffffff;
-    --nexo-card-surface: #ffffff;
-    --nexo-card-muted: #f6f9fd;
+    --nexo-page-surface: #edf3fa;
+    --nexo-section-surface: #fdfefe;
+    --nexo-card-surface: #fdfefe;
+    --nexo-card-muted: #f4f8fc;
     --nexo-border-soft: var(--border-soft);
     --nexo-border-strong: var(--border-subtle);
-    --nexo-depth-subtle: none;
-    --nexo-depth-hover: none;
+    --nexo-depth-subtle: 0 8px 22px rgba(18, 48, 82, 0.08);
+    --nexo-depth-hover: 0 12px 26px rgba(18, 48, 82, 0.12);
   }
 
   .app-root.dark,
@@ -2044,7 +2044,7 @@ html {
   .app-root .nexo-page-header {
     border: 1px solid var(--nexo-border-soft);
     background: var(--nexo-card-surface);
-    box-shadow: none;
+    box-shadow: var(--nexo-depth-subtle);
   }
 
   .app-root.dark .nexo-card-base,
@@ -2083,9 +2083,9 @@ html {
   .app-root .nexo-kpi-card:hover,
   .app-root .nexo-surface:hover,
   .app-root .nexo-surface-primary:hover {
-    transform: none;
-    border-color: var(--nexo-border-soft);
-    box-shadow: none;
+    transform: translateY(-1px);
+    border-color: color-mix(in srgb, var(--accent-primary) 18%, var(--nexo-border-soft));
+    box-shadow: var(--nexo-depth-hover);
   }
 
   .app-root.dark .nexo-card-base:hover,
@@ -2120,15 +2120,27 @@ html {
     flex-direction: column;
     border-color: var(--border-subtle);
     background: var(--bg-surface);
+    box-shadow: 0 24px 48px rgba(15, 23, 42, 0.24);
+  }
+
+  .app-root .nexo-modal-header {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    margin-bottom: 0;
+    border-bottom: 1px solid var(--border-subtle);
+    background: color-mix(in srgb, var(--bg-surface) 94%, transparent);
+    backdrop-filter: blur(10px);
   }
 
   .app-root .nexo-modal-body {
     min-height: 0;
     flex: 1;
     overflow-y: auto;
-    padding-bottom: 1.25rem;
+    padding-bottom: 1.5rem;
     background: var(--bg-surface);
     color: var(--text-secondary);
+    scrollbar-gutter: stable both-edges;
   }
 
   .app-root .nexo-modal-footer {
@@ -2137,13 +2149,43 @@ html {
     z-index: 2;
     margin-top: 0;
     border-top: 1px solid var(--border-subtle);
-    background: var(--bg-surface);
+    background: color-mix(in srgb, var(--bg-surface) 96%, transparent);
+    backdrop-filter: blur(10px);
   }
 
   .app-root:not(.dark) .nexo-sidebar,
+  .app-root[data-theme="light"] .nexo-sidebar {
+    color: var(--text-primary);
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--bg-sidebar) 94%, white) 0%, var(--bg-sidebar) 100%);
+    border-right-color: color-mix(in srgb, #bccce0 44%, var(--nexo-border-soft));
+    box-shadow: 16px 0 34px rgba(41, 72, 112, 0.08);
+  }
+
+  .app-root:not(.dark) .nexo-sidebar-item,
+  .app-root[data-theme="light"] .nexo-sidebar-item {
+    color: var(--text-secondary);
+    border: 1px solid transparent;
+    background: transparent;
+  }
+
+  .app-root:not(.dark) .nexo-sidebar-item:hover,
+  .app-root[data-theme="light"] .nexo-sidebar-item:hover {
+    color: var(--text-primary);
+    background: color-mix(in srgb, #ffffff 70%, var(--surface-base));
+    border-color: color-mix(in srgb, #9db1ca 25%, transparent);
+  }
+
+  .app-root:not(.dark) .nexo-sidebar-item-active,
+  .app-root[data-theme="light"] .nexo-sidebar-item-active {
+    color: var(--text-primary);
+    background: color-mix(in srgb, var(--accent-primary) 12%, #ffffff);
+    border-color: color-mix(in srgb, var(--accent-primary) 28%, var(--nexo-border-soft));
+    box-shadow: inset 2px 0 0 0 color-mix(in srgb, var(--accent-primary) 66%, transparent);
+  }
+
   .app-root:not(.dark) .nexo-topbar,
   .app-root:not(.dark) .nexo-topbar-control,
-  .app-root:not(.dark) .nexo-sidebar-item,
   .app-root:not(.dark) .nexo-subtle-surface,
   .app-root:not(.dark) .nexo-info-banner,
   .app-root:not(.dark) .nexo-empty-state,
@@ -2157,7 +2199,31 @@ html {
   .app-root:not(.dark) textarea,
   .app-root:not(.dark) select {
     color: var(--text-primary);
-    background: color-mix(in srgb, var(--nexo-card-surface) 94%, #f4f8ff);
+    background: color-mix(in srgb, var(--nexo-card-surface) 90%, #eef4fd);
     border-color: var(--nexo-border-soft);
+  }
+
+  .app-root:not(.dark) input:focus-visible,
+  .app-root:not(.dark) textarea:focus-visible,
+  .app-root:not(.dark) select:focus-visible {
+    border-color: color-mix(in srgb, var(--accent-primary) 42%, var(--nexo-border-soft));
+    box-shadow: 0 0 0 3px rgba(232, 119, 46, 0.14);
+  }
+
+  .app-root .nexo-cta-secondary {
+    background: color-mix(in srgb, var(--surface-base) 72%, transparent);
+    color: var(--text-secondary);
+    border-color: var(--nexo-border-soft);
+  }
+
+  .app-root .nexo-cta-secondary:hover {
+    color: var(--text-primary);
+    background: color-mix(in srgb, var(--surface-base) 46%, #ffffff);
+    border-color: color-mix(in srgb, var(--accent-primary) 24%, var(--nexo-border-soft));
+  }
+
+  .app-root .nexo-empty-state {
+    background: color-mix(in srgb, var(--nexo-card-surface) 88%, var(--surface-base));
+    border: 1px dashed color-mix(in srgb, var(--nexo-border-soft) 82%, #b3c5db);
   }
 }
