@@ -52,6 +52,8 @@ import { ContextPanel } from "@/components/operating-system/ContextPanel";
 import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import { runFlowChain } from "@/lib/operations/flowChain";
 import { getChargeExplainLayer } from "@/lib/operations/explain-layer";
+import { AppEntityContextPanel, AppNextActionList, AppSectionCard } from "@/components/app-system";
+import { buildEntityContextBridge, buildNextActions } from "@/lib/operations/operational-hub";
 
 type FinanceCharge = {
   id: string;
@@ -314,6 +316,31 @@ export default function FinancesPage() {
   useEffect(() => {
     setWhatsAppDraft(defaultWhatsAppMessage);
   }, [defaultWhatsAppMessage]);
+
+  const financeNextActions = useMemo(() => {
+    return buildNextActions({
+      customers: [],
+      appointments: [],
+      serviceOrders: finalVisibleCharges.map(charge => ({
+        id: charge.serviceOrderId ?? undefined,
+        status: charge.serviceOrderId ? "DONE" : "OPEN",
+        customerId: charge.customerId,
+        financialSummary: { hasCharge: true },
+      })),
+      charges: finalVisibleCharges,
+    }).slice(0, 3);
+  }, [finalVisibleCharges]);
+
+  const activeFinanceContext = useMemo(
+    () =>
+      buildEntityContextBridge({
+        customerId: activeCharge?.customerId ?? null,
+        serviceOrderId: activeCharge?.serviceOrderId ?? null,
+        chargeId: activeCharge?.id ?? null,
+        paymentId: paymentIdFromUrl || null,
+      }),
+    [activeCharge, paymentIdFromUrl]
+  );
 
   const timelineData = useMemo(() => {
     const ordered = [...finalVisibleCharges];
@@ -714,6 +741,23 @@ export default function FinancesPage() {
           </NexoActionGroup>
         }
       />
+
+
+      <section className="grid gap-3 lg:grid-cols-2">
+        <AppSectionCard>
+          <p className="mb-3 text-sm font-semibold text-[var(--text-primary)]">Próximas ações financeiras</p>
+          <AppNextActionList
+            actions={financeNextActions.map(action => ({
+              id: action.id,
+              title: action.title,
+              description: action.description,
+              severity: action.severity,
+              onRun: () => navigate(action.href),
+            }))}
+          />
+        </AppSectionCard>
+        <AppEntityContextPanel title="Contexto financeiro conectado" links={activeFinanceContext} />
+      </section>
 
       {queryState.hasBackgroundUpdate ? (
         <SurfaceSection className="nexo-info-banner text-sm">

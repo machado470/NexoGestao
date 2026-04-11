@@ -378,6 +378,151 @@ export function AppTimelineItem({ className, ...props }: ComponentProps<"li">) {
 
 export const AppActivityFeed = AppTimeline;
 
+type AppOperationalState = "NORMAL" | "WARNING" | "RESTRICTED" | "SUSPENDED";
+
+const operationalStateTone: Record<AppOperationalState, { badgeTone: ComponentProps<typeof AppStatusBadge>["tone"]; borderClass: string }> = {
+  NORMAL: { badgeTone: "success", borderClass: "border-[var(--success)]/30" },
+  WARNING: { badgeTone: "warning", borderClass: "border-[var(--warning)]/30" },
+  RESTRICTED: { badgeTone: "accent", borderClass: "border-[var(--accent)]/35" },
+  SUSPENDED: { badgeTone: "danger", borderClass: "border-[var(--danger)]/35" },
+};
+
+export function AppOperationalStateBadge({ state, className }: { state: AppOperationalState; className?: string }) {
+  return <AppStatusBadge className={className} tone={operationalStateTone[state].badgeTone} label={state} />;
+}
+
+export function AppOperationalStateCard({
+  state,
+  summary,
+  impact,
+  recommendation,
+  className,
+}: {
+  state: AppOperationalState;
+  summary: string;
+  impact: string;
+  recommendation?: string;
+  className?: string;
+}) {
+  return (
+    <AppSectionCard className={cn("space-y-3", operationalStateTone[state].borderClass, className)}>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-semibold text-[var(--text-primary)]">Estado operacional</p>
+        <AppOperationalStateBadge state={state} />
+      </div>
+      <p className="text-sm text-[var(--text-secondary)]">{summary}</p>
+      <div className="nexo-card-informative p-3 text-xs text-[var(--text-secondary)]">
+        <strong className="text-[var(--text-primary)]">Impacto:</strong> {impact}
+      </div>
+      {recommendation ? (
+        <p className="text-xs text-[var(--text-muted)]">
+          <strong className="text-[var(--text-primary)]">Recomendado agora:</strong> {recommendation}
+        </p>
+      ) : null}
+    </AppSectionCard>
+  );
+}
+
+export function AppOperationalStatePanel({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return <div className={cn("grid gap-3 lg:grid-cols-3", className)}>{children}</div>;
+}
+
+export type AppNextActionItem = {
+  id: string;
+  title: string;
+  description: string;
+  severity: "healthy" | "pending" | "overdue" | "critical";
+  href?: string;
+  onRun?: () => void;
+};
+
+export function AppNextActionButton({
+  action,
+  className,
+}: {
+  action: AppNextActionItem;
+  className?: string;
+}) {
+  if (action.href) {
+    return (
+      <a href={action.href} className={cn("nexo-cta-secondary", className)}>
+        Executar
+      </a>
+    );
+  }
+
+  return (
+    <Button className={className} variant={action.severity === "critical" ? "default" : "secondary"} onClick={action.onRun}>
+      Executar
+    </Button>
+  );
+}
+
+export function AppNextActionCard({ action }: { action: AppNextActionItem }) {
+  const tone: Record<AppNextActionItem["severity"], ComponentProps<typeof AppStatusBadge>["tone"]> = {
+    healthy: "success",
+    pending: "warning",
+    overdue: "accent",
+    critical: "danger",
+  };
+
+  return (
+    <article className="nexo-card-informative flex items-start justify-between gap-3 p-3">
+      <div className="space-y-1">
+        <AppStatusBadge label={action.severity.toUpperCase()} tone={tone[action.severity]} />
+        <p className="text-sm font-semibold text-[var(--text-primary)]">{action.title}</p>
+        <p className="text-xs text-[var(--text-muted)]">{action.description}</p>
+      </div>
+      <AppNextActionButton action={action} />
+    </article>
+  );
+}
+
+export function AppNextActionList({ actions, className }: { actions: AppNextActionItem[]; className?: string }) {
+  if (actions.length === 0) {
+    return <AppEmptyState title="Sem ações imediatas" description="A operação está estável neste momento." />;
+  }
+
+  return (
+    <div className={cn("space-y-2", className)}>
+      {actions.map(action => (
+        <AppNextActionCard key={action.id} action={action} />
+      ))}
+    </div>
+  );
+}
+
+export function AppEntityContextPanel({
+  title = "Fluxo conectado",
+  links,
+}: {
+  title?: string;
+  links: Array<{ id: string; label: string; href: string; active?: boolean }>;
+}) {
+  return (
+    <AppSectionCard>
+      <p className="text-sm font-semibold text-[var(--text-primary)]">{title}</p>
+      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+        {links.map((link, index) => (
+          <div key={link.id} className="inline-flex items-center gap-2">
+            <a className={cn("rounded-full border border-[var(--border-soft)] px-3 py-1", link.active && "text-[var(--accent)] border-[var(--accent)]/40")} href={link.href}>
+              {link.label}
+            </a>
+            {index < links.length - 1 ? <span className="text-[var(--text-muted)]">→</span> : null}
+          </div>
+        ))}
+      </div>
+    </AppSectionCard>
+  );
+}
+
+
 export const AppTabs = Tabs;
 export const AppTabsList = TabsList;
 export const AppTabsTrigger = TabsTrigger;

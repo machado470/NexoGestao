@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { SurfaceSection } from "@/components/PagePattern";
 import { EmptyState } from "@/components/EmptyState";
+import { AppEntityContextPanel, AppNextActionList, AppSectionCard } from "@/components/app-system";
 
 import ServiceOrderCard from "@/components/service-orders/ServiceOrderCard";
 import ServiceOrderDetailsPanel from "@/components/service-orders/ServiceOrderDetailsPanel";
@@ -64,6 +65,7 @@ import { ContextPanel } from "@/components/operating-system/ContextPanel";
 import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import { runFlowChain, type ExecutionSnapshot } from "@/lib/operations/flowChain";
 import { getServiceOrderExplainLayer } from "@/lib/operations/explain-layer";
+import { buildEntityContextBridge, buildNextActions } from "@/lib/operations/operational-hub";
 import {
   OperationalStickyZone,
   OperationalSummaryCards,
@@ -300,6 +302,31 @@ export default function ServiceOrdersPage() {
         (item.status === "DONE" && !item.financialSummary?.hasCharge)
     ).length;
   }, [sorted]);
+
+  const dashboardNextActions = useMemo(() => {
+    return buildNextActions({
+      customers,
+      appointments: [],
+      serviceOrders: sorted,
+      charges: sorted
+        .filter(item => item.financialSummary?.hasCharge)
+        .map(item => ({
+          id: item.financialSummary?.chargeId ?? item.id,
+          status: item.financialSummary?.chargeStatus,
+          customerId: item.customerId ?? item.customer?.id,
+        })),
+    }).slice(0, 3);
+  }, [customers, sorted]);
+
+  const activeContextLinks = useMemo(
+    () =>
+      buildEntityContextBridge({
+        customerId: activeOrder?.customerId ?? activeOrder?.customer?.id,
+        serviceOrderId: activeOrder?.id,
+        chargeId: activeOrder?.financialSummary?.chargeId ?? null,
+      }),
+    [activeOrder]
+  );
 
   const nextAction = useMemo(() => {
     if (activeOrder) {
@@ -551,6 +578,22 @@ export default function ServiceOrdersPage() {
           encontrada. Revise o link ou volte para a lista.
         </SurfaceSection>
       ) : null}
+
+      <section className="grid gap-3 lg:grid-cols-2">
+        <AppSectionCard>
+          <p className="mb-3 text-sm font-semibold text-[var(--text-primary)]">Próximas ações do módulo</p>
+          <AppNextActionList
+            actions={dashboardNextActions.map(action => ({
+              id: action.id,
+              title: action.title,
+              description: action.description,
+              severity: action.severity,
+              onRun: () => navigate(action.href),
+            }))}
+          />
+        </AppSectionCard>
+        <AppEntityContextPanel title="Contexto conectado da O.S." links={activeContextLinks} />
+      </section>
 
       <OperationalStickyZone
         summaryCards={(
