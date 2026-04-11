@@ -14,7 +14,7 @@ function envBool(name: string, fallback = false): boolean {
 export class ExecutionScheduler {
   constructor(private readonly runner: ExecutionRunner) {}
 
-  @Cron('*/1 * * * *')
+  @Cron('*/10 * * * * *')
   async tick() {
     if (envBool('DISABLE_EXECUTION_RUNNER', false)) return
     await this.runner.runOnce()

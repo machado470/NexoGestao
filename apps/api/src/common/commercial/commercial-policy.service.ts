@@ -193,6 +193,9 @@ export class CommercialPolicyService {
     }
 
     if (!context.features[feature]) {
+      if (process.env.NODE_ENV === 'development') {
+        return { allowed: true }
+      }
       return {
         allowed: false,
         policyType: 'commercial_block',

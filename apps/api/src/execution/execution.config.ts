@@ -5,7 +5,7 @@ import type { ExecutionMode, ExecutionPolicyConfig } from './execution.types'
 
 const DEFAULT_POLICY: ExecutionPolicyConfig = {
   allowAutomaticCharge: true,
-  allowWhatsAppAuto: false,
+  allowWhatsAppAuto: true,
   allowOverdueReminderAuto: true,
   allowFinanceTeamNotifications: true,
   allowGovernanceFollowup: true,
@@ -16,10 +16,13 @@ const DEFAULT_POLICY: ExecutionPolicyConfig = {
 }
 
 function normalizeMode(raw: string | undefined): ExecutionMode {
+  if (raw === 'auto') {
+    return 'automatic'
+  }
   if (raw === 'manual' || raw === 'semi_automatic' || raw === 'automatic') {
     return raw
   }
-  return 'manual'
+  return 'automatic'
 }
 
 @Injectable()
