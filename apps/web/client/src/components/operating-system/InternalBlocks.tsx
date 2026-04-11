@@ -84,11 +84,12 @@ export function NexoEntityRow({
 
 type NexoMessageBubbleProps = {
   children: ReactNode;
+  className?: string;
 };
 
-export function NexoMessageBubble({ children }: NexoMessageBubbleProps) {
+export function NexoMessageBubble({ children, className }: NexoMessageBubbleProps) {
   return (
-    <div className="ml-auto max-w-[85%] rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 text-sm text-[var(--text-primary)]">
+    <div className={`max-w-[85%] rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 text-sm text-[var(--text-primary)] ${className ?? ""}`.trim()}>
       {children}
     </div>
   );
