@@ -1,57 +1,134 @@
-import { Bar, BarChart, CartesianGrid, XAxis } from "recharts";
+import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { trpc } from "@/lib/trpc";
+import { normalizeArrayPayload } from "@/lib/query-helpers";
+import { buildIdempotencyKey } from "@/lib/idempotency";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { useRunAction } from "@/hooks/useRunAction";
+import { Input } from "@/components/ui/input";
 import {
-  AppAlertList,
-  AppChartPanel,
+  AppDataTable,
+  AppEmptyState,
   AppKpiRow,
-  AppListBlock,
+  AppLoadingState,
   AppPageHeader,
   AppPageShell,
-  AppRecentActivity,
   AppSectionBlock,
   AppStatusBadge,
 } from "@/components/internal-page-system";
 
 export default function WhatsAppPage() {
-  const [, navigate] = useLocation();
-  const { runAction, isRunning } = useRunAction();
-  const data = [{ day: "Seg", enviadas: 92, falhas: 4 }, { day: "Ter", enviadas: 106, falhas: 5 }, { day: "Qua", enviadas: 118, falhas: 3 }, { day: "Qui", enviadas: 133, falhas: 8 }, { day: "Sex", enviadas: 97, falhas: 2 }];
+  const [location] = useLocation();
+  const search = new URLSearchParams(location.split("?")[1] ?? "");
+  const queryCustomerId = search.get("customerId") ?? "";
+
+  const customersQuery = trpc.nexo.customers.list.useQuery(undefined, { retry: false });
+  const customers = useMemo(() => normalizeArrayPayload<any>(customersQuery.data), [customersQuery.data]);
+  const [customerId, setCustomerId] = useState(queryCustomerId);
+  const [content, setContent] = useState("");
+
+  const selectedCustomerId = customerId || String(customers[0]?.id ?? "");
+
+  const messagesQuery = trpc.nexo.whatsapp.messages.useQuery(
+    { customerId: selectedCustomerId },
+    { enabled: Boolean(selectedCustomerId), retry: false }
+  );
+  const sendMutation = trpc.nexo.whatsapp.send.useMutation();
+
+  const messages = useMemo(() => normalizeArrayPayload<any>(messagesQuery.data), [messagesQuery.data]);
+  const failed = messages.filter((item) => String(item?.status ?? "").toUpperCase() === "FAILED").length;
+  const delivered = messages.filter((item) => String(item?.status ?? "").toUpperCase() === "DELIVERED").length;
+
+  async function sendMessage() {
+    if (!selectedCustomerId || content.trim().length < 2) {
+      toast.error("Falha ao enviar mensagem: selecione cliente e preencha o conteúdo");
+      return;
+    }
+
+    try {
+      await sendMutation.mutateAsync({
+        customerId: selectedCustomerId,
+        content: content.trim(),
+        idempotencyKey: buildIdempotencyKey("whatsapp.manual_send", selectedCustomerId),
+      });
+      setContent("");
+      toast.success("Mensagem enviada com sucesso");
+      await messagesQuery.refetch();
+    } catch (error: any) {
+      toast.error(error?.message || "Falha ao enviar mensagem");
+    }
+  }
 
   return (
     <AppPageShell>
-      <AppPageHeader title="WhatsApp Operacional" description="Envie mensagens certas no momento certo para cobrar, confirmar e orientar clientes." ctaLabel="Enviar nova mensagem agora" onCta={() => void runAction(async () => navigate("/whatsapp?composer=open"))} />
-      <AppSectionBlock title="Contexto da conversa" subtitle="Atlas Engenharia · cliente com cobrança vencida há 2 dias">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <AppStatusBadge label="Cobrança vencida" />
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" onClick={() => void runAction(async () => navigate("/finances?status=overdue&customer=atlas"))} isLoading={isRunning}>Cobrar cliente agora</Button>
-            <Button size="sm" variant="secondary" onClick={() => void runAction(async () => navigate("/whatsapp?customer=atlas&template=payment-link"))} isLoading={isRunning}>Enviar link de pagamento</Button>
-            <Button size="sm" variant="outline" onClick={() => void runAction(async () => navigate("/timeline?customer=atlas&type=confirmation"))} isLoading={isRunning}>Confirmar atendimento</Button>
+      <AppPageHeader
+        title="WhatsApp Operacional"
+        description="Envio real de mensagens com histórico de entrega e falhas."
+        ctaLabel="Enviar mensagem"
+        onCta={() => void sendMessage()}
+      />
+
+      <AppKpiRow
+        items={[
+          { label: "Mensagens", value: String(messages.length), trend: 0, context: "histórico do cliente" },
+          { label: "Entregues", value: String(delivered), trend: 0, context: "status delivered" },
+          { label: "Falhas", value: String(failed), trend: 0, context: "requer intervenção" },
+          { label: "Clientes", value: String(customers.length), trend: 0, context: "com WhatsApp" },
+        ]}
+      />
+
+      <AppSectionBlock title="Novo envio" subtitle="Selecione cliente e envie mensagem real no backend">
+        {customers.length === 0 ? (
+          <AppEmptyState title="Nenhum dado disponível ainda" description="Ação recomendada: criar cliente" />
+        ) : (
+          <div className="space-y-3">
+            <select
+              value={selectedCustomerId}
+              onChange={(event) => setCustomerId(event.target.value)}
+              className="h-10 w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3"
+            >
+              {customers.map((customer) => (
+                <option key={String(customer.id)} value={String(customer.id)}>{String(customer.name ?? "Cliente")}</option>
+              ))}
+            </select>
+            <Input
+              value={content}
+              onChange={(event) => setContent(event.target.value)}
+              placeholder="Digite a mensagem"
+            />
+            <Button onClick={() => void sendMessage()} disabled={sendMutation.isPending}>Enviar WhatsApp</Button>
           </div>
-        </div>
+        )}
       </AppSectionBlock>
-      <AppKpiRow items={[{ label: "Enviadas", value: "546", trend: 6.4, context: "+18 hoje · últimos 7 dias", onClick: () => navigate("/whatsapp?metric=sent&period=7d") }, { label: "Entregues", value: "519", trend: 5.9, context: "↑ taxa de entrega · 7 dias", onClick: () => navigate("/whatsapp?metric=delivered&period=7d") }, { label: "Falhas", value: "19", trend: -3.7, context: "-2 hoje · semana atual", onClick: () => navigate("/whatsapp?status=failed&period=7d") }, { label: "Taxa entrega", value: "95,0%", trend: 1.2, context: "estável · média móvel", onClick: () => navigate("/whatsapp?metric=delivery_rate&period=7d") }]} />
-      <div className="grid gap-3 xl:grid-cols-3">
-        <AppChartPanel title="Volume e falhas de envio" description="Saúde de comunicação operacional." trendValue={9.4} trendLabel="↑ +9,4% · últimos 7 dias" onCtaClick={() => navigate("/whatsapp?chart=send_failures&period=7d")}>
-          <ChartContainer className="h-[240px] w-full" config={{ enviadas: { label: "Enviadas" }, falhas: { label: "Falhas" } }}>
-            <BarChart data={data}><CartesianGrid vertical={false} /><XAxis dataKey="day" tickLine={false} axisLine={false} /><ChartTooltip content={<ChartTooltipContent />} /><Bar dataKey="enviadas" fill="var(--brand-primary)" /><Bar dataKey="falhas" fill="var(--color-danger)" /></BarChart>
-          </ChartContainer>
-        </AppChartPanel>
-        <AppSectionBlock title="Falhas recentes" subtitle="Problemas que impedem o cliente de receber mensagem" onCtaClick={() => navigate("/whatsapp?status=failed")}>
-          <AppAlertList alerts={[{ text: "3 falhas por número inválido", tone: "warning" }, { text: "2 falhas por timeout da API", tone: "danger" }]} />
-        </AppSectionBlock>
-      </div>
-      <div className="grid gap-3 xl:grid-cols-2">
-        <AppSectionBlock title="Conversas por contexto" subtitle="Cada conversa já indica o problema e o próximo passo">
-          <AppListBlock items={[{ title: "Atlas Engenharia", subtitle: "Cobrança #218 · enviada há 5 min", right: <AppStatusBadge label="Entregue" />, action: <Button size="sm" onClick={() => void runAction(async () => navigate("/whatsapp?customer=atlas"))} isLoading={isRunning}>Ver detalhes da conversa</Button> }, { title: "Condomínio Orion", subtitle: "O.S. #1849 · mensagem de atraso", right: <AppStatusBadge label="Pendente" />, action: <Button size="sm" onClick={() => void runAction(async () => navigate("/whatsapp?customer=orion&context=charge"))} isLoading={isRunning}>Cobrar cliente agora</Button> }, { title: "Solar Prime", subtitle: "Agendamento #443", right: <AppStatusBadge label="Falhou" />, action: <Button size="sm" onClick={() => void runAction(async () => navigate("/whatsapp?customer=solar-prime&action=retry"))} isLoading={isRunning}>Confirmar agendamento</Button> }]} />
-        </AppSectionBlock>
-        <AppSectionBlock title="Atividade da comunicação" subtitle="Contexto recente" onCtaClick={() => navigate("/timeline?source=whatsapp")}>
-          <AppRecentActivity items={["Template cobrança enviado há 3 min", "Confirmação de agendamento há 8 min", "Reenvio de mensagem por falha há 15 min"]} />
-        </AppSectionBlock>
-      </div>
+
+      <AppSectionBlock title="Histórico de mensagens" subtitle="Status reais retornados pela API">
+        {messagesQuery.isLoading ? (
+          <AppLoadingState rows={4} />
+        ) : messages.length === 0 ? (
+          <AppEmptyState title="Nenhum dado disponível ainda" description="Ação recomendada: enviar WhatsApp" />
+        ) : (
+          <AppDataTable>
+            <table className="w-full text-sm">
+              <thead className="bg-[var(--surface-elevated)] text-xs text-[var(--text-muted)]">
+                <tr>
+                  <th className="p-3">Conteúdo</th>
+                  <th>Status</th>
+                  <th>Data</th>
+                </tr>
+              </thead>
+              <tbody>
+                {messages.map((message) => (
+                  <tr key={String(message?.id)} className="border-t border-[var(--border-subtle)]">
+                    <td className="p-3">{String(message?.content ?? "—")}</td>
+                    <td><AppStatusBadge label={String(message?.status ?? "Pendente")} /></td>
+                    <td>{message?.createdAt ? new Date(String(message.createdAt)).toLocaleString("pt-BR") : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </AppDataTable>
+        )}
+      </AppSectionBlock>
     </AppPageShell>
   );
 }

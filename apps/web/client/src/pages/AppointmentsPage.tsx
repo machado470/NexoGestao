@@ -1,70 +1,99 @@
-// Operating-system contract: PageWrapper + NexoActionGroup
-// OperationalSeverity compatibility marker
-import { Line, LineChart, CartesianGrid, XAxis } from "recharts";
+import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { trpc } from "@/lib/trpc";
+import { normalizeArrayPayload } from "@/lib/query-helpers";
+import { CreateAppointmentModal } from "@/components/CreateAppointmentModal";
 import {
-  AppAlertList,
-  AppChartPanel,
   AppDataTable,
-  AppFiltersBar,
+  AppEmptyState,
   AppKpiRow,
+  AppLoadingState,
   AppPageHeader,
   AppPageShell,
+  AppRowActions,
   AppSectionBlock,
   AppStatusBadge,
-  Input,
-  AppRowActions,
 } from "@/components/internal-page-system";
-import { AppNextActions } from "@/components/app";
-import { buildOperationalRoute } from "@/lib/operational";
 
 export default function AppointmentsPage() {
   const [, navigate] = useLocation();
-  const data = [
-    { day: "Seg", volume: 18 },
-    { day: "Ter", volume: 22 },
-    { day: "Qua", volume: 19 },
-    { day: "Qui", volume: 25 },
-    { day: "Sex", volume: 28 },
-  ];
+  const [openCreate, setOpenCreate] = useState(false);
+
+  const customersQuery = trpc.nexo.customers.list.useQuery(undefined, { retry: false });
+  const appointmentsQuery = trpc.nexo.appointments.list.useQuery(undefined, { retry: false });
+
+  const customers = useMemo(() => normalizeArrayPayload<any>(customersQuery.data), [customersQuery.data]);
+  const appointments = useMemo(() => normalizeArrayPayload<any>(appointmentsQuery.data), [appointmentsQuery.data]);
+
+  const scheduled = appointments.filter((item) => String(item?.status ?? "").toUpperCase() === "SCHEDULED").length;
+  const confirmed = appointments.filter((item) => String(item?.status ?? "").toUpperCase() === "CONFIRMED").length;
+
   return (
     <AppPageShell>
-      <AppPageHeader title="Agendamentos" description="Veja rapidamente quem precisa de confirmação e evite faltas." ctaLabel="Criar agendamento agora" />
-      <AppNextActions
-        title="Você precisa fazer isso agora"
-        engineInput={{
-          customers: [{ id: "c-1", name: "Cliente 1", phone: "5511988881200" }],
-          charges: [],
-          serviceOrders: [],
-          appointments: [
-            { id: "appt-1", customerId: "c-1", status: "SCHEDULED", startsAt: "2026-04-11T18:00:00Z" },
-            { id: "appt-2", customerId: "c-1", status: "CONFIRMED", startsAt: "2026-04-12T12:00:00Z" },
-          ],
-          autoExecute: true,
-        }}
+      <AppPageHeader
+        title="Agendamentos"
+        description="Agendamentos reais com atualização automática após cada criação."
+        ctaLabel="Criar agendamento agora"
+        onCta={() => setOpenCreate(true)}
       />
-      <AppKpiRow items={[
-        { label: "Hoje", value: "26", trend: 8.2, context: "vs ontem" },
-        { label: "Semana", value: "112", trend: 5.1, context: "vs semana passada" },
-        { label: "Confirmados", value: "87", trend: 3.6, context: "taxa de confirmação" },
-        { label: "Cancelados", value: "9", trend: -1.4, context: "últimos 7 dias" },
-      ]} />
-      <div className="grid gap-3 xl:grid-cols-3">
-        <AppChartPanel title="Volume por dia" description="Capacidade e picos da operação.">
-          <ChartContainer className="h-[240px] w-full" config={{ volume: { label: "Agendamentos" } }}>
-            <LineChart data={data}><CartesianGrid vertical={false} /><XAxis dataKey="day" tickLine={false} axisLine={false} /><ChartTooltip content={<ChartTooltipContent />} /><Line dataKey="volume" stroke="var(--brand-primary)" strokeWidth={3} /></LineChart>
-          </ChartContainer>
-        </AppChartPanel>
-        <AppSectionBlock title="Alertas de agenda" subtitle="Conflitos que podem gerar atraso no atendimento">
-          <AppAlertList alerts={[{ text: "3 conflitos de horário para amanhã", tone: "danger" }, { text: "Equipe Sul com concentração acima de 120%", tone: "warning" }]} />
-        </AppSectionBlock>
-      </div>
 
-      <AppSectionBlock title="Fila de agendamentos" subtitle="Lista principal para confirmar, concluir e acompanhar horários">
-        <AppFiltersBar><Input placeholder="Filtrar por cliente" className="max-w-sm" /></AppFiltersBar>
-        <AppDataTable><table className="w-full text-sm"><thead className="bg-[var(--surface-elevated)] text-xs text-[var(--text-muted)]"><tr><th className="p-3">Data</th><th>Cliente</th><th>Status</th><th>Responsável</th><th>Origem</th><th>Ações</th></tr></thead><tbody>{["08:30", "10:00", "14:20"].map((time, i) => <tr key={time} className="border-t border-[var(--border-subtle)] hover:bg-[var(--surface-base)]/70"><td className="p-3">15/04 {time}</td><td>Cliente {i + 1}</td><td><AppStatusBadge label={i === 1 ? "Pendente" : "Concluído"} /></td><td>Equipe {i + 1}</td><td>{i === 2 ? "WhatsApp" : "Portal"}</td><td className="p-3"><AppRowActions actions={[{ label: i === 1 ? "Confirmar agendamento agora" : "Ver detalhes do agendamento", onClick: () => navigate(buildOperationalRoute("/appointments", { hour: time })) }]} /></td></tr>)}</tbody></table></AppDataTable>
+      <AppKpiRow
+        items={[
+          { label: "Total", value: String(appointments.length), trend: 0, context: "dados reais" },
+          { label: "Agendados", value: String(scheduled), trend: 0, context: "aguardando confirmação" },
+          { label: "Confirmados", value: String(confirmed), trend: 0, context: "prontos para execução" },
+          { label: "Clientes", value: String(customers.length), trend: 0, context: "base disponível" },
+        ]}
+      />
+
+      <AppSectionBlock title="Fila de agendamentos" subtitle="Sincronizada em tempo real com backend">
+        {appointmentsQuery.isLoading ? (
+          <AppLoadingState rows={4} />
+        ) : appointments.length === 0 ? (
+          <AppEmptyState title="Nenhum dado disponível ainda" description="Ação recomendada: criar agendamento" />
+        ) : (
+          <AppDataTable>
+            <table className="w-full text-sm">
+              <thead className="bg-[var(--surface-elevated)] text-xs text-[var(--text-muted)]">
+                <tr>
+                  <th className="p-3">Início</th>
+                  <th>Cliente</th>
+                  <th>Status</th>
+                  <th>Fim</th>
+                  <th className="p-3">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {appointments.map((appointment) => (
+                  <tr key={String(appointment?.id)} className="border-t border-[var(--border-subtle)]">
+                    <td className="p-3">{new Date(String(appointment?.startsAt)).toLocaleString("pt-BR")}</td>
+                    <td>{String(appointment?.customer?.name ?? "Cliente")}</td>
+                    <td><AppStatusBadge label={String(appointment?.status ?? "Pendente")} /></td>
+                    <td>{appointment?.endsAt ? new Date(String(appointment.endsAt)).toLocaleString("pt-BR") : "—"}</td>
+                    <td className="p-3">
+                      <AppRowActions
+                        actions={[
+                          { label: "Criar O.S.", onClick: () => navigate(`/service-orders?customerId=${appointment.customerId}&appointmentId=${appointment.id}`) },
+                          { label: "Enviar WhatsApp", onClick: () => navigate(`/whatsapp?customerId=${appointment.customerId}`) },
+                        ]}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </AppDataTable>
+        )}
       </AppSectionBlock>
+
+      <CreateAppointmentModal
+        isOpen={openCreate}
+        onClose={() => setOpenCreate(false)}
+        onSuccess={() => {
+          void appointmentsQuery.refetch();
+        }}
+        customers={customers.map((item) => ({ id: String(item.id), name: String(item.name ?? "Cliente") }))}
+      />
     </AppPageShell>
   );
 }

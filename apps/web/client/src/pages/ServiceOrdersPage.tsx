@@ -1,55 +1,100 @@
-// Operating-system contract: PageWrapper + NexoActionGroup
-// OperationalSeverity compatibility marker
-import { Pie, PieChart } from "recharts";
+import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { trpc } from "@/lib/trpc";
+import { normalizeArrayPayload } from "@/lib/query-helpers";
+import CreateServiceOrderModal from "@/components/CreateServiceOrderModal";
 import {
-  AppAlertList,
-  AppChartPanel,
   AppDataTable,
+  AppEmptyState,
   AppKpiRow,
+  AppLoadingState,
   AppPageHeader,
   AppPageShell,
   AppPriorityBadge,
+  AppRowActions,
   AppSectionBlock,
   AppStatusBadge,
-  AppRowActions,
 } from "@/components/internal-page-system";
-import { AppNextActions } from "@/components/app";
-import { buildOperationalRoute } from "@/lib/operational";
 
 export default function ServiceOrdersPage() {
   const [, navigate] = useLocation();
-  const statusData = [{ name: "Abertas", value: 34, fill: "var(--brand-primary)" }, { name: "Execução", value: 27, fill: "var(--color-info)" }, { name: "Concluídas", value: 63, fill: "var(--color-success)" }, { name: "Atrasadas", value: 8, fill: "var(--color-danger)" }];
+  const [openCreate, setOpenCreate] = useState(false);
+  const customersQuery = trpc.nexo.customers.list.useQuery(undefined, { retry: false });
+  const peopleQuery = trpc.people.list.useQuery(undefined, { retry: false });
+  const serviceOrdersQuery = trpc.nexo.serviceOrders.list.useQuery({ page: 1, limit: 100 }, { retry: false });
+
+  const customers = useMemo(() => normalizeArrayPayload<any>(customersQuery.data), [customersQuery.data]);
+  const people = useMemo(() => normalizeArrayPayload<any>(peopleQuery.data), [peopleQuery.data]);
+  const orders = useMemo(() => normalizeArrayPayload<any>(serviceOrdersQuery.data), [serviceOrdersQuery.data]);
+
+  const inProgress = orders.filter((item) => String(item?.status ?? "").toUpperCase() === "IN_PROGRESS").length;
+  const done = orders.filter((item) => String(item?.status ?? "").toUpperCase() === "DONE").length;
+
   return (
     <AppPageShell>
-      <AppPageHeader title="Ordens de Serviço" description="Saiba quais serviços estão atrasados, em risco e o que concluir primeiro." ctaLabel="Criar nova O.S. agora" />
-      <AppNextActions
-        title="Você precisa fazer isso agora"
-        engineInput={{
-          customers: [{ id: "c-atlas", name: "Atlas", phone: "5511988881200" }],
-          charges: [],
-          appointments: [],
-          serviceOrders: [
-            { id: "so-1", customerId: "c-atlas", status: "OVERDUE", delayedMinutes: 360 },
-            { id: "so-2", customerId: "c-atlas", status: "AT_RISK", delayedMinutes: 120 },
-          ],
-        }}
+      <AppPageHeader
+        title="Ordens de Serviço"
+        description="Execução real conectada ao backend com próximos passos de cobrança e WhatsApp."
+        ctaLabel="Criar nova O.S. agora"
+        onCta={() => setOpenCreate(true)}
       />
-      <AppKpiRow items={[{ label: "Abertas", value: "34", trend: 6.2, context: "vs ontem" }, { label: "Em execução", value: "27", trend: 4.4, context: "agora" }, { label: "Concluídas", value: "124", trend: 9.1, context: "no mês" }, { label: "Atrasadas", value: "8", trend: -2.3, context: "vs semana passada" }]} />
-      <div className="grid gap-3 xl:grid-cols-3">
-        <AppChartPanel title="Distribuição por status" description="Mapa de execução das O.S.">
-          <ChartContainer className="h-[240px] w-full" config={{ value: { label: "Ordens" } }}>
-            <PieChart><Pie data={statusData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={80} /><ChartTooltip content={<ChartTooltipContent />} /></PieChart>
-          </ChartContainer>
-        </AppChartPanel>
-        <AppSectionBlock title="Gargalos críticos" subtitle="Serviços travados que atrasam a entrega ao cliente">
-          <AppAlertList alerts={[{ text: "5 O.S. acima do prazo de SLA", tone: "danger" }, { text: "2 ordens paradas por falta de peça", tone: "warning" }]} />
-        </AppSectionBlock>
-      </div>
-      <AppSectionBlock title="Fila operacional dominante" subtitle="Cada linha mostra prioridade, impacto e próxima ação clara">
-        <AppDataTable><table className="w-full text-sm"><thead className="bg-[var(--surface-elevated)] text-xs text-[var(--text-muted)]"><tr><th className="p-3">Cliente</th><th>Serviço</th><th>Status</th><th>Responsável</th><th>Prazo</th><th>Prioridade</th><th>Ações</th></tr></thead><tbody>{[{c:"Atlas",s:"Instalação",st:"Em risco",p:"Alta"},{c:"Orion",s:"Manutenção",st:"Atrasado",p:"Alta"},{c:"Solar",s:"Vistoria",st:"Concluído",p:"Baixa"}].map((row) => <tr key={row.c+row.s} className="border-t border-[var(--border-subtle)] hover:bg-[var(--surface-base)]/70"><td className="p-3">{row.c}</td><td>{row.s}</td><td><AppStatusBadge label={row.st} /></td><td>Equipe Campo</td><td>Hoje 17:00</td><td><AppPriorityBadge label={row.p} /></td><td className="p-3"><AppRowActions actions={[{ label: row.st === "Concluído" ? "Ver detalhes da O.S." : "Concluir serviço agora", onClick: () => navigate(buildOperationalRoute("/service-orders", { customer: row.c })) }]} /></td></tr>)}</tbody></table></AppDataTable>
+
+      <AppKpiRow
+        items={[
+          { label: "Total", value: String(orders.length), trend: 0, context: "ordens registradas" },
+          { label: "Em execução", value: String(inProgress), trend: 0, context: "andamento atual" },
+          { label: "Concluídas", value: String(done), trend: 0, context: "prontas para cobrança" },
+          { label: "Clientes", value: String(customers.length), trend: 0, context: "base vinculável" },
+        ]}
+      />
+
+      <AppSectionBlock title="Pipeline operacional" subtitle="Cada O.S. com ação real">
+        {serviceOrdersQuery.isLoading ? (
+          <AppLoadingState rows={4} />
+        ) : orders.length === 0 ? (
+          <AppEmptyState title="Nenhum dado disponível ainda" description="Ação recomendada: criar ordem de serviço" />
+        ) : (
+          <AppDataTable>
+            <table className="w-full text-sm">
+              <thead className="bg-[var(--surface-elevated)] text-xs text-[var(--text-muted)]">
+                <tr>
+                  <th className="p-3">Título</th>
+                  <th>Cliente</th>
+                  <th>Status</th>
+                  <th>Prioridade</th>
+                  <th className="p-3">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {orders.map((order) => (
+                  <tr key={String(order?.id)} className="border-t border-[var(--border-subtle)]">
+                    <td className="p-3">{String(order?.title ?? "Sem título")}</td>
+                    <td>{String(order?.customer?.name ?? "—")}</td>
+                    <td><AppStatusBadge label={String(order?.status ?? "Pendente")} /></td>
+                    <td><AppPriorityBadge label={`P${String(order?.priority ?? 2)}`} /></td>
+                    <td className="p-3">
+                      <AppRowActions actions={[
+                        { label: "Gerar cobrança", onClick: () => navigate(`/finances?serviceOrderId=${order.id}`) },
+                        { label: "Enviar WhatsApp", onClick: () => navigate(`/whatsapp?customerId=${order.customerId}`) },
+                      ]} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </AppDataTable>
+        )}
       </AppSectionBlock>
+
+      <CreateServiceOrderModal
+        open={openCreate}
+        onClose={() => setOpenCreate(false)}
+        onSuccess={() => {
+          void serviceOrdersQuery.refetch();
+        }}
+        customers={customers.map((item) => ({ id: String(item.id), name: String(item.name ?? "Cliente") }))}
+        people={people.map((item) => ({ id: String(item.id), name: String(item.name ?? "Pessoa") }))}
+      />
     </AppPageShell>
   );
 }
