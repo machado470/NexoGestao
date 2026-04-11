@@ -41,6 +41,7 @@ import {
 } from "@/components/design-system";
 import { BrandSignature } from "@/components/BrandSignature";
 import { AppShell } from "@/components/AppShell";
+import { ExecutionGlobalBar } from "@/components/ExecutionGlobalBar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -600,6 +601,8 @@ export function MainLayout({ children }: MainLayoutProps) {
                 </div>
               </div>
             </NexoTopbar>
+
+            <ExecutionGlobalBar />
 
             <NexoMainContainer>
               {shouldRenderGlobalEngine ? (

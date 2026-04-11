@@ -1,0 +1,124 @@
+import { useEffect, useMemo, useState } from "react";
+import { Loader2, PlayCircle } from "lucide-react";
+import { trpc } from "@/lib/trpc";
+import { getPayloadValue } from "@/lib/query-helpers";
+import { useAuth } from "@/contexts/AuthContext";
+import { can } from "@/lib/rbac";
+import { Button } from "@/components/design-system";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+type ExecutionMode = "manual" | "semi_automatic" | "automatic";
+type ModePayload = { mode?: ExecutionMode };
+type ExecutionStateSummary = {
+  executed?: number;
+  blocked?: number;
+  blockedRecent?: number;
+  failed?: number;
+};
+type RunOnceResult = {
+  executed?: number;
+  blocked?: number;
+  blockedRecent?: number;
+  failed?: number;
+};
+
+function normalizeModeLabel(mode?: ExecutionMode) {
+  if (mode === "automatic") return "AUTO";
+  if (mode === "semi_automatic") return "ASSISTED";
+  return "MANUAL";
+}
+
+export function ExecutionGlobalBar() {
+  const { role } = useAuth();
+  const canEditMode = role ? can(role, "governance:update") || role === "MANAGER" : false;
+
+  const utils = trpc.useUtils();
+  const modeQuery = trpc.nexo.executions.mode.useQuery(undefined, { retry: false });
+  const summaryQuery = trpc.nexo.executions.stateSummary.useQuery({ sinceMs: 1000 * 60 * 60 * 24 }, { retry: false });
+
+  const modePayload = useMemo(() => getPayloadValue<ModePayload>(modeQuery.data) ?? {}, [modeQuery.data]);
+  const summary = useMemo(() => getPayloadValue<ExecutionStateSummary>(summaryQuery.data) ?? {}, [summaryQuery.data]);
+
+  const [nextMode, setNextMode] = useState<ExecutionMode>("manual");
+
+  const updateMode = trpc.nexo.executions.updateMode.useMutation({
+    onSuccess: async () => {
+      await Promise.all([
+        utils.nexo.executions.mode.invalidate(),
+        utils.nexo.executions.stateSummary.invalidate(),
+        utils.nexo.executions.events.invalidate(),
+      ]);
+    },
+  });
+
+  const runOnce = trpc.nexo.executions.runOnce.useMutation({
+    onSuccess: async () => {
+      await Promise.all([
+        utils.nexo.executions.stateSummary.invalidate(),
+        utils.nexo.executions.events.invalidate(),
+      ]);
+    },
+  });
+
+  const runOnceResult = useMemo(
+    () => getPayloadValue<RunOnceResult>(runOnce.data) ?? {},
+    [runOnce.data]
+  );
+
+  const isLoading = modeQuery.isLoading || summaryQuery.isLoading;
+
+  const selectedMode = modePayload.mode ?? "manual";
+
+  useEffect(() => {
+    setNextMode(selectedMode);
+  }, [selectedMode]);
+
+  return (
+    <div className="border-b border-[var(--border)] bg-[var(--surface-base)]/95 px-4 py-2">
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-2 py-1">
+          Modo atual: <strong>{normalizeModeLabel(selectedMode)}</strong>
+        </div>
+
+        <Select value={nextMode} onValueChange={(value) => setNextMode(value as ExecutionMode)} disabled={!canEditMode || updateMode.isPending || isLoading}>
+          <SelectTrigger className="h-8 w-[150px]"><SelectValue placeholder="Alterar modo" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="manual">MANUAL</SelectItem>
+            <SelectItem value="semi_automatic">ASSISTED</SelectItem>
+            <SelectItem value="automatic">AUTO</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Button
+          variant="outline"
+          className="h-8"
+          disabled={!canEditMode || updateMode.isPending || isLoading}
+          onClick={() => updateMode.mutate({ mode: nextMode })}
+        >
+          {updateMode.isPending ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}
+          Alterar modo
+        </Button>
+
+        <Button className="h-8" disabled={!canEditMode || runOnce.isPending} onClick={() => runOnce.mutate()}>
+          {runOnce.isPending ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <PlayCircle className="mr-1 h-3.5 w-3.5" />}
+          Executar agora
+        </Button>
+
+        <div className="ml-auto flex flex-wrap gap-2">
+          <span className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-1 text-emerald-700 dark:text-emerald-300">Executadas: {Number(summary.executed ?? 0)}</span>
+          <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-amber-700 dark:text-amber-300">Bloqueadas: {Number(summary.blocked ?? 0)}</span>
+          <span className="rounded-full border border-orange-500/40 bg-orange-500/10 px-2 py-1 text-orange-700 dark:text-orange-300">Bloq. cooldown: {Number(summary.blockedRecent ?? 0)}</span>
+          <span className="rounded-full border border-red-500/40 bg-red-500/10 px-2 py-1 text-red-700 dark:text-red-300">Falhas: {Number(summary.failed ?? 0)}</span>
+        </div>
+      </div>
+
+      {runOnce.data ? (
+        <div className="mt-2 flex flex-wrap gap-2 text-xs text-[var(--text-secondary)]">
+          <span className="rounded-md border border-[var(--border-subtle)] px-2 py-1">Run once → executadas: <strong>{Number(runOnceResult.executed ?? 0)}</strong></span>
+          <span className="rounded-md border border-[var(--border-subtle)] px-2 py-1">bloqueadas: <strong>{Number((runOnceResult.blocked ?? 0) + (runOnceResult.blockedRecent ?? 0))}</strong></span>
+          <span className="rounded-md border border-[var(--border-subtle)] px-2 py-1">falhas: <strong>{Number(runOnceResult.failed ?? 0)}</strong></span>
+        </div>
+      ) : null}
+    </div>
+  );
+}

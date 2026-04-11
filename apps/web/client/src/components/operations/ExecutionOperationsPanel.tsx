@@ -32,7 +32,7 @@ type PolicyBooleanKey =
   | "allowRiskReviewEscalation";
 
 type ModePayload = { mode?: ExecutionMode; policy?: ExecutionPolicy };
-type ExecutionStateSummary = { pending?: number; executed?: number; failed?: number; blocked?: number; throttled?: number };
+type ExecutionStateSummary = { pending?: number; executed?: number; failed?: number; blocked?: number; blockedRecent?: number; throttled?: number };
 type ExecutionEvent = {
   id: string;
   actionId?: string;
@@ -42,6 +42,12 @@ type ExecutionEvent = {
   reasonCode?: string | null;
   timestamp?: string;
   diagnostics?: { executionKey?: string | null; explanation?: Record<string, unknown> | null };
+};
+type RunOnceResult = {
+  executed?: number;
+  blocked?: number;
+  blockedRecent?: number;
+  failed?: number;
 };
 type ConfigHistoryEntry = {
   id: string;
@@ -66,11 +72,42 @@ function formatTimestamp(value?: string) {
   return date.toLocaleString("pt-BR");
 }
 
+
+function formatRemainingCooldown(cooldownUntil?: string | null) {
+  if (!cooldownUntil) return null;
+  const target = new Date(cooldownUntil);
+  if (Number.isNaN(target.getTime())) return null;
+
+  const diffMs = target.getTime() - Date.now();
+  if (diffMs <= 0) return "Disponível agora";
+
+  const seconds = Math.ceil(diffMs / 1000);
+  if (seconds < 60) return `Disponível em ${seconds} segundos`;
+
+  const minutes = Math.ceil(seconds / 60);
+  return `Disponível em ${minutes} minutos`;
+}
+
+function reasonCodeLabel(reasonCode?: string | null) {
+  if (!reasonCode) return "Sem motivo informado";
+  if (reasonCode === "blocked_recent_execution") return "Executado recentemente";
+  if (reasonCode === "mode_manual_explicit_configuration") return "Modo manual ativo";
+  if (reasonCode === "limit_exceeded") return "Limite atingido";
+  return reasonCode;
+}
+
+
+function eventCooldownUntil(event: ExecutionEvent) {
+  const explanation = event.diagnostics?.explanation;
+  if (!explanation || typeof explanation !== "object") return null;
+  const raw = (explanation as Record<string, unknown>).cooldownUntil;
+  return typeof raw === "string" ? raw : null;
+}
+
 function toneFromStatus(status?: string) {
   if (status === "executed") return "border-emerald-500/40 bg-emerald-500/10 text-emerald-300";
   if (status === "failed") return "border-red-500/40 bg-red-500/10 text-red-300";
-  if (status === "throttled") return "border-orange-500/40 bg-orange-500/10 text-orange-300";
-  if (status === "blocked" || status === "requires_confirmation") return "border-amber-500/40 bg-amber-500/10 text-amber-300";
+  if (status === "blocked" || status === "requires_confirmation" || status === "throttled") return "border-amber-500/40 bg-amber-500/10 text-amber-300";
   return "border-zinc-500/40 bg-zinc-500/10 text-[var(--text-secondary)]";
 }
 
@@ -122,10 +159,21 @@ export function ExecutionOperationsPanel() {
     },
   });
 
-  const modePayload = useMemo(() => getPayloadValue<ModePayload>(modeQuery.data) ?? {}, [modeQuery.data]);
+
+  const runOnce = trpc.nexo.executions.runOnce.useMutation({
+    onSuccess: async () => {
+      await Promise.all([
+        utils.nexo.executions.events.invalidate(),
+        utils.nexo.executions.stateSummary.invalidate(),
+      ]);
+    },
+  });
+
+    const modePayload = useMemo(() => getPayloadValue<ModePayload>(modeQuery.data) ?? {}, [modeQuery.data]);
   const summary = useMemo(() => getPayloadValue<ExecutionStateSummary>(summaryQuery.data) ?? {}, [summaryQuery.data]);
   const events = useMemo(() => normalizeArrayPayload<ExecutionEvent>(eventsQuery.data), [eventsQuery.data]);
   const modeHistory = useMemo(() => normalizeArrayPayload<ConfigHistoryEntry>(modeHistoryQuery.data), [modeHistoryQuery.data]);
+  const runOnceResult = useMemo(() => getPayloadValue<RunOnceResult>(runOnce.data) ?? {}, [runOnce.data]);
 
   const isLoading = modeQuery.isLoading || summaryQuery.isLoading || eventsQuery.isLoading;
 
@@ -163,17 +211,26 @@ export function ExecutionOperationsPanel() {
           <h2 className="nexo-section-title">Execution Control v5</h2>
           <p className="nexo-section-description mt-1">Controle administrativo por organização, policy segura e diagnóstico operacional.</p>
         </div>
-        <div className="rounded-lg border border-orange-400/40 bg-orange-500/10 px-3 py-2 text-sm text-orange-200">Modo atual: <strong>{modeLabel(modePayload.mode)}</strong></div>
+        <div className="flex items-center gap-2">
+          <div className="rounded-lg border border-orange-400/40 bg-orange-500/10 px-3 py-2 text-sm text-orange-200">Modo atual: <strong>{modeLabel(modePayload.mode)}</strong></div>
+          <Button onClick={() => runOnce.mutate()} disabled={!canEdit || runOnce.isPending}>{runOnce.isPending ? "Executando..." : "Executar agora"}</Button>
+        </div>
       </div>
 
       {isLoading ? <div className="flex min-h-[120px] items-center justify-center gap-2 text-sm text-[var(--text-muted)]"><Loader2 className="h-4 w-4 animate-spin" /> Carregando execution...</div> : null}
+
+      {runOnce.data ? (
+        <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/40 p-3 text-xs text-[var(--text-secondary)]">
+          Run once: executadas <strong>{Number(runOnceResult.executed ?? 0)}</strong> · bloqueadas <strong>{Number((runOnceResult.blocked ?? 0) + (runOnceResult.blockedRecent ?? 0))}</strong> · falhas <strong>{Number(runOnceResult.failed ?? 0)}</strong>
+        </div>
+      ) : null}
 
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
         <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/40 p-3 text-sm">Pending: <strong>{Number(summary.pending ?? 0)}</strong></div>
         <div className="rounded-lg border border-emerald-700/60 bg-emerald-900/20 p-3 text-sm">Executed: <strong>{Number(summary.executed ?? 0)}</strong></div>
         <div className="rounded-lg border border-red-700/60 bg-red-900/20 p-3 text-sm">Failed: <strong>{Number(summary.failed ?? 0)}</strong></div>
         <div className="rounded-lg border border-amber-700/60 bg-amber-900/20 p-3 text-sm">Blocked: <strong>{Number(summary.blocked ?? 0)}</strong></div>
-        <div className="rounded-lg border border-orange-700/60 bg-orange-900/20 p-3 text-sm">Throttled: <strong>{Number(summary.throttled ?? 0)}</strong></div>
+        <div className="rounded-lg border border-orange-700/60 bg-orange-900/20 p-3 text-sm">Bloqueadas por cooldown: <strong>{Number(summary.blockedRecent ?? 0)}</strong></div>
       </div>
 
       <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/40 p-4 space-y-3">
@@ -280,7 +337,12 @@ export function ExecutionOperationsPanel() {
                   <span className={`rounded-full border px-2 py-1 text-xs font-semibold ${toneFromStatus(event.status)}`}>{event.status || "pending"}</span>
                 </div>
                 <div className="mt-1 text-xs text-[var(--text-secondary)]">Entidade: <strong>{event.entityType || "—"}</strong> · {event.entityId || "—"}</div>
-                <div className="mt-1 text-xs text-[var(--text-muted)]">Motivo (reasonCode): <strong>{event.reasonCode || "—"}</strong> · {formatTimestamp(event.timestamp)}</div>
+                <div className="mt-1 text-xs text-[var(--text-muted)]">Motivo: <strong>{reasonCodeLabel(event.reasonCode)}</strong> · {formatTimestamp(event.timestamp)}</div>
+                {event.status === "blocked" ? (
+                  <div className="mt-1 text-xs text-amber-300">
+                    {formatRemainingCooldown(eventCooldownUntil(event))}
+                  </div>
+                ) : null}
                 <div className="mt-1 text-[11px] text-[var(--text-muted)]">Diagnóstico: executionKey {event.diagnostics?.executionKey ?? "—"}</div>
                 {event.diagnostics?.explanation ? <div className="mt-1 text-[11px] text-[var(--text-muted)]">Explicação: {JSON.stringify(event.diagnostics.explanation)}</div> : null}
               </div>
