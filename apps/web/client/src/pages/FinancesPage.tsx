@@ -22,9 +22,9 @@ export default function FinancesPage() {
   const flow = [{ week: "S1", recebido: 58, vencido: 12 }, { week: "S2", recebido: 63, vencido: 17 }, { week: "S3", recebido: 69, vencido: 15 }, { week: "S4", recebido: 74, vencido: 11 }];
   return (
     <AppPageShell>
-      <AppPageHeader title="Financeiro" description="Dinheiro da operação conectado a cliente e O.S." ctaLabel="Nova cobrança" />
+      <AppPageHeader title="Financeiro" description="Entenda rapidamente o que entrou, o que está pendente e quem precisa ser cobrado." ctaLabel="Criar cobrança agora" />
       <AppNextActions
-        title="Próximas ações"
+        title="Você precisa fazer isso agora"
         engineInput={{
           customers: [
             { id: "c-atlas", name: "Atlas", phone: "5511988881200" },
@@ -45,12 +45,12 @@ export default function FinancesPage() {
             <AreaChart data={flow}><CartesianGrid vertical={false} /><XAxis dataKey="week" tickLine={false} axisLine={false} /><ChartTooltip content={<ChartTooltipContent />} /><Area dataKey="recebido" stroke="var(--brand-primary)" fill="var(--brand-primary)" fillOpacity={0.2} /><Area dataKey="vencido" stroke="var(--color-danger)" fill="var(--color-danger)" fillOpacity={0.14} /></AreaChart>
           </ChartContainer>
         </AppChartPanel>
-        <AppSectionBlock title="Risco financeiro" subtitle="Cobranças vencidas e impacto">
+        <AppSectionBlock title="Risco financeiro" subtitle="Cobranças vencidas com impacto direto no caixa">
           <AppAlertList alerts={[{ text: "12 cobranças vencidas ligadas a O.S. concluídas", tone: "danger" }, { text: "R$ 34k em risco acima de 15 dias", tone: "warning" }]} />
         </AppSectionBlock>
       </div>
-      <AppSectionBlock title="Cobranças e pagamentos" subtitle="Tabela dominante com origem operacional">
-        <AppDataTable><table className="w-full text-sm"><thead className="bg-[var(--surface-elevated)] text-xs text-[var(--text-muted)]"><tr><th className="p-3">Cliente</th><th>Valor</th><th>Status</th><th>Vencimento</th><th>Origem operacional</th><th>Ações</th></tr></thead><tbody>{[{n:"Atlas",v:"R$ 8.450",s:"Pendente",o:"O.S. #1851"},{n:"Orion",v:"R$ 4.100",s:"Atrasado",o:"O.S. #1832"},{n:"Prime",v:"R$ 2.980",s:"Pago",o:"Agendamento #901"}].map((r)=><tr key={r.n+r.v} className="border-t border-[var(--border-subtle)] hover:bg-[var(--surface-base)]/70"><td className="p-3">{r.n}</td><td>{r.v}</td><td><AppStatusBadge label={r.s} /></td><td>20/04/2026</td><td>{r.o}</td><td className="p-3"><AppRowActions actions={[{ label: "Cobrar", onClick: () => navigate(buildOperationalRoute("/finances", { customer: r.n.toLowerCase(), status: r.s.toLowerCase() })) }]} /></td></tr>)}</tbody></table></AppDataTable>
+      <AppSectionBlock title="Cobranças e pagamentos" subtitle="Veja problema, impacto e ação recomendada em cada cobrança">
+        <AppDataTable><table className="w-full text-sm"><thead className="bg-[var(--surface-elevated)] text-xs text-[var(--text-muted)]"><tr><th className="p-3">Cliente</th><th>Valor</th><th>Status</th><th>Vencimento</th><th>Origem operacional</th><th>Ações</th></tr></thead><tbody>{[{n:"Atlas",v:"R$ 8.450",s:"Pendente",o:"O.S. #1851"},{n:"Orion",v:"R$ 4.100",s:"Atrasado",o:"O.S. #1832"},{n:"Prime",v:"R$ 2.980",s:"Pago",o:"Agendamento #901"}].map((r)=><tr key={r.n+r.v} className="border-t border-[var(--border-subtle)] hover:bg-[var(--surface-base)]/70"><td className="p-3">{r.n}</td><td>{r.v}</td><td><AppStatusBadge label={r.s} /></td><td>20/04/2026</td><td>{r.o}</td><td className="p-3"><AppRowActions actions={[{ label: "Cobrar cliente agora", onClick: () => navigate(buildOperationalRoute("/finances", { customer: r.n.toLowerCase(), status: r.s.toLowerCase() })) }]} /></td></tr>)}</tbody></table></AppDataTable>
       </AppSectionBlock>
     </AppPageShell>
   );

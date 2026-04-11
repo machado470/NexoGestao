@@ -22,14 +22,14 @@ export default function WhatsAppPage() {
 
   return (
     <AppPageShell>
-      <AppPageHeader title="WhatsApp Operacional" description="Comunicação contextual vinculada a cliente, cobrança e O.S." ctaLabel="Nova mensagem" onCta={() => void runAction(async () => navigate("/whatsapp?composer=open"))} />
-      <AppSectionBlock title="Contexto da conversa" subtitle="Atlas Engenharia · cobrança vencida há 2 dias">
+      <AppPageHeader title="WhatsApp Operacional" description="Envie mensagens certas no momento certo para cobrar, confirmar e orientar clientes." ctaLabel="Enviar nova mensagem agora" onCta={() => void runAction(async () => navigate("/whatsapp?composer=open"))} />
+      <AppSectionBlock title="Contexto da conversa" subtitle="Atlas Engenharia · cliente com cobrança vencida há 2 dias">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <AppStatusBadge label="Cobrança vencida" />
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" onClick={() => void runAction(async () => navigate("/finances?status=overdue&customer=atlas"))} isLoading={isRunning}>Cobrar</Button>
-            <Button size="sm" variant="secondary" onClick={() => void runAction(async () => navigate("/whatsapp?customer=atlas&template=payment-link"))} isLoading={isRunning}>Enviar link</Button>
-            <Button size="sm" variant="outline" onClick={() => void runAction(async () => navigate("/timeline?customer=atlas&type=confirmation"))} isLoading={isRunning}>Confirmar</Button>
+            <Button size="sm" onClick={() => void runAction(async () => navigate("/finances?status=overdue&customer=atlas"))} isLoading={isRunning}>Cobrar cliente agora</Button>
+            <Button size="sm" variant="secondary" onClick={() => void runAction(async () => navigate("/whatsapp?customer=atlas&template=payment-link"))} isLoading={isRunning}>Enviar link de pagamento</Button>
+            <Button size="sm" variant="outline" onClick={() => void runAction(async () => navigate("/timeline?customer=atlas&type=confirmation"))} isLoading={isRunning}>Confirmar atendimento</Button>
           </div>
         </div>
       </AppSectionBlock>
@@ -40,13 +40,13 @@ export default function WhatsAppPage() {
             <BarChart data={data}><CartesianGrid vertical={false} /><XAxis dataKey="day" tickLine={false} axisLine={false} /><ChartTooltip content={<ChartTooltipContent />} /><Bar dataKey="enviadas" fill="var(--brand-primary)" /><Bar dataKey="falhas" fill="var(--color-danger)" /></BarChart>
           </ChartContainer>
         </AppChartPanel>
-        <AppSectionBlock title="Falhas recentes" subtitle="Entrega e roteamento" onCtaClick={() => navigate("/whatsapp?status=failed")}>
+        <AppSectionBlock title="Falhas recentes" subtitle="Problemas que impedem o cliente de receber mensagem" onCtaClick={() => navigate("/whatsapp?status=failed")}>
           <AppAlertList alerts={[{ text: "3 falhas por número inválido", tone: "warning" }, { text: "2 falhas por timeout da API", tone: "danger" }]} />
         </AppSectionBlock>
       </div>
       <div className="grid gap-3 xl:grid-cols-2">
-        <AppSectionBlock title="Conversas por contexto" subtitle="Lista operacional dominante">
-          <AppListBlock items={[{ title: "Atlas Engenharia", subtitle: "Cobrança #218 · enviada há 5 min", right: <AppStatusBadge label="Entregue" />, action: <Button size="sm" onClick={() => void runAction(async () => navigate("/whatsapp?customer=atlas"))} isLoading={isRunning}>Abrir</Button> }, { title: "Condomínio Orion", subtitle: "O.S. #1849 · mensagem de atraso", right: <AppStatusBadge label="Pendente" />, action: <Button size="sm" onClick={() => void runAction(async () => navigate("/whatsapp?customer=orion&context=charge"))} isLoading={isRunning}>Cobrar</Button> }, { title: "Solar Prime", subtitle: "Agendamento #443", right: <AppStatusBadge label="Falhou" />, action: <Button size="sm" onClick={() => void runAction(async () => navigate("/whatsapp?customer=solar-prime&action=retry"))} isLoading={isRunning}>Avançar status</Button> }]} />
+        <AppSectionBlock title="Conversas por contexto" subtitle="Cada conversa já indica o problema e o próximo passo">
+          <AppListBlock items={[{ title: "Atlas Engenharia", subtitle: "Cobrança #218 · enviada há 5 min", right: <AppStatusBadge label="Entregue" />, action: <Button size="sm" onClick={() => void runAction(async () => navigate("/whatsapp?customer=atlas"))} isLoading={isRunning}>Ver detalhes da conversa</Button> }, { title: "Condomínio Orion", subtitle: "O.S. #1849 · mensagem de atraso", right: <AppStatusBadge label="Pendente" />, action: <Button size="sm" onClick={() => void runAction(async () => navigate("/whatsapp?customer=orion&context=charge"))} isLoading={isRunning}>Cobrar cliente agora</Button> }, { title: "Solar Prime", subtitle: "Agendamento #443", right: <AppStatusBadge label="Falhou" />, action: <Button size="sm" onClick={() => void runAction(async () => navigate("/whatsapp?customer=solar-prime&action=retry"))} isLoading={isRunning}>Confirmar agendamento</Button> }]} />
         </AppSectionBlock>
         <AppSectionBlock title="Atividade da comunicação" subtitle="Contexto recente" onCtaClick={() => navigate("/timeline?source=whatsapp")}>
           <AppRecentActivity items={["Template cobrança enviado há 3 min", "Confirmação de agendamento há 8 min", "Reenvio de mensagem por falha há 15 min"]} />

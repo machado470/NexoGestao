@@ -136,7 +136,7 @@ export function AppSectionBlock({
         </div>
         {onCtaClick ? (
           <Button size="sm" variant="ghost" onClick={onCtaClick}>
-            {ctaLabel ?? "Ver detalhes"}
+            {ctaLabel ?? "Ver detalhes da operação"}
           </Button>
         ) : null}
       </div>
@@ -192,11 +192,14 @@ export function AppRecentActivity({ items }: { items: string[] }) {
 }
 
 const statusTone: Record<string, string> = {
-  urgente: "bg-rose-500/15 text-rose-500 border-rose-500/30",
+  urgente: "bg-rose-500/15 text-rose-600 border-rose-500/30",
+  alta: "bg-rose-500/15 text-rose-600 border-rose-500/30",
   "em risco": "bg-amber-500/15 text-amber-500 border-amber-500/30",
+  média: "bg-amber-500/15 text-amber-600 border-amber-500/30",
   atrasado: "bg-orange-500/15 text-orange-500 border-orange-500/30",
   concluído: "bg-emerald-500/15 text-emerald-500 border-emerald-500/30",
-  pendente: "bg-zinc-500/15 text-zinc-400 border-zinc-500/30",
+  pendente: "bg-zinc-500/15 text-zinc-500 border-zinc-500/30",
+  baixa: "bg-zinc-500/15 text-zinc-500 border-zinc-500/30",
   pago: "bg-emerald-500/15 text-emerald-500 border-emerald-500/30",
   falhou: "bg-rose-500/15 text-rose-500 border-rose-500/30",
 };

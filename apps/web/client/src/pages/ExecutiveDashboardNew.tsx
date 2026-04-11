@@ -137,10 +137,10 @@ export default function ExecutiveDashboardNew() {
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="nexo-page-header-title">Centro de decisão operacional</h1>
-            <p className="nexo-page-header-description">Painel executivo do ciclo Cliente → Agendamento → O.S. → Cobrança → Pagamento.</p>
+            <p className="nexo-page-header-description">Entenda em segundos o que precisa ser feito agora no ciclo Cliente → Agendamento → O.S. → Cobrança → Pagamento.</p>
           </div>
           <Button onClick={() => void executeNextAction()} disabled={isExecutingNext || nextActions.length === 0}>
-            {isExecutingNext ? "Executando fluxo..." : "Executar próxima ação"}
+            {isExecutingNext ? "Resolvendo próxima pendência..." : "Resolver próxima pendência agora"}
           </Button>
         </div>
       </AppPageHeader>
@@ -155,10 +155,11 @@ export default function ExecutiveDashboardNew() {
         />
         <AppSectionCard>
           <p className="text-sm font-semibold text-[var(--text-primary)]">Ações contextuais</p>
+          <p className="text-xs text-[var(--text-muted)]">Atalhos para agir sem sair do foco operacional.</p>
           <div className="mt-3 grid gap-2">
-            <button className="nexo-cta-secondary" onClick={() => navigate("/service-orders")}>Abrir fila de O.S.</button>
-            <button className="nexo-cta-secondary" onClick={() => navigate("/finances")}>Recuperar caixa</button>
-            <button className="nexo-cta-secondary" onClick={() => navigate("/appointments")}>Confirmar agenda</button>
+            <button className="nexo-cta-secondary" onClick={() => navigate("/service-orders")}>Concluir serviço em atraso</button>
+            <button className="nexo-cta-secondary" onClick={() => navigate("/finances")}>Cobrar cliente com pagamento pendente</button>
+            <button className="nexo-cta-secondary" onClick={() => navigate("/appointments")}>Confirmar agendamento de hoje</button>
           </div>
         </AppSectionCard>
       </AppOperationalStatePanel>
@@ -172,7 +173,8 @@ export default function ExecutiveDashboardNew() {
 
       <section className="grid gap-3 lg:grid-cols-2">
         <AppSectionCard>
-          <p className="mb-3 text-sm font-semibold text-[var(--text-primary)]">Prioridades e próximas ações</p>
+          <p className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Você precisa fazer isso agora</p>
+          <p className="mb-3 text-xs text-[var(--text-muted)]">Cada item mostra o problema, o impacto e a ação recomendada.</p>
           <AppNextActionList
             actions={nextActions.map(action => ({
               id: action.id,
@@ -185,7 +187,8 @@ export default function ExecutiveDashboardNew() {
         </AppSectionCard>
 
         <AppSectionCard>
-          <p className="mb-3 text-sm font-semibold text-[var(--text-primary)]">Gargalos operacionais</p>
+          <p className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Gargalos operacionais</p>
+          <p className="mb-3 text-xs text-[var(--text-muted)]">Pontos que travam a operação e exigem ação rápida.</p>
           <div className="space-y-2">
             {bottlenecks.map(item => (
               <button
@@ -203,7 +206,7 @@ export default function ExecutiveDashboardNew() {
 
       <section className="grid gap-3 lg:grid-cols-2">
         <AppNextActions
-          title="Próximas ações"
+          title="Você precisa fazer isso agora"
           engineInput={{
             customers: customers.map(item => ({ id: item.id, name: item.name, phone: item.phone ?? null })),
             appointments: appointments.map(item => ({
@@ -229,7 +232,8 @@ export default function ExecutiveDashboardNew() {
           }}
         />
         <AppSectionCard>
-          <p className="mb-3 text-sm font-semibold text-[var(--text-primary)]">Operação recente</p>
+          <p className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Operação recente</p>
+          <p className="mb-3 text-xs text-[var(--text-muted)]">Resumo curto do que acabou de acontecer na operação.</p>
           <AppTimeline>
             {feed.map(item => (
               <AppTimelineItem key={item}>{item}</AppTimelineItem>
