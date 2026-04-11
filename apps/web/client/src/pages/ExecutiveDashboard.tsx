@@ -1,5 +1,9 @@
 import { Area, AreaChart, CartesianGrid, XAxis } from "recharts";
+import { useState } from "react";
+import { useLocation } from "wouter";
+import { toast } from "sonner";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { Button } from "@/components/ui/button";
 import {
   AppAlertList,
   AppChartPanel,
@@ -22,25 +26,48 @@ const chartData = [
 ];
 
 export default function ExecutiveDashboard() {
+  const [, navigate] = useLocation();
+  const [loadingActionId, setLoadingActionId] = useState<string | null>(null);
+
+  const runAction = async (actionId: string, callback: () => void) => {
+    try {
+      setLoadingActionId(actionId);
+      await new Promise(resolve => setTimeout(resolve, 300));
+      callback();
+      toast.success("Ação executada com sucesso.");
+    } catch {
+      toast.error("Não foi possível executar a ação agora.");
+    } finally {
+      setLoadingActionId(null);
+    }
+  };
+
   return (
     <AppPageShell>
       <AppPageHeader
         title="Centro de decisão operacional"
         description="Visão executiva do fluxo Cliente → Agendamento → O.S. → Cobrança → Pagamento."
         ctaLabel="Executar próxima ação"
+        onCta={() => runAction("dashboard-next-action", () => navigate("/dashboard/operations"))}
       />
 
       <AppKpiRow
         items={[
-          { label: "Receita", value: "R$ 187,4k", trend: 15.6, context: "vs mês anterior" },
-          { label: "Ordens", value: "124", trend: -3.2, context: "vs semana passada" },
-          { label: "SLA", value: "92,8%", trend: 2.1, context: "últimos 30 dias" },
-          { label: "Ticket médio", value: "R$ 1.511", trend: 4.4, context: "vs mês anterior" },
+          { label: "Receita", value: "R$ 187,4k", trend: 15.6, context: "+2 hoje · últimos 30 dias", onClick: () => navigate("/finances?view=revenue&period=30d") },
+          { label: "Ordens", value: "124", trend: -3.2, context: "-4 hoje · últimos 7 dias", onClick: () => navigate("/service-orders?status=attention&period=7d") },
+          { label: "SLA", value: "92,8%", trend: 2.1, context: "estável · últimos 30 dias", onClick: () => navigate("/service-orders?metric=sla&period=30d") },
+          { label: "Ticket médio", value: "R$ 1.511", trend: 4.4, context: "+1 hoje · últimos 30 dias", onClick: () => navigate("/finances?metric=average_ticket&period=30d") },
         ]}
       />
 
       <div className="grid gap-3 xl:grid-cols-3">
-        <AppChartPanel title="Evolução de receita e volume" description="Ritmo operacional diário com impacto em faturamento.">
+        <AppChartPanel
+          title="Evolução de receita e volume"
+          description="Ritmo operacional diário com impacto em faturamento."
+          trendValue={12.8}
+          trendLabel="↑ +12,8% · últimos 7 dias"
+          onCtaClick={() => navigate("/finances?chart=revenue_volume&period=7d")}
+        >
           <ChartContainer
             className="h-[260px] w-full"
             config={{ receita: { label: "Receita" }, ordens: { label: "Ordens" } }}
@@ -55,11 +82,11 @@ export default function ExecutiveDashboard() {
           </ChartContainer>
         </AppChartPanel>
 
-        <AppSectionBlock title="Itens que exigem atenção" subtitle="Prioridades do dia">
+        <AppSectionBlock title="Itens que exigem atenção" subtitle="Prioridades do dia" onCtaClick={() => navigate("/dashboard/operations?filter=critical")}>
           <AppAlertList alerts={[{ text: "5 O.S. atrasadas aguardando execução", tone: "danger" }, { text: "12 cobranças vencidas sem negociação", tone: "warning" }, { text: "2 clientes sem retorno há 7 dias", tone: "warning" }]} />
         </AppSectionBlock>
 
-        <AppSectionBlock title="Atividade recente" subtitle="Atualizações em tempo real">
+        <AppSectionBlock title="Atividade recente" subtitle="Atualizações em tempo real" onCtaClick={() => navigate("/timeline?scope=recent")}>
           <AppRecentActivity items={["O.S. #1847 concluída há 3 min", "Pagamento recebido há 8 min", "Novo agendamento criado há 14 min", "Mensagem enviada ao cliente há 20 min"]} />
         </AppSectionBlock>
       </div>
@@ -67,9 +94,26 @@ export default function ExecutiveDashboard() {
       <AppSectionBlock title="Ordens críticas" subtitle="Foco operacional dominante">
         <AppListBlock
           items={[
-            { title: "O.S. #1851 · Instalação comercial", subtitle: "Cliente Atlas · Prazo hoje 17:00", right: <AppStatusBadge label="Urgente" /> },
-            { title: "O.S. #1849 · Manutenção preventiva", subtitle: "Equipe Norte · 2h de atraso", right: <AppStatusBadge label="Atrasado" /> },
-            { title: "O.S. #1844 · Retorno técnico", subtitle: "Risco de multa contratual", right: <AppStatusBadge label="Em risco" /> },
+            { title: "O.S. #1851 · Instalação comercial", subtitle: "Cliente Atlas · Prazo hoje 17:00", right: <AppStatusBadge label="Urgente" />, action: <Button size="sm" onClick={() => runAction("open-1851", () => navigate("/service-orders?os=1851"))} isLoading={loadingActionId === "open-1851"}>Abrir</Button> },
+            { title: "O.S. #1849 · Manutenção preventiva", subtitle: "Equipe Norte · 2h de atraso", right: <AppStatusBadge label="Atrasado" />, action: <Button size="sm" onClick={() => runAction("advance-1849", () => navigate("/service-orders?os=1849&action=advance-status"))} isLoading={loadingActionId === "advance-1849"}>Avançar status</Button> },
+            { title: "O.S. #1844 · Retorno técnico", subtitle: "Risco de multa contratual", right: <AppStatusBadge label="Em risco" />, action: <Button size="sm" onClick={() => runAction("charge-1844", () => navigate("/whatsapp?customer=atlas&context=charge"))} isLoading={loadingActionId === "charge-1844"}>Cobrar</Button> },
+          ]}
+        />
+      </AppSectionBlock>
+
+      <AppSectionBlock title="Próximas ações" subtitle="Execução direta sem sair do fluxo">
+        <AppListBlock
+          items={[
+            {
+              title: "Cliente Atlas com pagamento atrasado",
+              subtitle: "Cobrança vencida há 2 dias",
+              action: <Button size="sm" onClick={() => runAction("resolve-atlas", () => navigate("/finances?status=overdue&customer=atlas"))} isLoading={loadingActionId === "resolve-atlas"}>Resolver agora</Button>,
+            },
+            {
+              title: "O.S. #1849 atrasada",
+              subtitle: "Equipe Norte · SLA em risco",
+              action: <Button size="sm" onClick={() => runAction("resolve-os1849", () => navigate("/service-orders?os=1849&status=delayed"))} isLoading={loadingActionId === "resolve-os1849"}>Resolver agora</Button>,
+            },
           ]}
         />
       </AppSectionBlock>
