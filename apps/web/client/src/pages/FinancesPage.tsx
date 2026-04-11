@@ -1,57 +1,138 @@
-// Operating-system contract: PageWrapper + NexoActionGroup
-// OperationalSeverity compatibility marker
+import { useMemo, useState } from "react";
 import { Area, AreaChart, CartesianGrid, XAxis } from "recharts";
-import { useLocation } from "wouter";
+import { trpc } from "@/lib/trpc";
+import { CreateChargeModal } from "@/components/CreateChargeModal";
+import { normalizeArrayPayload, normalizeObjectPayload } from "@/lib/query-helpers";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import {
-  AppAlertList,
   AppChartPanel,
   AppDataTable,
+  AppEmptyState,
   AppKpiRow,
+  AppLoadingState,
   AppPageHeader,
   AppPageShell,
+  AppRowActions,
   AppSectionBlock,
   AppStatusBadge,
-  AppRowActions,
 } from "@/components/internal-page-system";
-import { AppNextActions } from "@/components/app";
-import { buildOperationalRoute } from "@/lib/operational";
+import { buildIdempotencyKey } from "@/lib/idempotency";
+import { toast } from "sonner";
+
+function formatCurrency(cents: number) {
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100);
+}
 
 export default function FinancesPage() {
-  const [, navigate] = useLocation();
-  const flow = [{ week: "S1", recebido: 58, vencido: 12 }, { week: "S2", recebido: 63, vencido: 17 }, { week: "S3", recebido: 69, vencido: 15 }, { week: "S4", recebido: 74, vencido: 11 }];
+  const [openCreate, setOpenCreate] = useState(false);
+  const utils = trpc.useUtils();
+
+  const chargesQuery = trpc.finance.charges.list.useQuery({ page: 1, limit: 100 }, { retry: false });
+  const statsQuery = trpc.finance.charges.stats.useQuery(undefined, { retry: false });
+  const revenueQuery = trpc.finance.charges.revenueByMonth.useQuery(undefined, { retry: false });
+  const payCharge = trpc.finance.charges.pay.useMutation();
+
+  const charges = useMemo(() => normalizeArrayPayload<any>(chargesQuery.data), [chargesQuery.data]);
+  const stats = useMemo(() => normalizeObjectPayload<any>(statsQuery.data) ?? {}, [statsQuery.data]);
+
+  const revenueData = useMemo(() => {
+    return normalizeArrayPayload<any>(revenueQuery.data).map((item) => ({
+      label: String(item?.month ?? item?.label ?? "Mês"),
+      revenue: Number(item?.totalRevenueCents ?? item?.revenueCents ?? item?.amountCents ?? 0) / 100,
+    }));
+  }, [revenueQuery.data]);
+
+  async function registerPayment(charge: any) {
+    try {
+      await payCharge.mutateAsync({
+        chargeId: String(charge.id),
+        method: "PIX",
+        amountCents: Number(charge.amountCents ?? 0),
+        idempotencyKey: buildIdempotencyKey("finance.pay_charge", String(charge.id)),
+      });
+      toast.success("Pagamento registrado com sucesso");
+      await Promise.all([chargesQuery.refetch(), statsQuery.refetch(), utils.dashboard.kpis.invalidate()]);
+    } catch (error: any) {
+      toast.error(error?.message || "Erro ao registrar pagamento");
+    }
+  }
+
   return (
     <AppPageShell>
-      <AppPageHeader title="Financeiro" description="Entenda rapidamente o que entrou, o que está pendente e quem precisa ser cobrado." ctaLabel="Criar cobrança agora" />
-      <AppNextActions
-        title="Você precisa fazer isso agora"
-        engineInput={{
-          customers: [
-            { id: "c-atlas", name: "Atlas", phone: "5511988881200" },
-            { id: "c-orion", name: "Orion", phone: "5511988881210" },
-          ],
-          charges: [
-            { id: "charge-fin-1", customerId: "c-atlas", status: "OVERDUE", amountCents: 845000, dueDate: "2026-03-30T10:00:00Z" },
-            { id: "charge-fin-2", customerId: "c-orion", status: "PENDING", amountCents: 410000, dueDate: "2026-04-20T10:00:00Z" },
-          ],
-          serviceOrders: [],
-          appointments: [],
+      <AppPageHeader
+        title="Financeiro"
+        description="Cobranças e pagamentos reais com atualização automática do caixa."
+        ctaLabel="Criar cobrança agora"
+        onCta={() => setOpenCreate(true)}
+      />
+
+      <AppKpiRow items={[
+        { label: "Cobranças", value: String(charges.length), trend: 0, context: "carteira total" },
+        { label: "Pendentes", value: String(stats.pendingCount ?? 0), trend: 0, context: "aguardando pagamento" },
+        { label: "Vencidas", value: String(stats.overdueCount ?? 0), trend: 0, context: "prioridade de cobrança" },
+        { label: "Recebido", value: formatCurrency(Number(stats.paidAmountCents ?? 0)), trend: 0, context: "valor liquidado" },
+      ]} />
+
+      <div className="grid gap-3 xl:grid-cols-3">
+        <AppChartPanel title="Receita por mês" description="Somente dados reais do backend.">
+          {revenueQuery.isLoading ? (
+            <AppLoadingState rows={2} />
+          ) : revenueData.length === 0 ? (
+            <AppEmptyState title="Nenhum dado disponível ainda" description="Ação recomendada: criar cobrança" />
+          ) : (
+            <ChartContainer className="h-[240px] w-full" config={{ revenue: { label: "Receita" } }}>
+              <AreaChart data={revenueData}>
+                <CartesianGrid vertical={false} />
+                <XAxis dataKey="label" tickLine={false} axisLine={false} />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Area dataKey="revenue" stroke="var(--brand-primary)" fill="var(--brand-primary)" fillOpacity={0.2} />
+              </AreaChart>
+            </ChartContainer>
+          )}
+        </AppChartPanel>
+      </div>
+
+      <AppSectionBlock title="Cobranças e pagamentos" subtitle="Fluxo real: cobrança → pagamento → atualização automática">
+        {chargesQuery.isLoading ? (
+          <AppLoadingState rows={4} />
+        ) : charges.length === 0 ? (
+          <AppEmptyState title="Nenhum dado disponível ainda" description="Ação recomendada: criar cobrança" />
+        ) : (
+          <AppDataTable>
+            <table className="w-full text-sm">
+              <thead className="bg-[var(--surface-elevated)] text-xs text-[var(--text-muted)]">
+                <tr>
+                  <th className="p-3">Cliente</th><th>Valor</th><th>Status</th><th>Vencimento</th><th className="p-3">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {charges.map((charge) => (
+                  <tr key={String(charge?.id)} className="border-t border-[var(--border-subtle)]">
+                    <td className="p-3">{String(charge?.customer?.name ?? "—")}</td>
+                    <td>{formatCurrency(Number(charge?.amountCents ?? 0))}</td>
+                    <td><AppStatusBadge label={String(charge?.status ?? "Pendente")} /></td>
+                    <td>{charge?.dueDate ? new Date(String(charge.dueDate)).toLocaleDateString("pt-BR") : "—"}</td>
+                    <td className="p-3">
+                      <AppRowActions actions={[
+                        { label: "Registrar pagamento", onClick: () => void registerPayment(charge) },
+                        { label: "Enviar WhatsApp", onClick: () => window.location.assign(`/whatsapp?customerId=${charge.customerId}&chargeId=${charge.id}`) },
+                      ]} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </AppDataTable>
+        )}
+      </AppSectionBlock>
+
+      <CreateChargeModal
+        isOpen={openCreate}
+        onClose={() => setOpenCreate(false)}
+        onSuccess={() => {
+          void Promise.all([chargesQuery.refetch(), statsQuery.refetch(), revenueQuery.refetch()]);
         }}
       />
-      <AppKpiRow items={[{ label: "Receita", value: "R$ 284k", trend: 11.4, context: "mês atual" }, { label: "A receber", value: "R$ 94k", trend: -2.8, context: "carteira ativa" }, { label: "Recebido", value: "R$ 190k", trend: 7.1, context: "vs mês anterior" }, { label: "Inadimplência", value: "6,8%", trend: -1.3, context: "últimos 30 dias" }]} />
-      <div className="grid gap-3 xl:grid-cols-3">
-        <AppChartPanel title="Fluxo recebido vs vencido" description="Saúde de caixa ligada à execução.">
-          <ChartContainer className="h-[240px] w-full" config={{ recebido: { label: "Recebido" }, vencido: { label: "Vencido" } }}>
-            <AreaChart data={flow}><CartesianGrid vertical={false} /><XAxis dataKey="week" tickLine={false} axisLine={false} /><ChartTooltip content={<ChartTooltipContent />} /><Area dataKey="recebido" stroke="var(--brand-primary)" fill="var(--brand-primary)" fillOpacity={0.2} /><Area dataKey="vencido" stroke="var(--color-danger)" fill="var(--color-danger)" fillOpacity={0.14} /></AreaChart>
-          </ChartContainer>
-        </AppChartPanel>
-        <AppSectionBlock title="Risco financeiro" subtitle="Cobranças vencidas com impacto direto no caixa">
-          <AppAlertList alerts={[{ text: "12 cobranças vencidas ligadas a O.S. concluídas", tone: "danger" }, { text: "R$ 34k em risco acima de 15 dias", tone: "warning" }]} />
-        </AppSectionBlock>
-      </div>
-      <AppSectionBlock title="Cobranças e pagamentos" subtitle="Veja problema, impacto e ação recomendada em cada cobrança">
-        <AppDataTable><table className="w-full text-sm"><thead className="bg-[var(--surface-elevated)] text-xs text-[var(--text-muted)]"><tr><th className="p-3">Cliente</th><th>Valor</th><th>Status</th><th>Vencimento</th><th>Origem operacional</th><th>Ações</th></tr></thead><tbody>{[{n:"Atlas",v:"R$ 8.450",s:"Pendente",o:"O.S. #1851"},{n:"Orion",v:"R$ 4.100",s:"Atrasado",o:"O.S. #1832"},{n:"Prime",v:"R$ 2.980",s:"Pago",o:"Agendamento #901"}].map((r)=><tr key={r.n+r.v} className="border-t border-[var(--border-subtle)] hover:bg-[var(--surface-base)]/70"><td className="p-3">{r.n}</td><td>{r.v}</td><td><AppStatusBadge label={r.s} /></td><td>20/04/2026</td><td>{r.o}</td><td className="p-3"><AppRowActions actions={[{ label: "Cobrar cliente agora", onClick: () => navigate(buildOperationalRoute("/finances", { customer: r.n.toLowerCase(), status: r.s.toLowerCase() })) }]} /></td></tr>)}</tbody></table></AppDataTable>
-      </AppSectionBlock>
     </AppPageShell>
   );
 }
