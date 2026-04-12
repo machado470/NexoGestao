@@ -9,12 +9,12 @@ import {
   AppPageHeader,
   AppPageShell,
   AppSectionCard,
-  AppStatCard,
   AppTimeline,
   AppTimelineItem,
   AppOperationalStateCard,
   AppOperationalStatePanel,
 } from "@/components/app-system";
+import { AppKpiRow } from "@/components/internal-page-system";
 import { Button } from "@/components/ui/button";
 import { useActionHandler } from "@/hooks/useActionHandler";
 import { AppLoadingState, AppNextActions } from "@/components/app";
@@ -24,6 +24,7 @@ import {
   buildNextActions,
   getOperationalStateSummary,
 } from "@/lib/operations/operational-hub";
+import { formatDelta, getDayWindow, getWindow, inRange, percentDelta, safeDate, trendFromDelta } from "@/lib/operational/kpi";
 
 function toArray<T>(payload: unknown): T[] {
   const raw = (payload as any)?.data?.data ?? (payload as any)?.data ?? payload;
@@ -67,6 +68,34 @@ export default function ExecutiveDashboardNew() {
   const overdueCharges = charges.filter(item => String(item?.status ?? "").toUpperCase() === "OVERDUE").length;
   const doneWithoutCharge = serviceOrders.filter(item => String(item?.status ?? "").toUpperCase() === "DONE" && !item?.financialSummary?.hasCharge).length;
   const overdueAppointments = appointments.filter(item => String(item?.status ?? "").toUpperCase() === "NO_SHOW").length;
+  const currentMonth = getWindow(30, 0);
+  const previousMonth = getWindow(30, 1);
+  const todayWindow = getDayWindow(0);
+  const yesterdayWindow = getDayWindow(1);
+  const sentCurrent = messagesInRange(charges, currentMonth.start, currentMonth.end);
+  const sentPrevious = messagesInRange(charges, previousMonth.start, previousMonth.end);
+
+  function messagesInRange(items: any[], start: Date, end: Date) {
+    return items
+      .filter((item) => String(item?.status ?? "").toUpperCase() === "PAID")
+      .reduce((acc, item) => {
+        const date = safeDate(item?.paidAt ?? item?.updatedAt);
+        if (!inRange(date, start, end)) return acc;
+        return acc + Number(item?.amountCents ?? 0);
+      }, 0);
+  }
+
+  const appointmentsToday = appointments.filter(item => inRange(safeDate(item?.startsAt), todayWindow.start, todayWindow.end)).length;
+  const appointmentsYesterday = appointments.filter(item => inRange(safeDate(item?.startsAt), yesterdayWindow.start, yesterdayWindow.end)).length;
+  const ordersExecuting = serviceOrders.filter(item => String(item?.status ?? "").toUpperCase() === "IN_PROGRESS").length;
+  const last7 = getWindow(7, 0);
+  const prev7 = getWindow(7, 1);
+  const ordersExecutingCurrent = serviceOrders.filter(item => String(item?.status ?? "").toUpperCase() === "IN_PROGRESS" && inRange(safeDate(item?.updatedAt), last7.start, last7.end)).length;
+  const ordersExecutingPrevious = serviceOrders.filter(item => String(item?.status ?? "").toUpperCase() === "IN_PROGRESS" && inRange(safeDate(item?.updatedAt), prev7.start, prev7.end)).length;
+  const overdueCurrent = charges.filter(item => String(item?.status ?? "").toUpperCase() === "OVERDUE" && inRange(safeDate(item?.dueDate), currentMonth.start, currentMonth.end)).length;
+  const overduePrevious = charges.filter(item => String(item?.status ?? "").toUpperCase() === "OVERDUE" && inRange(safeDate(item?.dueDate), previousMonth.start, previousMonth.end)).length;
+  const riskNow = Number((governanceSummaryQuery.data as any)?.data?.riskScore ?? (governanceSummaryQuery.data as any)?.data?.overallRisk ?? 0);
+  const riskPrev = Number((governanceSummaryQuery.data as any)?.data?.previousRiskScore ?? NaN);
 
   const operationalState = useMemo(
     () =>
@@ -191,12 +220,53 @@ export default function ExecutiveDashboardNew() {
         </AppSectionCard>
       </AppOperationalStatePanel>
 
-      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <AppStatCard label="Agendamentos pendentes" value={appointments.filter(item => String(item?.status ?? "").toUpperCase() === "SCHEDULED").length} helper="Precisam de confirmação" />
-        <AppStatCard label="O.S. em andamento" value={serviceOrders.filter(item => String(item?.status ?? "").toUpperCase() === "IN_PROGRESS").length} helper="Execução ativa" />
-        <AppStatCard label="Cobranças vencidas" value={overdueCharges} helper="Impacto direto em caixa" />
-        <AppStatCard label="Receita pendente" value={formatCurrency(metrics.pendingPaymentsInCents)} helper={`Faturamento total ${formatCurrency(metrics.totalRevenueInCents)}`} />
-      </section>
+      <AppKpiRow
+        emphasis="strong"
+        items={[
+          {
+            title: "Recebido no período",
+            value: formatCurrency(sentCurrent),
+            delta: formatDelta(percentDelta(sentCurrent, sentPrevious)),
+            trend: trendFromDelta(percentDelta(sentCurrent, sentPrevious)),
+            hint: "últimos 30 dias vs período anterior",
+            tone: "important",
+          },
+          {
+            title: "Cobranças em atraso",
+            value: String(overdueCharges),
+            delta: formatDelta(percentDelta(overdueCurrent, overduePrevious)),
+            trend: trendFromDelta(percentDelta(overdueCurrent, overduePrevious)),
+            hint: "status OVERDUE no financeiro",
+            tone: overdueCharges > 0 ? "critical" : "default",
+          },
+          {
+            title: "Ordens em execução",
+            value: String(ordersExecuting),
+            delta: formatDelta(percentDelta(ordersExecutingCurrent, ordersExecutingPrevious)),
+            trend: trendFromDelta(percentDelta(ordersExecutingCurrent, ordersExecutingPrevious)),
+            hint: "IN_PROGRESS · janela de 7 dias",
+          },
+          {
+            title: "Agendamentos do dia",
+            value: String(appointmentsToday),
+            delta: formatDelta(percentDelta(appointmentsToday, appointmentsYesterday)),
+            trend: trendFromDelta(percentDelta(appointmentsToday, appointmentsYesterday)),
+            hint: "hoje vs ontem",
+          },
+          {
+            title: "WhatsApp (falhas)",
+            value: "N/D",
+            hint: "métrica depende de tracking consolidado no endpoint",
+          },
+          {
+            title: "Risco operacional",
+            value: `${riskNow}/100`,
+            delta: formatDelta(percentDelta(riskNow, riskPrev)),
+            trend: trendFromDelta(percentDelta(riskNow, riskPrev)),
+            hint: "última leitura de governança",
+          },
+        ]}
+      />
 
       <section className="grid gap-3 lg:grid-cols-2">
         <AppSectionCard>

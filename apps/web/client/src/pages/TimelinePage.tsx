@@ -16,6 +16,7 @@ import {
   Input,
 } from "@/components/internal-page-system";
 import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
+import { formatDelta, getDayWindow, percentDelta, safeDate, trendFromDelta } from "@/lib/operational/kpi";
 
 function toLabel(value: unknown, fallback: string) {
   const text = String(value ?? "").trim();
@@ -70,7 +71,16 @@ export default function TimelinePage() {
     ["critical", "error", "failed"].includes(String(event?.severity ?? event?.status ?? "").toLowerCase())
   ).length;
   const uniqueEntities = new Set(filteredEvents.map((event) => String(event?.entityId ?? "")).filter(Boolean)).size;
-  const uniqueActors = new Set(filteredEvents.map((event) => String(event?.actorId ?? event?.actorName ?? "")).filter(Boolean)).size;
+  const currentDay = getDayWindow(0);
+  const previousDay = getDayWindow(1);
+  const recentEvents = events.filter((event) => {
+    const date = safeDate(event?.createdAt);
+    return Boolean(date && date >= currentDay.start && date < currentDay.end);
+  }).length;
+  const recentPrevious = events.filter((event) => {
+    const date = safeDate(event?.createdAt);
+    return Boolean(date && date >= previousDay.start && date < previousDay.end);
+  }).length;
 
   return (
     <PageWrapper title="Timeline Auditável" subtitle="Rastreabilidade operacional padronizada entre módulos.">
@@ -87,10 +97,15 @@ export default function TimelinePage() {
 
       <AppKpiRow
         items={[
-          { label: "Eventos", value: String(filteredEvents.length), trend: 0, context: "janela atual" },
-          { label: "Críticos", value: String(criticalEvents), trend: 0, context: "pedem intervenção" },
-          { label: "Entidades", value: String(uniqueEntities), trend: 0, context: "impactadas" },
-          { label: "Usuários", value: String(uniqueActors), trend: 0, context: "com ação registrada" },
+          {
+            title: "Eventos recentes",
+            value: String(recentEvents),
+            delta: formatDelta(percentDelta(recentEvents, recentPrevious)),
+            trend: trendFromDelta(percentDelta(recentEvents, recentPrevious)),
+            hint: "hoje vs ontem",
+          },
+          { title: "Eventos críticos", value: String(criticalEvents), hint: "pedem intervenção" },
+          { title: "Entidades impactadas", value: String(uniqueEntities), hint: "na janela filtrada" },
         ]}
       />
 

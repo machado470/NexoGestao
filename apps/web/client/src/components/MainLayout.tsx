@@ -146,6 +146,8 @@ interface MainLayoutProps {
 }
 
 export function MainLayout({ children }: MainLayoutProps) {
+  // KPI/top-metrics são definidos por página (dashboard forte, módulos contextuais).
+  // O layout principal não deve injetar cards globais para evitar regressão estrutural.
   const [location, navigate] = useLocation();
   const { role, user, logout, isLoggingOut, loading, isAuthenticated } = useAuth();
   const { stage } = useBootProbe();

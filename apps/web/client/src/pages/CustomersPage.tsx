@@ -17,6 +17,7 @@ import {
   AppSectionBlock,
   AppStatusBadge,
 } from "@/components/internal-page-system";
+import { formatDelta, getWindow, inRange, percentDelta, safeDate, trendFromDelta } from "@/lib/operational/kpi";
 
 export default function CustomersPage() {
   const [, navigate] = useLocation();
@@ -38,6 +39,10 @@ export default function CustomersPage() {
   });
 
   const activeCustomers = customers.filter((item) => item?.active !== false).length;
+  const currentWindow = getWindow(30, 0);
+  const previousWindow = getWindow(30, 1);
+  const newCustomersCurrent = customers.filter(item => inRange(safeDate(item?.createdAt), currentWindow.start, currentWindow.end)).length;
+  const newCustomersPrevious = customers.filter(item => inRange(safeDate(item?.createdAt), previousWindow.start, previousWindow.end)).length;
   const customersWithOverdue = new Set(
     charges
       .filter((item) => String(item?.status ?? "").toUpperCase() === "OVERDUE")
@@ -66,10 +71,16 @@ export default function CustomersPage() {
 
       <AppKpiRow
         items={[
-          { label: "Clientes totais", value: String(customers.length), trend: 0, context: "dados reais do backend" },
-          { label: "Ativos", value: String(activeCustomers), trend: 0, context: "clientes ativos" },
-          { label: "Com cobrança vencida", value: String(customersWithOverdue.size), trend: 0, context: "exigem ação" },
-          { label: "Sem cobrança", value: String(Math.max(customers.length - charges.length, 0)), trend: 0, context: "potencial de receita" },
+          { title: "Clientes ativos", value: String(activeCustomers), hint: "base ativa atual" },
+          {
+            title: "Novos no período",
+            value: String(newCustomersCurrent),
+            delta: formatDelta(percentDelta(newCustomersCurrent, newCustomersPrevious)),
+            trend: trendFromDelta(percentDelta(newCustomersCurrent, newCustomersPrevious)),
+            hint: "últimos 30 dias vs período anterior",
+          },
+          { title: "Com pendência financeira", value: String(customersWithOverdue.size), hint: "com cobrança vencida" },
+          { title: "Sem cobrança", value: String(Math.max(customers.length - charges.length, 0)), hint: "potencial de monetização" },
         ]}
       />
 

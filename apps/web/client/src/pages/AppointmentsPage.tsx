@@ -18,6 +18,7 @@ import {
   AppSectionBlock,
   AppStatusBadge,
 } from "@/components/internal-page-system";
+import { formatDelta, getDayWindow, getWindow, inRange, percentDelta, safeDate, trendFromDelta } from "@/lib/operational/kpi";
 
 export default function AppointmentsPage() {
   const [, navigate] = useLocation();
@@ -41,6 +42,16 @@ export default function AppointmentsPage() {
 
   const scheduled = appointments.filter((item) => String(item?.status ?? "").toUpperCase() === "SCHEDULED").length;
   const confirmed = appointments.filter((item) => String(item?.status ?? "").toUpperCase() === "CONFIRMED").length;
+  const todayWindow = getDayWindow(0);
+  const yesterdayWindow = getDayWindow(1);
+  const todayTotal = appointments.filter(item => inRange(safeDate(item?.startsAt), todayWindow.start, todayWindow.end)).length;
+  const yesterdayTotal = appointments.filter(item => inRange(safeDate(item?.startsAt), yesterdayWindow.start, yesterdayWindow.end)).length;
+  const current7 = getWindow(7, 0);
+  const previous7 = getWindow(7, 1);
+  const current7Appointments = appointments.filter(item => inRange(safeDate(item?.startsAt), current7.start, current7.end));
+  const previous7Appointments = appointments.filter(item => inRange(safeDate(item?.startsAt), previous7.start, previous7.end));
+  const confirmationRateCurrent = current7Appointments.length === 0 ? 0 : (current7Appointments.filter(item => String(item?.status ?? "").toUpperCase() === "CONFIRMED").length / current7Appointments.length) * 100;
+  const confirmationRatePrevious = previous7Appointments.length === 0 ? 0 : (previous7Appointments.filter(item => String(item?.status ?? "").toUpperCase() === "CONFIRMED").length / previous7Appointments.length) * 100;
 
   return (
     <PageWrapper title="Agendamentos" subtitle="Agenda operacional com ações padronizadas e rastreáveis.">
@@ -55,10 +66,22 @@ export default function AppointmentsPage() {
 
       <AppKpiRow
         items={[
-          { label: "Total", value: String(appointments.length), trend: 0, context: "dados reais" },
-          { label: "Agendados", value: String(scheduled), trend: 0, context: "aguardando confirmação" },
-          { label: "Confirmados", value: String(confirmed), trend: 0, context: "prontos para execução" },
-          { label: "Clientes", value: String(customers.length), trend: 0, context: "base disponível" },
+          {
+            title: "Agendamentos hoje",
+            value: String(todayTotal),
+            delta: formatDelta(percentDelta(todayTotal, yesterdayTotal)),
+            trend: trendFromDelta(percentDelta(todayTotal, yesterdayTotal)),
+            hint: "comparativo com ontem",
+          },
+          { title: "Confirmados", value: String(confirmed), hint: "prontos para execução" },
+          { title: "Pendentes", value: String(scheduled), hint: "aguardando confirmação" },
+          {
+            title: "Taxa de confirmação",
+            value: `${confirmationRateCurrent.toFixed(1).replace(".", ",")}%`,
+            delta: formatDelta(percentDelta(confirmationRateCurrent, confirmationRatePrevious)),
+            trend: trendFromDelta(percentDelta(confirmationRateCurrent, confirmationRatePrevious)),
+            hint: "últimos 7 dias",
+          },
         ]}
       />
 

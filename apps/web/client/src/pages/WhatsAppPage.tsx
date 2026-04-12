@@ -18,6 +18,7 @@ import {
 } from "@/components/internal-page-system";
 import { invalidateOperationalGraph } from "@/lib/operationalConsistency";
 import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
+import { formatDelta, getWindow, inRange, percentDelta, trendFromDelta } from "@/lib/operational/kpi";
 
 export default function WhatsAppPage() {
   const safeDate = (value: unknown) => {
@@ -51,6 +52,12 @@ export default function WhatsAppPage() {
   const serviceOrders = useMemo(() => normalizeArrayPayload<any>(serviceOrdersQuery.data), [serviceOrdersQuery.data]);
   const failed = messages.filter((item) => String(item?.status ?? "").toUpperCase() === "FAILED").length;
   const delivered = messages.filter((item) => String(item?.status ?? "").toUpperCase() === "DELIVERED").length;
+  const current7 = getWindow(7, 0);
+  const previous7 = getWindow(7, 1);
+  const current7Messages = messages.filter(item => inRange(safeDate(item?.createdAt), current7.start, current7.end));
+  const previous7Messages = messages.filter(item => inRange(safeDate(item?.createdAt), previous7.start, previous7.end));
+  const current7DeliveryRate = current7Messages.length === 0 ? 0 : (current7Messages.filter(item => String(item?.status ?? "").toUpperCase() === "DELIVERED").length / current7Messages.length) * 100;
+  const previous7DeliveryRate = previous7Messages.length === 0 ? 0 : (previous7Messages.filter(item => String(item?.status ?? "").toUpperCase() === "DELIVERED").length / previous7Messages.length) * 100;
   usePageDiagnostics({
     page: "whatsapp",
     isLoading: messagesQuery.isLoading,
@@ -171,10 +178,22 @@ export default function WhatsAppPage() {
 
       <AppKpiRow
         items={[
-          { label: "Mensagens", value: String(messages.length), trend: 0, context: "histórico do cliente" },
-          { label: "Entregues", value: String(delivered), trend: 0, context: "status delivered" },
-          { label: "Falhas", value: String(failed), trend: 0, context: "requer intervenção" },
-          { label: "Clientes", value: String(customers.length), trend: 0, context: "com WhatsApp" },
+          {
+            title: "Mensagens enviadas",
+            value: String(messages.length),
+            delta: formatDelta(percentDelta(current7Messages.length, previous7Messages.length)),
+            trend: trendFromDelta(percentDelta(current7Messages.length, previous7Messages.length)),
+            hint: "7 dias vs período anterior",
+          },
+          {
+            title: "Taxa de entrega",
+            value: `${current7DeliveryRate.toFixed(1).replace(".", ",")}%`,
+            delta: formatDelta(percentDelta(current7DeliveryRate, previous7DeliveryRate)),
+            trend: trendFromDelta(percentDelta(current7DeliveryRate, previous7DeliveryRate)),
+            hint: "mensagens entregues / enviadas (7d)",
+          },
+          { title: "Conversas com falha", value: String(failed), hint: "status FAILED" },
+          { title: "Follow-ups pendentes", value: String(automationSuggestions.length), hint: "gatilhos prontos para ação" },
         ]}
       />
 

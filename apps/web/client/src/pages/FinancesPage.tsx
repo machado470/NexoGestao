@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import { invalidateOperationalGraph } from "@/lib/operationalConsistency";
 import { getChargeSeverity, getOperationalSeverityLabel } from "@/lib/operations/operational-intelligence";
 import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
+import { formatDelta, getWindow, inRange, percentDelta, safeDate, trendFromDelta } from "@/lib/operational/kpi";
 
 function formatCurrency(cents: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100);
@@ -50,6 +51,16 @@ export default function FinancesPage() {
       revenue: Number(item?.totalRevenueCents ?? item?.revenueCents ?? item?.amountCents ?? 0) / 100,
     }));
   }, [revenueQuery.data]);
+  const current30 = getWindow(30, 0);
+  const previous30 = getWindow(30, 1);
+  const receivedCurrent = charges
+    .filter(item => String(item?.status ?? "").toUpperCase() === "PAID" && inRange(safeDate(item?.paidAt ?? item?.updatedAt), current30.start, current30.end))
+    .reduce((acc, item) => acc + Number(item?.amountCents ?? 0), 0);
+  const receivedPrevious = charges
+    .filter(item => String(item?.status ?? "").toUpperCase() === "PAID" && inRange(safeDate(item?.paidAt ?? item?.updatedAt), previous30.start, previous30.end))
+    .reduce((acc, item) => acc + Number(item?.amountCents ?? 0), 0);
+  const overdueCurrent = charges.filter(item => String(item?.status ?? "").toUpperCase() === "OVERDUE" && inRange(safeDate(item?.dueDate), current30.start, current30.end)).length;
+  const overduePrevious = charges.filter(item => String(item?.status ?? "").toUpperCase() === "OVERDUE" && inRange(safeDate(item?.dueDate), previous30.start, previous30.end)).length;
 
   usePageDiagnostics({
     page: "finances",
@@ -100,10 +111,28 @@ export default function FinancesPage() {
       />
 
       <AppKpiRow items={[
-        { label: "Cobranças", value: String(charges.length), trend: 0, context: "carteira total" },
-        { label: "Pendentes", value: String(stats.pendingCount ?? 0), trend: 0, context: "aguardando pagamento" },
-        { label: "Vencidas", value: String(stats.overdueCount ?? 0), trend: 0, context: "prioridade de cobrança" },
-        { label: "Recebido", value: formatCurrency(Number(stats.paidAmountCents ?? 0)), trend: 0, context: "valor liquidado" },
+        {
+          title: "Recebido no período",
+          value: formatCurrency(receivedCurrent),
+          delta: formatDelta(percentDelta(receivedCurrent, receivedPrevious)),
+          trend: trendFromDelta(percentDelta(receivedCurrent, receivedPrevious)),
+          hint: "30 dias vs período anterior",
+          tone: "important",
+        },
+        { title: "A receber", value: String(stats.pendingCount ?? 0), hint: "cobranças pendentes" },
+        {
+          title: "Em atraso",
+          value: String(stats.overdueCount ?? 0),
+          delta: formatDelta(percentDelta(overdueCurrent, overduePrevious)),
+          trend: trendFromDelta(percentDelta(overdueCurrent, overduePrevious)),
+          hint: "cobranças vencidas",
+          tone: Number(stats.overdueCount ?? 0) > 0 ? "critical" : "default",
+        },
+        {
+          title: "Taxa de atraso",
+          value: `${charges.length > 0 ? ((Number(stats.overdueCount ?? 0) / charges.length) * 100).toFixed(1).replace(".", ",") : "0,0"}%`,
+          hint: "vencidas / carteira total",
+        },
       ]} />
 
       <div className="grid gap-3 xl:grid-cols-3">
