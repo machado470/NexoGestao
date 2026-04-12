@@ -9,19 +9,21 @@ interface Props {
 interface State {
   hasError: boolean;
   error: Error | null;
+  componentStack: string | null;
 }
 
 class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false, error: null, componentStack: null };
   }
 
   static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error };
+    return { hasError: true, error, componentStack: null };
   }
 
   componentDidCatch(error: Error, info: { componentStack: string }) {
+    this.setState({ componentStack: info.componentStack });
     console.error("[AppErrorBoundary] runtime crash", {
       component: this.constructor.name,
       error,
@@ -45,9 +47,20 @@ class ErrorBoundary extends Component<Props, State> {
 
             <div className="p-4 w-full rounded bg-muted overflow-auto mb-6">
               <pre className="text-sm text-muted-foreground whitespace-break-spaces">
-                {this.state.error?.stack}
+                {this.state.error?.message ?? "Erro sem mensagem"}
+
+{this.state.error?.stack}
               </pre>
             </div>
+
+            {this.state.componentStack ? (
+              <div className="p-4 w-full rounded bg-muted overflow-auto mb-6">
+                <p className="text-sm font-medium text-foreground mb-2">Component stack</p>
+                <pre className="text-xs text-muted-foreground whitespace-break-spaces">
+                  {this.state.componentStack}
+                </pre>
+              </div>
+            ) : null}
 
             <button
               onClick={() => window.location.reload()}
