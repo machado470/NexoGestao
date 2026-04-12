@@ -1,8 +1,10 @@
 import {
   lazy,
   Suspense,
+  useCallback,
   useEffect,
   useMemo,
+  useState,
   type ComponentType,
   type LazyExoticComponent,
   type ReactNode,
@@ -14,7 +16,8 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ConsentBanner } from "@/components/ConsentBanner";
 
-import ErrorBoundary from "./components/ErrorBoundary";
+import { AppBootstrapGuard, type AppBootstrapState } from "./components/AppBootstrapGuard";
+import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { AppLayout } from "./components/AppLayout";
 import { PublicLayout } from "./components/PublicLayout";
 import { AuthLayout } from "./components/AuthLayout";
@@ -479,10 +482,8 @@ function Router() {
   const [location] = useLocation();
   const { isInitializing, isAuthenticated } = useAuth();
 
-  if (import.meta.env.DEV) {
-    // eslint-disable-next-line no-console
-    console.log("[boot] router render", { location, isInitializing, isAuthenticated });
-  }
+  // eslint-disable-next-line no-console
+  console.log("[boot] route_render_start", { route: location, isInitializing, isAuthenticated });
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -637,6 +638,8 @@ function Router() {
 }
 
 function App() {
+  const [bootstrapState, setBootstrapState] = useState<AppBootstrapState>("booting");
+  const [bootstrapReason, setBootstrapReason] = useState<string | undefined>(undefined);
   const bootProbeStage = useMemo<BootProbeStage>(() => {
     if (typeof window === "undefined") return "full";
     const value = new URLSearchParams(window.location.search)
@@ -653,15 +656,30 @@ function App() {
     return "full";
   }, []);
 
-  if (import.meta.env.DEV) {
-    // eslint-disable-next-line no-console
-    console.log("[boot] App render start", { bootProbeStage });
-  }
-
   useEffect(() => {
-    if (!import.meta.env.DEV) return;
     // eslint-disable-next-line no-console
-    console.log("[boot] app render ok");
+    console.log("[boot] app_init", { bootProbeStage });
+  }, []);
+
+  const markReady = useCallback(() => {
+    setBootstrapState(prev => {
+      if (prev === "ready") return prev;
+      // eslint-disable-next-line no-console
+      console.log("[boot] providers_ready");
+      return "ready";
+    });
+  }, []);
+
+  const markFailed = useCallback((reason: string) => {
+    setBootstrapReason(reason);
+    setBootstrapState("failed");
+    // eslint-disable-next-line no-console
+    console.error("[boot] app_failed", { reason });
+  }, []);
+
+  const reloadApp = useCallback(() => {
+    if (typeof window === "undefined") return;
+    window.location.reload();
   }, []);
 
   if (bootProbeStage === "static") {
@@ -670,7 +688,7 @@ function App() {
 
   if (bootProbeStage === "router") {
     return (
-      <ErrorBoundary>
+      <AppErrorBoundary>
         <TooltipProvider>
           <Toaster />
           <Switch>
@@ -679,20 +697,23 @@ function App() {
             </Route>
           </Switch>
         </TooltipProvider>
-      </ErrorBoundary>
+      </AppErrorBoundary>
     );
   }
 
   if (bootProbeStage === "auth") {
     return (
-      <ErrorBoundary>
+      <AppErrorBoundary>
         <AuthProvider>
-          <TooltipProvider>
-            <Toaster />
-            <AuthProbeScreen />
-          </TooltipProvider>
+          <AuthBootstrapStatus onReady={markReady} onFailed={markFailed} />
+          <AppBootstrapGuard state={bootstrapState} reason={bootstrapReason} onReload={reloadApp}>
+            <TooltipProvider>
+              <Toaster />
+              <AuthProbeScreen />
+            </TooltipProvider>
+          </AppBootstrapGuard>
         </AuthProvider>
-      </ErrorBoundary>
+      </AppErrorBoundary>
     );
   }
 
@@ -702,37 +723,66 @@ function App() {
     bootProbeStage === "global-engine"
   ) {
     return (
-      <ErrorBoundary>
+      <AppErrorBoundary>
         <AuthProvider>
-          <BootProbeProvider stage={bootProbeStage}>
-            <TooltipProvider>
-              <Toaster />
-              <AppLayout>
-                <div className="p-4 text-sm text-[var(--text-secondary)]">
-                  NEXO LAYOUT OK
-                </div>
-              </AppLayout>
-              <ConsentBanner />
-            </TooltipProvider>
-          </BootProbeProvider>
+          <AuthBootstrapStatus onReady={markReady} onFailed={markFailed} />
+          <AppBootstrapGuard state={bootstrapState} reason={bootstrapReason} onReload={reloadApp}>
+            <BootProbeProvider stage={bootProbeStage}>
+              <TooltipProvider>
+                <Toaster />
+                <AppLayout>
+                  <div className="p-4 text-sm text-[var(--text-secondary)]">
+                    NEXO LAYOUT OK
+                  </div>
+                </AppLayout>
+                <ConsentBanner />
+              </TooltipProvider>
+            </BootProbeProvider>
+          </AppBootstrapGuard>
         </AuthProvider>
-      </ErrorBoundary>
+      </AppErrorBoundary>
     );
   }
 
   return (
-    <ErrorBoundary>
+    <AppErrorBoundary>
       <AuthProvider>
-        <BootProbeProvider stage={bootProbeStage}>
-          <TooltipProvider>
-            <Toaster />
-            <Router />
-            <ConsentBanner />
-          </TooltipProvider>
-        </BootProbeProvider>
+        <AuthBootstrapStatus onReady={markReady} onFailed={markFailed} />
+        <AppBootstrapGuard state={bootstrapState} reason={bootstrapReason} onReload={reloadApp}>
+          <BootProbeProvider stage={bootProbeStage}>
+            <TooltipProvider>
+              <Toaster />
+              <Router />
+              <ConsentBanner />
+            </TooltipProvider>
+          </BootProbeProvider>
+        </AppBootstrapGuard>
       </AuthProvider>
-    </ErrorBoundary>
+    </AppErrorBoundary>
   );
+}
+
+function AuthBootstrapStatus({
+  onReady,
+  onFailed,
+}: {
+  onReady: () => void;
+  onFailed: (reason: string) => void;
+}) {
+  const { isInitializing, error } = useAuth();
+
+  useEffect(() => {
+    if (isInitializing) return;
+    if (error) {
+      onFailed(error instanceof Error ? error.message : "Falha ao inicializar autenticação");
+      return;
+    }
+    // eslint-disable-next-line no-console
+    console.log("[boot] auth_ready");
+    onReady();
+  }, [error, isInitializing, onFailed, onReady]);
+
+  return null;
 }
 
 function AuthProbeScreen() {

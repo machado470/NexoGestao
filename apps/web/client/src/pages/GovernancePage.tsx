@@ -8,9 +8,10 @@ import { OperationalTopCard } from "@/components/operating-system/OperationalTop
 import { Button } from "@/components/design-system";
 import {
   AppChartPanel,
-  AppEmptyState,
   AppKpiRow,
-  AppLoadingState,
+  AppPageEmptyState,
+  AppPageErrorState,
+  AppPageLoadingState,
   AppSectionBlock,
   AppStatusBadge,
 } from "@/components/internal-page-system";
@@ -32,6 +33,8 @@ export default function GovernancePage() {
     [summaryQuery.data]
   );
   const runs = useMemo(() => normalizeArrayPayload<any>(runsQuery.data), [runsQuery.data]);
+  const hasRunsData = runs.length > 0;
+  const hasSummaryData = Boolean(summaryQuery.data);
 
   const riskSeries = runs
     .map((run, index) => ({
@@ -73,10 +76,16 @@ export default function GovernancePage() {
 
       <div className="grid gap-3 xl:grid-cols-3">
         <AppChartPanel title="Evolução do risco" description="Histórico real das últimas execuções de governança.">
-          {runsQuery.isLoading ? (
-            <AppLoadingState rows={2} />
+          {runsQuery.isLoading && !hasRunsData ? (
+            <AppPageLoadingState description="Carregando histórico de risco..." />
+          ) : runsQuery.error && !hasRunsData ? (
+            <AppPageErrorState
+              description={runsQuery.error?.message ?? "Falha ao carregar histórico de risco."}
+              actionLabel="Tentar novamente"
+              onAction={() => void runsQuery.refetch()}
+            />
           ) : riskSeries.length === 0 ? (
-            <AppEmptyState title="Nenhum dado disponível ainda" description="Ação recomendada: rodar governança e acompanhar evolução." />
+            <AppPageEmptyState title="Nenhum dado disponível ainda" description="Ação recomendada: rodar governança e acompanhar evolução." />
           ) : (
             <ChartContainer className="h-[240px] w-full" config={{ score: { label: "Risco" } }}>
               <LineChart data={riskSeries}>
@@ -92,10 +101,16 @@ export default function GovernancePage() {
 
       <div className="grid gap-3 xl:grid-cols-2">
         <AppSectionBlock title="Entidades em risco" subtitle="Itens reais apontados pela governança">
-          {summaryQuery.isLoading ? (
-            <AppLoadingState rows={3} />
+          {summaryQuery.isLoading && !hasSummaryData ? (
+            <AppPageLoadingState description="Carregando entidades em risco..." />
+          ) : summaryQuery.error && !hasSummaryData ? (
+            <AppPageErrorState
+              description={summaryQuery.error?.message ?? "Falha ao carregar entidades em risco."}
+              actionLabel="Tentar novamente"
+              onAction={() => void summaryQuery.refetch()}
+            />
           ) : entitiesAtRisk.length === 0 ? (
-            <AppEmptyState title="Nenhuma entidade em risco" description="Sem desvios críticos detectados nesta organização." />
+            <AppPageEmptyState title="Nenhuma entidade em risco" description="Sem desvios críticos detectados nesta organização." />
           ) : (
             <ul className="space-y-2">
               {entitiesAtRisk.map((entity) => (
@@ -112,10 +127,16 @@ export default function GovernancePage() {
         </AppSectionBlock>
 
         <AppSectionBlock title="Ações recomendadas" subtitle="Próximas ações úteis para reduzir risco">
-          {summaryQuery.isLoading ? (
-            <AppLoadingState rows={3} />
+          {summaryQuery.isLoading && !hasSummaryData ? (
+            <AppPageLoadingState description="Carregando recomendações..." />
+          ) : summaryQuery.error && !hasSummaryData ? (
+            <AppPageErrorState
+              description={summaryQuery.error?.message ?? "Falha ao carregar recomendações."}
+              actionLabel="Tentar novamente"
+              onAction={() => void summaryQuery.refetch()}
+            />
           ) : recommendations.length === 0 ? (
-            <AppEmptyState title="Nenhuma recomendação disponível" description="Execute operações para gerar insights de governança." />
+            <AppPageEmptyState title="Nenhuma recomendação disponível" description="Execute operações para gerar insights de governança." />
           ) : (
             <ul className="space-y-2">
               {recommendations.map((item, index) => (

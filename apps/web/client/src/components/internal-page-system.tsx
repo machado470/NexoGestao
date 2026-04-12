@@ -218,6 +218,59 @@ export function AppEmptyState({ title, description }: { title: string; descripti
   return <AppBaseEmptyState title={title} description={description} />;
 }
 
+export function AppPageLoadingState({
+  title = "Carregando área",
+  description = "Aguarde enquanto preparamos os dados desta área.",
+}: {
+  title?: string;
+  description?: string;
+}) {
+  return (
+    <AppSectionCard className="flex min-h-[220px] items-center justify-center">
+      <AppBaseEmptyState title={title} description={description} />
+    </AppSectionCard>
+  );
+}
+
+export function AppPageErrorState({
+  title = "Não foi possível carregar esta área",
+  description,
+  actionLabel,
+  onAction,
+}: {
+  title?: string;
+  description: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}) {
+  return (
+    <AppSectionCard className="border-rose-500/30">
+      <div className="space-y-3">
+        <AppBaseEmptyState title={title} description={description} />
+        {actionLabel && onAction ? (
+          <Button type="button" onClick={onAction}>
+            {actionLabel}
+          </Button>
+        ) : null}
+      </div>
+    </AppSectionCard>
+  );
+}
+
+export function AppPageEmptyState({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <AppSectionCard>
+      <AppBaseEmptyState title={title} description={description} />
+    </AppSectionCard>
+  );
+}
+
 export function AppSkeleton(props: ComponentProps<typeof BaseSkeleton>) {
   return <BaseSkeleton {...props} />;
 }

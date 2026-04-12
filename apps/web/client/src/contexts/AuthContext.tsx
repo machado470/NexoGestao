@@ -114,27 +114,37 @@ function getRedirect(payload: unknown): string {
 }
 
 function redirectToLogin() {
-  if (typeof window === "undefined") return;
-  window.location.replace(`/login?logoutAt=${Date.now()}`);
+  try {
+    if (typeof window === "undefined") return;
+    window.location.replace(`/login?logoutAt=${Date.now()}`);
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error("[auth] redirect failed", error);
+  }
 }
 
 function clearAppStorage() {
-  if (typeof window === "undefined") return;
+  try {
+    if (typeof window === "undefined") return;
 
-  for (let i = window.localStorage.length - 1; i >= 0; i -= 1) {
-    const key = window.localStorage.key(i);
-    if (!key) continue;
-    if (APP_STORAGE_PREFIXES.some(prefix => key.startsWith(prefix))) {
-      window.localStorage.removeItem(key);
+    for (let i = window.localStorage.length - 1; i >= 0; i -= 1) {
+      const key = window.localStorage.key(i);
+      if (!key) continue;
+      if (APP_STORAGE_PREFIXES.some(prefix => key.startsWith(prefix))) {
+        window.localStorage.removeItem(key);
+      }
     }
-  }
 
-  for (let i = window.sessionStorage.length - 1; i >= 0; i -= 1) {
-    const key = window.sessionStorage.key(i);
-    if (!key) continue;
-    if (APP_STORAGE_PREFIXES.some(prefix => key.startsWith(prefix))) {
-      window.sessionStorage.removeItem(key);
+    for (let i = window.sessionStorage.length - 1; i >= 0; i -= 1) {
+      const key = window.sessionStorage.key(i);
+      if (!key) continue;
+      if (APP_STORAGE_PREFIXES.some(prefix => key.startsWith(prefix))) {
+        window.sessionStorage.removeItem(key);
+      }
     }
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error("[auth] clear storage failed", error);
   }
 }
 
@@ -162,8 +172,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [meBootstrapTimedOut, setMeBootstrapTimedOut] = useState(false);
   const channelRef = useRef<BroadcastChannel | null>(null);
   const [pathname, setPathname] = useState(() => {
-    if (typeof window === "undefined") return "/";
-    return window.location.pathname;
+    try {
+      if (typeof window === "undefined") return "/";
+      return window.location.pathname;
+    } catch {
+      return "/";
+    }
   });
 
   const isAuthPath = AUTH_PATH_PREFIXES.some(prefix =>
@@ -240,6 +254,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    if (typeof window === "undefined") return;
+
     const timer = window.setTimeout(() => {
       setMeBootstrapTimedOut(true);
       if (process.env.NODE_ENV !== "production") {
@@ -295,7 +311,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         channelRef.current?.removeEventListener("message", handler);
         channelRef.current?.close();
-      } catch {}
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error("[auth] failed to close BroadcastChannel", error);
+      }
       channelRef.current = null;
     };
   }, []);

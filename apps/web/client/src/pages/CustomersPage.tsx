@@ -8,9 +8,10 @@ import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import {
   AppDataTable,
-  AppEmptyState,
   AppKpiRow,
-  AppLoadingState,
+  AppPageEmptyState,
+  AppPageErrorState,
+  AppPageLoadingState,
   AppRowActions,
   AppSectionBlock,
   AppStatusBadge,
@@ -24,6 +25,9 @@ export default function CustomersPage() {
 
   const customers = useMemo(() => normalizeArrayPayload<any>(customersQuery.data), [customersQuery.data]);
   const charges = useMemo(() => normalizeArrayPayload<any>(chargesQuery.data), [chargesQuery.data]);
+  const hasData = customers.length > 0;
+  const showInitialLoading = customersQuery.isLoading && !hasData;
+  const showErrorState = customersQuery.error && !hasData;
 
   const activeCustomers = customers.filter((item) => item?.active !== false).length;
   const customersWithOverdue = new Set(
@@ -62,10 +66,16 @@ export default function CustomersPage() {
       />
 
       <AppSectionBlock title="Base de clientes" subtitle="Lista sincronizada com backend">
-        {customersQuery.isLoading ? (
-          <AppLoadingState rows={4} />
+        {showInitialLoading ? (
+          <AppPageLoadingState description="Carregando base de clientes..." />
+        ) : showErrorState ? (
+          <AppPageErrorState
+            description={customersQuery.error?.message ?? "Falha ao carregar clientes."}
+            actionLabel="Tentar novamente"
+            onAction={() => void customersQuery.refetch()}
+          />
         ) : customers.length === 0 ? (
-          <AppEmptyState title="Nenhum dado disponível ainda" description="Ação recomendada: criar cliente" />
+          <AppPageEmptyState title="Nenhum dado disponível ainda" description="Ação recomendada: criar cliente" />
         ) : (
           <AppDataTable>
             <table className="w-full text-sm">

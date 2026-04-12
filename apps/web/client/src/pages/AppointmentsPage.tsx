@@ -9,9 +9,10 @@ import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedba
 import { getAppointmentSeverity, getOperationalSeverityLabel } from "@/lib/operations/operational-intelligence";
 import {
   AppDataTable,
-  AppEmptyState,
   AppKpiRow,
-  AppLoadingState,
+  AppPageEmptyState,
+  AppPageErrorState,
+  AppPageLoadingState,
   AppRowActions,
   AppSectionBlock,
   AppStatusBadge,
@@ -26,6 +27,9 @@ export default function AppointmentsPage() {
 
   const customers = useMemo(() => normalizeArrayPayload<any>(customersQuery.data), [customersQuery.data]);
   const appointments = useMemo(() => normalizeArrayPayload<any>(appointmentsQuery.data), [appointmentsQuery.data]);
+  const hasData = appointments.length > 0;
+  const showInitialLoading = appointmentsQuery.isLoading && !hasData;
+  const showErrorState = appointmentsQuery.error && !hasData;
 
   const scheduled = appointments.filter((item) => String(item?.status ?? "").toUpperCase() === "SCHEDULED").length;
   const confirmed = appointments.filter((item) => String(item?.status ?? "").toUpperCase() === "CONFIRMED").length;
@@ -51,10 +55,16 @@ export default function AppointmentsPage() {
       />
 
       <AppSectionBlock title="Fila de agendamentos" subtitle="Sincronizada em tempo real com backend">
-        {appointmentsQuery.isLoading ? (
-          <AppLoadingState rows={4} />
+        {showInitialLoading ? (
+          <AppPageLoadingState description="Carregando agendamentos..." />
+        ) : showErrorState ? (
+          <AppPageErrorState
+            description={appointmentsQuery.error?.message ?? "Falha ao carregar agendamentos."}
+            actionLabel="Tentar novamente"
+            onAction={() => void appointmentsQuery.refetch()}
+          />
         ) : appointments.length === 0 ? (
-          <AppEmptyState title="Nenhum dado disponível ainda" description="Ação recomendada: criar agendamento" />
+          <AppPageEmptyState title="Nenhum dado disponível ainda" description="Ação recomendada: criar agendamento" />
         ) : (
           <AppDataTable>
             <table className="w-full text-sm">
