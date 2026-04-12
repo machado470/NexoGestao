@@ -14,10 +14,8 @@ import { initSentry } from "./lib/sentry";
 import { isPublicPath } from "./lib/publicRoutes";
 
 initSentry();
-if (import.meta.env.DEV) {
-  // eslint-disable-next-line no-console
-  console.log("[boot] main start");
-}
+// eslint-disable-next-line no-console
+console.log("[boot] main_entry_loaded");
 
 let isRedirectingToLogin = false;
 
@@ -104,12 +102,10 @@ if (!rootElement) {
   throw new Error("[boot] Root #root não encontrado para montar a aplicação.");
 }
 
-if (import.meta.env.DEV) {
-  // eslint-disable-next-line no-console
-  console.log("[boot] root found");
-  // eslint-disable-next-line no-console
-  console.log("[boot] app render start");
-}
+// eslint-disable-next-line no-console
+console.log("[boot] html_root_found");
+// eslint-disable-next-line no-console
+console.log("[boot] react_mount_start");
 
 createRoot(rootElement).render(
   <trpc.Provider client={trpcClient} queryClient={queryClient}>
@@ -119,7 +115,5 @@ createRoot(rootElement).render(
   </trpc.Provider>
 );
 
-if (import.meta.env.DEV) {
-  // eslint-disable-next-line no-console
-  console.log("[boot] app render ok");
-}
+// eslint-disable-next-line no-console
+console.log("[boot] react_mount_done");
