@@ -16,6 +16,7 @@ import {
   AppStatusBadge,
 } from "@/components/internal-page-system";
 import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
+import { formatDelta, percentDelta, trendFromDelta } from "@/lib/operational/kpi";
 
 function metric(summary: Record<string, any>, ...keys: string[]) {
   for (const key of keys) {
@@ -58,6 +59,8 @@ export default function GovernancePage() {
 
   const entitiesAtRisk = normalizeArrayPayload<any>(summary.entitiesAtRisk ?? summary.riskEntities ?? []);
   const recommendations = normalizeArrayPayload<any>(summary.recommendations ?? summary.nextActions ?? []);
+  const latestRisk = Number(riskSeries[riskSeries.length - 1]?.score ?? metric(summary, "riskScore", "overallRisk"));
+  const previousRisk = Number(riskSeries[riskSeries.length - 2]?.score ?? Number.NaN);
 
   return (
     <PageWrapper title="Governança e Risco" subtitle="Leitura de risco e contenção com o mesmo contrato operacional das demais telas.">
@@ -80,10 +83,17 @@ export default function GovernancePage() {
 
       <AppKpiRow
         items={[
-          { label: "Risco atual", value: `${metric(summary, "riskScore", "overallRisk")}/100`, trend: 0, context: "último cálculo" },
-          { label: "Alertas ativos", value: String(metric(summary, "activeAlerts", "alertsCount")), trend: 0, context: "monitoramento contínuo" },
-          { label: "Eventos críticos", value: String(metric(summary, "criticalEvents", "criticalCount")), trend: 0, context: "janela atual" },
-          { label: "Entidades em risco", value: String(entitiesAtRisk.length), trend: 0, context: "exigem atenção" },
+          {
+            title: "Score de risco",
+            value: `${latestRisk}/100`,
+            delta: formatDelta(percentDelta(latestRisk, previousRisk)),
+            trend: trendFromDelta(percentDelta(latestRisk, previousRisk)),
+            hint: "última execução vs anterior",
+            tone: latestRisk >= 70 ? "critical" : latestRisk >= 40 ? "important" : "default",
+          },
+          { title: "Entidades em risco", value: String(entitiesAtRisk.length), hint: "exigem contenção" },
+          { title: "Alertas abertos", value: String(metric(summary, "activeAlerts", "alertsCount")), hint: "monitoramento contínuo" },
+          { title: "Recomendações prioritárias", value: String(recommendations.length), hint: "ações sugeridas" },
         ]}
       />
 

@@ -1,15 +1,14 @@
 import type { ComponentProps, ReactNode } from "react";
-import { TriangleAlert } from "lucide-react";
+import { ArrowDownRight, ArrowRight, ArrowUpRight, TriangleAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { AppPageShell, AppSectionCard, AppSkeleton as BaseSkeleton } from "@/components/app-system";
 import {
-  AppActionCard,
   AppCardCTA,
   AppEmptyState as AppBaseEmptyState,
-  AppLoadingState,
+  AppLoadingState as BaseLoadingState,
   AppRowActions,
   AppTrendIndicator,
 } from "@/components/app";
@@ -43,6 +42,103 @@ export function AppPageHeader({
   );
 }
 
+export function AppFiltersBar({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <div className={cn("nexo-card-informative flex flex-wrap items-center justify-between gap-2 rounded-xl p-3", className)}>
+      {children}
+    </div>
+  );
+}
+
+type MetricTrend = "up" | "down" | "neutral";
+
+export type AppMetricCardItem = {
+  title: string;
+  value: ReactNode;
+  delta?: string;
+  trend?: MetricTrend;
+  hint?: string;
+  icon?: ReactNode;
+  tone?: "default" | "important" | "critical";
+  loading?: boolean;
+  emphasis?: "strong" | "compact";
+  footer?: ReactNode;
+  onClick?: () => void;
+  ctaLabel?: string;
+};
+
+function MetricTrendBadge({ trend, delta }: { trend?: MetricTrend; delta?: string }) {
+  if (!delta || !trend) return null;
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 text-xs font-semibold",
+        trend === "up" && "text-emerald-500",
+        trend === "down" && "text-rose-500",
+        trend === "neutral" && "text-[var(--text-muted)]"
+      )}
+    >
+      {trend === "up" ? <ArrowUpRight className="h-3.5 w-3.5" /> : null}
+      {trend === "down" ? <ArrowDownRight className="h-3.5 w-3.5" /> : null}
+      {trend === "neutral" ? <ArrowRight className="h-3.5 w-3.5" /> : null}
+      {delta}
+    </span>
+  );
+}
+
+export function AppMetricCard({
+  title,
+  value,
+  delta,
+  trend,
+  hint,
+  icon,
+  tone = "default",
+  loading = false,
+  emphasis = "compact",
+  footer,
+  onClick,
+  ctaLabel,
+}: AppMetricCardItem) {
+  const content = (
+    <article
+      className={cn(
+        "nexo-card-kpi h-full p-4",
+        tone === "important" && "nexo-card-kpi--important",
+        tone === "critical" && "nexo-card-kpi--critical"
+      )}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">{title}</p>
+          {loading ? (
+            <div className="mt-3 h-8 w-28 rounded-md bg-[var(--surface-elevated)]/70" aria-hidden />
+          ) : (
+            <p className={cn("mt-2 font-semibold tracking-tight text-[var(--text-primary)]", emphasis === "strong" ? "text-3xl md:text-[2rem]" : "text-2xl")}>{value}</p>
+          )}
+          {hint ? <p className="mt-1 text-xs text-[var(--text-muted)]">{hint}</p> : null}
+        </div>
+        {icon ? <div className="nexo-icon-tile">{icon}</div> : null}
+      </div>
+
+      {delta || footer || onClick ? (
+        <div className="mt-3 flex items-center justify-between gap-2">
+          <MetricTrendBadge trend={trend} delta={delta} />
+          {footer ? <div className="text-xs text-[var(--text-muted)]">{footer}</div> : null}
+          {onClick ? <AppCardCTA label={ctaLabel ?? "Abrir"} onClick={onClick} /> : null}
+        </div>
+      ) : null}
+    </article>
+  );
+
+  if (!onClick) return content;
+  return (
+    <button type="button" className="text-left" onClick={onClick}>
+      {content}
+    </button>
+  );
+}
+
 export function AppKpiCard({
   label,
   value,
@@ -56,19 +152,45 @@ export function AppKpiCard({
   context: string;
   onClick?: () => void;
 }) {
+  const direction: MetricTrend = trend > 0 ? "up" : trend < 0 ? "down" : "neutral";
+  const delta = Number.isFinite(trend) ? `${trend >= 0 ? "+" : ""}${trend.toFixed(1).replace(".", ",")}%` : undefined;
   return (
-    <AppActionCard title={label} description={context} onClick={onClick ?? (() => undefined)}>
-      <p className="text-xl font-bold text-[var(--text-primary)]">{value}</p>
-      <div className="flex items-center gap-2">
-        <AppTrendIndicator value={trend} />
-        {onClick ? <AppCardCTA label="Abrir" onClick={onClick} /> : null}
-      </div>
-    </AppActionCard>
+    <AppMetricCard
+      title={label}
+      value={value}
+      trend={delta ? direction : undefined}
+      delta={delta}
+      hint={context}
+      onClick={onClick}
+    />
   );
 }
 
-export function AppKpiRow({ items }: { items: Array<{ label: string; value: string; trend: number; context: string; onClick?: () => void }> }) {
-  return <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">{items.map(item => <AppKpiCard key={item.label} {...item} />)}</section>;
+export function AppKpiRow({
+  items,
+  emphasis = "compact",
+}: {
+  items: Array<AppMetricCardItem | { label: string; value: string; trend?: number; context?: string; onClick?: () => void }>;
+  emphasis?: "strong" | "compact";
+}) {
+  return (
+    <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      {items.map((item) => {
+        const normalized: AppMetricCardItem = "title" in item
+          ? item
+          : {
+              title: item.label,
+              value: item.value,
+              hint: item.context,
+              onClick: item.onClick,
+              delta: typeof item.trend === "number" ? `${item.trend >= 0 ? "+" : ""}${item.trend.toFixed(1).replace(".", ",")}%` : undefined,
+              trend: typeof item.trend === "number" ? (item.trend > 0 ? "up" : item.trend < 0 ? "down" : "neutral") : undefined,
+            };
+
+        return <AppMetricCard key={normalized.title} {...normalized} emphasis={normalized.emphasis ?? emphasis} />;
+      })}
+    </section>
+  );
 }
 
 export function AppChartPanel({
@@ -92,13 +214,13 @@ export function AppChartPanel({
     <AppSectionCard>
       <div className="mb-3 flex items-start justify-between gap-2">
         <div>
-        <h2 className="text-sm font-semibold text-[var(--text-primary)]">{title}</h2>
-        <p className="text-xs text-[var(--text-muted)]">{description}</p>
+          <h2 className="text-sm font-semibold text-[var(--text-primary)]">{title}</h2>
+          <p className="text-xs text-[var(--text-muted)]">{description}</p>
         </div>
         {typeof trendValue === "number" ? <AppTrendIndicator value={trendValue} /> : null}
       </div>
       {children}
-      {(trendLabel || onCtaClick) ? (
+      {trendLabel || onCtaClick ? (
         <div className="mt-3 flex items-center justify-between">
           <span className="text-xs text-[var(--text-muted)]">{trendLabel}</span>
           {onCtaClick ? (
@@ -131,8 +253,8 @@ export function AppSectionBlock({
     <AppSectionCard className={className}>
       <div className="mb-3 flex items-start justify-between gap-2">
         <div>
-        <h3 className="text-sm font-semibold text-[var(--text-primary)]">{title}</h3>
-        {subtitle ? <p className="text-xs text-[var(--text-muted)]">{subtitle}</p> : null}
+          <h3 className="text-sm font-semibold text-[var(--text-primary)]">{title}</h3>
+          {subtitle ? <p className="text-xs text-[var(--text-muted)]">{subtitle}</p> : null}
         </div>
         {onCtaClick ? (
           <Button size="sm" variant="ghost" onClick={onCtaClick}>
@@ -219,66 +341,48 @@ export function AppEmptyState({ title, description }: { title: string; descripti
 }
 
 export function AppPageLoadingState({
-  title = "Carregando área",
-  description = "Aguarde enquanto preparamos os dados desta área.",
+  title = "Carregando",
+  description = "Carregando dados operacionais...",
 }: {
   title?: string;
   description?: string;
 }) {
   return (
-    <AppSectionCard className="flex min-h-[220px] items-center justify-center">
-      <AppBaseEmptyState title={title} description={description} />
+    <AppSectionCard className="space-y-2">
+      <p className="text-sm font-semibold text-[var(--text-primary)]">{title}</p>
+      <p className="text-sm text-[var(--text-secondary)]">{description}</p>
+      <BaseLoadingState rows={4} />
     </AppSectionCard>
   );
 }
 
 export function AppPageErrorState({
-  title = "Não foi possível carregar esta área",
+  title = "Falha ao carregar",
   description,
   actionLabel,
   onAction,
 }: {
   title?: string;
   description: string;
-  actionLabel?: string;
-  onAction?: () => void;
+  actionLabel: string;
+  onAction: () => void;
 }) {
   return (
-    <AppSectionCard className="border-rose-500/30">
-      <div className="space-y-3">
-        <AppBaseEmptyState title={title} description={description} />
-        {actionLabel && onAction ? (
-          <Button type="button" onClick={onAction}>
-            {actionLabel}
-          </Button>
-        ) : null}
-      </div>
+    <AppSectionCard className="space-y-3">
+      <p className="text-sm font-semibold text-[var(--text-primary)]">{title}</p>
+      <p className="text-sm text-[var(--text-secondary)]">{description}</p>
+      <Button variant="outline" onClick={onAction}>{actionLabel}</Button>
     </AppSectionCard>
   );
 }
 
-export function AppPageEmptyState({
-  title,
-  description,
-}: {
-  title: string;
-  description: string;
-}) {
-  return (
-    <AppSectionCard>
-      <AppBaseEmptyState title={title} description={description} />
-    </AppSectionCard>
-  );
+export function AppPageEmptyState({ title, description }: { title: string; description: string }) {
+  return <AppBaseEmptyState title={title} description={description} />;
 }
 
-export function AppSkeleton(props: ComponentProps<typeof BaseSkeleton>) {
-  return <BaseSkeleton {...props} />;
+export function AppSkeleton({ className, ...props }: ComponentProps<typeof BaseSkeleton>) {
+  return <BaseSkeleton className={cn("bg-[var(--surface-elevated)]/70", className)} {...props} />;
 }
 
-export { AppLoadingState, AppRowActions, AppTrendIndicator };
-
-export function AppFiltersBar({ children }: { children: ReactNode }) {
-  return <div className="nexo-card-informative flex flex-wrap items-center gap-2 p-3">{children}</div>;
-}
-
-export { AppPageShell, Input };
+export { AppPageShell, Input, AppRowActions };
+export const AppLoadingState = BaseLoadingState;

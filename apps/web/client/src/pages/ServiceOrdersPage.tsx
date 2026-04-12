@@ -19,6 +19,7 @@ import {
   AppSectionBlock,
   AppStatusBadge,
 } from "@/components/internal-page-system";
+import { formatDelta, getWindow, inRange, percentDelta, safeDate, trendFromDelta } from "@/lib/operational/kpi";
 
 export default function ServiceOrdersPage() {
   const [, navigate] = useLocation();
@@ -43,6 +44,10 @@ export default function ServiceOrdersPage() {
 
   const inProgress = orders.filter((item) => String(item?.status ?? "").toUpperCase() === "IN_PROGRESS").length;
   const done = orders.filter((item) => String(item?.status ?? "").toUpperCase() === "DONE").length;
+  const current7 = getWindow(7, 0);
+  const previous7 = getWindow(7, 1);
+  const openedCurrent = orders.filter(item => inRange(safeDate(item?.createdAt), current7.start, current7.end)).length;
+  const openedPrevious = orders.filter(item => inRange(safeDate(item?.createdAt), previous7.start, previous7.end)).length;
 
   return (
     <PageWrapper title="Ordens de Serviço" subtitle="Pipeline operacional sem desvio de contrato entre módulos.">
@@ -57,10 +62,16 @@ export default function ServiceOrdersPage() {
 
       <AppKpiRow
         items={[
-          { label: "Total", value: String(orders.length), trend: 0, context: "ordens registradas" },
-          { label: "Em execução", value: String(inProgress), trend: 0, context: "andamento atual" },
-          { label: "Concluídas", value: String(done), trend: 0, context: "prontas para cobrança" },
-          { label: "Clientes", value: String(customers.length), trend: 0, context: "base vinculável" },
+          {
+            title: "O.S. abertas",
+            value: String(openedCurrent),
+            delta: formatDelta(percentDelta(openedCurrent, openedPrevious)),
+            trend: trendFromDelta(percentDelta(openedCurrent, openedPrevious)),
+            hint: "últimos 7 dias",
+          },
+          { title: "Em execução", value: String(inProgress), hint: "status IN_PROGRESS" },
+          { title: "Concluídas", value: String(done), hint: "prontas para cobrança" },
+          { title: "Base de clientes", value: String(customers.length), hint: "vinculáveis à execução" },
         ]}
       />
 

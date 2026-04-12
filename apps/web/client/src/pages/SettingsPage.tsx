@@ -1,5 +1,5 @@
 // Operating-system contract: PageWrapper + NexoActionGroup
-import { AppFiltersBar, AppKpiRow, AppPageHeader, AppPageShell, AppSectionBlock, Input, AppStatusBadge } from "@/components/internal-page-system";
+import { AppFiltersBar, AppPageHeader, AppPageShell, AppSectionBlock, Input, AppStatusBadge } from "@/components/internal-page-system";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 
@@ -7,7 +7,6 @@ export default function SettingsPage() {
   return (
     <AppPageShell>
       <AppPageHeader title="Configurações" description="Administração da organização, usuários, integrações e preferências." ctaLabel="Salvar alterações" />
-      <AppKpiRow items={[{ label: "Usuários ativos", value: "28", trend: 2.5, context: "no mês" }, { label: "Integrações", value: "6", trend: 0.0, context: "conectadas" }, { label: "Notificações ativas", value: "14", trend: 3.2, context: "regras" }, { label: "Falhas de configuração", value: "1", trend: -50, context: "vs semana passada" }]} />
       <AppSectionBlock title="Administração do sistema" subtitle="Estrutura em seções claras">
         <Tabs defaultValue="organizacao">
           <TabsList>
