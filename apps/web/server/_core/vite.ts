@@ -7,17 +7,32 @@ import { createServer as createViteServer } from "vite";
 import viteConfig from "../../vite.config";
 
 const ROOT_MARKUP = '<div id="root"></div>';
-const ENTRY_MARKUP = 'src="/src/main.tsx"';
 
-function assertHtmlShell(template: string, source: string) {
+function assertHtmlShell(
+  template: string,
+  source: string,
+  mode: "vite" | "static"
+) {
+  if (!template.includes("<html") || !template.includes("</html>")) {
+    throw new Error(`[web] HTML shell inválido (${source}): tag <html> ausente.`);
+  }
+
+  if (!template.includes("<head") || !template.includes("</head>")) {
+    throw new Error(`[web] HTML shell inválido (${source}): tag <head> ausente.`);
+  }
+
+  if (!template.includes("<body") || !template.includes("</body>")) {
+    throw new Error(`[web] HTML shell inválido (${source}): tag <body> ausente.`);
+  }
+
   if (!template.includes(ROOT_MARKUP)) {
     throw new Error(`[web] HTML shell inválido (${source}): #root não encontrado.`);
   }
 
-  if (!template.includes(ENTRY_MARKUP)) {
-    throw new Error(
-      `[web] HTML shell inválido (${source}): script de entrada /src/main.tsx não encontrado.`
-    );
+  const hasModuleScript = /<script[^>]*type=\"module\"[^>]*src=\"[^\"]+\"[^>]*>/.test(template);
+
+  if (!hasModuleScript) {
+    throw new Error(`[web] HTML shell inválido (${source}): script de entrada não encontrado em modo ${mode}.`);
   }
 }
 
@@ -50,8 +65,11 @@ export async function setupVite(app: Express, server: Server) {
 
       // always reload the index.html file from disk incase it changes
       let template = await fs.promises.readFile(clientTemplate, "utf-8");
-      assertHtmlShell(template, clientTemplate);
-      console.log("[web] html_template_loaded", { template: clientTemplate });
+      assertHtmlShell(template, clientTemplate, "vite");
+      console.log("[web] html_template_loaded", {
+        template: clientTemplate,
+        htmlSizeBytes: Buffer.byteLength(template, "utf-8"),
+      });
       template = template.replace(
         `src="/src/main.tsx"`,
         `src="/src/main.tsx?v=${nanoid()}"`
@@ -85,8 +103,11 @@ export function serveStatic(app: Express) {
 
     try {
       const template = await fs.promises.readFile(shellPath, "utf-8");
-      assertHtmlShell(template, shellPath);
-      console.log("[web] html_template_loaded", { template: shellPath });
+      assertHtmlShell(template, shellPath, "static");
+      console.log("[web] html_template_loaded", {
+        template: shellPath,
+        htmlSizeBytes: Buffer.byteLength(template, "utf-8"),
+      });
       res.sendFile(shellPath);
     } catch (error) {
       next(error);
