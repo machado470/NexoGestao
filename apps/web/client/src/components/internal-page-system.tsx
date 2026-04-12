@@ -173,9 +173,19 @@ export function AppKpiRow({
   items: Array<AppMetricCardItem | { label: string; value: string; trend?: number; context?: string; onClick?: () => void }>;
   emphasis?: "strong" | "compact";
 }) {
+  const safeItems = Array.isArray(items) ? items : [];
+
   return (
     <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-      {items.map((item) => {
+      {safeItems.map((item, index) => {
+        if (!item || typeof item !== "object") {
+          if (import.meta.env.DEV) {
+            // eslint-disable-next-line no-console
+            console.error("[kpi] item inválido recebido em AppKpiRow", { item, index });
+          }
+          return null;
+        }
+
         const normalized: AppMetricCardItem = "title" in item
           ? item
           : {
@@ -187,7 +197,12 @@ export function AppKpiRow({
               trend: typeof item.trend === "number" ? (item.trend > 0 ? "up" : item.trend < 0 ? "down" : "neutral") : undefined,
             };
 
-        return <AppMetricCard key={normalized.title} {...normalized} emphasis={normalized.emphasis ?? emphasis} />;
+        const safeTitle =
+          typeof normalized.title === "string" && normalized.title.trim().length > 0
+            ? normalized.title
+            : `Métrica ${index + 1}`;
+
+        return <AppMetricCard key={`${safeTitle}-${index}`} {...normalized} title={safeTitle} emphasis={normalized.emphasis ?? emphasis} />;
       })}
     </section>
   );
@@ -327,7 +342,8 @@ const statusTone: Record<string, string> = {
 };
 
 export function AppStatusBadge({ label }: { label: string }) {
-  return <Badge className={cn("border", statusTone[label.toLowerCase()] ?? "")}>{label}</Badge>;
+  const safeLabel = typeof label === "string" && label.trim().length > 0 ? label : "Pendente";
+  return <Badge className={cn("border", statusTone[safeLabel.toLowerCase()] ?? "")}>{safeLabel}</Badge>;
 }
 
 export const AppPriorityBadge = AppStatusBadge;
