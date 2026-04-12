@@ -159,6 +159,18 @@ export function MainLayout({ children }: MainLayoutProps) {
     !loading && isAuthenticated && Boolean(user?.id);
   const shouldRenderExecutionBar = shouldRenderGlobalEngine;
 
+  if (import.meta.env.DEV) {
+    // eslint-disable-next-line no-console
+    console.log("[boot] main layout render", {
+      location,
+      loading,
+      isAuthenticated,
+      userId: user?.id ?? null,
+      shouldRenderExecutionBar,
+      shouldRenderGlobalEngine,
+    });
+  }
+
   useEffect(() => {
     if (!import.meta.env.DEV) return;
     // eslint-disable-next-line no-console

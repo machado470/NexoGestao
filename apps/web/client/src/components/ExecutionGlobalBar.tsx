@@ -74,10 +74,6 @@ export function ExecutionGlobalBar() {
   const isLoading = modeQuery.isLoading || summaryQuery.isLoading;
   const selectedMode = modePayload.mode ?? "manual";
 
-  if (!canRenderBar) {
-    return null;
-  }
-
   useEffect(() => {
     setNextMode(selectedMode);
   }, [selectedMode]);
@@ -93,6 +89,21 @@ export function ExecutionGlobalBar() {
     if (Number(summary.blockedRecent ?? 0) > 0) return "Aguardando cooldown";
     return "Engine ativa";
   }, [selectedMode, summary.blockedRecent]);
+
+  if (import.meta.env.DEV) {
+    // eslint-disable-next-line no-console
+    console.log("[boot] execution bar render", {
+      canRenderBar,
+      loading,
+      isAuthenticated,
+      userId: user?.id ?? null,
+      selectedMode,
+    });
+  }
+
+  if (!canRenderBar) {
+    return null;
+  }
 
   return (
     <div className="border-b border-[var(--border)] bg-[var(--surface-base)]/95 px-4 py-2">

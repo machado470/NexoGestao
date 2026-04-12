@@ -16,7 +16,7 @@ import { isPublicPath } from "./lib/publicRoutes";
 initSentry();
 if (import.meta.env.DEV) {
   // eslint-disable-next-line no-console
-  console.log("[boot] frontend bootstrap started");
+  console.log("[boot] main start");
 }
 
 let isRedirectingToLogin = false;
@@ -106,7 +106,9 @@ if (!rootElement) {
 
 if (import.meta.env.DEV) {
   // eslint-disable-next-line no-console
-  console.log("[boot] mounting App");
+  console.log("[boot] root found");
+  // eslint-disable-next-line no-console
+  console.log("[boot] app render start");
 }
 
 createRoot(rootElement).render(
@@ -119,5 +121,5 @@ createRoot(rootElement).render(
 
 if (import.meta.env.DEV) {
   // eslint-disable-next-line no-console
-  console.log("[boot] App mount dispatched");
+  console.log("[boot] app render ok");
 }

@@ -409,6 +409,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loading = isInitializing || isSubmitting;
 
+  if (import.meta.env.DEV) {
+    // eslint-disable-next-line no-console
+    console.log("[boot] auth provider render", {
+      pathname,
+      shouldBootstrapSession,
+      forcedLoggedOut,
+      isInitializing,
+      loading,
+      isAuthenticated: Boolean(user),
+      userId: user?.id ?? null,
+      meFetchStatus: meQuery.fetchStatus,
+    });
+  }
+
   const value: AuthContextType = {
     user,
     payload,
