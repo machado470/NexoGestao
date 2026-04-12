@@ -23,7 +23,8 @@ export function shouldBypassFatalBootstrapForAnonymous(params: {
   return (
     params.state === "failed" &&
     params.isPublicRoute &&
-    params.authState === "unauthenticated"
+    params.authState !== "booting" &&
+    params.authState !== "authenticated"
   );
 }
 

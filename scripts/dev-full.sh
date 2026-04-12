@@ -140,6 +140,7 @@ fi
 
 if [ "$CLEAN_MODE" = "1" ]; then
   echo "🧹 Modo clean ativado (flag --clean ou DEV_FULL_CLEAN=1)."
+  docker rm -f nexogestao_postgres nexogestao_redis >/dev/null 2>&1 || true
 fi
 
 echo "ℹ️ Portas locais: API=${API_PORT} | WEB=${WEB_PORT}"
@@ -153,6 +154,17 @@ ensure_port_tooling() {
     return
   fi
   echo "⚠️ Nem lsof nem ss estão disponíveis; diagnóstico de processo externo pode ser limitado."
+}
+
+log_infra_ready() {
+  local service="${1:-}"
+  echo "[infra] ${service}_ready"
+}
+
+log_port_conflict_resolved() {
+  local port="${1:-}"
+  local detail="${2:-}"
+  echo "[infra] port_conflict_resolved port=${port}${detail:+ ${detail}}"
 }
 
 container_on_port() {
@@ -183,6 +195,13 @@ process_on_port() {
   return 0
 }
 
+lsof_dump_port() {
+  local port="${1:-}"
+  if command -v lsof >/dev/null 2>&1; then
+    lsof -i :"$port" || true
+  fi
+}
+
 port_in_use() {
   local port="${1:-}"
   if command -v lsof >/dev/null 2>&1; then
@@ -207,6 +226,42 @@ is_nexo_container_name() {
       return 1
       ;;
   esac
+}
+
+kill_external_listener_if_needed() {
+  local port="${1:-}"
+  local purpose="${2:-infra}"
+
+  lsof_dump_port "$port"
+
+  if ! port_in_use "$port"; then
+    return 0
+  fi
+
+  local owner
+  owner="$(container_on_port "$port" || true)"
+  if [ -n "$owner" ] && is_nexo_container_name "$owner"; then
+    echo "ℹ️ ${purpose}: porta ${port} já vinculada ao container Nexo (${owner}) — reutilizando."
+    return 0
+  fi
+
+  if ! command -v lsof >/dev/null 2>&1; then
+    fail_if_external_port_block "$port" "$purpose"
+    return 0
+  fi
+
+  local pids
+  pids="$(lsof -t -i:"$port" 2>/dev/null | tr '\n' ' ' | xargs)"
+  if [ -z "$pids" ]; then
+    fail_if_external_port_block "$port" "$purpose"
+    return 0
+  fi
+
+  echo "⚠️ ${purpose}: encerrando processo(s) externo(s) na porta ${port}: ${pids}"
+  # shellcheck disable=SC2086
+  kill -9 $pids || true
+  sleep 1
+  log_port_conflict_resolved "$port" "killed_pids=${pids}"
 }
 
 find_existing_nexo_container() {
@@ -341,6 +396,8 @@ ensure_service_running() {
 }
 
 ensure_port_tooling
+kill_external_listener_if_needed "6379" "redis"
+kill_external_listener_if_needed "5432" "postgres"
 
 services_to_up=()
 for infra_service in postgres redis; do
@@ -361,6 +418,8 @@ fi
 
 wait_for_postgres
 wait_for_redis
+log_infra_ready "postgres"
+log_infra_ready "redis"
 
 fail_if_external_port_block "3000" "API"
 fail_if_external_port_block "3010" "Web"
