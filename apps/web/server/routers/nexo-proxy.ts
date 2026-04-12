@@ -4,7 +4,7 @@ import { z } from "zod";
 import cookie from "cookie";
 import { getSessionCookieOptions } from "../_core/cookies";
 
-const NEXO_API_URL = process.env.NEXO_API_URL || "http://127.0.0.1:3000";
+const NEXO_API_URL = process.env.NEXO_API_URL || "http://localhost:3000";
 const NEXO_TOKEN_COOKIE = "nexo_token";
 const NEXO_FETCH_TIMEOUT_MS = Number(process.env.NEXO_FETCH_TIMEOUT_MS || 12000);
 
@@ -336,7 +336,7 @@ export const nexoProxyRouter = router({
       .input(
         z.object({
           email: z.string().email(),
-          password: z.string().min(8),
+          password: z.string().min(6),
         })
       )
       .mutation(async ({ input, ctx }) => {
@@ -351,6 +351,7 @@ export const nexoProxyRouter = router({
           throw new Error("Login não retornou token.");
         }
 
+        console.log("[auth.login] token:", token);
         setTokenCookie(ctx as CtxLike, token);
 
         return result;

@@ -13,7 +13,11 @@ const NEXO_TOKEN_COOKIE = "nexo_token";
 
 const GOOGLE_CLIENT_ID = (process.env.GOOGLE_CLIENT_ID ?? "").trim();
 const GOOGLE_CLIENT_SECRET = (process.env.GOOGLE_CLIENT_SECRET ?? "").trim();
-const GOOGLE_REDIRECT_URI = (process.env.GOOGLE_REDIRECT_URI ?? "").trim();
+const GOOGLE_REDIRECT_URI = (
+  process.env.GOOGLE_REDIRECT_URI ??
+  process.env.GOOGLE_REDIRECT_URL ??
+  "http://localhost:3010/api/auth/google/callback"
+).trim();
 const GOOGLE_OAUTH_STATE_SECRET = (
   process.env.GOOGLE_OAUTH_STATE_SECRET ||
   process.env.JWT_SECRET ||
@@ -268,6 +272,7 @@ async function establishSessionInApi(googleUser: {
     throw new Error("google_session_token_missing");
   }
 
+  console.log("[auth.google] token:", token);
   return { token, payload };
 }
 
