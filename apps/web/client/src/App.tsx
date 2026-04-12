@@ -2,6 +2,7 @@ import {
   lazy,
   Suspense,
   useEffect,
+  useMemo,
   type ComponentType,
   type LazyExoticComponent,
   type ReactNode,
@@ -18,6 +19,10 @@ import { AppLayout } from "./components/AppLayout";
 import { PublicLayout } from "./components/PublicLayout";
 import { AuthLayout } from "./components/AuthLayout";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import {
+  BootProbeProvider,
+  type BootProbeStage,
+} from "./contexts/BootProbeContext";
 import { canAny, type Permission } from "./lib/rbac";
 
 import CustomersPage from "./pages/CustomersPage";
@@ -632,9 +637,25 @@ function Router() {
 }
 
 function App() {
+  const bootProbeStage = useMemo<BootProbeStage>(() => {
+    if (typeof window === "undefined") return "full";
+    const value = new URLSearchParams(window.location.search)
+      .get("bootProbe")
+      ?.trim()
+      .toLowerCase();
+
+    if (value === "static") return "static";
+    if (value === "router") return "router";
+    if (value === "auth") return "auth";
+    if (value === "layout") return "layout";
+    if (value === "execution-bar") return "execution-bar";
+    if (value === "global-engine") return "global-engine";
+    return "full";
+  }, []);
+
   if (import.meta.env.DEV) {
     // eslint-disable-next-line no-console
-    console.log("[boot] App render start");
+    console.log("[boot] App render start", { bootProbeStage });
   }
 
   useEffect(() => {
@@ -643,16 +664,85 @@ function App() {
     console.log("[boot] app render ok");
   }, []);
 
+  if (bootProbeStage === "static") {
+    return <div>NEXO OK</div>;
+  }
+
+  if (bootProbeStage === "router") {
+    return (
+      <ErrorBoundary>
+        <TooltipProvider>
+          <Toaster />
+          <Switch>
+            <Route path="/">
+              <div>NEXO ROUTER OK</div>
+            </Route>
+          </Switch>
+        </TooltipProvider>
+      </ErrorBoundary>
+    );
+  }
+
+  if (bootProbeStage === "auth") {
+    return (
+      <ErrorBoundary>
+        <AuthProvider>
+          <TooltipProvider>
+            <Toaster />
+            <AuthProbeScreen />
+          </TooltipProvider>
+        </AuthProvider>
+      </ErrorBoundary>
+    );
+  }
+
+  if (
+    bootProbeStage === "layout" ||
+    bootProbeStage === "execution-bar" ||
+    bootProbeStage === "global-engine"
+  ) {
+    return (
+      <ErrorBoundary>
+        <AuthProvider>
+          <BootProbeProvider stage={bootProbeStage}>
+            <TooltipProvider>
+              <Toaster />
+              <AppLayout>
+                <div className="p-4 text-sm text-[var(--text-secondary)]">
+                  NEXO LAYOUT OK
+                </div>
+              </AppLayout>
+              <ConsentBanner />
+            </TooltipProvider>
+          </BootProbeProvider>
+        </AuthProvider>
+      </ErrorBoundary>
+    );
+  }
+
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Router />
-          <ConsentBanner />
-        </TooltipProvider>
+        <BootProbeProvider stage={bootProbeStage}>
+          <TooltipProvider>
+            <Toaster />
+            <Router />
+            <ConsentBanner />
+          </TooltipProvider>
+        </BootProbeProvider>
       </AuthProvider>
     </ErrorBoundary>
+  );
+}
+
+function AuthProbeScreen() {
+  const { isInitializing, isAuthenticated, user } = useAuth();
+
+  return (
+    <div className="p-4 text-sm text-[var(--text-secondary)]">
+      AUTH OK · init={String(isInitializing)} · auth={String(isAuthenticated)} ·
+      user={user?.id ?? "none"}
+    </div>
   );
 }
 

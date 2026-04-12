@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 
 import { useAuth } from "@/contexts/AuthContext";
+import { useBootProbe } from "@/contexts/BootProbeContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { canAny, type Permission } from "@/lib/rbac";
 import { useIsMobile } from "@/hooks/useMobile";
@@ -147,6 +148,7 @@ interface MainLayoutProps {
 export function MainLayout({ children }: MainLayoutProps) {
   const [location, navigate] = useLocation();
   const { role, user, logout, isLoggingOut, loading, isAuthenticated } = useAuth();
+  const { stage } = useBootProbe();
   const { theme, toggleTheme } = useTheme();
   const notifications = useNotificationStore(state => state.notifications);
   const clearNotifications = useNotificationStore(state => state.clear);
@@ -156,8 +158,17 @@ export function MainLayout({ children }: MainLayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const shouldRenderGlobalEngine =
-    !loading && isAuthenticated && Boolean(user?.id);
-  const shouldRenderExecutionBar = shouldRenderGlobalEngine;
+    !loading &&
+    isAuthenticated &&
+    Boolean(user?.id) &&
+    (stage === "full" || stage === "global-engine");
+  const shouldRenderExecutionBar =
+    !loading &&
+    isAuthenticated &&
+    Boolean(user?.id) &&
+    (stage === "full" ||
+      stage === "execution-bar" ||
+      stage === "global-engine");
 
   if (import.meta.env.DEV) {
     // eslint-disable-next-line no-console

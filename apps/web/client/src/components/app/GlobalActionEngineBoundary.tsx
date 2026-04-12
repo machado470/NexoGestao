@@ -7,16 +7,19 @@ type Props = {
 
 type State = {
   hasError: boolean;
+  error: Error | null;
 };
 
 export class GlobalActionEngineBoundary extends Component<Props, State> {
   state: State = {
     hasError: false,
+    error: null,
   };
 
-  static getDerivedStateFromError(): State {
+  static getDerivedStateFromError(error: Error): State {
     return {
       hasError: true,
+      error,
     };
   }
 
@@ -33,7 +36,23 @@ export class GlobalActionEngineBoundary extends Component<Props, State> {
 
   render() {
     if (this.state.hasError) {
-      return null;
+      return (
+        <div className="mx-4 mt-3 rounded-md border border-red-500/40 bg-red-500/10 p-3 text-xs text-red-700 dark:text-red-300">
+          <p className="font-semibold">
+            Falha ao renderizar {this.props.name ?? "componente"}.
+          </p>
+          <pre className="mt-1 whitespace-pre-wrap break-words text-[11px]">
+            {this.state.error?.stack ?? this.state.error?.message ?? "Erro desconhecido"}
+          </pre>
+          <button
+            type="button"
+            className="mt-2 rounded border border-red-500/40 px-2 py-1 text-[11px]"
+            onClick={() => window.location.reload()}
+          >
+            Recarregar
+          </button>
+        </div>
+      );
     }
     return this.props.children;
   }
