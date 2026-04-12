@@ -1,5 +1,18 @@
 export type MetricTrend = "up" | "down" | "neutral";
 
+function toFiniteNumber(value: unknown): number | null {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  if (typeof value === "string") {
+    const normalized = Number(value.replace(",", "."));
+    return Number.isFinite(normalized) ? normalized : null;
+  }
+
+  return null;
+}
+
 export function safeDate(value: unknown): Date | null {
   if (!value) return null;
   const parsed = new Date(String(value));
@@ -7,18 +20,23 @@ export function safeDate(value: unknown): Date | null {
 }
 
 export function getWindow(days: number, offset = 0, now = new Date()) {
-  const end = new Date(now);
+  const safeDays = Math.max(1, Math.floor(toFiniteNumber(days) ?? 1));
+  const safeOffset = Math.max(0, Math.floor(toFiniteNumber(offset) ?? 0));
+  const safeNow = safeDate(now) ?? new Date();
+  const end = new Date(safeNow);
   end.setHours(0, 0, 0, 0);
-  end.setDate(end.getDate() - offset * days);
+  end.setDate(end.getDate() - safeOffset * safeDays);
   const start = new Date(end);
-  start.setDate(start.getDate() - days);
+  start.setDate(start.getDate() - safeDays);
   return { start, end };
 }
 
 export function getDayWindow(offsetDays = 0, now = new Date()) {
-  const start = new Date(now);
+  const safeOffset = Math.max(0, Math.floor(toFiniteNumber(offsetDays) ?? 0));
+  const safeNow = safeDate(now) ?? new Date();
+  const start = new Date(safeNow);
   start.setHours(0, 0, 0, 0);
-  start.setDate(start.getDate() - offsetDays);
+  start.setDate(start.getDate() - safeOffset);
   const end = new Date(start);
   end.setDate(end.getDate() + 1);
   return { start, end };
@@ -29,9 +47,11 @@ export function inRange(date: Date | null, start: Date, end: Date) {
 }
 
 export function percentDelta(current: number, previous: number): number | null {
-  if (!Number.isFinite(current) || !Number.isFinite(previous)) return null;
-  if (previous <= 0) return null;
-  return ((current - previous) / previous) * 100;
+  const safeCurrent = toFiniteNumber(current);
+  const safePrevious = toFiniteNumber(previous);
+  if (safeCurrent === null || safePrevious === null) return null;
+  if (safePrevious <= 0) return null;
+  return ((safeCurrent - safePrevious) / safePrevious) * 100;
 }
 
 export function trendFromDelta(delta: number | null): MetricTrend | undefined {
