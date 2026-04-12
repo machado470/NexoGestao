@@ -138,6 +138,18 @@ function clearAppStorage() {
   }
 }
 
+function createSafeBroadcastChannel(name: string) {
+  try {
+    if (typeof window === "undefined") return null;
+    if (!("BroadcastChannel" in window)) return null;
+    return new BroadcastChannel(name);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn("[auth] BroadcastChannel unavailable", err);
+    return null;
+  }
+}
+
 /* ========================= */
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -148,7 +160,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [localError, setLocalError] = useState<unknown | null>(null);
   const [forcedLoggedOut, setForcedLoggedOut] = useState(false);
   const [meBootstrapTimedOut, setMeBootstrapTimedOut] = useState(false);
-  const authChannelRef = useRef<BroadcastChannel | null>(null);
+  const channelRef = useRef<BroadcastChannel | null>(null);
   const [pathname, setPathname] = useState(() => {
     if (typeof window === "undefined") return "/";
     return window.location.pathname;
@@ -159,6 +171,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
   const isMarketingPath = MARKETING_PATHS.has(pathname);
   const shouldBootstrapSession = isAuthPath || !isMarketingPath;
+  const syncEventRef = useRef<(payload: unknown) => Promise<void>>(async () => {});
+
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      // eslint-disable-next-line no-console
+      console.log("[boot] auth init");
+    }
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -243,57 +263,100 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (typeof window === "undefined") return;
 
     const onStorage = (evt: StorageEvent) => {
-      if (evt.key !== "nexo:auth:logout-at" || !evt.newValue) return;
-      setForcedLoggedOut(true);
-      queryClient.clear();
-      redirectToLogin();
+      try {
+        if (evt.key !== "nexo:auth:logout-at" || !evt.newValue) return;
+        setForcedLoggedOut(true);
+        queryClient.clear();
+        redirectToLogin();
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error("[auth] storage logout sync failed", err);
+      }
     };
 
     window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+    };
+  }, [queryClient]);
 
-    if (typeof window.BroadcastChannel !== "function") {
-      if (import.meta.env.DEV) {
+  useEffect(() => {
+    channelRef.current = createSafeBroadcastChannel("nexo-auth");
+
+    if (!channelRef.current) return;
+
+    const handler = (event: MessageEvent) => {
+      void syncEventRef.current(event?.data);
+    };
+
+    channelRef.current.addEventListener("message", handler);
+
+    return () => {
+      try {
+        channelRef.current?.removeEventListener("message", handler);
+        channelRef.current?.close();
+      } catch {}
+      channelRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (channelRef.current) return;
+
+    const handler = (event: StorageEvent) => {
+      if (event.key !== "nexo-auth-sync" || !event.newValue) return;
+      try {
+        const parsed = JSON.parse(event.newValue);
+        void syncEventRef.current(parsed);
+      } catch (err) {
         // eslint-disable-next-line no-console
-        console.warn("[auth] BroadcastChannel indisponível; sincronização entre abas desativada.");
+        console.error("[auth] storage sync parse failed", err);
       }
-      authChannelRef.current = null;
-      return () => {
-        window.removeEventListener("storage", onStorage);
-      };
-    }
+    };
 
-    let channel: BroadcastChannel | null = null;
+    window.addEventListener("storage", handler);
+    return () => {
+      window.removeEventListener("storage", handler);
+    };
+  }, []);
 
+  const emitAuthSync = useCallback((type: "login" | "logout") => {
+    if (typeof window === "undefined") return;
     try {
-      channel = new window.BroadcastChannel("nexo-auth");
-      authChannelRef.current = channel;
+      const payload = { type, at: Date.now() };
+      if (channelRef.current) {
+        channelRef.current.postMessage(payload);
+        return;
+      }
+      window.localStorage.setItem("nexo-auth-sync", JSON.stringify(payload));
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error("[auth] sync emit failed", err);
+    }
+  }, []);
 
-      channel.onmessage = async event => {
-        const type = String(event?.data?.type ?? "");
+  useEffect(() => {
+    syncEventRef.current = async payload => {
+      try {
+        const type = String((payload as { type?: unknown })?.type ?? "");
         if (type === "logout") {
           setForcedLoggedOut(true);
           await utils.session.me.cancel();
           utils.session.me.setData(undefined, null);
           queryClient.clear();
           redirectToLogin();
+          return;
         }
 
         if (type === "login") {
           setForcedLoggedOut(false);
           await utils.session.me.invalidate();
         }
-      };
-    } catch (error) {
-      authChannelRef.current = null;
-      if (import.meta.env.DEV) {
+      } catch (err) {
         // eslint-disable-next-line no-console
-        console.error("[auth] Falha ao inicializar BroadcastChannel", error);
+        console.error("[auth] sync event failed", err);
       }
-    }
-
-    return () => {
-      window.removeEventListener("storage", onStorage);
-      channel?.close();
     };
   }, [queryClient, utils.session.me]);
 
@@ -317,7 +380,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setForcedLoggedOut(false);
         queryClient.removeQueries();
         await meQuery.refetch();
-        authChannelRef.current?.postMessage({ type: "login", at: Date.now() });
+        emitAuthSync("login");
       } catch (err) {
         setLocalError(err);
         throw err;
@@ -325,7 +388,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLocalLoading(false);
       }
     },
-    [loginMutation, meQuery, queryClient]
+    [emitAuthSync, loginMutation, meQuery, queryClient]
   );
 
   const register = useCallback(
@@ -357,10 +420,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setForcedLoggedOut(false);
           queryClient.removeQueries();
           await meQuery.refetch();
-          authChannelRef.current?.postMessage({
-            type: "login",
-            at: Date.now(),
-          });
+          emitAuthSync("login");
         }
 
         return result;
@@ -371,7 +431,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLocalLoading(false);
       }
     },
-    [registerMutation, meQuery, queryClient]
+    [emitAuthSync, registerMutation, meQuery, queryClient]
   );
 
   const logout = useCallback(async () => {
@@ -384,7 +444,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         clearAppStorage();
         window.localStorage.setItem("nexo:auth:logout-at", String(Date.now()));
       }
-      authChannelRef.current?.postMessage({ type: "logout", at: Date.now() });
+      emitAuthSync("logout");
       await utils.session.me.cancel();
       utils.session.me.setData(undefined, null);
       await logoutMutation.mutateAsync();
@@ -398,7 +458,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLocalLoading(false);
     }
-  }, [logoutMutation, queryClient, utils]);
+  }, [emitAuthSync, logoutMutation, queryClient, utils]);
 
   const payload =
     forcedLoggedOut || !shouldBootstrapSession ? null : (meQuery.data ?? null);
@@ -430,6 +490,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     !isLoggingOut;
 
   const loading = isInitializing || isSubmitting;
+  const userSafe = user ?? null;
+  const isReady = !loading;
 
   if (import.meta.env.DEV) {
     // eslint-disable-next-line no-console
@@ -438,15 +500,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       shouldBootstrapSession,
       forcedLoggedOut,
       isInitializing,
+      isReady,
       loading,
-      isAuthenticated: Boolean(user),
-      userId: user?.id ?? null,
+      isAuthenticated: Boolean(userSafe),
+      userId: userSafe?.id ?? null,
       meFetchStatus: meQuery.fetchStatus,
     });
   }
 
+  useEffect(() => {
+    if (!isReady) return;
+    if (import.meta.env.DEV) {
+      // eslint-disable-next-line no-console
+      console.log("[boot] auth ready");
+    }
+  }, [isReady]);
+
+  useEffect(() => {
+    const bootstrapError =
+      localError ||
+      (shouldBootstrapSession ? meQuery.error : null) ||
+      loginMutation.error ||
+      registerMutation.error ||
+      logoutMutation.error ||
+      null;
+
+    if (!bootstrapError) return;
+    // eslint-disable-next-line no-console
+    console.error("[boot] auth error", bootstrapError);
+    // eslint-disable-next-line no-console
+    console.error("[auth] bootstrap failed", bootstrapError);
+  }, [
+    localError,
+    loginMutation.error,
+    logoutMutation.error,
+    meQuery.error,
+    registerMutation.error,
+    shouldBootstrapSession,
+  ]);
+
   const value: AuthContextType = {
-    user,
+    user: userSafe,
     payload,
     redirectTo,
     role,
@@ -465,7 +559,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     login,
     register,
     logout,
-    isAuthenticated: Boolean(user),
+    isAuthenticated: Boolean(userSafe),
     refresh,
   };
 
