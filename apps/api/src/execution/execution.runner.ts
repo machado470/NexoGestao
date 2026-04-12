@@ -130,6 +130,11 @@ export class ExecutionRunner {
     return ['1', 'true', 'yes', 'y', 'on'].includes(raw)
   }
 
+  private requiresInteractiveAuthForAutomation(): boolean {
+    const raw = (process.env.EXECUTION_REQUIRE_INTERACTIVE_AUTH ?? '').trim().toLowerCase()
+    return ['1', 'true', 'yes', 'y', 'on'].includes(raw)
+  }
+
   private incrementBlockedReason(reasonCode: string) {
     const current = this.blockedReasonCounters.get(reasonCode) ?? 0
     this.blockedReasonCounters.set(reasonCode, current + 1)
@@ -779,7 +784,7 @@ export class ExecutionRunner {
     }
 
     const hasValidAuth = await this.hasValidAutomationSession(candidate.orgId)
-    if (!hasValidAuth) {
+    if (this.requiresInteractiveAuthForAutomation() && !hasValidAuth) {
       await recordBlockedWithContext(
         executionKey,
         mode,

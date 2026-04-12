@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import CreateCustomerModal from "@/components/CreateCustomerModal";
 import { normalizeArrayPayload } from "@/lib/query-helpers";
+import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
 import { Button } from "@/components/design-system";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
@@ -28,6 +29,13 @@ export default function CustomersPage() {
   const hasData = customers.length > 0;
   const showInitialLoading = customersQuery.isLoading && !hasData;
   const showErrorState = customersQuery.error && !hasData;
+  usePageDiagnostics({
+    page: "customers",
+    isLoading: showInitialLoading,
+    hasError: Boolean(showErrorState),
+    isEmpty: !showInitialLoading && !showErrorState && customers.length === 0,
+    dataCount: customers.length,
+  });
 
   const activeCustomers = customers.filter((item) => item?.active !== false).length;
   const customersWithOverdue = new Set(

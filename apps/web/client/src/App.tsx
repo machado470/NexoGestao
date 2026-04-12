@@ -34,7 +34,7 @@ import ServiceOrdersPage from "./pages/ServiceOrdersPage";
 import PeoplePage from "./pages/PeoplePage";
 import GovernancePage from "./pages/GovernancePage";
 import FinancesPage from "./pages/FinancesPage";
-import ExecutiveDashboard from "./pages/ExecutiveDashboard";
+import ExecutiveDashboardNew from "./pages/ExecutiveDashboardNew";
 import WhatsAppPage from "./pages/WhatsAppPage";
 import CalendarPage from "./pages/CalendarPage";
 import SettingsPage from "./pages/SettingsPage";
@@ -429,7 +429,7 @@ const GovernanceRoute = protectedPage(GovernancePage, {
   requireCompletedOnboarding: true,
 });
 
-const ExecutiveDashboardRoute = protectedPage(ExecutiveDashboard, {
+const ExecutiveDashboardRoute = protectedPage(ExecutiveDashboardNew, {
   requireCompletedOnboarding: true,
 });
 
@@ -544,6 +544,15 @@ function Router() {
       <Route path="/customers" component={CustomersRoute} />
       <Route path="/appointments" component={AppointmentsRoute} />
       <Route path="/service-orders" component={ServiceOrdersRoute} />
+      <Route
+        path="/finance"
+        component={() => (
+          <LegacyAliasRoute
+            targetPath="/finances"
+            message="Finance foi consolidado em Financeiro. Redirecionando..."
+          />
+        )}
+      />
       <Route path="/finances" component={FinancesRoute} />
       <Route path="/people" component={PeopleRoute} />
       <Route path="/governance" component={GovernanceRoute} />

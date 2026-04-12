@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { normalizeArrayPayload } from "@/lib/query-helpers";
+import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
 import CreateServiceOrderModal from "@/components/CreateServiceOrderModal";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
@@ -32,6 +33,13 @@ export default function ServiceOrdersPage() {
   const hasData = orders.length > 0;
   const showInitialLoading = serviceOrdersQuery.isLoading && !hasData;
   const showErrorState = serviceOrdersQuery.error && !hasData;
+  usePageDiagnostics({
+    page: "service-orders",
+    isLoading: showInitialLoading,
+    hasError: Boolean(showErrorState),
+    isEmpty: !showInitialLoading && !showErrorState && orders.length === 0,
+    dataCount: orders.length,
+  });
 
   const inProgress = orders.filter((item) => String(item?.status ?? "").toUpperCase() === "IN_PROGRESS").length;
   const done = orders.filter((item) => String(item?.status ?? "").toUpperCase() === "DONE").length;
