@@ -87,19 +87,28 @@ O NexoGestão está em desenvolvimento ativo, com as funcionalidades principais 
 cp .env.example .env
 ```
 
-2. Inicie stack completa (infra + migrations + seed + API + Web):
+2. Primeira subida limpa (recomendada quando já houve `docker run` manual):
+
+```bash
+pnpm dev:full --clean
+```
+
+> Alternativa equivalente: `DEV_FULL_CLEAN=1 pnpm dev:full`
+
+3. Execução normal (idempotente e com reaproveitamento automático):
 
 ```bash
 pnpm dev:full
 ```
 
-Esse comando:
-- sobe `postgres:15` e `redis:7` via Docker Compose;
-- aguarda infra ficar pronta;
-- executa migrations e seed;
-- inicia API e Web localmente.
+Fluxo atual do `dev:full`:
+- verifica portas críticas (`5432`, `6379`, `3000`, `3010`);
+- detecta e reaproveita containers Nexo legados/compose (`nexogestao-postgres`, `nexogestao-redis`, `nexogestao_postgres`, `nexogestao_redis`);
+- recria apenas o que estiver faltando (ou tudo no modo `--clean`);
+- falha com mensagem objetiva quando a porta está ocupada por processo/container externo;
+- valida saúde de Postgres/Redis antes de seguir para migrations, seed, API e Web.
 
-3. Em outro terminal, execute os testes de integração com infra real:
+4. Em outro terminal, execute os testes de integração com infra real:
 
 ```bash
 pnpm --filter ./apps/api exec jest test/integration --runInBand
