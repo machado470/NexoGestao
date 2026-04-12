@@ -19,6 +19,34 @@ console.log("[boot] main_entry_loaded");
 
 let isRedirectingToLogin = false;
 
+if (typeof window !== "undefined") {
+  window.addEventListener("error", (event) => {
+    // eslint-disable-next-line no-console
+    console.error("[boot] window_error", {
+      message: event.message,
+      filename: event.filename,
+      lineno: event.lineno,
+      colno: event.colno,
+      stack: event.error instanceof Error ? event.error.stack : undefined,
+    });
+  });
+
+  window.addEventListener("unhandledrejection", (event) => {
+    const reason = event.reason;
+    // eslint-disable-next-line no-console
+    console.error("[boot] unhandled_rejection", {
+      message:
+        reason instanceof Error
+          ? reason.message
+          : typeof reason === "string"
+            ? reason
+            : "Promise rejeitada sem mensagem",
+      stack: reason instanceof Error ? reason.stack : undefined,
+      reason,
+    });
+  });
+}
+
 
 const shouldRedirectToLogin = (error: unknown): boolean => {
   if (!(error instanceof TRPCClientError)) return false;
