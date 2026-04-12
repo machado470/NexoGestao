@@ -24,7 +24,7 @@ class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: { componentStack: string }) {
     // eslint-disable-next-line no-console
-    console.error("[boot] route_render_failed", {
+    console.error("[RUNTIME ERROR] route_render_failed", {
       route: this.props.routeContext ?? "unknown",
       message: error.message,
       stack: error.stack,

@@ -24,7 +24,7 @@ export function AppBootstrapGuard({
     if (!import.meta.env.DEV) return;
     if (authState === "initializing") {
       // eslint-disable-next-line no-console
-      console.log("[boot] auth loading");
+      console.log("[AUTH] loading");
     }
   }, [authState]);
 

@@ -139,7 +139,7 @@ function redirectToLogin() {
     window.location.replace(`/login?logoutAt=${Date.now()}`);
   } catch (error) {
     // eslint-disable-next-line no-console
-    console.error("[auth] redirect failed", error);
+    console.error("[AUTH] redirect failed", error);
   }
 }
 
@@ -164,7 +164,7 @@ function clearAppStorage() {
     }
   } catch (error) {
     // eslint-disable-next-line no-console
-    console.error("[auth] clear storage failed", error);
+    console.error("[AUTH] clear storage failed", error);
   }
 }
 
@@ -175,7 +175,7 @@ function createSafeBroadcastChannel(name: string) {
     return new BroadcastChannel(name);
   } catch (err) {
     // eslint-disable-next-line no-console
-    console.warn("[auth] BroadcastChannel unavailable", err);
+    console.warn("[AUTH] BroadcastChannel unavailable", err);
     return null;
   }
 }
@@ -249,7 +249,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         redirectToLogin();
       } catch (err) {
         // eslint-disable-next-line no-console
-        console.error("[auth] storage logout sync failed", err);
+        console.error("[AUTH] storage logout sync failed", err);
       }
     };
 
@@ -276,7 +276,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         channelRef.current?.close();
       } catch (error) {
         // eslint-disable-next-line no-console
-        console.error("[auth] failed to close BroadcastChannel", error);
+        console.error("[AUTH] failed to close BroadcastChannel", error);
       }
       channelRef.current = null;
     };
@@ -293,7 +293,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         void syncEventRef.current(parsed);
       } catch (err) {
         // eslint-disable-next-line no-console
-        console.error("[auth] storage sync parse failed", err);
+        console.error("[AUTH] storage sync parse failed", err);
       }
     };
 
@@ -314,7 +314,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       window.localStorage.setItem("nexo-auth-sync", JSON.stringify(payload));
     } catch (err) {
       // eslint-disable-next-line no-console
-      console.error("[auth] sync emit failed", err);
+      console.error("[AUTH] sync emit failed", err);
     }
   }, []);
 
@@ -337,15 +337,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (err) {
         // eslint-disable-next-line no-console
-        console.error("[auth] sync event failed", err);
+        console.error("[AUTH] sync event failed", err);
       }
     };
   }, [queryClient, utils.session.me]);
 
   const refresh = useCallback(async () => {
     setLocalError(null);
-    await utils.session.me.invalidate();
-    await meQuery.refetch();
+    try {
+      await utils.session.me.invalidate();
+      await meQuery.refetch();
+    } catch (error) {
+      setLocalError(error);
+      // eslint-disable-next-line no-console
+      console.error("[AUTH] refresh failed", error);
+      throw error;
+    }
   }, [meQuery, utils]);
 
   const login = useCallback(
@@ -436,6 +443,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       redirectToLogin();
     } catch (err) {
       setLocalError(err);
+      // eslint-disable-next-line no-console
+      console.error("[AUTH] logout failed; forcing login redirect", err);
       redirectToLogin();
     } finally {
       setLocalLoading(false);
@@ -486,28 +495,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!shouldBootstrapSession || forcedLoggedOut || !import.meta.env.DEV) return;
     // eslint-disable-next-line no-console
-    console.info("[boot] auth init", { pathname });
+    console.info("[AUTH] init", { pathname });
   }, [forcedLoggedOut, pathname, shouldBootstrapSession]);
 
   if (import.meta.env.DEV && isInitializing) {
     // eslint-disable-next-line no-console
-    console.log("[boot] auth loading", { pathname, meFetchStatus: meQuery.fetchStatus });
+    console.log("[AUTH] loading", { pathname, meFetchStatus: meQuery.fetchStatus });
   }
 
   useEffect(() => {
     if (!import.meta.env.DEV || !isReady) return;
     if (authState === "authenticated") {
       // eslint-disable-next-line no-console
-      console.info("[boot] auth resolved authenticated", { userId: userSafe?.id ?? null });
+      console.info("[AUTH] resolved", { state: "authenticated", userId: userSafe?.id ?? null });
       return;
     }
     if (authState === "unauthenticated") {
       // eslint-disable-next-line no-console
-      console.info("[boot] auth resolved guest", { pathname });
+      console.info("[AUTH] resolved", { state: "unauthenticated", pathname });
       return;
     }
     // eslint-disable-next-line no-console
-    console.error("[boot] bootstrap error", meBootstrapError);
+    console.error("[BOOT ERROR] auth bootstrap", meBootstrapError);
   }, [authState, isReady, meBootstrapError, pathname, userSafe?.id]);
 
   const value: AuthContextType = {
