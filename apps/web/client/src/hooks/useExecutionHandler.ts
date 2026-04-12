@@ -65,6 +65,14 @@ export function useExecutionHandler() {
   const payChargeMutation = trpc.finance.charges.pay.useMutation();
   const { appendExecutionLog, logs, wasRecentlyExecuted, syncExecutionLogAsync, syncExecutionEventAsync } =
     useExecutionMemory();
+  const debugExecutionEnabled =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("debug") === "execution";
+
+  const debugExecution = useCallback((payload: Record<string, unknown>) => {
+    if (!debugExecutionEnabled) return;
+    console.debug("[execution-debug]", payload);
+  }, [debugExecutionEnabled]);
 
   const invalidateOperationalData = useCallback(async () => {
     await Promise.all([
@@ -121,6 +129,12 @@ export function useExecutionHandler() {
         timestamp: new Date(now).toISOString(),
       };
       void syncExecutionEventAsync(requestedEvent);
+      debugExecution({
+        stage: "requested",
+        actionId: action.id,
+        decisionId: params.decision.id,
+        executionKey,
+      });
 
       const policy = evaluateExecutionPolicy({
         action,
@@ -129,6 +143,16 @@ export function useExecutionHandler() {
         confirmed: params.confirmed,
         risk: { operationalState: params.riskOperationalState },
         recentLogs: logs,
+      });
+      debugExecution({
+        stage: "policy_evaluated",
+        actionId: action.id,
+        decisionId: params.decision.id,
+        executionKey,
+        policyAllowed: policy.allowed,
+        policyStatus: policy.status,
+        reasonCode: policy.reasonCode,
+        message: policy.message,
       });
 
       if (!policy.allowed) {
@@ -209,6 +233,13 @@ export function useExecutionHandler() {
           hasRecentExecutionByKey({ executionKey, logs }) ||
           (await hasRecentExecutionOnBackend(executionKey)))
       ) {
+        debugExecution({
+          stage: "deduplicated_recent_execution",
+          actionId: action.id,
+          decisionId: params.decision.id,
+          executionKey,
+          reasonCode: "blocked_recent_execution",
+        });
         return {
           ok: true,
           status: "executed",
@@ -249,6 +280,16 @@ export function useExecutionHandler() {
           },
         }
       );
+      debugExecution({
+        stage: "executed",
+        actionId: action.id,
+        decisionId: params.decision.id,
+        executionKey,
+        ok: result.ok,
+        status: result.status,
+        reasonCode: result.reasonCode,
+        message: result.message,
+      });
 
       if (result.ok && result.message) {
         toast.success(result.message);
@@ -292,6 +333,7 @@ export function useExecutionHandler() {
       syncExecutionLogAsync,
       syncExecutionEventAsync,
       wasRecentlyExecuted,
+      debugExecution,
     ]
   );
 

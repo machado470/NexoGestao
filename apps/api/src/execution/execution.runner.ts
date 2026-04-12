@@ -20,6 +20,7 @@ export class ExecutionRunner {
   private nextCycleAt = 0
   private readonly blockedRecentCooldownMap = new Map<string, number>()
   private readonly blockedLogSuppression = new Map<string, { until: number; blockedCountDuringWindow: number }>()
+  private readonly blockedReasonCounters = new Map<string, number>()
 
   private async sleep(ms: number) {
     await new Promise((resolve) => setTimeout(resolve, ms))
@@ -89,6 +90,35 @@ export class ExecutionRunner {
     if (message === 'charge_not_overdue_enough_for_followup') return 'blocked_recent_execution'
     if (message === 'risk_review_already_escalated_recently') return 'already_sent_recently'
     return null
+  }
+
+  private isDebugExecutionEnabled(input?: { debugExecution?: boolean }): boolean {
+    if (input?.debugExecution) return true
+    return process.env.EXECUTION_DEBUG_MODE === '1'
+  }
+
+  private isEmailVerificationEnforced(): boolean {
+    const raw = (process.env.AUTH_ENFORCE_EMAIL_VERIFICATION ?? '').trim().toLowerCase()
+    return ['1', 'true', 'yes', 'y', 'on'].includes(raw)
+  }
+
+  private incrementBlockedReason(reasonCode: string) {
+    const current = this.blockedReasonCounters.get(reasonCode) ?? 0
+    this.blockedReasonCounters.set(reasonCode, current + 1)
+  }
+
+  private async hasValidAutomationSession(orgId: string) {
+    const enforceVerification = this.isEmailVerificationEnforced()
+    const activeUser = await this.prisma.user.findFirst({
+      where: {
+        orgId,
+        active: true,
+        role: { in: ['ADMIN', 'MANAGER', 'STAFF'] },
+        ...(enforceVerification ? { emailVerifiedAt: { not: null } } : {}),
+      },
+      select: { id: true },
+    })
+    return Boolean(activeUser?.id)
   }
 
   constructor(
@@ -220,7 +250,9 @@ export class ExecutionRunner {
     }
   }
 
-  async runOnce() {
+  async runOnce(options?: { debugExecution?: boolean; overrideCooldown?: boolean }) {
+    const debugExecution = this.isDebugExecutionEnabled(options)
+    this.blockedReasonCounters.clear()
     const now = Date.now()
     if (now < this.nextCycleAt) {
       return {
@@ -244,19 +276,15 @@ export class ExecutionRunner {
     let skipped = 0
 
     for (const org of orgs) {
-      const allCandidates = await this.loadActionCandidates(org.id)
-      const candidates = allCandidates.filter((candidate) => {
-        const blockedUntil = this.isCandidateInRecentCooldown(candidate)
-        if (!blockedUntil) return true
-        skipped += 1
-        blockedRecent += 1
-        return false
-      })
+      const candidates = await this.loadActionCandidates(org.id)
       totalCandidates += candidates.length
 
       for (const candidate of candidates) {
         if (executed >= this.config.getMaxExecutionsPerCycle()) break
-        const result = await this.processCandidate(candidate)
+        const result = await this.processCandidate(candidate, {
+          debugExecution,
+          overrideCooldown: options?.overrideCooldown === true,
+        })
         if (result === 'executed') executed += 1
         else if (result === 'failed') failed += 1
         else if (result === 'blocked' || result === 'requires_confirmation' || result === 'throttled') blocked += 1
@@ -280,6 +308,16 @@ export class ExecutionRunner {
         blockedRecent,
         failed,
         skipped,
+        blockedByReason: Object.fromEntries(this.blockedReasonCounters.entries()),
+        blockedRecentVsConfig: {
+          blocked_recent: this.blockedReasonCounters.get('blocked_recent_execution') ?? 0,
+          blocked_config:
+            Array.from(this.blockedReasonCounters.entries())
+              .filter(([reasonCode]) => reasonCode !== 'blocked_recent_execution')
+              .reduce((total, [, count]) => total + count, 0),
+        },
+        debugExecution,
+        overrideCooldown: options?.overrideCooldown === true,
         orgsProcessed: orgs.length,
         maxExecutionsPerCycle: this.config.getMaxExecutionsPerCycle(),
         cycleDelayMs,
@@ -294,6 +332,8 @@ export class ExecutionRunner {
       blockedRecent,
       failed,
       skipped,
+      debugExecution,
+      blockedByReason: Object.fromEntries(this.blockedReasonCounters.entries()),
     }
   }
 
@@ -585,7 +625,11 @@ export class ExecutionRunner {
     ]
   }
 
-  private async processCandidate(candidate: ExecutionActionCandidate) {
+  private async processCandidate(
+    candidate: ExecutionActionCandidate,
+    options?: { debugExecution?: boolean; overrideCooldown?: boolean },
+  ) {
+    const debugExecution = options?.debugExecution === true
     const mode = await this.config.getExecutionMode({ orgId: candidate.orgId })
     const policy = await this.config.getPolicyConfig({ orgId: candidate.orgId })
 
@@ -614,7 +658,7 @@ export class ExecutionRunner {
       }
       this.logger.error(JSON.stringify(detail))
       await this.events.recordEvent(candidate.orgId, {
-        eventType: 'EXECUTION_ACTION_FAILED',
+        eventType: 'EXECUTION_FAILED',
         entityType: candidate.entityType,
         entityId: candidate.entityId,
         actionId: candidate.actionId,
@@ -625,6 +669,7 @@ export class ExecutionRunner {
         reasonCode: 'invalid_execution_context',
         timestamp: new Date().toISOString(),
         metadata: detail,
+        reasonDetail: contextValidation.reason,
         explanation: {
           ruleId: candidate.decisionId,
           eligibility: 'failed',
@@ -634,6 +679,52 @@ export class ExecutionRunner {
       })
       this.countOperationalStatus('failed')
       return 'failed'
+    }
+
+    const blockedUntil = this.isCandidateInRecentCooldown(candidate)
+    if (blockedUntil && options?.overrideCooldown !== true) {
+      await this.recordBlocked(candidate, executionKey, mode, 'blocked_recent_execution', 'blocked', {
+        ruleId: candidate.decisionId,
+        ruleReason: 'cooldown local ativo por execução recente',
+        eligibility: 'blocked',
+        cooldownUntil: new Date(blockedUntil).toISOString(),
+      })
+      this.countOperationalStatus('blocked')
+      return 'blocked_recent_execution'
+    }
+    if (blockedUntil && options?.overrideCooldown === true && debugExecution) {
+      this.logger.debug(
+        JSON.stringify({
+          event: 'execution_runner_debug_cooldown_override',
+          orgId: candidate.orgId,
+          actionId: candidate.actionId,
+          decisionId: candidate.decisionId,
+          entityType: candidate.entityType,
+          entityId: candidate.entityId,
+          executionKey,
+          reasonCode: 'blocked_recent_execution',
+          cooldownUntil: new Date(blockedUntil).toISOString(),
+        }),
+      )
+    }
+
+    const hasValidAuth = await this.hasValidAutomationSession(candidate.orgId)
+    if (!hasValidAuth) {
+      await this.recordBlocked(
+        candidate,
+        executionKey,
+        mode,
+        'auth_invalid_session',
+        'blocked',
+        {
+          ruleId: candidate.decisionId,
+          ruleReason: 'nenhuma sessão autenticada válida para automação',
+          eligibility: 'blocked',
+        },
+        'AUTH_BLOCKED_EXECUTION',
+      )
+      this.countOperationalStatus('blocked')
+      return 'blocked'
     }
 
     if (mode === 'manual') {
@@ -815,7 +906,7 @@ export class ExecutionRunner {
     }
 
     await this.events.recordEvent(candidate.orgId, {
-      eventType: 'EXECUTION_ACTION_REQUESTED',
+      eventType: 'EXECUTION_STARTED',
       entityType: candidate.entityType,
       entityId: candidate.entityId,
       actionId: candidate.actionId,
@@ -830,6 +921,7 @@ export class ExecutionRunner {
         policySnapshot: policy,
         trigger: candidate.metadata ?? {},
       },
+      reasonDetail: 'candidate aprovado para execução automática',
       explanation: {
         ruleId: candidate.decisionId,
         eligibility: 'eligible',
@@ -841,7 +933,7 @@ export class ExecutionRunner {
       await this.executeCandidate(candidate)
 
       await this.events.recordEvent(candidate.orgId, {
-        eventType: 'EXECUTION_ACTION_EXECUTED',
+        eventType: 'EXECUTION_EXECUTED',
         entityType: candidate.entityType,
         entityId: candidate.entityId,
         actionId: candidate.actionId,
@@ -850,6 +942,7 @@ export class ExecutionRunner {
         mode,
         status: 'executed',
         reasonCode: 'runner_executed',
+        reasonDetail: 'ação executada com sucesso',
         timestamp: new Date().toISOString(),
         customerId: contextValidation.customerId ?? undefined,
         explanation: {
@@ -887,7 +980,7 @@ export class ExecutionRunner {
       }
 
       await this.events.recordEvent(candidate.orgId, {
-        eventType: 'EXECUTION_ACTION_FAILED',
+        eventType: 'EXECUTION_FAILED',
         entityType: candidate.entityType,
         entityId: candidate.entityId,
         actionId: candidate.actionId,
@@ -896,6 +989,7 @@ export class ExecutionRunner {
         mode,
         status: 'failed',
         reasonCode: 'runner_execution_failed',
+        reasonDetail: 'falha inesperada durante execução',
         timestamp: new Date().toISOString(),
         customerId: contextValidation.customerId ?? undefined,
         metadata: {
@@ -946,9 +1040,11 @@ export class ExecutionRunner {
       governanceReason?: string
       cooldownUntil?: string
     },
+    eventType: 'EXECUTION_BLOCKED' | 'AUTH_BLOCKED_EXECUTION' = 'EXECUTION_BLOCKED',
   ) {
+    this.incrementBlockedReason(reasonCode)
     await this.events.recordEvent(candidate.orgId, {
-      eventType: 'EXECUTION_ACTION_BLOCKED',
+      eventType,
       entityType: candidate.entityType,
       entityId: candidate.entityId,
       actionId: candidate.actionId,
@@ -957,6 +1053,8 @@ export class ExecutionRunner {
       mode,
       status,
       reasonCode,
+      reasonDetail: explanation?.ruleReason,
+      cooldownUntil: explanation?.cooldownUntil,
       timestamp: new Date().toISOString(),
       explanation,
     })
@@ -982,6 +1080,7 @@ export class ExecutionRunner {
           executionKey,
           suppressedCountFromPreviousWindow: suppression.previousSuppressedCount,
           cooldownUntil: explanation?.cooldownUntil ?? null,
+          reasonDetail: explanation?.ruleReason ?? null,
         }),
       )
     }

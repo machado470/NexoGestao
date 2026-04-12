@@ -46,7 +46,12 @@ export type ExecutionActionCandidate = {
 }
 
 export type ExecutionEventPayload = {
-  eventType: 'EXECUTION_ACTION_REQUESTED' | 'EXECUTION_ACTION_EXECUTED' | 'EXECUTION_ACTION_FAILED' | 'EXECUTION_ACTION_BLOCKED'
+  eventType:
+    | 'EXECUTION_STARTED'
+    | 'EXECUTION_BLOCKED'
+    | 'EXECUTION_EXECUTED'
+    | 'EXECUTION_FAILED'
+    | 'AUTH_BLOCKED_EXECUTION'
   entityType: string
   entityId: string
   actionId: string
@@ -57,6 +62,8 @@ export type ExecutionEventPayload = {
   reasonCode?: string
   customerId?: string
   timestamp: string
+  reasonDetail?: string
+  cooldownUntil?: string
   explanation?: {
     ruleId?: string
     ruleReason?: string

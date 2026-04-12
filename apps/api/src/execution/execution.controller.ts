@@ -222,7 +222,13 @@ export class ExecutionController {
 
   @Post('runner/run-once')
   @Roles('ADMIN', 'MANAGER')
-  runOnce() {
-    return this.runner.runOnce()
+  runOnce(
+    @Query('debug') debug?: string,
+    @Query('overrideCooldown') overrideCooldown?: string,
+  ) {
+    return this.runner.runOnce({
+      debugExecution: debug === 'execution',
+      overrideCooldown: overrideCooldown === '1' || overrideCooldown === 'true',
+    })
   }
 }

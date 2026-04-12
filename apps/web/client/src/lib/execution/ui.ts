@@ -4,6 +4,7 @@ export function reasonCodeToHuman(reasonCode?: string | null) {
   if (reasonCode === "mode_manual_explicit_configuration") return "Modo manual ativo";
   if (reasonCode === "limit_exceeded") return "Limite da engine atingido";
   if (reasonCode === "feature_not_in_plan") return "Recurso indisponível no plano";
+  if (reasonCode === "auth_invalid_session") return "Sessão inválida para execução automática";
   if (reasonCode === "already_paid") return "Cobrança já paga";
   if (reasonCode === "charge_followup_already_exists") return "Follow-up já existe";
   return "Bloqueada por regra operacional";
