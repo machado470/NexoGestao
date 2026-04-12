@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
@@ -61,6 +61,25 @@ export default function ExecutiveDashboardNew() {
 
   const metrics = useMemo(() => toMetrics(metricsQuery.data), [metricsQuery.data]);
   const appointments = useMemo(() => toArray<any>(appointmentsQuery.data), [appointmentsQuery.data]);
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    // eslint-disable-next-line no-console
+    console.log("KPI payload", {
+      metrics: metricsQuery.data,
+      governance: governanceSummaryQuery.data,
+      appointments: appointmentsQuery.data,
+      serviceOrders: serviceOrdersQuery.data,
+      charges: chargesQuery.data,
+      customers: customersQuery.data,
+    });
+  }, [
+    appointmentsQuery.data,
+    chargesQuery.data,
+    customersQuery.data,
+    governanceSummaryQuery.data,
+    metricsQuery.data,
+    serviceOrdersQuery.data,
+  ]);
   const serviceOrders = useMemo(() => toArray<any>(serviceOrdersQuery.data), [serviceOrdersQuery.data]);
   const charges = useMemo(() => toArray<any>(chargesQuery.data), [chargesQuery.data]);
   const customers = useMemo(() => toArray<any>(customersQuery.data), [customersQuery.data]);
