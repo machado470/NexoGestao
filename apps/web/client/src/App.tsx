@@ -232,6 +232,8 @@ function ProtectedRoute({
     if (isInitializing) return;
 
     if (!isAuthenticated) {
+      // eslint-disable-next-line no-console
+      console.info("[auth] protected_route_redirect", { from: location });
       navigate(buildLoginRedirectPath(location), { replace: true });
       return;
     }
@@ -673,12 +675,12 @@ function App() {
     console.log("[boot] app_init", { bootProbeStage });
   }, []);
 
-  const markReady = useCallback(() => {
+  const markReady = useCallback((nextState: "authenticated" | "unauthenticated") => {
     setBootstrapState(prev => {
-      if (prev === "ready") return prev;
+      if (prev === nextState) return prev;
       // eslint-disable-next-line no-console
       console.log("[boot] providers_ready");
-      return "ready";
+      return nextState;
     });
   }, []);
 
@@ -778,31 +780,35 @@ function AuthBootstrapStatus({
   onReady,
   onFailed,
 }: {
-  onReady: () => void;
+  onReady: (state: "authenticated" | "unauthenticated") => void;
   onFailed: (reason: string) => void;
 }) {
-  const { isInitializing, error } = useAuth();
+  const { authState, bootstrapError } = useAuth();
 
   useEffect(() => {
-    if (isInitializing) return;
-    if (error) {
-      onFailed(error instanceof Error ? error.message : "Falha ao inicializar autenticação");
+    if (authState === "booting") return;
+    if (authState === "failed") {
+      onFailed(
+        bootstrapError instanceof Error
+          ? bootstrapError.message
+          : "Falha ao inicializar autenticação"
+      );
       return;
     }
     // eslint-disable-next-line no-console
     console.log("[boot] auth_ready");
-    onReady();
-  }, [error, isInitializing, onFailed, onReady]);
+    onReady(authState);
+  }, [authState, bootstrapError, onFailed, onReady]);
 
   return null;
 }
 
 function AuthProbeScreen() {
-  const { isInitializing, isAuthenticated, user } = useAuth();
+  const { isInitializing, isAuthenticated, user, authState } = useAuth();
 
   return (
     <div className="p-4 text-sm text-[var(--text-secondary)]">
-      AUTH OK · init={String(isInitializing)} · auth={String(isAuthenticated)} ·
+      AUTH OK · state={authState} · init={String(isInitializing)} · auth={String(isAuthenticated)} ·
       user={user?.id ?? "none"}
     </div>
   );

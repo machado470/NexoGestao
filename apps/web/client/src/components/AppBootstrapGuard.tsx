@@ -1,8 +1,12 @@
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { AppPageErrorState, AppPageLoadingState, AppPageShell } from "@/components/internal-page-system";
 import { useAuth } from "@/contexts/AuthContext";
 
-export type AppBootstrapState = "booting" | "ready" | "failed";
+export type AppBootstrapState =
+  | "booting"
+  | "unauthenticated"
+  | "authenticated"
+  | "failed";
 const PUBLIC_ROUTES = new Set([
   "/",
   "/login",
@@ -10,6 +14,18 @@ const PUBLIC_ROUTES = new Set([
   "/forgot-password",
   "/reset-password",
 ]);
+
+export function shouldBypassFatalBootstrapForAnonymous(params: {
+  state: AppBootstrapState;
+  isPublicRoute: boolean;
+  authState: "unauthenticated" | "authenticated" | "booting" | "failed";
+}) {
+  return (
+    params.state === "failed" &&
+    params.isPublicRoute &&
+    params.authState === "unauthenticated"
+  );
+}
 
 export function AppBootstrapGuard({
   state,
@@ -22,12 +38,21 @@ export function AppBootstrapGuard({
   onReload: () => void;
   children: ReactNode;
 }) {
-  const { isAuthenticated, error } = useAuth();
+  const { authState } = useAuth();
   const pathname =
     typeof window === "undefined" ? "/" : window.location.pathname;
   const isPublicRoute = PUBLIC_ROUTES.has(pathname);
-  const shouldBypassFatalForAnonymous =
-    state === "failed" && isPublicRoute && !isAuthenticated && !error;
+  const shouldBypassFatalForAnonymous = shouldBypassFatalBootstrapForAnonymous({
+    state,
+    isPublicRoute,
+    authState,
+  });
+
+  useEffect(() => {
+    if (authState !== "unauthenticated" || !isPublicRoute) return;
+    // eslint-disable-next-line no-console
+    console.info("[auth] public_route_allowed", { pathname });
+  }, [authState, isPublicRoute, pathname]);
 
   if (state === "booting") {
     return (
