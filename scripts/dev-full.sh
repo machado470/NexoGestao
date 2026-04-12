@@ -4,6 +4,16 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+CLEAN_MODE=0
+for arg in "$@"; do
+  if [ "$arg" = "--clean" ]; then
+    CLEAN_MODE=1
+  fi
+done
+if [ "${DEV_FULL_CLEAN:-0}" = "1" ]; then
+  CLEAN_MODE=1
+fi
+
 if ! command -v docker >/dev/null 2>&1; then
   echo "❌ Docker não encontrado. Instale Docker Desktop/Engine antes de rodar pnpm dev:full."
   exit 1
@@ -128,33 +138,238 @@ if [ -z "${REDIS_HOST:-}" ] || [ -z "${REDIS_PORT:-}" ]; then
   export REDIS_HOST REDIS_PORT
 fi
 
+if [ "$CLEAN_MODE" = "1" ]; then
+  echo "🧹 Modo clean ativado (flag --clean ou DEV_FULL_CLEAN=1)."
+fi
+
 echo "ℹ️ Portas locais: API=${API_PORT} | WEB=${WEB_PORT}"
 echo "ℹ️ NEXO_API_URL=${NEXO_API_URL}"
 
-echo "🧱 Subindo Postgres e Redis via Docker Compose..."
-"${COMPOSE_CMD[@]}" up -d postgres redis
-
-get_container_id() {
-  "${COMPOSE_CMD[@]}" ps -q "$1"
+ensure_port_tooling() {
+  if command -v lsof >/dev/null 2>&1; then
+    return
+  fi
+  if command -v ss >/dev/null 2>&1; then
+    return
+  fi
+  echo "⚠️ Nem lsof nem ss estão disponíveis; diagnóstico de processo externo pode ser limitado."
 }
 
-POSTGRES_CONTAINER="$(get_container_id postgres)"
-REDIS_CONTAINER="$(get_container_id redis)"
+container_on_port() {
+  local port="$1"
+  local cid
+  while IFS=$'\t' read -r cid _name; do
+    [ -n "$cid" ] || continue
+    if docker port "$cid" 2>/dev/null | grep -Eq "(^|:)${port}(\\s|$)"; then
+      docker inspect --format '{{.Name}}' "$cid" 2>/dev/null | sed 's#^/##'
+      return 0
+    fi
+  done < <(docker ps --format '{{.ID}}\t{{.Names}}')
+  return 1
+}
 
-if [ -z "$POSTGRES_CONTAINER" ] || [ -z "$REDIS_CONTAINER" ]; then
-  echo "❌ Não foi possível localizar os containers de postgres/redis via docker compose ps."
+process_on_port() {
+  local port="$1"
+  if command -v lsof >/dev/null 2>&1; then
+    lsof -nP -iTCP:"$port" -sTCP:LISTEN 2>/dev/null | awk 'NR==2 {print $1 " (pid " $2 ")"; exit}'
+    return 0
+  fi
+
+  if command -v ss >/dev/null 2>&1; then
+    ss -ltnp "( sport = :$port )" 2>/dev/null | awk 'NR>1 && match($0, /users:\(\("([^\"]+)",pid=([0-9]+)/, m) {print m[1] " (pid " m[2] ")"; exit}'
+    return 0
+  fi
+
+  return 0
+}
+
+port_in_use() {
+  local port="$1"
+  if command -v lsof >/dev/null 2>&1; then
+    lsof -nP -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1
+    return $?
+  fi
+
+  if command -v ss >/dev/null 2>&1; then
+    ss -ltn "( sport = :$port )" 2>/dev/null | awk 'NR>1 {found=1} END {exit found?0:1}'
+    return $?
+  fi
+
+  (echo >/dev/tcp/127.0.0.1/"$port") >/dev/null 2>&1
+}
+
+is_nexo_container_name() {
+  case "$1" in
+    nexogestao-postgres|nexogestao-redis|nexogestao_postgres|nexogestao_redis)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+find_existing_nexo_container() {
+  local service="$1"
+  local names=()
+  if [ "$service" = "postgres" ]; then
+    names=(nexogestao-postgres nexogestao_postgres)
+  else
+    names=(nexogestao-redis nexogestao_redis)
+  fi
+
+  local cname
+  for cname in "${names[@]}"; do
+    if docker inspect "$cname" >/dev/null 2>&1; then
+      echo "$cname"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+container_running() {
+  local cname="$1"
+  [ "$(docker inspect --format '{{.State.Running}}' "$cname" 2>/dev/null || true)" = "true" ]
+}
+
+wait_for_postgres() {
+  local attempts=40
+  echo "⏳ Validando Postgres na porta 5432..."
+  until node -e "const n=require('net');const s=n.createConnection({host:'127.0.0.1',port:5432});s.on('connect',()=>{s.end();process.exit(0)});s.on('error',()=>process.exit(1));setTimeout(()=>process.exit(1),1000);" >/dev/null 2>&1; do
+    attempts=$((attempts - 1))
+    if [ "$attempts" -le 0 ]; then
+      echo "❌ Postgres não respondeu na porta 5432 a tempo."
+      exit 1
+    fi
+    sleep 2
+  done
+  echo "✅ Postgres respondendo na 5432."
+}
+
+wait_for_redis() {
+  local attempts=40
+  echo "⏳ Validando Redis na porta 6379..."
+  until node -e "const n=require('net');const s=n.createConnection({host:'127.0.0.1',port:6379});let d='';s.on('connect',()=>s.write('*1\\r\\n$4\\r\\nPING\\r\\n'));s.on('data',c=>{d+=c.toString();if(d.includes('+PONG')){s.end();process.exit(0)}});s.on('error',()=>process.exit(1));setTimeout(()=>process.exit(1),1200);" >/dev/null 2>&1; do
+    attempts=$((attempts - 1))
+    if [ "$attempts" -le 0 ]; then
+      echo "❌ Redis não respondeu PING na porta 6379 a tempo."
+      exit 1
+    fi
+    sleep 2
+  done
+  echo "✅ Redis respondendo na 6379."
+}
+
+fail_if_external_port_block() {
+  local port="$1"
+  local purpose="$2"
+
+  if ! port_in_use "$port"; then
+    return 0
+  fi
+
+  local cname
+  cname="$(container_on_port "$port" || true)"
+  if [ -n "$cname" ] && is_nexo_container_name "$cname"; then
+    echo "ℹ️ ${purpose}: porta ${port} já ocupada por container Nexo (${cname}) — reutilizando."
+    return 0
+  fi
+
+  local process_desc
+  process_desc="$(process_on_port "$port" || true)"
+  if [ -n "$cname" ]; then
+    echo "❌ ${purpose}: porta ${port} ocupada por container externo (${cname})."
+    echo "   Pare/remova o container e tente novamente."
+  else
+    echo "❌ ${purpose}: porta ${port} ocupada por processo externo${process_desc:+ (${process_desc})}."
+    echo "   Libere a porta ${port} e execute pnpm dev:full novamente."
+  fi
   exit 1
+}
+
+ensure_service_running() {
+  local service="$1"
+  local port=""
+  if [ "$service" = "postgres" ]; then
+    port="5432"
+  else
+    port="6379"
+  fi
+
+  local existing_name
+  existing_name="$(find_existing_nexo_container "$service" || true)"
+
+  if [ "$CLEAN_MODE" = "1" ]; then
+    if [ -n "$existing_name" ]; then
+      echo "🧹 Removendo container legado/existente: ${existing_name}"
+      docker rm -f "$existing_name" >/dev/null
+    fi
+    return 1
+  fi
+
+  if [ -n "$existing_name" ]; then
+    if container_running "$existing_name"; then
+      echo "ℹ️ ${service}: container já ativo (${existing_name}) — reutilizando."
+      return 0
+    fi
+
+    echo "♻️ ${service}: container existente parado (${existing_name}) — iniciando."
+    docker start "$existing_name" >/dev/null
+    echo "✅ ${service}: container iniciado (${existing_name})."
+    return 0
+  fi
+
+  if port_in_use "$port"; then
+    local owner
+    owner="$(container_on_port "$port" || true)"
+    if [ -n "$owner" ] && is_nexo_container_name "$owner"; then
+      echo "ℹ️ ${service}: porta ${port} já ligada ao container Nexo (${owner}) — reutilizando."
+      if ! container_running "$owner"; then
+        echo "♻️ ${service}: subindo container Nexo parado (${owner})."
+        docker start "$owner" >/dev/null
+      fi
+      return 0
+    fi
+
+    fail_if_external_port_block "$port" "$service"
+  fi
+
+  echo "➕ ${service}: não encontrado. Será criado via Docker Compose."
+  return 1
+}
+
+ensure_port_tooling
+
+services_to_up=()
+for infra_service in postgres redis; do
+  if ! ensure_service_running "$infra_service"; then
+    services_to_up+=("$infra_service")
+  fi
+done
+
+if [ "$CLEAN_MODE" = "1" ]; then
+  echo "🧱 Subindo stack limpa de infra via Docker Compose (postgres + redis)..."
+  "${COMPOSE_CMD[@]}" up -d --force-recreate postgres redis
+elif [ "${#services_to_up[@]}" -gt 0 ]; then
+  echo "🧱 Subindo infra faltante via Docker Compose: ${services_to_up[*]}"
+  "${COMPOSE_CMD[@]}" up -d "${services_to_up[@]}"
+else
+  echo "✅ Infra já pronta. Nenhuma recriação necessária."
 fi
 
-echo "⏳ Aguardando Postgres ficar healthy..."
-until docker inspect --format='{{.State.Health.Status}}' "$POSTGRES_CONTAINER" 2>/dev/null | grep -q healthy; do
-  sleep 2
-done
+wait_for_postgres
+wait_for_redis
 
-echo "⏳ Aguardando Redis responder PING..."
-until docker exec "$REDIS_CONTAINER" redis-cli ping 2>/dev/null | grep -q PONG; do
-  sleep 2
-done
+fail_if_external_port_block "3000" "API"
+fail_if_external_port_block "3010" "Web"
+if [ "$API_PORT" != "3000" ]; then
+  fail_if_external_port_block "$API_PORT" "API"
+fi
+if [ "$WEB_PORT" != "3010" ]; then
+  fail_if_external_port_block "$WEB_PORT" "Web"
+fi
 
 echo "🗃️ Executando migrations..."
 pnpm --filter ./apps/api run prisma:generate
