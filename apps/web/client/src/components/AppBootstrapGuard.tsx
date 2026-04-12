@@ -3,30 +3,10 @@ import { AppPageErrorState, AppPageLoadingState, AppPageShell } from "@/componen
 import { useAuth } from "@/contexts/AuthContext";
 
 export type AppBootstrapState =
-  | "booting"
+  | "initializing"
   | "unauthenticated"
   | "authenticated"
-  | "failed";
-const PUBLIC_ROUTES = new Set([
-  "/",
-  "/login",
-  "/register",
-  "/forgot-password",
-  "/reset-password",
-]);
-
-export function shouldBypassFatalBootstrapForAnonymous(params: {
-  state: AppBootstrapState;
-  isPublicRoute: boolean;
-  authState: "unauthenticated" | "authenticated" | "booting" | "failed";
-}) {
-  return (
-    params.state === "failed" &&
-    params.isPublicRoute &&
-    params.authState !== "booting" &&
-    params.authState !== "authenticated"
-  );
-}
+  | "error";
 
 export function AppBootstrapGuard({
   state,
@@ -40,22 +20,15 @@ export function AppBootstrapGuard({
   children: ReactNode;
 }) {
   const { authState } = useAuth();
-  const pathname =
-    typeof window === "undefined" ? "/" : window.location.pathname;
-  const isPublicRoute = PUBLIC_ROUTES.has(pathname);
-  const shouldBypassFatalForAnonymous = shouldBypassFatalBootstrapForAnonymous({
-    state,
-    isPublicRoute,
-    authState,
-  });
-
   useEffect(() => {
-    if (authState !== "unauthenticated" || !isPublicRoute) return;
-    // eslint-disable-next-line no-console
-    console.info("[auth] public_route_allowed", { pathname });
-  }, [authState, isPublicRoute, pathname]);
+    if (!import.meta.env.DEV) return;
+    if (authState === "initializing") {
+      // eslint-disable-next-line no-console
+      console.log("[boot] auth loading");
+    }
+  }, [authState]);
 
-  if (state === "booting") {
+  if (state === "initializing") {
     return (
       <AppPageShell>
         <AppPageLoadingState
@@ -66,7 +39,7 @@ export function AppBootstrapGuard({
     );
   }
 
-  if (state === "failed" && !shouldBypassFatalForAnonymous) {
+  if (state === "error") {
     return (
       <AppPageShell>
         <AppPageErrorState

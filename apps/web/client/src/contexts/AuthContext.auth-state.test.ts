@@ -26,7 +26,7 @@ describe("AuthContext auth bootstrap state", () => {
   }>([
     {
       input: { isInitializing: true, bootstrapError: null, user: null },
-      expected: "booting",
+      expected: "initializing",
     },
     {
       input: { isInitializing: false, bootstrapError: null, user: null },
@@ -46,7 +46,7 @@ describe("AuthContext auth bootstrap state", () => {
         bootstrapError: new Error("backend down"),
         user: null,
       },
-      expected: "failed",
+      expected: "error",
     },
   ])("resolve estado global: $expected", ({ input, expected }) => {
     expect(resolveAuthBootstrapState(input)).toBe(expected);
