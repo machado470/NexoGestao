@@ -242,25 +242,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const channel = new BroadcastChannel("nexo-auth");
-    authChannelRef.current = channel;
-
-    channel.onmessage = async event => {
-      const type = String(event?.data?.type ?? "");
-      if (type === "logout") {
-        setForcedLoggedOut(true);
-        await utils.session.me.cancel();
-        utils.session.me.setData(undefined, null);
-        queryClient.clear();
-        redirectToLogin();
-      }
-
-      if (type === "login") {
-        setForcedLoggedOut(false);
-        await utils.session.me.invalidate();
-      }
-    };
-
     const onStorage = (evt: StorageEvent) => {
       if (evt.key !== "nexo:auth:logout-at" || !evt.newValue) return;
       setForcedLoggedOut(true);
@@ -269,9 +250,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     window.addEventListener("storage", onStorage);
+
+    if (typeof window.BroadcastChannel !== "function") {
+      if (import.meta.env.DEV) {
+        // eslint-disable-next-line no-console
+        console.warn("[auth] BroadcastChannel indisponível; sincronização entre abas desativada.");
+      }
+      authChannelRef.current = null;
+      return () => {
+        window.removeEventListener("storage", onStorage);
+      };
+    }
+
+    let channel: BroadcastChannel | null = null;
+
+    try {
+      channel = new window.BroadcastChannel("nexo-auth");
+      authChannelRef.current = channel;
+
+      channel.onmessage = async event => {
+        const type = String(event?.data?.type ?? "");
+        if (type === "logout") {
+          setForcedLoggedOut(true);
+          await utils.session.me.cancel();
+          utils.session.me.setData(undefined, null);
+          queryClient.clear();
+          redirectToLogin();
+        }
+
+        if (type === "login") {
+          setForcedLoggedOut(false);
+          await utils.session.me.invalidate();
+        }
+      };
+    } catch (error) {
+      authChannelRef.current = null;
+      if (import.meta.env.DEV) {
+        // eslint-disable-next-line no-console
+        console.error("[auth] Falha ao inicializar BroadcastChannel", error);
+      }
+    }
+
     return () => {
       window.removeEventListener("storage", onStorage);
-      channel.close();
+      channel?.close();
     };
   }, [queryClient, utils.session.me]);
 
