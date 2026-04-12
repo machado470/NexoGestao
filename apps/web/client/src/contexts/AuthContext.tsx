@@ -160,6 +160,31 @@ function createSafeBroadcastChannel(name: string) {
   }
 }
 
+function isExpectedUnauthenticatedError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+
+  const maybeError = error as {
+    data?: { code?: unknown; httpStatus?: unknown };
+    shape?: { data?: { code?: unknown; httpStatus?: unknown } };
+    message?: unknown;
+  };
+
+  const code =
+    maybeError.data?.code ??
+    maybeError.shape?.data?.code ??
+    (typeof maybeError.message === "string" ? maybeError.message : null);
+  const httpStatus =
+    maybeError.data?.httpStatus ?? maybeError.shape?.data?.httpStatus;
+
+  if (httpStatus === 401) return true;
+  if (code === "UNAUTHORIZED") return true;
+  if (typeof code === "string" && code.toLowerCase().includes("unauthorized")) {
+    return true;
+  }
+
+  return false;
+}
+
 /* ========================= */
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -499,6 +524,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localLoading || loginMutation.isPending || registerMutation.isPending;
 
   const isSubmitting = isAuthenticating;
+  const meBootstrapError =
+    shouldBootstrapSession && !isExpectedUnauthenticatedError(meQuery.error)
+      ? meQuery.error
+      : null;
 
   const isInitializing =
     shouldBootstrapSession &&
@@ -538,7 +567,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const bootstrapError =
       localError ||
-      (shouldBootstrapSession ? meQuery.error : null) ||
+      meBootstrapError ||
       loginMutation.error ||
       registerMutation.error ||
       logoutMutation.error ||
@@ -553,9 +582,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localError,
     loginMutation.error,
     logoutMutation.error,
-    meQuery.error,
+    meBootstrapError,
     registerMutation.error,
-    shouldBootstrapSession,
   ]);
 
   const value: AuthContextType = {
@@ -570,7 +598,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isLoggingOut,
     error:
       localError ||
-      (shouldBootstrapSession ? meQuery.error : null) ||
+      meBootstrapError ||
       loginMutation.error ||
       registerMutation.error ||
       logoutMutation.error ||

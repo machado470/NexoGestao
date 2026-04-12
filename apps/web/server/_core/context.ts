@@ -20,6 +20,13 @@ export type TrpcContext = {
 
 export type Context = TrpcContext;
 
+class NexoBootstrapError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "NexoBootstrapError";
+  }
+}
+
 export function getNexoTokenFromReq(req: any): string | null {
   const reqCookies = req?.cookies;
   if (reqCookies && typeof reqCookies?.[NEXO_TOKEN_COOKIE] === "string") {
@@ -152,6 +159,10 @@ export async function fetchNexoMe(req: any) {
     }
 
     if (!response.ok) {
+      if (response.status === 401) {
+        return null;
+      }
+
       if (process.env.NODE_ENV !== "production") {
         console.error("[trpc/context] fetchNexoMe failed", {
           url: `${NEXO_API_URL}/me`,
@@ -159,7 +170,9 @@ export async function fetchNexoMe(req: any) {
           body,
         });
       }
-      return null;
+      throw new NexoBootstrapError(
+        `Unexpected /me response status: ${response.status}`
+      );
     }
 
     const normalized = normalizeMePayload(body);
@@ -169,7 +182,7 @@ export async function fetchNexoMe(req: any) {
           body,
         });
       }
-      return null;
+      throw new NexoBootstrapError("Malformed /me payload");
     }
 
     return {
@@ -177,13 +190,17 @@ export async function fetchNexoMe(req: any) {
       ...normalized,
     } satisfies TrpcUser;
   } catch (error) {
+    if (error instanceof NexoBootstrapError) {
+      throw error;
+    }
+
     if (process.env.NODE_ENV !== "production") {
       console.error("[trpc/context] fetchNexoMe exception", {
         url: `${NEXO_API_URL}/me`,
         error,
       });
     }
-    return null;
+    throw new NexoBootstrapError("Unable to bootstrap session from /me");
   } finally {
     clearTimeout(timeout);
   }
