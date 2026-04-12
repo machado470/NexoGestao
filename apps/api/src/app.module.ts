@@ -1,4 +1,4 @@
-import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common'
+import { Module, MiddlewareConsumer, NestModule, CanActivate } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
 import { ScheduleModule } from '@nestjs/schedule'
 import { ClsModule } from 'nestjs-cls'
@@ -61,6 +61,14 @@ import { WebhookModule } from './webhooks/webhook.module'
 import { SentryModule } from './common/sentry/sentry.module'
 import { CommercialModule } from './commercial/commercial.module'
 
+const IS_DEVELOPMENT = (process.env.NODE_ENV ?? '').toLowerCase() === 'development'
+
+class AllowAllThrottlerGuard implements CanActivate {
+  canActivate() {
+    return true
+  }
+}
+
 @Module({
   imports: [
     CoreModule,
@@ -78,9 +86,9 @@ import { CommercialModule } from './commercial/commercial.module'
     }),
 
     ThrottlerModule.forRoot([
-      { name: 'short', ttl: 1000, limit: 20 },
-      { name: 'medium', ttl: 60000, limit: 200 },
-      { name: 'long', ttl: 3600000, limit: 1000 },
+      { name: 'short', ttl: 60000, limit: 1000 },
+      { name: 'medium', ttl: 60000, limit: 1000 },
+      { name: 'long', ttl: 3600000, limit: 2000 },
     ]),
 
     ScheduleModule.forRoot(),
@@ -148,7 +156,7 @@ import { CommercialModule } from './commercial/commercial.module'
     },
     {
       provide: APP_GUARD,
-      useClass: ThrottlerGuard,
+      useClass: IS_DEVELOPMENT ? AllowAllThrottlerGuard : ThrottlerGuard,
     },
     {
       provide: APP_GUARD,

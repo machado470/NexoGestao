@@ -25,8 +25,7 @@ async function ensureDefaultAdmin() {
     },
   })
 
-  const email = env('DEMO_ADMIN_EMAIL', 'admin@nexogestao.local').toLowerCase()
-  const password = env('DEMO_ADMIN_PASSWORD', 'Admin@123456')
+  const email = 'admin@nexogestao.local'
   const name = env('DEMO_ADMIN_NAME', 'Admin')
 
   const existingUser = await prisma.user.findUnique({
@@ -35,7 +34,7 @@ async function ensureDefaultAdmin() {
   })
 
   if (!existingUser) {
-    const passwordHash = await bcrypt.hash(password, 10)
+    const passwordHash = await bcrypt.hash('123456', 10)
 
     const user = await prisma.user.create({
       data: {
@@ -59,7 +58,7 @@ async function ensureDefaultAdmin() {
       },
     })
   } else {
-    const passwordHash = await bcrypt.hash(password, 10)
+    const passwordHash = await bcrypt.hash('123456', 10)
     await prisma.user.update({
       where: { id: existingUser.id },
       data: {
