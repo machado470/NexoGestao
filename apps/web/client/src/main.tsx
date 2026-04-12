@@ -14,15 +14,17 @@ import { initSentry } from "./lib/sentry";
 import { isPublicPath } from "./lib/publicRoutes";
 
 initSentry();
-// eslint-disable-next-line no-console
-console.log("[boot] main_entry_loaded");
+if (import.meta.env.DEV) {
+  // eslint-disable-next-line no-console
+  console.log("[boot] main start");
+}
 
 let isRedirectingToLogin = false;
 
-if (typeof window !== "undefined") {
+if (typeof window !== "undefined" && import.meta.env.DEV) {
   window.addEventListener("error", (event) => {
     // eslint-disable-next-line no-console
-    console.error("[boot] window_error", {
+    console.error("[boot] bootstrap error", {
       message: event.message,
       filename: event.filename,
       lineno: event.lineno,
@@ -34,7 +36,7 @@ if (typeof window !== "undefined") {
   window.addEventListener("unhandledrejection", (event) => {
     const reason = event.reason;
     // eslint-disable-next-line no-console
-    console.error("[boot] unhandled_rejection", {
+    console.error("[boot] bootstrap error", {
       message:
         reason instanceof Error
           ? reason.message
@@ -130,10 +132,10 @@ if (!rootElement) {
   throw new Error("[boot] Root #root não encontrado para montar a aplicação.");
 }
 
-// eslint-disable-next-line no-console
-console.log("[boot] html_root_found");
-// eslint-disable-next-line no-console
-console.log("[boot] react_mount_start");
+if (import.meta.env.DEV) {
+  // eslint-disable-next-line no-console
+  console.log("[boot] app render start");
+}
 
 createRoot(rootElement).render(
   <trpc.Provider client={trpcClient} queryClient={queryClient}>
@@ -143,5 +145,7 @@ createRoot(rootElement).render(
   </trpc.Provider>
 );
 
-// eslint-disable-next-line no-console
-console.log("[boot] react_mount_done");
+if (import.meta.env.DEV) {
+  // eslint-disable-next-line no-console
+  console.log("[boot] app render done");
+}

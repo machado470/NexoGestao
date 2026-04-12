@@ -22,18 +22,18 @@ type AuthUser = {
 } | null;
 
 export type AuthBootstrapState =
-  | "booting"
+  | "initializing"
   | "unauthenticated"
   | "authenticated"
-  | "failed";
+  | "error";
 
 export function resolveAuthBootstrapState(params: {
   isInitializing: boolean;
   bootstrapError: unknown | null;
   user: AuthUser;
 }): AuthBootstrapState {
-  if (params.isInitializing) return "booting";
-  if (params.bootstrapError) return "failed";
+  if (params.isInitializing) return "initializing";
+  if (params.bootstrapError) return "error";
   if (params.user) return "authenticated";
   return "unauthenticated";
 }
@@ -215,7 +215,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [localLoading, setLocalLoading] = useState(false);
   const [localError, setLocalError] = useState<unknown | null>(null);
   const [forcedLoggedOut, setForcedLoggedOut] = useState(false);
-  const [meBootstrapTimedOut, setMeBootstrapTimedOut] = useState(false);
   const channelRef = useRef<BroadcastChannel | null>(null);
   const pathname = useMemo(() => location.split(/[?#]/, 1)[0] || "/", [location]);
 
@@ -223,7 +222,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     pathname.startsWith(prefix)
   );
   const isMarketingPath = MARKETING_PATHS.has(pathname);
-  const shouldBootstrapSession = isAuthPath || !isMarketingPath;
+  const shouldBootstrapSession = pathname === "/" || isAuthPath || !isMarketingPath;
   const syncEventRef = useRef<(payload: unknown) => Promise<void>>(async () => {});
 
   const meQuery = trpc.session.me.useQuery(undefined, {
@@ -238,45 +237,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const registerMutation = trpc.nexo.auth.register.useMutation();
   const logoutMutation = trpc.session.logout.useMutation();
   const isLoggingOut = logoutMutation.isPending;
-
-  useEffect(() => {
-    if (forcedLoggedOut) {
-      setMeBootstrapTimedOut(false);
-      return;
-    }
-
-    const shouldTrackTimeout =
-      shouldBootstrapSession &&
-      meQuery.data === undefined &&
-      meQuery.fetchStatus === "fetching" &&
-      !meQuery.error &&
-      !isLoggingOut;
-
-    if (!shouldTrackTimeout) {
-      setMeBootstrapTimedOut(false);
-      return;
-    }
-
-    if (typeof window === "undefined") return;
-
-    const timer = window.setTimeout(() => {
-      setMeBootstrapTimedOut(true);
-      if (process.env.NODE_ENV !== "production") {
-        console.warn(
-          "[auth] session.me timeout exceeded. Public routes will continue rendering."
-        );
-      }
-    }, 4500);
-
-    return () => window.clearTimeout(timer);
-  }, [
-    forcedLoggedOut,
-    isLoggingOut,
-    meQuery.data,
-    meQuery.error,
-    meQuery.fetchStatus,
-    shouldBootstrapSession,
-  ]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -512,7 +472,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     !forcedLoggedOut &&
     meQuery.isLoading &&
     meQuery.data === undefined &&
-    !meBootstrapTimedOut &&
     !isLoggingOut;
 
   const loading = isInitializing || isSubmitting;
@@ -525,59 +484,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
 
   useEffect(() => {
-    if (!shouldBootstrapSession || forcedLoggedOut) return;
+    if (!shouldBootstrapSession || forcedLoggedOut || !import.meta.env.DEV) return;
     // eslint-disable-next-line no-console
-    console.info("[auth] bootstrap_start", { pathname });
+    console.info("[boot] auth init", { pathname });
   }, [forcedLoggedOut, pathname, shouldBootstrapSession]);
 
-  if (import.meta.env.DEV) {
+  if (import.meta.env.DEV && isInitializing) {
     // eslint-disable-next-line no-console
-    console.log("[boot] auth provider render", {
-      pathname,
-      shouldBootstrapSession,
-      forcedLoggedOut,
-      isInitializing,
-      isReady,
-      loading,
-      isAuthenticated: Boolean(userSafe),
-      userId: userSafe?.id ?? null,
-      meFetchStatus: meQuery.fetchStatus,
-    });
+    console.log("[boot] auth loading", { pathname, meFetchStatus: meQuery.fetchStatus });
   }
 
   useEffect(() => {
-    if (!isReady) return;
-    if (import.meta.env.DEV) {
-      // eslint-disable-next-line no-console
-      console.log("[boot] auth ready");
-    }
-  }, [isReady]);
-
-  useEffect(() => {
-    const bootstrapError = meBootstrapError || null;
-
-    if (!bootstrapError) return;
-    // eslint-disable-next-line no-console
-    console.error("[boot] auth error", bootstrapError);
-  }, [
-    meBootstrapError,
-  ]);
-
-  useEffect(() => {
-    if (authState === "booting") return;
-    if (authState === "unauthenticated") {
-      // eslint-disable-next-line no-console
-      console.info("[auth] bootstrap_unauthenticated", { pathname });
-      return;
-    }
+    if (!import.meta.env.DEV || !isReady) return;
     if (authState === "authenticated") {
       // eslint-disable-next-line no-console
-      console.info("[auth] bootstrap_authenticated", { userId: userSafe?.id ?? null });
+      console.info("[boot] auth resolved authenticated", { userId: userSafe?.id ?? null });
+      return;
+    }
+    if (authState === "unauthenticated") {
+      // eslint-disable-next-line no-console
+      console.info("[boot] auth resolved guest", { pathname });
       return;
     }
     // eslint-disable-next-line no-console
-    console.error("[auth] bootstrap_failed", meBootstrapError);
-  }, [authState, meBootstrapError, pathname, userSafe?.id]);
+    console.error("[boot] bootstrap error", meBootstrapError);
+  }, [authState, isReady, meBootstrapError, pathname, userSafe?.id]);
 
   const value: AuthContextType = {
     user: userSafe,
