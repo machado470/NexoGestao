@@ -74,7 +74,7 @@ function getEnvelope(payload: unknown): Record<string, unknown> | null {
   return payload;
 }
 
-function getRequiresOnboarding(payload: unknown): boolean {
+export function getRequiresOnboarding(payload: unknown): boolean {
   const env = getEnvelope(payload);
   return Boolean(env?.requiresOnboarding);
 }
@@ -83,6 +83,12 @@ function bootLog(label: string, payload?: unknown) {
   if (!import.meta.env.DEV) return;
   // eslint-disable-next-line no-console
   console.log(label, payload ?? "");
+}
+
+function bootError(label: string, payload?: unknown) {
+  if (!import.meta.env.DEV) return;
+  // eslint-disable-next-line no-console
+  console.error(label, payload ?? "");
 }
 
 function FullScreenLoader() {
@@ -158,7 +164,7 @@ function RedirectingScreen({ message }: { message: string }) {
   return <FullScreenMessage title="Redirecionando..." description={message} />;
 }
 
-function buildLoginRedirectPath(currentPath: string) {
+export function buildLoginRedirectPath(currentPath: string) {
   const normalizedCurrentPath = currentPath.trim();
   if (!normalizedCurrentPath || normalizedCurrentPath === "/login") {
     return "/login";
@@ -169,7 +175,7 @@ function buildLoginRedirectPath(currentPath: string) {
   return `/login?${params.toString()}`;
 }
 
-function readSafeRedirectFromPath(path: string): string | null {
+export function readSafeRedirectFromPath(path: string): string | null {
   const query = path.includes("?") ? path.slice(path.indexOf("?") + 1) : "";
   if (!query) return null;
 
@@ -238,23 +244,29 @@ function ProtectedRoute({
     if (authState === "initializing") return;
 
     if (!isAuthenticated) {
+      if (location.startsWith("/login")) return;
       // eslint-disable-next-line no-console
-      console.info("[auth] protected_route_redirect", { from: location });
+      console.info("[ROUTER] protected_route_redirect", { from: location, to: "login" });
       navigate(buildLoginRedirectPath(location), { replace: true });
       return;
     }
 
-    if (requireCompletedOnboarding && requiresOnboarding) {
+    if (requireCompletedOnboarding && requiresOnboarding && location !== "/onboarding") {
+      // eslint-disable-next-line no-console
+      console.info("[ROUTER] protected_route_redirect", { from: location, to: "/onboarding" });
       navigate("/onboarding", { replace: true });
       return;
     }
 
-    if (onboardingOnly && !requiresOnboarding) {
+    if (onboardingOnly && !requiresOnboarding && location !== "/executive-dashboard") {
+      // eslint-disable-next-line no-console
+      console.info("[ROUTER] protected_route_redirect", { from: location, to: "/executive-dashboard" });
       navigate("/executive-dashboard", { replace: true });
     }
   }, [
     authState,
     isAuthenticated,
+    location,
     navigate,
     onboardingOnly,
     requireCompletedOnboarding,
@@ -304,11 +316,15 @@ function AuthRoute({ component: Component }: { component: ComponentType }) {
 
   useEffect(() => {
     if (authState !== "initializing" && isAuthenticated) {
-      navigate(redirectParam || redirectTo || "/executive-dashboard", {
+      const nextRoute = redirectParam || redirectTo || "/executive-dashboard";
+      if (location === nextRoute) return;
+      // eslint-disable-next-line no-console
+      console.info("[ROUTER] auth_route_redirect", { from: location, to: nextRoute });
+      navigate(nextRoute, {
         replace: true,
       });
     }
-  }, [authState, isAuthenticated, navigate, redirectParam, redirectTo]);
+  }, [authState, isAuthenticated, location, navigate, redirectParam, redirectTo]);
 
   if (authState === "initializing") return <Component />;
 
@@ -487,7 +503,7 @@ function Router() {
   const [location] = useLocation();
   const { authState, isAuthenticated } = useAuth();
 
-  bootLog("[boot] router start", { route: location, authState, isAuthenticated });
+  bootLog("[ROUTER] enter", { route: location, authState, isAuthenticated });
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -657,17 +673,18 @@ function RootRoute() {
   const [, navigate] = useLocation();
 
   useEffect(() => {
-    bootLog("[boot] route /");
+    bootLog("[ROUTER] route /");
     if (authState === "initializing") {
-      bootLog("[boot] auth loading");
+      bootLog("[AUTH] initializing");
       return;
     }
     if (authState === "error") {
-      bootLog("[boot] bootstrap error", bootstrapError);
+      bootError("[BOOT ERROR] auth bootstrap", bootstrapError);
       return;
     }
     if (authState === "unauthenticated") {
-      bootLog("[boot] redirect -> /login");
+      if (typeof window !== "undefined" && window.location.pathname === "/login") return;
+      bootLog("[ROUTER] redirect", { to: "/login" });
       navigate("/login", { replace: true });
       return;
     }
@@ -675,11 +692,11 @@ function RootRoute() {
     const requiresOnboarding = getRequiresOnboarding(payload);
     const target = requiresOnboarding ? "/onboarding" : "/executive-dashboard";
     if (requiresOnboarding) {
-      bootLog("[boot] render onboarding");
+      bootLog("[RENDER] onboarding");
     } else {
-      bootLog("[boot] render app");
+      bootLog("[RENDER] app");
     }
-    bootLog("[boot] redirect -> X", { target });
+    bootLog("[ROUTER] redirect", { target });
     navigate(target, { replace: true });
   }, [authState, bootstrapError, navigate, payload]);
 
@@ -693,7 +710,13 @@ function RootRoute() {
         title="Falha no bootstrap de autenticação"
         description="Não foi possível validar sua sessão inicial. Tente novamente."
         actionLabel="Tentar novamente"
-        onAction={() => void refresh()}
+        onAction={() =>
+          void refresh().catch(error => {
+            bootError("[AUTH] refresh failed from root", {
+              message: error instanceof Error ? error.message : "Erro desconhecido",
+            });
+          })
+        }
       />
     );
   }
@@ -706,7 +729,7 @@ function RootRoute() {
 }
 
 function App() {
-  bootLog("[boot] app render start");
+  bootLog("[RENDER] app render start");
 
   const [bootstrapState, setBootstrapState] = useState<AppBootstrapState>("initializing");
   const [bootstrapReason, setBootstrapReason] = useState<string | undefined>(undefined);
@@ -727,13 +750,13 @@ function App() {
   }, []);
 
   useEffect(() => {
-    bootLog("[boot] app init", { bootProbeStage });
+    bootLog("[BOOT] app init", { bootProbeStage });
   }, []);
 
   const markReady = useCallback((nextState: "authenticated" | "unauthenticated") => {
     setBootstrapState(prev => {
       if (prev === nextState) return prev;
-      bootLog("[boot] providers ready");
+      bootLog("[BOOT] providers ready");
       return nextState;
     });
   }, []);
@@ -743,7 +766,7 @@ function App() {
     setBootstrapState("error");
     if (import.meta.env.DEV) {
       // eslint-disable-next-line no-console
-      console.error("[boot] bootstrap error", { reason });
+      console.error("[BOOT ERROR] bootstrap state failed", { reason });
     }
   }, []);
 
@@ -852,10 +875,10 @@ function AuthBootstrapStatus({
       return;
     }
     if (authState === "unauthenticated") {
-      bootLog("[boot] render login");
+      bootLog("[RENDER] login");
     }
     if (authState === "authenticated") {
-      bootLog("[boot] render app");
+      bootLog("[RENDER] app");
     }
     onReady(authState);
   }, [authState, bootstrapError, onFailed, onReady]);

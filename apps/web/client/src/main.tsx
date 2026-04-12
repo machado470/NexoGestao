@@ -13,18 +13,45 @@ import "./index.css";
 import { initSentry } from "./lib/sentry";
 import { isPublicPath } from "./lib/publicRoutes";
 
-initSentry();
-if (import.meta.env.DEV) {
+const isDev = import.meta.env.DEV;
+
+function devLog(prefix: string, payload?: unknown) {
+  if (!isDev) return;
   // eslint-disable-next-line no-console
-  console.log("[boot] main start");
+  console.log(prefix, payload ?? "");
 }
+
+function devError(prefix: string, payload?: unknown) {
+  if (!isDev) return;
+  // eslint-disable-next-line no-console
+  console.error(prefix, payload ?? "");
+}
+
+function renderFatalBootError(message: string) {
+  if (typeof document === "undefined") return;
+  const fallback = document.getElementById("boot-fatal-error");
+  if (fallback) {
+    fallback.textContent = message;
+    return;
+  }
+
+  const node = document.createElement("div");
+  node.id = "boot-fatal-error";
+  node.style.cssText =
+    "padding:16px;margin:16px;border:1px solid #fca5a5;border-radius:12px;background:#fff1f2;color:#7f1d1d;font-family:system-ui,sans-serif;";
+  node.textContent = message;
+  document.body.prepend(node);
+}
+
+initSentry();
+devLog("[BOOT] main start");
 
 let isRedirectingToLogin = false;
 
-if (typeof window !== "undefined" && import.meta.env.DEV) {
+if (typeof window !== "undefined" && isDev) {
   window.addEventListener("error", (event) => {
-    // eslint-disable-next-line no-console
-    console.error("[boot] bootstrap error", {
+    devError("[RUNTIME ERROR] window.onerror", {
+      phase: "window-error-listener",
       message: event.message,
       filename: event.filename,
       lineno: event.lineno,
@@ -35,8 +62,8 @@ if (typeof window !== "undefined" && import.meta.env.DEV) {
 
   window.addEventListener("unhandledrejection", (event) => {
     const reason = event.reason;
-    // eslint-disable-next-line no-console
-    console.error("[boot] bootstrap error", {
+    devError("[RUNTIME ERROR] unhandledrejection", {
+      phase: "promise-rejection",
       message:
         reason instanceof Error
           ? reason.message
@@ -127,25 +154,31 @@ const trpcClient = trpc.createClient({
   ],
 });
 
-const rootElement = document.getElementById("root");
-if (!rootElement) {
-  throw new Error("[boot] Root #root não encontrado para montar a aplicação.");
-}
+try {
+  devLog("[BOOT] locating #root");
+  const rootElement = document.getElementById("root");
+  if (!rootElement) {
+    throw new Error("[BOOT ERROR] Root #root não encontrado para montar a aplicação.");
+  }
 
-if (import.meta.env.DEV) {
-  // eslint-disable-next-line no-console
-  console.log("[boot] app render start");
-}
+  devLog("[BOOT] app render start");
 
-createRoot(rootElement).render(
-  <trpc.Provider client={trpcClient} queryClient={queryClient}>
-    <QueryClientProvider client={queryClient}>
-      <App />
-    </QueryClientProvider>
-  </trpc.Provider>
-);
+  createRoot(rootElement).render(
+    <trpc.Provider client={trpcClient} queryClient={queryClient}>
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>
+    </trpc.Provider>
+  );
 
-if (import.meta.env.DEV) {
-  // eslint-disable-next-line no-console
-  console.log("[boot] app render done");
+  devLog("[BOOT] app render done");
+} catch (error) {
+  devError("[BOOT ERROR] bootstrap failure", {
+    phase: "react-root-mount",
+    message: error instanceof Error ? error.message : "Erro desconhecido",
+    stack: error instanceof Error ? error.stack : undefined,
+  });
+  renderFatalBootError(
+    "Falha crítica ao iniciar o app. Confira o console para detalhes de [BOOT ERROR]."
+  );
 }
