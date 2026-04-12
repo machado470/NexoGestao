@@ -306,7 +306,7 @@ wait_for_postgres() {
 wait_for_redis() {
   local attempts=40
   echo "⏳ Validando Redis na porta 6379..."
-  until node -e "const n=require('net');const s=n.createConnection({host:'127.0.0.1',port:6379});let d='';s.on('connect',()=>s.write('*1\\r\\n$4\\r\\nPING\\r\\n'));s.on('data',c=>{d+=c.toString();if(d.includes('+PONG')){s.end();process.exit(0)}});s.on('error',()=>process.exit(1));setTimeout(()=>process.exit(1),1200);" >/dev/null 2>&1; do
+  until node -e 'const n=require("net");const s=n.createConnection({host:"127.0.0.1",port:6379});let d="";s.on("connect",()=>s.write("*1\r\n$4\r\nPING\r\n"));s.on("data",c=>{d+=c.toString();if(d.includes("+PONG")){s.end();process.exit(0)}});s.on("error",()=>process.exit(1));setTimeout(()=>process.exit(1),1200);' >/dev/null 2>&1; do
     attempts=$((attempts - 1))
     if [ "$attempts" -le 0 ]; then
       echo "❌ Redis não respondeu PING na porta 6379 a tempo."
