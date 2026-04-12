@@ -783,22 +783,25 @@ export class ExecutionRunner {
       )
     }
 
-    const hasValidAuth = await this.hasValidAutomationSession(candidate.orgId)
-    if (this.requiresInteractiveAuthForAutomation() && !hasValidAuth) {
-      await recordBlockedWithContext(
-        executionKey,
-        mode,
-        'auth_invalid_session',
-        'blocked',
-        {
-          ruleId: candidate.decisionId,
-          ruleReason: 'nenhuma sessão autenticada válida para automação',
-          eligibility: 'blocked',
-        },
-        'AUTH_BLOCKED_EXECUTION',
-      )
-      this.countOperationalStatus('blocked')
-      return 'blocked'
+    const requireInteractiveAuth = this.requiresInteractiveAuthForAutomation()
+    if (requireInteractiveAuth) {
+      const hasValidAuth = await this.hasValidAutomationSession(candidate.orgId)
+      if (!hasValidAuth) {
+        await recordBlockedWithContext(
+          executionKey,
+          mode,
+          'auth_invalid_session',
+          'blocked',
+          {
+            ruleId: candidate.decisionId,
+            ruleReason: 'nenhuma sessão autenticada válida para automação',
+            eligibility: 'blocked',
+          },
+          'AUTH_BLOCKED_EXECUTION',
+        )
+        this.countOperationalStatus('blocked')
+        return 'blocked'
+      }
     }
 
     if (mode === 'manual') {

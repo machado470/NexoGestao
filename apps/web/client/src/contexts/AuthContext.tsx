@@ -20,6 +20,23 @@ type AuthUser = {
   normalizedRole: Role | null;
 } | null;
 
+export type AuthBootstrapState =
+  | "booting"
+  | "unauthenticated"
+  | "authenticated"
+  | "failed";
+
+export function resolveAuthBootstrapState(params: {
+  isInitializing: boolean;
+  bootstrapError: unknown | null;
+  user: AuthUser;
+}): AuthBootstrapState {
+  if (params.isInitializing) return "booting";
+  if (params.bootstrapError) return "failed";
+  if (params.user) return "authenticated";
+  return "unauthenticated";
+}
+
 interface AuthContextType {
   user: AuthUser;
   loading: boolean;
@@ -41,6 +58,8 @@ interface AuthContextType {
   payload: unknown;
   redirectTo: string;
   role: Role | null;
+  authState: AuthBootstrapState;
+  bootstrapError: unknown | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -160,7 +179,7 @@ function createSafeBroadcastChannel(name: string) {
   }
 }
 
-function isExpectedUnauthenticatedError(error: unknown): boolean {
+export function isExpectedUnauthenticatedError(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
 
   const maybeError = error as {
@@ -540,6 +559,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loading = isInitializing || isSubmitting;
   const userSafe = user ?? null;
   const isReady = !loading;
+  const authState = resolveAuthBootstrapState({
+    isInitializing,
+    bootstrapError: meBootstrapError,
+    user: userSafe,
+  });
+
+  useEffect(() => {
+    if (!shouldBootstrapSession || forcedLoggedOut) return;
+    // eslint-disable-next-line no-console
+    console.info("[auth] bootstrap_start", { pathname });
+  }, [forcedLoggedOut, pathname, shouldBootstrapSession]);
 
   if (import.meta.env.DEV) {
     // eslint-disable-next-line no-console
@@ -565,13 +595,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [isReady]);
 
   useEffect(() => {
-    const bootstrapError =
-      localError ||
-      meBootstrapError ||
-      loginMutation.error ||
-      registerMutation.error ||
-      logoutMutation.error ||
-      null;
+    const bootstrapError = meBootstrapError || null;
 
     if (!bootstrapError) return;
     // eslint-disable-next-line no-console
@@ -579,18 +603,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line no-console
     console.error("[auth] bootstrap failed", bootstrapError);
   }, [
-    localError,
-    loginMutation.error,
-    logoutMutation.error,
     meBootstrapError,
-    registerMutation.error,
   ]);
+
+  useEffect(() => {
+    if (authState === "booting") return;
+    if (authState === "unauthenticated") {
+      // eslint-disable-next-line no-console
+      console.info("[auth] bootstrap_unauthenticated", { pathname });
+      return;
+    }
+    if (authState === "authenticated") {
+      // eslint-disable-next-line no-console
+      console.info("[auth] bootstrap_authenticated", { userId: userSafe?.id ?? null });
+      return;
+    }
+    // eslint-disable-next-line no-console
+    console.error("[auth] bootstrap_failed", meBootstrapError);
+  }, [authState, meBootstrapError, pathname, userSafe?.id]);
 
   const value: AuthContextType = {
     user: userSafe,
     payload,
     redirectTo,
     role,
+    authState,
+    bootstrapError: meBootstrapError,
     loading,
     isInitializing,
     isSubmitting,
