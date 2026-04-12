@@ -638,6 +638,9 @@ function Router() {
 }
 
 function App() {
+  // eslint-disable-next-line no-console
+  console.log("[boot] app_render_start");
+
   const [bootstrapState, setBootstrapState] = useState<AppBootstrapState>("booting");
   const [bootstrapReason, setBootstrapReason] = useState<string | undefined>(undefined);
   const bootProbeStage = useMemo<BootProbeStage>(() => {
