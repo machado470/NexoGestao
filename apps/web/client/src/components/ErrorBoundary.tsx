@@ -1,84 +1,78 @@
 import { cn } from "@/lib/utils";
 import { AlertTriangle, RotateCcw } from "lucide-react";
-import { Component, ReactNode } from "react";
+import { Component, type ReactNode } from "react";
 
 interface Props {
   children: ReactNode;
+  routeContext?: string;
 }
 
 interface State {
   hasError: boolean;
   error: Error | null;
-  componentStack: string | null;
 }
 
 class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
-    this.state = { hasError: false, error: null, componentStack: null };
+    this.state = { hasError: false, error: null };
   }
 
   static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error, componentStack: null };
+    return { hasError: true, error };
   }
 
   componentDidCatch(error: Error, info: { componentStack: string }) {
-    this.setState({ componentStack: info.componentStack });
-    console.error("[AppErrorBoundary] runtime crash", {
-      component: this.constructor.name,
-      error,
+    // eslint-disable-next-line no-console
+    console.error("[boot] route_render_failed", {
+      route: this.props.routeContext ?? "unknown",
       message: error.message,
       stack: error.stack,
       componentStack: info.componentStack,
     });
   }
 
+  componentDidUpdate(prevProps: Props) {
+    if (this.state.hasError && prevProps.routeContext !== this.props.routeContext) {
+      this.setState({ hasError: false, error: null });
+    }
+  }
+
+  private handleRetry = () => {
+    this.setState({ hasError: false, error: null });
+  };
+
   render() {
-    if (this.state.hasError) {
-      return (
-        <div className="flex items-center justify-center min-h-screen p-8 bg-background">
-          <div className="flex flex-col items-center w-full max-w-2xl p-8">
-            <AlertTriangle
-              size={48}
-              className="text-destructive mb-6 flex-shrink-0"
-            />
-
-            <h2 className="text-xl mb-4">O app encontrou um erro ao carregar.</h2>
-
-            <div className="p-4 w-full rounded bg-muted overflow-auto mb-6">
-              <pre className="text-sm text-muted-foreground whitespace-break-spaces">
-                {this.state.error?.message ?? "Erro sem mensagem"}
-
-{this.state.error?.stack}
-              </pre>
-            </div>
-
-            {this.state.componentStack ? (
-              <div className="p-4 w-full rounded bg-muted overflow-auto mb-6">
-                <p className="text-sm font-medium text-foreground mb-2">Component stack</p>
-                <pre className="text-xs text-muted-foreground whitespace-break-spaces">
-                  {this.state.componentStack}
-                </pre>
-              </div>
-            ) : null}
-
-            <button
-              onClick={() => window.location.reload()}
-              className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-lg",
-                "bg-primary text-primary-foreground",
-                "hover:opacity-90 cursor-pointer"
-              )}
-            >
-              <RotateCcw size={16} />
-              Recarregar
-            </button>
-          </div>
-        </div>
-      );
+    if (!this.state.hasError) {
+      return this.props.children;
     }
 
-    return this.props.children;
+    return (
+      <div className="nexo-app-shell flex min-h-screen items-center justify-center px-6">
+        <div className="nexo-app-panel-strong w-full max-w-lg p-6">
+          <div className="mb-4 flex items-center gap-2 text-rose-600">
+            <AlertTriangle className="h-5 w-5" />
+            <h1 className="text-base font-semibold">Ocorreu um erro ao carregar esta área</h1>
+          </div>
+
+          <p className="text-sm text-[var(--text-muted)]">
+            Você pode tentar renderizar novamente sem sair da aplicação.
+          </p>
+
+          <button
+            type="button"
+            onClick={this.handleRetry}
+            className={cn(
+              "mt-4 inline-flex items-center gap-2 rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white",
+              "transition-colors hover:bg-orange-600"
+            )}
+          >
+            <RotateCcw className="h-4 w-4" />
+            Tentar novamente
+          </button>
+        </div>
+      </div>
+    );
   }
 }
 

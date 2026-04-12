@@ -9,9 +9,10 @@ import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedba
 import { getOperationalSeverityLabel, getServiceOrderSeverity } from "@/lib/operations/operational-intelligence";
 import {
   AppDataTable,
-  AppEmptyState,
   AppKpiRow,
-  AppLoadingState,
+  AppPageEmptyState,
+  AppPageErrorState,
+  AppPageLoadingState,
   AppPriorityBadge,
   AppRowActions,
   AppSectionBlock,
@@ -28,6 +29,9 @@ export default function ServiceOrdersPage() {
   const customers = useMemo(() => normalizeArrayPayload<any>(customersQuery.data), [customersQuery.data]);
   const people = useMemo(() => normalizeArrayPayload<any>(peopleQuery.data), [peopleQuery.data]);
   const orders = useMemo(() => normalizeArrayPayload<any>(serviceOrdersQuery.data), [serviceOrdersQuery.data]);
+  const hasData = orders.length > 0;
+  const showInitialLoading = serviceOrdersQuery.isLoading && !hasData;
+  const showErrorState = serviceOrdersQuery.error && !hasData;
 
   const inProgress = orders.filter((item) => String(item?.status ?? "").toUpperCase() === "IN_PROGRESS").length;
   const done = orders.filter((item) => String(item?.status ?? "").toUpperCase() === "DONE").length;
@@ -53,10 +57,16 @@ export default function ServiceOrdersPage() {
       />
 
       <AppSectionBlock title="Pipeline operacional" subtitle="Cada O.S. com ação real">
-        {serviceOrdersQuery.isLoading ? (
-          <AppLoadingState rows={4} />
+        {showInitialLoading ? (
+          <AppPageLoadingState description="Carregando ordens de serviço..." />
+        ) : showErrorState ? (
+          <AppPageErrorState
+            description={serviceOrdersQuery.error?.message ?? "Falha ao carregar ordens de serviço."}
+            actionLabel="Tentar novamente"
+            onAction={() => void serviceOrdersQuery.refetch()}
+          />
         ) : orders.length === 0 ? (
-          <AppEmptyState title="Nenhum dado disponível ainda" description="Ação recomendada: criar ordem de serviço" />
+          <AppPageEmptyState title="Nenhum dado disponível ainda" description="Ação recomendada: criar ordem de serviço" />
         ) : (
           <AppDataTable>
             <table className="w-full text-sm">

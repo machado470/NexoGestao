@@ -11,9 +11,10 @@ import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedba
 import {
   AppChartPanel,
   AppDataTable,
-  AppEmptyState,
   AppKpiRow,
-  AppLoadingState,
+  AppPageEmptyState,
+  AppPageErrorState,
+  AppPageLoadingState,
   AppRowActions,
   AppSectionBlock,
   AppStatusBadge,
@@ -39,6 +40,9 @@ export default function FinancesPage() {
 
   const charges = useMemo(() => normalizeArrayPayload<any>(chargesQuery.data), [chargesQuery.data]);
   const stats = useMemo(() => normalizeObjectPayload<any>(statsQuery.data) ?? {}, [statsQuery.data]);
+  const hasChargeData = charges.length > 0;
+  const showChargesInitialLoading = chargesQuery.isLoading && !hasChargeData;
+  const showChargesErrorState = chargesQuery.error && !hasChargeData;
 
   const revenueData = useMemo(() => {
     return normalizeArrayPayload<any>(revenueQuery.data).map((item) => ({
@@ -92,10 +96,16 @@ export default function FinancesPage() {
 
       <div className="grid gap-3 xl:grid-cols-3">
         <AppChartPanel title="Receita por mês" description="Somente dados reais do backend.">
-          {revenueQuery.isLoading ? (
-            <AppLoadingState rows={2} />
+          {revenueQuery.isLoading && revenueData.length === 0 ? (
+            <AppPageLoadingState description="Carregando evolução de receita..." />
+          ) : revenueQuery.error && revenueData.length === 0 ? (
+            <AppPageErrorState
+              description={revenueQuery.error?.message ?? "Falha ao carregar evolução da receita."}
+              actionLabel="Tentar novamente"
+              onAction={() => void revenueQuery.refetch()}
+            />
           ) : revenueData.length === 0 ? (
-            <AppEmptyState title="Nenhum dado disponível ainda" description="Ação recomendada: criar cobrança" />
+            <AppPageEmptyState title="Nenhum dado disponível ainda" description="Ação recomendada: criar cobrança" />
           ) : (
             <ChartContainer className="h-[240px] w-full" config={{ revenue: { label: "Receita" } }}>
               <AreaChart data={revenueData}>
@@ -110,10 +120,16 @@ export default function FinancesPage() {
       </div>
 
       <AppSectionBlock title="Cobranças e pagamentos" subtitle="Fluxo real: cobrança → pagamento → atualização automática">
-        {chargesQuery.isLoading ? (
-          <AppLoadingState rows={4} />
+        {showChargesInitialLoading ? (
+          <AppPageLoadingState description="Carregando cobranças..." />
+        ) : showChargesErrorState ? (
+          <AppPageErrorState
+            description={chargesQuery.error?.message ?? "Falha ao carregar cobranças."}
+            actionLabel="Tentar novamente"
+            onAction={() => void chargesQuery.refetch()}
+          />
         ) : charges.length === 0 ? (
-          <AppEmptyState title="Nenhum dado disponível ainda" description="Ação recomendada: criar cobrança" />
+          <AppPageEmptyState title="Nenhum dado disponível ainda" description="Ação recomendada: criar cobrança" />
         ) : (
           <AppDataTable>
             <table className="w-full text-sm">
