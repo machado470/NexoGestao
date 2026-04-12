@@ -246,22 +246,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const originalPushState = history.pushState.bind(history);
     const originalReplaceState = history.replaceState.bind(history);
 
-    history.pushState = function (...args) {
-      originalPushState(...args);
-      updatePathname();
-    };
+    let patchedPushState = false;
+    let patchedReplaceState = false;
 
-    history.replaceState = function (...args) {
-      originalReplaceState(...args);
-      updatePathname();
-    };
+    try {
+      history.pushState = function (...args) {
+        originalPushState(...args);
+        updatePathname();
+      };
+      patchedPushState = true;
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.warn("[auth] pushState patch skipped", { error });
+    }
+
+    try {
+      history.replaceState = function (...args) {
+        originalReplaceState(...args);
+        updatePathname();
+      };
+      patchedReplaceState = true;
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.warn("[auth] replaceState patch skipped", { error });
+    }
 
     window.addEventListener("popstate", updatePathname);
     window.addEventListener("hashchange", updatePathname);
 
     return () => {
-      history.pushState = originalPushState;
-      history.replaceState = originalReplaceState;
+      if (patchedPushState) {
+        history.pushState = originalPushState;
+      }
+      if (patchedReplaceState) {
+        history.replaceState = originalReplaceState;
+      }
       window.removeEventListener("popstate", updatePathname);
       window.removeEventListener("hashchange", updatePathname);
     };
