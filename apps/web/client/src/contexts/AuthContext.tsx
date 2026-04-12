@@ -7,6 +7,7 @@ import React, {
   useState,
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { normalizeRole, type Role } from "@/lib/rbac";
 
@@ -209,20 +210,14 @@ export function isExpectedUnauthenticatedError(error: unknown): boolean {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const utils = trpc.useUtils();
   const queryClient = useQueryClient();
+  const [location] = useLocation();
 
   const [localLoading, setLocalLoading] = useState(false);
   const [localError, setLocalError] = useState<unknown | null>(null);
   const [forcedLoggedOut, setForcedLoggedOut] = useState(false);
   const [meBootstrapTimedOut, setMeBootstrapTimedOut] = useState(false);
   const channelRef = useRef<BroadcastChannel | null>(null);
-  const [pathname, setPathname] = useState(() => {
-    try {
-      if (typeof window === "undefined") return "/";
-      return window.location.pathname;
-    } catch {
-      return "/";
-    }
-  });
+  const pathname = useMemo(() => location.split(/[?#]/, 1)[0] || "/", [location]);
 
   const isAuthPath = AUTH_PATH_PREFIXES.some(prefix =>
     pathname.startsWith(prefix)
@@ -230,61 +225,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const isMarketingPath = MARKETING_PATHS.has(pathname);
   const shouldBootstrapSession = isAuthPath || !isMarketingPath;
   const syncEventRef = useRef<(payload: unknown) => Promise<void>>(async () => {});
-
-  useEffect(() => {
-    if (import.meta.env.DEV) {
-      // eslint-disable-next-line no-console
-      console.log("[boot] auth init");
-    }
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const updatePathname = () => setPathname(window.location.pathname);
-    const { history } = window;
-    const originalPushState = history.pushState.bind(history);
-    const originalReplaceState = history.replaceState.bind(history);
-
-    let patchedPushState = false;
-    let patchedReplaceState = false;
-
-    try {
-      history.pushState = function (...args) {
-        originalPushState(...args);
-        updatePathname();
-      };
-      patchedPushState = true;
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.warn("[auth] pushState patch skipped", { error });
-    }
-
-    try {
-      history.replaceState = function (...args) {
-        originalReplaceState(...args);
-        updatePathname();
-      };
-      patchedReplaceState = true;
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.warn("[auth] replaceState patch skipped", { error });
-    }
-
-    window.addEventListener("popstate", updatePathname);
-    window.addEventListener("hashchange", updatePathname);
-
-    return () => {
-      if (patchedPushState) {
-        history.pushState = originalPushState;
-      }
-      if (patchedReplaceState) {
-        history.replaceState = originalReplaceState;
-      }
-      window.removeEventListener("popstate", updatePathname);
-      window.removeEventListener("hashchange", updatePathname);
-    };
-  }, []);
 
   const meQuery = trpc.session.me.useQuery(undefined, {
     enabled: shouldBootstrapSession && !forcedLoggedOut,
