@@ -683,6 +683,18 @@ export const nexoProxyRouter = router({
         return authedGet(ctx as CtxLike, "/executions/events", input ?? {});
       }),
 
+    recent: protectedProcedure
+      .input(
+        z
+          .object({
+            limit: z.number().int().min(1).max(500).optional(),
+          })
+          .optional()
+      )
+      .query(async ({ ctx, input }) => {
+        return authedGet(ctx as CtxLike, "/executions/recent", input ?? {});
+      }),
+
     modeHistory: protectedProcedure
       .input(z.object({ limit: z.number().int().min(1).max(100).optional() }).optional())
       .query(async ({ ctx, input }) => {

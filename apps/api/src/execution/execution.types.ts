@@ -35,12 +35,40 @@ export type ExecutionRunnerStatus =
   | 'throttled'
   | 'requires_confirmation'
 
+export type ExecutionPriority = 'critical' | 'high' | 'medium' | 'low'
+
+export type ExecutionIntent =
+  | 'recover_revenue'
+  | 'reduce_risk'
+  | 'customer_engagement'
+  | 'operational_followup'
+  | (string & {})
+
+export type ExecutionResult = {
+  outcome: 'success' | 'blocked' | 'failed' | 'throttled' | 'requires_confirmation'
+  revenueRecoveredCents?: number
+  riskReducedScore?: number
+  [key: string]: unknown
+}
+
+export type ExecutionContext = {
+  orgId: string
+  entityId: string
+  decisionId: string
+  actionId: string
+  intent: ExecutionIntent
+  priority: ExecutionPriority
+  correlationId: string
+}
+
 export type ExecutionActionCandidate = {
   actionId: string
   decisionId: string
   entityType: 'serviceOrder' | 'charge' | 'system'
   entityId: string
   orgId: string
+  priority: ExecutionPriority
+  intent: ExecutionIntent
   mode?: ExecutionMode
   metadata?: Record<string, unknown>
 }
@@ -59,6 +87,10 @@ export type ExecutionEventPayload = {
   executionKey: string
   mode: ExecutionMode
   status: ExecutionRunnerStatus
+  intent: ExecutionIntent
+  priority: ExecutionPriority
+  correlationId: string
+  result?: ExecutionResult
   reasonCode?: string
   customerId?: string
   timestamp: string

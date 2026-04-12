@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common'
+import { randomUUID } from 'crypto'
 import { WhatsAppMessageType } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
 import { FinanceService } from '../finance/finance.service'
@@ -6,7 +7,12 @@ import { ExecutionConfigService } from './execution.config'
 import { ExecutionGovernanceService } from './execution.governance'
 import { ExecutionEventsService } from './execution.events'
 import { buildExecutionKey } from './execution.idempotency'
-import type { ExecutionActionCandidate } from './execution.types'
+import type {
+  ExecutionActionCandidate,
+  ExecutionContext,
+  ExecutionPriority,
+  ExecutionResult,
+} from './execution.types'
 import { MetricsService } from '../common/metrics/metrics.service'
 import { TenantOperationsService } from '../common/tenant-ops/tenant-ops.service'
 import {
@@ -21,6 +27,12 @@ export class ExecutionRunner {
   private readonly blockedRecentCooldownMap = new Map<string, number>()
   private readonly blockedLogSuppression = new Map<string, { until: number; blockedCountDuringWindow: number }>()
   private readonly blockedReasonCounters = new Map<string, number>()
+  private readonly priorityOrder: Record<ExecutionPriority, number> = {
+    critical: 0,
+    high: 1,
+    medium: 2,
+    low: 3,
+  }
 
   private async sleep(ms: number) {
     await new Promise((resolve) => setTimeout(resolve, ms))
@@ -28,6 +40,22 @@ export class ExecutionRunner {
 
   private hasUsablePhone(phone: string | null | undefined): boolean {
     return typeof phone === 'string' && phone.trim().length > 0
+  }
+
+  private sortCandidatesByPriority(candidates: ExecutionActionCandidate[]) {
+    return [...candidates].sort((a, b) => this.priorityOrder[a.priority] - this.priorityOrder[b.priority])
+  }
+
+  private buildExecutionContext(candidate: ExecutionActionCandidate, correlationId: string): ExecutionContext {
+    return {
+      orgId: candidate.orgId,
+      entityId: candidate.entityId,
+      decisionId: candidate.decisionId,
+      actionId: candidate.actionId,
+      intent: candidate.intent,
+      priority: candidate.priority,
+      correlationId,
+    }
   }
 
   private buildCooldownKey(candidate: ExecutionActionCandidate): string {
@@ -252,6 +280,7 @@ export class ExecutionRunner {
 
   async runOnce(options?: { debugExecution?: boolean; overrideCooldown?: boolean }) {
     const debugExecution = this.isDebugExecutionEnabled(options)
+    const correlationId = randomUUID()
     this.blockedReasonCounters.clear()
     const now = Date.now()
     if (now < this.nextCycleAt) {
@@ -276,7 +305,7 @@ export class ExecutionRunner {
     let skipped = 0
 
     for (const org of orgs) {
-      const candidates = await this.loadActionCandidates(org.id)
+      const candidates = this.sortCandidatesByPriority(await this.loadActionCandidates(org.id))
       totalCandidates += candidates.length
 
       for (const candidate of candidates) {
@@ -284,6 +313,7 @@ export class ExecutionRunner {
         const result = await this.processCandidate(candidate, {
           debugExecution,
           overrideCooldown: options?.overrideCooldown === true,
+          correlationId,
         })
         if (result === 'executed') executed += 1
         else if (result === 'failed') failed += 1
@@ -318,6 +348,7 @@ export class ExecutionRunner {
         },
         debugExecution,
         overrideCooldown: options?.overrideCooldown === true,
+        correlationId,
         orgsProcessed: orgs.length,
         maxExecutionsPerCycle: this.config.getMaxExecutionsPerCycle(),
         cycleDelayMs,
@@ -334,6 +365,7 @@ export class ExecutionRunner {
       skipped,
       debugExecution,
       blockedByReason: Object.fromEntries(this.blockedReasonCounters.entries()),
+      correlationId,
     }
   }
 
@@ -395,6 +427,8 @@ export class ExecutionRunner {
       entityType: 'serviceOrder',
       entityId: item.id,
       orgId,
+      priority: 'critical',
+      intent: 'recover_revenue',
       metadata: {
         customerId: item.customerId,
         amountCents: item.amountCents,
@@ -450,6 +484,8 @@ export class ExecutionRunner {
         entityType: 'charge',
         entityId: item.id,
         orgId,
+        priority: 'high',
+        intent: 'customer_engagement',
         metadata: {
           customerId: item.customerId,
           amountCents: item.amountCents,
@@ -476,6 +512,8 @@ export class ExecutionRunner {
         entityType: 'system',
         entityId: `org:${orgId}`,
         orgId,
+        priority: 'high',
+        intent: 'reduce_risk',
         metadata: {
           overdueCount,
           stalledServiceOrders,
@@ -515,6 +553,8 @@ export class ExecutionRunner {
         entityType: 'charge',
         entityId: item.id,
         orgId,
+        priority: 'high',
+        intent: 'recover_revenue',
         metadata: {
           customerId: item.customerId,
           amountCents: item.amountCents,
@@ -538,6 +578,8 @@ export class ExecutionRunner {
         entityType: 'system',
         entityId: `org:${orgId}`,
         orgId,
+        priority: 'medium',
+        intent: 'operational_followup',
         metadata: {
           overdueCount,
           thresholdOverdue: 5,
@@ -560,6 +602,8 @@ export class ExecutionRunner {
         entityType: 'system',
         entityId: `org:${orgId}`,
         orgId,
+        priority: 'medium',
+        intent: 'operational_followup',
         metadata: {
           stalledServiceOrders,
           thresholdStalledServiceOrders: 10,
@@ -591,6 +635,8 @@ export class ExecutionRunner {
       entityType: 'charge',
       entityId: item.id,
       orgId,
+      priority: 'critical',
+      intent: 'recover_revenue',
       metadata: {
         customerId: item.customerId,
         amountCents: item.amountCents,
@@ -615,6 +661,8 @@ export class ExecutionRunner {
         entityType: 'system',
         entityId: `org:${orgId}`,
         orgId,
+        priority: 'critical',
+        intent: 'reduce_risk',
         metadata: {
           overdueCount,
           stalledServiceOrders,
@@ -627,9 +675,27 @@ export class ExecutionRunner {
 
   private async processCandidate(
     candidate: ExecutionActionCandidate,
-    options?: { debugExecution?: boolean; overrideCooldown?: boolean },
+    options?: { debugExecution?: boolean; overrideCooldown?: boolean; correlationId?: string },
   ) {
     const debugExecution = options?.debugExecution === true
+    const correlationId = options?.correlationId ?? randomUUID()
+    const executionContext = this.buildExecutionContext(candidate, correlationId)
+    const recordBlockedWithContext = (
+      executionKey: string,
+      mode: 'manual' | 'semi_automatic' | 'automatic',
+      reasonCode: string,
+      status: 'blocked' | 'requires_confirmation' | 'throttled',
+      explanation?: {
+        ruleId?: string
+        ruleReason?: string
+        eligibility?: string
+        policyKey?: string
+        policyValue?: unknown
+        governanceReason?: string
+        cooldownUntil?: string
+      },
+      eventType: 'EXECUTION_BLOCKED' | 'AUTH_BLOCKED_EXECUTION' = 'EXECUTION_BLOCKED',
+    ) => this.recordBlocked(candidate, executionKey, mode, reasonCode, status, explanation, eventType, correlationId)
     const mode = await this.config.getExecutionMode({ orgId: candidate.orgId })
     const policy = await this.config.getPolicyConfig({ orgId: candidate.orgId })
 
@@ -666,8 +732,12 @@ export class ExecutionRunner {
         executionKey,
         mode,
         status: 'failed',
+        intent: executionContext.intent,
+        priority: executionContext.priority,
+        correlationId: executionContext.correlationId,
         reasonCode: 'invalid_execution_context',
         timestamp: new Date().toISOString(),
+        result: { outcome: 'failed' },
         metadata: detail,
         reasonDetail: contextValidation.reason,
         explanation: {
@@ -683,7 +753,7 @@ export class ExecutionRunner {
 
     const blockedUntil = this.isCandidateInRecentCooldown(candidate)
     if (blockedUntil && options?.overrideCooldown !== true) {
-      await this.recordBlocked(candidate, executionKey, mode, 'blocked_recent_execution', 'blocked', {
+      await recordBlockedWithContext(executionKey, mode, 'blocked_recent_execution', 'blocked', {
         ruleId: candidate.decisionId,
         ruleReason: 'cooldown local ativo por execução recente',
         eligibility: 'blocked',
@@ -710,8 +780,7 @@ export class ExecutionRunner {
 
     const hasValidAuth = await this.hasValidAutomationSession(candidate.orgId)
     if (!hasValidAuth) {
-      await this.recordBlocked(
-        candidate,
+      await recordBlockedWithContext(
         executionKey,
         mode,
         'auth_invalid_session',
@@ -728,7 +797,7 @@ export class ExecutionRunner {
     }
 
     if (mode === 'manual') {
-      await this.recordBlocked(candidate, executionKey, mode, 'mode_manual_explicit_configuration', 'blocked', {
+      await recordBlockedWithContext(executionKey, mode, 'mode_manual_explicit_configuration', 'blocked', {
         ruleId: candidate.decisionId,
         ruleReason: 'runner mode em manual por configuração explícita',
         eligibility: 'blocked',
@@ -738,8 +807,7 @@ export class ExecutionRunner {
     }
 
     if (mode === 'semi_automatic') {
-      await this.recordBlocked(
-        candidate,
+      await recordBlockedWithContext(
         executionKey,
         mode,
         'mode_semi_automatic_requires_confirmation',
@@ -755,7 +823,7 @@ export class ExecutionRunner {
     }
 
     if (candidate.actionId === 'action-generate-charge' && !policy.allowAutomaticCharge) {
-      await this.recordBlocked(candidate, executionKey, mode, 'policy_automatic_charge_disabled', 'blocked', {
+      await recordBlockedWithContext(executionKey, mode, 'policy_automatic_charge_disabled', 'blocked', {
         ruleId: candidate.decisionId,
         policyKey: 'allowAutomaticCharge',
         policyValue: policy.allowAutomaticCharge,
@@ -765,7 +833,7 @@ export class ExecutionRunner {
     }
 
     if (candidate.actionId === 'action-notify-finance-team' && !policy.allowFinanceTeamNotifications) {
-      await this.recordBlocked(candidate, executionKey, mode, 'policy_finance_team_notification_disabled', 'blocked', {
+      await recordBlockedWithContext(executionKey, mode, 'policy_finance_team_notification_disabled', 'blocked', {
         ruleId: candidate.decisionId,
         policyKey: 'allowFinanceTeamNotifications',
         policyValue: policy.allowFinanceTeamNotifications,
@@ -774,7 +842,7 @@ export class ExecutionRunner {
       return 'blocked'
     }
     if (candidate.actionId === 'action-mark-operational-attention' && !policy.allowGovernanceFollowup) {
-      await this.recordBlocked(candidate, executionKey, mode, 'policy_operational_attention_disabled', 'blocked', {
+      await recordBlockedWithContext(executionKey, mode, 'policy_operational_attention_disabled', 'blocked', {
         ruleId: candidate.decisionId,
         policyKey: 'allowGovernanceFollowup',
         policyValue: policy.allowGovernanceFollowup,
@@ -783,7 +851,7 @@ export class ExecutionRunner {
       return 'blocked'
     }
     if (candidate.actionId === 'action-create-charge-followup' && !policy.allowChargeFollowupCreation) {
-      await this.recordBlocked(candidate, executionKey, mode, 'policy_charge_followup_creation_disabled', 'blocked', {
+      await recordBlockedWithContext(executionKey, mode, 'policy_charge_followup_creation_disabled', 'blocked', {
         ruleId: candidate.decisionId,
         policyKey: 'allowChargeFollowupCreation',
         policyValue: policy.allowChargeFollowupCreation,
@@ -792,7 +860,7 @@ export class ExecutionRunner {
       return 'blocked'
     }
     if (candidate.actionId === 'action-escalate-risk-review' && !policy.allowRiskReviewEscalation) {
-      await this.recordBlocked(candidate, executionKey, mode, 'policy_risk_review_escalation_disabled', 'blocked', {
+      await recordBlockedWithContext(executionKey, mode, 'policy_risk_review_escalation_disabled', 'blocked', {
         ruleId: candidate.decisionId,
         policyKey: 'allowRiskReviewEscalation',
         policyValue: policy.allowRiskReviewEscalation,
@@ -803,8 +871,7 @@ export class ExecutionRunner {
 
     const governance = this.governance.evaluate(candidate)
     if (governance.status !== 'allowed') {
-      await this.recordBlocked(
-        candidate,
+      await recordBlockedWithContext(
         executionKey,
         mode,
         governance.reasonCode ?? 'governance_blocked',
@@ -828,7 +895,7 @@ export class ExecutionRunner {
       const cooldownMs = this.config.getBlockedRecentCooldownMs()
       const blockedUntil = Date.now() + cooldownMs
       this.markCandidateRecentCooldown(candidate, blockedUntil)
-      await this.recordBlocked(candidate, executionKey, mode, 'blocked_recent_execution', 'blocked', {
+      await recordBlockedWithContext(executionKey, mode, 'blocked_recent_execution', 'blocked', {
         ruleId: candidate.decisionId,
         ruleReason: 'idempotency',
         cooldownUntil: new Date(blockedUntil).toISOString(),
@@ -844,7 +911,7 @@ export class ExecutionRunner {
     })
 
     if (failureCount >= policy.maxRetries) {
-      await this.recordBlocked(candidate, executionKey, mode, 'retry_limit_reached', 'throttled', {
+      await recordBlockedWithContext(executionKey, mode, 'retry_limit_reached', 'throttled', {
         ruleId: candidate.decisionId,
         ruleReason: 'retry limit reached',
       })
@@ -855,7 +922,7 @@ export class ExecutionRunner {
 
     const featureAccess = await this.commercial.canUseFeature(candidate.orgId, 'advanced_automation')
     if (isCommercialBlocked(featureAccess)) {
-      await this.recordBlocked(candidate, executionKey, mode, featureAccess.reasonCode, 'blocked', {
+      await recordBlockedWithContext(executionKey, mode, featureAccess.reasonCode, 'blocked', {
         ruleId: candidate.decisionId,
         ruleReason: featureAccess.reasonMessage,
       })
@@ -866,7 +933,7 @@ export class ExecutionRunner {
 
     const commercialLimit = await this.commercial.enforceMeter(candidate.orgId, 'automation_executions')
     if (isCommercialBlocked(commercialLimit)) {
-      await this.recordBlocked(candidate, executionKey, mode, commercialLimit.reasonCode, 'blocked', {
+      await recordBlockedWithContext(executionKey, mode, commercialLimit.reasonCode, 'blocked', {
         ruleId: candidate.decisionId,
         ruleReason: commercialLimit.reasonMessage,
       })
@@ -884,8 +951,7 @@ export class ExecutionRunner {
     })
 
     if (!tenantLimit.allowed) {
-      await this.recordBlocked(
-        candidate,
+      await recordBlockedWithContext(
         executionKey,
         mode,
         tenantLimit.reason ?? 'tenant_execution_rate_limit_reached',
@@ -914,7 +980,11 @@ export class ExecutionRunner {
       executionKey,
       mode,
       status: 'pending',
+      intent: executionContext.intent,
+      priority: executionContext.priority,
+      correlationId: executionContext.correlationId,
       reasonCode: 'runner_execution_requested',
+      result: { outcome: 'success' },
       timestamp: new Date().toISOString(),
       customerId: contextValidation.customerId ?? undefined,
       metadata: {
@@ -930,7 +1000,7 @@ export class ExecutionRunner {
     })
 
     try {
-      await this.executeCandidate(candidate)
+      const executionResult = await this.executeCandidate(candidate, executionContext)
 
       await this.events.recordEvent(candidate.orgId, {
         eventType: 'EXECUTION_EXECUTED',
@@ -941,7 +1011,11 @@ export class ExecutionRunner {
         executionKey,
         mode,
         status: 'executed',
+        intent: executionContext.intent,
+        priority: executionContext.priority,
+        correlationId: executionContext.correlationId,
         reasonCode: 'runner_executed',
+        result: executionResult,
         reasonDetail: 'ação executada com sucesso',
         timestamp: new Date().toISOString(),
         customerId: contextValidation.customerId ?? undefined,
@@ -971,7 +1045,7 @@ export class ExecutionRunner {
     } catch (error) {
       const expectedReason = this.mapExpectedReasonFromError(error)
       if (expectedReason) {
-        await this.recordBlocked(candidate, executionKey, mode, expectedReason, 'blocked', {
+        await recordBlockedWithContext(executionKey, mode, expectedReason, 'blocked', {
           ruleId: candidate.decisionId,
           ruleReason: 'expected_non_failure',
         })
@@ -988,7 +1062,11 @@ export class ExecutionRunner {
         executionKey,
         mode,
         status: 'failed',
+        intent: executionContext.intent,
+        priority: executionContext.priority,
+        correlationId: executionContext.correlationId,
         reasonCode: 'runner_execution_failed',
+        result: { outcome: 'failed' },
         reasonDetail: 'falha inesperada durante execução',
         timestamp: new Date().toISOString(),
         customerId: contextValidation.customerId ?? undefined,
@@ -1041,6 +1119,7 @@ export class ExecutionRunner {
       cooldownUntil?: string
     },
     eventType: 'EXECUTION_BLOCKED' | 'AUTH_BLOCKED_EXECUTION' = 'EXECUTION_BLOCKED',
+    correlationId?: string,
   ) {
     this.incrementBlockedReason(reasonCode)
     await this.events.recordEvent(candidate.orgId, {
@@ -1052,7 +1131,11 @@ export class ExecutionRunner {
       executionKey,
       mode,
       status,
+      intent: candidate.intent,
+      priority: candidate.priority,
+      correlationId: correlationId ?? randomUUID(),
       reasonCode,
+      result: { outcome: status },
       reasonDetail: explanation?.ruleReason,
       cooldownUntil: explanation?.cooldownUntil,
       timestamp: new Date().toISOString(),
@@ -1086,7 +1169,10 @@ export class ExecutionRunner {
     }
   }
 
-  private async executeCandidate(candidate: ExecutionActionCandidate) {
+  private async executeCandidate(
+    candidate: ExecutionActionCandidate,
+    executionContext: ExecutionContext,
+  ): Promise<ExecutionResult> {
     if (candidate.actionId === 'action-generate-charge') {
       const amountCents = Number(candidate.metadata?.amountCents ?? 0)
       const customerId = String(candidate.metadata?.customerId ?? '')
@@ -1101,7 +1187,10 @@ export class ExecutionRunner {
         dueDate,
         actorUserId: null,
       })
-      return
+      return {
+        outcome: 'success',
+        revenueRecoveredCents: amountCents > 0 ? amountCents : undefined,
+      }
     }
 
     if (candidate.actionId === 'action-send-whatsapp-payment-link') {
@@ -1126,7 +1215,7 @@ export class ExecutionRunner {
       }
 
       await this.finance.sendChargeWhatsApp(charge.id)
-      return
+      return { outcome: 'success' }
     }
 
     if (candidate.actionId === 'action-notify-operational-alert') {
@@ -1138,11 +1227,12 @@ export class ExecutionRunner {
           metadata: {
             source: 'execution_runner_v5',
             decisionId: candidate.decisionId,
+            correlationId: executionContext.correlationId,
             ...candidate.metadata,
           },
         },
       })
-      return
+      return { outcome: 'success', riskReducedScore: 1 }
     }
 
     if (candidate.actionId === 'action-send-overdue-charge-reminder') {
@@ -1167,7 +1257,10 @@ export class ExecutionRunner {
       }
 
       await this.finance.sendPaymentReminderWhatsApp(charge.id)
-      return
+      return {
+        outcome: 'success',
+        revenueRecoveredCents: Number(candidate.metadata?.amountCents ?? 0) || undefined,
+      }
     }
 
     if (candidate.actionId === 'action-notify-finance-team') {
@@ -1179,11 +1272,12 @@ export class ExecutionRunner {
           metadata: {
             source: 'execution_runner_v5',
             decisionId: candidate.decisionId,
+            correlationId: executionContext.correlationId,
             ...candidate.metadata,
           },
         },
       })
-      return
+      return { outcome: 'success' }
     }
 
     if (candidate.actionId === 'action-mark-operational-attention') {
@@ -1195,11 +1289,12 @@ export class ExecutionRunner {
           metadata: {
             source: 'execution_runner_v5',
             decisionId: candidate.decisionId,
+            correlationId: executionContext.correlationId,
             ...candidate.metadata,
           },
         },
       })
-      return
+      return { outcome: 'success', riskReducedScore: 1 }
     }
     if (candidate.actionId === 'action-create-charge-followup') {
       const charge = await this.prisma.charge.findFirst({
@@ -1238,11 +1333,15 @@ export class ExecutionRunner {
           metadata: {
             source: 'execution_runner_v5',
             decisionId: candidate.decisionId,
+            correlationId: executionContext.correlationId,
             ...candidate.metadata,
           },
         },
       })
-      return
+      return {
+        outcome: 'success',
+        revenueRecoveredCents: Number(candidate.metadata?.amountCents ?? 0) || undefined,
+      }
     }
 
     if (candidate.actionId === 'action-escalate-risk-review') {
@@ -1264,11 +1363,12 @@ export class ExecutionRunner {
           metadata: {
             source: 'execution_runner_v5',
             decisionId: candidate.decisionId,
+            correlationId: executionContext.correlationId,
             ...candidate.metadata,
           },
         },
       })
-      return
+      return { outcome: 'success', riskReducedScore: 2 }
     }
 
     throw new Error(`unsupported_action:${candidate.actionId}`)
