@@ -2,6 +2,7 @@ import { Component, type ReactNode } from "react";
 
 type Props = {
   children: ReactNode;
+  name?: string;
 };
 
 type State = {
@@ -19,8 +20,14 @@ export class GlobalActionEngineBoundary extends Component<Props, State> {
     };
   }
 
-  componentDidCatch(error: Error) {
-    console.error("[GlobalActionEngine] render failure", error);
+  componentDidCatch(error: Error, info: { componentStack: string }) {
+    const label = this.props.name ?? "GlobalActionEngine";
+    console.error(`[${label}] render failure`, {
+      error,
+      message: error.message,
+      stack: error.stack,
+      componentStack: info.componentStack,
+    });
   }
 
   render() {

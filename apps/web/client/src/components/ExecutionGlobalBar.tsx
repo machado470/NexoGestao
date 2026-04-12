@@ -32,12 +32,16 @@ function normalizeModeLabel(mode?: ExecutionMode) {
 }
 
 export function ExecutionGlobalBar() {
-  const { role } = useAuth();
+  const { role, loading, isAuthenticated, user } = useAuth();
+  const canRenderBar = !loading && isAuthenticated && Boolean(user?.id);
   const canEditMode = role ? can(role, "governance:update") || role === "MANAGER" : false;
 
   const utils = trpc.useUtils();
-  const modeQuery = trpc.nexo.executions.mode.useQuery(undefined, { retry: false });
-  const summaryQuery = trpc.nexo.executions.stateSummary.useQuery({ sinceMs: 1000 * 60 * 60 * 24 }, { retry: false });
+  const modeQuery = trpc.nexo.executions.mode.useQuery(undefined, { retry: false, enabled: canRenderBar });
+  const summaryQuery = trpc.nexo.executions.stateSummary.useQuery(
+    { sinceMs: 1000 * 60 * 60 * 24 },
+    { retry: false, enabled: canRenderBar }
+  );
 
   const modePayload = useMemo(() => getPayloadValue<ModePayload>(modeQuery.data) ?? {}, [modeQuery.data]);
   const summary = useMemo(() => getPayloadValue<ExecutionStateSummary>(summaryQuery.data) ?? {}, [summaryQuery.data]);
@@ -69,6 +73,10 @@ export function ExecutionGlobalBar() {
 
   const isLoading = modeQuery.isLoading || summaryQuery.isLoading;
   const selectedMode = modePayload.mode ?? "manual";
+
+  if (!canRenderBar) {
+    return null;
+  }
 
   useEffect(() => {
     setNextMode(selectedMode);

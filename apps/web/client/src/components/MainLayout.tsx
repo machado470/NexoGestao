@@ -157,6 +157,17 @@ export function MainLayout({ children }: MainLayoutProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const shouldRenderGlobalEngine =
     !loading && isAuthenticated && Boolean(user?.id);
+  const shouldRenderExecutionBar = shouldRenderGlobalEngine;
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    // eslint-disable-next-line no-console
+    console.log("[boot] MainLayout mounted");
+    return () => {
+      // eslint-disable-next-line no-console
+      console.log("[boot] MainLayout unmounted");
+    };
+  }, []);
 
   const sections: MenuSection[] = [
     {
@@ -602,11 +613,15 @@ export function MainLayout({ children }: MainLayoutProps) {
               </div>
             </NexoTopbar>
 
-            <ExecutionGlobalBar />
+            {shouldRenderExecutionBar ? (
+              <GlobalActionEngineBoundary name="ExecutionGlobalBar">
+                <ExecutionGlobalBar />
+              </GlobalActionEngineBoundary>
+            ) : null}
 
             <NexoMainContainer>
               {shouldRenderGlobalEngine ? (
-                <GlobalActionEngineBoundary>
+                <GlobalActionEngineBoundary name="GlobalActionEngine">
                   <GlobalActionEngine />
                 </GlobalActionEngineBoundary>
               ) : null}

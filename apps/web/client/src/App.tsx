@@ -323,6 +323,11 @@ function MarketingRoute({
 
 function withMainLayout(Page: ComponentType) {
   return function LayoutWrappedPage() {
+    if (import.meta.env.DEV) {
+      // eslint-disable-next-line no-console
+      console.log("[boot] before MainLayout");
+    }
+
     return (
       <AppLayout>
         <Page />
@@ -621,6 +626,12 @@ function Router() {
 }
 
 function App() {
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    // eslint-disable-next-line no-console
+    console.log("[boot] App component mounted");
+  }, []);
+
   return (
     <ErrorBoundary>
       <AuthProvider>
