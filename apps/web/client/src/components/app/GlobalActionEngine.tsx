@@ -13,10 +13,6 @@ export function GlobalActionEngine() {
   const userId = user?.id ?? null;
   const canMountEngine = !loading && isAuthenticated && Boolean(userId);
 
-  if (!canMountEngine || !userId) {
-    return null;
-  }
-
   const queryOptions = {
     retry: false,
     staleTime: 120_000,
@@ -35,6 +31,20 @@ export function GlobalActionEngine() {
   const appointments = useMemo(() => toArray<any>(appointmentsQuery.data ?? []), [appointmentsQuery.data]);
   const serviceOrders = useMemo(() => toArray<any>(serviceOrdersQuery.data ?? []), [serviceOrdersQuery.data]);
   const charges = useMemo(() => toArray<any>(chargesQuery.data ?? []), [chargesQuery.data]);
+
+  if (import.meta.env.DEV) {
+    // eslint-disable-next-line no-console
+    console.log("[boot] GlobalActionEngine state", {
+      loading,
+      isAuthenticated,
+      userId,
+      canMountEngine,
+    });
+  }
+
+  if (!canMountEngine || !userId) {
+    return null;
+  }
 
   return (
     <div className="px-3 pb-3 pt-2 md:px-4">

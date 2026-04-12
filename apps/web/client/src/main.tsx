@@ -14,6 +14,10 @@ import { initSentry } from "./lib/sentry";
 import { isPublicPath } from "./lib/publicRoutes";
 
 initSentry();
+if (import.meta.env.DEV) {
+  // eslint-disable-next-line no-console
+  console.log("[boot] frontend bootstrap started");
+}
 
 let isRedirectingToLogin = false;
 
@@ -95,10 +99,25 @@ const trpcClient = trpc.createClient({
   ],
 });
 
-createRoot(document.getElementById("root")!).render(
+const rootElement = document.getElementById("root");
+if (!rootElement) {
+  throw new Error("[boot] Root #root não encontrado para montar a aplicação.");
+}
+
+if (import.meta.env.DEV) {
+  // eslint-disable-next-line no-console
+  console.log("[boot] mounting App");
+}
+
+createRoot(rootElement).render(
   <trpc.Provider client={trpcClient} queryClient={queryClient}>
     <QueryClientProvider client={queryClient}>
       <App />
     </QueryClientProvider>
   </trpc.Provider>
 );
+
+if (import.meta.env.DEV) {
+  // eslint-disable-next-line no-console
+  console.log("[boot] App mount dispatched");
+}
