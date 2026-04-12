@@ -472,6 +472,12 @@ function LegacyAliasRoute({
 
 function Router() {
   const [location] = useLocation();
+  const { isInitializing, isAuthenticated } = useAuth();
+
+  if (import.meta.env.DEV) {
+    // eslint-disable-next-line no-console
+    console.log("[boot] router render", { location, isInitializing, isAuthenticated });
+  }
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -626,10 +632,15 @@ function Router() {
 }
 
 function App() {
+  if (import.meta.env.DEV) {
+    // eslint-disable-next-line no-console
+    console.log("[boot] App render start");
+  }
+
   useEffect(() => {
     if (!import.meta.env.DEV) return;
     // eslint-disable-next-line no-console
-    console.log("[boot] App component mounted");
+    console.log("[boot] app render ok");
   }, []);
 
   return (

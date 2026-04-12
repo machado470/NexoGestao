@@ -23,6 +23,7 @@ class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: { componentStack: string }) {
     console.error("[AppErrorBoundary] runtime crash", {
+      component: this.constructor.name,
       error,
       message: error.message,
       stack: error.stack,

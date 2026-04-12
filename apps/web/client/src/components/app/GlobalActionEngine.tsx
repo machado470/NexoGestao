@@ -34,7 +34,7 @@ export function GlobalActionEngine() {
 
   if (import.meta.env.DEV) {
     // eslint-disable-next-line no-console
-    console.log("[boot] GlobalActionEngine state", {
+    console.log("[boot] global action engine render", {
       loading,
       isAuthenticated,
       userId,

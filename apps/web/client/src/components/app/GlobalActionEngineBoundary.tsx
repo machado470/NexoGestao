@@ -23,6 +23,7 @@ export class GlobalActionEngineBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, info: { componentStack: string }) {
     const label = this.props.name ?? "GlobalActionEngine";
     console.error(`[${label}] render failure`, {
+      component: label,
       error,
       message: error.message,
       stack: error.stack,
