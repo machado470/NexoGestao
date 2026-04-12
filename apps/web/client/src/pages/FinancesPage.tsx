@@ -23,6 +23,7 @@ import { buildIdempotencyKey } from "@/lib/idempotency";
 import { toast } from "sonner";
 import { invalidateOperationalGraph } from "@/lib/operationalConsistency";
 import { getChargeSeverity, getOperationalSeverityLabel } from "@/lib/operations/operational-intelligence";
+import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
 
 function formatCurrency(cents: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100);
@@ -43,13 +44,24 @@ export default function FinancesPage() {
   const hasChargeData = charges.length > 0;
   const showChargesInitialLoading = chargesQuery.isLoading && !hasChargeData;
   const showChargesErrorState = chargesQuery.error && !hasChargeData;
-
   const revenueData = useMemo(() => {
     return normalizeArrayPayload<any>(revenueQuery.data).map((item) => ({
       label: String(item?.month ?? item?.label ?? "Mês"),
       revenue: Number(item?.totalRevenueCents ?? item?.revenueCents ?? item?.amountCents ?? 0) / 100,
     }));
   }, [revenueQuery.data]);
+
+  usePageDiagnostics({
+    page: "finances",
+    isLoading: showChargesInitialLoading || (revenueQuery.isLoading && revenueData.length === 0),
+    hasError: Boolean(showChargesErrorState || (revenueQuery.error && revenueData.length === 0)),
+    isEmpty:
+      !showChargesInitialLoading &&
+      !showChargesErrorState &&
+      charges.length === 0 &&
+      !revenueQuery.isLoading,
+    dataCount: charges.length,
+  });
 
   async function registerPayment(charge: any) {
     if (payCharge.isPending) return;

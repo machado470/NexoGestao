@@ -15,6 +15,7 @@ import {
   AppSectionBlock,
   AppStatusBadge,
 } from "@/components/internal-page-system";
+import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
 
 function metric(summary: Record<string, any>, ...keys: string[]) {
   for (const key of keys) {
@@ -35,6 +36,18 @@ export default function GovernancePage() {
   const runs = useMemo(() => normalizeArrayPayload<any>(runsQuery.data), [runsQuery.data]);
   const hasRunsData = runs.length > 0;
   const hasSummaryData = Boolean(summaryQuery.data);
+  usePageDiagnostics({
+    page: "governance",
+    isLoading: (runsQuery.isLoading && !hasRunsData) || (summaryQuery.isLoading && !hasSummaryData),
+    hasError: Boolean((runsQuery.error && !hasRunsData) || (summaryQuery.error && !hasSummaryData)),
+    isEmpty:
+      !runsQuery.isLoading &&
+      !summaryQuery.isLoading &&
+      !runsQuery.error &&
+      !summaryQuery.error &&
+      runs.length === 0,
+    dataCount: runs.length,
+  });
 
   const riskSeries = runs
     .map((run, index) => ({

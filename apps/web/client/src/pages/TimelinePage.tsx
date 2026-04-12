@@ -15,6 +15,7 @@ import {
   AppSectionBlock,
   Input,
 } from "@/components/internal-page-system";
+import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
 
 function toLabel(value: unknown, fallback: string) {
   const text = String(value ?? "").trim();
@@ -25,6 +26,13 @@ export default function TimelinePage() {
   const [filter, setFilter] = useState("");
   const timelineQuery = trpc.nexo.timeline.listByOrg.useQuery({ limit: 200 }, { retry: false });
   const events = useMemo(() => normalizeArrayPayload<any>(timelineQuery.data), [timelineQuery.data]);
+  usePageDiagnostics({
+    page: "timeline",
+    isLoading: timelineQuery.isLoading,
+    hasError: Boolean(timelineQuery.error),
+    isEmpty: !timelineQuery.isLoading && !timelineQuery.error && events.length === 0,
+    dataCount: events.length,
+  });
 
   const filteredEvents = useMemo(() => {
     const q = filter.trim().toLowerCase();

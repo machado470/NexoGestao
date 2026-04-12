@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { normalizeArrayPayload } from "@/lib/query-helpers";
+import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
 import { CreateAppointmentModal } from "@/components/CreateAppointmentModal";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
@@ -30,6 +31,13 @@ export default function AppointmentsPage() {
   const hasData = appointments.length > 0;
   const showInitialLoading = appointmentsQuery.isLoading && !hasData;
   const showErrorState = appointmentsQuery.error && !hasData;
+  usePageDiagnostics({
+    page: "appointments",
+    isLoading: showInitialLoading,
+    hasError: Boolean(showErrorState),
+    isEmpty: !showInitialLoading && !showErrorState && appointments.length === 0,
+    dataCount: appointments.length,
+  });
 
   const scheduled = appointments.filter((item) => String(item?.status ?? "").toUpperCase() === "SCHEDULED").length;
   const confirmed = appointments.filter((item) => String(item?.status ?? "").toUpperCase() === "CONFIRMED").length;

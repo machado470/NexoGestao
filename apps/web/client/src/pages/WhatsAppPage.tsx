@@ -17,6 +17,7 @@ import {
   AppStatusBadge,
 } from "@/components/internal-page-system";
 import { invalidateOperationalGraph } from "@/lib/operationalConsistency";
+import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
 
 export default function WhatsAppPage() {
   const safeDate = (value: unknown) => {
@@ -50,6 +51,13 @@ export default function WhatsAppPage() {
   const serviceOrders = useMemo(() => normalizeArrayPayload<any>(serviceOrdersQuery.data), [serviceOrdersQuery.data]);
   const failed = messages.filter((item) => String(item?.status ?? "").toUpperCase() === "FAILED").length;
   const delivered = messages.filter((item) => String(item?.status ?? "").toUpperCase() === "DELIVERED").length;
+  usePageDiagnostics({
+    page: "whatsapp",
+    isLoading: messagesQuery.isLoading,
+    hasError: Boolean(messagesQuery.error),
+    isEmpty: !messagesQuery.isLoading && !messagesQuery.error && messages.length === 0,
+    dataCount: messages.length,
+  });
 
   const automationSuggestions = useMemo(() => {
     const now = Date.now();
