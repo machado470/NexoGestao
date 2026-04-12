@@ -600,8 +600,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!bootstrapError) return;
     // eslint-disable-next-line no-console
     console.error("[boot] auth error", bootstrapError);
-    // eslint-disable-next-line no-console
-    console.error("[auth] bootstrap failed", bootstrapError);
   }, [
     meBootstrapError,
   ]);

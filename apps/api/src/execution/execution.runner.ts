@@ -125,11 +125,6 @@ export class ExecutionRunner {
     return process.env.EXECUTION_DEBUG_MODE === '1'
   }
 
-  private isEmailVerificationEnforced(): boolean {
-    const raw = (process.env.AUTH_ENFORCE_EMAIL_VERIFICATION ?? '').trim().toLowerCase()
-    return ['1', 'true', 'yes', 'y', 'on'].includes(raw)
-  }
-
   private requiresInteractiveAuthForAutomation(): boolean {
     const raw = (process.env.EXECUTION_REQUIRE_INTERACTIVE_AUTH ?? '').trim().toLowerCase()
     return ['1', 'true', 'yes', 'y', 'on'].includes(raw)
@@ -138,20 +133,6 @@ export class ExecutionRunner {
   private incrementBlockedReason(reasonCode: string) {
     const current = this.blockedReasonCounters.get(reasonCode) ?? 0
     this.blockedReasonCounters.set(reasonCode, current + 1)
-  }
-
-  private async hasValidAutomationSession(orgId: string) {
-    const enforceVerification = this.isEmailVerificationEnforced()
-    const activeUser = await this.prisma.user.findFirst({
-      where: {
-        orgId,
-        active: true,
-        role: { in: ['ADMIN', 'MANAGER', 'STAFF'] },
-        ...(enforceVerification ? { emailVerifiedAt: { not: null } } : {}),
-      },
-      select: { id: true },
-    })
-    return Boolean(activeUser?.id)
   }
 
   constructor(
@@ -785,23 +766,17 @@ export class ExecutionRunner {
 
     const requireInteractiveAuth = this.requiresInteractiveAuthForAutomation()
     if (requireInteractiveAuth) {
-      const hasValidAuth = await this.hasValidAutomationSession(candidate.orgId)
-      if (!hasValidAuth) {
-        await recordBlockedWithContext(
+      this.logger.warn(
+        JSON.stringify({
+          event: 'execution_runner_interactive_auth_required',
           executionKey,
-          mode,
-          'auth_invalid_session',
-          'blocked',
-          {
-            ruleId: candidate.decisionId,
-            ruleReason: 'nenhuma sessão autenticada válida para automação',
-            eligibility: 'blocked',
-          },
-          'AUTH_BLOCKED_EXECUTION',
-        )
-        this.countOperationalStatus('blocked')
-        return 'blocked'
-      }
+          orgId: candidate.orgId,
+          actionId: candidate.actionId,
+          decisionId: candidate.decisionId,
+          detail:
+            'EXECUTION_REQUIRE_INTERACTIVE_AUTH=true ativo, mas automação segue com contexto técnico (sem dependência de sessão).',
+        }),
+      )
     }
 
     if (mode === 'manual') {
