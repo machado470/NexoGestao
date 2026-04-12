@@ -220,6 +220,16 @@ export class ExecutionController {
     })
   }
 
+  @Get('recent')
+  @Roles('ADMIN', 'MANAGER', 'STAFF', 'VIEWER')
+  listRecent(
+    @Org() orgId: string,
+    @Query('limit') limit?: string,
+  ) {
+    const normalizedLimit = Number(limit ?? 100)
+    return this.executionEvents.listRecentExecutions(orgId, Number.isFinite(normalizedLimit) ? normalizedLimit : 100)
+  }
+
   @Post('runner/run-once')
   @Roles('ADMIN', 'MANAGER')
   runOnce(

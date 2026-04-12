@@ -162,8 +162,12 @@ export class ExecutionEventsService {
         entityId: String(meta.entityId ?? ''),
         eventType: String(meta.eventType ?? ''),
         status: String(meta.status ?? ''),
+        intent: typeof meta.intent === 'string' ? meta.intent : null,
+        priority: typeof meta.priority === 'string' ? meta.priority : null,
+        correlationId: typeof meta.correlationId === 'string' ? meta.correlationId : null,
         reasonCode: typeof meta.reasonCode === 'string' ? meta.reasonCode : null,
         mode: typeof meta.mode === 'string' ? meta.mode : null,
+        result: typeof meta.result === 'object' && meta.result ? meta.result : null,
         timestamp:
           typeof meta.timestamp === 'string' && meta.timestamp
             ? meta.timestamp
@@ -189,5 +193,21 @@ export class ExecutionEventsService {
         return true
       })
       .slice(0, normalizedLimit)
+  }
+
+  async listRecentExecutions(
+    orgId: string,
+    limit = 100,
+  ) {
+    const rows = await this.listRecentEvents(orgId, limit)
+    return rows.map((row) => ({
+      id: row.id,
+      timestamp: row.timestamp,
+      status: row.status,
+      reasonCode: row.reasonCode,
+      intent: row.intent,
+      priority: row.priority,
+      correlationId: row.correlationId,
+    }))
   }
 }
