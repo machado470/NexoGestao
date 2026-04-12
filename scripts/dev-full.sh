@@ -49,7 +49,7 @@ if [ ! -f "$ENV_FILE" ]; then
 fi
 
 load_env_file() {
-  local file="$1"
+  local file="${1:-}"
   [ -f "$file" ] || return 0
 
   while IFS= read -r line || [ -n "$line" ]; do
@@ -156,7 +156,7 @@ ensure_port_tooling() {
 }
 
 container_on_port() {
-  local port="$1"
+  local port="${1:-}"
   local cid
   while IFS=$'\t' read -r cid _name; do
     [ -n "$cid" ] || continue
@@ -169,7 +169,7 @@ container_on_port() {
 }
 
 process_on_port() {
-  local port="$1"
+  local port="${1:-}"
   if command -v lsof >/dev/null 2>&1; then
     lsof -nP -iTCP:"$port" -sTCP:LISTEN 2>/dev/null | awk 'NR==2 {print $1 " (pid " $2 ")"; exit}'
     return 0
@@ -184,7 +184,7 @@ process_on_port() {
 }
 
 port_in_use() {
-  local port="$1"
+  local port="${1:-}"
   if command -v lsof >/dev/null 2>&1; then
     lsof -nP -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1
     return $?
@@ -199,7 +199,7 @@ port_in_use() {
 }
 
 is_nexo_container_name() {
-  case "$1" in
+  case "${1:-}" in
     nexogestao-postgres|nexogestao-redis|nexogestao_postgres|nexogestao_redis)
       return 0
       ;;
@@ -210,7 +210,7 @@ is_nexo_container_name() {
 }
 
 find_existing_nexo_container() {
-  local service="$1"
+  local service="${1:-}"
   local names=()
   if [ "$service" = "postgres" ]; then
     names=(nexogestao-postgres nexogestao_postgres)
@@ -230,7 +230,7 @@ find_existing_nexo_container() {
 }
 
 container_running() {
-  local cname="$1"
+  local cname="${1:-}"
   [ "$(docker inspect --format '{{.State.Running}}' "$cname" 2>/dev/null || true)" = "true" ]
 }
 
@@ -263,8 +263,8 @@ wait_for_redis() {
 }
 
 fail_if_external_port_block() {
-  local port="$1"
-  local purpose="$2"
+  local port="${1:-}"
+  local purpose="${2:-}"
 
   if ! port_in_use "$port"; then
     return 0
@@ -290,7 +290,7 @@ fail_if_external_port_block() {
 }
 
 ensure_service_running() {
-  local service="$1"
+  local service="${1:-}"
   local port=""
   if [ "$service" = "postgres" ]; then
     port="5432"
