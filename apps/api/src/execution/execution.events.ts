@@ -20,9 +20,15 @@ export class ExecutionEventsService {
     await this.timeline.log({
       orgId,
       action: EXECUTION_EVENT_ACTION,
-      description: `${payload.actionId} => ${payload.status}`,
+      description: `${payload.eventType} | ${payload.actionId} => ${payload.status}`,
       customerId: payload.customerId,
-      metadata: payload,
+      metadata: {
+        ...payload,
+        orgId,
+        entityId: payload.entityId,
+        reasonCode: payload.reasonCode ?? null,
+        cooldownUntil: payload.cooldownUntil ?? payload.explanation?.cooldownUntil ?? null,
+      },
     })
   }
 
@@ -44,7 +50,7 @@ export class ExecutionEventsService {
         },
         OR: [
           { metadata: { path: ['status'], equals: 'executed' as ExecutionRunnerStatus } },
-          { metadata: { path: ['eventType'], equals: 'EXECUTION_ACTION_REQUESTED' } },
+          { metadata: { path: ['eventType'], equals: 'EXECUTION_STARTED' } },
         ],
       },
       select: { id: true },
@@ -167,6 +173,8 @@ export class ExecutionEventsService {
           executionKey: typeof meta.executionKey === 'string' ? meta.executionKey : null,
           policySignal: typeof meta.policySignal === 'string' ? meta.policySignal : null,
           governanceSignal: typeof meta.governanceSignal === 'string' ? meta.governanceSignal : null,
+          orgId: typeof meta.orgId === 'string' ? meta.orgId : orgId,
+          cooldownUntil: typeof meta.cooldownUntil === 'string' ? meta.cooldownUntil : null,
           explanation:
             typeof meta.explanation === 'object' && meta.explanation
               ? (meta.explanation as Record<string, unknown>)
