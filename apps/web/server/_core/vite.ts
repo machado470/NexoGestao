@@ -30,9 +30,19 @@ function assertHtmlShell(
   }
 
   const hasModuleScript = /<script[^>]*type=\"module\"[^>]*src=\"[^\"]+\"[^>]*>/.test(template);
+  const hasMainEntrypoint =
+    /<script[^>]*type=\"module\"[^>]*src=\"\/src\/main\.tsx(?:\?[^\"]*)?\"[^>]*>/.test(
+      template
+    );
 
   if (!hasModuleScript) {
     throw new Error(`[web] HTML shell inválido (${source}): script de entrada não encontrado em modo ${mode}.`);
+  }
+
+  if (mode === "vite" && !hasMainEntrypoint) {
+    throw new Error(
+      `[web] HTML shell inválido (${source}): entrypoint esperado /src/main.tsx não encontrado.`
+    );
   }
 }
 
@@ -50,10 +60,24 @@ export async function setupVite(app: Express, server: Server) {
     appType: "custom",
   });
 
+  console.log("[BFF] Vite dev server criado em middleware mode");
+
+  app.use((req, _res, next) => {
+    console.log("[BFF] intercept", req.method, req.originalUrl);
+    next();
+  });
+
+  app.use("/src/main.tsx", (req, _res, next) => {
+    console.log("[BFF] calling Vite for entrypoint", req.originalUrl);
+    next();
+  });
+
   app.use(vite.middlewares);
+  console.log("[BFF] Vite middlewares acoplados ao Express");
+
   app.use("*", async (req, res, next) => {
     const url = req.originalUrl;
-    console.log("[web] serving_app_shell", { url, mode: "vite" });
+    console.log("[BFF] serving HTML for", url);
 
     try {
       const clientTemplate = path.resolve(
@@ -74,11 +98,27 @@ export async function setupVite(app: Express, server: Server) {
         `src="/src/main.tsx"`,
         `src="/src/main.tsx?v=${nanoid()}"`
       );
+      console.log("[BFF] calling Vite transformIndexHtml for", url);
       const page = await vite.transformIndexHtml(url, template);
       res.status(200).set({ "Content-Type": "text/html" }).end(page);
     } catch (e) {
       vite.ssrFixStacktrace(e as Error);
-      next(e);
+      console.error("[BFF] vite transform falhou, enviando fallback hard", e);
+      res
+        .status(200)
+        .set({ "Content-Type": "text/html" })
+        .end(`<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NexoGestão - fallback</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>document.body.innerHTML = "JS não carregado";</script>
+  </body>
+</html>`);
     }
   });
 }
