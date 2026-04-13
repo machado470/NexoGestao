@@ -8,21 +8,42 @@
 
   <body>
     <div
-      id="debug-static-html"
-      style="display:none;position:fixed;top:8px;left:8px;z-index:2147483647;background:#111827;color:#f9fafb;padding:4px 8px;border-radius:6px;font:600 12px/1.2 system-ui"
+      id="debug-html-static"
+      style="position:fixed;top:8px;left:8px;z-index:2147483647;background:#111827;color:#f9fafb;padding:4px 8px;border-radius:6px;font:600 12px/1.2 system-ui"
     >
-      STATIC HTML OK
+      HTML STATIC OK
     </div>
     <div id="root"></div>
     <script>
       (function () {
         try {
-          const params = new URLSearchParams(window.location.search);
-          if (params.get("renderAudit") === "1") {
-            const marker = document.getElementById("debug-static-html");
-            if (marker) marker.style.display = "inline-flex";
+          var at = new Date().toISOString();
+          var marker = document.getElementById("debug-html-static");
+          console.log("[HTML] inline script running", {
+            at: at,
+            pathname: window.location.pathname,
+            readyState: document.readyState,
+          });
+          if (marker) {
+            marker.textContent = "HTML STATIC OK | INLINE JS OK";
+            marker.style.background = "#14532d";
+            marker.style.color = "#dcfce7";
           }
-        } catch (_) {}
+
+          var params = new URLSearchParams(window.location.search);
+          if (params.get("renderAudit") === "1") {
+            document.documentElement.style.outline = "3px solid #ef4444";
+            document.body.style.background = "#fff7ed";
+            var root = document.getElementById("root");
+            if (root) {
+              root.style.outline = "3px dashed #f97316";
+              root.style.minHeight = "100vh";
+              root.style.background = "rgba(254,215,170,0.35)";
+            }
+          }
+        } catch (error) {
+          console.error("[HTML] inline script error", error);
+        }
       })();
     </script>
     <script type="module" src="/src/main.tsx"></script>

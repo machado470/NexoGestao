@@ -9,68 +9,26 @@ import { setBootPhase, getLastPhase } from "@/lib/bootPhase";
 import { showFatalDebugOverlay } from "@/lib/fatalDebugOverlay";
 import { getQueryClient, getTrpcClient, trpc } from "@/lib/trpc";
 
-console.log("MAIN START");
-
 const ROOT_ID = "root";
-export const PROVIDER_TREE_ORDER = ["QueryClientProvider", "trpc.Provider", "ErrorBoundary", "App"] as const;
 
-function ProvidersMountLogger() {
-  React.useEffect(() => {
-    if (!import.meta.env.DEV) return;
-    // eslint-disable-next-line no-console
-    console.info("[BOOT] QueryClientProvider mounted");
-    return () => {
-      // eslint-disable-next-line no-console
-      console.info("[BOOT] QueryClientProvider unmounted");
-    };
-  }, []);
+type RenderAuditMode = "minimal" | "static-react" | "app";
 
-  return null;
+function nowIso() {
+  return new Date().toISOString();
 }
 
-function TrpcProviderMountLogger() {
-  React.useEffect(() => {
-    if (!import.meta.env.DEV) return;
-    // eslint-disable-next-line no-console
-    console.info("[BOOT] trpc.Provider mounted");
-    return () => {
-      // eslint-disable-next-line no-console
-      console.info("[BOOT] trpc.Provider unmounted");
-    };
-  }, []);
+function getRenderAuditMode(): RenderAuditMode {
+  if (typeof window === "undefined") return "app";
 
-  return null;
-}
-
-
-function AppMountLogger() {
-  React.useEffect(() => {
-    if (!import.meta.env.DEV || typeof window === "undefined") return;
-    // eslint-disable-next-line no-console
-    console.info("[BOOT] App mounted", { pathname: window.location.pathname, providerOrder: PROVIDER_TREE_ORDER });
-    return () => {
-      // eslint-disable-next-line no-console
-      console.info("[BOOT] App unmounted", { pathname: window.location.pathname });
-    };
-  }, []);
-
-  return null;
-}
-
-function shouldRunBootProbe() {
-  if (typeof window === "undefined") return false;
   const params = new URLSearchParams(window.location.search);
-  return params.get("bootProbe") === "1";
-}
+  if (params.get("renderAudit") === "1" && !params.get("renderAuditMode")) {
+    return "app";
+  }
 
-function isRenderAuditEnabled() {
-  if (typeof window === "undefined") return false;
-  return new URLSearchParams(window.location.search).get("renderAudit") === "1";
-}
-
-function shouldRunMinimalRenderProbe() {
-  if (typeof window === "undefined") return false;
-  return new URLSearchParams(window.location.search).get("renderAuditMode") === "minimal";
+  const mode = (params.get("renderAuditMode") ?? "").trim().toLowerCase();
+  if (mode === "minimal") return "minimal";
+  if (mode === "static-react") return "static-react";
+  return "app";
 }
 
 function normalizeError(errorLike: unknown) {
@@ -100,120 +58,152 @@ function handleFatalError(title: string, errorLike: unknown, extra?: unknown) {
     cause: parsed.cause,
     extra,
     url: typeof window !== "undefined" ? window.location.href : "unknown",
-    timestamp: new Date().toISOString(),
+    timestamp: nowIso(),
   });
 }
 
+function installGlobalErrorHooks() {
+  window.onerror = (message, source, lineno, colno, error) => {
+    const parsed = normalizeError(error ?? message);
+    // eslint-disable-next-line no-console
+    console.error("[WINDOW_ERROR]", {
+      at: nowIso(),
+      pathname: window.location.pathname,
+      message: String(message),
+      source,
+      lineno,
+      colno,
+      stack: parsed.stack,
+    });
+
+    setBootPhase("WINDOW_ONERROR");
+    handleFatalError("Erro global não tratado", error ?? String(message), {
+      source,
+      lineno,
+      colno,
+      rawMessage: message,
+    });
+    return false;
+  };
+
+  window.onunhandledrejection = (event) => {
+    const parsed = normalizeError(event.reason);
+    // eslint-disable-next-line no-console
+    console.error("[UNHANDLED_PROMISE]", {
+      at: nowIso(),
+      pathname: window.location.pathname,
+      message: parsed.message,
+      stack: parsed.stack,
+      reason: event.reason,
+    });
+
+    setBootPhase("WINDOW_UNHANDLED_REJECTION");
+    handleFatalError("Promise rejeitada sem catch", event.reason, {
+      type: "unhandledrejection",
+    });
+  };
+}
+
 function mountApp() {
+  installGlobalErrorHooks();
   setBootPhase("BOOT_START");
+
   const pathname = typeof window === "undefined" ? "unknown" : window.location.pathname;
-  const renderAudit = isRenderAuditEnabled();
-  const minimalProbe = shouldRunMinimalRenderProbe();
+  const readyState = typeof document === "undefined" ? "unknown" : document.readyState;
+  const renderAuditMode = getRenderAuditMode();
+
   if (import.meta.env.DEV) {
     // eslint-disable-next-line no-console
-    console.log("[BOOT] pathname", pathname);
+    console.log("[MAIN] bootstrap", { at: nowIso(), pathname, readyState, renderAuditMode });
   }
 
   const rootElement = document.getElementById(ROOT_ID);
   if (import.meta.env.DEV) {
     // eslint-disable-next-line no-console
-    console.log("[BOOT] root element found", rootElement);
+    console.log("[MAIN] root lookup", { found: Boolean(rootElement), rootId: ROOT_ID });
   }
+
   if (!rootElement) {
     setBootPhase("ROOT_NOT_FOUND");
     handleFatalError("Falha de bootstrap do frontend", new Error(`Root element #${ROOT_ID} not found`));
     return;
   }
-  if (import.meta.env.DEV) {
-    // eslint-disable-next-line no-console
-    console.log("[BOOT] root element metadata", { id: rootElement.id, tagName: rootElement.tagName });
-  }
 
   setBootPhase("ROOT_FOUND");
-  const queryClient = getQueryClient();
-  const trpcClient = getTrpcClient();
-  const useProbe = shouldRunBootProbe();
+
   if (import.meta.env.DEV) {
     // eslint-disable-next-line no-console
-    console.log("[BOOT] before createRoot");
+    console.log("[MAIN] createRoot:start", { at: nowIso() });
   }
   const root = createRoot(rootElement);
 
   setBootPhase("APP_RENDER_START");
   if (import.meta.env.DEV) {
     // eslint-disable-next-line no-console
-    console.log("[BOOT] before render");
+    console.log("[MAIN] render:start", { at: nowIso(), renderAuditMode });
   }
+
+  if (renderAuditMode === "minimal") {
+    root.render(
+      <div
+        data-debug="minimal-client-render-ok"
+        style={{
+          minHeight: "100vh",
+          display: "grid",
+          placeContent: "center",
+          background: "#052e16",
+          color: "#ecfdf5",
+          font: "700 18px/1.2 system-ui",
+        }}
+      >
+        MINIMAL CLIENT RENDER OK
+      </div>
+    );
+    return;
+  }
+
+  if (renderAuditMode === "static-react") {
+    root.render(
+      <React.StrictMode>
+        <div
+          data-debug="static-react-render-ok"
+          style={{
+            minHeight: "100vh",
+            display: "grid",
+            placeContent: "center",
+            background: "#082f49",
+            color: "#e0f2fe",
+            font: "700 18px/1.2 system-ui",
+          }}
+        >
+          STATIC REACT OK
+        </div>
+      </React.StrictMode>
+    );
+    return;
+  }
+
+  const queryClient = getQueryClient();
+  const trpcClient = getTrpcClient();
+
   root.render(
     <React.StrictMode>
       <QueryClientProvider client={queryClient}>
-        <ProvidersMountLogger />
         <trpc.Provider client={trpcClient} queryClient={queryClient}>
-          <TrpcProviderMountLogger />
-          {minimalProbe ? (
-            <div
-              data-debug="minimal-client-render-ok"
-              style={{ position: "fixed", bottom: 8, right: 8, zIndex: 2147483647, background: "#052e16", color: "#ecfdf5", padding: "6px 10px", borderRadius: 6, font: "600 12px/1.2 system-ui" }}
-            >
-              MINIMAL CLIENT RENDER OK
-            </div>
-          ) : useProbe ? (
-            <div data-testid="boot-probe">NexoGestão boot probe</div>
-          ) : (
-            <ErrorBoundary routeContext="root">
-              <AppMountLogger />
-              {renderAudit ? (
-                <div data-debug="main-render-ok" style={{ position: "relative", outline: "2px solid #f97316", outlineOffset: -2 }}>
-                  <div style={{ position: "fixed", top: 8, right: 8, zIndex: 2147483647, background: "#7c2d12", color: "#fff7ed", padding: "6px 10px", borderRadius: 6, font: "600 12px/1.2 system-ui" }}>
-                    MAIN RENDER OK
-                  </div>
-                  <App />
-                </div>
-              ) : (
-                <App />
-              )}
-            </ErrorBoundary>
-          )}
+          <ErrorBoundary routeContext="root">
+            <App />
+          </ErrorBoundary>
         </trpc.Provider>
       </QueryClientProvider>
     </React.StrictMode>
   );
+
   if (import.meta.env.DEV) {
     // eslint-disable-next-line no-console
-    console.log("[BOOT] after render");
+    console.log("[MAIN] render:dispatched", { at: nowIso() });
   }
+
   setBootPhase("APP_RENDER_DISPATCHED");
 }
-
-window.onerror = (message, source, lineno, colno, error) => {
-  document.body.innerHTML = `
-    <pre style="background:#000;color:#0f0;padding:20px;">
-    WINDOW ERROR:
-    ${String(message)}
-    ${(error as Error | undefined)?.stack || ""}
-    </pre>
-  `;
-  setBootPhase("WINDOW_ONERROR");
-  handleFatalError("Erro global não tratado", error ?? String(message), {
-    source,
-    lineno,
-    colno,
-    rawMessage: message,
-  });
-  return false;
-};
-
-window.onunhandledrejection = (event) => {
-  document.body.innerHTML = `
-    <pre style="background:#000;color:#0f0;padding:20px;">
-    PROMISE ERROR:
-    ${String(event.reason)}
-    </pre>
-  `;
-  setBootPhase("WINDOW_UNHANDLED_REJECTION");
-  handleFatalError("Promise rejeitada sem catch", event.reason, {
-    type: "unhandledrejection",
-  });
-};
 
 mountApp();

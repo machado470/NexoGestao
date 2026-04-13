@@ -737,8 +737,11 @@ function RootRoute() {
     if (!import.meta.env.DEV) return;
     // eslint-disable-next-line no-console
     console.info("[ROOT] branch", {
+      at: new Date().toISOString(),
       pathname,
       location,
+      readyState: typeof document !== "undefined" ? document.readyState : "unknown",
+      title: typeof document !== "undefined" ? document.title : "unknown",
       authState,
       branch: rootBranch,
     });
@@ -873,6 +876,14 @@ function RootRoute() {
 
 function App() {
   bootLog("[APP] render");
+  if (import.meta.env.DEV && typeof window !== "undefined") {
+    // eslint-disable-next-line no-console
+    console.info("[APP] render details", {
+      at: new Date().toISOString(),
+      pathname: window.location.pathname,
+      readyState: document.readyState,
+    });
+  }
   setBootPhase("AUTH_INIT");
 
   useEffect(() => {
@@ -883,6 +894,18 @@ function App() {
       // eslint-disable-next-line no-console
       console.info("[APP] unmount");
     };
+  }, []);
+
+  useEffect(() => {
+    if (!import.meta.env.DEV || typeof window === "undefined") return;
+    const raf = window.requestAnimationFrame(() => {
+      // eslint-disable-next-line no-console
+      console.info("[APP] first paint reached", {
+        at: new Date().toISOString(),
+        pathname: window.location.pathname,
+      });
+    });
+    return () => window.cancelAnimationFrame(raf);
   }, []);
 
   const [bootstrapState, setBootstrapState] = useState<AppBootstrapState>("initializing");
