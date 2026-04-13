@@ -11,6 +11,7 @@ import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { normalizeRole, type Role } from "@/lib/rbac";
 import { extractPathname, shouldBootstrapSessionForPath } from "@/lib/routeAccess";
+import { pushAuditEvent, setAuditField } from "@/lib/renderAudit";
 
 type AuthUser = {
   token?: string;
@@ -209,6 +210,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;
+    setAuditField("pathname", pathname);
+    pushAuditEvent("auth", "provider:mount", { pathname });
     // eslint-disable-next-line no-console
     console.info("[AUTH] AuthProvider mounted", { pathname });
     return () => {
@@ -483,6 +486,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     bootstrapError: meBootstrapError,
     user: userSafe,
   });
+
+  useEffect(() => {
+    setAuditField("bootstrapBranch", `auth:${authState}`);
+    pushAuditEvent("auth", "state", {
+      pathname,
+      authState,
+      shouldBootstrapSession,
+      isInitializing,
+      hasUser: Boolean(userSafe),
+    });
+  }, [authState, isInitializing, pathname, shouldBootstrapSession, userSafe]);
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;

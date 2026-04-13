@@ -1,124 +1,147 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>NexoGestão</title>
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        min-height: 100%;
+        background: #f3f4f6;
+        font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      }
+      #html-immediate-marker {
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        color: #111827;
+      }
+      #html-immediate-marker .panel {
+        width: min(720px, calc(100vw - 32px));
+        background: #ffffff;
+        border: 1px solid #d1d5db;
+        border-radius: 10px;
+        box-shadow: 0 6px 30px rgba(15, 23, 42, 0.08);
+        padding: 16px;
+      }
+      #html-immediate-marker .title { font-size: 18px; font-weight: 700; }
+      #html-immediate-marker .subtitle { margin-top: 6px; font-size: 13px; color: #4b5563; }
+      #boot-watchdog, #pre-react-error {
+        display: none;
+        position: fixed;
+        inset: 12px;
+        margin: auto;
+        max-width: 980px;
+        max-height: 85vh;
+        overflow: auto;
+        z-index: 2147483647;
+        background: #111827;
+        color: #fee2e2;
+        border: 1px solid #7f1d1d;
+        border-radius: 10px;
+        padding: 14px;
+        font: 600 12px/1.45 system-ui;
+      }
+      #root { position: relative; z-index: 2; }
+    </style>
   </head>
 
   <body>
-    <div
-      id="debug-html-static"
-      style="position:fixed;top:8px;left:8px;z-index:2147483647;background:#111827;color:#f9fafb;padding:4px 8px;border-radius:6px;font:600 12px/1.2 system-ui"
-    >
-      HTML STATIC OK
+    <div id="html-immediate-marker" data-stage="html-loaded">
+      <div class="panel">
+        <div class="title">HTML carregado</div>
+        <div class="subtitle">Bootstrap inicial executando… se React falhar, o diagnóstico aparece aqui.</div>
+      </div>
     </div>
+
     <div id="root"></div>
-    <div
-      id="boot-watchdog"
-      style="display:none;position:fixed;inset:auto 12px 12px 12px;z-index:2147483646;background:#7f1d1d;color:#fee2e2;padding:10px 12px;border-radius:8px;font:600 12px/1.4 system-ui;max-width:860px"
-    >
-      [BOOTSTRAP] O frontend não confirmou mount completo em tempo esperado. Abra
-      <code>?renderAuditMode=minimal</code> e teste janela anônima/outro navegador.
-    </div>
+    <div id="pre-react-error"></div>
+    <div id="boot-watchdog"></div>
+
     <script>
       (function () {
+        var fallbackVisible = false;
+
+        function showPreReactError(label, details) {
+          try {
+            var panel = document.getElementById("pre-react-error");
+            if (!panel) return;
+            fallbackVisible = true;
+            var text = typeof details === "string" ? details : JSON.stringify(details, null, 2);
+            panel.style.display = "block";
+            panel.innerHTML = ""
+              + "<div style='font-size:16px;margin-bottom:6px;color:#fecaca'>Erro antes do React</div>"
+              + "<div><strong>Mensagem:</strong> " + String(label) + "</div>"
+              + "<div><strong>Pathname:</strong> " + window.location.pathname + "</div>"
+              + "<pre style='margin-top:10px;white-space:pre-wrap;background:#020617;border:1px solid #334155;border-radius:8px;padding:10px;color:#e2e8f0'>" + (text || "(sem detalhes)") + "</pre>"
+              + "<div style='margin-top:10px'><button onclick='window.location.reload()' style='background:#f97316;color:#fff;border:0;border-radius:6px;padding:8px 10px;cursor:pointer'>Recarregar</button></div>";
+          } catch (_err) {
+            // no-op
+          }
+        }
+
         try {
-          var at = new Date().toISOString();
-          var marker = document.getElementById("debug-html-static");
-          var params = new URLSearchParams(window.location.search);
-          var renderAuditMode = (params.get("renderAuditMode") || "app").trim().toLowerCase();
+          console.log("[HTML] loaded", {
+            pathname: window.location.pathname,
+            readyState: document.readyState,
+            title: document.title,
+          });
+
+          window.__NEXO_AUDIT__ = window.__NEXO_AUDIT__ || {
+            events: [],
+            pathname: window.location.pathname,
+            readyState: document.readyState,
+            title: document.title,
+            rootFound: Boolean(document.getElementById("root")),
+            htmlStartedAt: new Date().toISOString(),
+          };
 
           window.onerror = function (message, source, lineno, colno, error) {
-            console.error("[WINDOW_ERROR]", {
-              at: new Date().toISOString(),
-              message: String(message),
-              source: source || null,
-              lineno: lineno || null,
-              colno: colno || null,
-              stack: error && error.stack ? error.stack : null,
-            });
+            console.error("[WINDOW_ERROR]", { message: String(message), source: source || null, lineno: lineno || null, colno: colno || null, stack: error && error.stack ? error.stack : null });
+            showPreReactError(message, error && error.stack ? error.stack : String(message));
             return false;
           };
 
           window.onunhandledrejection = function (event) {
-            console.error("[UNHANDLED_PROMISE]", {
-              at: new Date().toISOString(),
-              reason: event ? event.reason : null,
-            });
+            console.error("[UNHANDLED_PROMISE]", { reason: event ? event.reason : null });
+            showPreReactError("Promise rejeitada sem tratamento", event && event.reason ? event.reason : "Sem motivo");
           };
-
-          console.log("[HTML] inline script running", {
-            at: at,
-            pathname: window.location.pathname,
-            readyState: document.readyState,
-            renderAuditMode: renderAuditMode,
-          });
-          if (marker) {
-            marker.textContent = "HTML STATIC OK | INLINE JS OK";
-            marker.style.background = "#14532d";
-            marker.style.color = "#dcfce7";
-          }
-
-          window.__NEXO_AUDIT__ = {
-            htmlStartedAt: at,
-            renderAuditMode: renderAuditMode,
-            appRenderDispatchedAt: null,
-            appMountedAt: null,
-          };
-
-          var watchdog = document.getElementById("boot-watchdog");
-          var watchdogTimer = window.setTimeout(function () {
-            if (!watchdog) return;
-            var audit = window.__NEXO_AUDIT__ || {};
-            if (audit.appMountedAt) return;
-            watchdog.style.display = "block";
-            console.warn("[BOOTSTRAP] watchdog_timeout", {
-              at: new Date().toISOString(),
-              pathname: window.location.pathname,
-              readyState: document.readyState,
-              title: document.title,
-              appRenderDispatchedAt: audit.appRenderDispatchedAt,
-              appMountedAt: audit.appMountedAt,
-            });
-          }, 8000);
-
-          window.addEventListener("nexo:app-render-dispatched", function () {
-            if (!window.__NEXO_AUDIT__) return;
-            window.__NEXO_AUDIT__.appRenderDispatchedAt = new Date().toISOString();
-          });
 
           window.addEventListener("nexo:app-mounted", function () {
-            if (!window.__NEXO_AUDIT__) return;
-            window.__NEXO_AUDIT__.appMountedAt = new Date().toISOString();
-            if (watchdog) {
-              watchdog.style.display = "none";
-            }
-            window.clearTimeout(watchdogTimer);
+            var marker = document.getElementById("html-immediate-marker");
+            if (marker) marker.style.display = "none";
+            var watchdog = document.getElementById("boot-watchdog");
+            if (watchdog) watchdog.style.display = "none";
           });
 
-          if (params.get("renderAudit") === "1" || params.has("renderAuditMode")) {
-            document.documentElement.style.outline = "3px solid #ef4444";
-            document.body.style.background = "#fff7ed";
-            var root = document.getElementById("root");
-            if (root) {
-              root.style.outline = "3px dashed #f97316";
-              root.style.minHeight = "100vh";
-              root.style.background = "rgba(254,215,170,0.35)";
-            }
-          }
+          var watchdogTimer = window.setTimeout(function () {
+            if (fallbackVisible) return;
+            var audit = window.__NEXO_AUDIT__ || {};
+            if (audit.appMountedAt) return;
+            var watchdog = document.getElementById("boot-watchdog");
+            if (!watchdog) return;
+            watchdog.style.display = "block";
+            watchdog.innerHTML = ""
+              + "<div style='font-size:16px;margin-bottom:6px;color:#fecaca'>Erro de renderização</div>"
+              + "<div>O app não confirmou mount no tempo esperado.</div>"
+              + "<div><strong>Pathname:</strong> " + window.location.pathname + "</div>"
+              + "<div><strong>Fase:</strong> " + (window.__NEXO_LAST_PHASE__ || "UNKNOWN") + "</div>"
+              + "<div style='margin-top:10px'><button onclick='window.location.reload()' style='background:#f97316;color:#fff;border:0;border-radius:6px;padding:8px 10px;cursor:pointer'>Recarregar</button></div>";
+          }, 8000);
 
-          if (renderAuditMode === "bare-html") {
-            var bare = document.createElement("div");
-            bare.id = "debug-bare-html";
-            bare.textContent = "BARE HTML MODE ACTIVE";
-            bare.style.cssText = "position:fixed;inset:auto 8px 8px auto;z-index:2147483647;background:#1e3a8a;color:#dbeafe;padding:6px 10px;border-radius:6px;font:700 12px/1.2 system-ui";
-            document.body.appendChild(bare);
-          }
+          window.addEventListener("nexo:app-mounted", function () {
+            window.clearTimeout(watchdogTimer);
+          });
         } catch (error) {
-          console.error("[HTML] inline script error", error);
+          showPreReactError("Falha no script inline de bootstrap", error && error.stack ? error.stack : String(error));
         }
       })();
+    </script>
+
+    <script>
+      console.log("[HTML] loading main.tsx", { src: "/src/main.tsx" });
     </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
