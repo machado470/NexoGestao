@@ -87,8 +87,9 @@ describe('DashboardService', () => {
       await service.getMetrics('org-1')
       await service.getMetrics('org-1')
 
-      // Prisma deve ser chamado apenas uma vez (segunda chamada usa cache)
-      expect(mockPrisma.customer.count).toHaveBeenCalledTimes(1)
+      // fetchMetrics faz duas consultas em customer.count (ativos + total).
+      // A segunda execução deve vir do cache e não repetir consultas.
+      expect(mockPrisma.customer.count).toHaveBeenCalledTimes(2)
     })
   })
 
