@@ -89,12 +89,9 @@ describe('DashboardService', () => {
         mockPrisma.customer.count.mock.calls.length
       await service.getMetrics('org-1')
 
-      // O primeiro fetch faz duas contagens de customer (ativos + total),
-      // mas a segunda chamada não deve acrescentar novas consultas.
-      expect(mockPrisma.customer.count).toHaveBeenCalledTimes(
-        customerCountCallsAfterFirstRequest,
-      )
-      expect(customerCountCallsAfterFirstRequest).toBeGreaterThan(0)
+      // fetchMetrics faz duas consultas em customer.count (ativos + total).
+      // A segunda execução deve vir do cache e não repetir consultas.
+      expect(mockPrisma.customer.count).toHaveBeenCalledTimes(2)
     })
   })
 
