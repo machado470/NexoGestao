@@ -83,7 +83,6 @@ function renderFatalBootError(message: string, error?: unknown) {
   document.body.innerHTML = html;
 }
 
-initSentry();
 devLog("[BOOT] main start");
 appendBootVisualLog("[BOOT] main start");
 
@@ -194,6 +193,17 @@ const trpcClient = trpc.createClient({
   ],
 });
 
+const bootProbe =
+  typeof window !== "undefined"
+    ? new URLSearchParams(window.location.search).get("bootProbe")?.trim().toLowerCase()
+    : null;
+
+void initSentry().catch((error) => {
+  appendBootVisualLog("[BOOT ERROR] sentry init failure");
+  devError("[FATAL BOOT] sentry init failure", error);
+  renderFatalBootError("Falha crítica ao inicializar monitoramento do app.", error);
+});
+
 try {
   devLog("[BOOT] locating #root");
   const rootElement = document.getElementById("root");
@@ -212,17 +222,40 @@ try {
   appendBootVisualLog("[BOOT] rendering App");
   devLog("[BOOT] rendering App");
 
-  const bootProbe =
-    typeof window !== "undefined"
-      ? new URLSearchParams(window.location.search).get("bootProbe")?.trim().toLowerCase()
-      : null;
-
   if (bootProbe === "minimal") {
     appendBootVisualLog("[BOOT] minimal mode: providers/router/auth desativados");
 
     createRoot(rootElement).render(
       <ErrorBoundary routeContext="boot-root-minimal">
         <div style={{ padding: 16, fontFamily: "system-ui,sans-serif" }}>APP OK</div>
+      </ErrorBoundary>
+    );
+  } else if (bootProbe === "providers-query-only") {
+    appendBootVisualLog("[BOOT] probe providers-query-only: QueryClientProvider + App");
+
+    createRoot(rootElement).render(
+      <ErrorBoundary routeContext="boot-root-providers-query-only">
+        <QueryClientProvider client={queryClient}>
+          <App />
+        </QueryClientProvider>
+      </ErrorBoundary>
+    );
+  } else if (bootProbe === "providers-trpc-only") {
+    appendBootVisualLog("[BOOT] probe providers-trpc-only: trpc.Provider + App");
+
+    createRoot(rootElement).render(
+      <ErrorBoundary routeContext="boot-root-providers-trpc-only">
+        <trpc.Provider client={trpcClient} queryClient={queryClient}>
+          <App />
+        </trpc.Provider>
+      </ErrorBoundary>
+    );
+  } else if (bootProbe === "providers-none") {
+    appendBootVisualLog("[BOOT] probe providers-none: App sem providers de main");
+
+    createRoot(rootElement).render(
+      <ErrorBoundary routeContext="boot-root-providers-none">
+        <App />
       </ErrorBoundary>
     );
   } else {
