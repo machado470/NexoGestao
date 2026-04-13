@@ -887,12 +887,18 @@ function App() {
   setBootPhase("AUTH_INIT");
 
   useEffect(() => {
-    if (!import.meta.env.DEV) return;
-    // eslint-disable-next-line no-console
-    console.info("[APP] mount");
-    return () => {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("nexo:app-mounted"));
+    }
+    if (import.meta.env.DEV) {
       // eslint-disable-next-line no-console
-      console.info("[APP] unmount");
+      console.info("[APP] mount");
+    }
+    return () => {
+      if (import.meta.env.DEV) {
+        // eslint-disable-next-line no-console
+        console.info("[APP] unmount");
+      }
     };
   }, []);
 

@@ -14,6 +14,13 @@
       HTML STATIC OK
     </div>
     <div id="root"></div>
+    <div
+      id="boot-watchdog"
+      style="display:none;position:fixed;inset:auto 12px 12px 12px;z-index:2147483646;background:#7f1d1d;color:#fee2e2;padding:10px 12px;border-radius:8px;font:600 12px/1.4 system-ui;max-width:860px"
+    >
+      [BOOTSTRAP] O frontend não confirmou mount completo em tempo esperado. Abra
+      <code>?renderAuditMode=minimal</code> e teste janela anônima/outro navegador.
+    </div>
     <script>
       (function () {
         try {
@@ -52,6 +59,43 @@
             marker.style.background = "#14532d";
             marker.style.color = "#dcfce7";
           }
+
+          window.__NEXO_AUDIT__ = {
+            htmlStartedAt: at,
+            renderAuditMode: renderAuditMode,
+            appRenderDispatchedAt: null,
+            appMountedAt: null,
+          };
+
+          var watchdog = document.getElementById("boot-watchdog");
+          var watchdogTimer = window.setTimeout(function () {
+            if (!watchdog) return;
+            var audit = window.__NEXO_AUDIT__ || {};
+            if (audit.appMountedAt) return;
+            watchdog.style.display = "block";
+            console.warn("[BOOTSTRAP] watchdog_timeout", {
+              at: new Date().toISOString(),
+              pathname: window.location.pathname,
+              readyState: document.readyState,
+              title: document.title,
+              appRenderDispatchedAt: audit.appRenderDispatchedAt,
+              appMountedAt: audit.appMountedAt,
+            });
+          }, 8000);
+
+          window.addEventListener("nexo:app-render-dispatched", function () {
+            if (!window.__NEXO_AUDIT__) return;
+            window.__NEXO_AUDIT__.appRenderDispatchedAt = new Date().toISOString();
+          });
+
+          window.addEventListener("nexo:app-mounted", function () {
+            if (!window.__NEXO_AUDIT__) return;
+            window.__NEXO_AUDIT__.appMountedAt = new Date().toISOString();
+            if (watchdog) {
+              watchdog.style.display = "none";
+            }
+            window.clearTimeout(watchdogTimer);
+          });
 
           if (params.get("renderAudit") === "1" || params.has("renderAuditMode")) {
             document.documentElement.style.outline = "3px solid #ef4444";
