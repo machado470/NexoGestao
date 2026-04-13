@@ -347,6 +347,8 @@ function MarketingRoute({
 }: {
   component: ComponentType;
 }) {
+  const [location] = useLocation();
+  bootLog("[ROUTER] marketing_route_render", { route: location, component: Component.name || "anonymous" });
   return (
     <PublicLayout>
       <Component />
@@ -676,10 +678,21 @@ function Router() {
 
 function RootRoute() {
   const { authState, bootstrapError, payload, refresh } = useAuth();
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
 
   useEffect(() => {
-    bootLog("[ROUTER] route /");
+    bootLog("[ROUTER] root_route_state", {
+      route: location,
+      authState,
+      branch:
+        authState === "initializing"
+          ? "loading"
+          : authState === "error"
+            ? "error"
+            : authState === "unauthenticated"
+              ? "landing"
+              : "redirect",
+    });
     if (authState === "initializing") {
       bootLog("[AUTH] initializing");
       return;
@@ -699,10 +712,15 @@ function RootRoute() {
     }
     bootLog("[ROUTER] redirect", { target });
     navigate(target, { replace: true });
-  }, [authState, bootstrapError, navigate, payload]);
+  }, [authState, bootstrapError, location, navigate, payload]);
 
   if (authState === "initializing") {
-    return <FullScreenLoader />;
+    return (
+      <>
+        <MarketingRoute component={Landing} />
+        <AuthRouteLoader />
+      </>
+    );
   }
 
   if (authState === "error") {
