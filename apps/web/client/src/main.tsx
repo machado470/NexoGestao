@@ -1,33 +1,15 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
+import { QueryClientProvider } from "@tanstack/react-query";
 
 import ErrorBoundary from "./components/ErrorBoundary";
 import App from "./App";
 import "./index.css";
 import { setBootPhase, getLastPhase } from "@/lib/bootPhase";
 import { showFatalDebugOverlay } from "@/lib/fatalDebugOverlay";
+import { getQueryClient, getTrpcClient, trpc } from "@/lib/trpc";
 
 console.log("MAIN START");
-
-window.onerror = (msg, src, line, col, err) => {
-  document.body.innerHTML = `
-    <pre style="background:#000;color:#0f0;padding:20px;">
-    WINDOW ERROR:
-    ${String(msg)}
-    ${err?.stack || ""}
-    </pre>
-  `;
-  return false;
-};
-
-window.onunhandledrejection = (e) => {
-  document.body.innerHTML = `
-    <pre style="background:#000;color:#0f0;padding:20px;">
-    PROMISE ERROR:
-    ${String(e.reason)}
-    </pre>
-  `;
-};
 
 const ROOT_ID = "root";
 
@@ -79,19 +61,24 @@ function mountApp() {
   }
 
   setBootPhase("ROOT_FOUND");
-  const root = createRoot(rootElement);
+  const queryClient = getQueryClient();
+  const trpcClient = getTrpcClient();
   const useProbe = shouldRunBootProbe();
 
   setBootPhase("APP_RENDER_START");
-  root.render(
+  createRoot(rootElement).render(
     <React.StrictMode>
-      {useProbe ? (
-        <div data-testid="boot-probe">NexoGestão boot probe</div>
-      ) : (
-        <ErrorBoundary routeContext="root">
-          <App />
-        </ErrorBoundary>
-      )}
+      <QueryClientProvider client={queryClient}>
+        <trpc.Provider client={trpcClient} queryClient={queryClient}>
+          {useProbe ? (
+            <div data-testid="boot-probe">NexoGestão boot probe</div>
+          ) : (
+            <ErrorBoundary routeContext="root">
+              <App />
+            </ErrorBoundary>
+          )}
+        </trpc.Provider>
+      </QueryClientProvider>
     </React.StrictMode>
   );
   setBootPhase("APP_RENDER_DISPATCHED");
@@ -128,13 +115,4 @@ window.onunhandledrejection = (event) => {
   });
 };
 
-try {
-  createRoot(document.getElementById("root")!).render(<App />);
-} catch (error) {
-  document.body.innerHTML = `
-    <pre style="background:red;color:white;padding:20px;">
-    ROOT CRASH:
-    ${(error as Error)?.stack || String(error)}
-    </pre>
-  `;
-}
+mountApp();
