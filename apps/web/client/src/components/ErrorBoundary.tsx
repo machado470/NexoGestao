@@ -2,6 +2,7 @@ import { cn } from "@/lib/utils";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { Component, type ReactNode } from "react";
 import { getLastPhase, setBootPhase } from "@/lib/bootPhase";
+import { getAuditSnapshot, markAuditError, pushAuditEvent } from "@/lib/renderAudit";
 
 interface Props {
   children: ReactNode;
@@ -31,6 +32,11 @@ class ErrorBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, info: { componentStack: string }) {
     this.setState({ componentStack: info.componentStack });
     setBootPhase(`REACT_BOUNDARY:${this.props.routeContext ?? "unknown"}`);
+    markAuditError("react-render", error);
+    pushAuditEvent("boundary", "componentDidCatch", {
+      route: this.props.routeContext ?? "unknown",
+      message: error.message,
+    });
 
     // eslint-disable-next-line no-console
     console.error("[FATAL RENDER]", {
@@ -65,6 +71,10 @@ class ErrorBoundary extends Component<Props, State> {
     const stack = this.state.error?.stack ?? "(stack indisponível)";
     const message = this.state.error?.message ?? "Erro desconhecido";
     const mode = this.props.fallbackMode ?? "fullscreen";
+    const audit = getAuditSnapshot();
+    const errorType = audit.errorType ?? "react-render";
+    const rootBranch = audit.rootBranch ?? "unknown";
+    const bootstrapBranch = audit.bootstrapBranch ?? "unknown";
 
     const content = (
       <>
@@ -79,8 +89,11 @@ class ErrorBoundary extends Component<Props, State> {
 
         <div className="mt-3 space-y-1 text-xs text-[var(--text-muted)]">
           <p><strong>Mensagem:</strong> {message}</p>
+          <p><strong>Tipo:</strong> {errorType}</p>
           <p><strong>Fase atual:</strong> {phase}</p>
           <p><strong>Pathname:</strong> {pathname}</p>
+          <p><strong>RootRoute:</strong> {rootBranch}</p>
+          <p><strong>Bootstrap:</strong> {bootstrapBranch}</p>
         </div>
 
         <pre className="mt-4 max-h-[26vh] overflow-auto rounded-lg bg-zinc-950 p-3 text-xs text-zinc-100">{stack}</pre>
