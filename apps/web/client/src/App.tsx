@@ -29,6 +29,7 @@ import {
 import { canAny, type Permission } from "./lib/rbac";
 import { setBootPhase } from "./lib/bootPhase";
 import { extractPathname } from "./lib/routeAccess";
+import { pushAuditEvent, setAuditField } from "./lib/renderAudit";
 
 import CustomersPage from "./pages/CustomersPage";
 import AppointmentsPage from "./pages/AppointmentsPage";
@@ -734,6 +735,8 @@ function RootRoute() {
   const rootBranch = resolveRootRouteBranch(authState);
 
   useEffect(() => {
+    setAuditField("rootBranch", rootBranch);
+    pushAuditEvent("root", "branch", { pathname, rootBranch, authState });
     if (!import.meta.env.DEV) return;
     // eslint-disable-next-line no-console
     console.info("[ROOT] branch", {
@@ -771,6 +774,7 @@ function RootRoute() {
     if (rootBranch === "unauthenticated_landing") return;
     if (rootBranch === "unknown_state_fallback") {
       bootError("[ROOT] unexpected auth state", { authState, pathname });
+      setAuditField("errorType", "route");
       return;
     }
 
@@ -815,6 +819,7 @@ function RootRoute() {
           actionLabel="Tentar novamente"
           onAction={() =>
             void refresh().catch(error => {
+              setAuditField("errorType", "bootstrap");
               bootError("[AUTH] refresh failed from root", {
                 message: error instanceof Error ? error.message : "Erro desconhecido",
               });
@@ -888,6 +893,8 @@ function App() {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
+      setAuditField("appMountedAt", new Date().toISOString());
+      pushAuditEvent("app", "mounted", { pathname: window.location.pathname });
       window.dispatchEvent(new CustomEvent("nexo:app-mounted"));
     }
     if (import.meta.env.DEV) {
@@ -946,6 +953,8 @@ function App() {
 
   useEffect(() => {
     bootLog("[BOOTSTRAP] app init", { bootProbeStage });
+    setAuditField("bootstrapBranch", bootProbeStage);
+    pushAuditEvent("bootstrap", "boot-probe-stage", { bootProbeStage });
   }, []);
 
   const bootProbeLabel = useMemo(() => {
@@ -957,6 +966,7 @@ function App() {
     setBootstrapState(prev => {
       if (prev === nextState) return prev;
       bootLog("[BOOT] providers ready");
+      setAuditField("bootstrapBranch", `ready:${nextState}`);
       return nextState;
     });
   }, []);
@@ -968,6 +978,8 @@ function App() {
       // eslint-disable-next-line no-console
       console.error("[BOOT ERROR] bootstrap state failed", { reason });
     }
+    setAuditField("errorType", "bootstrap");
+    pushAuditEvent("bootstrap", "failed", { reason });
   }, []);
 
   const reloadApp = useCallback(() => {

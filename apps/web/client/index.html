@@ -16,11 +16,8 @@
     <div id="root"></div>
     <div
       id="boot-watchdog"
-      style="display:none;position:fixed;inset:auto 12px 12px 12px;z-index:2147483646;background:#7f1d1d;color:#fee2e2;padding:10px 12px;border-radius:8px;font:600 12px/1.4 system-ui;max-width:860px"
-    >
-      [BOOTSTRAP] O frontend não confirmou mount completo em tempo esperado. Abra
-      <code>?renderAuditMode=minimal</code> e teste janela anônima/outro navegador.
-    </div>
+      style="display:none;position:fixed;inset:12px;z-index:2147483646;background:#111827;color:#fee2e2;padding:14px;border-radius:10px;font:600 12px/1.4 system-ui;max-width:980px;margin:auto;border:1px solid #7f1d1d"
+    ></div>
     <script>
       (function () {
         try {
@@ -29,50 +26,102 @@
           var params = new URLSearchParams(window.location.search);
           var renderAuditMode = (params.get("renderAuditMode") || "app").trim().toLowerCase();
 
-          window.onerror = function (message, source, lineno, colno, error) {
-            console.error("[WINDOW_ERROR]", {
-              at: new Date().toISOString(),
-              message: String(message),
-              source: source || null,
-              lineno: lineno || null,
-              colno: colno || null,
-              stack: error && error.stack ? error.stack : null,
-            });
-            return false;
+          function pushEvent(source, message, payload) {
+            if (!window.__NEXO_AUDIT__) return;
+            var events = Array.isArray(window.__NEXO_AUDIT__.events) ? window.__NEXO_AUDIT__.events : [];
+            events.push({ at: new Date().toISOString(), source: source, message: message, payload: payload || null });
+            window.__NEXO_AUDIT__.events = events.slice(-120);
+          }
+
+          window.__NEXO_AUDIT__ = {
+            htmlStartedAt: at,
+            renderAuditMode: renderAuditMode,
+            pathname: window.location.pathname,
+            readyState: document.readyState,
+            title: document.title,
+            rootFound: Boolean(document.getElementById("root")),
+            appRenderDispatchedAt: null,
+            appMountedAt: null,
+            events: [],
           };
 
-          window.onunhandledrejection = function (event) {
+          window.addEventListener("error", function (event) {
+            console.error("[WINDOW_ERROR]", {
+              at: new Date().toISOString(),
+              pathname: window.location.pathname,
+              message: String(event.message),
+              source: event.filename || null,
+              lineno: event.lineno || null,
+              colno: event.colno || null,
+              stack: event.error && event.error.stack ? event.error.stack : null,
+            });
+            if (window.__NEXO_AUDIT__) {
+              window.__NEXO_AUDIT__.errorType = "runtime";
+              window.__NEXO_AUDIT__.lastErrorMessage = String(event.message);
+            }
+            pushEvent("window", "error", { message: String(event.message) });
+          });
+
+          window.addEventListener("unhandledrejection", function (event) {
             console.error("[UNHANDLED_PROMISE]", {
               at: new Date().toISOString(),
+              pathname: window.location.pathname,
               reason: event ? event.reason : null,
             });
-          };
+            if (window.__NEXO_AUDIT__) {
+              window.__NEXO_AUDIT__.errorType = "runtime";
+              window.__NEXO_AUDIT__.lastErrorMessage = String(event && event.reason ? event.reason : "Unhandled promise");
+            }
+            pushEvent("window", "unhandledrejection", { reason: event ? event.reason : null });
+          });
 
           console.log("[HTML] inline script running", {
             at: at,
             pathname: window.location.pathname,
             readyState: document.readyState,
+            title: document.title,
             renderAuditMode: renderAuditMode,
           });
+
           if (marker) {
             marker.textContent = "HTML STATIC OK | INLINE JS OK";
             marker.style.background = "#14532d";
             marker.style.color = "#dcfce7";
           }
 
-          window.__NEXO_AUDIT__ = {
-            htmlStartedAt: at,
+          pushEvent("html", "inline-script:start", {
+            pathname: window.location.pathname,
+            readyState: document.readyState,
+            title: document.title,
             renderAuditMode: renderAuditMode,
-            appRenderDispatchedAt: null,
-            appMountedAt: null,
-          };
+          });
 
           var watchdog = document.getElementById("boot-watchdog");
           var watchdogTimer = window.setTimeout(function () {
             if (!watchdog) return;
             var audit = window.__NEXO_AUDIT__ || {};
             if (audit.appMountedAt) return;
+
+            var currentPhase = window.__NEXO_LAST_PHASE__ || window.__NEXO_BOOT_PHASE__ || "UNKNOWN";
+            var rootBranch = audit.rootBranch || "unknown";
+            var bootstrapBranch = audit.bootstrapBranch || "unknown";
+            var errorText = audit.lastErrorMessage || "sem erro capturado";
+
             watchdog.style.display = "block";
+            watchdog.innerHTML = [
+              "<div style='font-size:16px;margin-bottom:6px;color:#fecaca'>Erro de renderização</div>",
+              "<div><strong>Mensagem:</strong> O app não confirmou mount completo dentro do tempo esperado.</div>",
+              "<div><strong>Pathname:</strong> " + window.location.pathname + "</div>",
+              "<div><strong>Fase:</strong> " + currentPhase + "</div>",
+              "<div><strong>RootRoute:</strong> " + rootBranch + "</div>",
+              "<div><strong>Bootstrap:</strong> " + bootstrapBranch + "</div>",
+              "<div><strong>Último erro:</strong> " + errorText + "</div>",
+              "<div style='margin-top:8px;display:flex;gap:8px;flex-wrap:wrap'>",
+              "  <button onclick='window.location.reload()' style='background:#f97316;border:0;border-radius:6px;padding:8px 10px;color:#fff;cursor:pointer'>Recarregar</button>",
+              "  <button onclick='window.location.search=" + '"?renderAuditMode=minimal"' + "' style='background:#1d4ed8;border:0;border-radius:6px;padding:8px 10px;color:#fff;cursor:pointer'>Abrir minimal</button>",
+              "</div>",
+            ].join("");
+
             console.warn("[BOOTSTRAP] watchdog_timeout", {
               at: new Date().toISOString(),
               pathname: window.location.pathname,
@@ -80,17 +129,27 @@
               title: document.title,
               appRenderDispatchedAt: audit.appRenderDispatchedAt,
               appMountedAt: audit.appMountedAt,
+              rootBranch: rootBranch,
+              bootstrapBranch: bootstrapBranch,
+            });
+
+            pushEvent("html", "watchdog:timeout", {
+              phase: currentPhase,
+              rootBranch: rootBranch,
+              bootstrapBranch: bootstrapBranch,
             });
           }, 8000);
 
           window.addEventListener("nexo:app-render-dispatched", function () {
             if (!window.__NEXO_AUDIT__) return;
             window.__NEXO_AUDIT__.appRenderDispatchedAt = new Date().toISOString();
+            pushEvent("html", "app-render-dispatched");
           });
 
           window.addEventListener("nexo:app-mounted", function () {
             if (!window.__NEXO_AUDIT__) return;
             window.__NEXO_AUDIT__.appMountedAt = new Date().toISOString();
+            pushEvent("html", "app-mounted");
             if (watchdog) {
               watchdog.style.display = "none";
             }
@@ -114,6 +173,7 @@
             bare.textContent = "BARE HTML MODE ACTIVE";
             bare.style.cssText = "position:fixed;inset:auto 8px 8px auto;z-index:2147483647;background:#1e3a8a;color:#dbeafe;padding:6px 10px;border-radius:6px;font:700 12px/1.2 system-ui";
             document.body.appendChild(bare);
+            pushEvent("html", "audit:bare-html");
           }
         } catch (error) {
           console.error("[HTML] inline script error", error);

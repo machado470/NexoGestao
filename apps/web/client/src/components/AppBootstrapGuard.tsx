@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { AppPageErrorState, AppPageShell } from "@/components/internal-page-system";
 import { useAuth } from "@/contexts/AuthContext";
 import { extractPathname, isPublicOrAuthPath } from "@/lib/routeAccess";
+import { pushAuditEvent, setAuditField } from "@/lib/renderAudit";
 
 export type AppBootstrapState =
   | "initializing"
@@ -43,6 +44,15 @@ export function AppBootstrapGuard({
   }), [isPublicBootstrapPath, state]);
 
   useEffect(() => {
+    setAuditField("bootstrapBranch", `guard:${guardBranch}`);
+    pushAuditEvent("bootstrap", "guard", {
+      pathname,
+      state,
+      authState,
+      guardBranch,
+      isPublicBootstrapPath,
+      hasChildren: Boolean(children),
+    });
     if (!import.meta.env.DEV) return;
     // eslint-disable-next-line no-console
     console.info("[BOOTSTRAP] guard", {
@@ -80,6 +90,7 @@ export function AppBootstrapGuard({
   }
 
   if (state === "error" && !isPublicBootstrapPath) {
+    setAuditField("errorType", "bootstrap");
     return (
       <AppPageShell>
         <AppPageErrorState
@@ -93,6 +104,7 @@ export function AppBootstrapGuard({
   }
 
   if (state !== "initializing" && state !== "error" && state !== "authenticated" && state !== "unauthenticated") {
+    setAuditField("errorType", "bootstrap");
     return (
       <div className="nexo-app-shell flex min-h-screen items-center justify-center px-6">
         <div className="nexo-app-panel-strong w-full max-w-md p-6">

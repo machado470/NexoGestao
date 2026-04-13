@@ -8,6 +8,12 @@ import "./index.css";
 import { setBootPhase, getLastPhase } from "@/lib/bootPhase";
 import { showFatalDebugOverlay } from "@/lib/fatalDebugOverlay";
 import { getQueryClient, getTrpcClient, trpc } from "@/lib/trpc";
+import {
+  ensureAuditState,
+  markAuditError,
+  pushAuditEvent,
+  setAuditField,
+} from "@/lib/renderAudit";
 
 const ROOT_ID = "root";
 
@@ -50,6 +56,7 @@ function normalizeError(errorLike: unknown) {
 
 function handleFatalError(title: string, errorLike: unknown, extra?: unknown) {
   const parsed = normalizeError(errorLike);
+  markAuditError("runtime", errorLike);
 
   showFatalDebugOverlay({
     title,
@@ -64,31 +71,44 @@ function handleFatalError(title: string, errorLike: unknown, extra?: unknown) {
 }
 
 function installGlobalErrorHooks() {
-  window.onerror = (message, source, lineno, colno, error) => {
-    const parsed = normalizeError(error ?? message);
+  window.addEventListener("error", (event) => {
+    const parsed = normalizeError(event.error ?? event.message);
+    setBootPhase("WINDOW_ONERROR");
+    pushAuditEvent("window", "error", {
+      pathname: window.location.pathname,
+      message: String(event.message),
+      source: event.filename,
+      lineno: event.lineno,
+      colno: event.colno,
+    });
+    markAuditError("runtime", event.error ?? event.message);
     // eslint-disable-next-line no-console
     console.error("[WINDOW_ERROR]", {
       at: nowIso(),
       pathname: window.location.pathname,
-      message: String(message),
-      source,
-      lineno,
-      colno,
+      message: String(event.message),
+      source: event.filename,
+      lineno: event.lineno,
+      colno: event.colno,
       stack: parsed.stack,
     });
 
-    setBootPhase("WINDOW_ONERROR");
-    handleFatalError("Erro global não tratado", error ?? String(message), {
-      source,
-      lineno,
-      colno,
-      rawMessage: message,
+    handleFatalError("Erro global não tratado", event.error ?? String(event.message), {
+      source: event.filename,
+      lineno: event.lineno,
+      colno: event.colno,
+      rawMessage: event.message,
     });
-    return false;
-  };
+  });
 
-  window.onunhandledrejection = (event) => {
+  window.addEventListener("unhandledrejection", (event) => {
     const parsed = normalizeError(event.reason);
+    setBootPhase("WINDOW_UNHANDLED_REJECTION");
+    pushAuditEvent("window", "unhandledrejection", {
+      pathname: window.location.pathname,
+      message: parsed.message,
+    });
+    markAuditError("runtime", event.reason);
     // eslint-disable-next-line no-console
     console.error("[UNHANDLED_PROMISE]", {
       at: nowIso(),
@@ -98,11 +118,10 @@ function installGlobalErrorHooks() {
       reason: event.reason,
     });
 
-    setBootPhase("WINDOW_UNHANDLED_REJECTION");
     handleFatalError("Promise rejeitada sem catch", event.reason, {
       type: "unhandledrejection",
     });
-  };
+  });
 }
 
 function dispatchAuditEvent(name: "nexo:app-render-dispatched" | "nexo:app-mounted") {
@@ -111,19 +130,28 @@ function dispatchAuditEvent(name: "nexo:app-render-dispatched" | "nexo:app-mount
 }
 
 function mountApp() {
+  ensureAuditState();
   installGlobalErrorHooks();
   setBootPhase("BOOT_START");
 
   const pathname = typeof window === "undefined" ? "unknown" : window.location.pathname;
   const readyState = typeof document === "undefined" ? "unknown" : document.readyState;
+  const title = typeof document === "undefined" ? "unknown" : document.title;
   const renderAuditMode = getRenderAuditMode();
+
+  setAuditField("pathname", pathname);
+  setAuditField("readyState", readyState);
+  setAuditField("title", title);
+  setAuditField("renderAuditMode", renderAuditMode);
+  pushAuditEvent("main", "bootstrap:start", { pathname, readyState, title, renderAuditMode });
 
   if (import.meta.env.DEV) {
     // eslint-disable-next-line no-console
-    console.log("[MAIN] bootstrap", { at: nowIso(), pathname, readyState, renderAuditMode });
+    console.log("[MAIN] bootstrap", { at: nowIso(), pathname, readyState, title, renderAuditMode });
   }
 
   const rootElement = document.getElementById(ROOT_ID);
+  setAuditField("rootFound", Boolean(rootElement));
   if (import.meta.env.DEV) {
     // eslint-disable-next-line no-console
     console.log("[MAIN] root lookup", { found: Boolean(rootElement), rootId: ROOT_ID });
@@ -131,12 +159,14 @@ function mountApp() {
 
   if (!rootElement) {
     setBootPhase("ROOT_NOT_FOUND");
+    markAuditError("bootstrap", `Root element #${ROOT_ID} not found`);
     handleFatalError("Falha de bootstrap do frontend", new Error(`Root element #${ROOT_ID} not found`));
     return;
   }
 
   if (renderAuditMode === "bare-html") {
     setBootPhase("AUDIT_BARE_HTML");
+    pushAuditEvent("main", "audit:bare-html", { pathname });
     if (import.meta.env.DEV) {
       // eslint-disable-next-line no-console
       console.log("[MAIN] bare-html mode: React mount skipped", { at: nowIso() });
@@ -146,86 +176,94 @@ function mountApp() {
 
   setBootPhase("ROOT_FOUND");
 
-  if (import.meta.env.DEV) {
-    // eslint-disable-next-line no-console
-    console.log("[MAIN] createRoot:start", { at: nowIso() });
-  }
-  const root = createRoot(rootElement);
-  if (import.meta.env.DEV) {
-    // eslint-disable-next-line no-console
-    console.log("[MAIN] createRoot:done", { at: nowIso() });
-  }
+  try {
+    setAuditField("createRootStartedAt", nowIso());
+    if (import.meta.env.DEV) {
+      // eslint-disable-next-line no-console
+      console.log("[MAIN] createRoot:start", { at: nowIso() });
+    }
+    const root = createRoot(rootElement);
+    setAuditField("createRootDoneAt", nowIso());
+    if (import.meta.env.DEV) {
+      // eslint-disable-next-line no-console
+      console.log("[MAIN] createRoot:done", { at: nowIso() });
+    }
 
-  setBootPhase("APP_RENDER_START");
-  if (import.meta.env.DEV) {
-    // eslint-disable-next-line no-console
-    console.log("[MAIN] render:start", { at: nowIso(), renderAuditMode });
-  }
+    setBootPhase("APP_RENDER_START");
+    pushAuditEvent("main", "render:start", { renderAuditMode });
 
-  if (renderAuditMode === "minimal") {
-    root.render(
-      <div
-        data-debug="minimal-client-render-ok"
-        style={{
-          minHeight: "100vh",
-          display: "grid",
-          placeContent: "center",
-          background: "#052e16",
-          color: "#ecfdf5",
-          font: "700 18px/1.2 system-ui",
-        }}
-      >
-        MINIMAL CLIENT RENDER OK
-      </div>
-    );
-    dispatchAuditEvent("nexo:app-render-dispatched");
-    return;
-  }
-
-  if (renderAuditMode === "static-react") {
-    root.render(
-      <React.StrictMode>
+    if (renderAuditMode === "minimal") {
+      root.render(
         <div
-          data-debug="static-react-render-ok"
+          data-debug="minimal-client-render-ok"
           style={{
             minHeight: "100vh",
             display: "grid",
             placeContent: "center",
-            background: "#082f49",
-            color: "#e0f2fe",
+            background: "#052e16",
+            color: "#ecfdf5",
             font: "700 18px/1.2 system-ui",
           }}
         >
-          STATIC REACT OK
+          MINIMAL CLIENT RENDER OK
         </div>
+      );
+      setAuditField("appRenderDispatchedAt", nowIso());
+      dispatchAuditEvent("nexo:app-render-dispatched");
+      return;
+    }
+
+    if (renderAuditMode === "static-react") {
+      root.render(
+        <React.StrictMode>
+          <div
+            data-debug="static-react-render-ok"
+            style={{
+              minHeight: "100vh",
+              display: "grid",
+              placeContent: "center",
+              background: "#082f49",
+              color: "#e0f2fe",
+              font: "700 18px/1.2 system-ui",
+            }}
+          >
+            STATIC REACT OK
+          </div>
+        </React.StrictMode>
+      );
+      setAuditField("appRenderDispatchedAt", nowIso());
+      dispatchAuditEvent("nexo:app-render-dispatched");
+      return;
+    }
+
+    const queryClient = getQueryClient();
+    const trpcClient = getTrpcClient();
+
+    root.render(
+      <React.StrictMode>
+        <QueryClientProvider client={queryClient}>
+          <trpc.Provider client={trpcClient} queryClient={queryClient}>
+            <ErrorBoundary routeContext="root" fallbackMode="fullscreen">
+              <App />
+            </ErrorBoundary>
+          </trpc.Provider>
+        </QueryClientProvider>
       </React.StrictMode>
     );
+
+    setBootPhase("APP_RENDER_DISPATCHED");
+    setAuditField("appRenderDispatchedAt", nowIso());
+    pushAuditEvent("main", "render:dispatched", { pathname });
     dispatchAuditEvent("nexo:app-render-dispatched");
-    return;
+  } catch (error) {
+    setBootPhase("APP_RENDER_FATAL");
+    markAuditError("bootstrap", error);
+    handleFatalError("Falha crítica ao inicializar React", error, {
+      pathname,
+      readyState,
+      title,
+    });
   }
-
-  const queryClient = getQueryClient();
-  const trpcClient = getTrpcClient();
-
-  root.render(
-    <React.StrictMode>
-      <QueryClientProvider client={queryClient}>
-        <trpc.Provider client={trpcClient} queryClient={queryClient}>
-          <ErrorBoundary routeContext="root">
-            <App />
-          </ErrorBoundary>
-        </trpc.Provider>
-      </QueryClientProvider>
-    </React.StrictMode>
-  );
-
-  if (import.meta.env.DEV) {
-    // eslint-disable-next-line no-console
-    console.log("[MAIN] render:dispatched", { at: nowIso() });
-  }
-
-  setBootPhase("APP_RENDER_DISPATCHED");
-  dispatchAuditEvent("nexo:app-render-dispatched");
 }
 
 mountApp();
