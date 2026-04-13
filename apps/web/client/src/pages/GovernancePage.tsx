@@ -21,6 +21,8 @@ import { formatDelta, percentDelta, trendFromDelta } from "@/lib/operational/kpi
 import { safeChartData } from "@/lib/safeChartData";
 import { ChartErrorBoundary } from "@/components/ChartErrorBoundary";
 import { KpiErrorBoundary } from "@/components/KpiErrorBoundary";
+import { TrpcSectionErrorBoundary } from "@/components/TrpcSectionErrorBoundary";
+import { setBootPhase } from "@/lib/bootPhase";
 
 function metric(summary: Record<string, any>, ...keys: string[]) {
   for (const key of keys) {
@@ -31,6 +33,7 @@ function metric(summary: Record<string, any>, ...keys: string[]) {
 }
 
 export default function GovernancePage() {
+  setBootPhase("PAGE:Governança");
   useRenderWatchdog("GovernancePage");
   const summaryQuery = trpc.governance.summary.useQuery(undefined, { retry: false });
   const runsQuery = trpc.governance.runs.useQuery({ limit: 12 }, { retry: false });
@@ -149,6 +152,7 @@ export default function GovernancePage() {
         </AppChartPanel>
       </div>
 
+      <TrpcSectionErrorBoundary context="governance:entity-recommendations">
       <div className="grid gap-3 xl:grid-cols-2">
         <AppSectionBlock title="Entidades em risco" subtitle="Itens reais apontados pela governança">
           {summaryQuery.isLoading && !hasSummaryData ? (
@@ -199,6 +203,7 @@ export default function GovernancePage() {
           )}
         </AppSectionBlock>
       </div>
+      </TrpcSectionErrorBoundary>
     </PageWrapper>
   );
 }

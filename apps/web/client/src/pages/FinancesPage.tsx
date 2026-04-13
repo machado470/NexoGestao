@@ -29,12 +29,15 @@ import { formatDelta, getWindow, inRange, percentDelta, safeDate, trendFromDelta
 import { safeChartData } from "@/lib/safeChartData";
 import { ChartErrorBoundary } from "@/components/ChartErrorBoundary";
 import { KpiErrorBoundary } from "@/components/KpiErrorBoundary";
+import { TrpcSectionErrorBoundary } from "@/components/TrpcSectionErrorBoundary";
+import { setBootPhase } from "@/lib/bootPhase";
 
 function formatCurrency(cents: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100);
 }
 
 export default function FinancesPage() {
+  setBootPhase("PAGE:Financeiro");
   useRenderWatchdog("FinancesPage");
   const [, navigate] = useLocation();
   const [openCreate, setOpenCreate] = useState(false);
@@ -199,6 +202,7 @@ export default function FinancesPage() {
         </AppChartPanel>
       </div>
 
+      <TrpcSectionErrorBoundary context="finances:charges-table">
       <AppSectionBlock title="Cobranças e pagamentos" subtitle="Fluxo real: cobrança → pagamento → atualização automática">
         {showChargesInitialLoading ? (
           <AppPageLoadingState description="Carregando cobranças..." />
@@ -238,6 +242,7 @@ export default function FinancesPage() {
           </AppDataTable>
         )}
       </AppSectionBlock>
+      </TrpcSectionErrorBoundary>
 
       <CreateChargeModal
         isOpen={openCreate}

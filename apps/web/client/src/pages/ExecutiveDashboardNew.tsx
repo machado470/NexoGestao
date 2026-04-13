@@ -25,6 +25,7 @@ import {
   getOperationalStateSummary,
 } from "@/lib/operations/operational-hub";
 import { formatDelta, getDayWindow, getWindow, inRange, percentDelta, safeDate, trendFromDelta } from "@/lib/operational/kpi";
+import { setBootPhase } from "@/lib/bootPhase";
 
 function toArray<T>(payload: unknown): T[] {
   const raw = (payload as any)?.data?.data ?? (payload as any)?.data ?? payload;
@@ -46,6 +47,7 @@ function formatCurrency(cents: number) {
 }
 
 export default function ExecutiveDashboardNew() {
+  setBootPhase("PAGE:ExecutiveDashboard");
   const { isAuthenticated, isInitializing } = useAuth();
   const [, navigate] = useLocation();
   const { executeAction } = useActionHandler();

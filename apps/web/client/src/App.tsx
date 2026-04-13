@@ -27,6 +27,7 @@ import {
   type BootProbeStage,
 } from "./contexts/BootProbeContext";
 import { canAny, type Permission } from "./lib/rbac";
+import { setBootPhase } from "./lib/bootPhase";
 
 import CustomersPage from "./pages/CustomersPage";
 import AppointmentsPage from "./pages/AppointmentsPage";
@@ -504,6 +505,7 @@ function Router() {
   const { authState, isAuthenticated } = useAuth();
 
   bootLog("[ROUTER] enter", { route: location, authState, isAuthenticated });
+  setBootPhase("ROUTER_INIT");
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -530,6 +532,10 @@ function Router() {
       ? "app"
       : "landing";
 
+  }, [location]);
+
+  useEffect(() => {
+    setBootPhase(`APP_PAGE:${location}`);
   }, [location]);
 
   return (
@@ -730,6 +736,7 @@ function RootRoute() {
 
 function App() {
   bootLog("[RENDER] app render start");
+  setBootPhase("AUTH_INIT");
 
   const [bootstrapState, setBootstrapState] = useState<AppBootstrapState>("initializing");
   const [bootstrapReason, setBootstrapReason] = useState<string | undefined>(undefined);
@@ -884,6 +891,7 @@ function AuthBootstrapStatus({
   useEffect(() => {
     if (authState === "initializing") return;
     if (authState === "error") {
+      setBootPhase("AUTH_ERROR");
       onFailed(
         bootstrapError instanceof Error
           ? bootstrapError.message
@@ -892,9 +900,11 @@ function AuthBootstrapStatus({
       return;
     }
     if (authState === "unauthenticated") {
+      setBootPhase("AUTH_UNAUTHENTICATED");
       bootLog("[RENDER] login");
     }
     if (authState === "authenticated") {
+      setBootPhase("AUTH_AUTHENTICATED");
       bootLog("[RENDER] app");
     }
     onReady(authState);
