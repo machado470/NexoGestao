@@ -85,6 +85,8 @@ describe('DashboardService', () => {
       mockPrisma.correctiveAction.count.mockResolvedValue(0)
 
       await service.getMetrics('org-1')
+      const customerCountCallsAfterFirstRequest =
+        mockPrisma.customer.count.mock.calls.length
       await service.getMetrics('org-1')
 
       // fetchMetrics faz duas consultas em customer.count (ativos + total).
