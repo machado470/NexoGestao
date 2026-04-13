@@ -1,11 +1,14 @@
 "use client";
 
+import { useEffect, useMemo } from "react";
 import { Wallet } from "lucide-react";
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
 
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { EmptyState } from "@/components/EmptyState";
+import { safeChartData } from "@/lib/safeChartData";
+import { useRenderWatchdog } from "@/hooks/useRenderWatchdog";
 
 type FinanceTimelinePoint = {
   day: string;
@@ -41,7 +44,16 @@ function formatMoneyFromCents(value: number) {
 }
 
 export default function FinanceOverviewAreaChart({ timeline }: FinanceOverviewAreaChartProps) {
-  const hasTimeline = timeline.some(
+  useRenderWatchdog("FinanceOverviewAreaChart");
+  const safeTimeline = useMemo(
+    () => safeChartData<FinanceTimelinePoint>(timeline, ["paid", "pending", "overdue"]),
+    [timeline]
+  );
+  useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.info("[CHART DATA] finances.timeline", safeTimeline);
+  }, [safeTimeline]);
+  const hasTimeline = safeTimeline.data.some(
     (point) => Number(point.paid) > 0 || Number(point.pending) > 0 || Number(point.overdue) > 0
   );
 
@@ -53,9 +65,15 @@ export default function FinanceOverviewAreaChart({ timeline }: FinanceOverviewAr
       </CardHeader>
 
       <CardContent>
-        {hasTimeline ? (
+        {!safeTimeline.isValid ? (
+          <EmptyState
+            icon={<Wallet className="h-6 w-6" />}
+            title="Erro ao renderizar gráfico"
+            description={safeTimeline.reason ?? "Dados inválidos para o gráfico."}
+          />
+        ) : hasTimeline ? (
           <ChartContainer config={chartConfig} className="h-[260px] w-full">
-            <AreaChart accessibilityLayer data={timeline} margin={{ left: 8, right: 8 }}>
+            <AreaChart accessibilityLayer data={safeTimeline.data} margin={{ left: 8, right: 8 }}>
               <CartesianGrid vertical={false} />
               <XAxis dataKey="day" tickLine={false} axisLine={false} tickMargin={8} />
               <YAxis tickFormatter={(value) => formatMoneyFromCents(Number(value))} width={92} />

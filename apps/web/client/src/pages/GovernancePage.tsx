@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { Line, LineChart, CartesianGrid, XAxis } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { trpc } from "@/lib/trpc";
@@ -16,7 +16,11 @@ import {
   AppStatusBadge,
 } from "@/components/internal-page-system";
 import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
+import { useRenderWatchdog } from "@/hooks/useRenderWatchdog";
 import { formatDelta, percentDelta, trendFromDelta } from "@/lib/operational/kpi";
+import { safeChartData } from "@/lib/safeChartData";
+import { ChartErrorBoundary } from "@/components/ChartErrorBoundary";
+import { KpiErrorBoundary } from "@/components/KpiErrorBoundary";
 
 function metric(summary: Record<string, any>, ...keys: string[]) {
   for (const key of keys) {
@@ -27,6 +31,7 @@ function metric(summary: Record<string, any>, ...keys: string[]) {
 }
 
 export default function GovernancePage() {
+  useRenderWatchdog("GovernancePage");
   const summaryQuery = trpc.governance.summary.useQuery(undefined, { retry: false });
   const runsQuery = trpc.governance.runs.useQuery({ limit: 12 }, { retry: false });
 
@@ -50,17 +55,33 @@ export default function GovernancePage() {
     dataCount: runs.length,
   });
 
-  const riskSeries = runs
+  const riskSeriesRaw = runs
     .map((run, index) => ({
       label: String(run?.createdAt ? new Date(String(run.createdAt)).toLocaleDateString("pt-BR") : `Execução ${index + 1}`),
       score: Number(run?.riskScore ?? run?.score ?? run?.overallRisk ?? 0),
     }))
     .filter((item) => Number.isFinite(item.score));
+  const riskSeries = useMemo(
+    () => safeChartData<{ label: string; score: number }>(riskSeriesRaw, ["score"]),
+    [riskSeriesRaw]
+  );
 
   const entitiesAtRisk = normalizeArrayPayload<any>(summary.entitiesAtRisk ?? summary.riskEntities ?? []);
   const recommendations = normalizeArrayPayload<any>(summary.recommendations ?? summary.nextActions ?? []);
-  const latestRisk = Number(riskSeries[riskSeries.length - 1]?.score ?? metric(summary, "riskScore", "overallRisk"));
-  const previousRisk = Number(riskSeries[riskSeries.length - 2]?.score ?? Number.NaN);
+  const latestRisk = Number(riskSeries.data[riskSeries.data.length - 1]?.score ?? metric(summary, "riskScore", "overallRisk"));
+  const previousRisk = Number(riskSeries.data[riskSeries.data.length - 2]?.score ?? Number.NaN);
+  useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.info("[RENDER PAGE] governance");
+  }, []);
+  useEffect(() => {
+    if (!summaryQuery.error && !runsQuery.error) return;
+    // eslint-disable-next-line no-console
+    console.error("[TRPC ERROR] governance_query_error", {
+      summary: summaryQuery.error?.message,
+      runs: runsQuery.error?.message,
+    });
+  }, [runsQuery.error, summaryQuery.error]);
 
   return (
     <PageWrapper title="Governança e Risco" subtitle="Leitura de risco e contenção com o mesmo contrato operacional das demais telas.">
@@ -81,7 +102,8 @@ export default function GovernancePage() {
         )}
       />
 
-      <AppKpiRow
+      <KpiErrorBoundary context="governance:kpi">
+        <AppKpiRow
         items={[
           {
             title: "Score de risco",
@@ -96,6 +118,7 @@ export default function GovernancePage() {
           { title: "Recomendações prioritárias", value: String(recommendations.length), hint: "ações sugeridas" },
         ]}
       />
+      </KpiErrorBoundary>
 
       <div className="grid gap-3 xl:grid-cols-3">
         <AppChartPanel title="Evolução do risco" description="Histórico real das últimas execuções de governança.">
@@ -107,17 +130,21 @@ export default function GovernancePage() {
               actionLabel="Tentar novamente"
               onAction={() => void runsQuery.refetch()}
             />
-          ) : riskSeries.length === 0 ? (
+          ) : !riskSeries.isValid ? (
+            <AppPageEmptyState title="Erro ao renderizar gráfico" description={riskSeries.reason ?? "Dados inválidos do gráfico."} />
+          ) : riskSeries.data.length === 0 ? (
             <AppPageEmptyState title="Nenhum dado disponível ainda" description="Ação recomendada: rodar governança e acompanhar evolução." />
           ) : (
-            <ChartContainer className="h-[240px] w-full" config={{ score: { label: "Risco" } }}>
-              <LineChart data={riskSeries}>
-                <CartesianGrid vertical={false} />
-                <XAxis dataKey="label" tickLine={false} axisLine={false} />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Line dataKey="score" stroke="var(--brand-primary)" strokeWidth={3} />
-              </LineChart>
-            </ChartContainer>
+            <ChartErrorBoundary context="governance:risk-chart">
+              <ChartContainer className="h-[240px] w-full" config={{ score: { label: "Risco" } }}>
+                <LineChart data={riskSeries.data}>
+                  <CartesianGrid vertical={false} />
+                  <XAxis dataKey="label" tickLine={false} axisLine={false} />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Line dataKey="score" stroke="var(--brand-primary)" strokeWidth={3} />
+                </LineChart>
+              </ChartContainer>
+            </ChartErrorBoundary>
           )}
         </AppChartPanel>
       </div>

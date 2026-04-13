@@ -1,9 +1,12 @@
 "use client";
 
+import { useEffect, useMemo } from "react";
 import { Bar, BarChart, CartesianGrid, LabelList, XAxis, YAxis } from "recharts";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
+import { safeChartData } from "@/lib/safeChartData";
+import { useRenderWatchdog } from "@/hooks/useRenderWatchdog";
 
 type ServiceOrdersStatusBarChartProps = {
   openCount: number;
@@ -30,6 +33,7 @@ export default function ServiceOrdersStatusBarChart({
   doneCount,
   canceledCount,
 }: ServiceOrdersStatusBarChartProps) {
+  useRenderWatchdog("ServiceOrdersStatusBarChart");
   const chartData = [
     { status: "Abertas", count: Math.max(Number(openCount || 0), 0) },
     { status: "Atribuídas", count: Math.max(Number(assignedCount || 0), 0) },
@@ -37,6 +41,14 @@ export default function ServiceOrdersStatusBarChart({
     { status: "Concluídas", count: Math.max(Number(doneCount || 0), 0) },
     { status: "Canceladas", count: Math.max(Number(canceledCount || 0), 0) },
   ];
+  const safeData = useMemo(
+    () => safeChartData<{ status: string; count: number }>(chartData, ["count"]),
+    [chartData]
+  );
+  useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.info("[CHART DATA] service-orders.status", safeData);
+  }, [safeData]);
 
   return (
     <Card className="h-full">
@@ -48,10 +60,13 @@ export default function ServiceOrdersStatusBarChart({
       </CardHeader>
 
       <CardContent>
-        <ChartContainer config={chartConfig} className="h-[300px] w-full">
+        {!safeData.isValid ? (
+          <p className="text-sm text-[var(--text-muted)]">Erro ao renderizar gráfico.</p>
+        ) : (
+          <ChartContainer config={chartConfig} className="h-[300px] w-full">
           <BarChart
             accessibilityLayer
-            data={chartData}
+            data={safeData.data}
             layout="vertical"
             margin={{
               right: 20,
@@ -81,7 +96,8 @@ export default function ServiceOrdersStatusBarChart({
               />
             </Bar>
           </BarChart>
-        </ChartContainer>
+          </ChartContainer>
+        )}
       </CardContent>
     </Card>
   );

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { Area, AreaChart, CartesianGrid, XAxis } from "recharts";
 import { trpc } from "@/lib/trpc";
@@ -24,13 +24,18 @@ import { toast } from "sonner";
 import { invalidateOperationalGraph } from "@/lib/operationalConsistency";
 import { getChargeSeverity, getOperationalSeverityLabel } from "@/lib/operations/operational-intelligence";
 import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
+import { useRenderWatchdog } from "@/hooks/useRenderWatchdog";
 import { formatDelta, getWindow, inRange, percentDelta, safeDate, trendFromDelta } from "@/lib/operational/kpi";
+import { safeChartData } from "@/lib/safeChartData";
+import { ChartErrorBoundary } from "@/components/ChartErrorBoundary";
+import { KpiErrorBoundary } from "@/components/KpiErrorBoundary";
 
 function formatCurrency(cents: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100);
 }
 
 export default function FinancesPage() {
+  useRenderWatchdog("FinancesPage");
   const [, navigate] = useLocation();
   const [openCreate, setOpenCreate] = useState(false);
   const utils = trpc.useUtils();
@@ -45,12 +50,16 @@ export default function FinancesPage() {
   const hasChargeData = charges.length > 0;
   const showChargesInitialLoading = chargesQuery.isLoading && !hasChargeData;
   const showChargesErrorState = chargesQuery.error && !hasChargeData;
-  const revenueData = useMemo(() => {
+  const revenueDataParsed = useMemo(() => {
     return normalizeArrayPayload<any>(revenueQuery.data).map((item) => ({
       label: String(item?.month ?? item?.label ?? "Mês"),
       revenue: Number(item?.totalRevenueCents ?? item?.revenueCents ?? item?.amountCents ?? 0) / 100,
     }));
   }, [revenueQuery.data]);
+  const revenueSafe = useMemo(
+    () => safeChartData<{ label: string; revenue: number }>(revenueDataParsed, ["revenue"]),
+    [revenueDataParsed]
+  );
   const current30 = getWindow(30, 0);
   const previous30 = getWindow(30, 1);
   const receivedCurrent = charges
@@ -64,8 +73,8 @@ export default function FinancesPage() {
 
   usePageDiagnostics({
     page: "finances",
-    isLoading: showChargesInitialLoading || (revenueQuery.isLoading && revenueData.length === 0),
-    hasError: Boolean(showChargesErrorState || (revenueQuery.error && revenueData.length === 0)),
+    isLoading: showChargesInitialLoading || (revenueQuery.isLoading && revenueSafe.data.length === 0),
+    hasError: Boolean(showChargesErrorState || (revenueQuery.error && revenueSafe.data.length === 0)),
     isEmpty:
       !showChargesInitialLoading &&
       !showChargesErrorState &&
@@ -73,6 +82,30 @@ export default function FinancesPage() {
       !revenueQuery.isLoading,
     dataCount: charges.length,
   });
+
+  useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.info("[RENDER PAGE] finances");
+  }, []);
+
+  useEffect(() => {
+    if (!chargesQuery.error && !statsQuery.error && !revenueQuery.error) return;
+    // eslint-disable-next-line no-console
+    console.error("[TRPC ERROR] finances_query_error", {
+      charges: chargesQuery.error?.message,
+      stats: statsQuery.error?.message,
+      revenue: revenueQuery.error?.message,
+    });
+  }, [chargesQuery.error, revenueQuery.error, statsQuery.error]);
+
+  useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.info("[CHART DATA] finances.revenue", {
+      points: revenueSafe.data.length,
+      isValid: revenueSafe.isValid,
+      reason: revenueSafe.reason,
+    });
+  }, [revenueSafe.data.length, revenueSafe.isValid, revenueSafe.reason]);
 
   async function registerPayment(charge: any) {
     if (payCharge.isPending) return;
@@ -110,7 +143,8 @@ export default function FinancesPage() {
         )}
       />
 
-      <AppKpiRow items={[
+      <KpiErrorBoundary context="finances:kpi">
+        <AppKpiRow items={[
         {
           title: "Recebido no período",
           value: formatCurrency(receivedCurrent),
@@ -134,28 +168,33 @@ export default function FinancesPage() {
           hint: "vencidas / carteira total",
         },
       ]} />
+      </KpiErrorBoundary>
 
       <div className="grid gap-3 xl:grid-cols-3">
         <AppChartPanel title="Receita por mês" description="Somente dados reais do backend.">
-          {revenueQuery.isLoading && revenueData.length === 0 ? (
+          {revenueQuery.isLoading && revenueSafe.data.length === 0 ? (
             <AppPageLoadingState description="Carregando evolução de receita..." />
-          ) : revenueQuery.error && revenueData.length === 0 ? (
+          ) : revenueQuery.error && revenueSafe.data.length === 0 ? (
             <AppPageErrorState
               description={revenueQuery.error?.message ?? "Falha ao carregar evolução da receita."}
               actionLabel="Tentar novamente"
               onAction={() => void revenueQuery.refetch()}
             />
-          ) : revenueData.length === 0 ? (
+          ) : !revenueSafe.isValid ? (
+            <AppPageEmptyState title="Erro ao renderizar gráfico" description={revenueSafe.reason ?? "Dados inválidos do gráfico."} />
+          ) : revenueSafe.data.length === 0 ? (
             <AppPageEmptyState title="Nenhum dado disponível ainda" description="Ação recomendada: criar cobrança" />
           ) : (
-            <ChartContainer className="h-[240px] w-full" config={{ revenue: { label: "Receita" } }}>
-              <AreaChart data={revenueData}>
-                <CartesianGrid vertical={false} />
-                <XAxis dataKey="label" tickLine={false} axisLine={false} />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Area dataKey="revenue" stroke="var(--brand-primary)" fill="var(--brand-primary)" fillOpacity={0.2} />
-              </AreaChart>
-            </ChartContainer>
+            <ChartErrorBoundary context="finances:revenue-chart">
+              <ChartContainer className="h-[240px] w-full" config={{ revenue: { label: "Receita" } }}>
+                <AreaChart data={revenueSafe.data}>
+                  <CartesianGrid vertical={false} />
+                  <XAxis dataKey="label" tickLine={false} axisLine={false} />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Area dataKey="revenue" stroke="var(--brand-primary)" fill="var(--brand-primary)" fillOpacity={0.2} />
+                </AreaChart>
+              </ChartContainer>
+            </ChartErrorBoundary>
           )}
         </AppChartPanel>
       </div>

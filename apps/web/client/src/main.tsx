@@ -1,6 +1,7 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 
+import ErrorBoundary from "./components/ErrorBoundary";
 import App from "./App";
 import "./index.css";
 
@@ -60,6 +61,8 @@ function shouldRunBootProbe() {
 }
 
 function mountApp() {
+  // eslint-disable-next-line no-console
+  console.info("[RENDER START] mount_app");
   const rootElement = document.getElementById(ROOT_ID);
 
   if (!rootElement) {
@@ -71,7 +74,11 @@ function mountApp() {
 
   root.render(
     <React.StrictMode>
-      {useProbe ? <RootBootProbe /> : <App />}
+      {useProbe ? <RootBootProbe /> : (
+        <ErrorBoundary routeContext="root">
+          <App />
+        </ErrorBoundary>
+      )}
     </React.StrictMode>
   );
 }
@@ -79,10 +86,14 @@ function mountApp() {
 try {
   window.addEventListener("error", (event) => {
     // eslint-disable-next-line no-console
+    console.error("[RENDER ERROR] window_error", event.error ?? event.message);
+    // eslint-disable-next-line no-console
     console.error("[web] uncaught_error", event.error ?? event.message);
   });
 
   window.addEventListener("unhandledrejection", (event) => {
+    // eslint-disable-next-line no-console
+    console.error("[RENDER ERROR] unhandled_rejection", event.reason);
     // eslint-disable-next-line no-console
     console.error("[web] unhandled_rejection", event.reason);
   });

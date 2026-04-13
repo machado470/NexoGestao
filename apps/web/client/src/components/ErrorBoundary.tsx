@@ -5,6 +5,9 @@ import { Component, type ReactNode } from "react";
 interface Props {
   children: ReactNode;
   routeContext?: string;
+  fallbackTitle?: string;
+  fallbackDescription?: string;
+  reloadLabel?: string;
 }
 
 interface State {
@@ -27,7 +30,7 @@ class ErrorBoundary extends Component<Props, State> {
     this.setState({ componentStack: info.componentStack });
 
     // eslint-disable-next-line no-console
-    console.error("[RUNTIME ERROR] route_render_failed", {
+    console.error("[RENDER ERROR] route_render_failed", {
       route: this.props.routeContext ?? "unknown",
       message: error.message,
       stack: error.stack,
@@ -53,14 +56,11 @@ class ErrorBoundary extends Component<Props, State> {
 
     const details = [
       this.state.error
-        ? `${this.state.error.name}: ${this.state.error.message}
-
-${this.state.error.stack ?? "(stack indisponível)"}`
+        ? `${this.state.error.name}: ${this.state.error.message}\n\n${this.state.error.stack ?? "(stack indisponível)"}`
         : "Erro desconhecido",
-      this.state.componentStack ? `
-
---- Component Stack ---
-${this.state.componentStack}` : "",
+      this.state.componentStack
+        ? `\n\n--- Component Stack ---\n${this.state.componentStack}`
+        : "",
     ]
       .join("")
       .trim();
@@ -70,11 +70,11 @@ ${this.state.componentStack}` : "",
         <div className="nexo-app-panel-strong w-full max-w-3xl p-6">
           <div className="mb-4 flex items-center gap-2 text-rose-600">
             <AlertTriangle className="h-5 w-5" />
-            <h1 className="text-base font-semibold">Erro de renderização</h1>
+            <h1 className="text-base font-semibold">{this.props.fallbackTitle ?? "Erro de renderização"}</h1>
           </div>
 
           <p className="text-sm text-[var(--text-muted)]">
-            O app encontrou um erro inesperado durante a renderização. Use os detalhes abaixo para depuração.
+            {this.props.fallbackDescription ?? "O app encontrou um erro inesperado durante a renderização. Use os detalhes abaixo para depuração."}
           </p>
 
           <pre className="mt-4 max-h-[45vh] overflow-auto rounded-lg bg-zinc-950 p-3 text-xs text-zinc-100">
@@ -90,7 +90,7 @@ ${this.state.componentStack}` : "",
             )}
           >
             <RefreshCw className="h-4 w-4" />
-            Recarregar aplicação
+            {this.props.reloadLabel ?? "Recarregar aplicação"}
           </button>
         </div>
       </div>

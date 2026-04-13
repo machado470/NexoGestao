@@ -1,10 +1,13 @@
 "use client";
 
+import { useEffect, useMemo } from "react";
 import { CheckCircle2, TrendingUp } from "lucide-react";
 import { Label, PolarGrid, PolarRadiusAxis, RadialBar, RadialBarChart } from "recharts";
 
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, type ChartConfig } from "@/components/ui/chart";
+import { safeChartData } from "@/lib/safeChartData";
+import { useRenderWatchdog } from "@/hooks/useRenderWatchdog";
 
 type OperationsCompletionRadialProps = {
   totalOrders: number;
@@ -26,12 +29,21 @@ export default function OperationsCompletionRadial({
   title = "Taxa de conclusão",
   description = "Percentual das O.S. concluídas no período",
 }: OperationsCompletionRadialProps) {
+  useRenderWatchdog("OperationsCompletionRadial");
   const safeTotal = Math.max(Number(totalOrders || 0), 0);
   const safeCompleted = Math.max(Number(completedOrders || 0), 0);
   const percentage =
     safeTotal > 0 ? Math.min(100, Math.round((safeCompleted / safeTotal) * 100)) : 0;
 
   const chartData = [{ name: "completion", value: percentage, fill: "var(--color-completion)" }];
+  const safeData = useMemo(
+    () => safeChartData<{ name: string; value: number; fill: string }>(chartData, ["value"]),
+    [chartData]
+  );
+  useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.info("[CHART DATA] operations.completion", safeData);
+  }, [safeData]);
 
   return (
     <Card className="flex h-full flex-col">
@@ -41,12 +53,15 @@ export default function OperationsCompletionRadial({
       </CardHeader>
 
       <CardContent className="flex flex-1 items-center justify-center pb-0">
-        <ChartContainer
-          config={chartConfig}
-          className="mx-auto aspect-square h-[240px] max-h-[240px]"
-        >
+        {!safeData.isValid ? (
+          <p className="text-sm text-[var(--text-muted)]">Erro ao renderizar gráfico.</p>
+        ) : (
+          <ChartContainer
+            config={chartConfig}
+            className="mx-auto aspect-square h-[240px] max-h-[240px]"
+          >
           <RadialBarChart
-            data={chartData}
+            data={safeData.data}
             startAngle={90}
             endAngle={90 - (percentage * 3.6)}
             innerRadius={80}
@@ -92,7 +107,8 @@ export default function OperationsCompletionRadial({
               />
             </PolarRadiusAxis>
           </RadialBarChart>
-        </ChartContainer>
+          </ChartContainer>
+        )}
       </CardContent>
 
       <CardFooter className="flex-col gap-2 text-sm">

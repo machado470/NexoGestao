@@ -3,6 +3,8 @@ import { useLocation } from "wouter";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Button } from "@/components/ui/button";
 import { useRunAction } from "@/hooks/useRunAction";
+import { useRenderWatchdog } from "@/hooks/useRenderWatchdog";
+import { useEffect, useMemo } from "react";
 import {
   AppAlertList,
   AppChartPanel,
@@ -14,6 +16,9 @@ import {
   AppSectionBlock,
   AppStatusBadge,
 } from "@/components/internal-page-system";
+import { safeChartData } from "@/lib/safeChartData";
+import { ChartErrorBoundary } from "@/components/ChartErrorBoundary";
+import { KpiErrorBoundary } from "@/components/KpiErrorBoundary";
 
 const chartData = [
   { day: "Seg", receita: 42, ordens: 18 },
@@ -25,8 +30,19 @@ const chartData = [
 ];
 
 export default function ExecutiveDashboard() {
+  useRenderWatchdog("ExecutiveDashboard");
   const [, navigate] = useLocation();
   const { runAction, isRunning } = useRunAction();
+  const safeData = useMemo(
+    () => safeChartData<{ day: string; receita: number; ordens: number }>(chartData, ["receita", "ordens"]),
+    []
+  );
+  useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.info("[RENDER PAGE] executive-dashboard");
+    // eslint-disable-next-line no-console
+    console.info("[CHART DATA] executive-dashboard.revenue", safeData);
+  }, [safeData]);
 
   return (
     <AppPageShell>
@@ -37,7 +53,8 @@ export default function ExecutiveDashboard() {
         onCta={() => void runAction(async () => navigate("/dashboard/operations"))}
       />
 
-      <AppKpiRow
+      <KpiErrorBoundary context="executive-dashboard:kpi">
+        <AppKpiRow
         items={[
           { label: "Receita", value: "R$ 187,4k", trend: 15.6, context: "+2 hoje · últimos 30 dias", onClick: () => navigate("/finances?view=revenue&period=30d") },
           { label: "Ordens", value: "124", trend: -3.2, context: "-4 hoje · últimos 7 dias", onClick: () => navigate("/service-orders?status=attention&period=7d") },
@@ -45,6 +62,7 @@ export default function ExecutiveDashboard() {
           { label: "Ticket médio", value: "R$ 1.511", trend: 4.4, context: "+1 hoje · últimos 30 dias", onClick: () => navigate("/finances?metric=average_ticket&period=30d") },
         ]}
       />
+      </KpiErrorBoundary>
 
       <div className="grid gap-3 xl:grid-cols-3">
         <AppChartPanel
@@ -54,18 +72,24 @@ export default function ExecutiveDashboard() {
           trendLabel="↑ +12,8% · últimos 7 dias"
           onCtaClick={() => navigate("/finances?chart=revenue_volume&period=7d")}
         >
-          <ChartContainer
-            className="h-[260px] w-full"
-            config={{ receita: { label: "Receita" }, ordens: { label: "Ordens" } }}
-          >
-            <AreaChart data={chartData}>
-              <CartesianGrid vertical={false} />
-              <XAxis dataKey="day" tickLine={false} axisLine={false} />
-              <ChartTooltip content={<ChartTooltipContent />} />
-              <Area type="monotone" dataKey="receita" stroke="var(--brand-primary)" fill="var(--brand-primary)" fillOpacity={0.25} />
-              <Area type="monotone" dataKey="ordens" stroke="var(--color-info)" fill="var(--color-info)" fillOpacity={0.1} />
-            </AreaChart>
-          </ChartContainer>
+          {!safeData.isValid ? (
+            <p className="text-sm text-[var(--text-muted)]">Erro ao renderizar gráfico.</p>
+          ) : (
+            <ChartErrorBoundary context="executive-dashboard:revenue-chart">
+              <ChartContainer
+                className="h-[260px] w-full"
+                config={{ receita: { label: "Receita" }, ordens: { label: "Ordens" } }}
+              >
+                <AreaChart data={safeData.data}>
+                  <CartesianGrid vertical={false} />
+                  <XAxis dataKey="day" tickLine={false} axisLine={false} />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Area type="monotone" dataKey="receita" stroke="var(--brand-primary)" fill="var(--brand-primary)" fillOpacity={0.25} />
+                  <Area type="monotone" dataKey="ordens" stroke="var(--color-info)" fill="var(--color-info)" fillOpacity={0.1} />
+                </AreaChart>
+              </ChartContainer>
+            </ChartErrorBoundary>
+          )}
         </AppChartPanel>
 
         <AppSectionBlock title="Itens que exigem atenção" subtitle="Prioridades do dia" onCtaClick={() => navigate("/dashboard/operations?filter=critical")}>
