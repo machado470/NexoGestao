@@ -21,6 +21,21 @@ function assertHtmlShell(template: string, source: string, mode: "vite" | "stati
 }
 
 export async function setupVite(app: Express, server: Server) {
+  const configuredPlugins = Array.isArray(viteConfig.plugins)
+    ? viteConfig.plugins.flatMap((plugin) =>
+        Array.isArray(plugin)
+          ? plugin.map((inner) => (inner && typeof inner === "object" && "name" in inner ? inner.name : String(inner)))
+          : [plugin && typeof plugin === "object" && "name" in plugin ? plugin.name : String(plugin)]
+      )
+    : [];
+
+  console.log("[web] setupVite env", {
+    NODE_ENV: process.env.NODE_ENV ?? "(undefined)",
+    MANUS_RUNTIME: process.env.MANUS_RUNTIME ?? "(undefined)",
+    MANUS_DEBUG_COLLECTOR: process.env.MANUS_DEBUG_COLLECTOR ?? "(undefined)",
+    configuredPlugins,
+  });
+
   const vite = await createViteServer({
     ...viteConfig,
     configFile: false,

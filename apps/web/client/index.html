@@ -19,10 +19,33 @@
         try {
           var at = new Date().toISOString();
           var marker = document.getElementById("debug-html-static");
+          var params = new URLSearchParams(window.location.search);
+          var renderAuditMode = (params.get("renderAuditMode") || "app").trim().toLowerCase();
+
+          window.onerror = function (message, source, lineno, colno, error) {
+            console.error("[WINDOW_ERROR]", {
+              at: new Date().toISOString(),
+              message: String(message),
+              source: source || null,
+              lineno: lineno || null,
+              colno: colno || null,
+              stack: error && error.stack ? error.stack : null,
+            });
+            return false;
+          };
+
+          window.onunhandledrejection = function (event) {
+            console.error("[UNHANDLED_PROMISE]", {
+              at: new Date().toISOString(),
+              reason: event ? event.reason : null,
+            });
+          };
+
           console.log("[HTML] inline script running", {
             at: at,
             pathname: window.location.pathname,
             readyState: document.readyState,
+            renderAuditMode: renderAuditMode,
           });
           if (marker) {
             marker.textContent = "HTML STATIC OK | INLINE JS OK";
@@ -30,8 +53,7 @@
             marker.style.color = "#dcfce7";
           }
 
-          var params = new URLSearchParams(window.location.search);
-          if (params.get("renderAudit") === "1") {
+          if (params.get("renderAudit") === "1" || params.has("renderAuditMode")) {
             document.documentElement.style.outline = "3px solid #ef4444";
             document.body.style.background = "#fff7ed";
             var root = document.getElementById("root");
@@ -40,6 +62,14 @@
               root.style.minHeight = "100vh";
               root.style.background = "rgba(254,215,170,0.35)";
             }
+          }
+
+          if (renderAuditMode === "bare-html") {
+            var bare = document.createElement("div");
+            bare.id = "debug-bare-html";
+            bare.textContent = "BARE HTML MODE ACTIVE";
+            bare.style.cssText = "position:fixed;inset:auto 8px 8px auto;z-index:2147483647;background:#1e3a8a;color:#dbeafe;padding:6px 10px;border-radius:6px;font:700 12px/1.2 system-ui";
+            document.body.appendChild(bare);
           }
         } catch (error) {
           console.error("[HTML] inline script error", error);
