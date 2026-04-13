@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from "react";
+import { useLocation } from "wouter";
 import { AppPageErrorState, AppPageLoadingState, AppPageShell } from "@/components/internal-page-system";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -20,6 +21,25 @@ export function AppBootstrapGuard({
   children: ReactNode;
 }) {
   const { authState } = useAuth();
+  const [location] = useLocation();
+  const pathname = location.split(/[?#]/, 1)[0] || "/";
+  const isPublicBootstrapPath =
+    pathname === "/" ||
+    pathname === "/about" ||
+    pathname === "/sobre" ||
+    pathname === "/produto" ||
+    pathname === "/precos" ||
+    pathname === "/contato" ||
+    pathname === "/funcionalidades" ||
+    pathname === "/privacy" ||
+    pathname === "/privacidade" ||
+    pathname === "/terms" ||
+    pathname === "/termos" ||
+    pathname === "/login" ||
+    pathname === "/register" ||
+    pathname === "/forgot-password" ||
+    pathname === "/reset-password" ||
+    pathname.startsWith("/auth/");
   useEffect(() => {
     if (!import.meta.env.DEV) return;
     if (authState === "initializing") {
@@ -29,6 +49,10 @@ export function AppBootstrapGuard({
   }, [authState]);
 
   if (state === "initializing") {
+    if (isPublicBootstrapPath) {
+      return <>{children}</>;
+    }
+
     return (
       <AppPageShell>
         <AppPageLoadingState
