@@ -13,6 +13,34 @@ console.log("MAIN START");
 
 const ROOT_ID = "root";
 
+function ProvidersMountLogger() {
+  React.useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    // eslint-disable-next-line no-console
+    console.info("[BOOT] QueryClientProvider mounted");
+    return () => {
+      // eslint-disable-next-line no-console
+      console.info("[BOOT] QueryClientProvider unmounted");
+    };
+  }, []);
+
+  return null;
+}
+
+function TrpcProviderMountLogger() {
+  React.useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    // eslint-disable-next-line no-console
+    console.info("[BOOT] trpc.Provider mounted");
+    return () => {
+      // eslint-disable-next-line no-console
+      console.info("[BOOT] trpc.Provider unmounted");
+    };
+  }, []);
+
+  return null;
+}
+
 function shouldRunBootProbe() {
   if (typeof window === "undefined") return false;
   const params = new URLSearchParams(window.location.search);
@@ -69,7 +97,9 @@ function mountApp() {
   createRoot(rootElement).render(
     <React.StrictMode>
       <QueryClientProvider client={queryClient}>
+        <ProvidersMountLogger />
         <trpc.Provider client={trpcClient} queryClient={queryClient}>
+          <TrpcProviderMountLogger />
           {useProbe ? (
             <div data-testid="boot-probe">NexoGestão boot probe</div>
           ) : (

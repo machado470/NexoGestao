@@ -226,6 +226,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const shouldBootstrapSession = pathname === "/" || isAuthPath || !isMarketingPath;
   const syncEventRef = useRef<(payload: unknown) => Promise<void>>(async () => {});
 
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    // eslint-disable-next-line no-console
+    console.info("[AUTH] AuthProvider mounted", { pathname });
+    return () => {
+      // eslint-disable-next-line no-console
+      console.info("[AUTH] AuthProvider unmounted", { pathname });
+    };
+  }, [pathname]);
+
   const meQuery = trpc.session.me.useQuery(undefined, {
     enabled: shouldBootstrapSession && !forcedLoggedOut,
     retry: false,

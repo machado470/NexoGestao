@@ -680,6 +680,25 @@ function RootRoute() {
   const { authState, bootstrapError, payload, refresh } = useAuth();
   const [location, navigate] = useLocation();
   const pathname = location.split(/[?#]/, 1)[0] || "/";
+  const rootBranch =
+    authState === "initializing"
+      ? "initializing_landing"
+      : authState === "error"
+        ? "error_screen"
+        : authState === "unauthenticated"
+          ? "unauthenticated_landing"
+          : "authenticated_redirect";
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    // eslint-disable-next-line no-console
+    console.info("[ROUTER] RootRoute branch", {
+      pathname,
+      location,
+      authState,
+      branch: rootBranch,
+    });
+  }, [authState, location, pathname, rootBranch]);
 
   useEffect(() => {
     bootLog("[ROUTER] root_route_state", {
@@ -853,61 +872,42 @@ function App() {
     );
   }
 
-  if (bootProbeStage === "auth") {
-    return (
-      <AppErrorBoundary>
-        <AuthProvider>
-          <AuthBootstrapStatus onReady={markReady} onFailed={markFailed} />
-          <AppBootstrapGuard state={bootstrapState} reason={bootstrapReason} onReload={reloadApp}>
-            <TooltipProvider>
-              <Toaster />
-              <AuthProbeScreen />
-            </TooltipProvider>
-          </AppBootstrapGuard>
-        </AuthProvider>
-      </AppErrorBoundary>
+  const appContent =
+    bootProbeStage === "auth" ? (
+      <TooltipProvider>
+        <Toaster />
+        <AuthProbeScreen />
+      </TooltipProvider>
+    ) : bootProbeStage === "layout" ||
+      bootProbeStage === "execution-bar" ||
+      bootProbeStage === "global-engine" ? (
+      <BootProbeProvider stage={bootProbeStage}>
+        <TooltipProvider>
+          <Toaster />
+          <AppLayout>
+            <div className="p-4 text-sm text-[var(--text-secondary)]">
+              NEXO LAYOUT OK
+            </div>
+          </AppLayout>
+          <ConsentBanner />
+        </TooltipProvider>
+      </BootProbeProvider>
+    ) : (
+      <BootProbeProvider stage={bootProbeStage}>
+        <TooltipProvider>
+          <Toaster />
+          <Router />
+          <ConsentBanner />
+        </TooltipProvider>
+      </BootProbeProvider>
     );
-  }
-
-  if (
-    bootProbeStage === "layout" ||
-    bootProbeStage === "execution-bar" ||
-    bootProbeStage === "global-engine"
-  ) {
-    return (
-      <AppErrorBoundary>
-        <AuthProvider>
-          <AuthBootstrapStatus onReady={markReady} onFailed={markFailed} />
-          <AppBootstrapGuard state={bootstrapState} reason={bootstrapReason} onReload={reloadApp}>
-            <BootProbeProvider stage={bootProbeStage}>
-              <TooltipProvider>
-                <Toaster />
-                <AppLayout>
-                  <div className="p-4 text-sm text-[var(--text-secondary)]">
-                    NEXO LAYOUT OK
-                  </div>
-                </AppLayout>
-                <ConsentBanner />
-              </TooltipProvider>
-            </BootProbeProvider>
-          </AppBootstrapGuard>
-        </AuthProvider>
-      </AppErrorBoundary>
-    );
-  }
 
   return (
     <AppErrorBoundary>
       <AuthProvider>
         <AuthBootstrapStatus onReady={markReady} onFailed={markFailed} />
         <AppBootstrapGuard state={bootstrapState} reason={bootstrapReason} onReload={reloadApp}>
-          <BootProbeProvider stage={bootProbeStage}>
-            <TooltipProvider>
-              <Toaster />
-              <Router />
-              <ConsentBanner />
-            </TooltipProvider>
-          </BootProbeProvider>
+          {appContent}
         </AppBootstrapGuard>
       </AuthProvider>
     </AppErrorBoundary>

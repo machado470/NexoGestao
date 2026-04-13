@@ -58,6 +58,16 @@ export function AppBootstrapGuard({
     });
   }, [authState, guardBranch, isPublicBootstrapPath, pathname, state]);
 
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    // eslint-disable-next-line no-console
+    console.info("[BOOT GUARD] mounted", { pathname });
+    return () => {
+      // eslint-disable-next-line no-console
+      console.info("[BOOT GUARD] unmounted", { pathname });
+    };
+  }, [pathname]);
+
   if (state === "initializing" && !isPublicBootstrapPath) {
     return (
       <>
