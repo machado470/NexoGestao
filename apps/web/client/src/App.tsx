@@ -679,6 +679,7 @@ function Router() {
 function RootRoute() {
   const { authState, bootstrapError, payload, refresh } = useAuth();
   const [location, navigate] = useLocation();
+  const pathname = location.split(/[?#]/, 1)[0] || "/";
 
   useEffect(() => {
     bootLog("[ROUTER] root_route_state", {
@@ -715,6 +716,11 @@ function RootRoute() {
   }, [authState, bootstrapError, location, navigate, payload]);
 
   if (authState === "initializing") {
+    bootLog("[ROUTER] root_render", {
+      route: pathname,
+      branch: "initializing_landing",
+      landingRendered: true,
+    });
     return (
       <>
         <MarketingRoute component={Landing} />
@@ -724,6 +730,11 @@ function RootRoute() {
   }
 
   if (authState === "error") {
+    bootLog("[ROUTER] root_render", {
+      route: pathname,
+      branch: "error_screen",
+      landingRendered: false,
+    });
     return (
       <FullScreenMessage
         title="Falha no bootstrap de autenticação"
@@ -741,8 +752,19 @@ function RootRoute() {
   }
 
   if (authState === "unauthenticated") {
+    bootLog("[ROUTER] root_render", {
+      route: pathname,
+      branch: "unauthenticated_landing",
+      landingRendered: true,
+    });
     return <MarketingRoute component={Landing} />;
   }
+
+  bootLog("[ROUTER] root_render", {
+    route: pathname,
+    branch: "authenticated_redirect",
+    landingRendered: false,
+  });
 
   return <RedirectingScreen message="Redirecionando para o ambiente interno..." />;
 }

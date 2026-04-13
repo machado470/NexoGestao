@@ -217,6 +217,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [forcedLoggedOut, setForcedLoggedOut] = useState(false);
   const channelRef = useRef<BroadcastChannel | null>(null);
   const pathname = useMemo(() => location.split(/[?#]/, 1)[0] || "/", [location]);
+  const previousAuthStateRef = useRef<AuthBootstrapState | null>(null);
 
   const isAuthPath = AUTH_PATH_PREFIXES.some(prefix =>
     pathname.startsWith(prefix)
@@ -491,6 +492,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     bootstrapError: meBootstrapError,
     user: userSafe,
   });
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    const prevState = previousAuthStateRef.current;
+    if (prevState === authState) return;
+    // eslint-disable-next-line no-console
+    console.info("[AUTH] state_transition", {
+      from: prevState,
+      to: authState,
+      pathname,
+      shouldBootstrapSession,
+      forcedLoggedOut,
+      meFetchStatus: meQuery.fetchStatus,
+      meHasData: meQuery.data !== undefined,
+    });
+    previousAuthStateRef.current = authState;
+  }, [
+    authState,
+    forcedLoggedOut,
+    meQuery.data,
+    meQuery.fetchStatus,
+    pathname,
+    shouldBootstrapSession,
+  ]);
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    // eslint-disable-next-line no-console
+    console.info("[AUTH] snapshot", {
+      pathname,
+      authState,
+      isInitializing,
+      isAuthenticated: Boolean(userSafe),
+      shouldBootstrapSession,
+      forcedLoggedOut,
+      meFetchStatus: meQuery.fetchStatus,
+    });
+  }, [
+    authState,
+    forcedLoggedOut,
+    isInitializing,
+    meQuery.fetchStatus,
+    pathname,
+    shouldBootstrapSession,
+    userSafe,
+  ]);
 
   useEffect(() => {
     if (!shouldBootstrapSession || forcedLoggedOut || !import.meta.env.DEV) return;
