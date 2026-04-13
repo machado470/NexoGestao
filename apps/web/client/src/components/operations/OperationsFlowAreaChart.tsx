@@ -1,10 +1,13 @@
 "use client";
 
+import { useEffect, useMemo } from "react";
 import { Activity } from "lucide-react";
 import { Area, AreaChart, CartesianGrid, XAxis } from "recharts";
 
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
+import { safeChartData } from "@/lib/safeChartData";
+import { useRenderWatchdog } from "@/hooks/useRenderWatchdog";
 
 type OperationsFlowAreaChartProps = {
   openOrders: number;
@@ -26,12 +29,21 @@ export default function OperationsFlowAreaChart({
   inProgressOrders,
   completedOrders,
 }: OperationsFlowAreaChartProps) {
+  useRenderWatchdog("OperationsFlowAreaChart");
   const chartData = [
     { stage: "Abertas", quantity: Math.max(Number(openOrders || 0), 0) },
     { stage: "Atribuídas", quantity: Math.max(Number(assignedOrders || 0), 0) },
     { stage: "Em execução", quantity: Math.max(Number(inProgressOrders || 0), 0) },
     { stage: "Concluídas", quantity: Math.max(Number(completedOrders || 0), 0) },
   ];
+  const safeData = useMemo(
+    () => safeChartData<{ stage: string; quantity: number }>(chartData, ["quantity"]),
+    [chartData]
+  );
+  useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.info("[CHART DATA] operations.flow", safeData);
+  }, [safeData]);
 
   return (
     <Card className="h-full">
@@ -43,10 +55,13 @@ export default function OperationsFlowAreaChart({
       </CardHeader>
 
       <CardContent>
-        <ChartContainer config={chartConfig} className="h-[260px] w-full">
+        {!safeData.isValid ? (
+          <p className="text-sm text-[var(--text-muted)]">Erro ao renderizar gráfico.</p>
+        ) : (
+          <ChartContainer config={chartConfig} className="h-[260px] w-full">
           <AreaChart
             accessibilityLayer
-            data={chartData}
+            data={safeData.data}
             margin={{
               left: 12,
               right: 12,
@@ -75,7 +90,8 @@ export default function OperationsFlowAreaChart({
               strokeWidth={2}
             />
           </AreaChart>
-        </ChartContainer>
+          </ChartContainer>
+        )}
       </CardContent>
 
       <CardFooter>
