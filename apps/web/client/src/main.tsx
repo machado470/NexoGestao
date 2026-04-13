@@ -11,7 +11,7 @@ import { getQueryClient, getTrpcClient, trpc } from "@/lib/trpc";
 
 const ROOT_ID = "root";
 
-type RenderAuditMode = "minimal" | "static-react" | "app";
+type RenderAuditMode = "bare-html" | "minimal" | "static-react" | "app";
 
 function nowIso() {
   return new Date().toISOString();
@@ -26,6 +26,7 @@ function getRenderAuditMode(): RenderAuditMode {
   }
 
   const mode = (params.get("renderAuditMode") ?? "").trim().toLowerCase();
+  if (mode === "bare-html") return "bare-html";
   if (mode === "minimal") return "minimal";
   if (mode === "static-react") return "static-react";
   return "app";
@@ -129,6 +130,15 @@ function mountApp() {
     return;
   }
 
+  if (renderAuditMode === "bare-html") {
+    setBootPhase("AUDIT_BARE_HTML");
+    if (import.meta.env.DEV) {
+      // eslint-disable-next-line no-console
+      console.log("[MAIN] bare-html mode: React mount skipped", { at: nowIso() });
+    }
+    return;
+  }
+
   setBootPhase("ROOT_FOUND");
 
   if (import.meta.env.DEV) {
@@ -136,6 +146,10 @@ function mountApp() {
     console.log("[MAIN] createRoot:start", { at: nowIso() });
   }
   const root = createRoot(rootElement);
+  if (import.meta.env.DEV) {
+    // eslint-disable-next-line no-console
+    console.log("[MAIN] createRoot:done", { at: nowIso() });
+  }
 
   setBootPhase("APP_RENDER_START");
   if (import.meta.env.DEV) {

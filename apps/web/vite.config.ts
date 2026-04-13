@@ -128,12 +128,30 @@ const plugins = [
   react(),
   tailwindcss(),
   jsxLocPlugin(),
-  vitePluginManusDebugCollector(),
 ];
 
-if (process.env.MANUS_RUNTIME === "1") {
+const manusRuntimeEnabled = process.env.MANUS_RUNTIME === "1";
+const manusDebugCollectorEnabled = process.env.MANUS_DEBUG_COLLECTOR === "1";
+
+if (manusDebugCollectorEnabled) {
+  plugins.push(vitePluginManusDebugCollector());
+}
+
+if (manusRuntimeEnabled) {
   plugins.unshift(vitePluginManusRuntime());
 }
+
+console.info("[VITE_BOOT]", {
+  manusRuntimeEnabled,
+  manusDebugCollectorEnabled,
+  MANUS_RUNTIME: process.env.MANUS_RUNTIME ?? "(undefined)",
+  MANUS_DEBUG_COLLECTOR: process.env.MANUS_DEBUG_COLLECTOR ?? "(undefined)",
+  pluginNames: plugins.flatMap((plugin) =>
+    Array.isArray(plugin)
+      ? plugin.map((inner) => inner?.name ?? "(unnamed)")
+      : [plugin?.name ?? "(unnamed)"]
+  ),
+});
 
 function getVendorChunk(id: string) {
   if (!id.includes("node_modules")) return;
