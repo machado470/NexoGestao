@@ -490,9 +490,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (prevState === authState) return;
     // eslint-disable-next-line no-console
     console.info("[AUTH] state_transition", {
+      at: new Date().toISOString(),
       from: prevState,
       to: authState,
       pathname,
+      readyState: typeof document !== "undefined" ? document.readyState : "unknown",
       shouldBootstrapSession,
       forcedLoggedOut,
       meFetchStatus: meQuery.fetchStatus,
@@ -512,6 +514,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!import.meta.env.DEV) return;
     // eslint-disable-next-line no-console
     console.info("[AUTH] snapshot", {
+      at: new Date().toISOString(),
       pathname,
       authState,
       isInitializing,

@@ -46,13 +46,15 @@ export function AppBootstrapGuard({
     if (!import.meta.env.DEV) return;
     // eslint-disable-next-line no-console
     console.info("[BOOTSTRAP] guard", {
+      at: new Date().toISOString(),
       route: pathname,
       appBootstrapState: state,
       authState,
       isPublicBootstrapPath,
       branch: guardBranch,
+      hasChildren: Boolean(children),
     });
-  }, [authState, guardBranch, isPublicBootstrapPath, pathname, state]);
+  }, [authState, children, guardBranch, isPublicBootstrapPath, pathname, state]);
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;

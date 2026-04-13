@@ -5,7 +5,8 @@ export function AuthLayout({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   const renderAudit =
     typeof window !== "undefined" &&
-    new URLSearchParams(window.location.search).get("renderAudit") === "1";
+    (new URLSearchParams(window.location.search).get("renderAudit") === "1" ||
+      new URLSearchParams(window.location.search).has("renderAuditMode"));
   if (import.meta.env.DEV) {
     // eslint-disable-next-line no-console
     console.info("[LAYOUT] auth", { pathname: location, hasChildren: Boolean(children) });

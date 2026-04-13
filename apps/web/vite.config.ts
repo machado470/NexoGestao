@@ -128,9 +128,12 @@ const plugins = [
   react(),
   tailwindcss(),
   jsxLocPlugin(),
-  vitePluginManusRuntime(),
   vitePluginManusDebugCollector(),
 ];
+
+if (process.env.MANUS_RUNTIME === "1") {
+  plugins.unshift(vitePluginManusRuntime());
+}
 
 function getVendorChunk(id: string) {
   if (!id.includes("node_modules")) return;
