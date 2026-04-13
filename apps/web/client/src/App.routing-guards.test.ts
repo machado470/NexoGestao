@@ -5,6 +5,7 @@ import {
   readSafeRedirectFromPath,
   resolveRootRouteBranch,
 } from "./App";
+import { resolveAppBootstrapGuardBranch } from "./components/AppBootstrapGuard";
 
 describe("App routing/auth guard helpers", () => {
   it("monta redirect para login de forma determinística", () => {
@@ -39,6 +40,22 @@ describe("App routing/auth guard helpers", () => {
     expect(resolveRootRouteBranch("error")).toBe("error_screen");
     expect(resolveRootRouteBranch("unauthenticated")).toBe("unauthenticated_landing");
     expect(resolveRootRouteBranch("authenticated")).toBe("authenticated_redirect");
+    expect(resolveRootRouteBranch("qualquer-coisa")).toBe("unknown_state_fallback");
   });
 
+  it("AppBootstrapGuard nunca entra em branch silencioso para erro interno", () => {
+    expect(
+      resolveAppBootstrapGuardBranch({
+        state: "error",
+        isPublicBootstrapPath: false,
+      })
+    ).toBe("blocking_error");
+
+    expect(
+      resolveAppBootstrapGuardBranch({
+        state: "initializing",
+        isPublicBootstrapPath: true,
+      })
+    ).toBe("pass_through");
+  });
 });

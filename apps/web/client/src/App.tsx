@@ -689,13 +689,15 @@ export type RootRouteBranch =
   | "initializing_landing"
   | "error_screen"
   | "unauthenticated_landing"
-  | "authenticated_redirect";
+  | "authenticated_redirect"
+  | "unknown_state_fallback";
 
-export function resolveRootRouteBranch(authState: ReturnType<typeof useAuth>["authState"]): RootRouteBranch {
+export function resolveRootRouteBranch(authState: unknown): RootRouteBranch {
   if (authState === "initializing") return "initializing_landing";
   if (authState === "error") return "error_screen";
   if (authState === "unauthenticated") return "unauthenticated_landing";
-  return "authenticated_redirect";
+  if (authState === "authenticated") return "authenticated_redirect";
+  return "unknown_state_fallback";
 }
 
 function RootRoute() {
@@ -707,7 +709,7 @@ function RootRoute() {
   useEffect(() => {
     if (!import.meta.env.DEV) return;
     // eslint-disable-next-line no-console
-    console.info("[ROUTER] RootRoute branch", {
+    console.info("[ROOT] branch", {
       pathname,
       location,
       authState,
@@ -728,15 +730,19 @@ function RootRoute() {
               ? "landing"
               : "redirect",
     });
-    if (authState === "initializing") {
+    if (rootBranch === "initializing_landing") {
       bootLog("[AUTH] initializing");
       return;
     }
-    if (authState === "error") {
+    if (rootBranch === "error_screen") {
       bootError("[BOOT ERROR] auth bootstrap", bootstrapError);
       return;
     }
-    if (authState === "unauthenticated") return;
+    if (rootBranch === "unauthenticated_landing") return;
+    if (rootBranch === "unknown_state_fallback") {
+      bootError("[ROOT] unexpected auth state", { authState, pathname });
+      return;
+    }
 
     const requiresOnboarding = getRequiresOnboarding(payload);
     const target = requiresOnboarding ? "/onboarding" : "/executive-dashboard";
@@ -749,7 +755,7 @@ function RootRoute() {
     navigate(target, { replace: true });
   }, [authState, bootstrapError, location, navigate, payload]);
 
-  if (authState === "initializing") {
+  if (rootBranch === "initializing_landing") {
     bootLog("[ROUTER] root_render", {
       route: pathname,
       branch: "initializing_landing",
@@ -763,7 +769,7 @@ function RootRoute() {
     );
   }
 
-  if (authState === "error") {
+  if (rootBranch === "error_screen") {
     bootLog("[ROUTER] root_render", {
       route: pathname,
       branch: "error_screen",
@@ -785,7 +791,7 @@ function RootRoute() {
     );
   }
 
-  if (authState === "unauthenticated") {
+  if (rootBranch === "unauthenticated_landing") {
     bootLog("[ROUTER] root_render", {
       route: pathname,
       branch: "unauthenticated_landing",
@@ -794,26 +800,44 @@ function RootRoute() {
     return <MarketingRoute component={Landing} />;
   }
 
-  bootLog("[ROUTER] root_render", {
-    route: pathname,
-    branch: "authenticated_redirect",
-    landingRendered: false,
+  if (rootBranch === "authenticated_redirect") {
+    bootLog("[ROUTER] root_render", {
+      route: pathname,
+      branch: "authenticated_redirect",
+      landingRendered: false,
+    });
+    return <RedirectingScreen message="Redirecionando para o ambiente interno..." />;
+  }
+
+  bootError("[ROOT] fallback visual acionado", {
+    pathname,
+    authState,
   });
 
-  return <RedirectingScreen message="Redirecionando para o ambiente interno..." />;
+  return (
+    <FullScreenMessage
+      title="Fallback RootRoute"
+      description="Estado inesperado de roteamento detectado. Atualize a página para continuar."
+      actionLabel="Recarregar aplicação"
+      onAction={() => {
+        if (typeof window === "undefined") return;
+        window.location.reload();
+      }}
+    />
+  );
 }
 
 function App() {
-  bootLog("[RENDER] app render start");
+  bootLog("[APP] render");
   setBootPhase("AUTH_INIT");
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;
     // eslint-disable-next-line no-console
-    console.info("[APP] mounted");
+    console.info("[APP] mount");
     return () => {
       // eslint-disable-next-line no-console
-      console.info("[APP] unmounted");
+      console.info("[APP] unmount");
     };
   }, []);
 
@@ -848,7 +872,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    bootLog("[BOOT] app init", { bootProbeStage });
+    bootLog("[BOOTSTRAP] app init", { bootProbeStage });
   }, []);
 
   const bootProbeLabel = useMemo(() => {
@@ -927,6 +951,15 @@ function App() {
       </BootProbeProvider>
     );
 
+  if (!appContent) {
+    return (
+      <FullScreenMessage
+        title="Fallback App"
+        description="Falha inesperada ao montar a aplicação."
+      />
+    );
+  }
+
   return (
     <AppErrorBoundary>
       <AuthProvider>
@@ -949,6 +982,10 @@ function AuthBootstrapStatus({
   const { authState, bootstrapError } = useAuth();
 
   useEffect(() => {
+    if (import.meta.env.DEV) {
+      // eslint-disable-next-line no-console
+      console.info("[BOOTSTRAP] state", { authState });
+    }
     if (authState === "initializing") return;
     if (authState === "error") {
       setBootPhase("AUTH_ERROR");
@@ -967,7 +1004,11 @@ function AuthBootstrapStatus({
       setBootPhase("AUTH_AUTHENTICATED");
       bootLog("[RENDER] app");
     }
-    onReady(authState);
+    if (authState === "authenticated" || authState === "unauthenticated") {
+      onReady(authState);
+      return;
+    }
+    onFailed("Estado de autenticação inesperado durante bootstrap");
   }, [authState, bootstrapError, onFailed, onReady]);
 
   return null;
