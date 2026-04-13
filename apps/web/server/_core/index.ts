@@ -31,8 +31,10 @@ async function startServer() {
   );
 
   if (process.env.NODE_ENV === "development") {
+    console.log("[BFF] NODE_ENV=development, habilitando Vite middleware");
     await setupVite(app, server);
   } else {
+    console.log("[BFF] NODE_ENV!=development, servindo frontend estático");
     serveStatic(app);
   }
 
