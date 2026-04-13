@@ -47,6 +47,45 @@ export async function setupVite(app: Express, server: Server) {
     appType: "custom",
   });
 
+  app.use((req, res, next) => {
+    const startedAt = Date.now();
+    const url = req.originalUrl || req.url || "";
+    const isTrackedAsset =
+      url === "/" ||
+      url.includes("index.html") ||
+      url.includes("/src/main.tsx") ||
+      /\.([cm]?js|mjs|ts|tsx)$/.test(url);
+
+    if (!isTrackedAsset) {
+      next();
+      return;
+    }
+
+    console.log("[VITE_REQ] start", { method: req.method, url });
+    const pendingTimer = setTimeout(() => {
+      console.warn("[VITE_REQ] pending", { method: req.method, url, pendingMs: Date.now() - startedAt });
+    }, 10_000);
+
+    res.on("finish", () => {
+      clearTimeout(pendingTimer);
+      const payload = {
+        method: req.method,
+        url,
+        status: res.statusCode,
+        durationMs: Date.now() - startedAt,
+      };
+      if (res.statusCode >= 500) {
+        console.error("[VITE_REQ] finish", payload);
+      } else if (res.statusCode >= 400) {
+        console.warn("[VITE_REQ] finish", payload);
+      } else {
+        console.log("[VITE_REQ] finish", payload);
+      }
+    });
+
+    next();
+  });
+
   app.use(vite.middlewares);
 
   app.use("*", async (req, res, next) => {
@@ -83,6 +122,31 @@ export function serveStatic(app: Express) {
       `Could not find the build directory: ${distPath}, make sure to build the client first`
     );
   }
+
+  app.use((req, res, next) => {
+    const url = req.originalUrl || req.url || "";
+    const isTrackedAsset =
+      url === "/" ||
+      url.includes("index.html") ||
+      url.includes("/src/main.tsx") ||
+      /\.([cm]?js|mjs|ts|tsx)$/.test(url);
+    if (!isTrackedAsset) {
+      next();
+      return;
+    }
+    console.log("[STATIC_REQ] start", { method: req.method, url });
+    res.on("finish", () => {
+      const payload = { method: req.method, url, status: res.statusCode };
+      if (res.statusCode >= 500) {
+        console.error("[STATIC_REQ] finish", payload);
+      } else if (res.statusCode >= 400) {
+        console.warn("[STATIC_REQ] finish", payload);
+      } else {
+        console.log("[STATIC_REQ] finish", payload);
+      }
+    });
+    next();
+  });
 
   app.use(express.static(distPath));
 

@@ -15,6 +15,10 @@ import {
   setAuditField,
 } from "@/lib/renderAudit";
 
+// Primeiro código executável do bootstrap do frontend.
+// eslint-disable-next-line no-console
+console.log("[MAIN] start");
+
 const ROOT_ID = "root";
 
 type RenderAuditMode = "bare-html" | "minimal" | "static-react" | "app";
@@ -68,6 +72,23 @@ function handleFatalError(title: string, errorLike: unknown, extra?: unknown) {
     url: typeof window !== "undefined" ? window.location.href : "unknown",
     timestamp: nowIso(),
   });
+}
+
+function renderDomFatalFallback(title: string, errorLike: unknown) {
+  if (typeof document === "undefined") return;
+  const parsed = normalizeError(errorLike);
+  const panel = document.createElement("div");
+  panel.id = "main-dom-fatal-fallback";
+  panel.style.cssText = "position:fixed;inset:12px;z-index:2147483647;background:#111827;color:#fee2e2;border:1px solid #7f1d1d;border-radius:10px;padding:14px;overflow:auto;font:600 12px/1.45 system-ui";
+  panel.innerHTML = `
+    <div style="font-size:16px;margin-bottom:6px;color:#fecaca">Erro antes do React</div>
+    <div><strong>Título:</strong> ${title.replace(/</g, "&lt;")}</div>
+    <div><strong>Mensagem:</strong> ${(parsed.message || "Erro desconhecido").replace(/</g, "&lt;")}</div>
+    <div><strong>Pathname:</strong> ${(typeof window !== "undefined" ? window.location.pathname : "unknown").replace(/</g, "&lt;")}</div>
+    <pre style="margin-top:10px;white-space:pre-wrap;background:#020617;border:1px solid #334155;border-radius:8px;padding:10px;color:#e2e8f0">${(parsed.stack || "(stack indisponível)").replace(/</g, "&lt;")}</pre>
+    <button onclick="window.location.reload()" style="margin-top:10px;background:#f97316;color:#fff;border:0;border-radius:6px;padding:8px 10px;cursor:pointer">Recarregar</button>
+  `;
+  document.body.appendChild(panel);
 }
 
 function installGlobalErrorHooks() {
@@ -160,6 +181,7 @@ function mountApp() {
   if (!rootElement) {
     setBootPhase("ROOT_NOT_FOUND");
     markAuditError("bootstrap", `Root element #${ROOT_ID} not found`);
+    renderDomFatalFallback("Falha de bootstrap do frontend", new Error(`Root element #${ROOT_ID} not found`));
     handleFatalError("Falha de bootstrap do frontend", new Error(`Root element #${ROOT_ID} not found`));
     return;
   }
@@ -243,7 +265,7 @@ function mountApp() {
       <React.StrictMode>
         <QueryClientProvider client={queryClient}>
           <trpc.Provider client={trpcClient} queryClient={queryClient}>
-            <ErrorBoundary routeContext="root" fallbackMode="fullscreen">
+            <ErrorBoundary routeContext="root">
               <App />
             </ErrorBoundary>
           </trpc.Provider>
@@ -258,6 +280,7 @@ function mountApp() {
   } catch (error) {
     setBootPhase("APP_RENDER_FATAL");
     markAuditError("bootstrap", error);
+    renderDomFatalFallback("Falha crítica ao inicializar React", error);
     handleFatalError("Falha crítica ao inicializar React", error, {
       pathname,
       readyState,
