@@ -105,6 +105,11 @@ function installGlobalErrorHooks() {
   };
 }
 
+function dispatchAuditEvent(name: "nexo:app-render-dispatched" | "nexo:app-mounted") {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(name));
+}
+
 function mountApp() {
   installGlobalErrorHooks();
   setBootPhase("BOOT_START");
@@ -173,6 +178,7 @@ function mountApp() {
         MINIMAL CLIENT RENDER OK
       </div>
     );
+    dispatchAuditEvent("nexo:app-render-dispatched");
     return;
   }
 
@@ -194,6 +200,7 @@ function mountApp() {
         </div>
       </React.StrictMode>
     );
+    dispatchAuditEvent("nexo:app-render-dispatched");
     return;
   }
 
@@ -218,6 +225,7 @@ function mountApp() {
   }
 
   setBootPhase("APP_RENDER_DISPATCHED");
+  dispatchAuditEvent("nexo:app-render-dispatched");
 }
 
 mountApp();
