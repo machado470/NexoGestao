@@ -4,55 +4,10 @@ import { createRoot } from "react-dom/client";
 import ErrorBoundary from "./components/ErrorBoundary";
 import App from "./App";
 import "./index.css";
+import { setBootPhase, getLastPhase } from "@/lib/bootPhase";
+import { showFatalDebugOverlay } from "@/lib/fatalDebugOverlay";
 
 const ROOT_ID = "root";
-
-function RootBootProbe() {
-  return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "grid",
-        placeItems: "center",
-        fontFamily: "system-ui, sans-serif",
-        padding: "1rem",
-      }}
-      data-testid="boot-probe"
-    >
-      <div style={{ textAlign: "center" }}>
-        <h1 style={{ margin: 0 }}>NexoGestão boot probe</h1>
-        <p style={{ marginTop: 8 }}>
-          JS carregou e o mount em #{ROOT_ID} funcionou.
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function FatalBootstrapScreen({ reason }: { reason: string }) {
-  return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "grid",
-        placeItems: "center",
-        fontFamily: "system-ui, sans-serif",
-        background: "#0f172a",
-        color: "#e2e8f0",
-        padding: "1rem",
-      }}
-      role="alert"
-    >
-      <div style={{ maxWidth: 640 }}>
-        <h1 style={{ marginTop: 0 }}>Falha de bootstrap do frontend</h1>
-        <p>{reason}</p>
-        <p style={{ opacity: 0.85 }}>
-          Abra o console para ver o erro completo. Esta tela evita branco absoluto silencioso.
-        </p>
-      </div>
-    </div>
-  );
-}
 
 function shouldRunBootProbe() {
   if (typeof window === "undefined") return false;
@@ -60,53 +15,87 @@ function shouldRunBootProbe() {
   return params.get("bootProbe") === "1";
 }
 
-function mountApp() {
-  // eslint-disable-next-line no-console
-  console.info("[RENDER START] mount_app");
-  const rootElement = document.getElementById(ROOT_ID);
-
-  if (!rootElement) {
-    throw new Error(`Root element #${ROOT_ID} not found`);
+function normalizeError(errorLike: unknown) {
+  if (errorLike instanceof Error) {
+    return {
+      message: errorLike.message,
+      stack: errorLike.stack,
+      cause: (errorLike as Error & { cause?: unknown }).cause,
+    };
   }
 
+  return {
+    message: typeof errorLike === "string" ? errorLike : "Erro desconhecido",
+    stack: undefined,
+    cause: errorLike,
+  };
+}
+
+function handleFatalError(title: string, errorLike: unknown, extra?: unknown) {
+  const parsed = normalizeError(errorLike);
+
+  showFatalDebugOverlay({
+    title,
+    phase: getLastPhase(),
+    message: parsed.message,
+    stack: parsed.stack,
+    cause: parsed.cause,
+    extra,
+    url: typeof window !== "undefined" ? window.location.href : "unknown",
+    timestamp: new Date().toISOString(),
+  });
+}
+
+function mountApp() {
+  setBootPhase("BOOT_START");
+
+  const rootElement = document.getElementById(ROOT_ID);
+  if (!rootElement) {
+    setBootPhase("ROOT_NOT_FOUND");
+    handleFatalError("Falha de bootstrap do frontend", new Error(`Root element #${ROOT_ID} not found`));
+    return;
+  }
+
+  setBootPhase("ROOT_FOUND");
   const root = createRoot(rootElement);
   const useProbe = shouldRunBootProbe();
 
+  setBootPhase("APP_RENDER_START");
   root.render(
     <React.StrictMode>
-      {useProbe ? <RootBootProbe /> : (
+      {useProbe ? (
+        <div data-testid="boot-probe">NexoGestão boot probe</div>
+      ) : (
         <ErrorBoundary routeContext="root">
           <App />
         </ErrorBoundary>
       )}
     </React.StrictMode>
   );
+  setBootPhase("APP_RENDER_DISPATCHED");
 }
 
+window.onerror = (message, source, lineno, colno, error) => {
+  setBootPhase("WINDOW_ONERROR");
+  handleFatalError("Erro global não tratado", error ?? String(message), {
+    source,
+    lineno,
+    colno,
+    rawMessage: message,
+  });
+  return false;
+};
+
+window.onunhandledrejection = (event) => {
+  setBootPhase("WINDOW_UNHANDLED_REJECTION");
+  handleFatalError("Promise rejeitada sem catch", event.reason, {
+    type: "unhandledrejection",
+  });
+};
+
 try {
-  window.addEventListener("error", (event) => {
-    // eslint-disable-next-line no-console
-    console.error("[RENDER ERROR] window_error", event.error ?? event.message);
-    // eslint-disable-next-line no-console
-    console.error("[web] uncaught_error", event.error ?? event.message);
-  });
-
-  window.addEventListener("unhandledrejection", (event) => {
-    // eslint-disable-next-line no-console
-    console.error("[RENDER ERROR] unhandled_rejection", event.reason);
-    // eslint-disable-next-line no-console
-    console.error("[web] unhandled_rejection", event.reason);
-  });
-
   mountApp();
 } catch (error) {
-  const reason = error instanceof Error ? `${error.name}: ${error.message}` : "Erro desconhecido";
-  // eslint-disable-next-line no-console
-  console.error("[web] fatal_bootstrap_error", error);
-
-  const fallbackRoot = document.getElementById(ROOT_ID);
-
-  if (fallbackRoot) {
-    createRoot(fallbackRoot).render(<FatalBootstrapScreen reason={reason} />);
-  }
+  setBootPhase("BOOTSTRAP_CRASH");
+  handleFatalError("Falha de bootstrap do frontend", error);
 }

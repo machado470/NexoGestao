@@ -9,6 +9,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } f
 import { EmptyState } from "@/components/EmptyState";
 import { safeChartData } from "@/lib/safeChartData";
 import { useRenderWatchdog } from "@/hooks/useRenderWatchdog";
+import { setBootPhase } from "@/lib/bootPhase";
 
 type FinanceTimelinePoint = {
   day: string;
@@ -44,6 +45,7 @@ function formatMoneyFromCents(value: number) {
 }
 
 export default function FinanceOverviewAreaChart({ timeline }: FinanceOverviewAreaChartProps) {
+  setBootPhase("CHART:FinanceOverviewAreaChart");
   useRenderWatchdog("FinanceOverviewAreaChart");
   const safeTimeline = useMemo(
     () => safeChartData<FinanceTimelinePoint>(timeline, ["paid", "pending", "overdue"]),

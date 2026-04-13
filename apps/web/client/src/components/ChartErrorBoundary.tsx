@@ -1,13 +1,17 @@
 import type { ReactNode } from "react";
 
 import ErrorBoundary from "@/components/ErrorBoundary";
+import { setBootPhase } from "@/lib/bootPhase";
 
 export function ChartErrorBoundary({ children, context }: { children: ReactNode; context: string }) {
+  setBootPhase(`CHART_RENDER:${context}`);
+
   return (
     <ErrorBoundary
       routeContext={context}
-      fallbackTitle="Erro ao renderizar gráfico"
-      fallbackDescription="Este gráfico falhou, mas a página continua disponível. Verifique o stack abaixo para corrigir o componente."
+      fallbackMode="inline"
+      fallbackTitle={`Erro no gráfico (${context})`}
+      fallbackDescription="Este gráfico falhou, mas a página continua disponível."
     >
       {children}
     </ErrorBoundary>

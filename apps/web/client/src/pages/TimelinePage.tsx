@@ -21,6 +21,8 @@ import { formatDelta, getDayWindow, percentDelta, safeDate, trendFromDelta } fro
 import { safeChartData } from "@/lib/safeChartData";
 import { ChartErrorBoundary } from "@/components/ChartErrorBoundary";
 import { KpiErrorBoundary } from "@/components/KpiErrorBoundary";
+import { TrpcSectionErrorBoundary } from "@/components/TrpcSectionErrorBoundary";
+import { setBootPhase } from "@/lib/bootPhase";
 
 function toLabel(value: unknown, fallback: string) {
   const text = String(value ?? "").trim();
@@ -28,6 +30,7 @@ function toLabel(value: unknown, fallback: string) {
 }
 
 export default function TimelinePage() {
+  setBootPhase("PAGE:Timeline");
   useRenderWatchdog("TimelinePage");
   const [filter, setFilter] = useState("");
   const timelineQuery = trpc.nexo.timeline.listByOrg.useQuery({ limit: 200 }, { retry: false });
@@ -156,6 +159,7 @@ export default function TimelinePage() {
         </AppChartPanel>
       </div>
 
+      <TrpcSectionErrorBoundary context="timeline:events-feed">
       <AppSectionBlock title="Feed de eventos" subtitle="Sem placeholders: somente eventos reais.">
         <AppFiltersBar>
           <Input
@@ -185,6 +189,7 @@ export default function TimelinePage() {
           </ul>
         )}
       </AppSectionBlock>
+      </TrpcSectionErrorBoundary>
     </PageWrapper>
   );
 }
