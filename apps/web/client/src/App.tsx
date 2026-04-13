@@ -688,12 +688,7 @@ function RootRoute() {
       bootError("[BOOT ERROR] auth bootstrap", bootstrapError);
       return;
     }
-    if (authState === "unauthenticated") {
-      if (typeof window !== "undefined" && window.location.pathname === "/login") return;
-      bootLog("[ROUTER] redirect", { to: "/login" });
-      navigate("/login", { replace: true });
-      return;
-    }
+    if (authState === "unauthenticated") return;
 
     const requiresOnboarding = getRequiresOnboarding(payload);
     const target = requiresOnboarding ? "/onboarding" : "/executive-dashboard";
@@ -728,7 +723,7 @@ function RootRoute() {
   }
 
   if (authState === "unauthenticated") {
-    return <RedirectingScreen message="Redirecionando para login..." />;
+    return <MarketingRoute component={Landing} />;
   }
 
   return <RedirectingScreen message="Redirecionando para o ambiente interno..." />;
