@@ -85,10 +85,16 @@ describe('DashboardService', () => {
       mockPrisma.correctiveAction.count.mockResolvedValue(0)
 
       await service.getMetrics('org-1')
+      const customerCountCallsAfterFirstRequest =
+        mockPrisma.customer.count.mock.calls.length
       await service.getMetrics('org-1')
 
-      // Prisma deve ser chamado apenas uma vez (segunda chamada usa cache)
-      expect(mockPrisma.customer.count).toHaveBeenCalledTimes(1)
+      // O primeiro fetch faz duas contagens de customer (ativos + total),
+      // mas a segunda chamada não deve acrescentar novas consultas.
+      expect(mockPrisma.customer.count).toHaveBeenCalledTimes(
+        customerCountCallsAfterFirstRequest,
+      )
+      expect(customerCountCallsAfterFirstRequest).toBeGreaterThan(0)
     })
   })
 
