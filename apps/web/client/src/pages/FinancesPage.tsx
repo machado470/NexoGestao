@@ -37,6 +37,8 @@ function formatCurrency(cents: number) {
 }
 
 export default function FinancesPage() {
+  return <div style={{ padding: 20 }}>PAGE OK</div>;
+
   setBootPhase("PAGE:Financeiro");
   useRenderWatchdog("FinancesPage");
   const [, navigate] = useLocation();

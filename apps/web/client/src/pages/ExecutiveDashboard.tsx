@@ -30,6 +30,8 @@ const chartData = [
 ];
 
 export default function ExecutiveDashboard() {
+  return <div style={{ padding: 20 }}>PAGE OK</div>;
+
   useRenderWatchdog("ExecutiveDashboard");
   const [, navigate] = useLocation();
   const { runAction, isRunning } = useRunAction();

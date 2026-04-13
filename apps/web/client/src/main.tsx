@@ -7,6 +7,28 @@ import "./index.css";
 import { setBootPhase, getLastPhase } from "@/lib/bootPhase";
 import { showFatalDebugOverlay } from "@/lib/fatalDebugOverlay";
 
+console.log("MAIN START");
+
+window.onerror = (msg, src, line, col, err) => {
+  document.body.innerHTML = `
+    <pre style="background:#000;color:#0f0;padding:20px;">
+    WINDOW ERROR:
+    ${String(msg)}
+    ${err?.stack || ""}
+    </pre>
+  `;
+  return false;
+};
+
+window.onunhandledrejection = (e) => {
+  document.body.innerHTML = `
+    <pre style="background:#000;color:#0f0;padding:20px;">
+    PROMISE ERROR:
+    ${String(e.reason)}
+    </pre>
+  `;
+};
+
 const ROOT_ID = "root";
 
 function shouldRunBootProbe() {
@@ -76,6 +98,13 @@ function mountApp() {
 }
 
 window.onerror = (message, source, lineno, colno, error) => {
+  document.body.innerHTML = `
+    <pre style="background:#000;color:#0f0;padding:20px;">
+    WINDOW ERROR:
+    ${String(message)}
+    ${(error as Error | undefined)?.stack || ""}
+    </pre>
+  `;
   setBootPhase("WINDOW_ONERROR");
   handleFatalError("Erro global não tratado", error ?? String(message), {
     source,
@@ -87,6 +116,12 @@ window.onerror = (message, source, lineno, colno, error) => {
 };
 
 window.onunhandledrejection = (event) => {
+  document.body.innerHTML = `
+    <pre style="background:#000;color:#0f0;padding:20px;">
+    PROMISE ERROR:
+    ${String(event.reason)}
+    </pre>
+  `;
   setBootPhase("WINDOW_UNHANDLED_REJECTION");
   handleFatalError("Promise rejeitada sem catch", event.reason, {
     type: "unhandledrejection",
@@ -94,8 +129,12 @@ window.onunhandledrejection = (event) => {
 };
 
 try {
-  mountApp();
+  createRoot(document.getElementById("root")!).render(<App />);
 } catch (error) {
-  setBootPhase("BOOTSTRAP_CRASH");
-  handleFatalError("Falha de bootstrap do frontend", error);
+  document.body.innerHTML = `
+    <pre style="background:red;color:white;padding:20px;">
+    ROOT CRASH:
+    ${(error as Error)?.stack || String(error)}
+    </pre>
+  `;
 }
