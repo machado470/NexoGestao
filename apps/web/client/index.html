@@ -7,7 +7,24 @@
   </head>
 
   <body>
+    <div
+      id="debug-static-html"
+      style="display:none;position:fixed;top:8px;left:8px;z-index:2147483647;background:#111827;color:#f9fafb;padding:4px 8px;border-radius:6px;font:600 12px/1.2 system-ui"
+    >
+      STATIC HTML OK
+    </div>
     <div id="root"></div>
+    <script>
+      (function () {
+        try {
+          const params = new URLSearchParams(window.location.search);
+          if (params.get("renderAudit") === "1") {
+            const marker = document.getElementById("debug-static-html");
+            if (marker) marker.style.display = "inline-flex";
+          }
+        } catch (_) {}
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

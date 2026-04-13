@@ -93,6 +93,33 @@ function bootError(label: string, payload?: unknown) {
   console.error(label, payload ?? "");
 }
 
+function isRenderAuditEnabled() {
+  if (typeof window === "undefined") return false;
+  return new URLSearchParams(window.location.search).get("renderAudit") === "1";
+}
+
+function RenderAuditMarker({ label }: { label: string }) {
+  if (!isRenderAuditEnabled()) return null;
+  return (
+    <div
+      data-debug={label}
+      style={{
+        position: "fixed",
+        left: 8,
+        bottom: 8,
+        zIndex: 2147483646,
+        background: "#1d4ed8",
+        color: "#eff6ff",
+        padding: "6px 10px",
+        borderRadius: 6,
+        font: "600 12px/1.2 system-ui",
+      }}
+    >
+      {label}
+    </div>
+  );
+}
+
 function FullScreenLoader() {
   return (
     <div className="nexo-app-shell flex min-h-screen items-center justify-center px-6">
@@ -763,6 +790,7 @@ function RootRoute() {
     });
     return (
       <>
+        <RenderAuditMarker label="ROOT BRANCH: initializing_landing" />
         <MarketingRoute component={Landing} />
         <AuthRouteLoader />
       </>
@@ -776,18 +804,21 @@ function RootRoute() {
       landingRendered: false,
     });
     return (
-      <FullScreenMessage
-        title="Falha no bootstrap de autenticação"
-        description="Não foi possível validar sua sessão inicial. Tente novamente."
-        actionLabel="Tentar novamente"
-        onAction={() =>
-          void refresh().catch(error => {
-            bootError("[AUTH] refresh failed from root", {
-              message: error instanceof Error ? error.message : "Erro desconhecido",
-            });
-          })
-        }
-      />
+      <>
+        <RenderAuditMarker label="ROOT BRANCH: error_screen" />
+        <FullScreenMessage
+          title="Falha no bootstrap de autenticação"
+          description="Não foi possível validar sua sessão inicial. Tente novamente."
+          actionLabel="Tentar novamente"
+          onAction={() =>
+            void refresh().catch(error => {
+              bootError("[AUTH] refresh failed from root", {
+                message: error instanceof Error ? error.message : "Erro desconhecido",
+              });
+            })
+          }
+        />
+      </>
     );
   }
 
@@ -797,7 +828,12 @@ function RootRoute() {
       branch: "unauthenticated_landing",
       landingRendered: true,
     });
-    return <MarketingRoute component={Landing} />;
+    return (
+      <>
+        <RenderAuditMarker label="ROOT BRANCH: unauthenticated_landing" />
+        <MarketingRoute component={Landing} />
+      </>
+    );
   }
 
   if (rootBranch === "authenticated_redirect") {
@@ -806,7 +842,12 @@ function RootRoute() {
       branch: "authenticated_redirect",
       landingRendered: false,
     });
-    return <RedirectingScreen message="Redirecionando para o ambiente interno..." />;
+    return (
+      <>
+        <RenderAuditMarker label="ROOT BRANCH: authenticated_redirect" />
+        <RedirectingScreen message="Redirecionando para o ambiente interno..." />
+      </>
+    );
   }
 
   bootError("[ROOT] fallback visual acionado", {
@@ -815,15 +856,18 @@ function RootRoute() {
   });
 
   return (
-    <FullScreenMessage
-      title="Fallback RootRoute"
-      description="Estado inesperado de roteamento detectado. Atualize a página para continuar."
-      actionLabel="Recarregar aplicação"
-      onAction={() => {
-        if (typeof window === "undefined") return;
-        window.location.reload();
-      }}
-    />
+    <>
+      <RenderAuditMarker label="ROOT BRANCH: unknown_state_fallback" />
+      <FullScreenMessage
+        title="Fallback RootRoute"
+        description="Estado inesperado de roteamento detectado. Atualize a página para continuar."
+        actionLabel="Recarregar aplicação"
+        onAction={() => {
+          if (typeof window === "undefined") return;
+          window.location.reload();
+        }}
+      />
+    </>
   );
 }
 
@@ -965,6 +1009,7 @@ function App() {
       <AuthProvider>
         <AuthBootstrapStatus onReady={markReady} onFailed={markFailed} />
         <AppBootstrapGuard state={bootstrapState} reason={bootstrapReason} onReload={reloadApp}>
+          <RenderAuditMarker label="APP RENDER OK" />
           {appContent}
         </AppBootstrapGuard>
       </AuthProvider>
