@@ -14,7 +14,7 @@ export type AppBootstrapState =
 export type AppBootstrapGuardBranch = "blocking_error" | "pass_through";
 
 export function resolveAppBootstrapGuardBranch(params: {
-  state: AppBootstrapState;
+  state: AppBootstrapState | "unknown";
   isPublicBootstrapPath: boolean;
 }): AppBootstrapGuardBranch {
   if (params.state === "error" && !params.isPublicBootstrapPath) return "blocking_error";
@@ -38,14 +38,14 @@ export function AppBootstrapGuard({
   const isPublicBootstrapPath = isPublicOrAuthPath(pathname);
 
   const guardBranch = useMemo(() => resolveAppBootstrapGuardBranch({
-    state,
+    state: (state as AppBootstrapState | "unknown") ?? "unknown",
     isPublicBootstrapPath,
   }), [isPublicBootstrapPath, state]);
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;
     // eslint-disable-next-line no-console
-    console.info("[BOOT GUARD] evaluate", {
+    console.info("[BOOTSTRAP] guard", {
       route: pathname,
       appBootstrapState: state,
       authState,
@@ -57,10 +57,10 @@ export function AppBootstrapGuard({
   useEffect(() => {
     if (!import.meta.env.DEV) return;
     // eslint-disable-next-line no-console
-    console.info("[BOOT GUARD] mounted");
+    console.info("[BOOTSTRAP] guard mount");
     return () => {
       // eslint-disable-next-line no-console
-      console.info("[BOOT GUARD] unmounted");
+      console.info("[BOOTSTRAP] guard unmount");
     };
   }, []);
 
@@ -87,6 +87,19 @@ export function AppBootstrapGuard({
           onAction={onReload}
         />
       </AppPageShell>
+    );
+  }
+
+  if (state !== "initializing" && state !== "error" && state !== "authenticated" && state !== "unauthenticated") {
+    return (
+      <div className="nexo-app-shell flex min-h-screen items-center justify-center px-6">
+        <div className="nexo-app-panel-strong w-full max-w-md p-6">
+          <h1 className="text-lg font-semibold text-zinc-950 dark:text-white">Fallback Bootstrap</h1>
+          <p className="mt-2 text-sm text-[var(--text-muted)] dark:text-[var(--text-muted)]">
+            Estado inesperado de bootstrap ({String(state)}). Recarregue para continuar.
+          </p>
+        </div>
+      </div>
     );
   }
 

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useLocation } from "wouter";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { CriticalActionOverlay } from "@/components/CriticalActionOverlay";
 import { ThemeProvider } from "@/contexts/ThemeContext";
@@ -11,6 +12,11 @@ type AppLayoutProps = {
 };
 
 export function AppLayout({ children }: AppLayoutProps) {
+  const [location] = useLocation();
+  if (import.meta.env.DEV) {
+    // eslint-disable-next-line no-console
+    console.info("[LAYOUT] app", { pathname: location, hasChildren: Boolean(children) });
+  }
   return (
     <ThemeProvider defaultTheme="light">
       <LayoutProtectionGuard />
