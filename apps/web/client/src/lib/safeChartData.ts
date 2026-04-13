@@ -4,33 +4,33 @@ export type SafeChartResult<T> = {
   reason?: string;
 };
 
+export function safeChartData(data: any[]): any[];
 export function safeChartData<T extends Record<string, unknown>>(
-  input: unknown,
-  numericKeys: string[] = []
-): SafeChartResult<T> {
-  if (!Array.isArray(input)) {
-    return { data: [], isValid: false, reason: "Payload de gráfico não é array" };
+  data: unknown,
+  numericKeys: string[]
+): SafeChartResult<T>;
+export function safeChartData<T extends Record<string, unknown>>(
+  data: unknown,
+  numericKeys?: string[]
+): any[] | SafeChartResult<T> {
+  if (!Array.isArray(data)) {
+    return numericKeys ? { data: [], isValid: false, reason: "Payload de gráfico não é array" } : [];
   }
 
-  const normalized: T[] = [];
+  const filtered = data.filter((item) => {
+    if (!item) return false;
+    return Object.values(item).every((v) => v !== null && v !== undefined && !Number.isNaN(v));
+  });
 
-  for (const item of input) {
-    if (!item || typeof item !== "object") {
-      return { data: [], isValid: false, reason: "Item de gráfico inválido" };
-    }
+  if (!numericKeys) return filtered;
 
+  const normalized = filtered.map((item) => {
     const candidate = { ...(item as Record<string, unknown>) };
-
     for (const key of numericKeys) {
-      const raw = Number(candidate[key] ?? 0);
-      if (!Number.isFinite(raw) || Number.isNaN(raw)) {
-        return { data: [], isValid: false, reason: `Valor inválido em ${key}` };
-      }
-      candidate[key] = raw;
+      candidate[key] = Number(candidate[key] ?? 0);
     }
+    return candidate as T;
+  });
 
-    normalized.push(candidate as T);
-  }
-
-  return { data: normalized, isValid: true };
+  return { data: normalized, isValid: normalized.length === data.length };
 }
