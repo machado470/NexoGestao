@@ -10,6 +10,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { normalizeRole, type Role } from "@/lib/rbac";
+import { extractPathname, shouldBootstrapSessionForPath } from "@/lib/routeAccess";
 
 type AuthUser = {
   token?: string;
@@ -65,22 +66,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const APP_STORAGE_PREFIXES = ["nexo:", "nexogestao_", "pilot-onboarding:"];
-const AUTH_PATH_PREFIXES = [
-  "/login",
-  "/register",
-  "/forgot-password",
-  "/reset-password",
-  "/auth/",
-];
-const MARKETING_PATHS = new Set([
-  "/",
-  "/about",
-  "/sobre",
-  "/produto",
-  "/precos",
-  "/contato",
-]);
-
 /* =========================
    HELPERS
 ========================= */
@@ -216,14 +201,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [localError, setLocalError] = useState<unknown | null>(null);
   const [forcedLoggedOut, setForcedLoggedOut] = useState(false);
   const channelRef = useRef<BroadcastChannel | null>(null);
-  const pathname = useMemo(() => location.split(/[?#]/, 1)[0] || "/", [location]);
+  const pathname = useMemo(() => extractPathname(location), [location]);
   const previousAuthStateRef = useRef<AuthBootstrapState | null>(null);
 
-  const isAuthPath = AUTH_PATH_PREFIXES.some(prefix =>
-    pathname.startsWith(prefix)
-  );
-  const isMarketingPath = MARKETING_PATHS.has(pathname);
-  const shouldBootstrapSession = pathname === "/" || isAuthPath || !isMarketingPath;
+  const shouldBootstrapSession = shouldBootstrapSessionForPath(pathname);
   const syncEventRef = useRef<(payload: unknown) => Promise<void>>(async () => {});
 
   useEffect(() => {

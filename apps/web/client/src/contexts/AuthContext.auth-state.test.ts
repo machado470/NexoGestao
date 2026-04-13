@@ -4,6 +4,7 @@ import {
   resolveAuthBootstrapState,
   type AuthBootstrapState,
 } from "./AuthContext";
+import { shouldBootstrapSessionForPath } from "@/lib/routeAccess";
 
 describe("AuthContext auth bootstrap state", () => {
   it("trata 401 como estado anônimo esperado", () => {
@@ -51,4 +52,13 @@ describe("AuthContext auth bootstrap state", () => {
   ])("resolve estado global: $expected", ({ input, expected }) => {
     expect(resolveAuthBootstrapState(input)).toBe(expected);
   });
+
+  it("bootstrap de sessão não depende de rota de marketing pura", () => {
+    expect(shouldBootstrapSessionForPath("/")).toBe(true);
+    expect(shouldBootstrapSessionForPath("/login")).toBe(true);
+    expect(shouldBootstrapSessionForPath("/register")).toBe(true);
+    expect(shouldBootstrapSessionForPath("/about")).toBe(false);
+    expect(shouldBootstrapSessionForPath("/executive-dashboard")).toBe(true);
+  });
+
 });

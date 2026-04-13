@@ -3,6 +3,7 @@ import {
   buildLoginRedirectPath,
   getRequiresOnboarding,
   readSafeRedirectFromPath,
+  resolveRootRouteBranch,
 } from "./App";
 
 describe("App routing/auth guard helpers", () => {
@@ -32,4 +33,12 @@ describe("App routing/auth guard helpers", () => {
     expect(getRequiresOnboarding({})).toBe(false);
     expect(getRequiresOnboarding(undefined)).toBe(false);
   });
+
+  it("define branch explícito para RootRoute sem render vazio", () => {
+    expect(resolveRootRouteBranch("initializing")).toBe("initializing_landing");
+    expect(resolveRootRouteBranch("error")).toBe("error_screen");
+    expect(resolveRootRouteBranch("unauthenticated")).toBe("unauthenticated_landing");
+    expect(resolveRootRouteBranch("authenticated")).toBe("authenticated_redirect");
+  });
+
 });
