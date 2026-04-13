@@ -746,11 +746,28 @@ function App() {
     if (value === "layout") return "layout";
     if (value === "execution-bar") return "execution-bar";
     if (value === "global-engine") return "global-engine";
+
+    // Probes de main.tsx para isolar providers não devem executar o App real.
+    // Mantemos esses aliases apontando para a sonda estática para validar apenas
+    // a camada de bootstrap/provider sem router/auth/layout.
+    if (
+      value === "providers-none" ||
+      value === "providers-query-only" ||
+      value === "providers-trpc-only"
+    ) {
+      return "static";
+    }
+
     return "full";
   }, []);
 
   useEffect(() => {
     bootLog("[BOOT] app init", { bootProbeStage });
+  }, []);
+
+  const bootProbeLabel = useMemo(() => {
+    if (typeof window === "undefined") return null;
+    return new URLSearchParams(window.location.search).get("bootProbe")?.trim() || null;
   }, []);
 
   const markReady = useCallback((nextState: "authenticated" | "unauthenticated") => {
@@ -776,7 +793,7 @@ function App() {
   }, []);
 
   if (bootProbeStage === "static") {
-    return <div>NEXO OK</div>;
+    return <div>NEXO OK{bootProbeLabel ? ` · probe=${bootProbeLabel}` : ""}</div>;
   }
 
   if (bootProbeStage === "router") {
