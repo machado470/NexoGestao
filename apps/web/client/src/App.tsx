@@ -28,6 +28,7 @@ import {
 } from "./contexts/BootProbeContext";
 import { canAny, type Permission } from "./lib/rbac";
 import { setBootPhase } from "./lib/bootPhase";
+import { extractPathname } from "./lib/routeAccess";
 
 import CustomersPage from "./pages/CustomersPage";
 import AppointmentsPage from "./pages/AppointmentsPage";
@@ -505,8 +506,9 @@ function LegacyAliasRoute({
 function Router() {
   const [location] = useLocation();
   const { authState, isAuthenticated } = useAuth();
+  const pathname = extractPathname(location);
 
-  bootLog("[ROUTER] enter", { route: location, authState, isAuthenticated });
+  bootLog("[ROUTER] enter", { route: location, pathname, authState, isAuthenticated });
   setBootPhase("ROUTER_INIT");
 
   useEffect(() => {
@@ -539,6 +541,12 @@ function Router() {
   useEffect(() => {
     setBootPhase(`APP_PAGE:${location}`);
   }, [location]);
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    // eslint-disable-next-line no-console
+    console.info("[ROUTER] pathname", { pathname, location });
+  }, [location, pathname]);
 
   return (
     <Switch>
@@ -676,18 +684,25 @@ function Router() {
   );
 }
 
+
+export type RootRouteBranch =
+  | "initializing_landing"
+  | "error_screen"
+  | "unauthenticated_landing"
+  | "authenticated_redirect";
+
+export function resolveRootRouteBranch(authState: ReturnType<typeof useAuth>["authState"]): RootRouteBranch {
+  if (authState === "initializing") return "initializing_landing";
+  if (authState === "error") return "error_screen";
+  if (authState === "unauthenticated") return "unauthenticated_landing";
+  return "authenticated_redirect";
+}
+
 function RootRoute() {
   const { authState, bootstrapError, payload, refresh } = useAuth();
   const [location, navigate] = useLocation();
-  const pathname = location.split(/[?#]/, 1)[0] || "/";
-  const rootBranch =
-    authState === "initializing"
-      ? "initializing_landing"
-      : authState === "error"
-        ? "error_screen"
-        : authState === "unauthenticated"
-          ? "unauthenticated_landing"
-          : "authenticated_redirect";
+  const pathname = extractPathname(location);
+  const rootBranch = resolveRootRouteBranch(authState);
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;
@@ -791,6 +806,16 @@ function RootRoute() {
 function App() {
   bootLog("[RENDER] app render start");
   setBootPhase("AUTH_INIT");
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    // eslint-disable-next-line no-console
+    console.info("[APP] mounted");
+    return () => {
+      // eslint-disable-next-line no-console
+      console.info("[APP] unmounted");
+    };
+  }, []);
 
   const [bootstrapState, setBootstrapState] = useState<AppBootstrapState>("initializing");
   const [bootstrapReason, setBootstrapReason] = useState<string | undefined>(undefined);

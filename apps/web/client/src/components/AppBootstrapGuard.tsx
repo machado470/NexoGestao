@@ -2,12 +2,24 @@ import { useEffect, useMemo, type ReactNode } from "react";
 import { useLocation } from "wouter";
 import { AppPageErrorState, AppPageShell } from "@/components/internal-page-system";
 import { useAuth } from "@/contexts/AuthContext";
+import { extractPathname, isPublicOrAuthPath } from "@/lib/routeAccess";
 
 export type AppBootstrapState =
   | "initializing"
   | "unauthenticated"
   | "authenticated"
   | "error";
+
+
+export type AppBootstrapGuardBranch = "blocking_error" | "pass_through";
+
+export function resolveAppBootstrapGuardBranch(params: {
+  state: AppBootstrapState;
+  isPublicBootstrapPath: boolean;
+}): AppBootstrapGuardBranch {
+  if (params.state === "error" && !params.isPublicBootstrapPath) return "blocking_error";
+  return "pass_through";
+}
 
 export function AppBootstrapGuard({
   state,
@@ -22,29 +34,13 @@ export function AppBootstrapGuard({
 }) {
   const { authState } = useAuth();
   const [location] = useLocation();
-  const pathname = location.split(/[?#]/, 1)[0] || "/";
-  const isPublicBootstrapPath =
-    pathname === "/" ||
-    pathname === "/about" ||
-    pathname === "/sobre" ||
-    pathname === "/produto" ||
-    pathname === "/precos" ||
-    pathname === "/contato" ||
-    pathname === "/funcionalidades" ||
-    pathname === "/privacy" ||
-    pathname === "/privacidade" ||
-    pathname === "/terms" ||
-    pathname === "/termos" ||
-    pathname === "/login" ||
-    pathname === "/register" ||
-    pathname === "/forgot-password" ||
-    pathname === "/reset-password" ||
-    pathname.startsWith("/auth/");
+  const pathname = extractPathname(location);
+  const isPublicBootstrapPath = isPublicOrAuthPath(pathname);
 
-  const guardBranch = useMemo(() => {
-    if (state === "error" && !isPublicBootstrapPath) return "blocking_error";
-    return "pass_through";
-  }, [isPublicBootstrapPath, state]);
+  const guardBranch = useMemo(() => resolveAppBootstrapGuardBranch({
+    state,
+    isPublicBootstrapPath,
+  }), [isPublicBootstrapPath, state]);
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;
@@ -61,12 +57,12 @@ export function AppBootstrapGuard({
   useEffect(() => {
     if (!import.meta.env.DEV) return;
     // eslint-disable-next-line no-console
-    console.info("[BOOT GUARD] mounted", { pathname });
+    console.info("[BOOT GUARD] mounted");
     return () => {
       // eslint-disable-next-line no-console
-      console.info("[BOOT GUARD] unmounted", { pathname });
+      console.info("[BOOT GUARD] unmounted");
     };
-  }, [pathname]);
+  }, []);
 
   if (state === "initializing" && !isPublicBootstrapPath) {
     return (

@@ -12,6 +12,7 @@ import { getQueryClient, getTrpcClient, trpc } from "@/lib/trpc";
 console.log("MAIN START");
 
 const ROOT_ID = "root";
+export const PROVIDER_TREE_ORDER = ["QueryClientProvider", "trpc.Provider", "ErrorBoundary", "App"] as const;
 
 function ProvidersMountLogger() {
   React.useEffect(() => {
@@ -35,6 +36,21 @@ function TrpcProviderMountLogger() {
     return () => {
       // eslint-disable-next-line no-console
       console.info("[BOOT] trpc.Provider unmounted");
+    };
+  }, []);
+
+  return null;
+}
+
+
+function AppMountLogger() {
+  React.useEffect(() => {
+    if (!import.meta.env.DEV || typeof window === "undefined") return;
+    // eslint-disable-next-line no-console
+    console.info("[BOOT] App mounted", { pathname: window.location.pathname, providerOrder: PROVIDER_TREE_ORDER });
+    return () => {
+      // eslint-disable-next-line no-console
+      console.info("[BOOT] App unmounted", { pathname: window.location.pathname });
     };
   }, []);
 
@@ -104,6 +120,7 @@ function mountApp() {
             <div data-testid="boot-probe">NexoGestão boot probe</div>
           ) : (
             <ErrorBoundary routeContext="root">
+              <AppMountLogger />
               <App />
             </ErrorBoundary>
           )}

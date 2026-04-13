@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import type { AppBootstrapState } from "./AppBootstrapGuard";
+import {
+  resolveAppBootstrapGuardBranch,
+  type AppBootstrapState,
+} from "./AppBootstrapGuard";
+import { isPublicOrAuthPath } from "@/lib/routeAccess";
 
 describe("AppBootstrapGuard", () => {
   it("mantém estados de bootstrap explícitos", () => {
@@ -16,5 +20,28 @@ describe("AppBootstrapGuard", () => {
       "authenticated",
       "error",
     ]);
+  });
+
+  it("nunca bloqueia rotas públicas/auth durante initializing", () => {
+    const publicPaths = ["/", "/login", "/register", "/forgot-password", "/auth/callback"];
+
+    publicPaths.forEach(pathname => {
+      expect(isPublicOrAuthPath(pathname)).toBe(true);
+      expect(
+        resolveAppBootstrapGuardBranch({
+          state: "initializing",
+          isPublicBootstrapPath: true,
+        })
+      ).toBe("pass_through");
+    });
+  });
+
+  it("bloqueia apenas erro em rota privada", () => {
+    expect(
+      resolveAppBootstrapGuardBranch({
+        state: "error",
+        isPublicBootstrapPath: false,
+      })
+    ).toBe("blocking_error");
   });
 });
