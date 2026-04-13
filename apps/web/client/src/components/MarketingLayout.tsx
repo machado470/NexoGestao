@@ -8,6 +8,7 @@ type MarketingLayoutProps = {
 };
 
 const headerLinks = [
+  { label: "Home", href: "/" },
   { label: "Produto", href: "/produto" },
   { label: "Funcionalidades", href: "/funcionalidades" },
   { label: "Preços", href: "/precos" },
@@ -18,6 +19,7 @@ const footerGroups = [
   {
     title: "Navegação",
     links: [
+      { label: "Home", href: "/" },
       { label: "Produto", href: "/produto" },
       { label: "Funcionalidades", href: "/funcionalidades" },
       { label: "Preços", href: "/precos" },
