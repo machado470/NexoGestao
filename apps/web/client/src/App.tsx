@@ -897,10 +897,8 @@ function App() {
       pushAuditEvent("app", "mounted", { pathname: window.location.pathname });
       window.dispatchEvent(new CustomEvent("nexo:app-mounted"));
     }
-    if (import.meta.env.DEV) {
-      // eslint-disable-next-line no-console
-      console.info("[APP] mount");
-    }
+    // eslint-disable-next-line no-console
+    console.log("[APP] mounted");
     return () => {
       if (import.meta.env.DEV) {
         // eslint-disable-next-line no-console

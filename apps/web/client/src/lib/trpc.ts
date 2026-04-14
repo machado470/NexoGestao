@@ -1,4 +1,5 @@
 import { QueryClient } from "@tanstack/react-query";
+import { createElement, type ReactNode } from "react";
 import { createTRPCReact, httpBatchLink } from "@trpc/react-query";
 import superjson from "superjson";
 import type { AppRouter } from "../../../server/routers";
@@ -54,4 +55,26 @@ export function getTrpcClient() {
   }
 
   return trpcClientSingleton;
+}
+
+
+export function TRPCProvider({
+  client,
+  queryClient,
+  children,
+}: {
+  client: ReturnType<typeof trpc.createClient>;
+  queryClient: QueryClient;
+  children: ReactNode;
+}) {
+  console.log("[BOOT] TRPC Provider ativo");
+  return createElement(trpc.Provider, { client, queryClient }, children);
+}
+
+export function useSafeTRPC() {
+  try {
+    return trpc.useUtils();
+  } catch {
+    throw new Error("TRPC usado fora do provider");
+  }
 }
