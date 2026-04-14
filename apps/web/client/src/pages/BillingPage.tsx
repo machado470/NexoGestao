@@ -185,11 +185,11 @@ export default function BillingPage() {
 
   return (
     <PageWrapper
-      title="Billing"
+      title="Assinatura e plano"
       subtitle="Controle plano, limites e upgrade com fluxo orientado a receita sem sair da operação."
     >
       <OperationalTopCard
-        contextLabel="Billing"
+        contextLabel="Direção comercial"
         title="Plano e faturamento"
         description="Controle trial, limites e upgrade com fluxo orientado a receita e sem sair da operação."
         chips={

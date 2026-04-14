@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { normalizeArrayPayload, normalizeObjectPayload } from "@/lib/query-helpers";
-import { AppFiltersBar, AppPageLoadingState, AppSectionBlock, AppStatusBadge, Input } from "@/components/internal-page-system";
+import { AppFiltersBar, AppKpiRow, AppNextActionCard, AppPageLoadingState, AppSectionBlock, AppStatusBadge, Input } from "@/components/internal-page-system";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -57,6 +57,31 @@ export default function SettingsPage() {
           </Button>
         )}
       />
+      <AppKpiRow
+        items={[
+          { title: "Organização", value: String(organizationName || "Não definida"), hint: "identidade da operação" },
+          { title: "Membros", value: String(members.length), hint: "time com acesso ativo" },
+          {
+            title: "Integrações prontas",
+            value: `${[readiness?.stripe?.configured, readiness?.twilio?.configured].filter(Boolean).length}/2`,
+            hint: "Stripe e WhatsApp/Twilio",
+          },
+          { title: "Timezone", value: String(timezone), hint: "fuso usado em agenda e cobranças" },
+        ]}
+      />
+
+      <AppSectionBlock title="Próxima ação administrativa" subtitle="Evite gargalo operacional por configuração incompleta">
+        <AppNextActionCard
+          title={readiness?.stripe?.configured ? "Revisar equipe e permissões" : "Concluir integração de cobrança"}
+          description={readiness?.stripe?.configured ? "Com Stripe ativo, foque em membros, papéis e notificações." : "Sem Stripe configurado, o upgrade automático fica indisponível no billing."}
+          severity={readiness?.stripe?.configured ? "medium" : "high"}
+          metadata="configurações"
+          action={{
+            label: readiness?.stripe?.configured ? "Revisar membros" : "Ver integrações",
+            onClick: () => window.scrollTo({ top: 820, behavior: "smooth" }),
+          }}
+        />
+      </AppSectionBlock>
 
       <AppSectionBlock title="Administração do sistema" subtitle="Estrutura em seções claras">
         <Tabs defaultValue="organizacao">
@@ -69,8 +94,8 @@ export default function SettingsPage() {
 
           <TabsContent value="organizacao" className="space-y-3 pt-3">
             <AppFiltersBar>
-              <Input className="max-w-sm" placeholder="Nome da organização" value={organizationName} onChange={(event) => setOrganizationName(event.target.value)} />
-              <Input className="max-w-xs" placeholder="Timezone" value={timezone} onChange={(event) => setTimezone(event.target.value)} />
+              <Input className="max-w-sm" placeholder="Ex.: Nexo Serviços" value={organizationName} onChange={(event) => setOrganizationName(event.target.value)} />
+              <Input className="max-w-xs" placeholder="Ex.: America/Sao_Paulo" value={timezone} onChange={(event) => setTimezone(event.target.value)} />
               <Button variant="outline" onClick={() => {
                 setOrganizationName(String(settings.organizationName ?? settings.name ?? ""));
                 setTimezone(String(settings.timezone ?? "America/Sao_Paulo"));
@@ -84,7 +109,7 @@ export default function SettingsPage() {
           <TabsContent value="usuarios" className="pt-3 text-sm text-[var(--text-secondary)]">
             <div className="space-y-2">
               <p>Total de membros: {members.length}</p>
-              <p>Convites e papéis são gerenciados no backend de autenticação.</p>
+              <p>Convites e papéis seguem o controle de autenticação da organização.</p>
             </div>
           </TabsContent>
 
@@ -96,7 +121,7 @@ export default function SettingsPage() {
           </TabsContent>
 
           <TabsContent value="notificacoes" className="pt-3 text-sm text-[var(--text-secondary)]">
-            Regras de alerta por risco, atraso e cobrança são herdadas da configuração de governança.
+            Alertas de risco, atraso e cobrança seguem a política definida em Governança.
           </TabsContent>
         </Tabs>
       </AppSectionBlock>

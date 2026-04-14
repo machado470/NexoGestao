@@ -32,6 +32,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   getConcurrencyErrorMessage,
   isConcurrentConflictError,
 } from "@/lib/concurrency";
@@ -170,7 +177,7 @@ function EventDetailModal({
   return (
     <Dialog open={state.open} onOpenChange={(open) => (!open ? onClose() : undefined)}>
       <DialogContent className="max-w-sm border-[var(--border-subtle)] bg-[var(--card-bg)] p-0 text-[var(--text-primary)] shadow-2xl backdrop-blur">
-        <DialogHeader className="border-b border-zinc-800/90 px-6 py-5">
+        <DialogHeader className="border-b border-[var(--border-subtle)] px-6 py-5">
           <DialogTitle className="pr-2 text-lg font-semibold">
             Detalhes do Agendamento
           </DialogTitle>
@@ -214,22 +221,21 @@ function EventDetailModal({
               Status
             </span>
             <div className="mt-1.5">
-              <select
+              <Select
                 value={event.status}
-                onChange={e =>
-                  handleStatusChange(
-                    e.target.value as AppointmentEvent["status"]
-                  )
-                }
-                disabled={updateMutation.isPending}
-                className="h-9 w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none ring-offset-zinc-950 focus-visible:border-orange-400 focus-visible:ring-2 focus-visible:ring-orange-500/50"
+                onValueChange={(value) => handleStatusChange(value as AppointmentEvent["status"])}
               >
-                <option value="SCHEDULED">Agendado</option>
-                <option value="CONFIRMED">Confirmado</option>
-                <option value="DONE">Concluído</option>
-                <option value="CANCELED">Cancelado</option>
-                <option value="NO_SHOW">Não compareceu</option>
-              </select>
+                <SelectTrigger disabled={updateMutation.isPending}>
+                  <SelectValue placeholder="Selecione o status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="SCHEDULED">Agendado</SelectItem>
+                  <SelectItem value="CONFIRMED">Confirmado</SelectItem>
+                  <SelectItem value="DONE">Concluído</SelectItem>
+                  <SelectItem value="CANCELED">Cancelado</SelectItem>
+                  <SelectItem value="NO_SHOW">Não compareceu</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
@@ -243,7 +249,7 @@ function EventDetailModal({
           </div>
         </div>
 
-        <DialogFooter className="space-y-2 border-t border-zinc-800/90 px-6 py-4 sm:flex-col sm:space-x-0">
+        <DialogFooter className="space-y-2 border-t border-[var(--border-subtle)] px-6 py-4 sm:flex-col sm:space-x-0">
           <Button
             type="button"
             className="w-full"
@@ -505,7 +511,7 @@ export default function CalendarPage() {
           ))}
         </div>
 
-        <SurfaceSection className="overflow-hidden rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+        <SurfaceSection className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4">
           {appointmentsQuery.isLoading ? (
             <CalendarSkeleton />
           ) : (

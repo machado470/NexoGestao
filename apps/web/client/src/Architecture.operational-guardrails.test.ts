@@ -8,6 +8,13 @@ const criticalPages = [
   "client/src/pages/AppointmentsPage.tsx",
   "client/src/pages/ServiceOrdersPage.tsx",
   "client/src/pages/WhatsAppPage.tsx",
+  "client/src/pages/ExecutiveDashboard.tsx",
+  "client/src/pages/CustomersPage.tsx",
+  "client/src/pages/BillingPage.tsx",
+  "client/src/pages/PeoplePage.tsx",
+  "client/src/pages/ProfilePage.tsx",
+  "client/src/pages/SettingsPage.tsx",
+  "client/src/pages/CalendarPage.tsx",
 ];
 
 describe("Operational page guardrails", () => {
@@ -15,6 +22,7 @@ describe("Operational page guardrails", () => {
     for (const file of criticalPages) {
       const source = readFileSync(file, "utf8");
       expect(source.includes("PAGE OK")).toBe(false);
+      expect(source.includes("Lorem ipsum")).toBe(false);
     }
   });
 
@@ -29,7 +37,18 @@ describe("Operational page guardrails", () => {
   });
 
   it("mantém AppNextActionCard nas páginas operacionais", () => {
-    for (const file of criticalPages) {
+    const nextActionPages = [
+      "client/src/pages/FinancesPage.tsx",
+      "client/src/pages/GovernancePage.tsx",
+      "client/src/pages/TimelinePage.tsx",
+      "client/src/pages/AppointmentsPage.tsx",
+      "client/src/pages/ServiceOrdersPage.tsx",
+      "client/src/pages/WhatsAppPage.tsx",
+      "client/src/pages/ExecutiveDashboard.tsx",
+      "client/src/pages/ProfilePage.tsx",
+      "client/src/pages/SettingsPage.tsx",
+    ];
+    for (const file of nextActionPages) {
       const source = readFileSync(file, "utf8");
       expect(source).toContain("AppNextActionCard");
     }
@@ -49,6 +68,7 @@ describe("Operational page guardrails", () => {
       "client/src/components/EditChargeModal.tsx",
       "client/src/components/CreateServiceOrderModal.tsx",
       "client/src/components/EditServiceOrderModal.tsx",
+      "client/src/pages/CalendarPage.tsx",
     ];
 
     for (const file of operationalFiles) {
@@ -67,5 +87,17 @@ describe("Operational page guardrails", () => {
       const source = readFileSync(file, "utf8");
       expect(source.includes("FormModal") || source.includes("BaseOperationalModal")).toBe(true);
     }
+  });
+
+  it("evita select nativo no modal crítico do calendário (dark/light consistente)", () => {
+    const calendar = readFileSync("client/src/pages/CalendarPage.tsx", "utf8");
+    expect(calendar).toContain("<Select");
+    expect(calendar).not.toContain("<select");
+  });
+
+  it("mantém linguagem de O.S. sem labels técnicas de status interno", () => {
+    const serviceOrders = readFileSync("client/src/pages/ServiceOrdersPage.tsx", "utf8");
+    expect(serviceOrders).not.toContain("status IN_PROGRESS");
+    expect(serviceOrders).not.toContain("status DONE");
   });
 });

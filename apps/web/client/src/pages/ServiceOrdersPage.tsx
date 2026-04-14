@@ -76,8 +76,8 @@ export default function ServiceOrdersPage() {
             trend: trendFromDelta(percentDelta(openedCurrent, openedPrevious)),
             hint: "últimos 7 dias",
           },
-          { title: "Em execução", value: String(inProgress), hint: "status IN_PROGRESS" },
-          { title: "Concluídas", value: String(done), hint: "status DONE" },
+          { title: "Em execução", value: String(inProgress), hint: "equipes com atendimento em campo" },
+          { title: "Concluídas", value: String(done), hint: "serviços finalizados" },
           { title: "Prontas p/ cobrança", value: String(pipeline.prontaCobranca), hint: "concluídas sem cobrança" },
           { title: "Base de clientes", value: String(customers.length), hint: "vinculáveis à execução" },
         ]}
