@@ -76,10 +76,8 @@ export async function setupVite(app: Express, server: Server) {
       )
     : [];
 
-  console.log("[web] setupVite env", {
+  console.log("[web] setupVite", {
     NODE_ENV: process.env.NODE_ENV ?? "(undefined)",
-    MANUS_RUNTIME: process.env.MANUS_RUNTIME ?? "(undefined)",
-    MANUS_DEBUG_COLLECTOR: process.env.MANUS_DEBUG_COLLECTOR ?? "(undefined)",
     configuredPlugins,
   });
 
