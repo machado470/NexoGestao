@@ -1,6 +1,8 @@
 import type { Decision } from "./decision.types";
 
-export type OperationalLogStatus = "executed" | "ignored";
+type OperationalLogType = "manual" | "automation";
+
+export type OperationalLogStatus = "executed" | "ignored" | "error" | "scheduled";
 
 export type OperationalLogEntry = {
   decision_id: string;
@@ -9,6 +11,8 @@ export type OperationalLogEntry = {
   source: Decision["source"];
   entityId?: string;
   message?: string;
+  type?: OperationalLogType;
+  rule_id?: string;
 };
 
 const STORAGE_KEY = "nexo.operational.log.v1";
@@ -38,7 +42,20 @@ export function appendOperationalLog(entry: OperationalLogEntry) {
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
 }
 
-export function logDecisionStatus(decision: Decision, status: OperationalLogStatus, message?: string) {
+export function hasDecisionExecutionLog(decisionId: string) {
+  return listOperationalLogs().some((entry) => entry.decision_id === decisionId && entry.status === "executed");
+}
+
+export function wasDecisionAutoExecuted(decisionId: string) {
+  return listOperationalLogs().some((entry) => entry.decision_id === decisionId && entry.status === "executed" && entry.type === "automation");
+}
+
+export function logDecisionStatus(
+  decision: Decision,
+  status: OperationalLogStatus,
+  message?: string,
+  metadata?: Pick<OperationalLogEntry, "type" | "rule_id">
+) {
   appendOperationalLog({
     decision_id: decision.id,
     status,
@@ -46,5 +63,7 @@ export function logDecisionStatus(decision: Decision, status: OperationalLogStat
     entityId: decision.entityId,
     timestamp: new Date().toISOString(),
     message,
+    type: metadata?.type,
+    rule_id: metadata?.rule_id,
   });
 }

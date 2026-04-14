@@ -31,6 +31,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { canAny, type Permission } from "@/lib/rbac";
 import { useIsMobile } from "@/hooks/useMobile";
 import { useNotificationStore } from "@/stores/notificationStore";
+import { useAutomationRunner } from "@/hooks/useAutomationRunner";
 import { GlobalSearch } from "@/components/GlobalSearch";
 import {
   NexoAppShell,
@@ -155,6 +156,8 @@ export function MainLayout({ children }: MainLayoutProps) {
   const isMobile = useIsMobile();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  useAutomationRunner({ navigate, enabled: isAuthenticated });
 
   if (import.meta.env.DEV) {
     // eslint-disable-next-line no-console
