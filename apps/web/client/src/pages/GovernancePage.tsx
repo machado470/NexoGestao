@@ -24,7 +24,6 @@ import { ChartErrorBoundary } from "@/components/ChartErrorBoundary";
 import { KpiErrorBoundary } from "@/components/KpiErrorBoundary";
 import { TrpcSectionErrorBoundary } from "@/components/TrpcSectionErrorBoundary";
 import { setBootPhase } from "@/lib/bootPhase";
-import { GlobalNextAction } from "@/components/decision-engine/GlobalNextAction";
 
 function metric(summary: Record<string, any>, ...keys: string[]) {
   for (const key of keys) {
@@ -109,8 +108,6 @@ export default function GovernancePage() {
           </Button>
         )}
       />
-
-      <GlobalNextAction className="mb-3" />
 
       <KpiErrorBoundary context="governance:kpi">
         <AppKpiRow

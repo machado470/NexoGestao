@@ -5,12 +5,13 @@ import { Button } from "@/components/ui/button";
 import { useRunAction } from "@/hooks/useRunAction";
 import { useRenderWatchdog } from "@/hooks/useRenderWatchdog";
 import { useEffect, useMemo } from "react";
+import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import {
   AppAlertList,
   AppChartPanel,
   AppKpiRow,
   AppListBlock,
-  AppPageHeader,
+  AppNextActionCard,
   AppPageShell,
   AppRecentActivity,
   AppSectionBlock,
@@ -19,7 +20,6 @@ import {
 import { safeChartData } from "@/lib/safeChartData";
 import { ChartErrorBoundary } from "@/components/ChartErrorBoundary";
 import { KpiErrorBoundary } from "@/components/KpiErrorBoundary";
-import { GlobalNextAction } from "@/components/decision-engine/GlobalNextAction";
 
 const chartData = [
   { day: "Seg", receita: 42, ordens: 18 },
@@ -47,14 +47,16 @@ export default function ExecutiveDashboard() {
 
   return (
     <AppPageShell>
-      <AppPageHeader
+      <OperationalTopCard
+        contextLabel="Direção executiva"
         title="Centro de decisão operacional"
         description="Visão executiva do fluxo Cliente → Agendamento → O.S. → Cobrança → Pagamento."
-        ctaLabel="Executar próxima ação"
-        onCta={() => void runAction(async () => navigate("/dashboard/operations"))}
+        primaryAction={(
+          <Button onClick={() => void runAction(async () => navigate("/dashboard/operations"))}>
+            Executar próxima ação
+          </Button>
+        )}
       />
-
-      <GlobalNextAction className="mb-3" />
 
       <KpiErrorBoundary context="executive-dashboard:kpi">
         <AppKpiRow
@@ -68,6 +70,13 @@ export default function ExecutiveDashboard() {
       </KpiErrorBoundary>
 
       <div className="grid gap-3 xl:grid-cols-3">
+        <AppNextActionCard
+          title="Próxima ação recomendada"
+          description="Atue primeiro nas O.S. atrasadas para proteger SLA e reduzir efeito em cobrança."
+          severity="high"
+          metadata="centro executivo"
+          action={{ label: "Abrir ordens críticas", onClick: () => navigate("/service-orders?status=attention&period=7d") }}
+        />
         <AppChartPanel
           title="Evolução de receita e volume"
           description="Ritmo operacional diário com impacto em faturamento."
@@ -104,7 +113,7 @@ export default function ExecutiveDashboard() {
         </AppSectionBlock>
       </div>
 
-      <AppSectionBlock title="Ordens críticas" subtitle="Foco operacional dominante">
+      <AppSectionBlock title="Saúde operacional" subtitle="Foco operacional dominante">
         <AppListBlock
           items={[
             { title: "O.S. #1851 · Instalação comercial", subtitle: "Cliente Atlas · Prazo hoje 17:00", right: <AppStatusBadge label="Urgente" />, action: <Button size="sm" onClick={() => void runAction(async () => navigate("/service-orders?os=1851"))} isLoading={isRunning}>Abrir</Button> },
@@ -114,7 +123,7 @@ export default function ExecutiveDashboard() {
         />
       </AppSectionBlock>
 
-      <AppSectionBlock title="Próximas ações" subtitle="Execução direta sem sair do fluxo">
+      <AppSectionBlock title="Falhas / bloqueios" subtitle="Execução direta sem sair do fluxo">
         <AppListBlock
           items={[
             {
@@ -129,6 +138,15 @@ export default function ExecutiveDashboard() {
             },
           ]}
         />
+      </AppSectionBlock>
+
+      <AppSectionBlock title="Resumo de execução do dia" subtitle="Visão rápida do que foi executado hoje">
+        <AppRecentActivity items={[
+          "14 execuções concluídas no fluxo operacional",
+          "3 exceções exigiram intervenção manual",
+          "9 automações disparadas com sucesso",
+          "2 bloqueios ainda aguardando resolução",
+        ]} />
       </AppSectionBlock>
     </AppPageShell>
   );

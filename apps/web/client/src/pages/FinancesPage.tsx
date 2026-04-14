@@ -32,7 +32,6 @@ import { ChartErrorBoundary } from "@/components/ChartErrorBoundary";
 import { KpiErrorBoundary } from "@/components/KpiErrorBoundary";
 import { TrpcSectionErrorBoundary } from "@/components/TrpcSectionErrorBoundary";
 import { setBootPhase } from "@/lib/bootPhase";
-import { GlobalNextAction } from "@/components/decision-engine/GlobalNextAction";
 
 function formatCurrency(cents: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100);
@@ -157,8 +156,6 @@ export default function FinancesPage() {
           <ActionFeedbackButton state="idle" idleLabel="Criar cobrança agora" onClick={() => setOpenCreate(true)} />
         )}
       />
-
-      <GlobalNextAction className="mb-3" />
 
       <KpiErrorBoundary context="finances:kpi">
         <AppKpiRow items={[

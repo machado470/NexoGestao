@@ -21,6 +21,7 @@ describe("Global execution controls architecture guardrails", () => {
       const source = readFileSync(path.join(pagesDir, pageFile), "utf8");
       expect(source.includes("ExecutionGlobalBar")).toBe(false);
       expect(source.includes("GlobalActionEngine")).toBe(false);
+      expect(source.includes("GlobalNextAction")).toBe(false);
     }
   });
 });

@@ -24,7 +24,7 @@ import { ChartErrorBoundary } from "@/components/ChartErrorBoundary";
 import { KpiErrorBoundary } from "@/components/KpiErrorBoundary";
 import { TrpcSectionErrorBoundary } from "@/components/TrpcSectionErrorBoundary";
 import { setBootPhase } from "@/lib/bootPhase";
-import { GlobalNextAction } from "@/components/decision-engine/GlobalNextAction";
+import { AppSelect } from "@/components/app-system";
 
 function toLabel(value: unknown, fallback: string) {
   const text = String(value ?? "").trim();
@@ -37,6 +37,7 @@ export default function TimelinePage() {
   const [filter, setFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [periodFilter, setPeriodFilter] = useState("all");
+  const [entityFilter, setEntityFilter] = useState("all");
   const [events, setEvents] = useState<any[]>([]);
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [hasMore, setHasMore] = useState(true);
@@ -71,6 +72,7 @@ export default function TimelinePage() {
     return events.filter((event) => {
       const date = safeDate(event?.createdAt);
       if (typeFilter !== "all" && String(event?.type ?? event?.action ?? "").toLowerCase() !== typeFilter) return false;
+      if (entityFilter !== "all" && String(event?.entityType ?? "").toLowerCase() !== entityFilter) return false;
       
       if (periodFilter === "24h" && (!date || Date.now() - date.getTime() > 1000 * 60 * 60 * 24)) return false;
       if (periodFilter === "7d" && (!date || Date.now() - date.getTime() > 1000 * 60 * 60 * 24 * 7)) return false;
@@ -89,7 +91,7 @@ export default function TimelinePage() {
         .join(" ");
       return text.includes(q);
     });
-  }, [events, filter, periodFilter, typeFilter]);
+  }, [entityFilter, events, filter, periodFilter, typeFilter]);
 
   const groupedEvents = useMemo(() => {
     const groups = new Map<string, any[]>();
@@ -168,8 +170,6 @@ export default function TimelinePage() {
         )}
       />
 
-      <GlobalNextAction className="mb-3" />
-
       <KpiErrorBoundary context="timeline:kpi">
         <AppKpiRow
         items={[
@@ -225,19 +225,39 @@ export default function TimelinePage() {
             value={filter}
             onChange={(event) => setFilter(event.target.value)}
           />
-          <select className="h-10 rounded-[0.76rem] border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 text-sm text-[var(--text-primary)]" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
-            <option value="all">Todos os tipos</option>
-            <option value="finance">Financeiro</option>
-            <option value="service_order">O.S.</option>
-            <option value="whatsapp">WhatsApp</option>
-            <option value="appointment">Agendamento</option>
-          </select>
-          <select className="h-10 rounded-[0.76rem] border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 text-sm text-[var(--text-primary)]" value={periodFilter} onChange={(event) => setPeriodFilter(event.target.value)}>
-            <option value="all">Período total</option>
-            <option value="24h">Últimas 24h</option>
-            <option value="7d">Últimos 7 dias</option>
-            <option value="30d">Últimos 30 dias</option>
-          </select>
+          <AppSelect
+            value={typeFilter}
+            onValueChange={setTypeFilter}
+            options={[
+              { value: "all", label: "Todos os tipos" },
+              { value: "finance", label: "Financeiro" },
+              { value: "service_order", label: "O.S." },
+              { value: "whatsapp", label: "WhatsApp" },
+              { value: "appointment", label: "Agendamento" },
+            ]}
+          />
+          <AppSelect
+            value={entityFilter}
+            onValueChange={setEntityFilter}
+            options={[
+              { value: "all", label: "Todas as entidades" },
+              { value: "customer", label: "Cliente" },
+              { value: "service_order", label: "O.S." },
+              { value: "appointment", label: "Agendamento" },
+              { value: "charge", label: "Cobrança" },
+              { value: "whatsapp", label: "WhatsApp" },
+            ]}
+          />
+          <AppSelect
+            value={periodFilter}
+            onValueChange={setPeriodFilter}
+            options={[
+              { value: "all", label: "Período total" },
+              { value: "24h", label: "Últimas 24h" },
+              { value: "7d", label: "Últimos 7 dias" },
+              { value: "30d", label: "Últimos 30 dias" },
+            ]}
+          />
           <p className="text-xs text-[var(--text-muted)]">Mostrando {events.length} eventos carregados em lotes de {pageSize}.</p>
         </AppFiltersBar>
 
@@ -258,6 +278,17 @@ export default function TimelinePage() {
                       </p>
                       <p className="mt-1 text-xs text-[var(--text-muted)]">
                         {toLabel(event?.entityType, "Entidade")} #{toLabel(event?.entityId, "—")} · {toLabel(event?.actorName, "Sistema")} · {event?.createdAt ? new Date(String(event.createdAt)).toLocaleString("pt-BR") : "sem data"}
+                      </p>
+                      <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                        Status: {String(event?.status ?? event?.executionMode ?? "manual").toLowerCase().includes("fail")
+                          ? "falha"
+                          : String(event?.status ?? event?.executionMode ?? "").toLowerCase().includes("block")
+                            ? "bloqueado"
+                            : String(event?.status ?? event?.executionMode ?? "").toLowerCase().includes("ignore")
+                              ? "ignorado"
+                              : String(event?.executionMode ?? event?.source ?? "").toLowerCase().includes("auto")
+                                ? "automático"
+                                : "manual"}
                       </p>
                     </li>
                   ))}

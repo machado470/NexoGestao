@@ -23,6 +23,8 @@ describe("Operational page guardrails", () => {
     expect(timeline).toContain("const pageSize = 20");
     expect(timeline).toContain("const [cursor, setCursor] = useState<string | undefined>(undefined)");
     expect(timeline).toContain("disabled={!hasMore || timelineQuery.isFetching}");
+    expect(timeline).toContain("const [entityFilter, setEntityFilter] = useState(\"all\")");
+    expect(timeline).toContain("Status:");
     expect(timeline).not.toContain("setLimit(limit + 120)");
   });
 
@@ -52,6 +54,18 @@ describe("Operational page guardrails", () => {
     for (const file of operationalFiles) {
       const source = readFileSync(file, "utf8");
       expect(source).not.toContain("bg-white");
+    }
+  });
+
+  it("garante shell modal unificado nos modais operacionais críticos", () => {
+    const modalFiles = [
+      "client/src/components/CreateAppointmentModal.tsx",
+      "client/src/components/CustomerWorkspaceModal.tsx",
+    ];
+
+    for (const file of modalFiles) {
+      const source = readFileSync(file, "utf8");
+      expect(source.includes("FormModal") || source.includes("BaseOperationalModal")).toBe(true);
     }
   });
 });
