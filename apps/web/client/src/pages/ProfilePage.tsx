@@ -1,20 +1,90 @@
-import { AppPageHeader, AppPageShell, AppSectionBlock, AppRecentActivity, AppFiltersBar, Input } from "@/components/internal-page-system";
+import { useEffect, useMemo, useState } from "react";
+import { trpc } from "@/lib/trpc";
+import { normalizeObjectPayload } from "@/lib/query-helpers";
+import {
+  AppFiltersBar,
+  AppPageHeader,
+  AppPageLoadingState,
+  AppPageShell,
+  AppRecentActivity,
+  AppSectionBlock,
+  Input,
+} from "@/components/internal-page-system";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 export default function ProfilePage() {
+  const utils = trpc.useUtils();
+  const meQuery = trpc.nexo.me.useQuery(undefined, { retry: false });
+  const settingsQuery = trpc.nexo.settings.get.useQuery(undefined, { retry: false });
+  const updateSettings = trpc.nexo.settings.update.useMutation({
+    onSuccess: async () => {
+      toast.success("Preferências salvas com sucesso.");
+      await settingsQuery.refetch();
+      await utils.nexo.settings.get.invalidate();
+    },
+    onError: (error) => toast.error(error.message || "Falha ao salvar preferências."),
+  });
+
+  const me = useMemo(() => normalizeObjectPayload<any>(meQuery.data) ?? {}, [meQuery.data]);
+  const settings = useMemo(() => normalizeObjectPayload<any>(settingsQuery.data) ?? {}, [settingsQuery.data]);
+  const [timezone, setTimezone] = useState<string>("America/Sao_Paulo");
+
+  useEffect(() => {
+    setTimezone(String(settings.timezone ?? "America/Sao_Paulo"));
+  }, [settings.timezone]);
+
+  if (meQuery.isLoading || settingsQuery.isLoading) {
+    return (
+      <AppPageShell>
+        <AppPageHeader title="Perfil" description="Dados pessoais, segurança e preferências individuais." />
+        <AppSectionBlock title="Carregando" subtitle="Buscando dados de perfil.">
+          <AppPageLoadingState description="Sincronizando dados do usuário..." />
+        </AppSectionBlock>
+      </AppPageShell>
+    );
+  }
+
   return (
     <AppPageShell>
-      <AppPageHeader title="Perfil" description="Dados pessoais, segurança e preferências individuais." ctaLabel="Salvar perfil" />
+      <AppPageHeader title="Perfil" description="Dados pessoais, segurança e preferências individuais." />
       <div className="grid gap-3 xl:grid-cols-2">
-        <AppSectionBlock title="Dados pessoais" subtitle="Informações básicas do usuário">
-          <AppFiltersBar><Input placeholder="Nome" className="max-w-sm" /><Input placeholder="E-mail" className="max-w-sm" /><Button>Atualizar dados</Button></AppFiltersBar>
+        <AppSectionBlock title="Dados pessoais" subtitle="Identidade da sessão autenticada">
+          <AppFiltersBar>
+            <Input value={String(me.name ?? me.fullName ?? "")} readOnly className="max-w-sm" />
+            <Input value={String(me.email ?? "")} readOnly className="max-w-sm" />
+            <Input value={String(me.role ?? "USER")} readOnly className="max-w-xs" />
+          </AppFiltersBar>
         </AppSectionBlock>
-        <AppSectionBlock title="Segurança" subtitle="Senha, sessão e validações">
-          <AppFiltersBar><Input placeholder="Nova senha" className="max-w-sm" /><Button>Trocar senha</Button></AppFiltersBar>
+        <AppSectionBlock title="Segurança" subtitle="Estado atual de proteção da conta">
+          <AppFiltersBar>
+            <Input value={String(me.emailVerifiedAt ? "E-mail verificado" : "E-mail pendente")} readOnly className="max-w-sm" />
+            <Input value={String(me.lastLoginAt ? new Date(String(me.lastLoginAt)).toLocaleString("pt-BR") : "Sem registro")} readOnly className="max-w-sm" />
+            <Button variant="outline" disabled>
+              Alteração de senha via backend
+            </Button>
+          </AppFiltersBar>
         </AppSectionBlock>
       </div>
+
+      <AppSectionBlock title="Preferências" subtitle="Ajustes pessoais sincronizados com organização">
+        <AppFiltersBar>
+          <Input placeholder="Timezone" className="max-w-sm" value={timezone} onChange={(event) => setTimezone(event.target.value)} />
+          <Button
+            onClick={() => updateSettings.mutate({ timezone })}
+            isLoading={updateSettings.isPending}
+          >
+            Salvar preferências
+          </Button>
+        </AppFiltersBar>
+      </AppSectionBlock>
+
       <AppSectionBlock title="Atividade e contexto" subtitle="Histórico recente do usuário">
-        <AppRecentActivity items={["Login validado em novo dispositivo há 2 dias", "Preferência de notificação atualizada ontem", "Exportação de relatório executada há 4 horas"]} />
+        <AppRecentActivity items={[
+          me.lastLoginAt ? `Último login em ${new Date(String(me.lastLoginAt)).toLocaleString("pt-BR")}` : "Sem registro recente de login",
+          me.emailVerifiedAt ? "E-mail validado com sucesso" : "Validação de e-mail pendente",
+          settings.timezone ? `Timezone atual: ${String(settings.timezone)}` : "Timezone padrão da organização",
+        ]} />
       </AppSectionBlock>
     </AppPageShell>
   );

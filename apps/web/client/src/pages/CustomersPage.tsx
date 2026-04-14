@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import CreateCustomerModal from "@/components/CreateCustomerModal";
+import { CustomerWorkspaceModal } from "@/components/CustomerWorkspaceModal";
 import { normalizeArrayPayload } from "@/lib/query-helpers";
 import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
 import { Button } from "@/components/design-system";
@@ -22,6 +23,8 @@ import { formatDelta, getWindow, inRange, percentDelta, safeDate, trendFromDelta
 export default function CustomersPage() {
   const [, navigate] = useLocation();
   const [createOpen, setCreateOpen] = useState(false);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const [selectedCustomerName, setSelectedCustomerName] = useState<string>("");
   const customersQuery = trpc.nexo.customers.list.useQuery(undefined, { retry: false });
   const chargesQuery = trpc.finance.charges.list.useQuery({ page: 1, limit: 200 }, { retry: false });
 
@@ -119,6 +122,13 @@ export default function CustomersPage() {
                       <td className="p-3">
                         <AppRowActions
                           actions={[
+                            {
+                              label: "Abrir workspace",
+                              onClick: () => {
+                                setSelectedCustomerId(String(customer.id));
+                                setSelectedCustomerName(String(customer?.name ?? "Cliente"));
+                              },
+                            },
                             { label: "Criar agendamento", onClick: () => navigate(`/appointments?customerId=${customer.id}`) },
                             { label: "Criar O.S.", onClick: () => navigate(`/service-orders?customerId=${customer.id}`) },
                           ]}
@@ -140,6 +150,18 @@ export default function CustomersPage() {
           setCreateOpen(false);
           await customersQuery.refetch();
           if (created?.id) navigate(`/appointments?customerId=${created.id}`);
+        }}
+      />
+
+      <CustomerWorkspaceModal
+        open={Boolean(selectedCustomerId)}
+        customerId={selectedCustomerId}
+        customerName={selectedCustomerName}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedCustomerId(null);
+            setSelectedCustomerName("");
+          }
         }}
       />
     </PageWrapper>
