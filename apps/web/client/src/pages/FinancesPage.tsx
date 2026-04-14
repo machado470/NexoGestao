@@ -12,6 +12,7 @@ import {
   AppChartPanel,
   AppDataTable,
   AppKpiRow,
+  AppNextActionCard,
   AppPageEmptyState,
   AppPageErrorState,
   AppPageLoadingState,
@@ -73,6 +74,16 @@ export default function FinancesPage() {
     .reduce((acc, item) => acc + Number(item?.amountCents ?? 0), 0);
   const overdueCurrent = charges.filter(item => String(item?.status ?? "").toUpperCase() === "OVERDUE" && inRange(safeDate(item?.dueDate), current30.start, current30.end)).length;
   const overduePrevious = charges.filter(item => String(item?.status ?? "").toUpperCase() === "OVERDUE" && inRange(safeDate(item?.dueDate), previous30.start, previous30.end)).length;
+  const openTotal = charges.filter(item => ["PENDING", "OVERDUE"].includes(String(item?.status ?? "").toUpperCase())).reduce((acc, item) => acc + Number(item?.amountCents ?? 0), 0);
+  const overdueTotal = charges.filter(item => String(item?.status ?? "").toUpperCase() === "OVERDUE").reduce((acc, item) => acc + Number(item?.amountCents ?? 0), 0);
+  const receivedTotal = charges.filter(item => String(item?.status ?? "").toUpperCase() === "PAID").reduce((acc, item) => acc + Number(item?.amountCents ?? 0), 0);
+  const dueSoon = charges.filter((item) => {
+    const status = String(item?.status ?? "").toUpperCase();
+    const due = safeDate(item?.dueDate);
+    if (!due || status !== "PENDING") return false;
+    const delta = due.getTime() - Date.now();
+    return delta >= 0 && delta <= 1000 * 60 * 60 * 24 * 7;
+  }).length;
 
   usePageDiagnostics({
     page: "finances",
@@ -156,7 +167,7 @@ export default function FinancesPage() {
           hint: "30 dias vs período anterior",
           tone: "important",
         },
-        { title: "A receber", value: String(stats.pendingCount ?? 0), hint: "cobranças pendentes" },
+        { title: "Total em aberto", value: formatCurrency(openTotal), hint: "pendentes + vencidas" },
         {
           title: "Em atraso",
           value: String(stats.overdueCount ?? 0),
@@ -165,11 +176,8 @@ export default function FinancesPage() {
           hint: "cobranças vencidas",
           tone: Number(stats.overdueCount ?? 0) > 0 ? "critical" : "default",
         },
-        {
-          title: "Taxa de atraso",
-          value: `${charges.length > 0 ? ((Number(stats.overdueCount ?? 0) / charges.length) * 100).toFixed(1).replace(".", ",") : "0,0"}%`,
-          hint: "vencidas / carteira total",
-        },
+        { title: "Recebidas", value: formatCurrency(receivedTotal), hint: "somatório de cobranças pagas" },
+        { title: "Próx. a vencer", value: String(dueSoon), hint: "vencimento em até 7 dias" },
       ]} />
       </KpiErrorBoundary>
 
@@ -223,20 +231,38 @@ export default function FinancesPage() {
                 </tr>
               </thead>
               <tbody>
-                {charges.map((charge) => (
-                  <tr key={String(charge?.id)} className="border-t border-[var(--border-subtle)]">
+                {charges.map((charge) => {
+                  const status = String(charge?.status ?? "").toUpperCase();
+                  const isOverdue = status === "OVERDUE";
+                  const nextAction = isOverdue ? "Cobrar" : status === "PENDING" ? "Enviar lembrete" : "Marcar como paga";
+                  return (
+                  <tr key={String(charge?.id)} className={`border-t border-[var(--border-subtle)] ${isOverdue ? "bg-rose-500/10" : ""}`}>
                     <td className="p-3">{String(charge?.customer?.name ?? "—")}</td>
                     <td>{formatCurrency(Number(charge?.amountCents ?? 0))}</td>
                     <td><AppStatusBadge label={getOperationalSeverityLabel(getChargeSeverity(charge))} /></td>
                     <td>{charge?.dueDate ? new Date(String(charge.dueDate)).toLocaleDateString("pt-BR") : "—"}</td>
                     <td className="p-3">
-                      <AppRowActions actions={[
-                        { label: "Registrar pagamento", onClick: () => void registerPayment(charge) },
-                        { label: "Enviar WhatsApp", onClick: () => navigate(`/whatsapp?customerId=${charge.customerId}&chargeId=${charge.id}`) },
-                      ]} />
+                      <div className="space-y-2">
+                        <AppNextActionCard
+                          title="Próxima ação"
+                          action={nextAction}
+                          reason={isOverdue ? "Cobrança vencida impacta o caixa do dia." : "Ação recomendada para manter previsibilidade de receita."}
+                          onExecute={() => {
+                            if (nextAction === "Marcar como paga") {
+                              void registerPayment(charge);
+                              return;
+                            }
+                            navigate(`/whatsapp?customerId=${charge.customerId}&chargeId=${charge.id}`);
+                          }}
+                        />
+                        <AppRowActions actions={[
+                          { label: "Registrar pagamento", onClick: () => void registerPayment(charge) },
+                          { label: "Enviar WhatsApp", onClick: () => navigate(`/whatsapp?customerId=${charge.customerId}&chargeId=${charge.id}`) },
+                        ]} />
+                      </div>
                     </td>
                   </tr>
-                ))}
+                )})}
               </tbody>
             </table>
           </AppDataTable>

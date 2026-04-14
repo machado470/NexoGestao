@@ -11,6 +11,7 @@ import { getAppointmentSeverity, getOperationalSeverityLabel } from "@/lib/opera
 import {
   AppDataTable,
   AppKpiRow,
+  AppNextActionCard,
   AppPageEmptyState,
   AppPageErrorState,
   AppPageLoadingState,
@@ -52,6 +53,12 @@ export default function AppointmentsPage() {
   const previous7Appointments = appointments.filter(item => inRange(safeDate(item?.startsAt), previous7.start, previous7.end));
   const confirmationRateCurrent = current7Appointments.length === 0 ? 0 : (current7Appointments.filter(item => String(item?.status ?? "").toUpperCase() === "CONFIRMED").length / current7Appointments.length) * 100;
   const confirmationRatePrevious = previous7Appointments.length === 0 ? 0 : (previous7Appointments.filter(item => String(item?.status ?? "").toUpperCase() === "CONFIRMED").length / previous7Appointments.length) * 100;
+  const appointmentsBySlot = appointments.reduce<Record<string, number>>((acc, item) => {
+    const slot = safeDate(item?.startsAt)?.toISOString().slice(0, 16) ?? "";
+    if (!slot) return acc;
+    acc[slot] = (acc[slot] ?? 0) + 1;
+    return acc;
+  }, {});
 
   return (
     <PageWrapper title="Agendamentos" subtitle="Agenda operacional com ações padronizadas e rastreáveis.">
@@ -109,22 +116,53 @@ export default function AppointmentsPage() {
                 </tr>
               </thead>
               <tbody>
-                {appointments.map((appointment) => (
+                {appointments.map((appointment) => {
+                  const severity = getAppointmentSeverity(appointment);
+                  const status = String(appointment?.status ?? "").toUpperCase();
+                  const slot = safeDate(appointment?.startsAt)?.toISOString().slice(0, 16) ?? "";
+                  const hasConflict = Boolean(slot && (appointmentsBySlot[slot] ?? 0) > 1);
+                  const operationalState =
+                    status === "DONE" ? "Concluído" :
+                    status === "CONFIRMED" ? "Confirmado" :
+                    hasConflict || severity === "critical" ? "Em risco" : "Pendente";
+                  const nextAction = status === "SCHEDULED"
+                    ? "Confirmar"
+                    : status === "CONFIRMED"
+                      ? "Criar O.S."
+                      : hasConflict
+                        ? "Reagendar"
+                        : "Enviar WhatsApp";
+                  return (
                   <tr key={String(appointment?.id)} className="border-t border-[var(--border-subtle)]">
-                    <td className="p-3">{new Date(String(appointment?.startsAt)).toLocaleString("pt-BR")}</td>
-                    <td>{String(appointment?.customer?.name ?? "Cliente")}</td>
-                    <td><AppStatusBadge label={getOperationalSeverityLabel(getAppointmentSeverity(appointment))} /></td>
+                    <td className="p-3">
+                      {new Date(String(appointment?.startsAt)).toLocaleString("pt-BR")}
+                      {hasConflict ? <p className="text-xs text-rose-300">Conflito de horário detectado</p> : null}
+                    </td>
+                    <td>
+                      <p>{String(appointment?.customer?.name ?? "Cliente")}</p>
+                      <p className="text-xs text-[var(--text-muted)]">#{String(appointment?.customerId ?? "—")}</p>
+                    </td>
+                    <td><AppStatusBadge label={operationalState || getOperationalSeverityLabel(severity)} /></td>
                     <td>{appointment?.endsAt ? new Date(String(appointment.endsAt)).toLocaleString("pt-BR") : "—"}</td>
                     <td className="p-3">
-                      <AppRowActions
-                        actions={[
-                          { label: "Criar O.S.", onClick: () => navigate(`/service-orders?customerId=${appointment.customerId}&appointmentId=${appointment.id}`) },
-                          { label: "Enviar WhatsApp", onClick: () => navigate(`/whatsapp?customerId=${appointment.customerId}`) },
-                        ]}
-                      />
+                      <div className="space-y-2">
+                        <AppNextActionCard
+                          title="Próxima ação"
+                          action={nextAction}
+                          reason={hasConflict ? "Resolver conflito antes da execução." : "Mantenha o fluxo de execução ativo."}
+                          onExecute={() => navigate(nextAction === "Criar O.S." ? `/service-orders?customerId=${appointment.customerId}&appointmentId=${appointment.id}` : `/whatsapp?customerId=${appointment.customerId}`)}
+                        />
+                        <AppRowActions
+                          actions={[
+                            { label: "Criar O.S.", onClick: () => navigate(`/service-orders?customerId=${appointment.customerId}&appointmentId=${appointment.id}`) },
+                            { label: "Enviar WhatsApp", onClick: () => navigate(`/whatsapp?customerId=${appointment.customerId}`) },
+                            { label: "Reagendar", onClick: () => setOpenCreate(true) },
+                          ]}
+                        />
+                      </div>
                     </td>
                   </tr>
-                ))}
+                )})}
               </tbody>
             </table>
           </AppDataTable>

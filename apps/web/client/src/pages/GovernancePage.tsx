@@ -9,6 +9,7 @@ import { Button } from "@/components/design-system";
 import {
   AppChartPanel,
   AppKpiRow,
+  AppNextActionCard,
   AppPageEmptyState,
   AppPageErrorState,
   AppPageLoadingState,
@@ -71,6 +72,9 @@ export default function GovernancePage() {
 
   const entitiesAtRisk = normalizeArrayPayload<any>(summary.entitiesAtRisk ?? summary.riskEntities ?? []);
   const recommendations = normalizeArrayPayload<any>(summary.recommendations ?? summary.nextActions ?? []);
+  const bottlenecks = normalizeArrayPayload<any>(summary.bottlenecks ?? summary.constraints ?? []);
+  const failures = normalizeArrayPayload<any>(summary.operationalFailures ?? summary.failures ?? []);
+  const institutionalPolicies = normalizeArrayPayload<any>(summary.policies ?? summary.institutionalPolicies ?? []);
   const latestRisk = Number(riskSeries.data[riskSeries.data.length - 1]?.score ?? metric(summary, "riskScore", "overallRisk"));
   const previousRisk = Number(riskSeries.data[riskSeries.data.length - 2]?.score ?? Number.NaN);
   useEffect(() => {
@@ -202,6 +206,48 @@ export default function GovernancePage() {
             </ul>
           )}
         </AppSectionBlock>
+      </div>
+      <div className="mt-3 grid gap-3 xl:grid-cols-3">
+        <AppSectionBlock title="Gargalos operacionais" subtitle="Onde a operação está travando">
+          {bottlenecks.length === 0 ? <AppPageEmptyState title="Sem gargalos críticos" description="Nenhum gargalo estrutural detectado na leitura atual." /> : (
+            <ul className="space-y-2">
+              {bottlenecks.slice(0, 5).map((item, index) => (
+                <li key={`${String(item?.id ?? "b")}-${index}`} className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm text-[var(--text-secondary)]">
+                  {String(item?.title ?? item?.name ?? item?.description ?? "Gargalo operacional identificado")}
+                </li>
+              ))}
+            </ul>
+          )}
+        </AppSectionBlock>
+        <AppSectionBlock title="Falhas operacionais" subtitle="Desvios que exigem correção">
+          {failures.length === 0 ? <AppPageEmptyState title="Sem falhas abertas" description="Nenhuma falha crítica registrada nesta janela." /> : (
+            <ul className="space-y-2">
+              {failures.slice(0, 5).map((item, index) => (
+                <li key={`${String(item?.id ?? "f")}-${index}`} className="rounded-lg border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-200">
+                  {String(item?.title ?? item?.description ?? "Falha operacional")}
+                </li>
+              ))}
+            </ul>
+          )}
+        </AppSectionBlock>
+        <AppSectionBlock title="Estado institucional" subtitle="Políticas e aderência">
+          {institutionalPolicies.length === 0 ? <AppPageEmptyState title="Sem políticas registradas" description="Backend não retornou políticas institucionais nesta organização." /> : (
+            <ul className="space-y-2">
+              {institutionalPolicies.slice(0, 5).map((policy, index) => (
+                <li key={`${String(policy?.id ?? "p")}-${index}`} className="rounded-lg border border-[var(--border-subtle)] p-3">
+                  <p className="text-sm font-medium text-[var(--text-primary)]">{String(policy?.title ?? policy?.name ?? "Política")}</p>
+                  <p className="text-xs text-[var(--text-muted)]">{String(policy?.status ?? "Sem status")}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </AppSectionBlock>
+      </div>
+      <div className="mt-3">
+        <AppNextActionCard
+          action={latestRisk >= 70 ? "Executar contenção imediata nos alertas críticos" : "Revisar recomendações e manter monitoramento"}
+          reason="Governança deve responder claramente o que está errado hoje e o próximo passo executivo."
+        />
       </div>
       </TrpcSectionErrorBoundary>
     </PageWrapper>

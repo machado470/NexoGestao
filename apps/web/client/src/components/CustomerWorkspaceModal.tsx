@@ -1,10 +1,11 @@
 import { useMemo } from "react";
 import { useLocation } from "wouter";
 import { BaseModal } from "@/components/app-modal-system";
-import { AppSectionBlock, AppStatusBadge } from "@/components/internal-page-system";
+import { AppNextActionCard, AppSectionBlock, AppStatusBadge } from "@/components/internal-page-system";
 import { Button } from "@/components/design-system";
 import { trpc } from "@/lib/trpc";
 import { normalizeArrayPayload, normalizeObjectPayload } from "@/lib/query-helpers";
+import { getCustomerSeverity, getNextActionCustomer, getOperationalSeverityLabel } from "@/lib/operations/operational-intelligence";
 
 function listOf(input: unknown) {
   return normalizeArrayPayload<any>(input);
@@ -35,6 +36,21 @@ export function CustomerWorkspaceModal({ open, customerId, customerName, onOpenC
   const charges = listOf(workspace.charges ?? workspace.finance);
   const messages = listOf(workspace.messages ?? workspace.whatsappMessages);
   const timeline = listOf(workspace.timeline ?? workspace.events).slice(0, 8);
+  const overdueCharges = charges.filter((item) => String(item?.status ?? "").toUpperCase() === "OVERDUE").length;
+  const pendingCharges = charges.filter((item) => String(item?.status ?? "").toUpperCase() === "PENDING").length;
+  const customerSeverity = getCustomerSeverity({
+    active: customer.active !== false,
+    overdueCharges,
+    pendingCharges,
+    openServiceOrders: serviceOrders.filter((item) => !["DONE", "CANCELED"].includes(String(item?.status ?? "").toUpperCase())).length,
+  });
+  const customerRisk = overdueCharges > 0 ? "Alto" : pendingCharges > 0 ? "Moderado" : "Baixo";
+  const nextAction = getNextActionCustomer({
+    active: customer.active !== false,
+    overdueCharges,
+    pendingCharges,
+    openServiceOrders: serviceOrders.length,
+  });
 
   const headerName = String(customer.name ?? customerName ?? "Cliente");
 
@@ -67,6 +83,27 @@ export function CustomerWorkspaceModal({ open, customerId, customerName, onOpenC
         </div>
       ) : (
         <div className="space-y-3">
+          <div className="grid gap-3 xl:grid-cols-3">
+            <AppSectionBlock title="Estado operacional" subtitle="Saúde e risco do cliente">
+              <div className="flex flex-wrap items-center gap-2">
+                <AppStatusBadge label={getOperationalSeverityLabel(customerSeverity)} />
+                <AppStatusBadge label={`Risco ${customerRisk}`} />
+                <AppStatusBadge label={customer.active === false ? "Inativo" : "Ativo"} />
+              </div>
+            </AppSectionBlock>
+            <AppSectionBlock title="Resumo encadeado" subtitle="Cliente → execução → receita">
+              <p className="text-sm text-[var(--text-secondary)]">
+                {appointments.length} agendamento(s) · {serviceOrders.length} O.S. · {charges.length} cobrança(s) · {messages.length} interação(ões) WhatsApp · {timeline.length} evento(s) recentes.
+              </p>
+            </AppSectionBlock>
+            <AppNextActionCard
+              action={nextAction.label}
+              reason={overdueCharges > 0 ? "Cobranças vencidas exigem contato imediato." : "Mantenha o fluxo ativo com a próxima etapa operacional."}
+              onExecute={() => navigate(overdueCharges > 0 ? `/whatsapp?customerId=${customerId ?? ""}` : `/appointments?customerId=${customerId ?? ""}`)}
+              ctaLabel={overdueCharges > 0 ? "Cobrar no WhatsApp" : "Seguir fluxo"}
+            />
+          </div>
+
           <AppSectionBlock title="Dados básicos" subtitle="Identificação e contato">
             <div className="grid gap-3 md:grid-cols-2">
               <p className="text-sm text-[var(--text-secondary)]">Nome: <span className="text-[var(--text-primary)]">{headerName}</span></p>
