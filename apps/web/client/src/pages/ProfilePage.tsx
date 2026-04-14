@@ -3,6 +3,8 @@ import { trpc } from "@/lib/trpc";
 import { normalizeObjectPayload } from "@/lib/query-helpers";
 import {
   AppFiltersBar,
+  AppKpiRow,
+  AppNextActionCard,
   AppPageHeader,
   AppPageLoadingState,
   AppPageShell,
@@ -47,7 +49,15 @@ export default function ProfilePage() {
 
   return (
     <AppPageShell>
-      <AppPageHeader title="Perfil" description="Dados pessoais, segurança e preferências individuais." />
+      <AppPageHeader title="Perfil" description="Seus dados, segurança da conta e contexto de uso no dia a dia." />
+      <AppKpiRow
+        items={[
+          { title: "Perfil", value: String(me.name ?? me.fullName ?? "Usuário"), hint: "identidade da sessão atual" },
+          { title: "E-mail", value: String(me.emailVerifiedAt ? "Verificado" : "Pendente"), hint: "segurança de acesso" },
+          { title: "Função", value: String(me.role ?? "Usuário"), hint: "permissão operacional" },
+          { title: "Timezone", value: String(timezone || "America/Sao_Paulo"), hint: "preferência aplicada no produto" },
+        ]}
+      />
       <div className="grid gap-3 xl:grid-cols-2">
         <AppSectionBlock title="Dados pessoais" subtitle="Identidade da sessão autenticada">
           <AppFiltersBar>
@@ -67,17 +77,29 @@ export default function ProfilePage() {
         </AppSectionBlock>
       </div>
 
-      <AppSectionBlock title="Preferências" subtitle="Ajustes pessoais sincronizados com organização">
+      <div className="grid gap-3 xl:grid-cols-3">
+        <AppNextActionCard
+          title="Próxima ação recomendada"
+          description={me.emailVerifiedAt ? "Mantenha seus dados atualizados para evitar bloqueios operacionais." : "Valide seu e-mail para reduzir risco de perda de acesso."}
+          severity={me.emailVerifiedAt ? "low" : "high"}
+          metadata="perfil"
+          action={{
+            label: me.emailVerifiedAt ? "Revisar preferências" : "Validar conta",
+            onClick: () => window.scrollTo({ top: 720, behavior: "smooth" }),
+          }}
+        />
+        <AppSectionBlock title="Preferências" subtitle="Ajustes pessoais sincronizados com organização" className="xl:col-span-2">
         <AppFiltersBar>
-          <Input placeholder="Timezone" className="max-w-sm" value={timezone} onChange={(event) => setTimezone(event.target.value)} />
+          <Input placeholder="Ex.: America/Sao_Paulo" className="max-w-sm" value={timezone} onChange={(event) => setTimezone(event.target.value)} />
           <Button
             onClick={() => updateSettings.mutate({ timezone })}
             isLoading={updateSettings.isPending}
           >
-            Salvar preferências
+            Salvar alterações do perfil
           </Button>
         </AppFiltersBar>
-      </AppSectionBlock>
+        </AppSectionBlock>
+      </div>
 
       <AppSectionBlock title="Atividade e contexto" subtitle="Histórico recente do usuário">
         <AppRecentActivity items={[
