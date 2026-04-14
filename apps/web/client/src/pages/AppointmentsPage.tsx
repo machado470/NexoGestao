@@ -148,9 +148,13 @@ export default function AppointmentsPage() {
                       <div className="space-y-2">
                         <AppNextActionCard
                           title="Próxima ação"
-                          action={nextAction}
-                          reason={hasConflict ? "Resolver conflito antes da execução." : "Mantenha o fluxo de execução ativo."}
-                          onExecute={() => navigate(nextAction === "Criar O.S." ? `/service-orders?customerId=${appointment.customerId}&appointmentId=${appointment.id}` : `/whatsapp?customerId=${appointment.customerId}`)}
+                          description={hasConflict ? "Resolver conflito antes da execução." : "Mantenha o fluxo de execução ativo."}
+                          severity={hasConflict ? "critical" : status === "CONFIRMED" ? "medium" : "high"}
+                          metadata="agendamento"
+                          action={{
+                            label: nextAction,
+                            onClick: () => navigate(nextAction === "Criar O.S." ? `/service-orders?customerId=${appointment.customerId}&appointmentId=${appointment.id}` : `/whatsapp?customerId=${appointment.customerId}`),
+                          }}
                         />
                         <AppRowActions
                           actions={[

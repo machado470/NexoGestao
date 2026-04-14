@@ -1,30 +1,57 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const pageFiles = [
+const criticalPages = [
   "client/src/pages/FinancesPage.tsx",
   "client/src/pages/GovernancePage.tsx",
   "client/src/pages/TimelinePage.tsx",
+  "client/src/pages/AppointmentsPage.tsx",
+  "client/src/pages/ServiceOrdersPage.tsx",
+  "client/src/pages/WhatsAppPage.tsx",
 ];
 
 describe("Operational page guardrails", () => {
   it("evita placeholders rasos nas páginas críticas", () => {
-    for (const file of pageFiles) {
+    for (const file of criticalPages) {
       const source = readFileSync(file, "utf8");
       expect(source.includes("PAGE OK")).toBe(false);
     }
   });
 
-  it("mantém timeline incremental sem feed infinito automático", () => {
+  it("mantém timeline paginada sem auto-fetch infinito", () => {
     const timeline = readFileSync("client/src/pages/TimelinePage.tsx", "utf8");
-    expect(timeline).toContain("const [limit, setLimit] = useState(120)");
-    expect(timeline).toContain("onClick={() => setLimit((prev) => prev + 120)}");
+    expect(timeline).toContain("const pageSize = 20");
+    expect(timeline).toContain("const [cursor, setCursor] = useState<string | undefined>(undefined)");
+    expect(timeline).toContain("disabled={!hasMore || timelineQuery.isFetching}");
     expect(timeline).not.toContain("setLimit(limit + 120)");
   });
 
-  it("mantém botão primário padronizado nas ações contextuais", () => {
+  it("mantém AppNextActionCard nas páginas operacionais", () => {
+    for (const file of criticalPages) {
+      const source = readFileSync(file, "utf8");
+      expect(source).toContain("AppNextActionCard");
+    }
+  });
+
+  it("mantém botão primário padronizado no contrato de próxima ação", () => {
     const operationalComponent = readFileSync("client/src/components/internal-page-system.tsx", "utf8");
-    expect(operationalComponent).toContain("export function AppNextActionCard");
-    expect(operationalComponent).toContain("<Button className=\"mt-2\" type=\"button\" onClick={onExecute}>");
+    expect(operationalComponent).toContain("variant=\"default\"");
+    expect(operationalComponent).toContain("severity: AppNextActionSeverity");
+    expect(operationalComponent).toContain("action: { label: string; onClick: () => void }");
+  });
+
+  it("evita bg-white nas superfícies operacionais e inputs críticos", () => {
+    const operationalFiles = [
+      ...criticalPages,
+      "client/src/components/CreateChargeModal.tsx",
+      "client/src/components/EditChargeModal.tsx",
+      "client/src/components/CreateServiceOrderModal.tsx",
+      "client/src/components/EditServiceOrderModal.tsx",
+    ];
+
+    for (const file of operationalFiles) {
+      const source = readFileSync(file, "utf8");
+      expect(source).not.toContain("bg-white");
+    }
   });
 });

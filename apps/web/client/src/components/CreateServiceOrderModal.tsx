@@ -387,7 +387,7 @@ export default function CreateServiceOrderModal({
                     Cliente *
                   </label>
                   <select
-                    className="w-full rounded-lg border border-gray-300 bg-white p-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-[var(--border-subtle)] dark:bg-zinc-950 dark:text-white"
+                    className="w-full rounded-lg border border-gray-300 bg-[var(--surface-elevated)] p-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-[var(--border-subtle)] dark:bg-zinc-950 dark:text-white"
                     value={formData.customerId}
                     onChange={(e) =>
                       setFormData((state) => ({
@@ -412,7 +412,7 @@ export default function CreateServiceOrderModal({
                     Responsável
                   </label>
                   <select
-                    className="w-full rounded-lg border border-gray-300 bg-white p-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-[var(--border-subtle)] dark:bg-zinc-950 dark:text-white"
+                    className="w-full rounded-lg border border-gray-300 bg-[var(--surface-elevated)] p-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-[var(--border-subtle)] dark:bg-zinc-950 dark:text-white"
                     value={formData.assignedToPersonId}
                     onChange={(e) =>
                       setFormData((state) => ({
@@ -439,7 +439,7 @@ export default function CreateServiceOrderModal({
                     Título *
                   </label>
                   <input
-                    className="w-full rounded-lg border border-gray-300 bg-white p-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-[var(--border-subtle)] dark:bg-zinc-950 dark:text-white"
+                    className="w-full rounded-lg border border-gray-300 bg-[var(--surface-elevated)] p-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-[var(--border-subtle)] dark:bg-zinc-950 dark:text-white"
                     placeholder="Ex: Limpeza pós-obra apartamento 302"
                     value={formData.title}
                     onChange={(e) =>
@@ -454,7 +454,7 @@ export default function CreateServiceOrderModal({
                     Descrição
                   </label>
                   <textarea
-                    className="w-full rounded-lg border border-gray-300 bg-white p-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-[var(--border-subtle)] dark:bg-zinc-950 dark:text-white"
+                    className="w-full rounded-lg border border-gray-300 bg-[var(--surface-elevated)] p-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-[var(--border-subtle)] dark:bg-zinc-950 dark:text-white"
                     placeholder="Detalhes do serviço, escopo, observações iniciais ou orientação para a equipe"
                     rows={4}
                     value={formData.description}
@@ -474,7 +474,7 @@ export default function CreateServiceOrderModal({
                       Prioridade
                     </label>
                     <select
-                      className="w-full rounded-lg border border-gray-300 bg-white p-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-[var(--border-subtle)] dark:bg-zinc-950 dark:text-white"
+                      className="w-full rounded-lg border border-gray-300 bg-[var(--surface-elevated)] p-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-[var(--border-subtle)] dark:bg-zinc-950 dark:text-white"
                       value={formData.priority}
                       onChange={(e) =>
                         setFormData((state) => ({
@@ -499,7 +499,7 @@ export default function CreateServiceOrderModal({
                     </label>
                     <input
                       type="datetime-local"
-                      className="w-full rounded-lg border border-gray-300 bg-white p-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-[var(--border-subtle)] dark:bg-zinc-950 dark:text-white"
+                      className="w-full rounded-lg border border-gray-300 bg-[var(--surface-elevated)] p-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-[var(--border-subtle)] dark:bg-zinc-950 dark:text-white"
                       value={formData.scheduledFor}
                       onChange={(e) =>
                         setFormData((state) => ({
@@ -528,7 +528,7 @@ export default function CreateServiceOrderModal({
                   </label>
                   <input
                     inputMode="decimal"
-                    className="w-full rounded-lg border border-gray-300 bg-white p-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-[var(--border-subtle)] dark:bg-zinc-950 dark:text-white"
+                    className="w-full rounded-lg border border-gray-300 bg-[var(--surface-elevated)] p-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-[var(--border-subtle)] dark:bg-zinc-950 dark:text-white"
                     placeholder="Ex: 150,00"
                     value={formData.amount}
                     onChange={(e) =>
@@ -547,7 +547,7 @@ export default function CreateServiceOrderModal({
                   </label>
                   <input
                     type="datetime-local"
-                    className="w-full rounded-lg border border-gray-300 bg-white p-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-[var(--border-subtle)] dark:bg-zinc-950 dark:text-white"
+                    className="w-full rounded-lg border border-gray-300 bg-[var(--surface-elevated)] p-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-[var(--border-subtle)] dark:bg-zinc-950 dark:text-white"
                     value={formData.dueDate}
                     onChange={(e) =>
                       setFormData((state) => ({ ...state, dueDate: e.target.value }))

@@ -245,8 +245,16 @@ export default function GovernancePage() {
       </div>
       <div className="mt-3">
         <AppNextActionCard
-          action={latestRisk >= 70 ? "Executar contenção imediata nos alertas críticos" : "Revisar recomendações e manter monitoramento"}
-          reason="Governança deve responder claramente o que está errado hoje e o próximo passo executivo."
+          title="Prioridade executiva"
+          description="Governança deve responder claramente o que está errado hoje e o próximo passo executivo."
+          severity={latestRisk >= 70 ? "critical" : latestRisk >= 40 ? "high" : "medium"}
+          metadata="governança"
+          action={{
+            label: latestRisk >= 70 ? "Executar contenção imediata" : "Revisar recomendações",
+            onClick: () => {
+              void Promise.all([summaryQuery.refetch(), runsQuery.refetch()]);
+            },
+          }}
         />
       </div>
       </TrpcSectionErrorBoundary>

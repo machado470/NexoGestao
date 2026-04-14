@@ -126,9 +126,13 @@ export default function ServiceOrdersPage() {
                       <div className="space-y-2">
                         <AppNextActionCard
                           title="Próxima ação"
-                          action={String(order?.financialSummary?.hasCharge ? "Enviar WhatsApp" : "Gerar cobrança")}
-                          reason={order?.financialSummary?.hasCharge ? "Cobrança já vinculada, mantenha cliente informado." : "Sem cobrança vinculada após execução."}
-                          onExecute={() => navigate(order?.financialSummary?.hasCharge ? `/whatsapp?customerId=${order.customerId}` : `/finances?serviceOrderId=${order.id}`)}
+                          description={order?.financialSummary?.hasCharge ? "Cobrança já vinculada, mantenha cliente informado." : "Sem cobrança vinculada após execução."}
+                          severity={order?.financialSummary?.hasCharge ? "medium" : "high"}
+                          metadata="ordem de serviço"
+                          action={{
+                            label: String(order?.financialSummary?.hasCharge ? "Enviar WhatsApp" : "Gerar cobrança"),
+                            onClick: () => navigate(order?.financialSummary?.hasCharge ? `/whatsapp?customerId=${order.customerId}` : `/finances?serviceOrderId=${order.id}`),
+                          }}
                         />
                         <AppRowActions actions={[
                           { label: "Gerar cobrança", onClick: () => navigate(`/finances?serviceOrderId=${order.id}`) },

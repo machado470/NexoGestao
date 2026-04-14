@@ -246,6 +246,14 @@ export class TimelineService {
 
     const action = query?.action
     const personId = query?.personId
+    const cursorRaw = String(query?.cursor ?? '').trim()
+    let cursorId: string | null = null
+
+    if (cursorRaw) {
+      const cursorParts = cursorRaw.split('_')
+      const parsedCursorId = cursorParts[cursorParts.length - 1]
+      cursorId = parsedCursorId || null
+    }
 
     return this.prisma.timelineEvent.findMany({
       where: {
@@ -253,8 +261,9 @@ export class TimelineService {
         ...(action ? { action: String(action) } : {}),
         ...(personId ? { personId: String(personId) } : {}),
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take,
+      ...(cursorId ? { cursor: { id: cursorId }, skip: 1 } : {}),
     })
   }
 

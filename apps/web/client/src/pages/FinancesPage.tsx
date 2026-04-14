@@ -245,14 +245,18 @@ export default function FinancesPage() {
                       <div className="space-y-2">
                         <AppNextActionCard
                           title="Próxima ação"
-                          action={nextAction}
-                          reason={isOverdue ? "Cobrança vencida impacta o caixa do dia." : "Ação recomendada para manter previsibilidade de receita."}
-                          onExecute={() => {
-                            if (nextAction === "Marcar como paga") {
-                              void registerPayment(charge);
-                              return;
-                            }
-                            navigate(`/whatsapp?customerId=${charge.customerId}&chargeId=${charge.id}`);
+                          description={isOverdue ? "Cobrança vencida impacta o caixa do dia." : "Ação recomendada para manter previsibilidade de receita."}
+                          severity={isOverdue ? "critical" : status === "PENDING" ? "high" : "medium"}
+                          metadata="cobrança"
+                          action={{
+                            label: nextAction,
+                            onClick: () => {
+                              if (nextAction === "Marcar como paga") {
+                                void registerPayment(charge);
+                                return;
+                              }
+                              navigate(`/whatsapp?customerId=${charge.customerId}&chargeId=${charge.id}`);
+                            },
                           }}
                         />
                         <AppRowActions actions={[

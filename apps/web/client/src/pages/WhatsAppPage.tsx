@@ -250,16 +250,19 @@ export default function WhatsAppPage() {
         </AppSectionBlock>
         <AppNextActionCard
           title="Próxima ação sugerida"
-          action={nextSuggestedAction}
-          reason="Combina status de envio, histórico do cliente e gatilhos operacionais."
-          onExecute={() => {
-            if (automationSuggestions[0]) {
-              void executeSuggestedMessage(automationSuggestions[0].customerId, automationSuggestions[0].preview);
-              return;
-            }
-            void sendMessage();
+          description="Combina status de envio, histórico do cliente e gatilhos operacionais."
+          severity={failed > 0 ? "critical" : automationSuggestions.length > 0 ? "high" : "medium"}
+          metadata="whatsapp"
+          action={{
+            label: nextSuggestedAction,
+            onClick: () => {
+              if (automationSuggestions[0]) {
+                void executeSuggestedMessage(automationSuggestions[0].customerId, automationSuggestions[0].preview);
+                return;
+              }
+              void sendMessage();
+            },
           }}
-          ctaLabel="Executar ação"
         />
       </div>
 
