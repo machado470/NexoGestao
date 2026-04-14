@@ -55,7 +55,7 @@ export function MarketingLayout({ children }: MarketingLayoutProps) {
 
   if (import.meta.env.DEV) {
     // eslint-disable-next-line no-console
-    console.info("[LAYOUT] marketing", {
+    console.info("[LAYOUT] MarketingLayout mounted", {
       at: new Date().toISOString(),
       pathname: location,
       hasChildren: Boolean(children),

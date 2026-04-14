@@ -174,7 +174,7 @@ export function MainLayout({ children }: MainLayoutProps) {
 
   if (import.meta.env.DEV) {
     // eslint-disable-next-line no-console
-    console.info("[LAYOUT] main", {
+    console.info("[LAYOUT] MainLayout mounted", {
       pathname: location,
       hasChildren: Boolean(children),
       loading,

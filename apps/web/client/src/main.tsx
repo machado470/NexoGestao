@@ -16,6 +16,8 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+console.info("[MAIN] file loaded", { at: nowIso() });
+
 function getRenderAuditMode(): "bare-html" | "minimal" | "app" {
   const raw = new URLSearchParams(window.location.search)
     .get("renderAuditMode")
@@ -130,6 +132,26 @@ window.addEventListener("error", (event) => {
   });
   console.error("[WINDOW_ERROR]", error);
 });
+window.onerror = (message, source, lineno, colno, error) => {
+  const normalized = error instanceof Error ? error : new Error(String(message));
+  markAuditError("window-onerror", normalized);
+  setAuditField("phase", "window:onerror");
+  pushAuditEvent("window", "onerror", {
+    message: String(message),
+    source: source ?? "(unknown)",
+    lineno: lineno ?? -1,
+    colno: colno ?? -1,
+    stack: normalized.stack ?? normalized.message,
+  });
+  console.error("[WINDOW_ONERROR]", {
+    message,
+    source,
+    lineno,
+    colno,
+    stack: normalized.stack,
+  });
+  return false;
+};
 
 window.addEventListener("unhandledrejection", (event) => {
   markAuditError("unhandled-promise", event.reason);
@@ -139,6 +161,14 @@ window.addEventListener("unhandledrejection", (event) => {
   });
   console.error("[UNHANDLED_PROMISE]", event.reason);
 });
+window.onunhandledrejection = (event) => {
+  markAuditError("window-onunhandledrejection", event.reason);
+  setAuditField("phase", "window:onunhandledrejection");
+  pushAuditEvent("window", "onunhandledrejection", {
+    reason: String(event.reason),
+  });
+  console.error("[WINDOW_ONUNHANDLEDREJECTION]", event.reason);
+};
 
 const root = document.getElementById("root");
 setAuditField("rootFound", Boolean(root));
@@ -178,15 +208,24 @@ if (renderAuditMode === "bare-html") {
   try {
     setAuditField("createRootStartedAt", nowIso());
     setAuditField("phase", "main:createRoot");
+    console.info("[MAIN] before createRoot", { renderAuditMode });
     console.info("[BOOT] createRoot called", { renderAuditMode });
+    const reactRoot = createRoot(root);
+    console.info("[MAIN] after createRoot", { renderAuditMode });
+    console.info("[MAIN] before render", { renderAuditMode });
 
-    createRoot(root).render(
+    reactRoot.render(
       <QueryClientProvider client={queryClient}>
-        <TRPCProvider client={trpcClient} queryClient={queryClient}>
-          <ErrorBoundary routeContext="root">
-            {appNode}
-          </ErrorBoundary>
-        </TRPCProvider>
+        {(() => {
+          console.info("[BOOT] QueryClientProvider ativo");
+          return (
+            <TRPCProvider client={trpcClient} queryClient={queryClient}>
+              <ErrorBoundary routeContext="root">
+                {appNode}
+              </ErrorBoundary>
+            </TRPCProvider>
+          );
+        })()}
       </QueryClientProvider>
     );
 
@@ -194,6 +233,7 @@ if (renderAuditMode === "bare-html") {
     setAuditField("appRenderDispatchedAt", nowIso());
     setAuditField("phase", "main:render-dispatched");
     pushAuditEvent("boot", "render-dispatched", { renderAuditMode });
+    console.info("[MAIN] render dispatched", { renderAuditMode });
     console.info("[BOOT] render dispatched", { renderAuditMode });
   } catch (error) {
     renderBootstrapError(error, "main:render");
