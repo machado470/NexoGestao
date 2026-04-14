@@ -7,9 +7,9 @@ describe("Global execution controls architecture guardrails", () => {
   const pagesDir = "client/src/pages";
   const pageFiles = readdirSync(pagesDir).filter(file => file.endsWith(".tsx"));
 
-  it("renderiza ExecutionGlobalBar apenas uma vez no shell principal", () => {
+  it("não renderiza ExecutionGlobalBar no shell principal", () => {
     const matches = mainLayoutSource.match(/<ExecutionGlobalBar\s*\/>/g) ?? [];
-    expect(matches).toHaveLength(1);
+    expect(matches).toHaveLength(0);
   });
 
   it("não renderiza GlobalActionEngine no MainLayout", () => {

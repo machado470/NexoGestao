@@ -27,13 +27,11 @@ import {
 } from "lucide-react";
 
 import { useAuth } from "@/contexts/AuthContext";
-import { useBootProbe } from "@/contexts/BootProbeContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { canAny, type Permission } from "@/lib/rbac";
 import { useIsMobile } from "@/hooks/useMobile";
 import { useNotificationStore } from "@/stores/notificationStore";
 import { GlobalSearch } from "@/components/GlobalSearch";
-import { GlobalActionEngineBoundary } from "@/components/app";
 import {
   NexoAppShell,
   NexoMainContainer,
@@ -42,7 +40,6 @@ import {
 } from "@/components/design-system";
 import { BrandSignature } from "@/components/BrandSignature";
 import { AppShell } from "@/components/AppShell";
-import { ExecutionGlobalBar } from "@/components/ExecutionGlobalBar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -150,7 +147,6 @@ export function MainLayout({ children }: MainLayoutProps) {
   // O layout principal não deve injetar cards globais para evitar regressão estrutural.
   const [location, navigate] = useLocation();
   const { role, user, logout, isLoggingOut, loading, isAuthenticated } = useAuth();
-  const { stage } = useBootProbe();
   const { theme, toggleTheme } = useTheme();
   const notifications = useNotificationStore(state => state.notifications);
   const clearNotifications = useNotificationStore(state => state.clear);
@@ -159,13 +155,6 @@ export function MainLayout({ children }: MainLayoutProps) {
   const isMobile = useIsMobile();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const shouldRenderExecutionBar =
-    !loading &&
-    isAuthenticated &&
-    Boolean(user?.id) &&
-    (stage === "full" ||
-      stage === "execution-bar" ||
-      stage === "global-engine");
 
   if (import.meta.env.DEV) {
     // eslint-disable-next-line no-console
@@ -175,7 +164,6 @@ export function MainLayout({ children }: MainLayoutProps) {
       loading,
       isAuthenticated,
       userId: user?.id ?? null,
-      shouldRenderExecutionBar,
     });
   }
 
@@ -632,12 +620,6 @@ export function MainLayout({ children }: MainLayoutProps) {
                 </div>
               </div>
             </NexoTopbar>
-
-            {shouldRenderExecutionBar ? (
-              <GlobalActionEngineBoundary name="ExecutionGlobalBar">
-                <ExecutionGlobalBar />
-              </GlobalActionEngineBoundary>
-            ) : null}
 
             <NexoMainContainer>
               {children}
