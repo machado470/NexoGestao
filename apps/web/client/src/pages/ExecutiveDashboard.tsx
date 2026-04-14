@@ -19,6 +19,7 @@ import {
 import { safeChartData } from "@/lib/safeChartData";
 import { ChartErrorBoundary } from "@/components/ChartErrorBoundary";
 import { KpiErrorBoundary } from "@/components/KpiErrorBoundary";
+import { GlobalNextAction } from "@/components/decision-engine/GlobalNextAction";
 
 const chartData = [
   { day: "Seg", receita: 42, ordens: 18 },
@@ -52,6 +53,8 @@ export default function ExecutiveDashboard() {
         ctaLabel="Executar próxima ação"
         onCta={() => void runAction(async () => navigate("/dashboard/operations"))}
       />
+
+      <GlobalNextAction className="mb-3" />
 
       <KpiErrorBoundary context="executive-dashboard:kpi">
         <AppKpiRow

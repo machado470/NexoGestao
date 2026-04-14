@@ -24,6 +24,7 @@ import { ChartErrorBoundary } from "@/components/ChartErrorBoundary";
 import { KpiErrorBoundary } from "@/components/KpiErrorBoundary";
 import { TrpcSectionErrorBoundary } from "@/components/TrpcSectionErrorBoundary";
 import { setBootPhase } from "@/lib/bootPhase";
+import { GlobalNextAction } from "@/components/decision-engine/GlobalNextAction";
 
 function toLabel(value: unknown, fallback: string) {
   const text = String(value ?? "").trim();
@@ -166,6 +167,8 @@ export default function TimelinePage() {
           </div>
         )}
       />
+
+      <GlobalNextAction className="mb-3" />
 
       <KpiErrorBoundary context="timeline:kpi">
         <AppKpiRow
