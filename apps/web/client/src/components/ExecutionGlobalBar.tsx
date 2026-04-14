@@ -32,6 +32,8 @@ function normalizeModeLabel(mode?: ExecutionMode) {
 }
 
 export function ExecutionGlobalBar() {
+  // Guardrail arquitetural: este componente é global e deve ser montado
+  // somente no MainLayout/AppShell autenticado.
   const { role, loading, isAuthenticated, user } = useAuth();
   const canRenderBar = !loading && isAuthenticated && Boolean(user?.id);
   const canEditMode = role ? can(role, "governance:update") || role === "MANAGER" : false;

@@ -33,7 +33,7 @@ import { canAny, type Permission } from "@/lib/rbac";
 import { useIsMobile } from "@/hooks/useMobile";
 import { useNotificationStore } from "@/stores/notificationStore";
 import { GlobalSearch } from "@/components/GlobalSearch";
-import { GlobalActionEngine, GlobalActionEngineBoundary } from "@/components/app";
+import { GlobalActionEngineBoundary } from "@/components/app";
 import {
   NexoAppShell,
   NexoMainContainer,
@@ -159,11 +159,6 @@ export function MainLayout({ children }: MainLayoutProps) {
   const isMobile = useIsMobile();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const shouldRenderGlobalEngine =
-    !loading &&
-    isAuthenticated &&
-    Boolean(user?.id) &&
-    (stage === "full" || stage === "global-engine");
   const shouldRenderExecutionBar =
     !loading &&
     isAuthenticated &&
@@ -181,7 +176,6 @@ export function MainLayout({ children }: MainLayoutProps) {
       isAuthenticated,
       userId: user?.id ?? null,
       shouldRenderExecutionBar,
-      shouldRenderGlobalEngine,
     });
   }
 
@@ -646,11 +640,6 @@ export function MainLayout({ children }: MainLayoutProps) {
             ) : null}
 
             <NexoMainContainer>
-              {shouldRenderGlobalEngine ? (
-                <GlobalActionEngineBoundary name="GlobalActionEngine">
-                  <GlobalActionEngine />
-                </GlobalActionEngineBoundary>
-              ) : null}
               {children}
             </NexoMainContainer>
           </div>
