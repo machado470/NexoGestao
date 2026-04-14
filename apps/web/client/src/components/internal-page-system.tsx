@@ -391,12 +391,14 @@ export function AppNextActionCard({
   severity,
   action,
   metadata,
+  automationStatus,
 }: {
   title: string;
   description: string;
   severity: AppNextActionSeverity;
   action: { label: string; onClick: () => void };
   metadata?: string;
+  automationStatus?: string;
 }) {
   const tone = nextActionTone[severity];
 
@@ -406,6 +408,7 @@ export function AppNextActionCard({
       <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">{title}</p>
       <p className="mt-1 text-xs text-[var(--text-secondary)]">{description}</p>
       {metadata ? <p className="mt-1 text-[11px] uppercase tracking-[0.08em] text-[var(--text-muted)]">Origem: {metadata}</p> : null}
+      {automationStatus ? <p className="mt-1 text-[11px] uppercase tracking-[0.08em] text-[var(--text-muted)]">{automationStatus}</p> : null}
       <Button className="mt-2" type="button" variant="default" onClick={action.onClick}>
         {action.label}
       </Button>

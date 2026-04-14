@@ -2,7 +2,7 @@ import { useLocation } from "wouter";
 import { AppNextActionCard } from "@/components/internal-page-system";
 import { executeDecision } from "@/lib/decision-engine/execution.handler";
 import type { Decision } from "@/lib/decision-engine/decision.types";
-import { appendOperationalLog } from "@/lib/decision-engine/operational-log";
+import { appendOperationalLog, wasDecisionAutoExecuted } from "@/lib/decision-engine/operational-log";
 import { useNextExecution } from "@/lib/decision-engine/useNextExecution";
 
 export function toNextActionCardProps(decision: Decision) {
@@ -25,11 +25,13 @@ export function GlobalNextAction({ customerId, className }: { customerId?: strin
   if (!nextDecision) return null;
 
   const cardProps = toNextActionCardProps(nextDecision);
+  const automationLabel = wasDecisionAutoExecuted(nextDecision.id) ? "Executado automaticamente" : "Sugerido";
 
   return (
     <div className={className}>
       <AppNextActionCard
         {...cardProps}
+        automationStatus={automationLabel}
         action={{
           ...cardProps.action,
           onClick: () => {
