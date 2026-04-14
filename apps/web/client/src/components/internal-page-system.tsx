@@ -364,29 +364,51 @@ export function AppStatusBadge({ label }: { label: string }) {
 
 export const AppPriorityBadge = AppStatusBadge;
 
+type AppNextActionSeverity = "low" | "medium" | "high" | "critical";
+
+const nextActionTone: Record<AppNextActionSeverity, { container: string; badge: string }> = {
+  low: {
+    container: "border-emerald-500/30 bg-emerald-500/10",
+    badge: "text-emerald-300",
+  },
+  medium: {
+    container: "border-amber-500/35 bg-amber-500/10",
+    badge: "text-amber-300",
+  },
+  high: {
+    container: "border-orange-500/35 bg-orange-500/10",
+    badge: "text-orange-300",
+  },
+  critical: {
+    container: "border-rose-500/40 bg-rose-500/12",
+    badge: "text-rose-300",
+  },
+};
+
 export function AppNextActionCard({
-  title = "Próxima ação recomendada",
+  title,
+  description,
+  severity,
   action,
-  reason,
-  onExecute,
-  ctaLabel = "Executar agora",
+  metadata,
 }: {
-  title?: string;
-  action: string;
-  reason?: string;
-  onExecute?: () => void;
-  ctaLabel?: string;
+  title: string;
+  description: string;
+  severity: AppNextActionSeverity;
+  action: { label: string; onClick: () => void };
+  metadata?: string;
 }) {
+  const tone = nextActionTone[severity];
+
   return (
-    <div className="rounded-lg border border-orange-500/30 bg-orange-500/10 p-3">
-      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-orange-300">{title}</p>
-      <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">{action}</p>
-      {reason ? <p className="mt-1 text-xs text-[var(--text-secondary)]">{reason}</p> : null}
-      {onExecute ? (
-        <Button className="mt-2" type="button" onClick={onExecute}>
-          {ctaLabel}
-        </Button>
-      ) : null}
+    <div className={cn("rounded-lg border p-3", tone.container)}>
+      <p className={cn("text-xs font-semibold uppercase tracking-[0.12em]", tone.badge)}>{severity.toUpperCase()}</p>
+      <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">{title}</p>
+      <p className="mt-1 text-xs text-[var(--text-secondary)]">{description}</p>
+      {metadata ? <p className="mt-1 text-[11px] uppercase tracking-[0.08em] text-[var(--text-muted)]">Origem: {metadata}</p> : null}
+      <Button className="mt-2" type="button" variant="default" onClick={action.onClick}>
+        {action.label}
+      </Button>
     </div>
   );
 }

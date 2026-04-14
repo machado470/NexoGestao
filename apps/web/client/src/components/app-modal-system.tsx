@@ -139,6 +139,17 @@ export function ModalFooter({
   );
 }
 
+
+export function BaseOperationalModal(props: Omit<Parameters<typeof BaseModal>[0], "fixedHeader" | "fixedFooter">) {
+  return (
+    <BaseModal
+      {...props}
+      fixedHeader
+      fixedFooter
+    />
+  );
+}
+
 export function ConfirmModal({
   open,
   onOpenChange,

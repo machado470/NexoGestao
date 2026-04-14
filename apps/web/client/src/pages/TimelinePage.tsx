@@ -12,6 +12,7 @@ import {
   AppFiltersBar,
   AppKpiRow,
   AppLoadingState,
+  AppNextActionCard,
   AppSectionBlock,
   Input,
 } from "@/components/internal-page-system";
@@ -34,11 +35,28 @@ export default function TimelinePage() {
   useRenderWatchdog("TimelinePage");
   const [filter, setFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
-  const [entityFilter, setEntityFilter] = useState("all");
   const [periodFilter, setPeriodFilter] = useState("all");
-  const [limit, setLimit] = useState(120);
-  const timelineQuery = trpc.nexo.timeline.listByOrg.useQuery({ limit }, { retry: false });
-  const events = useMemo(() => normalizeArrayPayload<any>(timelineQuery.data), [timelineQuery.data]);
+  const [events, setEvents] = useState<any[]>([]);
+  const [cursor, setCursor] = useState<string | undefined>(undefined);
+  const [hasMore, setHasMore] = useState(true);
+  const pageSize = 20;
+  const timelineQuery = trpc.nexo.timeline.listByOrg.useQuery({ limit: pageSize, cursor }, { retry: false });
+
+  useEffect(() => {
+    if (!timelineQuery.data) return;
+    const incoming = normalizeArrayPayload<any>(timelineQuery.data);
+    setHasMore(incoming.length === pageSize);
+    setEvents((prev) => {
+      if (!cursor) return incoming;
+      const seen = new Set(prev.map((item) => String(item?.id ?? "")));
+      const merged = [...prev];
+      incoming.forEach((item) => {
+        const key = String(item?.id ?? "");
+        if (!seen.has(key)) merged.push(item);
+      });
+      return merged;
+    });
+  }, [cursor, timelineQuery.data]);
   usePageDiagnostics({
     page: "timeline",
     isLoading: timelineQuery.isLoading,
@@ -52,9 +70,10 @@ export default function TimelinePage() {
     return events.filter((event) => {
       const date = safeDate(event?.createdAt);
       if (typeFilter !== "all" && String(event?.type ?? event?.action ?? "").toLowerCase() !== typeFilter) return false;
-      if (entityFilter !== "all" && String(event?.entityType ?? "").toLowerCase() !== entityFilter) return false;
+      
       if (periodFilter === "24h" && (!date || Date.now() - date.getTime() > 1000 * 60 * 60 * 24)) return false;
       if (periodFilter === "7d" && (!date || Date.now() - date.getTime() > 1000 * 60 * 60 * 24 * 7)) return false;
+      if (periodFilter === "30d" && (!date || Date.now() - date.getTime() > 1000 * 60 * 60 * 24 * 30)) return false;
       if (!q) return true;
       const text = [
         event?.action,
@@ -69,7 +88,7 @@ export default function TimelinePage() {
         .join(" ");
       return text.includes(q);
     });
-  }, [entityFilter, events, filter, periodFilter, typeFilter]);
+  }, [events, filter, periodFilter, typeFilter]);
 
   const groupedEvents = useMemo(() => {
     const groups = new Map<string, any[]>();
@@ -137,8 +156,12 @@ export default function TimelinePage() {
             <Button type="button" variant="outline" onClick={() => void timelineQuery.refetch()}>
               Atualizar timeline
             </Button>
-            <Button type="button" onClick={() => setLimit((prev) => prev + 120)}>
-              Carregar mais
+            <Button type="button" onClick={() => {
+              const last = events[events.length - 1];
+              if (!last?.id || !last?.createdAt) return;
+              setCursor(`${String(last.createdAt)}_${String(last.id)}`);
+            }} disabled={!hasMore || timelineQuery.isFetching}>
+              {timelineQuery.isFetching ? "Carregando..." : "Carregar mais"}
             </Button>
           </div>
         )}
@@ -161,6 +184,13 @@ export default function TimelinePage() {
       </KpiErrorBoundary>
 
       <div className="grid gap-3 xl:grid-cols-3">
+        <AppNextActionCard
+          title="Próxima ação de auditoria"
+          description="Revise eventos críticos e avance em lotes controlados para evitar feed infinito."
+          severity={criticalEvents > 0 ? "high" : "low"}
+          metadata="timeline"
+          action={{ label: criticalEvents > 0 ? "Investigar críticos" : "Revisar histórico", onClick: () => window.scrollTo({ top: 720, behavior: "smooth" }) }}
+        />
         <AppChartPanel title="Volume de eventos por hora" description="Distribuição real dos eventos retornados pelo backend.">
           {timelineQuery.isLoading ? (
             <AppLoadingState rows={2} />
@@ -192,10 +222,20 @@ export default function TimelinePage() {
             value={filter}
             onChange={(event) => setFilter(event.target.value)}
           />
-          <Input placeholder="Tipo (all/charge.created)" className="max-w-[220px]" value={typeFilter === "all" ? "" : typeFilter} onChange={(event) => setTypeFilter(event.target.value.trim().toLowerCase() || "all")} />
-          <Input placeholder="Entidade (all/customer)" className="max-w-[210px]" value={entityFilter === "all" ? "" : entityFilter} onChange={(event) => setEntityFilter(event.target.value.trim().toLowerCase() || "all")} />
-          <Input placeholder="Período (all/24h/7d)" className="max-w-[190px]" value={periodFilter === "all" ? "" : periodFilter} onChange={(event) => setPeriodFilter(event.target.value.trim().toLowerCase() || "all")} />
-          <p className="text-xs text-[var(--text-muted)]">Mostrando até {limit} eventos por carregamento.</p>
+          <select className="h-10 rounded-[0.76rem] border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 text-sm text-[var(--text-primary)]" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
+            <option value="all">Todos os tipos</option>
+            <option value="finance">Financeiro</option>
+            <option value="service_order">O.S.</option>
+            <option value="whatsapp">WhatsApp</option>
+            <option value="appointment">Agendamento</option>
+          </select>
+          <select className="h-10 rounded-[0.76rem] border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 text-sm text-[var(--text-primary)]" value={periodFilter} onChange={(event) => setPeriodFilter(event.target.value)}>
+            <option value="all">Período total</option>
+            <option value="24h">Últimas 24h</option>
+            <option value="7d">Últimos 7 dias</option>
+            <option value="30d">Últimos 30 dias</option>
+          </select>
+          <p className="text-xs text-[var(--text-muted)]">Mostrando {events.length} eventos carregados em lotes de {pageSize}.</p>
         </AppFiltersBar>
 
         {timelineQuery.isLoading ? (
@@ -222,8 +262,12 @@ export default function TimelinePage() {
               </div>
             ))}
             <div className="pt-1">
-              <Button type="button" variant="outline" onClick={() => setLimit((prev) => prev + 120)}>
-                Carregar mais eventos
+              <Button type="button" variant="outline" onClick={() => {
+                const last = events[events.length - 1];
+                if (!last?.id || !last?.createdAt) return;
+                setCursor(`${String(last.createdAt)}_${String(last.id)}`);
+              }} disabled={!hasMore || timelineQuery.isFetching}>
+                {timelineQuery.isFetching ? "Carregando..." : hasMore ? "Carregar mais eventos" : "Sem mais eventos"}
               </Button>
             </div>
           </div>

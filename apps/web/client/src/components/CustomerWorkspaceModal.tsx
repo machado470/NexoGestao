@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useLocation } from "wouter";
-import { BaseModal } from "@/components/app-modal-system";
+import { BaseOperationalModal } from "@/components/app-modal-system";
 import { AppNextActionCard, AppSectionBlock, AppStatusBadge } from "@/components/internal-page-system";
 import { Button } from "@/components/design-system";
 import { trpc } from "@/lib/trpc";
@@ -55,7 +55,7 @@ export function CustomerWorkspaceModal({ open, customerId, customerName, onOpenC
   const headerName = String(customer.name ?? customerName ?? "Cliente");
 
   return (
-    <BaseModal
+    <BaseOperationalModal
       open={open}
       onOpenChange={onOpenChange}
       size="xl"
@@ -97,10 +97,14 @@ export function CustomerWorkspaceModal({ open, customerId, customerName, onOpenC
               </p>
             </AppSectionBlock>
             <AppNextActionCard
-              action={nextAction.label}
-              reason={overdueCharges > 0 ? "Cobranças vencidas exigem contato imediato." : "Mantenha o fluxo ativo com a próxima etapa operacional."}
-              onExecute={() => navigate(overdueCharges > 0 ? `/whatsapp?customerId=${customerId ?? ""}` : `/appointments?customerId=${customerId ?? ""}`)}
-              ctaLabel={overdueCharges > 0 ? "Cobrar no WhatsApp" : "Seguir fluxo"}
+              title="Próxima ação do cliente"
+              description={overdueCharges > 0 ? "Cobranças vencidas exigem contato imediato." : "Mantenha o fluxo ativo com a próxima etapa operacional."}
+              severity={overdueCharges > 0 ? "critical" : pendingCharges > 0 ? "high" : "medium"}
+              metadata="workspace do cliente"
+              action={{
+                label: overdueCharges > 0 ? "Cobrar no WhatsApp" : nextAction.label,
+                onClick: () => navigate(overdueCharges > 0 ? `/whatsapp?customerId=${customerId ?? ""}` : `/appointments?customerId=${customerId ?? ""}`),
+              }}
             />
           </div>
 
@@ -184,6 +188,6 @@ export function CustomerWorkspaceModal({ open, customerId, customerName, onOpenC
           </AppSectionBlock>
         </div>
       )}
-    </BaseModal>
+    </BaseOperationalModal>
   );
 }

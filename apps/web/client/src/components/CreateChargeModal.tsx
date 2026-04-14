@@ -266,7 +266,7 @@ export function CreateChargeModal({
     <Dialog open={isOpen} onOpenChange={(open) => (!open ? handleClose() : null)}>
       <DialogContent
         showCloseButton={false}
-        className="max-h-[90vh] max-w-2xl overflow-hidden border-[var(--border-subtle)] bg-white p-0 shadow-sm dark:bg-[var(--surface-base)]"
+        className="max-h-[90vh] max-w-2xl overflow-hidden border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-0 shadow-sm dark:bg-[var(--surface-base)]"
       >
         <DialogHeader className="border-b border-gray-200 px-6 py-6 dark:border-zinc-800">
           <DialogTitle className="flex items-center gap-2 text-xl text-gray-900 dark:text-white">
@@ -300,7 +300,7 @@ export function CreateChargeModal({
                         customerId: e.target.value,
                       }))
                     }
-                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                    className="w-full rounded-lg border border-gray-300 bg-[var(--surface-elevated)] px-3 py-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
                     disabled={createCharge.isPending}
                   >
                     <option value="">Selecione um cliente</option>
@@ -327,7 +327,7 @@ export function CreateChargeModal({
                           amount: e.target.value,
                         }))
                       }
-                      className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                      className="w-full rounded-lg border border-gray-300 bg-[var(--surface-elevated)] px-3 py-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
                       placeholder="100,00"
                       disabled={createCharge.isPending}
                     />
@@ -350,7 +350,7 @@ export function CreateChargeModal({
                           dueDate: e.target.value,
                         }))
                       }
-                      className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                      className="w-full rounded-lg border border-gray-300 bg-[var(--surface-elevated)] px-3 py-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
                       disabled={createCharge.isPending}
                     />
                   </div>
@@ -368,7 +368,7 @@ export function CreateChargeModal({
                         notes: e.target.value,
                       }))
                     }
-                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                    className="w-full rounded-lg border border-gray-300 bg-[var(--surface-elevated)] px-3 py-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
                     placeholder="Adicione observações sobre a cobrança, referência do serviço ou contexto de emissão"
                     rows={4}
                     disabled={createCharge.isPending}
