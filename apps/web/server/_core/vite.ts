@@ -26,12 +26,13 @@ const HTML_FALLBACK = `<!DOCTYPE html>
   </body>
 </html>`;
 
-function logHtmlDelivery(url: string, html: string, source: string) {
+function logHtmlDelivery(url: string, html: string, source: string, host: string | undefined) {
   const htmlSizeBytes = Buffer.byteLength(html, "utf-8");
   const snippet = html.slice(0, 200).replace(/\s+/g, " ");
   console.log("[web] serving index.html", {
     url,
     source,
+    host: host ?? "(unknown)",
     htmlSizeBytes,
     first200Chars: snippet,
   });
@@ -116,7 +117,10 @@ export async function setupVite(app: Express, server: Server) {
       const payload = {
         method: req.method,
         url,
+        host: req.headers.host ?? "(unknown)",
         status: res.statusCode,
+        contentType: res.getHeader("content-type") ?? "(unset)",
+        contentLength: res.getHeader("content-length") ?? "(unset)",
         durationMs: Date.now() - startedAt,
       };
       if (res.statusCode >= 500) {
@@ -135,7 +139,7 @@ export async function setupVite(app: Express, server: Server) {
     try {
       const { html, source } = await loadClientHtml(req.originalUrl);
       assertHtmlShell(html, source, "vite");
-      logHtmlDelivery(req.originalUrl, html, source);
+      logHtmlDelivery(req.originalUrl, html, source, req.headers.host);
       res.status(200).set({ "Content-Type": "text/html; charset=utf-8" }).send(html);
     } catch (error) {
       vite.ssrFixStacktrace(error as Error);
@@ -149,7 +153,7 @@ export async function setupVite(app: Express, server: Server) {
     try {
       const { html, source } = await loadClientHtml(req.originalUrl);
       assertHtmlShell(html, source, "vite");
-      logHtmlDelivery(req.originalUrl, html, source);
+      logHtmlDelivery(req.originalUrl, html, source, req.headers.host);
       res.status(200).set({ "Content-Type": "text/html; charset=utf-8" }).send(html);
     } catch (error) {
       vite.ssrFixStacktrace(error as Error);
@@ -182,7 +186,14 @@ export function serveStatic(app: Express) {
     }
     console.log("[STATIC_REQ] start", { method: req.method, url });
     res.on("finish", () => {
-      const payload = { method: req.method, url, status: res.statusCode };
+      const payload = {
+        method: req.method,
+        url,
+        host: req.headers.host ?? "(unknown)",
+        status: res.statusCode,
+        contentType: res.getHeader("content-type") ?? "(unset)",
+        contentLength: res.getHeader("content-length") ?? "(unset)",
+      };
       if (res.statusCode >= 500) {
         console.error("[STATIC_REQ] finish", payload);
       } else if (res.statusCode >= 400) {
@@ -211,7 +222,7 @@ export function serveStatic(app: Express) {
           ? `${shellPath} (fallback)`
           : shellPath;
       assertHtmlShell(html, source, "static");
-      logHtmlDelivery(req.originalUrl, html, source);
+      logHtmlDelivery(req.originalUrl, html, source, req.headers.host);
       res.status(200).set({ "Content-Type": "text/html; charset=utf-8" }).send(html);
     } catch (error) {
       next(error);
