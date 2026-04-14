@@ -52,10 +52,6 @@ export function MarketingLayout({ children }: MarketingLayoutProps) {
   const [location, navigate] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const year = useMemo(() => new Date().getFullYear(), []);
-  const renderAudit =
-    typeof window !== "undefined" &&
-    (new URLSearchParams(window.location.search).get("renderAudit") === "1" ||
-      new URLSearchParams(window.location.search).has("renderAuditMode"));
 
   if (import.meta.env.DEV) {
     // eslint-disable-next-line no-console
@@ -70,11 +66,6 @@ export function MarketingLayout({ children }: MarketingLayoutProps) {
 
   return (
     <div className="nexo-public landing-root min-h-screen">
-      {renderAudit ? (
-        <div style={{ position: "fixed", left: 8, bottom: 88, zIndex: 2147483645, background: "#0f766e", color: "#ccfbf1", padding: "4px 8px", borderRadius: 6, font: "600 11px/1.2 system-ui" }}>
-          LAYOUT: marketing
-        </div>
-      ) : null}
       <header className="sticky top-0 z-50 border-b border-[var(--border-subtle)] bg-[#f8f9fb]/90 backdrop-blur-sm">
         <div className="container flex h-20 items-center justify-between gap-4">
           <button
