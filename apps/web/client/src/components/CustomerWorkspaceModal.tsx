@@ -5,6 +5,8 @@ import { AppNextActionCard, AppSectionBlock, AppStatusBadge } from "@/components
 import { Button } from "@/components/design-system";
 import { trpc } from "@/lib/trpc";
 import { normalizeArrayPayload, normalizeObjectPayload } from "@/lib/query-helpers";
+import { useOperationalDecisions } from "@/lib/decision-engine/useOperationalDecisions";
+import { executeDecision } from "@/lib/decision-engine/execution.handler";
 import { getCustomerSeverity, getNextActionCustomer, getOperationalSeverityLabel } from "@/lib/operations/operational-intelligence";
 
 function listOf(input: unknown) {
@@ -53,6 +55,11 @@ export function CustomerWorkspaceModal({ open, customerId, customerName, onOpenC
   });
 
   const headerName = String(customer.name ?? customerName ?? "Cliente");
+  const { decisions: customerDecisions } = useOperationalDecisions({
+    navigate,
+    customerId,
+    enabled: open && Boolean(customerId),
+  });
 
   return (
     <BaseOperationalModal
@@ -85,10 +92,32 @@ export function CustomerWorkspaceModal({ open, customerId, customerName, onOpenC
         <div className="space-y-3">
           <div className="grid gap-3 xl:grid-cols-3">
             <AppSectionBlock title="Estado operacional" subtitle="Saúde e risco do cliente">
-              <div className="flex flex-wrap items-center gap-2">
-                <AppStatusBadge label={getOperationalSeverityLabel(customerSeverity)} />
-                <AppStatusBadge label={`Risco ${customerRisk}`} />
-                <AppStatusBadge label={customer.active === false ? "Inativo" : "Ativo"} />
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <AppStatusBadge label={getOperationalSeverityLabel(customerSeverity)} />
+                  <AppStatusBadge label={`Risco ${customerRisk}`} />
+                  <AppStatusBadge label={customer.active === false ? "Inativo" : "Ativo"} />
+                </div>
+                {customerDecisions.length === 0 ? (
+                  <p className="text-xs text-[var(--text-muted)]">Sem decisões operacionais críticas para este cliente.</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {customerDecisions.slice(0, 3).map((decision) => (
+                      <li key={decision.id} className="rounded-md border border-[var(--border-subtle)] p-2">
+                        <p className="text-sm font-medium text-[var(--text-primary)]">{decision.title}</p>
+                        <p className="text-xs text-[var(--text-muted)]">{decision.description}</p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="mt-2 h-8"
+                          onClick={() => executeDecision(decision)}
+                        >
+                          {decision.action.label}
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             </AppSectionBlock>
             <AppSectionBlock title="Resumo encadeado" subtitle="Cliente → execução → receita">
