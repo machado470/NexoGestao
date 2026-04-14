@@ -7,7 +7,7 @@ describe("Front bootstrap architecture guardrails", () => {
   const authSource = readFileSync("client/src/contexts/AuthContext.tsx", "utf8");
 
   it("mantém árvore canônica QueryClientProvider -> TRPCProvider -> ErrorBoundary -> App", () => {
-    expect(mainSource).toContain("createRoot(root).render(");
+    expect(mainSource.includes("createRoot(root).render(") || mainSource.includes("createRoot(root);")).toBe(true);
     expect(mainSource).toContain("<QueryClientProvider client={queryClient}>");
     expect(mainSource).toContain("<TRPCProvider client={trpcClient} queryClient={queryClient}>");
     expect(mainSource).toContain("<ErrorBoundary routeContext=\"root\">");

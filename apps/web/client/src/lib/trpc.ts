@@ -16,6 +16,7 @@ function resolveTrpcUrl() {
 
 let queryClientSingleton: QueryClient | null = null;
 let trpcClientSingleton: ReturnType<typeof trpc.createClient> | null = null;
+let trpcProviderMounted = false;
 
 export function getQueryClient() {
   if (!queryClientSingleton) {
@@ -66,14 +67,16 @@ export function TRPCProvider({
   queryClient: QueryClient;
   children: ReactNode;
 }) {
-  console.log("[BOOT] TRPC Provider ativo");
+  trpcProviderMounted = true;
+  console.info("[BOOT] TRPCProvider ativo");
   return createElement(trpc.Provider, { client, queryClient, children });
 }
 
 export function useSafeTRPC() {
-  try {
-    return trpc.useUtils();
-  } catch {
-    throw new Error("TRPC usado fora do provider");
+  if (!trpcProviderMounted) {
+    throw new Error(
+      "[DIAGNOSTIC] tRPC usado fora do provider. Garanta árvore: QueryClientProvider -> TRPCProvider -> ErrorBoundary -> App."
+    );
   }
+  return trpc.useUtils();
 }

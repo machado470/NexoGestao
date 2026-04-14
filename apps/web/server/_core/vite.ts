@@ -29,7 +29,7 @@ const HTML_FALLBACK = `<!DOCTYPE html>
 function logHtmlDelivery(url: string, html: string, source: string, host: string | undefined) {
   const htmlSizeBytes = Buffer.byteLength(html, "utf-8");
   const snippet = html.slice(0, 200).replace(/\s+/g, " ");
-  console.log("[web] serving index.html", {
+  console.log("[HTML_DELIVERY] prepared", {
     url,
     source,
     host: host ?? "(unknown)",
@@ -93,6 +93,19 @@ export async function setupVite(app: Express, server: Server) {
     appType: "custom",
   });
 
+  async function buildHtmlResponse(url: string, host: string | undefined) {
+    const { html, source } = await loadClientHtml(url);
+    const transformed = await vite.transformIndexHtml(url, html);
+    const finalSource = `${source} + vite.transformIndexHtml`;
+    assertHtmlShell(transformed, finalSource, "vite");
+    logHtmlDelivery(url, transformed, finalSource, host);
+    return {
+      html: transformed,
+      source: finalSource,
+      contentLength: Buffer.byteLength(transformed, "utf-8"),
+    };
+  }
+
   app.use((req, res, next) => {
     const startedAt = Date.now();
     const url = req.originalUrl || req.url || "";
@@ -137,10 +150,16 @@ export async function setupVite(app: Express, server: Server) {
 
   app.get("/", async (req, res, next) => {
     try {
-      const { html, source } = await loadClientHtml(req.originalUrl);
-      assertHtmlShell(html, source, "vite");
-      logHtmlDelivery(req.originalUrl, html, source, req.headers.host);
+      const { html, source, contentLength } = await buildHtmlResponse(req.originalUrl, req.headers.host);
       res.status(200).set({ "Content-Type": "text/html; charset=utf-8" }).send(html);
+      console.log("[HTML_DELIVERY] sent", {
+        host: req.headers.host ?? "(unknown)",
+        path: req.originalUrl,
+        status: 200,
+        contentType: "text/html; charset=utf-8",
+        contentLength,
+        source,
+      });
     } catch (error) {
       vite.ssrFixStacktrace(error as Error);
       next(error);
@@ -151,10 +170,16 @@ export async function setupVite(app: Express, server: Server) {
 
   app.get("*", async (req, res, next) => {
     try {
-      const { html, source } = await loadClientHtml(req.originalUrl);
-      assertHtmlShell(html, source, "vite");
-      logHtmlDelivery(req.originalUrl, html, source, req.headers.host);
+      const { html, source, contentLength } = await buildHtmlResponse(req.originalUrl, req.headers.host);
       res.status(200).set({ "Content-Type": "text/html; charset=utf-8" }).send(html);
+      console.log("[HTML_DELIVERY] sent", {
+        host: req.headers.host ?? "(unknown)",
+        path: req.originalUrl,
+        status: 200,
+        contentType: "text/html; charset=utf-8",
+        contentLength,
+        source,
+      });
     } catch (error) {
       vite.ssrFixStacktrace(error as Error);
       next(error);
