@@ -260,6 +260,8 @@ function mountApp() {
 
     const queryClient = getQueryClient();
     const trpcClient = getTrpcClient();
+    // eslint-disable-next-line no-console
+    console.log("[BOOT] TRPC Provider ativo");
 
     root.render(
       <React.StrictMode>
