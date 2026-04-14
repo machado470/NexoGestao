@@ -30,8 +30,6 @@ function toLabel(value: unknown, fallback: string) {
 }
 
 export default function TimelinePage() {
-  return <div style={{ padding: 20 }}>PAGE OK</div>;
-
   setBootPhase("PAGE:Timeline");
   useRenderWatchdog("TimelinePage");
   const [filter, setFilter] = useState("");

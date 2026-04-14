@@ -2379,9 +2379,15 @@ html {
   }
 
   .app-root :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
-    background: #ffffff;
+    background: var(--surface-elevated);
     border-color: var(--border-subtle);
     color: var(--text-primary);
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  .app-root :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea)::placeholder {
+    color: var(--text-muted);
   }
 
   .app-root :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea):focus-visible {

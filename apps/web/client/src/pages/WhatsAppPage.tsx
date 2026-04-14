@@ -6,6 +6,13 @@ import { buildIdempotencyKey } from "@/lib/idempotency";
 import { toast } from "sonner";
 import { Button } from "@/components/design-system";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import {
@@ -202,15 +209,18 @@ export default function WhatsAppPage() {
           <AppEmptyState title="Nenhum dado disponível ainda" description="Ação recomendada: criar cliente" />
         ) : (
           <div className="space-y-3">
-            <select
-              value={selectedCustomerId}
-              onChange={(event) => setCustomerId(event.target.value)}
-              className="h-10 w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3"
-            >
+            <Select value={selectedCustomerId} onValueChange={setCustomerId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione um cliente" />
+              </SelectTrigger>
+              <SelectContent>
               {customers.map((customer) => (
-                <option key={String(customer.id)} value={String(customer.id)}>{String(customer.name ?? "Cliente")}</option>
+                <SelectItem key={String(customer.id)} value={String(customer.id)}>
+                  {String(customer.name ?? "Cliente")}
+                </SelectItem>
               ))}
-            </select>
+              </SelectContent>
+            </Select>
             <Input
               value={content}
               onChange={(event) => setContent(event.target.value)}

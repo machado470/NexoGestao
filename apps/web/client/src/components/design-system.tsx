@@ -1,35 +1,8 @@
 import type { ComponentProps, ReactNode } from "react";
 import { Search } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { cva, type VariantProps } from "class-variance-authority";
+import { Button as UIButton, buttonVariants } from "@/components/ui/button";
 import { sanitizeRootWrapperStyle } from "@/components/LayoutProtectionGuard";
-
-const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 rounded-[12px] text-sm font-semibold transition disabled:pointer-events-none disabled:opacity-50",
-  {
-    variants: {
-      variant: {
-        default: "nexo-cta-primary",
-        secondary: "nexo-cta-secondary",
-        outline: "nexo-cta-secondary",
-        ghost:
-          "h-9 px-3 text-[var(--text-secondary)] hover:bg-[var(--accent-soft)] hover:text-[var(--text-primary)]",
-        destructive: "nexo-cta-primary",
-        link: "h-auto px-0 text-[var(--accent)] underline-offset-4 hover:underline",
-      },
-      size: {
-        default: "h-9 px-4",
-        sm: "h-9 px-3 text-xs",
-        lg: "h-10 px-6",
-        icon: "size-9 px-0",
-      },
-    },
-    defaultVariants: {
-      variant: "default",
-      size: "default",
-    },
-  }
-);
 
 export function AppShell({
   children,
@@ -504,39 +477,35 @@ export function PrimaryButton({
   className,
   ...props
 }: ComponentProps<"button">) {
-  return <button {...props} className={cn("nexo-cta-primary", className)} />;
+  return <UIButton {...props} variant="primary" className={className} />;
 }
 
 export function SecondaryButton({
   className,
   ...props
 }: ComponentProps<"button">) {
-  return <button {...props} className={cn("nexo-cta-secondary", className)} />;
+  return <UIButton {...props} variant="secondary" className={className} />;
 }
 
 export function GhostButton({ className, ...props }: ComponentProps<"button">) {
-  return (
-    <button
-      {...props}
-      className={cn(
-        "inline-flex h-9 items-center rounded-[12px] px-3 text-sm text-[var(--text-secondary)] transition hover:bg-[var(--accent-soft)] hover:text-[var(--text-primary)]",
-        className
-      )}
-    />
-  );
+  return <UIButton {...props} variant="ghost" className={className} />;
 }
 
 export function Button({
   className,
-  variant,
+  variant = "primary",
   size,
   ...props
-}: ComponentProps<"button"> & VariantProps<typeof buttonVariants>) {
+}: ComponentProps<typeof UIButton> & {
+  variant?: "primary" | "secondary" | "ghost" | "danger" | "neutral" | "default" | "outline" | "destructive" | "link";
+}) {
+  const normalizedVariant =
+    variant === "default" ? "primary" :
+    variant === "destructive" ? "danger" :
+    variant;
+
   return (
-    <button
-      {...props}
-      className={cn(buttonVariants({ variant, size }), className)}
-    />
+    <UIButton {...props} size={size} variant={normalizedVariant} className={className} />
   );
 }
 
