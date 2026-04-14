@@ -33,6 +33,9 @@ export default function TimelinePage() {
   setBootPhase("PAGE:Timeline");
   useRenderWatchdog("TimelinePage");
   const [filter, setFilter] = useState("");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [entityFilter, setEntityFilter] = useState("all");
+  const [periodFilter, setPeriodFilter] = useState("all");
   const [limit, setLimit] = useState(120);
   const timelineQuery = trpc.nexo.timeline.listByOrg.useQuery({ limit }, { retry: false });
   const events = useMemo(() => normalizeArrayPayload<any>(timelineQuery.data), [timelineQuery.data]);
@@ -46,8 +49,13 @@ export default function TimelinePage() {
 
   const filteredEvents = useMemo(() => {
     const q = filter.trim().toLowerCase();
-    if (!q) return events;
     return events.filter((event) => {
+      const date = safeDate(event?.createdAt);
+      if (typeFilter !== "all" && String(event?.type ?? event?.action ?? "").toLowerCase() !== typeFilter) return false;
+      if (entityFilter !== "all" && String(event?.entityType ?? "").toLowerCase() !== entityFilter) return false;
+      if (periodFilter === "24h" && (!date || Date.now() - date.getTime() > 1000 * 60 * 60 * 24)) return false;
+      if (periodFilter === "7d" && (!date || Date.now() - date.getTime() > 1000 * 60 * 60 * 24 * 7)) return false;
+      if (!q) return true;
       const text = [
         event?.action,
         event?.type,
@@ -61,7 +69,7 @@ export default function TimelinePage() {
         .join(" ");
       return text.includes(q);
     });
-  }, [events, filter]);
+  }, [entityFilter, events, filter, periodFilter, typeFilter]);
 
   const groupedEvents = useMemo(() => {
     const groups = new Map<string, any[]>();
@@ -184,6 +192,9 @@ export default function TimelinePage() {
             value={filter}
             onChange={(event) => setFilter(event.target.value)}
           />
+          <Input placeholder="Tipo (all/charge.created)" className="max-w-[220px]" value={typeFilter === "all" ? "" : typeFilter} onChange={(event) => setTypeFilter(event.target.value.trim().toLowerCase() || "all")} />
+          <Input placeholder="Entidade (all/customer)" className="max-w-[210px]" value={entityFilter === "all" ? "" : entityFilter} onChange={(event) => setEntityFilter(event.target.value.trim().toLowerCase() || "all")} />
+          <Input placeholder="Período (all/24h/7d)" className="max-w-[190px]" value={periodFilter === "all" ? "" : periodFilter} onChange={(event) => setPeriodFilter(event.target.value.trim().toLowerCase() || "all")} />
           <p className="text-xs text-[var(--text-muted)]">Mostrando até {limit} eventos por carregamento.</p>
         </AppFiltersBar>
 

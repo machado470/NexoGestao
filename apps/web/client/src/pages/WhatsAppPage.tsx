@@ -20,6 +20,7 @@ import {
   AppEmptyState,
   AppKpiRow,
   AppLoadingState,
+  AppNextActionCard,
   AppSectionBlock,
   AppStatusBadge,
 } from "@/components/internal-page-system";
@@ -129,6 +130,9 @@ export default function WhatsAppPage() {
 
     return items.slice(0, 6);
   }, [charges, customers, serviceOrders]);
+  const lastMessage = messages[0];
+  const selectedCustomerMessages = messages.filter(item => String(item?.customerId ?? selectedCustomerId) === selectedCustomerId);
+  const nextSuggestedAction = failed > 0 ? "Reenviar mensagens com falha" : automationSuggestions.length > 0 ? "Executar automação sugerida" : "Enviar follow-up de relacionamento";
 
   async function sendMessage() {
     if (!selectedCustomerId || content.trim().length < 2) {
@@ -230,6 +234,34 @@ export default function WhatsAppPage() {
           </div>
         )}
       </AppSectionBlock>
+
+      <div className="grid gap-3 xl:grid-cols-2">
+        <AppSectionBlock title="Contexto do cliente selecionado" subtitle="Base para comunicação contextual">
+          {selectedCustomer ? (
+            <div className="space-y-1 text-sm text-[var(--text-secondary)]">
+              <p><span className="text-[var(--text-muted)]">Cliente:</span> {String(selectedCustomer?.name ?? "—")}</p>
+              <p><span className="text-[var(--text-muted)]">Telefone:</span> {String(selectedCustomer?.phone ?? "—")}</p>
+              <p><span className="text-[var(--text-muted)]">Última interação:</span> {lastMessage?.createdAt ? new Date(String(lastMessage.createdAt)).toLocaleString("pt-BR") : "Sem histórico"}</p>
+              <p><span className="text-[var(--text-muted)]">Mensagens no histórico:</span> {selectedCustomerMessages.length}</p>
+            </div>
+          ) : (
+            <AppEmptyState title="Selecione um cliente" description="Escolha um cliente para carregar histórico e contexto de comunicação." />
+          )}
+        </AppSectionBlock>
+        <AppNextActionCard
+          title="Próxima ação sugerida"
+          action={nextSuggestedAction}
+          reason="Combina status de envio, histórico do cliente e gatilhos operacionais."
+          onExecute={() => {
+            if (automationSuggestions[0]) {
+              void executeSuggestedMessage(automationSuggestions[0].customerId, automationSuggestions[0].preview);
+              return;
+            }
+            void sendMessage();
+          }}
+          ctaLabel="Executar ação"
+        />
+      </div>
 
       <AppSectionBlock title="Automações sugeridas pela engine" subtitle="Problema detectado → ação pronta com pré-visualização e envio em 1 clique">
         {automationSuggestions.length === 0 ? (

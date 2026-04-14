@@ -11,6 +11,7 @@ import { getOperationalSeverityLabel, getServiceOrderSeverity } from "@/lib/oper
 import {
   AppDataTable,
   AppKpiRow,
+  AppNextActionCard,
   AppPageEmptyState,
   AppPageErrorState,
   AppPageLoadingState,
@@ -48,6 +49,12 @@ export default function ServiceOrdersPage() {
   const previous7 = getWindow(7, 1);
   const openedCurrent = orders.filter(item => inRange(safeDate(item?.createdAt), current7.start, current7.end)).length;
   const openedPrevious = orders.filter(item => inRange(safeDate(item?.createdAt), previous7.start, previous7.end)).length;
+  const pipeline = {
+    aberta: orders.filter(item => ["OPEN", "ASSIGNED"].includes(String(item?.status ?? "").toUpperCase())).length,
+    execucao: orders.filter(item => String(item?.status ?? "").toUpperCase() === "IN_PROGRESS").length,
+    concluida: orders.filter(item => String(item?.status ?? "").toUpperCase() === "DONE").length,
+    prontaCobranca: orders.filter(item => String(item?.status ?? "").toUpperCase() === "DONE" && !item?.financialSummary?.hasCharge).length,
+  };
 
   return (
     <PageWrapper title="Ordens de Serviço" subtitle="Pipeline operacional sem desvio de contrato entre módulos.">
@@ -70,10 +77,20 @@ export default function ServiceOrdersPage() {
             hint: "últimos 7 dias",
           },
           { title: "Em execução", value: String(inProgress), hint: "status IN_PROGRESS" },
-          { title: "Concluídas", value: String(done), hint: "prontas para cobrança" },
+          { title: "Concluídas", value: String(done), hint: "status DONE" },
+          { title: "Prontas p/ cobrança", value: String(pipeline.prontaCobranca), hint: "concluídas sem cobrança" },
           { title: "Base de clientes", value: String(customers.length), hint: "vinculáveis à execução" },
         ]}
       />
+
+      <AppSectionBlock title="Leitura executiva do pipeline" subtitle="Coração operacional da execução">
+        <div className="grid gap-2 md:grid-cols-4">
+          <div className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Abertas: <strong>{pipeline.aberta}</strong></div>
+          <div className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Em execução: <strong>{pipeline.execucao}</strong></div>
+          <div className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Concluídas: <strong>{pipeline.concluida}</strong></div>
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm">Prontas para cobrança: <strong>{pipeline.prontaCobranca}</strong></div>
+        </div>
+      </AppSectionBlock>
 
       <AppSectionBlock title="Pipeline operacional" subtitle="Cada O.S. com ação real">
         {showInitialLoading ? (
@@ -106,10 +123,18 @@ export default function ServiceOrdersPage() {
                     <td><AppStatusBadge label={getOperationalSeverityLabel(getServiceOrderSeverity(order))} /></td>
                     <td><AppPriorityBadge label={`P${String(order?.priority ?? 2)}`} /></td>
                     <td className="p-3">
-                      <AppRowActions actions={[
-                        { label: "Gerar cobrança", onClick: () => navigate(`/finances?serviceOrderId=${order.id}`) },
-                        { label: "Enviar WhatsApp", onClick: () => navigate(`/whatsapp?customerId=${order.customerId}`) },
-                      ]} />
+                      <div className="space-y-2">
+                        <AppNextActionCard
+                          title="Próxima ação"
+                          action={String(order?.financialSummary?.hasCharge ? "Enviar WhatsApp" : "Gerar cobrança")}
+                          reason={order?.financialSummary?.hasCharge ? "Cobrança já vinculada, mantenha cliente informado." : "Sem cobrança vinculada após execução."}
+                          onExecute={() => navigate(order?.financialSummary?.hasCharge ? `/whatsapp?customerId=${order.customerId}` : `/finances?serviceOrderId=${order.id}`)}
+                        />
+                        <AppRowActions actions={[
+                          { label: "Gerar cobrança", onClick: () => navigate(`/finances?serviceOrderId=${order.id}`) },
+                          { label: "Enviar WhatsApp", onClick: () => navigate(`/whatsapp?customerId=${order.customerId}`) },
+                        ]} />
+                      </div>
                     </td>
                   </tr>
                 ))}
