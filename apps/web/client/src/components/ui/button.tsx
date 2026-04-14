@@ -10,14 +10,20 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
+        primary:
+          "bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-primary-hover)]",
         default:
-          "bg-primary text-primary-foreground hover:bg-[var(--accent-hover)]",
+          "bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-primary-hover)]",
+        danger:
+          "bg-destructive text-destructive-foreground hover:bg-[color-mix(in_srgb,var(--destructive)_86%,black)]",
         destructive:
           "bg-destructive text-destructive-foreground hover:bg-[color-mix(in_srgb,var(--destructive)_86%,black)]",
+        neutral:
+          "border border-[var(--border)] bg-[var(--surface-elevated)] text-[var(--text-primary)] hover:border-[var(--accent-soft)] hover:bg-[var(--surface-base)]",
         outline:
           "border border-[var(--border)] bg-[var(--surface-elevated)] text-[var(--text-primary)] hover:border-[var(--accent-soft)] hover:bg-[var(--surface-base)]",
         secondary:
-          "border border-[var(--border)] bg-[var(--surface-base)] text-[var(--text-secondary)] hover:border-[var(--accent-soft)] hover:bg-[var(--surface-elevated)]",
+          "border border-[var(--border)] bg-[var(--surface-base)] text-[var(--text-primary)] hover:border-[var(--accent-soft)] hover:bg-[var(--surface-elevated)]",
         ghost:
           "text-[var(--text-secondary)] hover:bg-[var(--accent-soft)] hover:text-[var(--text-primary)]",
         link: "text-primary underline-offset-4 hover:underline",
@@ -32,7 +38,7 @@ const buttonVariants = cva(
       },
     },
     defaultVariants: {
-      variant: "default",
+      variant: "primary",
       size: "default",
     },
   }

@@ -33,8 +33,6 @@ function metric(summary: Record<string, any>, ...keys: string[]) {
 }
 
 export default function GovernancePage() {
-  return <div style={{ padding: 20 }}>PAGE OK</div>;
-
   setBootPhase("PAGE:Governança");
   useRenderWatchdog("GovernancePage");
   const summaryQuery = trpc.governance.summary.useQuery(undefined, { retry: false });
