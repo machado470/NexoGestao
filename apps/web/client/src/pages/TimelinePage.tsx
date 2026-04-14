@@ -33,7 +33,8 @@ export default function TimelinePage() {
   setBootPhase("PAGE:Timeline");
   useRenderWatchdog("TimelinePage");
   const [filter, setFilter] = useState("");
-  const timelineQuery = trpc.nexo.timeline.listByOrg.useQuery({ limit: 200 }, { retry: false });
+  const [limit, setLimit] = useState(120);
+  const timelineQuery = trpc.nexo.timeline.listByOrg.useQuery({ limit }, { retry: false });
   const events = useMemo(() => normalizeArrayPayload<any>(timelineQuery.data), [timelineQuery.data]);
   usePageDiagnostics({
     page: "timeline",
@@ -61,6 +62,16 @@ export default function TimelinePage() {
       return text.includes(q);
     });
   }, [events, filter]);
+
+  const groupedEvents = useMemo(() => {
+    const groups = new Map<string, any[]>();
+    filteredEvents.forEach((event) => {
+      const key = event?.createdAt ? new Date(String(event.createdAt)).toLocaleDateString("pt-BR") : "Sem data";
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)?.push(event);
+    });
+    return Array.from(groups.entries());
+  }, [filteredEvents]);
 
   const chartDataRaw = useMemo(() => {
     const buckets = new Map<string, number>();
@@ -114,9 +125,14 @@ export default function TimelinePage() {
         title="Histórico operacional rastreável"
         description="Histórico operacional real com rastreabilidade por entidade e ação."
         primaryAction={(
-          <Button type="button" variant="outline" onClick={() => void timelineQuery.refetch()}>
-            Atualizar timeline
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button type="button" variant="outline" onClick={() => void timelineQuery.refetch()}>
+              Atualizar timeline
+            </Button>
+            <Button type="button" onClick={() => setLimit((prev) => prev + 120)}>
+              Carregar mais
+            </Button>
+          </div>
         )}
       />
 
@@ -168,6 +184,7 @@ export default function TimelinePage() {
             value={filter}
             onChange={(event) => setFilter(event.target.value)}
           />
+          <p className="text-xs text-[var(--text-muted)]">Mostrando até {limit} eventos por carregamento.</p>
         </AppFiltersBar>
 
         {timelineQuery.isLoading ? (
@@ -175,18 +192,30 @@ export default function TimelinePage() {
         ) : filteredEvents.length === 0 ? (
           <AppEmptyState title="Nenhum evento encontrado" description="Ajuste o filtro ou execute ações operacionais para gerar histórico." />
         ) : (
-          <ul className="space-y-2">
-            {filteredEvents.map((event) => (
-              <li key={String(event?.id ?? `${event?.entityId}-${event?.createdAt}`)} className="rounded-lg border border-[var(--border-subtle)] p-3">
-                <p className="text-sm font-medium text-[var(--text-primary)]">
-                  {toLabel(event?.title ?? event?.action ?? event?.type, "Evento operacional")}
-                </p>
-                <p className="mt-1 text-xs text-[var(--text-muted)]">
-                  {toLabel(event?.entityType, "Entidade")} #{toLabel(event?.entityId, "—")} · {toLabel(event?.actorName, "Sistema")} · {event?.createdAt ? new Date(String(event.createdAt)).toLocaleString("pt-BR") : "sem data"}
-                </p>
-              </li>
+          <div className="space-y-3">
+            {groupedEvents.map(([dateLabel, items]) => (
+              <div key={dateLabel} className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">{dateLabel}</p>
+                <ul className="space-y-2">
+                  {items.map((event) => (
+                    <li key={String(event?.id ?? `${event?.entityId}-${event?.createdAt}`)} className="rounded-lg border border-[var(--border-subtle)] p-3">
+                      <p className="text-sm font-medium text-[var(--text-primary)]">
+                        {toLabel(event?.title ?? event?.action ?? event?.type, "Evento operacional")}
+                      </p>
+                      <p className="mt-1 text-xs text-[var(--text-muted)]">
+                        {toLabel(event?.entityType, "Entidade")} #{toLabel(event?.entityId, "—")} · {toLabel(event?.actorName, "Sistema")} · {event?.createdAt ? new Date(String(event.createdAt)).toLocaleString("pt-BR") : "sem data"}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             ))}
-          </ul>
+            <div className="pt-1">
+              <Button type="button" variant="outline" onClick={() => setLimit((prev) => prev + 120)}>
+                Carregar mais eventos
+              </Button>
+            </div>
+          </div>
         )}
       </AppSectionBlock>
       </TrpcSectionErrorBoundary>
