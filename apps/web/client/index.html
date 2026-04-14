@@ -4,6 +4,24 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>NexoGestão</title>
+    <script>
+      (function () {
+        var now = new Date().toISOString();
+        window.__NEXO_AUDIT__ = window.__NEXO_AUDIT__ || { events: [] };
+        window.__NEXO_AUDIT__.htmlStartedAt = now;
+        window.__NEXO_AUDIT__.pathname = window.location.pathname;
+        window.__NEXO_AUDIT__.renderAuditMode = new URLSearchParams(window.location.search).get("renderAuditMode") || "app";
+        window.__NEXO_AUDIT__.events = (window.__NEXO_AUDIT__.events || []).concat([
+          { at: now, source: "html", message: "document-start", payload: { href: window.location.href } }
+        ]).slice(-120);
+        console.info("[HTML] document-start", {
+          at: now,
+          href: window.location.href,
+          readyState: document.readyState,
+          renderAuditMode: window.__NEXO_AUDIT__.renderAuditMode,
+        });
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

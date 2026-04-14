@@ -57,7 +57,6 @@ export function getTrpcClient() {
   return trpcClientSingleton;
 }
 
-
 export function TRPCProvider({
   client,
   queryClient,
@@ -68,7 +67,7 @@ export function TRPCProvider({
   children: ReactNode;
 }) {
   console.log("[BOOT] TRPC Provider ativo");
-  return createElement(trpc.Provider, { client, queryClient }, children);
+  return createElement(trpc.Provider, { client, queryClient, children });
 }
 
 export function useSafeTRPC() {
