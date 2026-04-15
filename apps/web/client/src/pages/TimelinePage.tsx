@@ -1,16 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { Bar, BarChart, CartesianGrid, XAxis } from "recharts";
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { trpc } from "@/lib/trpc";
 import { normalizeArrayPayload } from "@/lib/query-helpers";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import { Button } from "@/components/design-system";
 import {
-  AppChartPanel,
   AppEmptyState,
   AppFiltersBar,
   AppKpiRow,
+  AppListBlock,
   AppLoadingState,
   AppNextActionCard,
   AppSectionBlock,
@@ -19,8 +17,6 @@ import {
 import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
 import { useRenderWatchdog } from "@/hooks/useRenderWatchdog";
 import { formatDelta, getDayWindow, percentDelta, safeDate, trendFromDelta } from "@/lib/operational/kpi";
-import { safeChartData } from "@/lib/safeChartData";
-import { ChartErrorBoundary } from "@/components/ChartErrorBoundary";
 import { KpiErrorBoundary } from "@/components/KpiErrorBoundary";
 import { TrpcSectionErrorBoundary } from "@/components/TrpcSectionErrorBoundary";
 import { setBootPhase } from "@/lib/bootPhase";
@@ -103,25 +99,14 @@ export default function TimelinePage() {
     return Array.from(groups.entries());
   }, [filteredEvents]);
 
-  const chartDataRaw = useMemo(() => {
-    const buckets = new Map<string, number>();
-    filteredEvents.forEach((event) => {
-      const createdAt = event?.createdAt ? new Date(String(event.createdAt)) : null;
-      if (!createdAt || Number.isNaN(createdAt.getTime())) return;
-      const label = `${String(createdAt.getHours()).padStart(2, "0")}h`;
-      buckets.set(label, (buckets.get(label) ?? 0) + 1);
-    });
-    return [...buckets.entries()]
-      .map(([hour, total]) => ({ hour, total }))
-      .sort((a, b) => a.hour.localeCompare(b.hour));
-  }, [filteredEvents]);
-  const chartData = useMemo(
-    () => safeChartData<{ hour: string; total: number }>(chartDataRaw, ["total"]),
-    [chartDataRaw]
-  );
-
   const criticalEvents = filteredEvents.filter((event) =>
     ["critical", "error", "failed"].includes(String(event?.severity ?? event?.status ?? "").toLowerCase())
+  ).length;
+  const failedRecent = filteredEvents.filter((event) =>
+    String(event?.status ?? event?.executionMode ?? "").toLowerCase().includes("fail")
+  ).length;
+  const semRetorno = filteredEvents.filter((event) =>
+    String(event?.description ?? event?.title ?? "").toLowerCase().includes("sem retorno")
   ).length;
   const uniqueEntities = new Set(filteredEvents.map((event) => String(event?.entityId ?? "")).filter(Boolean)).size;
   const currentDay = getDayWindow(0);
@@ -143,11 +128,6 @@ export default function TimelinePage() {
     // eslint-disable-next-line no-console
     console.error("[TRPC ERROR] timeline_query_error", timelineQuery.error.message);
   }, [timelineQuery.error]);
-  useEffect(() => {
-    // eslint-disable-next-line no-console
-    console.info("[CHART DATA] timeline.events_by_hour", chartData);
-  }, [chartData]);
-
   return (
     <PageWrapper title="Timeline operacional" subtitle="Histórico auditável em lotes, com leitura objetiva para decisão.">
       <OperationalTopCard
@@ -188,32 +168,28 @@ export default function TimelinePage() {
 
       <div className="grid gap-3 xl:grid-cols-3">
         <AppNextActionCard
-          title="Próxima ação de auditoria"
-          description="Revise eventos críticos e avance em lotes controlados para evitar feed infinito."
+          title="O que deu problema"
+          description={`${criticalEvents} eventos críticos e ${failedRecent} falhas recentes pedindo reação imediata.`}
           severity={criticalEvents > 0 ? "high" : "low"}
           metadata="timeline"
-          action={{ label: criticalEvents > 0 ? "Investigar críticos" : "Revisar histórico", onClick: () => window.scrollTo({ top: 720, behavior: "smooth" }) }}
+          action={{ label: "Resolver agora", onClick: () => window.scrollTo({ top: 720, behavior: "smooth" }) }}
         />
-        <AppChartPanel title="Volume de eventos por hora" description="Distribuição real dos eventos retornados pelo backend.">
-          {timelineQuery.isLoading ? (
-            <AppLoadingState rows={2} />
-          ) : !chartData.isValid ? (
-            <AppEmptyState title="Erro ao renderizar gráfico" description={chartData.reason ?? "Dados inválidos."} />
-          ) : chartData.data.length === 0 ? (
-            <AppEmptyState title="Nenhum dado disponível ainda" description="Ação recomendada: executar uma operação e voltar nesta tela." />
-          ) : (
-            <ChartErrorBoundary context="timeline:events-chart">
-              <ChartContainer className="h-[220px] w-full" config={{ total: { label: "Eventos" } }}>
-                <BarChart data={chartData.data}>
-                  <CartesianGrid vertical={false} />
-                  <XAxis dataKey="hour" tickLine={false} axisLine={false} />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Bar dataKey="total" fill="var(--brand-primary)" />
-                </BarChart>
-              </ChartContainer>
-            </ChartErrorBoundary>
-          )}
-        </AppChartPanel>
+        <AppNextActionCard
+          title="O que precisa de atenção"
+          description={`${uniqueEntities} entidades com sinal de atraso e ${semRetorno} eventos marcados como sem retorno.`}
+          severity={criticalEvents > 0 || semRetorno > 0 ? "high" : "medium"}
+          metadata="atenção de execução"
+          action={{ label: "Analisar agora", onClick: () => window.scrollTo({ top: 720, behavior: "smooth" }) }}
+        />
+        <AppSectionBlock title="Leitura rápida de lotes" subtitle="Sem feed infinito: revisar, agir e carregar o próximo lote.">
+          <AppListBlock
+            items={[
+              { title: `${events.length} eventos carregados`, subtitle: `Lotes de ${pageSize} com controle manual` },
+              { title: `${criticalEvents} críticos na janela atual`, subtitle: "Priorize antes de puxar novos eventos" },
+              { title: `${hasMore ? "Ainda há lotes pendentes" : "Sem novos lotes agora"}`, subtitle: hasMore ? "Clique em carregar mais quando finalizar este lote" : "Use atualizar timeline para buscar novos eventos" },
+            ]}
+          />
+        </AppSectionBlock>
       </div>
 
       <TrpcSectionErrorBoundary context="timeline:events-feed">

@@ -77,15 +77,15 @@ function parseAmountToCents(raw: string): number | undefined {
 function getPriorityLabel(priority: string) {
   switch (priority) {
     case "1":
-      return "Muito baixa";
+      return "Bem baixa";
     case "2":
       return "Baixa";
     case "3":
-      return "Média";
+      return "Normal";
     case "4":
       return "Alta";
     case "5":
-      return "Urgente";
+      return "Urgente hoje";
     default:
       return "Baixa";
   }
@@ -345,10 +345,10 @@ export default function CreateServiceOrderModal({
         <DialogHeader className="nexo-modal-header border-b border-[var(--border-subtle)] px-6 py-6">
           <DialogTitle className="flex items-center gap-2 text-xl text-[var(--text-primary)]">
             <ClipboardList className="h-5 w-5 text-orange-500" />
-            Nova Ordem de Serviço
+            Nova O.S.
           </DialogTitle>
           <DialogDescription className="mt-1 text-sm text-[var(--text-muted)]">
-            Cadastre a execução operacional e, se quiser, já deixe a base financeira preparada.
+            Registre o serviço de forma simples e, se quiser, já deixe a cobrança pronta.
           </DialogDescription>
         </DialogHeader>
 
@@ -374,7 +374,7 @@ export default function CreateServiceOrderModal({
                 Você precisa ter ao menos um cliente para criar uma O.S. Cadastre um cliente e volte aqui.
               </section>
             ) : null}
-            <section className="rounded-xl border border-gray-200 p-4 dark:border-zinc-800">
+            <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4">
               <SectionTitle
                 icon={ClipboardList}
                 title="Dados operacionais"
@@ -407,6 +407,40 @@ export default function CreateServiceOrderModal({
                 </div>
 
                 <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-white">
+                    Serviço que será feito *
+                  </label>
+                  <input
+                    className="w-full rounded-lg border border-gray-300 bg-[var(--surface-elevated)] p-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-[var(--border-subtle)] dark:bg-zinc-950 dark:text-white"
+                    placeholder="Ex: Manutenção elétrica no quadro do condomínio"
+                    value={formData.title}
+                    onChange={(e) =>
+                      setFormData((state) => ({ ...state, title: e.target.value }))
+                    }
+                    disabled={createMutation.isPending}
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-white">
+                    Detalhes para a equipe
+                  </label>
+                  <textarea
+                    className="w-full rounded-lg border border-gray-300 bg-[var(--surface-elevated)] p-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-[var(--border-subtle)] dark:bg-zinc-950 dark:text-white"
+                    placeholder="Ex: Levar escada, trocar disjuntor e testar iluminação da área comum."
+                    rows={4}
+                    value={formData.description}
+                    onChange={(e) =>
+                      setFormData((state) => ({
+                        ...state,
+                        description: e.target.value,
+                      }))
+                    }
+                    disabled={createMutation.isPending}
+                  />
+                </div>
+
+                <div>
                   <label className="mb-2 flex items-center gap-2 text-sm font-medium text-gray-900 dark:text-white">
                     <User className="h-4 w-4 text-gray-500" />
                     Responsável
@@ -430,42 +464,8 @@ export default function CreateServiceOrderModal({
                     ))}
                   </select>
                   <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    Se definir agora, a O.S. já nasce atribuída.
+                    Se você escolher agora, a equipe já recebe com dono definido.
                   </p>
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-white">
-                    Título *
-                  </label>
-                  <input
-                    className="w-full rounded-lg border border-gray-300 bg-[var(--surface-elevated)] p-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-[var(--border-subtle)] dark:bg-zinc-950 dark:text-white"
-                    placeholder="Ex: Limpeza pós-obra apartamento 302"
-                    value={formData.title}
-                    onChange={(e) =>
-                      setFormData((state) => ({ ...state, title: e.target.value }))
-                    }
-                    disabled={createMutation.isPending}
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-white">
-                    Descrição
-                  </label>
-                  <textarea
-                    className="w-full rounded-lg border border-gray-300 bg-[var(--surface-elevated)] p-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-[var(--border-subtle)] dark:bg-zinc-950 dark:text-white"
-                    placeholder="Detalhes do serviço, escopo, observações iniciais ou orientação para a equipe"
-                    rows={4}
-                    value={formData.description}
-                    onChange={(e) =>
-                      setFormData((state) => ({
-                        ...state,
-                        description: e.target.value,
-                      }))
-                    }
-                    disabled={createMutation.isPending}
-                  />
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -484,11 +484,11 @@ export default function CreateServiceOrderModal({
                       }
                       disabled={createMutation.isPending}
                     >
-                      <option value="1">Muito baixa</option>
+                      <option value="1">Bem baixa</option>
                       <option value="2">Baixa</option>
-                      <option value="3">Média</option>
+                      <option value="3">Normal</option>
                       <option value="4">Alta</option>
-                      <option value="5">Urgente</option>
+                      <option value="5">Urgente hoje</option>
                     </select>
                   </div>
 
@@ -514,11 +514,11 @@ export default function CreateServiceOrderModal({
               </div>
             </section>
 
-            <section className="rounded-xl border border-gray-200 p-4 dark:border-zinc-800">
+            <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4">
               <SectionTitle
                 icon={Wallet}
                 title="Preparação financeira"
-                subtitle="Opcional. Você pode já definir valor e vencimento para acelerar a cobrança depois."
+                subtitle="Opcional. Se preencher agora, você ganha tempo na hora de cobrar."
               />
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -529,7 +529,7 @@ export default function CreateServiceOrderModal({
                   <input
                     inputMode="decimal"
                     className="w-full rounded-lg border border-gray-300 bg-[var(--surface-elevated)] p-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-[var(--border-subtle)] dark:bg-zinc-950 dark:text-white"
-                    placeholder="Ex: 150,00"
+                    placeholder="Ex: 890,00"
                     value={formData.amount}
                     onChange={(e) =>
                       setFormData((state) => ({ ...state, amount: e.target.value }))
@@ -561,7 +561,7 @@ export default function CreateServiceOrderModal({
                 <div className="flex items-start gap-2">
                   <CircleHelp className="mt-0.5 h-4 w-4 shrink-0" />
                   <div className="space-y-1">
-                    <p className="font-medium">Como isso funciona no fluxo</p>
+                    <p className="font-medium">Como isso ajuda no dia a dia</p>
                     <p>
                       Se você definir um valor agora, a O.S. já fica pronta para caminhar melhor
                       até cobrança e pagamento.
@@ -569,7 +569,7 @@ export default function CreateServiceOrderModal({
                     {!hasDueDate && hasAmount ? (
                       <p>
                         Como o vencimento está vazio, o backend tende a aplicar um vencimento
-                        padrão automaticamente.
+                        padrão automaticamente para não travar o envio.
                       </p>
                     ) : null}
                   </div>
@@ -577,11 +577,11 @@ export default function CreateServiceOrderModal({
               </div>
             </section>
 
-            <section className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-4 dark:border-zinc-800 dark:bg-[var(--surface-base)]">
+            <section className="rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4">
               <div className="mb-3 flex items-center gap-2">
                 <AlertCircle className="h-4 w-4 text-orange-500" />
                 <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-                  Resumo antes de criar
+                  Confira antes de criar
                 </h3>
               </div>
 
@@ -615,10 +615,10 @@ export default function CreateServiceOrderModal({
 
                 <div>
                   <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                    Agendamento previsto
+                    Quando executar
                   </p>
                   <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
-                    {formData.scheduledFor || "Não definido"}
+                    {formData.scheduledFor || "Ainda não definido"}
                   </p>
                 </div>
 
@@ -627,7 +627,7 @@ export default function CreateServiceOrderModal({
                     Base financeira
                   </p>
                   <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
-                    {hasAmount ? formatCurrencyFromInput(formData.amount) : "Ainda sem valor"}
+                    {hasAmount ? formatCurrencyFromInput(formData.amount) : "Sem valor informado"}
                   </p>
                 </div>
               </div>
@@ -695,7 +695,7 @@ export default function CreateServiceOrderModal({
                 Salvando...
               </span>
             ) : (
-              "Criar ordem de serviço"
+              "Criar O.S. agora"
             )}
           </Button>
 
