@@ -108,9 +108,8 @@ export default function AppointmentsPage() {
             trend: trendFromDelta(percentDelta(todayTotal, yesterdayTotal)),
             hint: "comparativo com ontem",
           },
-          { title: "Confirmados", value: String(confirmed), hint: "prontos para execução" },
+          { title: "Confirmados", value: String(confirmed), hint: "prontos para executar" },
           { title: "Pendentes", value: String(scheduled), hint: "aguardando confirmação" },
-          { title: "Concluídos", value: String(done), hint: "atendimentos finalizados" },
           {
             title: "Taxa de confirmação",
             value: `${confirmationRateCurrent.toFixed(1).replace(".", ",")}%`,
@@ -121,7 +120,27 @@ export default function AppointmentsPage() {
         ]}
       />
 
-      <AppSectionBlock title="Resumo operacional da agenda" subtitle="Decisão rápida para não travar o dia">
+      <AppSectionBlock
+        title="Agenda do dia"
+        subtitle="Bloco principal: lista direta com ação imediata para executar sem dispersão"
+        className="border-[var(--brand-primary)]/40 bg-[var(--surface-elevated)] p-5 md:p-6"
+      >
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-[var(--text-muted)]">Comece por aqui: confirme, execute ou reagende e mantenha o dia fluindo.</p>
+          <ActionFeedbackButton state="idle" idleLabel="Executar agenda agora" onClick={() => navigate("/service-orders")} />
+        </div>
+        <AppListBlock
+          items={agendaDoDia.length > 0
+            ? agendaDoDia.map((item) => ({
+                title: `${safeDate(item?.startsAt)?.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) ?? "--:--"} · ${String(item?.customer?.name ?? "Cliente")}`,
+                subtitle: `Status ${String(item?.status ?? "").toUpperCase()} · ${String(item?.title ?? "atendimento")}`,
+                action: <button className="nexo-cta-secondary" onClick={() => navigate(`/whatsapp?customerId=${item?.customerId}`)}>Executar agora</button>,
+              }))
+            : [{ title: "Sem agenda hoje", subtitle: "Crie novos horários para preencher a operação.", action: <button className="nexo-cta-secondary" onClick={() => setOpenCreate(true)}>Criar</button> }]}
+        />
+      </AppSectionBlock>
+
+      <AppSectionBlock title="Resumo operacional da agenda" subtitle="Bloco secundário para orientar ajustes">
         <div className="grid gap-2 md:grid-cols-4">
           <div className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Conflitos de horário: <strong>{conflicts}</strong></div>
           <div className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Pendentes de confirmação: <strong>{scheduled}</strong></div>
@@ -131,23 +150,17 @@ export default function AppointmentsPage() {
       </AppSectionBlock>
 
       <section className="grid gap-3 xl:grid-cols-2">
-        <AppSectionBlock title="Agenda do dia" subtitle="Lista direta do que precisa ser executado hoje">
-          <AppListBlock
-            items={agendaDoDia.length > 0
-              ? agendaDoDia.map((item) => ({
-                  title: `${safeDate(item?.startsAt)?.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) ?? "--:--"} · ${String(item?.customer?.name ?? "Cliente")}`,
-                  subtitle: `Status ${String(item?.status ?? "").toUpperCase()} · ${String(item?.title ?? "atendimento")}`,
-                  action: <button className="nexo-cta-secondary" onClick={() => navigate(`/whatsapp?customerId=${item?.customerId}`)}>Confirmar</button>,
-                }))
-              : [{ title: "Sem agenda hoje", subtitle: "Crie novos horários para preencher a operação.", action: <button className="nexo-cta-secondary" onClick={() => setOpenCreate(true)}>Criar</button> }]}
-          />
-        </AppSectionBlock>
         <AppSectionBlock title="Gargalos de atraso e conflito" subtitle="Atrasados, conflitos e itens sem dono para destravar">
           <AppListBlock
             items={gargalosAgenda.length > 0
               ? gargalosAgenda
               : [{ title: "Sem gargalos críticos agora", subtitle: "Mantenha a rotina e monitore novos conflitos.", action: <button className="nexo-cta-secondary" onClick={() => navigate("/service-orders")}>Próxima etapa</button> }]}
           />
+        </AppSectionBlock>
+        <AppSectionBlock title="Concluídos no período" subtitle="Bloco de apoio para leitura de fechamento operacional">
+          <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/70 p-3 text-sm text-[var(--text-secondary)]">
+            Atendimentos concluídos: <strong className="text-[var(--text-primary)]">{done}</strong>
+          </div>
         </AppSectionBlock>
       </section>
 

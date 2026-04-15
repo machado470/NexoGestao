@@ -336,41 +336,36 @@ export default function ExecutiveDashboardNew() {
         ]}
       />
 
-      <section className="grid gap-3 lg:grid-cols-2">
-        <AppSectionCard>
-          <p className="mb-1 text-sm font-semibold text-[var(--text-primary)]">O que resolver agora</p>
-          <p className="mb-3 text-xs text-[var(--text-muted)]">Itens com problema real para executar sem abrir outra tela.</p>
-          {immediateQueue.length > 0 ? (
-            <AppListBlock items={immediateQueue} />
-          ) : (
-            <AppNextActionList
-              actions={nextActions.map(action => ({
-                id: action.id,
-                title: action.title,
-                description: action.description,
-                severity: action.severity,
-                action: action.executionAction,
-              }))}
-            />
-          )}
-        </AppSectionCard>
+      <AppSectionCard className="border-[var(--brand-primary)]/40 bg-[var(--surface-elevated)] p-5 md:p-6">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="mb-1 text-base font-semibold text-[var(--text-primary)] md:text-lg">O que resolver agora</p>
+            <p className="text-sm text-[var(--text-muted)]">Bloco principal da página: ataque imediato dos itens que travam execução, receita e agenda.</p>
+          </div>
+          <Button onClick={() => void executeNextAction()} disabled={isExecutingNext || nextActions.length === 0}>
+            {isExecutingNext ? "Executando foco principal..." : "Resolver foco principal"}
+          </Button>
+        </div>
+        {immediateQueue.length > 0 ? (
+          <AppListBlock items={immediateQueue} />
+        ) : (
+          <AppNextActionList
+            actions={nextActions.map(action => ({
+              id: action.id,
+              title: action.title,
+              description: action.description,
+              severity: action.severity,
+              action: action.executionAction,
+            }))}
+          />
+        )}
+      </AppSectionCard>
 
+      <section className="grid gap-3 lg:grid-cols-2">
         <AppSectionCard>
           <p className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Próximas ações</p>
           <p className="mb-3 text-xs text-[var(--text-muted)]">Fila operacional por prioridade: O.S, agenda e cobrança.</p>
           <AppListBlock items={upcomingQueue} />
-        </AppSectionCard>
-      </section>
-
-      <section className="grid gap-3 lg:grid-cols-2">
-        <AppSectionCard>
-          <p className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Operação recente</p>
-          <p className="mb-3 text-xs text-[var(--text-muted)]">Resumo curto do que acabou de acontecer na operação.</p>
-          <AppTimeline>
-            {feed.map(item => (
-              <AppTimelineItem key={item}>{item}</AppTimelineItem>
-            ))}
-          </AppTimeline>
         </AppSectionCard>
         <AppEntityContextPanel links={buildEntityContextBridge({})} />
       </section>
@@ -406,6 +401,16 @@ export default function ExecutiveDashboardNew() {
           />
         </AppSectionCard>
       </section>
+
+      <AppSectionCard className="bg-[var(--surface-base)]/70">
+        <p className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Operação recente</p>
+        <p className="mb-3 text-xs text-[var(--text-muted)]">Bloco de apoio: leitura rápida do que acabou de acontecer.</p>
+        <AppTimeline>
+          {feed.map(item => (
+            <AppTimelineItem key={item}>{item}</AppTimelineItem>
+          ))}
+        </AppTimeline>
+      </AppSectionCard>
     </AppPageShell>
   );
 }
