@@ -59,9 +59,11 @@ export default function AppointmentsPage() {
     acc[slot] = (acc[slot] ?? 0) + 1;
     return acc;
   }, {});
+  const conflicts = Object.values(appointmentsBySlot).filter((count) => count > 1).length;
+  const done = appointments.filter((item) => String(item?.status ?? "").toUpperCase() === "DONE").length;
 
   return (
-    <PageWrapper title="Agendamentos" subtitle="Agenda operacional com ações padronizadas e rastreáveis.">
+    <PageWrapper title="Agendamentos" subtitle="Agenda diária com prioridade clara e próximos passos de execução.">
       <OperationalTopCard
         contextLabel="Direção de agenda"
         title="Fila de agendamentos"
@@ -82,6 +84,7 @@ export default function AppointmentsPage() {
           },
           { title: "Confirmados", value: String(confirmed), hint: "prontos para execução" },
           { title: "Pendentes", value: String(scheduled), hint: "aguardando confirmação" },
+          { title: "Concluídos", value: String(done), hint: "atendimentos finalizados" },
           {
             title: "Taxa de confirmação",
             value: `${confirmationRateCurrent.toFixed(1).replace(".", ",")}%`,
@@ -91,6 +94,15 @@ export default function AppointmentsPage() {
           },
         ]}
       />
+
+      <AppSectionBlock title="Resumo operacional da agenda" subtitle="Decisão rápida para não travar o dia">
+        <div className="grid gap-2 md:grid-cols-4">
+          <div className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Conflitos de horário: <strong>{conflicts}</strong></div>
+          <div className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Pendentes de confirmação: <strong>{scheduled}</strong></div>
+          <div className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Prontos para virar O.S.: <strong>{confirmed}</strong></div>
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm">Próxima ação: <strong>{conflicts > 0 ? "reorganizar conflitos" : "converter confirmados em O.S."}</strong></div>
+        </div>
+      </AppSectionBlock>
 
       <AppSectionBlock title="Fila de agendamentos" subtitle="Sincronizada em tempo real com backend">
         {showInitialLoading ? (

@@ -149,11 +149,11 @@ export default function TimelinePage() {
   }, [chartData]);
 
   return (
-    <PageWrapper title="Timeline Auditável" subtitle="Rastreabilidade operacional padronizada entre módulos.">
+    <PageWrapper title="Timeline operacional" subtitle="Histórico auditável em lotes, com leitura objetiva para decisão.">
       <OperationalTopCard
         contextLabel="Direção de auditoria"
         title="Histórico operacional rastreável"
-        description="Histórico operacional real com rastreabilidade por entidade e ação."
+        description="Acompanhe o que aconteceu, o que falhou e o que precisa de reação sem feed infinito."
         primaryAction={(
           <div className="flex flex-wrap items-center gap-2">
             <Button type="button" variant="outline" onClick={() => void timelineQuery.refetch()}>

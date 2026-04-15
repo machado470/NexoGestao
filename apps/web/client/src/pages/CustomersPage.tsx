@@ -52,9 +52,11 @@ export default function CustomersPage() {
       .map((item) => String(item?.customerId ?? ""))
       .filter(Boolean)
   );
+  const withoutEmail = customers.filter((item) => !String(item?.email ?? "").trim()).length;
+  const withoutPhone = customers.filter((item) => !String(item?.phone ?? "").trim()).length;
 
   return (
-    <PageWrapper title="Clientes" subtitle="Cadastre clientes reais e avance o fluxo operacional sem rupturas.">
+    <PageWrapper title="Clientes" subtitle="Base comercial viva para atendimento, execução e cobrança.">
       <OperationalTopCard
         contextLabel="Direção comercial"
         title="Base de clientes operacional"
@@ -86,6 +88,15 @@ export default function CustomersPage() {
           { title: "Sem cobrança", value: String(Math.max(customers.length - charges.length, 0)), hint: "potencial de monetização" },
         ]}
       />
+
+      <AppSectionBlock title="Leitura operacional da carteira" subtitle="Onde agir primeiro para evitar atraso de receita">
+        <div className="grid gap-2 md:grid-cols-4">
+          <div className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Em risco financeiro: <strong>{customersWithOverdue.size}</strong></div>
+          <div className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Sem e-mail: <strong>{withoutEmail}</strong></div>
+          <div className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Sem telefone: <strong>{withoutPhone}</strong></div>
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm">Próxima ação: <strong>{customersWithOverdue.size > 0 ? "cobrar pendentes hoje" : "ativar clientes sem cobrança"}</strong></div>
+        </div>
+      </AppSectionBlock>
 
       <AppSectionBlock title="Base de clientes" subtitle="Lista sincronizada com backend">
         {showInitialLoading ? (

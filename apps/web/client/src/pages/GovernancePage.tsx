@@ -91,7 +91,7 @@ export default function GovernancePage() {
   }, [runsQuery.error, summaryQuery.error]);
 
   return (
-    <PageWrapper title="Governança e Risco" subtitle="Leitura de risco e contenção com o mesmo contrato operacional das demais telas.">
+    <PageWrapper title="Governança e Risco" subtitle="Risco, alerta e contenção prática para manter operação e receita protegidas.">
       <OperationalTopCard
         contextLabel="Direção de governança"
         title="Risco e contenção operacional"

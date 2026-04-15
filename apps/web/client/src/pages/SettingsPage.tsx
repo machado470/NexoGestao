@@ -70,6 +70,14 @@ export default function SettingsPage() {
         ]}
       />
 
+      <AppSectionBlock title="Resumo administrativo" subtitle="Pendências e próximos passos sem linguagem técnica">
+        <div className="grid gap-2 md:grid-cols-3">
+          <div className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Cobrança automática: <strong>{readiness?.stripe?.configured ? "ativa" : "pendente"}</strong></div>
+          <div className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Canal WhatsApp: <strong>{readiness?.twilio?.configured ? "ativo" : "pendente"}</strong></div>
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm">Próxima ação: <strong>{readiness?.stripe?.configured && readiness?.twilio?.configured ? "revisar usuários e permissões" : "concluir integrações pendentes"}</strong></div>
+        </div>
+      </AppSectionBlock>
+
       <AppSectionBlock title="Próxima ação administrativa" subtitle="Evite gargalo operacional por configuração incompleta">
         <AppNextActionCard
           title={readiness?.stripe?.configured ? "Revisar equipe e permissões" : "Concluir integração de cobrança"}

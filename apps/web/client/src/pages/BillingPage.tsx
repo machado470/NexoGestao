@@ -226,7 +226,7 @@ export default function BillingPage() {
       ) : null}
       {["PAST_DUE", "SUSPENDED", "CANCELED"].includes(subscriptionStatus) ? (
         <SurfaceSection className="border-red-300/60 bg-red-50 text-red-900 dark:border-red-600/50 dark:bg-red-900/20 dark:text-red-200">
-          Política comercial ativa para este tenant ({subscriptionStatus}). Alguns recursos premium podem ser bloqueados até regularizar a assinatura.
+          Política comercial ativa para esta organização ({subscriptionStatus}). Alguns recursos premium podem ser bloqueados até regularizar a assinatura.
         </SurfaceSection>
       ) : null}
 
