@@ -84,6 +84,33 @@ export default function FinancesPage() {
     const delta = due.getTime() - Date.now();
     return delta >= 0 && delta <= 1000 * 60 * 60 * 24 * 7;
   }).length;
+  const dueToday = charges.filter((item) => {
+    const status = String(item?.status ?? "").toUpperCase();
+    const due = safeDate(item?.dueDate);
+    if (status !== "PENDING" || !due) return false;
+    const now = new Date();
+    return due.toDateString() === now.toDateString();
+  }).length;
+  const clientesPossivelAtraso = new Set(
+    charges
+      .filter((item) => String(item?.status ?? "").toUpperCase() === "PENDING" && Number(item?.reminderCount ?? 0) >= 2)
+      .map((item) => String(item?.customerId ?? ""))
+      .filter(Boolean)
+  ).size;
+  const cobrancasRecentes = charges.filter((item) => {
+    const createdAt = safeDate(item?.createdAt);
+    if (!createdAt) return false;
+    return Date.now() - createdAt.getTime() <= 1000 * 60 * 60 * 24 * 3;
+  }).length;
+  const recebivelHoje = charges
+    .filter((item) => {
+      const status = String(item?.status ?? "").toUpperCase();
+      const due = safeDate(item?.dueDate);
+      if (status !== "PENDING" || !due) return false;
+      const now = new Date();
+      return due <= now;
+    })
+    .reduce((acc, item) => acc + Number(item?.amountCents ?? 0), 0);
 
   usePageDiagnostics({
     page: "finances",
@@ -181,17 +208,22 @@ export default function FinancesPage() {
       ]} />
       </KpiErrorBoundary>
 
-      <AppSectionBlock title="Leitura executiva do caixa" subtitle="Risco de atraso, oportunidade de recebimento e próxima ação">
-        <div className="grid gap-2 md:grid-cols-4">
-          <div className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Em aberto: <strong>{formatCurrency(openTotal)}</strong></div>
-          <div className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Vencidas: <strong>{String(stats.overdueCount ?? 0)}</strong></div>
-          <div className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">A vencer em 7 dias: <strong>{dueSoon}</strong></div>
-          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm">Próxima ação: <strong>{Number(stats.overdueCount ?? 0) > 0 ? "cobrar vencidas hoje" : "acelerar recebimento pendente"}</strong></div>
-        </div>
-      </AppSectionBlock>
-
       <div className="grid gap-3 xl:grid-cols-3">
-        <AppChartPanel title="Receita por mês" description="Somente dados reais do backend.">
+        <AppNextActionCard
+          title="Dinheiro em risco"
+          description={`${String(stats.overdueCount ?? 0)} vencidas · ${dueToday} vencendo hoje · ${dueSoon} em até 7 dias · ${clientesPossivelAtraso} clientes com sinal de atraso.`}
+          severity={Number(stats.overdueCount ?? 0) > 0 ? "critical" : dueSoon > 0 ? "high" : "medium"}
+          metadata="risco de caixa"
+          action={{ label: "Cobrar agora", onClick: () => navigate("/whatsapp?context=overdue-charges") }}
+        />
+        <AppNextActionCard
+          title="Entradas rápidas"
+          description={`${cobrancasRecentes} cobranças abertas nos últimos 3 dias · potencial de ${formatCurrency(recebivelHoje)} para receber ainda hoje.`}
+          severity={recebivelHoje > 0 ? "high" : "medium"}
+          metadata="oportunidade de recebimento"
+          action={{ label: "Enviar cobrança", onClick: () => setOpenCreate(true) }}
+        />
+        <AppChartPanel title="Receita por mês" description="Evolução mensal para confirmar tendência de entrada.">
           {revenueQuery.isLoading && revenueSafe.data.length === 0 ? (
             <AppPageLoadingState description="Carregando evolução de receita..." />
           ) : revenueQuery.error && revenueSafe.data.length === 0 ? (
@@ -203,7 +235,7 @@ export default function FinancesPage() {
           ) : !revenueSafe.isValid ? (
             <AppPageEmptyState title="Erro ao renderizar gráfico" description={revenueSafe.reason ?? "Dados inválidos do gráfico."} />
           ) : revenueSafe.data.length === 0 ? (
-            <AppPageEmptyState title="Nenhum dado disponível ainda" description="Ação recomendada: criar cobrança" />
+            <AppPageEmptyState title="Ainda sem histórico mensal" description="Use os cards ao lado para gerar entradas hoje e alimentar a curva real." />
           ) : (
             <ChartErrorBoundary context="finances:revenue-chart">
               <ChartContainer className="h-[240px] w-full" config={{ revenue: { label: "Receita" } }}>

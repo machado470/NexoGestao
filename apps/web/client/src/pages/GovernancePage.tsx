@@ -117,18 +117,18 @@ export default function GovernancePage() {
             value: `${latestRisk}/100`,
             delta: formatDelta(percentDelta(latestRisk, previousRisk)),
             trend: trendFromDelta(percentDelta(latestRisk, previousRisk)),
-            hint: "última execução vs anterior",
+            hint: latestRisk >= 70 ? "alto impacto no fluxo operacional" : latestRisk >= 40 ? "atenção para evitar escalada" : "faixa controlada",
             tone: latestRisk >= 70 ? "critical" : latestRisk >= 40 ? "important" : "default",
           },
-          { title: "Entidades em risco", value: String(entitiesAtRisk.length), hint: "exigem contenção" },
-          { title: "Alertas abertos", value: String(metric(summary, "activeAlerts", "alertsCount")), hint: "monitoramento contínuo" },
-          { title: "Recomendações prioritárias", value: String(recommendations.length), hint: "ações sugeridas" },
+          { title: "Entidades em risco", value: String(entitiesAtRisk.length), hint: entitiesAtRisk.length > 0 ? "podem travar execução e receita" : "sem travas críticas detectadas" },
+          { title: "Alertas abertos", value: String(metric(summary, "activeAlerts", "alertsCount")), hint: "urgência para contenção" },
+          { title: "Recomendações prioritárias", value: String(recommendations.length), hint: "próxima ação para reduzir risco" },
         ]}
       />
       </KpiErrorBoundary>
 
       <div className="grid gap-3 xl:grid-cols-3">
-        <AppChartPanel title="Evolução do risco" description="Histórico real das últimas execuções de governança.">
+        <AppChartPanel title="Evolução do risco" description="Histórico compacto das últimas execuções.">
           {runsQuery.isLoading && !hasRunsData ? (
             <AppPageLoadingState description="Carregando histórico de risco..." />
           ) : runsQuery.error && !hasRunsData ? (
@@ -143,7 +143,7 @@ export default function GovernancePage() {
             <AppPageEmptyState title="Nenhum dado disponível ainda" description="Ação recomendada: rodar governança e acompanhar evolução." />
           ) : (
             <ChartErrorBoundary context="governance:risk-chart">
-              <ChartContainer className="h-[240px] w-full" config={{ score: { label: "Risco" } }}>
+              <ChartContainer className="h-[180px] w-full" config={{ score: { label: "Risco" } }}>
                 <LineChart data={riskSeries.data}>
                   <CartesianGrid vertical={false} />
                   <XAxis dataKey="label" tickLine={false} axisLine={false} />
@@ -154,6 +154,24 @@ export default function GovernancePage() {
             </ChartErrorBoundary>
           )}
         </AppChartPanel>
+        <AppNextActionCard
+          title="Risco real agora"
+          description={entitiesAtRisk.length > 0
+            ? `${entitiesAtRisk.length} entidades podem travar operação e ${metric(summary, "activeAlerts", "alertsCount")} alertas podem afetar receita.`
+            : "Sem risco crítico aberto no momento, mas mantenha monitoramento ativo."}
+          severity={latestRisk >= 70 ? "critical" : latestRisk >= 40 ? "high" : "medium"}
+          metadata="contenção imediata"
+          action={{ label: "Agir agora", onClick: () => void summaryQuery.refetch() }}
+        />
+        <AppNextActionCard
+          title="Ação recomendada"
+          description={recommendations[0]
+            ? `${String(recommendations[0]?.title ?? recommendations[0]?.action ?? "Ação de contenção")} · área ${String(recommendations[0]?.area ?? "operacional")} · impacto esperado em estabilidade.`
+            : "Reexecutar governança para gerar próxima ação de contenção orientada a impacto."}
+          severity="high"
+          metadata="próximo passo"
+          action={{ label: "Aplicar ação", onClick: () => void Promise.all([summaryQuery.refetch(), runsQuery.refetch()]) }}
+        />
       </div>
 
       <TrpcSectionErrorBoundary context="governance:entity-recommendations">

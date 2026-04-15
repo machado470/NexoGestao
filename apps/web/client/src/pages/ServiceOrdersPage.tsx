@@ -57,6 +57,15 @@ export default function ServiceOrdersPage() {
   };
   const travadas = orders.filter(item => ["BLOCKED", "ON_HOLD", "PAUSED"].includes(String(item?.status ?? "").toUpperCase())).length;
   const semResponsavel = orders.filter(item => !item?.assignedToPersonId).length;
+  const aguardandoCliente = orders.filter(item => String(item?.status ?? "").toUpperCase() === "WAITING_CUSTOMER").length;
+  const semAvanco = orders.filter((item) => {
+    const status = String(item?.status ?? "").toUpperCase();
+    return status === "OPEN" || status === "ASSIGNED";
+  }).length;
+  const valorPotencialCobranca = orders
+    .filter(item => String(item?.status ?? "").toUpperCase() === "DONE" && !item?.financialSummary?.hasCharge)
+    .reduce((acc, item) => acc + Number(item?.financialSummary?.estimatedAmountCents ?? item?.amountCents ?? 0), 0);
+  const valorPotencialFormatado = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(valorPotencialCobranca / 100);
 
   return (
     <PageWrapper title="Ordens de Serviço" subtitle="Centro da operação: execução, cobrança e próxima ação sem ruído.">
@@ -86,20 +95,22 @@ export default function ServiceOrdersPage() {
         ]}
       />
 
-      <AppSectionBlock title="Leitura executiva do pipeline" subtitle="Do atendimento até a cobrança">
-        <div className="grid gap-2 md:grid-cols-5">
-          <div className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Abertas: <strong>{pipeline.aberta}</strong></div>
-          <div className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Em execução: <strong>{pipeline.execucao}</strong></div>
-          <div className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Concluídas: <strong>{pipeline.concluida}</strong></div>
-          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm">Prontas para cobrança: <strong>{pipeline.prontaCobranca}</strong></div>
-          <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 p-3 text-sm">Travadas/sem avanço: <strong>{travadas}</strong></div>
-        </div>
-        <div className="mt-3 grid gap-2 md:grid-cols-3">
-          <div className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Sem responsável: <strong>{semResponsavel}</strong></div>
-          <div className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Podem virar cobrança hoje: <strong>{pipeline.prontaCobranca}</strong></div>
-          <div className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Próximo passo recomendado: <strong>{pipeline.prontaCobranca > 0 ? "gerar cobranças pendentes" : "avançar ordens em execução"}</strong></div>
-        </div>
-      </AppSectionBlock>
+      <div className="grid gap-3 xl:grid-cols-2">
+        <AppNextActionCard
+          title="Travadas"
+          description={`${semResponsavel} sem responsável · ${semAvanco} sem avanço · ${aguardandoCliente} aguardando cliente.`}
+          severity={travadas + semResponsavel > 0 ? "high" : "medium"}
+          metadata="ordens em risco"
+          action={{ label: "Destravar ordens", onClick: () => navigate("/service-orders?status=blocked") }}
+        />
+        <AppNextActionCard
+          title="Prontas para cobrar"
+          description={`${pipeline.prontaCobranca} O.S. concluídas sem cobrança ativa${valorPotencialCobranca > 0 ? ` · potencial ${valorPotencialFormatado}` : ""}.`}
+          severity={pipeline.prontaCobranca > 0 ? "high" : "low"}
+          metadata="oportunidade de receita"
+          action={{ label: "Gerar cobrança", onClick: () => navigate("/finances?status=pending&source=service-order") }}
+        />
+      </div>
 
       <AppSectionBlock title="Pipeline operacional" subtitle="Cada O.S. com ação real">
         {showInitialLoading ? (

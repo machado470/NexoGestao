@@ -3,7 +3,7 @@ import { AlertTriangle, CheckCircle2, CreditCard, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { useProductAnalytics } from "@/hooks/useProductAnalytics";
-import { SmartPage, SurfaceSection } from "@/components/PagePattern";
+import { SurfaceSection } from "@/components/PagePattern";
 import { EmptyState } from "@/components/EmptyState";
 import { Button } from "@/components/design-system";
 import { getQueryUiState, normalizeArrayPayload } from "@/lib/query-helpers";
@@ -182,6 +182,13 @@ export default function BillingPage() {
   };
 
   const heroPrimaryAction: PlanName = blockedItems.length > 0 ? "PRO" : "STARTER";
+  const planoLiberaHoje = [
+    `Clientes: ${limits?.limits?.customers ?? "—"}`,
+    `Usuários: ${limits?.limits?.users ?? "—"}`,
+    `Mensagens: ${limits?.limits?.messages ?? "—"}`,
+    `Ordens: ${limits?.limits?.serviceOrders ?? "—"}`,
+    `Agenda: ${limits?.limits?.appointments ?? "—"}`,
+  ];
 
   return (
     <PageWrapper
@@ -219,6 +226,30 @@ export default function BillingPage() {
         <div className="nexo-card-kpi p-4"><p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Modo</p><p className="relative mt-2 text-2xl font-bold tracking-tight">{isTrial ? "Trial" : "Ativo"}</p></div>
         <div className="nexo-card-kpi p-4"><p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Próxima ação</p><p className="relative mt-2 text-xl font-bold tracking-tight">{blockedItems.length > 0 ? "Upgrade urgente" : "Revisar limites"}</p></div>
       </div>
+      <div className="grid gap-3 lg:grid-cols-2">
+        <SurfaceSection>
+          <p className="text-sm font-semibold text-[var(--text-primary)]">O que seu plano libera hoje</p>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">Capacidade operacional disponível para manter a rotina sem travar.</p>
+          <ul className="mt-3 space-y-1 text-sm text-[var(--text-secondary)]">
+            {planoLiberaHoje.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </SurfaceSection>
+        <SurfaceSection className="border-amber-500/40 bg-amber-500/10">
+          <p className="text-sm font-semibold text-[var(--text-primary)]">O que está travado no plano atual</p>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
+            {blockedItems.length > 0
+              ? `Limites atingidos em ${blockedItems.map((item) => item.label).join(", ")}. Isso bloqueia novas ações e reduz receita.`
+              : "Sem bloqueio crítico agora. Próxima ação é prevenir travas com folga de limite."}
+          </p>
+          <div className="mt-3">
+            <Button type="button" onClick={() => void handleUpgrade(heroPrimaryAction)} disabled={checkoutMutation.isPending || !stripeConfigured}>
+              {blockedItems.length > 0 ? "Liberar agora" : "Fazer upgrade agora"}
+            </Button>
+          </div>
+        </SurfaceSection>
+      </div>
       {!stripeConfigured ? (
         <SurfaceSection className="border-amber-300/60 bg-amber-50 text-amber-900 dark:border-amber-600/50 dark:bg-amber-900/20 dark:text-amber-200">
           Checkout online indisponível: Stripe não configurado. Alternativa segura: registre cobranças e pagamentos manualmente na tela de Finanças.
@@ -229,53 +260,6 @@ export default function BillingPage() {
           Política comercial ativa para esta organização ({subscriptionStatus}). Alguns recursos premium podem ser bloqueados até regularizar a assinatura.
         </SurfaceSection>
       ) : null}
-
-      <SmartPage
-        pageContext="finances"
-        headline="Centro de monetização"
-        dominantProblem={blockedItems.length > 0 ? "Limite atingido bloqueando vendas" : "Plano pode limitar escala"}
-        dominantImpact={blockedItems.length > 0 ? `Bloqueio em ${blockedItems.map((item) => item.label).join(", ")}` : "Fluxo operacional disponível"}
-        dominantCta={{
-          label: blockedItems.length > 0 ? "Desbloquear com upgrade" : "Atualizar plano",
-          path: "/billing",
-          onClick: () => void handleUpgrade(heroPrimaryAction),
-        }}
-        priorities={[
-          {
-            id: "billing-upgrade",
-            type: "idle_cash",
-            title: blockedItems.length > 0 ? "Upgrade imediato" : "Revisar plano atual",
-            helperText:
-              blockedItems.length > 0
-                ? "Evita bloqueio de criação em recursos críticos."
-                : "Garante escala sem fricção comercial.",
-            count: blockedItems.length > 0 ? blockedItems.length : 1,
-            impactCents: blockedItems.length > 0 ? 100000 : 50000,
-            ctaLabel: "Atualizar plano",
-            ctaPath: "/billing",
-          },
-          {
-            id: "billing-usage",
-            type: "overdue_charges",
-            title: "Monitorar limites",
-            helperText: "Acompanhe consumo para não travar o funil.",
-            count: hasExceededUsage ? blockedItems.length : 1,
-            impactCents: hasExceededUsage ? 80000 : 10000,
-            ctaLabel: "Ver limites",
-            ctaPath: "/billing",
-          },
-          {
-            id: "billing-trial",
-            type: "operational_risk",
-            title: isTrial ? "Converter trial em assinatura" : "Plano recorrente validado",
-            helperText: isTrial ? "Defina plano antes do fim do período de avaliação." : "Operação monetizada sem risco imediato.",
-            count: 1,
-            impactCents: isTrial ? 65000 : 1000,
-            ctaLabel: "Revisar cobrança",
-            ctaPath: "/billing",
-          },
-        ]}
-      />
 
       {queryState.shouldBlockForError ? (
         <SurfaceSection>
@@ -305,7 +289,7 @@ export default function BillingPage() {
       ) : null}
 
       {!queryState.isInitialLoading ? (
-        <section className="grid gap-3 md:grid-cols-3">
+        <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {plans.map((plan: any) => {
             const name = String(plan.name ?? "FREE").toUpperCase();
             const isCurrent = name === currentPlan;
@@ -333,6 +317,7 @@ export default function BillingPage() {
                   ) : (
                     <Button
                       type="button"
+                      className="w-full"
                       disabled={!canUpgrade || checkoutMutation.isPending || !stripeConfigured}
                       onClick={() => void handleUpgrade(name as PlanName)}
                     >

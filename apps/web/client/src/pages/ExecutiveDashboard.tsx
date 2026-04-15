@@ -1,14 +1,11 @@
-import { Area, AreaChart, CartesianGrid, XAxis } from "recharts";
 import { useLocation } from "wouter";
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Button } from "@/components/ui/button";
 import { useRunAction } from "@/hooks/useRunAction";
 import { useRenderWatchdog } from "@/hooks/useRenderWatchdog";
-import { useEffect, useMemo } from "react";
+import { useEffect } from "react";
 import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import {
   AppAlertList,
-  AppChartPanel,
   AppKpiRow,
   AppListBlock,
   AppNextActionCard,
@@ -17,33 +14,24 @@ import {
   AppSectionBlock,
   AppStatusBadge,
 } from "@/components/internal-page-system";
-import { safeChartData } from "@/lib/safeChartData";
-import { ChartErrorBoundary } from "@/components/ChartErrorBoundary";
 import { KpiErrorBoundary } from "@/components/KpiErrorBoundary";
-
-const chartData = [
-  { day: "Seg", receita: 42, ordens: 18 },
-  { day: "Ter", receita: 38, ordens: 16 },
-  { day: "Qua", receita: 47, ordens: 21 },
-  { day: "Qui", receita: 51, ordens: 24 },
-  { day: "Sex", receita: 58, ordens: 27 },
-  { day: "Sáb", receita: 36, ordens: 14 },
-];
 
 export default function ExecutiveDashboard() {
   useRenderWatchdog("ExecutiveDashboard");
   const [, navigate] = useLocation();
   const { runAction, isRunning } = useRunAction();
-  const safeData = useMemo(
-    () => safeChartData<{ day: string; receita: number; ordens: number }>(chartData, ["receita", "ordens"]),
-    []
-  );
+  const ordensTravadas = 5;
+  const clientesSemResposta = 2;
+  const cobrancasPendentes = 12;
+  const agendaSemConfirmacao = 4;
+  const osSemCobranca = 8;
+  const clientesSemCobrancaRecente = 6;
+  const cobrancasComAltaConversao = 9;
+
   useEffect(() => {
     // eslint-disable-next-line no-console
     console.info("[RENDER PAGE] executive-dashboard");
-    // eslint-disable-next-line no-console
-    console.info("[CHART DATA] executive-dashboard.revenue", safeData);
-  }, [safeData]);
+  }, []);
 
   return (
     <AppPageShell>
@@ -77,32 +65,32 @@ export default function ExecutiveDashboard() {
           metadata="centro executivo"
           action={{ label: "Abrir ordens críticas", onClick: () => navigate("/service-orders?status=attention&period=7d") }}
         />
-        <AppChartPanel
-          title="Evolução de receita e volume"
-          description="Ritmo operacional diário com impacto em faturamento."
-          trendValue={12.8}
-          trendLabel="↑ +12,8% · últimos 7 dias"
-          onCtaClick={() => navigate("/finances?chart=revenue_volume&period=7d")}
-        >
-          {!safeData.isValid ? (
-            <p className="text-sm text-[var(--text-muted)]">Erro ao renderizar gráfico.</p>
-          ) : (
-            <ChartErrorBoundary context="executive-dashboard:revenue-chart">
-              <ChartContainer
-                className="h-[260px] w-full"
-                config={{ receita: { label: "Receita" }, ordens: { label: "Ordens" } }}
-              >
-                <AreaChart data={safeData.data}>
-                  <CartesianGrid vertical={false} />
-                  <XAxis dataKey="day" tickLine={false} axisLine={false} />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Area type="monotone" dataKey="receita" stroke="var(--brand-primary)" fill="var(--brand-primary)" fillOpacity={0.25} />
-                  <Area type="monotone" dataKey="ordens" stroke="var(--color-info)" fill="var(--color-info)" fillOpacity={0.1} />
-                </AreaChart>
-              </ChartContainer>
-            </ChartErrorBoundary>
-          )}
-        </AppChartPanel>
+        <AppSectionBlock title="O que está parado agora" subtitle="Bloqueios que pedem reação hoje">
+          <AppListBlock
+            items={[
+              { title: `${clientesSemResposta} clientes sem resposta`, subtitle: "Risco de esfriar oportunidade comercial" },
+              { title: `${ordensTravadas} ordens travadas`, subtitle: "Impacto direto no SLA e na agenda" },
+              { title: `${cobrancasPendentes} cobranças pendentes`, subtitle: "Valor em aberto sem follow-up ativo" },
+              { title: `${agendaSemConfirmacao} agendamentos sem confirmação`, subtitle: "Pode virar no-show ainda hoje" },
+            ]}
+          />
+          <div className="mt-3">
+            <Button onClick={() => navigate("/dashboard/operations?filter=critical")}>Resolver agora</Button>
+          </div>
+        </AppSectionBlock>
+
+        <AppSectionBlock title="O que pode virar dinheiro hoje" subtitle="Oportunidades para gerar caixa ainda no dia">
+          <AppListBlock
+            items={[
+              { title: `${osSemCobranca} O.S. concluídas sem cobrança`, subtitle: "Serviço finalizado sem passo financeiro" },
+              { title: `${clientesSemCobrancaRecente} clientes ativos sem cobrança recente`, subtitle: "Risco de atraso no ciclo de receita" },
+              { title: `${cobrancasComAltaConversao} cobranças com alta chance de conversão`, subtitle: "Janela boa para contato imediato" },
+            ]}
+          />
+          <div className="mt-3">
+            <Button onClick={() => navigate("/finances?status=pending&priority=high")}>Cobrar agora</Button>
+          </div>
+        </AppSectionBlock>
 
         <AppSectionBlock title="Itens que exigem atenção" subtitle="Prioridades do dia" onCtaClick={() => navigate("/dashboard/operations?filter=critical")}>
           <AppAlertList alerts={[{ text: "5 O.S. atrasadas aguardando execução", tone: "danger" }, { text: "12 cobranças vencidas sem negociação", tone: "warning" }, { text: "2 clientes sem retorno há 7 dias", tone: "warning" }]} />
@@ -140,13 +128,14 @@ export default function ExecutiveDashboard() {
         />
       </AppSectionBlock>
 
-      <AppSectionBlock title="Resumo de execução do dia" subtitle="Visão rápida do que foi executado hoje">
-        <AppRecentActivity items={[
-          "14 execuções concluídas no fluxo operacional",
-          "3 exceções exigiram intervenção manual",
-          "9 automações disparadas com sucesso",
-          "2 bloqueios ainda aguardando resolução",
-        ]} />
+      <AppSectionBlock title="Próximas decisões das 2 horas" subtitle="Fechamento objetivo para não deixar a operação parar">
+        <AppListBlock
+          items={[
+            { title: "Cobrar clientes com vencimento de hoje", subtitle: "Protege o caixa do fim do dia", action: <Button size="sm" onClick={() => navigate("/finances?window=today")}>Cobrar agora</Button> },
+            { title: "Reatribuir O.S. sem responsável", subtitle: "Evita acúmulo no turno seguinte", action: <Button size="sm" onClick={() => navigate("/service-orders?status=unassigned")}>Resolver agora</Button> },
+            { title: "Confirmar agenda do próximo período", subtitle: "Reduz faltas e remarcações", action: <Button size="sm" onClick={() => navigate("/appointments?status=unconfirmed")}>Confirmar</Button> },
+          ]}
+        />
       </AppSectionBlock>
     </AppPageShell>
   );
