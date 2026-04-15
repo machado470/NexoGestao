@@ -266,7 +266,7 @@ export default function WhatsAppPage() {
         />
       </div>
 
-      <AppSectionBlock title="Automações sugeridas pela engine" subtitle="Problema detectado → ação pronta com pré-visualização e envio em 1 clique">
+      <AppSectionBlock title="Automações sugeridas" subtitle="Problema detectado → ação pronta com pré-visualização e envio em 1 clique">
         {automationSuggestions.length === 0 ? (
           <AppEmptyState title="Sem gatilhos automáticos agora" description="Operação estável: nenhuma cobrança vencida, atraso de O.S. ou cliente sem contato crítico." />
         ) : (

@@ -42,6 +42,7 @@ import {
   getConcurrencyErrorMessage,
   isConcurrentConflictError,
 } from "@/lib/concurrency";
+import { AppKpiRow, AppSectionBlock } from "@/components/internal-page-system";
 
 const STATUS_COLORS: Record<string, string> = {
   SCHEDULED: "#f97316",
@@ -348,6 +349,10 @@ export default function CalendarPage() {
       extendedProps: appointment,
     }));
   }, [rawAppointments]);
+  const scheduledCount = rawAppointments.filter((item) => item.status === "SCHEDULED").length;
+  const confirmedCount = rawAppointments.filter((item) => item.status === "CONFIRMED").length;
+  const noShowCount = rawAppointments.filter((item) => item.status === "NO_SHOW").length;
+  const doneCount = rawAppointments.filter((item) => item.status === "DONE").length;
 
   const customers = useMemo(() => {
     const payload = customersQuery.data;
@@ -453,6 +458,23 @@ export default function CalendarPage() {
       />
 
       <SurfaceSection className="space-y-6">
+        <AppKpiRow
+          items={[
+            { title: "Agendados", value: String(scheduledCount), hint: "aguardando confirmação" },
+            { title: "Confirmados", value: String(confirmedCount), hint: "prontos para atendimento" },
+            { title: "Concluídos", value: String(doneCount), hint: "execução finalizada" },
+            { title: "Não compareceu", value: String(noShowCount), hint: "pedem reação comercial" },
+          ]}
+        />
+
+        <AppSectionBlock title="Leitura operacional da agenda" subtitle="O que priorizar hoje">
+          <div className="grid gap-2 md:grid-cols-3">
+            <div className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Atendimentos prontos para O.S.: <strong>{confirmedCount}</strong></div>
+            <div className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Clientes sem comparecimento: <strong>{noShowCount}</strong></div>
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm">Próxima ação: <strong>{noShowCount > 0 ? "reativar cliente por WhatsApp" : "converter confirmados em execução"}</strong></div>
+          </div>
+        </AppSectionBlock>
+
         {appointmentsQuery.error ? (
           <SurfaceSection className="rounded-xl border border-red-500/40 bg-red-500/10 p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">

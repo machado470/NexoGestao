@@ -49,7 +49,7 @@ export default function ProfilePage() {
 
   return (
     <AppPageShell>
-      <AppPageHeader title="Perfil" description="Seus dados, segurança da conta e contexto de uso no dia a dia." />
+      <AppPageHeader title="Perfil" description="Sua identidade no sistema, segurança de acesso e ajustes pessoais." />
       <AppKpiRow
         items={[
           { title: "Perfil", value: String(me.name ?? me.fullName ?? "Usuário"), hint: "identidade da sessão atual" },
@@ -71,7 +71,7 @@ export default function ProfilePage() {
             <Input value={String(me.emailVerifiedAt ? "E-mail verificado" : "E-mail pendente")} readOnly className="max-w-sm" />
             <Input value={String(me.lastLoginAt ? new Date(String(me.lastLoginAt)).toLocaleString("pt-BR") : "Sem registro")} readOnly className="max-w-sm" />
             <Button variant="outline" disabled>
-              Alteração de senha via backend
+              Alteração de senha em liberação
             </Button>
           </AppFiltersBar>
         </AppSectionBlock>
@@ -80,7 +80,7 @@ export default function ProfilePage() {
       <div className="grid gap-3 xl:grid-cols-3">
         <AppNextActionCard
           title="Próxima ação recomendada"
-          description={me.emailVerifiedAt ? "Mantenha seus dados atualizados para evitar bloqueios operacionais." : "Valide seu e-mail para reduzir risco de perda de acesso."}
+          description={me.emailVerifiedAt ? "Revise preferências para manter alertas e horários corretos." : "Valide seu e-mail para reduzir risco de perda de acesso."}
           severity={me.emailVerifiedAt ? "low" : "high"}
           metadata="perfil"
           action={{

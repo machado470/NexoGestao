@@ -234,7 +234,7 @@ export default function PeoplePage() {
   return (
     <PageWrapper
       title="Pessoas"
-      subtitle="Base de pessoas conectada à operação, com a mesma leitura visual do dashboard executivo."
+      subtitle="Equipe operacional com carga, risco e distribuição clara por responsável."
     >
       <OperationalTopCard
         contextLabel="Direção da equipe"
@@ -267,8 +267,8 @@ export default function PeoplePage() {
               >
                 {unassignedOrders > 0 ? "Distribuir ordens" : "Nova pessoa"}
               </Button>
-              <Button type="button" className="min-h-12 gap-2" onClick={() => navigate("/finances")}>
-                Ir para cobrança
+              <Button type="button" variant="outline" className="min-h-12 gap-2" onClick={() => navigate("/finances")}>
+                Ver impacto no financeiro
               </Button>
             </div>
           </div>
@@ -294,10 +294,10 @@ export default function PeoplePage() {
         <div className="nexo-kpi-card p-4"><p className="text-xs text-[var(--text-muted)]">O.S. sem responsável</p><p className="text-2xl font-bold">{unassignedOrders}</p></div>
       </div>
 
-      <SurfaceSection>
-        <p className="text-sm text-[var(--text-secondary)] dark:text-[var(--text-secondary)]">
-          Bloco analítico: distribua carga da equipe para evitar gargalos de execução e reduzir riscos operacionais.
-        </p>
+      <SurfaceSection className="grid gap-2 md:grid-cols-3">
+        <div className="nexo-subtle-surface p-3 text-sm">Sem responsável: <strong>{unassignedOrders}</strong> O.S. prontas para distribuição.</div>
+        <div className="nexo-subtle-surface p-3 text-sm">Pessoas em atenção: <strong>{warningPeople}</strong> com risco de gargalo.</div>
+        <div className="nexo-subtle-surface p-3 text-sm">Próxima ação recomendada: <strong>{unassignedOrders > 0 ? "distribuir ordens travadas" : "equilibrar carga da equipe"}</strong>.</div>
       </SurfaceSection>
 
       <SurfaceSection className="space-y-2">

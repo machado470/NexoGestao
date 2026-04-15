@@ -147,7 +147,7 @@ export default function FinancesPage() {
   }
 
   return (
-    <PageWrapper title="Financeiro" subtitle="Cobranças com execução padronizada de ações e invalidação consistente.">
+    <PageWrapper title="Financeiro" subtitle="Dinheiro em movimento: cobrança, atraso, recebimento e decisão rápida.">
       <OperationalTopCard
         contextLabel="Direção de receita"
         title="Fluxo cobrança → pagamento"
@@ -180,6 +180,15 @@ export default function FinancesPage() {
         { title: "Próx. a vencer", value: String(dueSoon), hint: "vencimento em até 7 dias" },
       ]} />
       </KpiErrorBoundary>
+
+      <AppSectionBlock title="Leitura executiva do caixa" subtitle="Risco de atraso, oportunidade de recebimento e próxima ação">
+        <div className="grid gap-2 md:grid-cols-4">
+          <div className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Em aberto: <strong>{formatCurrency(openTotal)}</strong></div>
+          <div className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Vencidas: <strong>{String(stats.overdueCount ?? 0)}</strong></div>
+          <div className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">A vencer em 7 dias: <strong>{dueSoon}</strong></div>
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm">Próxima ação: <strong>{Number(stats.overdueCount ?? 0) > 0 ? "cobrar vencidas hoje" : "acelerar recebimento pendente"}</strong></div>
+        </div>
+      </AppSectionBlock>
 
       <div className="grid gap-3 xl:grid-cols-3">
         <AppChartPanel title="Receita por mês" description="Somente dados reais do backend.">
