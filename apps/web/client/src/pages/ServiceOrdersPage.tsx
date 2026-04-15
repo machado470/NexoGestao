@@ -11,6 +11,7 @@ import { getOperationalSeverityLabel, getServiceOrderSeverity } from "@/lib/oper
 import {
   AppDataTable,
   AppKpiRow,
+  AppListBlock,
   AppNextActionCard,
   AppPageEmptyState,
   AppPageErrorState,
@@ -66,6 +67,39 @@ export default function ServiceOrdersPage() {
     .filter(item => String(item?.status ?? "").toUpperCase() === "DONE" && !item?.financialSummary?.hasCharge)
     .reduce((acc, item) => acc + Number(item?.financialSummary?.estimatedAmountCents ?? item?.amountCents ?? 0), 0);
   const valorPotencialFormatado = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(valorPotencialCobranca / 100);
+  const topOS = [...orders]
+    .sort((a, b) => {
+      const priorityDiff = Number(b?.priority ?? 0) - Number(a?.priority ?? 0);
+      if (priorityDiff !== 0) return priorityDiff;
+      return (safeDate(b?.updatedAt)?.getTime() ?? 0) - (safeDate(a?.updatedAt)?.getTime() ?? 0);
+    })
+    .slice(0, 6);
+  const travadasDetalhadas = [
+    ...orders
+      .filter(item => ["BLOCKED", "ON_HOLD", "PAUSED"].includes(String(item?.status ?? "").toUpperCase()))
+      .slice(0, 3)
+      .map((item) => ({
+        title: String(item?.title ?? "O.S. sem título"),
+        subtitle: `Status ${String(item?.status ?? "").toUpperCase()} · cliente ${String(item?.customer?.name ?? "não identificado")}`,
+        action: <button className="nexo-cta-secondary" onClick={() => navigate(`/service-orders?serviceOrderId=${item?.id}`)}>Destravar</button>,
+      })),
+    ...orders
+      .filter(item => !item?.assignedToPersonId)
+      .slice(0, 2)
+      .map((item) => ({
+        title: `${String(item?.title ?? "O.S.")} sem responsável`,
+        subtitle: "Sem técnico alocado para execução.",
+        action: <button className="nexo-cta-secondary" onClick={() => setOpenCreate(true)}>Atribuir</button>,
+      })),
+    ...orders
+      .filter(item => String(item?.status ?? "").toUpperCase() === "WAITING_CUSTOMER")
+      .slice(0, 2)
+      .map((item) => ({
+        title: `${String(item?.title ?? "O.S.")} sem resposta do cliente`,
+        subtitle: `Cliente ${String(item?.customer?.name ?? "não identificado")} aguardando retorno.`,
+        action: <button className="nexo-cta-secondary" onClick={() => navigate(`/whatsapp?customerId=${item?.customerId}`)}>Cobrar retorno</button>,
+      })),
+  ].slice(0, 7);
 
   return (
     <PageWrapper title="Ordens de Serviço" subtitle="Centro da operação: execução, cobrança e próxima ação sem ruído.">
@@ -111,6 +145,27 @@ export default function ServiceOrdersPage() {
           action={{ label: "Gerar cobrança", onClick: () => navigate("/finances?status=pending&source=service-order") }}
         />
       </div>
+
+      <section className="grid gap-3 xl:grid-cols-2">
+        <AppSectionBlock title="Top O.S. para executar agora" subtitle="Prioridade alta com ação operacional direta">
+          <AppListBlock
+            items={topOS.length > 0
+              ? topOS.map((item) => ({
+                  title: `${String(item?.title ?? "O.S. sem título")} · P${String(item?.priority ?? 2)}`,
+                  subtitle: `${String(item?.customer?.name ?? "Cliente")} · ${String(item?.status ?? "").toUpperCase()}`,
+                  action: <button className="nexo-cta-secondary" onClick={() => navigate(`/service-orders?serviceOrderId=${item?.id}`)}>Executar</button>,
+                }))
+              : [{ title: "Sem O.S. abertas", subtitle: "Crie uma ordem para iniciar execução.", action: <button className="nexo-cta-secondary" onClick={() => setOpenCreate(true)}>Criar O.S.</button> }]}
+          />
+        </AppSectionBlock>
+        <AppSectionBlock title="Travadas detalhadas" subtitle="Atrasadas, sem responsável e sem resposta para resolver agora">
+          <AppListBlock
+            items={travadasDetalhadas.length > 0
+              ? travadasDetalhadas
+              : [{ title: "Sem travas críticas", subtitle: "Pipeline fluindo no momento.", action: <button className="nexo-cta-secondary" onClick={() => navigate("/finances")}>Seguir para cobrança</button> }]}
+          />
+        </AppSectionBlock>
+      </section>
 
       <AppSectionBlock title="Pipeline operacional" subtitle="Cada O.S. com ação real">
         {showInitialLoading ? (

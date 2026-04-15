@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
+import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { normalizeArrayPayload } from "@/lib/query-helpers";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import { Button } from "@/components/design-system";
 import {
-  AppEmptyState,
   AppFiltersBar,
   AppKpiRow,
   AppListBlock,
@@ -30,6 +30,7 @@ function toLabel(value: unknown, fallback: string) {
 export default function TimelinePage() {
   setBootPhase("PAGE:Timeline");
   useRenderWatchdog("TimelinePage");
+  const [, navigate] = useLocation();
   const [filter, setFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [periodFilter, setPeriodFilter] = useState("all");
@@ -109,6 +110,15 @@ export default function TimelinePage() {
     String(event?.description ?? event?.title ?? "").toLowerCase().includes("sem retorno")
   ).length;
   const uniqueEntities = new Set(filteredEvents.map((event) => String(event?.entityId ?? "")).filter(Boolean)).size;
+  const eventosAcionaveis = filteredEvents.slice(0, 8).map((event) => {
+    const entity = String(event?.entityType ?? "").toLowerCase();
+    const route = entity.includes("service") ? "/service-orders" : entity.includes("appoint") ? "/appointments" : entity.includes("charge") ? "/finances" : "/dashboard";
+    return {
+      title: toLabel(event?.title ?? event?.action ?? event?.type, "Evento operacional"),
+      subtitle: `${toLabel(event?.entityType, "Entidade")} #${toLabel(event?.entityId, "—")} · ${event?.createdAt ? new Date(String(event.createdAt)).toLocaleString("pt-BR") : "sem data"}`,
+      action: <Button type="button" variant="outline" onClick={() => navigate(route)}>Agir</Button>,
+    };
+  });
   const currentDay = getDayWindow(0);
   const previousDay = getDayWindow(1);
   const recentEvents = events.filter((event) => {
@@ -240,9 +250,18 @@ export default function TimelinePage() {
         {timelineQuery.isLoading ? (
           <AppLoadingState rows={5} />
         ) : filteredEvents.length === 0 ? (
-          <AppEmptyState title="Nenhum evento encontrado" description="Ajuste o filtro ou execute ações operacionais para gerar histórico." />
+          <AppListBlock
+            items={[
+              { title: "Sem eventos no filtro atual", subtitle: "Ajuste o período/tipo para localizar itens acionáveis.", action: <Button type="button" variant="outline" onClick={() => setPeriodFilter("all")}>Limpar período</Button> },
+              { title: "Validar gargalos da agenda", subtitle: "Cheque atrasos e conflitos para alimentar a timeline.", action: <Button type="button" variant="outline" onClick={() => navigate("/appointments")}>Abrir agenda</Button> },
+              { title: "Verificar cobranças vencidas", subtitle: "Ações financeiras criam novos eventos de execução.", action: <Button type="button" variant="outline" onClick={() => navigate("/finances")}>Abrir financeiro</Button> },
+            ]}
+          />
         ) : (
           <div className="space-y-3">
+            <AppSectionBlock title="Eventos acionáveis" subtitle="Sem espaço vazio: tudo aqui tem próximo passo operacional.">
+              <AppListBlock items={eventosAcionaveis} />
+            </AppSectionBlock>
             {groupedEvents.map(([dateLabel, items]) => (
               <div key={dateLabel} className="space-y-2">
                 <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">{dateLabel}</p>
