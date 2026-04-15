@@ -331,15 +331,14 @@ export default function BillingPage() {
                       <CheckCircle2 className="h-3.5 w-3.5" /> Plano em uso
                     </span>
                   ) : (
-                    <button
+                    <Button
                       type="button"
-                      className="nexo-cta-primary inline-flex h-10 items-center gap-2 rounded-xl px-4 text-sm font-medium disabled:opacity-60"
                       disabled={!canUpgrade || checkoutMutation.isPending || !stripeConfigured}
                       onClick={() => void handleUpgrade(name as PlanName)}
                     >
                       <CreditCard className="h-4 w-4" />
                       {checkoutMutation.isPending ? "Processando..." : "Continuar crescendo"}
-                    </button>
+                    </Button>
                   )}
                 </div>
               </article>

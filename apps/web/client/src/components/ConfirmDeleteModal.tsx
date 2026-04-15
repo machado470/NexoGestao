@@ -32,42 +32,41 @@ export function ConfirmDeleteModal({
     <Dialog open={isOpen} onOpenChange={(open) => (!open ? onCancel() : null)}>
       <DialogContent
         showCloseButton={false}
-        className="max-w-md border-[var(--border-subtle)] bg-white p-0 shadow-sm dark:bg-gray-800"
+        className="max-w-md border-[var(--border-subtle)] p-0 shadow-sm"
       >
-        <DialogHeader className="border-b border-gray-200 p-6 dark:border-gray-700">
-          <DialogTitle className="flex items-start gap-3 text-lg text-gray-900 dark:text-white">
-            <AlertCircle className="mt-0.5 h-5 w-5 text-red-600 dark:text-red-400" />
+        <DialogHeader className="border-b border-[var(--border-subtle)] p-6">
+          <DialogTitle className="flex items-start gap-3 text-lg text-[var(--text-primary)]">
+            <AlertCircle className="mt-0.5 h-5 w-5 text-[var(--color-danger)]" />
             {title}
           </DialogTitle>
         </DialogHeader>
         <div className="p-6">
-          <p className="text-gray-700 dark:text-gray-300 mb-4">
+          <p className="mb-4 text-[var(--text-secondary)]">
             {message}
           </p>
           {itemName && (
-            <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-3 mb-4">
-              <p className="text-sm font-medium text-gray-900 dark:text-white">
+            <div className="mb-4 rounded-lg bg-[var(--surface-base)] p-3">
+              <p className="text-sm font-medium text-[var(--text-primary)]">
                 {itemName}
               </p>
             </div>
           )}
-          <p className="text-sm text-gray-600 dark:text-gray-400">
+          <p className="text-sm text-[var(--text-muted)]">
             Esta ação não pode ser desfeita.
           </p>
         </div>
-        <DialogFooter className="flex justify-end gap-3 border-t border-gray-200 p-6 dark:border-gray-700">
+        <DialogFooter className="flex justify-end gap-3 border-t border-[var(--border-subtle)] p-6">
           <Button
             onClick={onCancel}
             disabled={isLoading}
             variant="outline"
-            className="text-gray-700 dark:text-gray-300"
           >
             Cancelar
           </Button>
           <Button
             onClick={onConfirm}
             disabled={isLoading}
-            className="bg-red-600 hover:bg-red-700 text-white"
+            variant="danger"
           >
             {isLoading ? (
               <>

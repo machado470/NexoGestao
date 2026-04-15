@@ -3,6 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { Loader2, PlusCircle, Receipt, X } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Button } from "@/components/design-system";
 
 type Props = {
   open: boolean;
@@ -126,9 +127,9 @@ export default function CreateExpenseModal({
 
   return (
     <Dialog open={open} onOpenChange={nextOpen => !nextOpen && onClose()}>
-      <DialogContent className="max-h-[90vh] max-w-2xl overflow-hidden border-[var(--border-subtle)] bg-white p-0 shadow-sm dark:bg-zinc-950">
-        <div className="flex max-h-[90vh] w-full flex-col rounded-2xl border bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
-          <div className="flex items-center justify-between border-b p-4 dark:border-zinc-800">
+      <DialogContent className="max-h-[90vh] max-w-2xl overflow-hidden border-[var(--border-subtle)] p-0 shadow-sm">
+        <div className="flex max-h-[90vh] w-full flex-col rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] shadow-sm">
+          <div className="flex items-center justify-between border-b border-[var(--border-subtle)] p-4">
             <div className="flex items-center gap-2">
               <Receipt className="h-5 w-5 text-orange-500" />
               <h2 className="text-lg font-semibold">Nova despesa</h2>
@@ -137,7 +138,7 @@ export default function CreateExpenseModal({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg p-2 transition-colors hover:bg-[var(--surface-base)] dark:hover:bg-[var(--surface-base)]"
+              className="rounded-lg p-2 transition-colors hover:bg-[var(--surface-base)]"
               disabled={createMutation.isPending}
             >
               <X className="h-4 w-4" />
@@ -151,7 +152,7 @@ export default function CreateExpenseModal({
                 <input
                   value={formData.description}
                   onChange={e => handleChange("description", e.target.value)}
-                  className="w-full rounded-md border bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-zinc-800"
+                  className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-orange-500"
                   placeholder="Ex: compra de material, frete, fornecedor, imposto"
                 />
               </div>
@@ -164,7 +165,7 @@ export default function CreateExpenseModal({
                   min="0"
                   value={formData.amount}
                   onChange={e => handleChange("amount", e.target.value)}
-                  className="w-full rounded-md border bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-zinc-800"
+                  className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-orange-500"
                   placeholder="0,00"
                 />
               </div>
@@ -176,7 +177,7 @@ export default function CreateExpenseModal({
                   onChange={e =>
                     handleChange("category", e.target.value as ExpenseCategory)
                   }
-                  className="w-full rounded-md border bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-zinc-800"
+                  className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-orange-500"
                 >
                   {CATEGORY_OPTIONS.map(category => (
                     <option key={category} value={category}>
@@ -192,7 +193,7 @@ export default function CreateExpenseModal({
                   type="date"
                   value={formData.date}
                   onChange={e => handleChange("date", e.target.value)}
-                  className="w-full rounded-md border bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-zinc-800"
+                  className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-orange-500"
                 />
               </div>
 
@@ -202,26 +203,26 @@ export default function CreateExpenseModal({
                   value={formData.notes}
                   onChange={e => handleChange("notes", e.target.value)}
                   rows={4}
-                  className="w-full rounded-md border bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-zinc-800"
+                  className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-orange-500"
                   placeholder="Observações opcionais sobre a despesa"
                 />
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 border-t px-4 py-4 dark:border-zinc-800">
-              <button
+            <div className="flex items-center justify-end gap-2 border-t border-[var(--border-subtle)] px-4 py-4">
+              <Button
                 type="button"
+                variant="outline"
                 onClick={onClose}
                 disabled={createMutation.isPending}
-                className="rounded-md border px-4 py-2 text-sm font-medium transition-colors hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-800 dark:hover:bg-[var(--surface-base)]"
               >
                 Cancelar
-              </button>
+              </Button>
 
-              <button
+              <Button
                 type="submit"
                 disabled={createMutation.isPending}
-                className="inline-flex items-center gap-2 rounded-md bg-orange-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600 disabled:opacity-50"
+                className="inline-flex items-center gap-2"
               >
                 {createMutation.isPending ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -229,7 +230,7 @@ export default function CreateExpenseModal({
                   <PlusCircle className="h-4 w-4" />
                 )}
                 Criar despesa
-              </button>
+              </Button>
             </div>
           </form>
         </div>

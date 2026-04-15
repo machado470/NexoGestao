@@ -105,7 +105,7 @@ export default function CreatePersonModal({ open, onClose, onSaved }: Props) {
               id="person-name"
               value={formData.name}
               onChange={(e) => handleChange("name", e.target.value)}
-              className="border-[var(--border-subtle)] bg-white"
+              className="border-[var(--border-subtle)]"
               placeholder="Ex: João da Silva"
             />
           </div>
@@ -116,7 +116,7 @@ export default function CreatePersonModal({ open, onClose, onSaved }: Props) {
               id="person-role"
               value={formData.role}
               onChange={(e) => handleChange("role", e.target.value)}
-              className="border-[var(--border-subtle)] bg-white"
+              className="border-[var(--border-subtle)]"
               placeholder="Ex: Técnico, Supervisor, Administrativo"
             />
           </div>
@@ -128,7 +128,7 @@ export default function CreatePersonModal({ open, onClose, onSaved }: Props) {
               type="email"
               value={formData.email}
               onChange={(e) => handleChange("email", e.target.value)}
-              className="border-[var(--border-subtle)] bg-white"
+              className="border-[var(--border-subtle)]"
               placeholder="Ex: pessoa@empresa.com"
             />
           </div>
@@ -143,7 +143,7 @@ export default function CreatePersonModal({ open, onClose, onSaved }: Props) {
             <Button
               type="submit"
               disabled={createPerson.isPending}
-              className="inline-flex items-center gap-2 bg-orange-500 text-white hover:bg-orange-600"
+              className="inline-flex items-center gap-2"
             >
               {createPerson.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
