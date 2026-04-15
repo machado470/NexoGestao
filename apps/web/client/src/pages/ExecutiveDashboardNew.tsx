@@ -252,28 +252,28 @@ export default function ExecutiveDashboardNew() {
         </div>
       </AppSectionCard>
 
-      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
         {kpis.map((item) => {
           const isUp = item.trend === "up";
           const isDown = item.trend === "down";
           return (
-            <AppSectionCard key={item.label} className="flex h-full min-h-[168px] flex-col p-4">
+            <AppSectionCard key={item.label} className="flex h-full min-h-[132px] flex-col p-3.5">
               <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">{item.label}</p>
-              <p className="mt-2 text-2xl font-semibold leading-none text-[var(--text-primary)]">{item.value}</p>
-              <p className="mt-2 text-xs text-[var(--text-muted)]">{item.description}</p>
-              <div className="mt-auto flex items-end justify-between gap-2 pt-4">
-                <span className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium ${
+              <p className="mt-1.5 text-[1.65rem] font-semibold leading-none text-[var(--text-primary)]">{item.value}</p>
+              <p className="mt-1 text-xs text-[var(--text-muted)]">{item.description}</p>
+              <div className="mt-2 flex items-center justify-between gap-2">
+                <span className={`inline-flex h-6 items-center gap-1 rounded-md px-1.5 text-[11px] font-medium ${
                   isUp
                     ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
                     : isDown
                       ? "bg-rose-500/10 text-rose-700 dark:text-rose-300"
-                      : "bg-muted text-[var(--text-muted)]"
+                    : "bg-muted text-[var(--text-muted)]"
                 }`}>
-                  {isUp ? <TrendingUp className="h-3.5 w-3.5" /> : isDown ? <TrendingDown className="h-3.5 w-3.5" /> : null}
+                  {isUp ? <TrendingUp className="h-3 w-3" /> : isDown ? <TrendingDown className="h-3 w-3" /> : null}
                   {item.variation}
                 </span>
-                <Button variant="ghost" size="sm" className="h-7 shrink-0 px-2 text-xs" onClick={item.onOpen}>
-                  Abrir <ArrowUpRight className="ml-1 h-3.5 w-3.5" />
+                <Button variant="ghost" size="sm" className="h-6 shrink-0 px-1.5 text-[11px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)]" onClick={item.onOpen}>
+                  Abrir <ArrowUpRight className="ml-1 h-3 w-3" />
                 </Button>
               </div>
             </AppSectionCard>
