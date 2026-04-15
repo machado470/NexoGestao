@@ -242,7 +242,7 @@ export default function FinancesPage() {
       <AppSectionBlock
         title="Dinheiro em risco"
         subtitle="Bloco principal: atraso e vencimento que ameaçam o caixa imediato"
-        className="border-rose-500/35 bg-rose-500/8 p-5 md:p-6"
+        className="border-rose-500/35 bg-rose-500/8 p-5 md:p-6 lg:col-span-2"
       >
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-[var(--text-secondary)]">
@@ -257,7 +257,7 @@ export default function FinancesPage() {
         />
       </AppSectionBlock>
 
-      <div className="grid gap-3 xl:grid-cols-2">
+      <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(320px,1fr))]">
         <AppNextActionCard
           title="Entradas rápidas"
           description={`${cobrancasRecentes} cobranças abertas nos últimos 3 dias · potencial de ${formatCurrency(recebivelHoje)} para receber ainda hoje.`}

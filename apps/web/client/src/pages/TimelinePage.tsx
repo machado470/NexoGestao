@@ -185,10 +185,21 @@ export default function TimelinePage() {
           <p className="text-sm text-[var(--text-secondary)]">{criticalEvents} eventos críticos e {failedRecent} falhas recentes pedindo reação imediata.</p>
           <Button type="button" onClick={() => window.scrollTo({ top: 720, behavior: "smooth" })}>Resolver agora</Button>
         </div>
-        <AppListBlock items={eventosAcionaveis.slice(0, 5)} />
+        <AppListBlock
+          className="col-span-full"
+          items={eventosAcionaveis.slice(0, 5).length > 0
+            ? eventosAcionaveis.slice(0, 5)
+            : [
+              {
+                title: "Sem eventos críticos no momento",
+                subtitle: "Use os módulos operacionais para gerar novos registros auditáveis.",
+                action: <Button type="button" variant="outline" onClick={() => navigate("/dashboard")}>Ir para dashboard</Button>,
+              },
+            ]}
+        />
       </AppSectionBlock>
 
-      <div className="grid gap-3 xl:grid-cols-2">
+      <div className="space-y-3">
         <AppNextActionCard
           title="O que precisa de atenção"
           description={`${uniqueEntities} entidades com sinal de atraso e ${semRetorno} eventos marcados como sem retorno.`}
@@ -265,7 +276,18 @@ export default function TimelinePage() {
         ) : (
           <div className="space-y-3">
             <AppSectionBlock title="Eventos acionáveis" subtitle="Sem espaço vazio: tudo aqui tem próximo passo operacional.">
-              <AppListBlock items={eventosAcionaveis} />
+              <AppListBlock
+                className="col-span-full"
+                items={eventosAcionaveis.length > 0
+                  ? eventosAcionaveis
+                  : [
+                    {
+                      title: "Sem eventos acionáveis nesta janela",
+                      subtitle: "Acione agenda, financeiro ou O.S. para produzir novos eventos operacionais.",
+                      action: <Button type="button" variant="outline" onClick={() => navigate("/appointments")}>Abrir agenda</Button>,
+                    },
+                  ]}
+              />
             </AppSectionBlock>
             {groupedEvents.map(([dateLabel, items]) => (
               <div key={dateLabel} className="space-y-2">

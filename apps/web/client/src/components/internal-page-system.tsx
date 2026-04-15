@@ -176,7 +176,7 @@ export function AppKpiRow({
   const safeItems = Array.isArray(items) ? items : [];
 
   return (
-    <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+    <section className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(320px,1fr))]">
       {safeItems.map((item, index) => {
         if (!item || typeof item !== "object") {
           if (import.meta.env.DEV) {
@@ -286,9 +286,15 @@ export function AppDataTable({ children }: { children: ReactNode }) {
   return <div className="overflow-x-auto rounded-xl border border-[var(--border-subtle)]">{children}</div>;
 }
 
-export function AppListBlock({ items }: { items: Array<{ title: string; subtitle?: string; right?: ReactNode; action?: ReactNode }> }) {
+export function AppListBlock({
+  items,
+  className,
+}: {
+  items: Array<{ title: string; subtitle?: string; right?: ReactNode; action?: ReactNode }>;
+  className?: string;
+}) {
   return (
-    <div className="space-y-2">
+    <div className={cn("space-y-2", className)}>
       {items.map(item => (
         <div key={item.title} className="flex items-center justify-between rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/70 p-3">
           <div>

@@ -336,7 +336,7 @@ export default function ExecutiveDashboardNew() {
         ]}
       />
 
-      <AppSectionCard className="border-[var(--brand-primary)]/40 bg-[var(--surface-elevated)] p-5 md:p-6">
+      <AppSectionCard className="border-[var(--brand-primary)]/40 bg-[var(--surface-elevated)] p-5 md:p-6 lg:col-span-2">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="mb-1 text-base font-semibold text-[var(--text-primary)] md:text-lg">O que resolver agora</p>
@@ -361,24 +361,42 @@ export default function ExecutiveDashboardNew() {
         )}
       </AppSectionCard>
 
-      <section className="grid gap-3 lg:grid-cols-2">
-        <AppSectionCard>
+      <section className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(320px,1fr))]">
+        <AppSectionCard className="lg:col-span-2">
           <p className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Próximas ações</p>
           <p className="mb-3 text-xs text-[var(--text-muted)]">Fila operacional por prioridade: O.S, agenda e cobrança.</p>
-          <AppListBlock items={upcomingQueue} />
+          <AppListBlock
+            className="col-span-full"
+            items={upcomingQueue.length > 0
+              ? upcomingQueue
+              : [{
+                title: "Sem próximas ações geradas",
+                subtitle: "Atualize os módulos operacionais para preencher esta fila automaticamente.",
+                action: <button className="nexo-cta-secondary" onClick={() => navigate("/appointments")}>Abrir agenda</button>,
+              }]}
+          />
         </AppSectionCard>
         <AppEntityContextPanel links={buildEntityContextBridge({})} />
       </section>
 
-      <section className="grid gap-3 lg:grid-cols-3">
+      <section className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(320px,1fr))]">
         <AppSectionCard>
           <p className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Gargalos</p>
           <p className="mb-3 text-xs text-[var(--text-muted)]">Atrasados, sem responsável ou sem resposta.</p>
-          <AppListBlock items={bottlenecks.slice(0, 5).map((item) => ({
-            title: item.label,
-            subtitle: `Impacto atual: ${item.value}`,
-            action: <button className="nexo-cta-secondary" onClick={() => navigate(item.href)}>Atuar</button>,
-          }))} />
+          <AppListBlock
+            className="col-span-full"
+            items={bottlenecks.slice(0, 5).length > 0
+              ? bottlenecks.slice(0, 5).map((item) => ({
+                title: item.label,
+                subtitle: `Impacto atual: ${item.value}`,
+                action: <button className="nexo-cta-secondary" onClick={() => navigate(item.href)}>Atuar</button>,
+              }))
+              : [{
+                title: "Sem gargalos mapeados agora",
+                subtitle: "Operação estabilizada; siga para fechamento financeiro.",
+                action: <button className="nexo-cta-secondary" onClick={() => navigate("/finances")}>Ir para financeiro</button>,
+              }]}
+          />
         </AppSectionCard>
         <AppSectionCard>
           <p className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Oportunidade de hoje</p>

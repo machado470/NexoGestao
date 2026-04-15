@@ -123,13 +123,14 @@ export default function AppointmentsPage() {
       <AppSectionBlock
         title="Agenda do dia"
         subtitle="Bloco principal: lista direta com ação imediata para executar sem dispersão"
-        className="border-[var(--brand-primary)]/40 bg-[var(--surface-elevated)] p-5 md:p-6"
+        className="border-[var(--brand-primary)]/40 bg-[var(--surface-elevated)] p-5 md:p-6 lg:col-span-2"
       >
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <p className="text-xs text-[var(--text-muted)]">Comece por aqui: confirme, execute ou reagende e mantenha o dia fluindo.</p>
           <ActionFeedbackButton state="idle" idleLabel="Executar agenda agora" onClick={() => navigate("/service-orders")} />
         </div>
         <AppListBlock
+          className="col-span-full"
           items={agendaDoDia.length > 0
             ? agendaDoDia.map((item) => ({
                 title: `${safeDate(item?.startsAt)?.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) ?? "--:--"} · ${String(item?.customer?.name ?? "Cliente")}`,
@@ -141,7 +142,7 @@ export default function AppointmentsPage() {
       </AppSectionBlock>
 
       <AppSectionBlock title="Resumo operacional da agenda" subtitle="Bloco secundário para orientar ajustes">
-        <div className="grid gap-2 md:grid-cols-4">
+        <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(320px,1fr))]">
           <div className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Conflitos de horário: <strong>{conflicts}</strong></div>
           <div className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Pendentes de confirmação: <strong>{scheduled}</strong></div>
           <div className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Prontos para virar O.S.: <strong>{confirmed}</strong></div>
@@ -149,9 +150,10 @@ export default function AppointmentsPage() {
         </div>
       </AppSectionBlock>
 
-      <section className="grid gap-3 xl:grid-cols-2">
-        <AppSectionBlock title="Gargalos de atraso e conflito" subtitle="Atrasados, conflitos e itens sem dono para destravar">
+      <section className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(320px,1fr))]">
+        <AppSectionBlock title="Gargalos de atraso e conflito" subtitle="Atrasados, conflitos e itens sem dono para destravar" className="lg:col-span-2">
           <AppListBlock
+            className="col-span-full"
             items={gargalosAgenda.length > 0
               ? gargalosAgenda
               : [{ title: "Sem gargalos críticos agora", subtitle: "Mantenha a rotina e monitore novos conflitos.", action: <button className="nexo-cta-secondary" onClick={() => navigate("/service-orders")}>Próxima etapa</button> }]}
