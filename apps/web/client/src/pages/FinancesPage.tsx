@@ -239,14 +239,25 @@ export default function FinancesPage() {
       ]} />
       </KpiErrorBoundary>
 
-      <div className="grid gap-3 xl:grid-cols-3">
-        <AppNextActionCard
-          title="Dinheiro em risco"
-          description={`${String(stats.overdueCount ?? 0)} vencidas · ${dueToday} vencendo hoje · ${dueSoon} em até 7 dias · ${clientesPossivelAtraso} clientes com sinal de atraso.`}
-          severity={Number(stats.overdueCount ?? 0) > 0 ? "critical" : dueSoon > 0 ? "high" : "medium"}
-          metadata="risco de caixa"
-          action={{ label: "Cobrar agora", onClick: () => navigate("/whatsapp?context=overdue-charges") }}
+      <AppSectionBlock
+        title="Dinheiro em risco"
+        subtitle="Bloco principal: atraso e vencimento que ameaçam o caixa imediato"
+        className="border-rose-500/35 bg-rose-500/8 p-5 md:p-6"
+      >
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-[var(--text-secondary)]">
+            {String(stats.overdueCount ?? 0)} vencidas · {dueToday} vencendo hoje · {dueSoon} em até 7 dias · {clientesPossivelAtraso} clientes com sinal de atraso.
+          </p>
+          <ActionFeedbackButton state="idle" idleLabel="Cobrar agora" onClick={() => navigate("/whatsapp?context=overdue-charges")} />
+        </div>
+        <AppListBlock
+          items={[...cobrancasVencidas, ...cobrancasAbertas, ...cobrancasProximas].slice(0, 6).length > 0
+            ? [...cobrancasVencidas, ...cobrancasAbertas, ...cobrancasProximas].slice(0, 6)
+            : [{ title: "Sem cobranças na fila", subtitle: "Crie cobrança para alimentar o fluxo de receita.", action: <button className="nexo-cta-secondary" onClick={() => setOpenCreate(true)}>Criar cobrança</button> }]}
         />
+      </AppSectionBlock>
+
+      <div className="grid gap-3 xl:grid-cols-2">
         <AppNextActionCard
           title="Entradas rápidas"
           description={`${cobrancasRecentes} cobranças abertas nos últimos 3 dias · potencial de ${formatCurrency(recebivelHoje)} para receber ainda hoje.`}
@@ -281,14 +292,6 @@ export default function FinancesPage() {
           )}
         </AppChartPanel>
       </div>
-
-      <AppSectionBlock title="Cobranças abertas, vencidas e próximas" subtitle="Fila operacional para atuar no caixa agora">
-        <AppListBlock
-          items={[...cobrancasVencidas, ...cobrancasAbertas, ...cobrancasProximas].slice(0, 8).length > 0
-            ? [...cobrancasVencidas, ...cobrancasAbertas, ...cobrancasProximas].slice(0, 8)
-            : [{ title: "Sem cobranças na fila", subtitle: "Crie cobrança para alimentar o fluxo de receita.", action: <button className="nexo-cta-secondary" onClick={() => setOpenCreate(true)}>Criar cobrança</button> }]}
-        />
-      </AppSectionBlock>
 
       <TrpcSectionErrorBoundary context="finances:charges-table">
       <AppSectionBlock title="Cobranças e pagamentos" subtitle="Fluxo real: cobrança → pagamento → atualização automática">

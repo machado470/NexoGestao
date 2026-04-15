@@ -129,14 +129,23 @@ export default function ServiceOrdersPage() {
         ]}
       />
 
-      <div className="grid gap-3 xl:grid-cols-2">
-        <AppNextActionCard
-          title="Travadas"
-          description={`${semResponsavel} sem responsável · ${semAvanco} sem avanço · ${aguardandoCliente} aguardando cliente.`}
-          severity={travadas + semResponsavel > 0 ? "high" : "medium"}
-          metadata="ordens em risco"
-          action={{ label: "Destravar ordens", onClick: () => navigate("/service-orders?status=blocked") }}
+      <AppSectionBlock
+        title="Travadas"
+        subtitle="Bloco principal: ordens que mais pressionam SLA e precisam de ação direta agora"
+        className="border-rose-500/35 bg-rose-500/8 p-5 md:p-6"
+      >
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-[var(--text-secondary)]">{semResponsavel} sem responsável · {semAvanco} sem avanço · {aguardandoCliente} aguardando cliente.</p>
+          <ActionFeedbackButton state="idle" idleLabel="Destravar ordens agora" onClick={() => navigate("/service-orders?status=blocked")} />
+        </div>
+        <AppListBlock
+          items={travadasDetalhadas.length > 0
+            ? travadasDetalhadas
+            : [{ title: "Sem travas críticas", subtitle: "Pipeline fluindo no momento.", action: <button className="nexo-cta-secondary" onClick={() => navigate("/finances")}>Seguir para cobrança</button> }]}
         />
+      </AppSectionBlock>
+
+      <div className="grid gap-3 xl:grid-cols-2">
         <AppNextActionCard
           title="Prontas para cobrar"
           description={`${pipeline.prontaCobranca} O.S. concluídas sem cobrança ativa${valorPotencialCobranca > 0 ? ` · potencial ${valorPotencialFormatado}` : ""}.`}
@@ -158,12 +167,12 @@ export default function ServiceOrdersPage() {
               : [{ title: "Sem O.S. abertas", subtitle: "Crie uma ordem para iniciar execução.", action: <button className="nexo-cta-secondary" onClick={() => setOpenCreate(true)}>Criar O.S.</button> }]}
           />
         </AppSectionBlock>
-        <AppSectionBlock title="Travadas detalhadas" subtitle="Atrasadas, sem responsável e sem resposta para resolver agora">
-          <AppListBlock
-            items={travadasDetalhadas.length > 0
-              ? travadasDetalhadas
-              : [{ title: "Sem travas críticas", subtitle: "Pipeline fluindo no momento.", action: <button className="nexo-cta-secondary" onClick={() => navigate("/finances")}>Seguir para cobrança</button> }]}
-          />
+        <AppSectionBlock title="Resumo de bloqueio" subtitle="Bloco secundário de apoio para decidir o próximo destrave">
+          <div className="grid gap-2 md:grid-cols-3">
+            <div className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Travadas agora: <strong>{travadas}</strong></div>
+            <div className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Sem responsável: <strong>{semResponsavel}</strong></div>
+            <div className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Aguardando cliente: <strong>{aguardandoCliente}</strong></div>
+          </div>
         </AppSectionBlock>
       </section>
 

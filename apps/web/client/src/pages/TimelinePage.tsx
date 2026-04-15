@@ -176,14 +176,19 @@ export default function TimelinePage() {
       />
       </KpiErrorBoundary>
 
-      <div className="grid gap-3 xl:grid-cols-3">
-        <AppNextActionCard
-          title="O que deu problema"
-          description={`${criticalEvents} eventos críticos e ${failedRecent} falhas recentes pedindo reação imediata.`}
-          severity={criticalEvents > 0 ? "high" : "low"}
-          metadata="timeline"
-          action={{ label: "Resolver agora", onClick: () => window.scrollTo({ top: 720, behavior: "smooth" }) }}
-        />
+      <AppSectionBlock
+        title="O que deu problema agora"
+        subtitle="Bloco principal: eventos críticos que exigem reação imediata antes de qualquer outra leitura"
+        className="border-rose-500/35 bg-rose-500/8 p-5 md:p-6"
+      >
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-[var(--text-secondary)]">{criticalEvents} eventos críticos e {failedRecent} falhas recentes pedindo reação imediata.</p>
+          <Button type="button" onClick={() => window.scrollTo({ top: 720, behavior: "smooth" })}>Resolver agora</Button>
+        </div>
+        <AppListBlock items={eventosAcionaveis.slice(0, 5)} />
+      </AppSectionBlock>
+
+      <div className="grid gap-3 xl:grid-cols-2">
         <AppNextActionCard
           title="O que precisa de atenção"
           description={`${uniqueEntities} entidades com sinal de atraso e ${semRetorno} eventos marcados como sem retorno.`}
@@ -191,7 +196,7 @@ export default function TimelinePage() {
           metadata="atenção de execução"
           action={{ label: "Analisar agora", onClick: () => window.scrollTo({ top: 720, behavior: "smooth" }) }}
         />
-        <AppSectionBlock title="Leitura rápida de lotes" subtitle="Sem feed infinito: revisar, agir e carregar o próximo lote.">
+        <AppSectionBlock title="Leitura rápida de lotes" subtitle="Bloco de apoio para controle manual de carga da timeline." className="bg-[var(--surface-base)]/70">
           <AppListBlock
             items={[
               { title: `${events.length} eventos carregados`, subtitle: `Lotes de ${pageSize} com controle manual` },
