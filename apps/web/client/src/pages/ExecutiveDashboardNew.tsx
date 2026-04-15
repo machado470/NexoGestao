@@ -1,49 +1,67 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/contexts/AuthContext";
-import {
-  AppEntityContextPanel,
-  AppNextActionList,
-  AppPageHeader,
-  AppPageShell,
-  AppSectionCard,
-  AppTimeline,
-  AppTimelineItem,
-  AppOperationalStateCard,
-  AppOperationalStatePanel,
-} from "@/components/app-system";
-import { AppKpiRow, AppListBlock } from "@/components/internal-page-system";
+import { AppPageHeader, AppPageShell, AppSectionCard } from "@/components/app-system";
 import { Button } from "@/components/ui/button";
 import { useActionHandler } from "@/hooks/useActionHandler";
-import { AppLoadingState, AppNextActions } from "@/components/app";
+import { AppLoadingState } from "@/components/app";
 import {
   buildBottleneckGroups,
-  buildEntityContextBridge,
   buildNextActions,
   getOperationalStateSummary,
 } from "@/lib/operations/operational-hub";
 import { formatDelta, getDayWindow, getWindow, inRange, percentDelta, safeDate, trendFromDelta } from "@/lib/operational/kpi";
 import { setBootPhase } from "@/lib/bootPhase";
+import { ArrowUpRight, TrendingDown, TrendingUp } from "lucide-react";
 
 function toArray<T>(payload: unknown): T[] {
   const raw = (payload as any)?.data?.data ?? (payload as any)?.data ?? payload;
   return Array.isArray(raw) ? (raw as T[]) : [];
 }
 
-function toMetrics(payload: unknown) {
-  const raw = (payload as any)?.data?.data ?? (payload as any)?.data ?? payload ?? {};
-  return {
-    openServiceOrders: Number((raw as any)?.openServiceOrders ?? (raw as any)?.openOrders ?? 0),
-    pendingPaymentsInCents: Number((raw as any)?.pendingPaymentsInCents ?? 0),
-    totalRevenueInCents: Number((raw as any)?.totalRevenueInCents ?? 0),
-    delayedOrders: Number((raw as any)?.delayedOrders ?? 0),
-  };
-}
-
 function formatCurrency(cents: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100);
+}
+
+function clampPercent(value: number) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(100, value));
+}
+
+function messagesInRange(items: any[], start: Date, end: Date) {
+  return items
+    .filter((item) => String(item?.status ?? "").toUpperCase() === "PAID")
+    .reduce((acc, item) => {
+      const date = safeDate(item?.paidAt ?? item?.updatedAt);
+      if (!inRange(date, start, end)) return acc;
+      return acc + Number(item?.amountCents ?? 0);
+    }, 0);
+}
+
+function CompactActionItem({
+  title,
+  description,
+  actionLabel,
+  onAction,
+}: {
+  title: string;
+  description: string;
+  actionLabel: string;
+  onAction: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-lg border border-[var(--border)]/70 bg-[var(--surface)] px-3 py-2.5">
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-[var(--text-primary)]">{title}</p>
+        <p className="line-clamp-2 text-xs text-[var(--text-muted)]">{description}</p>
+      </div>
+      <Button variant="ghost" size="sm" className="h-7 shrink-0 whitespace-nowrap px-2.5 text-xs" onClick={onAction}>
+        {actionLabel}
+      </Button>
+    </div>
+  );
 }
 
 export default function ExecutiveDashboardNew() {
@@ -54,69 +72,61 @@ export default function ExecutiveDashboardNew() {
   const [isExecutingNext, setIsExecutingNext] = useState(false);
   const canQuery = isAuthenticated && !isInitializing;
 
-  const metricsQuery = trpc.dashboard.kpis.useQuery(undefined, { enabled: canQuery, retry: false, refetchOnWindowFocus: false });
   const governanceSummaryQuery = trpc.governance.summary.useQuery(undefined, { enabled: canQuery, retry: false, refetchOnWindowFocus: false });
   const appointmentsQuery = trpc.nexo.appointments.list.useQuery(undefined, { enabled: canQuery, retry: false, refetchOnWindowFocus: false });
   const serviceOrdersQuery = trpc.nexo.serviceOrders.list.useQuery({ page: 1, limit: 100 }, { enabled: canQuery, retry: false, refetchOnWindowFocus: false });
   const chargesQuery = trpc.finance.charges.list.useQuery({ page: 1, limit: 100 }, { enabled: canQuery, retry: false, refetchOnWindowFocus: false });
   const customersQuery = trpc.nexo.customers.list.useQuery(undefined, { enabled: canQuery, retry: false, refetchOnWindowFocus: false });
 
-  const metrics = useMemo(() => toMetrics(metricsQuery.data), [metricsQuery.data]);
   const appointments = useMemo(() => toArray<any>(appointmentsQuery.data), [appointmentsQuery.data]);
-  useEffect(() => {
-    if (!import.meta.env.DEV) return;
-    // eslint-disable-next-line no-console
-    console.log("KPI payload", {
-      metrics: metricsQuery.data,
-      governance: governanceSummaryQuery.data,
-      appointments: appointmentsQuery.data,
-      serviceOrders: serviceOrdersQuery.data,
-      charges: chargesQuery.data,
-      customers: customersQuery.data,
-    });
-  }, [
-    appointmentsQuery.data,
-    chargesQuery.data,
-    customersQuery.data,
-    governanceSummaryQuery.data,
-    metricsQuery.data,
-    serviceOrdersQuery.data,
-  ]);
   const serviceOrders = useMemo(() => toArray<any>(serviceOrdersQuery.data), [serviceOrdersQuery.data]);
   const charges = useMemo(() => toArray<any>(chargesQuery.data), [chargesQuery.data]);
   const customers = useMemo(() => toArray<any>(customersQuery.data), [customersQuery.data]);
 
-  const overdueCharges = charges.filter(item => String(item?.status ?? "").toUpperCase() === "OVERDUE").length;
-  const doneWithoutCharge = serviceOrders.filter(item => String(item?.status ?? "").toUpperCase() === "DONE" && !item?.financialSummary?.hasCharge).length;
-  const overdueAppointments = appointments.filter(item => String(item?.status ?? "").toUpperCase() === "NO_SHOW").length;
   const currentMonth = getWindow(30, 0);
   const previousMonth = getWindow(30, 1);
   const todayWindow = getDayWindow(0);
   const yesterdayWindow = getDayWindow(1);
+
   const sentCurrent = messagesInRange(charges, currentMonth.start, currentMonth.end);
   const sentPrevious = messagesInRange(charges, previousMonth.start, previousMonth.end);
 
-  function messagesInRange(items: any[], start: Date, end: Date) {
-    return items
-      .filter((item) => String(item?.status ?? "").toUpperCase() === "PAID")
-      .reduce((acc, item) => {
-        const date = safeDate(item?.paidAt ?? item?.updatedAt);
-        if (!inRange(date, start, end)) return acc;
-        return acc + Number(item?.amountCents ?? 0);
-      }, 0);
-  }
+  const paidCurrentCount = charges.filter(
+    (item) => String(item?.status ?? "").toUpperCase() === "PAID" && inRange(safeDate(item?.paidAt ?? item?.updatedAt), currentMonth.start, currentMonth.end)
+  ).length;
+  const paidPreviousCount = charges.filter(
+    (item) => String(item?.status ?? "").toUpperCase() === "PAID" && inRange(safeDate(item?.paidAt ?? item?.updatedAt), previousMonth.start, previousMonth.end)
+  ).length;
+
+  const ticketCurrent = paidCurrentCount > 0 ? sentCurrent / paidCurrentCount : 0;
+  const ticketPrevious = paidPreviousCount > 0 ? sentPrevious / paidPreviousCount : 0;
+
+  const ordersOpen = serviceOrders.filter((item) => ["OPEN", "ASSIGNED", "IN_PROGRESS"].includes(String(item?.status ?? "").toUpperCase())).length;
+  const ordersOpenCurrent = serviceOrders.filter(
+    (item) => ["OPEN", "ASSIGNED", "IN_PROGRESS"].includes(String(item?.status ?? "").toUpperCase()) && inRange(safeDate(item?.updatedAt), currentMonth.start, currentMonth.end)
+  ).length;
+  const ordersOpenPrevious = serviceOrders.filter(
+    (item) => ["OPEN", "ASSIGNED", "IN_PROGRESS"].includes(String(item?.status ?? "").toUpperCase()) && inRange(safeDate(item?.updatedAt), previousMonth.start, previousMonth.end)
+  ).length;
+
+  const slaEligible = serviceOrders.filter((item) => ["IN_PROGRESS", "DONE"].includes(String(item?.status ?? "").toUpperCase()));
+  const slaOnTrack = slaEligible.filter((item) => Number(item?.delayedMinutes ?? 0) <= 0).length;
+  const slaCurrent = slaEligible.length ? (slaOnTrack / slaEligible.length) * 100 : 100;
+
+  const slaEligiblePrev = serviceOrders.filter(
+    (item) =>
+      ["IN_PROGRESS", "DONE"].includes(String(item?.status ?? "").toUpperCase()) &&
+      inRange(safeDate(item?.updatedAt), previousMonth.start, previousMonth.end)
+  );
+  const slaOnTrackPrev = slaEligiblePrev.filter((item) => Number(item?.delayedMinutes ?? 0) <= 0).length;
+  const slaPrevious = slaEligiblePrev.length ? (slaOnTrackPrev / slaEligiblePrev.length) * 100 : slaCurrent;
 
   const appointmentsToday = appointments.filter(item => inRange(safeDate(item?.startsAt), todayWindow.start, todayWindow.end)).length;
   const appointmentsYesterday = appointments.filter(item => inRange(safeDate(item?.startsAt), yesterdayWindow.start, yesterdayWindow.end)).length;
-  const ordersExecuting = serviceOrders.filter(item => String(item?.status ?? "").toUpperCase() === "IN_PROGRESS").length;
-  const last7 = getWindow(7, 0);
-  const prev7 = getWindow(7, 1);
-  const ordersExecutingCurrent = serviceOrders.filter(item => String(item?.status ?? "").toUpperCase() === "IN_PROGRESS" && inRange(safeDate(item?.updatedAt), last7.start, last7.end)).length;
-  const ordersExecutingPrevious = serviceOrders.filter(item => String(item?.status ?? "").toUpperCase() === "IN_PROGRESS" && inRange(safeDate(item?.updatedAt), prev7.start, prev7.end)).length;
-  const overdueCurrent = charges.filter(item => String(item?.status ?? "").toUpperCase() === "OVERDUE" && inRange(safeDate(item?.dueDate), currentMonth.start, currentMonth.end)).length;
-  const overduePrevious = charges.filter(item => String(item?.status ?? "").toUpperCase() === "OVERDUE" && inRange(safeDate(item?.dueDate), previousMonth.start, previousMonth.end)).length;
-  const riskNow = Number((governanceSummaryQuery.data as any)?.data?.riskScore ?? (governanceSummaryQuery.data as any)?.data?.overallRisk ?? 0);
-  const riskPrev = Number((governanceSummaryQuery.data as any)?.data?.previousRiskScore ?? NaN);
+
+  const overdueCharges = charges.filter(item => String(item?.status ?? "").toUpperCase() === "OVERDUE").length;
+  const doneWithoutCharge = serviceOrders.filter(item => String(item?.status ?? "").toUpperCase() === "DONE" && !item?.financialSummary?.hasCharge).length;
+  const overdueAppointments = appointments.filter(item => String(item?.status ?? "").toUpperCase() === "NO_SHOW").length;
 
   const operationalState = useMemo(
     () =>
@@ -137,57 +147,16 @@ export default function ExecutiveDashboardNew() {
         appointments,
         serviceOrders,
         charges,
-      }).slice(0, 6),
+      }).slice(0, 5),
     [appointments, charges, customers, serviceOrders]
   );
 
   const bottlenecks = useMemo(() => buildBottleneckGroups({ appointments, serviceOrders, charges }), [appointments, charges, serviceOrders]);
-  const immediateQueue = nextActions.slice(0, 6).map((action) => ({
-    title: action.title,
-    subtitle: action.description,
-    action: (
-      <button className="nexo-cta-secondary" onClick={() => void executeAction(action.executionAction)}>
-        Resolver
-      </button>
-    ),
-  }));
-  const upcomingQueue = [
-    ...appointments
-      .filter((item) => ["SCHEDULED", "CONFIRMED"].includes(String(item?.status ?? "").toUpperCase()))
-      .slice(0, 2)
-      .map((item) => ({
-        title: `Agendamento ${String(item?.customer?.name ?? "sem cliente")}`,
-        subtitle: `${new Date(String(item?.startsAt)).toLocaleString("pt-BR")} · ${String(item?.status ?? "").toUpperCase()}`,
-        action: <button className="nexo-cta-secondary" onClick={() => navigate("/appointments")}>Abrir agenda</button>,
-      })),
-    ...serviceOrders
-      .filter((item) => ["OPEN", "ASSIGNED", "IN_PROGRESS"].includes(String(item?.status ?? "").toUpperCase()))
-      .slice(0, 2)
-      .map((item) => ({
-        title: `O.S. ${String(item?.title ?? item?.id ?? "sem título")}`,
-        subtitle: `Status ${String(item?.status ?? "").toUpperCase()} · prioridade P${String(item?.priority ?? 2)}`,
-        action: <button className="nexo-cta-secondary" onClick={() => navigate("/service-orders")}>Executar</button>,
-      })),
-    ...charges
-      .filter((item) => ["OVERDUE", "PENDING"].includes(String(item?.status ?? "").toUpperCase()))
-      .slice(0, 2)
-      .map((item) => ({
-        title: `Cobrança ${String(item?.customer?.name ?? "sem cliente")}`,
-        subtitle: `Vence em ${item?.dueDate ? new Date(String(item?.dueDate)).toLocaleDateString("pt-BR") : "data não informada"}`,
-        action: <button className="nexo-cta-secondary" onClick={() => navigate("/finances")}>Cobrar</button>,
-      })),
-  ].slice(0, 6);
-  const customersActive = customers.filter((item) => Boolean(item?.lastContactAt)).length;
-  const customersAtRisk = customers.filter((item) => {
-    const lastContact = safeDate(item?.lastContactAt);
-    if (!lastContact) return true;
-    return Date.now() - lastContact.getTime() > 1000 * 60 * 60 * 24 * 21;
-  }).length;
-  const customersNoContact = customers.filter((item) => !item?.lastContactAt).length;
+
   const opportunities = [
-    `${pipelinePotential(serviceOrders)} prontos para gerar cobrança hoje`,
-    `${overdueCharges} cobranças vencidas com chance de recuperação imediata`,
-    `${appointments.filter(item => String(item?.status ?? "").toUpperCase() === "CONFIRMED").length} agendamentos confirmados que podem virar O.S.`,
+    `${pipelinePotential(serviceOrders)} O.S. prontas para faturar hoje`,
+    `${overdueCharges} cobranças vencidas com recuperação rápida`,
+    `${appointments.filter(item => String(item?.status ?? "").toUpperCase() === "CONFIRMED").length} agendamentos confirmados com potencial de conversão`,
   ];
 
   const executeNextAction = async () => {
@@ -200,7 +169,6 @@ export default function ExecutiveDashboardNew() {
     setIsExecutingNext(true);
     const result = await executeAction(nextAction.executionAction);
     await Promise.all([
-      metricsQuery.refetch(),
       appointmentsQuery.refetch(),
       serviceOrdersQuery.refetch(),
       chargesQuery.refetch(),
@@ -214,7 +182,7 @@ export default function ExecutiveDashboardNew() {
     setIsExecutingNext(false);
   };
 
-  if (metricsQuery.isLoading || governanceSummaryQuery.isLoading) {
+  if (governanceSummaryQuery.isLoading) {
     return (
       <AppPageShell>
         <AppLoadingState rows={6} />
@@ -222,198 +190,148 @@ export default function ExecutiveDashboardNew() {
     );
   }
 
+  const kpis = [
+    {
+      label: "Receita",
+      value: formatCurrency(sentCurrent),
+      description: "últimos 30 dias",
+      variation: formatDelta(percentDelta(sentCurrent, sentPrevious)),
+      trend: trendFromDelta(percentDelta(sentCurrent, sentPrevious)),
+      onOpen: () => navigate("/finances"),
+    },
+    {
+      label: "Ordens",
+      value: String(ordersOpen),
+      description: "em aberto para execução",
+      variation: formatDelta(percentDelta(ordersOpenCurrent, ordersOpenPrevious)),
+      trend: trendFromDelta(percentDelta(ordersOpenCurrent, ordersOpenPrevious)),
+      onOpen: () => navigate("/service-orders"),
+    },
+    {
+      label: "SLA",
+      value: `${clampPercent(slaCurrent).toFixed(0)}%`,
+      description: "ordens no prazo",
+      variation: formatDelta(percentDelta(slaCurrent, slaPrevious)),
+      trend: trendFromDelta(percentDelta(slaCurrent, slaPrevious)),
+      onOpen: () => navigate("/service-orders"),
+    },
+    {
+      label: "Ticket médio",
+      value: formatCurrency(ticketCurrent),
+      description: "valor por cobrança paga",
+      variation: formatDelta(percentDelta(ticketCurrent, ticketPrevious)),
+      trend: trendFromDelta(percentDelta(ticketCurrent, ticketPrevious)),
+      onOpen: () => navigate("/finances"),
+    },
+  ];
+
   return (
     <AppPageShell>
       <AppPageHeader>
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="nexo-page-header-title">Centro de decisão operacional</h1>
-            <p className="nexo-page-header-description">Entenda em segundos o que precisa ser feito agora no ciclo Cliente → Agendamento → O.S. → Cobrança → Pagamento.</p>
+            <p className="nexo-page-header-description">Direção executiva para agir rápido no ciclo Cliente → Agendamento → O.S. → Cobrança.</p>
           </div>
-          <Button onClick={() => void executeNextAction()} disabled={isExecutingNext || nextActions.length === 0}>
-            {isExecutingNext ? "Resolvendo próxima pendência..." : "Resolver próxima pendência agora"}
+          <Button size="sm" onClick={() => void executeNextAction()} disabled={isExecutingNext || nextActions.length === 0}>
+            {isExecutingNext ? "Executando..." : "Executar próxima ação"}
           </Button>
         </div>
       </AppPageHeader>
 
-      <AppNextActions
-        title="Engine prioritária de execução"
-        engineInput={{
-          customers: customers.map(item => ({ id: item.id, name: item.name, phone: item.phone ?? null, lastContactAt: item.lastContactAt ?? null })),
-          appointments: appointments.map(item => ({
-            id: item.id,
-            customerId: item.customerId,
-            status: item.status,
-            startsAt: item.startsAt,
-          })),
-          serviceOrders: serviceOrders.map(item => ({
-            id: item.id,
-            customerId: item.customerId,
-            status: item.status,
-            delayedMinutes: item.delayedMinutes ?? 0,
-            updatedAt: item.updatedAt,
-          })),
-          charges: charges.map(item => ({
-            id: item.id,
-            customerId: item.customerId,
-            status: item.status,
-            amountCents: item.amountCents,
-            dueDate: item.dueDate,
-          })),
-        }}
-      />
-
-      <AppOperationalStatePanel>
-        <AppOperationalStateCard
-          state={operationalState.level}
-          summary={operationalState.summary}
-          impact={operationalState.impact}
-          recommendation={operationalState.recommendedAction}
-          className="lg:col-span-2"
-        />
-        <AppSectionCard>
-          <p className="text-sm font-semibold text-[var(--text-primary)]">Ações contextuais</p>
-          <p className="text-xs text-[var(--text-muted)]">Atalhos para agir sem sair do foco operacional.</p>
-          <div className="mt-3 grid gap-2">
-            <button className="nexo-cta-secondary" onClick={() => navigate("/service-orders")}>Concluir serviço em atraso</button>
-            <button className="nexo-cta-secondary" onClick={() => navigate("/finances")}>Cobrar cliente com pagamento pendente</button>
-            <button className="nexo-cta-secondary" onClick={() => navigate("/appointments")}>Confirmar agendamento de hoje</button>
+      <AppSectionCard className="border-[var(--brand-primary)]/35 bg-[var(--surface-elevated)] px-4 py-4 md:px-5 md:py-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--text-muted)]">Direção executiva</p>
+            <p className="text-base font-semibold text-[var(--text-primary)] md:text-lg">Visão consolidada para manter a operação previsível hoje</p>
+            <p className="mt-1 line-clamp-2 text-sm text-[var(--text-muted)]">{operationalState.summary} · {appointmentsToday} agendamentos hoje e variação de {formatDelta(percentDelta(appointmentsToday, appointmentsYesterday))} vs ontem.</p>
           </div>
-        </AppSectionCard>
-      </AppOperationalStatePanel>
-
-      <AppKpiRow
-        emphasis="strong"
-        items={[
-          {
-            title: "Recebido no período",
-            value: formatCurrency(sentCurrent),
-            delta: formatDelta(percentDelta(sentCurrent, sentPrevious)),
-            trend: trendFromDelta(percentDelta(sentCurrent, sentPrevious)),
-            hint: "últimos 30 dias vs período anterior",
-            tone: "important",
-          },
-          {
-            title: "Cobranças em atraso",
-            value: String(overdueCharges),
-            delta: formatDelta(percentDelta(overdueCurrent, overduePrevious)),
-            trend: trendFromDelta(percentDelta(overdueCurrent, overduePrevious)),
-            hint: "status OVERDUE no financeiro",
-            tone: overdueCharges > 0 ? "critical" : "default",
-          },
-          {
-            title: "Ordens em execução",
-            value: String(ordersExecuting),
-            delta: formatDelta(percentDelta(ordersExecutingCurrent, ordersExecutingPrevious)),
-            trend: trendFromDelta(percentDelta(ordersExecutingCurrent, ordersExecutingPrevious)),
-            hint: "IN_PROGRESS · janela de 7 dias",
-          },
-          {
-            title: "Agendamentos do dia",
-            value: String(appointmentsToday),
-            delta: formatDelta(percentDelta(appointmentsToday, appointmentsYesterday)),
-            trend: trendFromDelta(percentDelta(appointmentsToday, appointmentsYesterday)),
-            hint: "hoje vs ontem",
-          },
-          {
-            title: "WhatsApp (falhas)",
-            value: "N/D",
-            hint: "métrica depende de tracking consolidado no endpoint",
-          },
-          {
-            title: "Risco operacional",
-            value: `${riskNow}/100`,
-            delta: formatDelta(percentDelta(riskNow, riskPrev)),
-            trend: trendFromDelta(percentDelta(riskNow, riskPrev)),
-            hint: "última leitura de governança",
-          },
-        ]}
-      />
-
-      <AppSectionCard className="min-h-[240px] lg:min-h-[280px] border-[var(--brand-primary)]/40 bg-[var(--surface-elevated)] p-6 lg:p-8 lg:col-span-2">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="mb-1 text-base font-semibold text-[var(--text-primary)] md:text-lg">O que resolver agora</p>
-            <p className="text-sm text-[var(--text-muted)]">Bloco principal da página: ataque imediato dos itens que travam execução, receita e agenda.</p>
-          </div>
-          <Button onClick={() => void executeNextAction()} disabled={isExecutingNext || nextActions.length === 0}>
-            {isExecutingNext ? "Executando foco principal..." : "Resolver foco principal"}
+          <Button size="sm" variant="outline" className="shrink-0" onClick={() => void executeNextAction()} disabled={isExecutingNext || nextActions.length === 0}>
+            {isExecutingNext ? "Executando..." : "Executar próxima ação"}
           </Button>
         </div>
-        {immediateQueue.length > 0 ? (
-          <AppListBlock items={immediateQueue} />
-        ) : (
-          <AppNextActionList
-            actions={nextActions.map(action => ({
-              id: action.id,
-              title: action.title,
-              description: action.description,
-              severity: action.severity,
-              action: action.executionAction,
-            }))}
-          />
-        )}
       </AppSectionCard>
 
-      <section className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(320px,1fr))]">
-        <AppSectionCard className="min-h-[240px] lg:min-h-[280px] lg:col-span-2">
-          <p className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Próximas ações</p>
-          <p className="mb-3 text-xs text-[var(--text-muted)]">Fila operacional por prioridade: O.S, agenda e cobrança.</p>
-          <AppListBlock
-            className="col-span-full"
-            items={upcomingQueue.length > 0
-              ? upcomingQueue
-              : [{
-                title: "Sem próximas ações geradas",
-                subtitle: "Atualize os módulos operacionais para preencher esta fila automaticamente.",
-                action: <button className="nexo-cta-secondary" onClick={() => navigate("/appointments")}>Abrir agenda</button>,
-              }]}
-          />
-        </AppSectionCard>
-        <AppEntityContextPanel links={buildEntityContextBridge({})} />
+      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        {kpis.map((item) => {
+          const isUp = item.trend === "up";
+          const isDown = item.trend === "down";
+          return (
+            <AppSectionCard key={item.label} className="flex h-full min-h-[168px] flex-col p-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">{item.label}</p>
+              <p className="mt-2 text-2xl font-semibold leading-none text-[var(--text-primary)]">{item.value}</p>
+              <p className="mt-2 text-xs text-[var(--text-muted)]">{item.description}</p>
+              <div className="mt-auto flex items-end justify-between gap-2 pt-4">
+                <span className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium ${
+                  isUp
+                    ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                    : isDown
+                      ? "bg-rose-500/10 text-rose-700 dark:text-rose-300"
+                      : "bg-muted text-[var(--text-muted)]"
+                }`}>
+                  {isUp ? <TrendingUp className="h-3.5 w-3.5" /> : isDown ? <TrendingDown className="h-3.5 w-3.5" /> : null}
+                  {item.variation}
+                </span>
+                <Button variant="ghost" size="sm" className="h-7 shrink-0 px-2 text-xs" onClick={item.onOpen}>
+                  Abrir <ArrowUpRight className="ml-1 h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </AppSectionCard>
+          );
+        })}
       </section>
 
-      <section className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(320px,1fr))]">
-        <AppSectionCard className="min-h-[240px] lg:min-h-[280px]">
-          <p className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Gargalos</p>
-          <p className="mb-3 text-xs text-[var(--text-muted)]">Atrasados, sem responsável ou sem resposta.</p>
-          <AppListBlock
-            className="col-span-full"
-            items={bottlenecks.slice(0, 5).length > 0
-              ? bottlenecks.slice(0, 5).map((item) => ({
-                title: item.label,
-                subtitle: `Impacto atual: ${item.value}`,
-                action: <button className="nexo-cta-secondary" onClick={() => navigate(item.href)}>Atuar</button>,
+      <section className="grid gap-3 lg:grid-cols-3">
+        <AppSectionCard className="p-4">
+          <p className="text-sm font-semibold text-[var(--text-primary)]">Próxima ação recomendada</p>
+          <p className="mb-3 text-xs text-[var(--text-muted)]">Foco imediato para destravar execução e receita.</p>
+          <div className="space-y-2">
+            {(nextActions.length > 0
+              ? nextActions.slice(0, 3).map((action) => ({
+                title: action.title,
+                description: action.description,
+                actionLabel: "Resolver",
+                onAction: () => void executeAction(action.executionAction),
               }))
-              : [{
-                title: "Sem gargalos mapeados agora",
-                subtitle: "Operação estabilizada; siga para fechamento financeiro.",
-                action: <button className="nexo-cta-secondary" onClick={() => navigate("/finances")}>Ir para financeiro</button>,
-              }]}
-          />
-        </AppSectionCard>
-        <AppSectionCard className="min-h-[240px] lg:min-h-[280px]">
-          <p className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Oportunidade de hoje</p>
-          <p className="mb-3 text-xs text-[var(--text-muted)]">Pode virar dinheiro ou fechamento de cliente ainda hoje.</p>
-          <AppTimeline>
-            {opportunities.map((item) => (
-              <AppTimelineItem key={item}>{item}</AppTimelineItem>
+              : [{ title: "Nenhuma ação crítica agora", description: "A operação está estável no momento.", actionLabel: "Agenda", onAction: () => navigate("/appointments") }]).map((item) => (
+              <CompactActionItem key={item.title} {...item} />
             ))}
-          </AppTimeline>
+          </div>
         </AppSectionCard>
-        <AppSectionCard className="min-h-[240px] lg:min-h-[280px]">
-          <p className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Entidades</p>
-          <p className="mb-3 text-xs text-[var(--text-muted)]">Clientes ativos, em risco e sem contato.</p>
-          <AppListBlock
-            items={[
-              { title: `${customersActive} clientes ativos`, subtitle: "contato recente registrado", action: <button className="nexo-cta-secondary" onClick={() => navigate("/customers?tab=active")}>Abrir</button> },
-              { title: `${customersAtRisk} clientes em risco`, subtitle: "sem contato há mais de 21 dias", action: <button className="nexo-cta-secondary" onClick={() => navigate("/customers?tab=risk")}>Priorizar</button> },
-              { title: `${customersNoContact} clientes sem contato`, subtitle: "não possuem interação registrada", action: <button className="nexo-cta-secondary" onClick={() => navigate("/customers?tab=no-contact")}>Contato</button> },
-            ]}
-          />
+
+        <AppSectionCard className="p-4">
+          <p className="text-sm font-semibold text-[var(--text-primary)]">O que está parado agora</p>
+          <p className="mb-3 text-xs text-[var(--text-muted)]">Itens sem avanço que exigem intervenção curta.</p>
+          <div className="space-y-2">
+            {(bottlenecks.length > 0
+              ? bottlenecks.slice(0, 3).map((item) => ({
+                title: item.label,
+                description: `Impacto atual: ${item.value}`,
+                actionLabel: "Atuar",
+                onAction: () => navigate(item.href),
+              }))
+              : [{ title: "Sem gargalos críticos", description: "Nenhum bloqueio operacional relevante identificado.", actionLabel: "Financeiro", onAction: () => navigate("/finances") }]).map((item) => (
+              <CompactActionItem key={item.title} {...item} />
+            ))}
+          </div>
+        </AppSectionCard>
+
+        <AppSectionCard className="p-4">
+          <p className="text-sm font-semibold text-[var(--text-primary)]">O que pode virar dinheiro hoje</p>
+          <p className="mb-3 text-xs text-[var(--text-muted)]">Prioridades comerciais e financeiras de giro rápido.</p>
+          <div className="space-y-2">
+            {opportunities.slice(0, 3).map((opportunity, index) => (
+              <CompactActionItem
+                key={opportunity}
+                title={opportunity}
+                description="Acompanhe este ponto agora para elevar conversão ou recebimento no dia."
+                actionLabel={index === 0 ? "Cobrar" : "Abrir"}
+                onAction={() => navigate(index === 0 ? "/finances" : "/service-orders")}
+              />
+            ))}
+          </div>
         </AppSectionCard>
       </section>
-
     </AppPageShell>
   );
 }
