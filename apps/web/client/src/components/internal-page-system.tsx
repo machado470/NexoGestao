@@ -265,7 +265,7 @@ export function AppSectionBlock({
   onCtaClick?: () => void;
 }) {
   return (
-    <AppSectionCard className={className}>
+    <AppSectionCard className={cn("min-h-[240px] lg:min-h-[280px]", className)}>
       <div className="mb-3 flex items-start justify-between gap-2">
         <div>
           <h3 className="text-sm font-semibold text-[var(--text-primary)]">{title}</h3>
@@ -293,10 +293,34 @@ export function AppListBlock({
   items: Array<{ title: string; subtitle?: string; right?: ReactNode; action?: ReactNode }>;
   className?: string;
 }) {
+  const normalizedItems = items.slice(0, 8).map((item, index) => ({
+    ...item,
+    subtitle: item.subtitle ?? "Ação operacional disponível para execução imediata.",
+    action: item.action ?? (
+      <Button size="sm" variant="outline">
+        Executar
+      </Button>
+    ),
+    __key: `${item.title}-${index}`,
+  }));
+  while (normalizedItems.length < 5) {
+    const idx = normalizedItems.length + 1;
+    normalizedItems.push({
+      title: `Ação complementar ${idx}`,
+      subtitle: "Preencha este espaço com uma ação direta do fluxo operacional.",
+      action: (
+        <Button size="sm" variant="outline">
+          Definir ação
+        </Button>
+      ),
+      __key: `placeholder-${idx}`,
+    });
+  }
+
   return (
-    <div className={cn("space-y-2", className)}>
-      {items.map(item => (
-        <div key={item.title} className="flex items-center justify-between rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/70 p-3">
+    <div className={cn("space-y-2 min-h-[240px] lg:min-h-[280px]", className)}>
+      {normalizedItems.map(item => (
+        <div key={item.__key} className="flex items-center justify-between rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/70 p-3">
           <div>
             <p className="text-sm font-medium text-[var(--text-primary)]">{item.title}</p>
             {item.subtitle ? <p className="text-xs text-[var(--text-muted)]">{item.subtitle}</p> : null}

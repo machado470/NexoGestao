@@ -123,7 +123,7 @@ export default function AppointmentsPage() {
       <AppSectionBlock
         title="Agenda do dia"
         subtitle="Bloco principal: lista direta com ação imediata para executar sem dispersão"
-        className="border-[var(--brand-primary)]/40 bg-[var(--surface-elevated)] p-5 md:p-6 lg:col-span-2"
+        className="border-[var(--brand-primary)]/40 bg-[var(--surface-elevated)] p-6 lg:p-8 lg:col-span-2"
       >
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <p className="text-xs text-[var(--text-muted)]">Comece por aqui: confirme, execute ou reagende e mantenha o dia fluindo.</p>
@@ -159,10 +159,14 @@ export default function AppointmentsPage() {
               : [{ title: "Sem gargalos críticos agora", subtitle: "Mantenha a rotina e monitore novos conflitos.", action: <button className="nexo-cta-secondary" onClick={() => navigate("/service-orders")}>Próxima etapa</button> }]}
           />
         </AppSectionBlock>
-        <AppSectionBlock title="Concluídos no período" subtitle="Bloco de apoio para leitura de fechamento operacional">
-          <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/70 p-3 text-sm text-[var(--text-secondary)]">
-            Atendimentos concluídos: <strong className="text-[var(--text-primary)]">{done}</strong>
-          </div>
+        <AppSectionBlock title="Fechamentos com ação" subtitle="Concluídos e próximos passos para manter a agenda densa">
+          <AppListBlock
+            items={[
+              { title: `${done} atendimentos concluídos`, subtitle: "Consolide no histórico e avance para cobrança.", action: <button className="nexo-cta-secondary" onClick={() => navigate("/service-orders?status=done")}>Ver concluídos</button> },
+              { title: `${confirmed} confirmados prontos`, subtitle: "Converta confirmados em ordens de serviço.", action: <button className="nexo-cta-secondary" onClick={() => navigate("/service-orders")}>Gerar O.S.</button> },
+              { title: `${scheduled} pendentes de confirmação`, subtitle: "Reduza risco de no-show com contato ativo.", action: <button className="nexo-cta-secondary" onClick={() => navigate("/whatsapp")}>Cobrar confirmação</button> },
+            ]}
+          />
         </AppSectionBlock>
       </section>
 
