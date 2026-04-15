@@ -11,6 +11,7 @@ import { getAppointmentSeverity, getOperationalSeverityLabel } from "@/lib/opera
 import {
   AppDataTable,
   AppKpiRow,
+  AppListBlock,
   AppNextActionCard,
   AppPageEmptyState,
   AppPageErrorState,
@@ -61,6 +62,31 @@ export default function AppointmentsPage() {
   }, {});
   const conflicts = Object.values(appointmentsBySlot).filter((count) => count > 1).length;
   const done = appointments.filter((item) => String(item?.status ?? "").toUpperCase() === "DONE").length;
+  const now = new Date();
+  const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+  const agendaDoDia = appointments
+    .filter((item) => inRange(safeDate(item?.startsAt), dayStart, dayEnd))
+    .sort((a, b) => (safeDate(a?.startsAt)?.getTime() ?? 0) - (safeDate(b?.startsAt)?.getTime() ?? 0))
+    .slice(0, 6);
+  const atrasados = appointments.filter((item) => {
+    const start = safeDate(item?.startsAt);
+    const status = String(item?.status ?? "").toUpperCase();
+    return Boolean(start && start < now && ["SCHEDULED", "CONFIRMED"].includes(status));
+  });
+  const semResponsavel = appointments.filter((item) => !item?.personId && !item?.assignedToPersonId);
+  const gargalosAgenda = [
+    ...atrasados.slice(0, 3).map((item) => ({
+      title: `${String(item?.customer?.name ?? "Cliente")} atrasado`,
+      subtitle: `Início ${safeDate(item?.startsAt)?.toLocaleString("pt-BR") ?? "sem horário"} · ${String(item?.status ?? "").toUpperCase()}`,
+      action: <button className="nexo-cta-secondary" onClick={() => navigate(`/whatsapp?customerId=${item?.customerId}`)}>Avisar</button>,
+    })),
+    ...semResponsavel.slice(0, 3).map((item) => ({
+      title: `${String(item?.customer?.name ?? "Cliente")} sem responsável`,
+      subtitle: `Agendamento ${safeDate(item?.startsAt)?.toLocaleString("pt-BR") ?? "sem horário"}`,
+      action: <button className="nexo-cta-secondary" onClick={() => setOpenCreate(true)}>Reatribuir</button>,
+    })),
+  ].slice(0, 6);
 
   return (
     <PageWrapper title="Agendamentos" subtitle="Agenda diária com prioridade clara e próximos passos de execução.">
@@ -103,6 +129,27 @@ export default function AppointmentsPage() {
           <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm">Próxima ação: <strong>{conflicts > 0 ? "reorganizar conflitos" : "converter confirmados em O.S."}</strong></div>
         </div>
       </AppSectionBlock>
+
+      <section className="grid gap-3 xl:grid-cols-2">
+        <AppSectionBlock title="Agenda do dia" subtitle="Lista direta do que precisa ser executado hoje">
+          <AppListBlock
+            items={agendaDoDia.length > 0
+              ? agendaDoDia.map((item) => ({
+                  title: `${safeDate(item?.startsAt)?.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) ?? "--:--"} · ${String(item?.customer?.name ?? "Cliente")}`,
+                  subtitle: `Status ${String(item?.status ?? "").toUpperCase()} · ${String(item?.title ?? "atendimento")}`,
+                  action: <button className="nexo-cta-secondary" onClick={() => navigate(`/whatsapp?customerId=${item?.customerId}`)}>Confirmar</button>,
+                }))
+              : [{ title: "Sem agenda hoje", subtitle: "Crie novos horários para preencher a operação.", action: <button className="nexo-cta-secondary" onClick={() => setOpenCreate(true)}>Criar</button> }]}
+          />
+        </AppSectionBlock>
+        <AppSectionBlock title="Gargalos de atraso e conflito" subtitle="Atrasados, conflitos e itens sem dono para destravar">
+          <AppListBlock
+            items={gargalosAgenda.length > 0
+              ? gargalosAgenda
+              : [{ title: "Sem gargalos críticos agora", subtitle: "Mantenha a rotina e monitore novos conflitos.", action: <button className="nexo-cta-secondary" onClick={() => navigate("/service-orders")}>Próxima etapa</button> }]}
+          />
+        </AppSectionBlock>
+      </section>
 
       <AppSectionBlock title="Fila de agendamentos" subtitle="Sincronizada em tempo real com backend">
         {showInitialLoading ? (

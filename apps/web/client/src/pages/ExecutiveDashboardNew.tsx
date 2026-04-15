@@ -14,7 +14,7 @@ import {
   AppOperationalStateCard,
   AppOperationalStatePanel,
 } from "@/components/app-system";
-import { AppKpiRow } from "@/components/internal-page-system";
+import { AppKpiRow, AppListBlock } from "@/components/internal-page-system";
 import { Button } from "@/components/ui/button";
 import { useActionHandler } from "@/hooks/useActionHandler";
 import { AppLoadingState, AppNextActions } from "@/components/app";
@@ -142,6 +142,53 @@ export default function ExecutiveDashboardNew() {
   );
 
   const bottlenecks = useMemo(() => buildBottleneckGroups({ appointments, serviceOrders, charges }), [appointments, charges, serviceOrders]);
+  const immediateQueue = nextActions.slice(0, 6).map((action) => ({
+    title: action.title,
+    subtitle: action.description,
+    action: (
+      <button className="nexo-cta-secondary" onClick={() => void executeAction(action.executionAction)}>
+        Resolver
+      </button>
+    ),
+  }));
+  const upcomingQueue = [
+    ...appointments
+      .filter((item) => ["SCHEDULED", "CONFIRMED"].includes(String(item?.status ?? "").toUpperCase()))
+      .slice(0, 2)
+      .map((item) => ({
+        title: `Agendamento ${String(item?.customer?.name ?? "sem cliente")}`,
+        subtitle: `${new Date(String(item?.startsAt)).toLocaleString("pt-BR")} · ${String(item?.status ?? "").toUpperCase()}`,
+        action: <button className="nexo-cta-secondary" onClick={() => navigate("/appointments")}>Abrir agenda</button>,
+      })),
+    ...serviceOrders
+      .filter((item) => ["OPEN", "ASSIGNED", "IN_PROGRESS"].includes(String(item?.status ?? "").toUpperCase()))
+      .slice(0, 2)
+      .map((item) => ({
+        title: `O.S. ${String(item?.title ?? item?.id ?? "sem título")}`,
+        subtitle: `Status ${String(item?.status ?? "").toUpperCase()} · prioridade P${String(item?.priority ?? 2)}`,
+        action: <button className="nexo-cta-secondary" onClick={() => navigate("/service-orders")}>Executar</button>,
+      })),
+    ...charges
+      .filter((item) => ["OVERDUE", "PENDING"].includes(String(item?.status ?? "").toUpperCase()))
+      .slice(0, 2)
+      .map((item) => ({
+        title: `Cobrança ${String(item?.customer?.name ?? "sem cliente")}`,
+        subtitle: `Vence em ${item?.dueDate ? new Date(String(item?.dueDate)).toLocaleDateString("pt-BR") : "data não informada"}`,
+        action: <button className="nexo-cta-secondary" onClick={() => navigate("/finances")}>Cobrar</button>,
+      })),
+  ].slice(0, 6);
+  const customersActive = customers.filter((item) => Boolean(item?.lastContactAt)).length;
+  const customersAtRisk = customers.filter((item) => {
+    const lastContact = safeDate(item?.lastContactAt);
+    if (!lastContact) return true;
+    return Date.now() - lastContact.getTime() > 1000 * 60 * 60 * 24 * 21;
+  }).length;
+  const customersNoContact = customers.filter((item) => !item?.lastContactAt).length;
+  const opportunities = [
+    `${pipelinePotential(serviceOrders)} prontos para gerar cobrança hoje`,
+    `${overdueCharges} cobranças vencidas com chance de recuperação imediata`,
+    `${appointments.filter(item => String(item?.status ?? "").toUpperCase() === "CONFIRMED").length} agendamentos confirmados que podem virar O.S.`,
+  ];
 
   const feed = [
     `${doneWithoutCharge} O.S. concluídas sem cobrança`,
@@ -291,34 +338,27 @@ export default function ExecutiveDashboardNew() {
 
       <section className="grid gap-3 lg:grid-cols-2">
         <AppSectionCard>
-          <p className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Você precisa fazer isso agora</p>
-          <p className="mb-3 text-xs text-[var(--text-muted)]">Cada item mostra o problema, o impacto e a ação recomendada.</p>
-          <AppNextActionList
-            actions={nextActions.map(action => ({
-              id: action.id,
-              title: action.title,
-              description: action.description,
-              severity: action.severity,
-              action: action.executionAction,
-            }))}
-          />
+          <p className="mb-1 text-sm font-semibold text-[var(--text-primary)]">O que resolver agora</p>
+          <p className="mb-3 text-xs text-[var(--text-muted)]">Itens com problema real para executar sem abrir outra tela.</p>
+          {immediateQueue.length > 0 ? (
+            <AppListBlock items={immediateQueue} />
+          ) : (
+            <AppNextActionList
+              actions={nextActions.map(action => ({
+                id: action.id,
+                title: action.title,
+                description: action.description,
+                severity: action.severity,
+                action: action.executionAction,
+              }))}
+            />
+          )}
         </AppSectionCard>
 
         <AppSectionCard>
-          <p className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Gargalos operacionais</p>
-          <p className="mb-3 text-xs text-[var(--text-muted)]">Pontos que travam a operação e exigem ação rápida.</p>
-          <div className="space-y-2">
-            {bottlenecks.map(item => (
-              <button
-                key={item.id}
-                className="nexo-card-informative flex w-full items-center justify-between p-3 text-left"
-                onClick={() => navigate(item.href)}
-              >
-                <span className="text-sm text-[var(--text-secondary)]">{item.label}</span>
-                <span className="text-sm font-semibold text-[var(--text-primary)]">{item.value}</span>
-              </button>
-            ))}
-          </div>
+          <p className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Próximas ações</p>
+          <p className="mb-3 text-xs text-[var(--text-muted)]">Fila operacional por prioridade: O.S, agenda e cobrança.</p>
+          <AppListBlock items={upcomingQueue} />
         </AppSectionCard>
       </section>
 
@@ -334,6 +374,42 @@ export default function ExecutiveDashboardNew() {
         </AppSectionCard>
         <AppEntityContextPanel links={buildEntityContextBridge({})} />
       </section>
+
+      <section className="grid gap-3 lg:grid-cols-3">
+        <AppSectionCard>
+          <p className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Gargalos</p>
+          <p className="mb-3 text-xs text-[var(--text-muted)]">Atrasados, sem responsável ou sem resposta.</p>
+          <AppListBlock items={bottlenecks.slice(0, 5).map((item) => ({
+            title: item.label,
+            subtitle: `Impacto atual: ${item.value}`,
+            action: <button className="nexo-cta-secondary" onClick={() => navigate(item.href)}>Atuar</button>,
+          }))} />
+        </AppSectionCard>
+        <AppSectionCard>
+          <p className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Oportunidade de hoje</p>
+          <p className="mb-3 text-xs text-[var(--text-muted)]">Pode virar dinheiro ou fechamento de cliente ainda hoje.</p>
+          <AppTimeline>
+            {opportunities.map((item) => (
+              <AppTimelineItem key={item}>{item}</AppTimelineItem>
+            ))}
+          </AppTimeline>
+        </AppSectionCard>
+        <AppSectionCard>
+          <p className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Entidades</p>
+          <p className="mb-3 text-xs text-[var(--text-muted)]">Clientes ativos, em risco e sem contato.</p>
+          <AppListBlock
+            items={[
+              { title: `${customersActive} clientes ativos`, subtitle: "contato recente registrado", action: <button className="nexo-cta-secondary" onClick={() => navigate("/customers?tab=active")}>Abrir</button> },
+              { title: `${customersAtRisk} clientes em risco`, subtitle: "sem contato há mais de 21 dias", action: <button className="nexo-cta-secondary" onClick={() => navigate("/customers?tab=risk")}>Priorizar</button> },
+              { title: `${customersNoContact} clientes sem contato`, subtitle: "não possuem interação registrada", action: <button className="nexo-cta-secondary" onClick={() => navigate("/customers?tab=no-contact")}>Contato</button> },
+            ]}
+          />
+        </AppSectionCard>
+      </section>
     </AppPageShell>
   );
+}
+
+function pipelinePotential(serviceOrders: any[]) {
+  return serviceOrders.filter((item) => String(item?.status ?? "").toUpperCase() === "DONE" && !item?.financialSummary?.hasCharge).length;
 }
