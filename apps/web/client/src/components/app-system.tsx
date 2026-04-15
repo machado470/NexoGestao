@@ -407,7 +407,7 @@ export function AppOperationalStateCard({
   className?: string;
 }) {
   return (
-    <AppSectionCard className={cn("space-y-3", operationalStateTone[state].borderClass, className)}>
+    <AppSectionCard className={cn("min-h-[240px] lg:min-h-[280px] space-y-3", operationalStateTone[state].borderClass, className)}>
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm font-semibold text-[var(--text-primary)]">Estado operacional</p>
         <AppOperationalStateBadge state={state} />

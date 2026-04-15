@@ -5,12 +5,10 @@ import { useRenderWatchdog } from "@/hooks/useRenderWatchdog";
 import { useEffect } from "react";
 import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import {
-  AppAlertList,
   AppKpiRow,
   AppListBlock,
   AppNextActionCard,
   AppPageShell,
-  AppRecentActivity,
   AppSectionBlock,
   AppStatusBadge,
 } from "@/components/internal-page-system";
@@ -93,15 +91,28 @@ export default function ExecutiveDashboard() {
         </AppSectionBlock>
 
         <AppSectionBlock title="Itens que exigem atenção" subtitle="Prioridades do dia" onCtaClick={() => navigate("/dashboard/operations?filter=critical")}>
-          <AppAlertList alerts={[{ text: "5 O.S. atrasadas aguardando execução", tone: "danger" }, { text: "12 cobranças vencidas sem negociação", tone: "warning" }, { text: "2 clientes sem retorno há 7 dias", tone: "warning" }]} />
+          <AppListBlock
+            items={[
+              { title: "5 O.S. atrasadas aguardando execução", subtitle: "Risco direto para SLA e remarcações.", action: <Button size="sm" onClick={() => navigate("/service-orders?status=attention")}>Atuar</Button> },
+              { title: "12 cobranças vencidas sem negociação", subtitle: "Pressão sobre caixa e previsibilidade de receita.", action: <Button size="sm" onClick={() => navigate("/finances?status=overdue")}>Cobrar</Button> },
+              { title: "2 clientes sem retorno há 7 dias", subtitle: "Churn potencial se não houver contato agora.", action: <Button size="sm" onClick={() => navigate("/whatsapp")}>Contato</Button> },
+            ]}
+          />
         </AppSectionBlock>
 
         <AppSectionBlock title="Atividade recente" subtitle="Atualizações em tempo real" onCtaClick={() => navigate("/timeline?scope=recent")}>
-          <AppRecentActivity items={["O.S. #1847 concluída há 3 min", "Pagamento recebido há 8 min", "Novo agendamento criado há 14 min", "Mensagem enviada ao cliente há 20 min"]} />
+          <AppListBlock
+            items={[
+              { title: "O.S. #1847 concluída há 3 min", subtitle: "Finalize cobrança vinculada para fechar ciclo.", action: <Button size="sm" onClick={() => navigate("/finances?serviceOrderId=1847")}>Cobrar</Button> },
+              { title: "Pagamento recebido há 8 min", subtitle: "Atualize histórico financeiro da conta.", action: <Button size="sm" onClick={() => navigate("/finances")}>Registrar</Button> },
+              { title: "Novo agendamento criado há 14 min", subtitle: "Confirme cliente e aloque responsável.", action: <Button size="sm" onClick={() => navigate("/appointments")}>Executar</Button> },
+              { title: "Mensagem enviada ao cliente há 20 min", subtitle: "Acompanhe resposta e próximo passo.", action: <Button size="sm" onClick={() => navigate("/timeline?scope=recent")}>Acompanhar</Button> },
+            ]}
+          />
         </AppSectionBlock>
       </div>
 
-      <AppSectionBlock title="Saúde operacional" subtitle="Foco operacional dominante">
+      <AppSectionBlock title="O que resolver agora" subtitle="Foco operacional dominante com execução imediata" className="border-[var(--brand-primary)]/40 bg-[var(--surface-elevated)] p-6 lg:p-8">
         <AppListBlock
           items={[
             { title: "O.S. #1851 · Instalação comercial", subtitle: "Cliente Atlas · Prazo hoje 17:00", right: <AppStatusBadge label="Urgente" />, action: <Button size="sm" onClick={() => void runAction(async () => navigate("/service-orders?os=1851"))} isLoading={isRunning}>Abrir</Button> },

@@ -242,7 +242,7 @@ export default function FinancesPage() {
       <AppSectionBlock
         title="Dinheiro em risco"
         subtitle="Bloco principal: atraso e vencimento que ameaçam o caixa imediato"
-        className="border-rose-500/35 bg-rose-500/8 p-5 md:p-6 lg:col-span-2"
+        className="border-rose-500/35 bg-rose-500/8 p-6 lg:p-8 lg:col-span-2"
       >
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-[var(--text-secondary)]">

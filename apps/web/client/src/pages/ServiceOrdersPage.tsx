@@ -132,7 +132,7 @@ export default function ServiceOrdersPage() {
       <AppSectionBlock
         title="Travadas"
         subtitle="Bloco principal: ordens que mais pressionam SLA e precisam de ação direta agora"
-        className="border-rose-500/35 bg-rose-500/8 p-5 md:p-6"
+        className="border-rose-500/35 bg-rose-500/8 p-6 lg:p-8"
       >
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-[var(--text-secondary)]">{semResponsavel} sem responsável · {semAvanco} sem avanço · {aguardandoCliente} aguardando cliente.</p>
@@ -167,12 +167,14 @@ export default function ServiceOrdersPage() {
               : [{ title: "Sem O.S. abertas", subtitle: "Crie uma ordem para iniciar execução.", action: <button className="nexo-cta-secondary" onClick={() => setOpenCreate(true)}>Criar O.S.</button> }]}
           />
         </AppSectionBlock>
-        <AppSectionBlock title="Resumo de bloqueio" subtitle="Bloco secundário de apoio para decidir o próximo destrave">
-          <div className="grid gap-2 md:grid-cols-3">
-            <div className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Travadas agora: <strong>{travadas}</strong></div>
-            <div className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Sem responsável: <strong>{semResponsavel}</strong></div>
-            <div className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Aguardando cliente: <strong>{aguardandoCliente}</strong></div>
-          </div>
+        <AppSectionBlock title="Resumo de bloqueio" subtitle="Indicadores com CTA para destrave imediato">
+          <AppListBlock
+            items={[
+              { title: `Travadas agora: ${travadas}`, subtitle: "Ataque o topo da fila para reduzir pressão de SLA.", action: <button className="nexo-cta-secondary" onClick={() => navigate("/service-orders?status=blocked")}>Destravar</button> },
+              { title: `Sem responsável: ${semResponsavel}`, subtitle: "Distribua técnico para remover gargalo de execução.", action: <button className="nexo-cta-secondary" onClick={() => setOpenCreate(true)}>Atribuir</button> },
+              { title: `Aguardando cliente: ${aguardandoCliente}`, subtitle: "Cobrança ativa de retorno evita tempo morto.", action: <button className="nexo-cta-secondary" onClick={() => navigate("/whatsapp")}>Cobrar retorno</button> },
+            ]}
+          />
         </AppSectionBlock>
       </section>
 

@@ -190,12 +190,6 @@ export default function ExecutiveDashboardNew() {
     `${appointments.filter(item => String(item?.status ?? "").toUpperCase() === "CONFIRMED").length} agendamentos confirmados que podem virar O.S.`,
   ];
 
-  const feed = [
-    `${doneWithoutCharge} O.S. concluídas sem cobrança`,
-    `${overdueCharges} cobranças vencidas aguardando follow-up`,
-    `${metrics.delayedOrders} ordens com atraso operacional`,
-  ];
-
   const executeNextAction = async () => {
     const nextAction = nextActions[0];
     if (!nextAction?.executionAction) {
@@ -336,7 +330,7 @@ export default function ExecutiveDashboardNew() {
         ]}
       />
 
-      <AppSectionCard className="border-[var(--brand-primary)]/40 bg-[var(--surface-elevated)] p-5 md:p-6 lg:col-span-2">
+      <AppSectionCard className="min-h-[240px] lg:min-h-[280px] border-[var(--brand-primary)]/40 bg-[var(--surface-elevated)] p-6 lg:p-8 lg:col-span-2">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="mb-1 text-base font-semibold text-[var(--text-primary)] md:text-lg">O que resolver agora</p>
@@ -362,7 +356,7 @@ export default function ExecutiveDashboardNew() {
       </AppSectionCard>
 
       <section className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(320px,1fr))]">
-        <AppSectionCard className="lg:col-span-2">
+        <AppSectionCard className="min-h-[240px] lg:min-h-[280px] lg:col-span-2">
           <p className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Próximas ações</p>
           <p className="mb-3 text-xs text-[var(--text-muted)]">Fila operacional por prioridade: O.S, agenda e cobrança.</p>
           <AppListBlock
@@ -380,7 +374,7 @@ export default function ExecutiveDashboardNew() {
       </section>
 
       <section className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(320px,1fr))]">
-        <AppSectionCard>
+        <AppSectionCard className="min-h-[240px] lg:min-h-[280px]">
           <p className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Gargalos</p>
           <p className="mb-3 text-xs text-[var(--text-muted)]">Atrasados, sem responsável ou sem resposta.</p>
           <AppListBlock
@@ -398,7 +392,7 @@ export default function ExecutiveDashboardNew() {
               }]}
           />
         </AppSectionCard>
-        <AppSectionCard>
+        <AppSectionCard className="min-h-[240px] lg:min-h-[280px]">
           <p className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Oportunidade de hoje</p>
           <p className="mb-3 text-xs text-[var(--text-muted)]">Pode virar dinheiro ou fechamento de cliente ainda hoje.</p>
           <AppTimeline>
@@ -407,7 +401,7 @@ export default function ExecutiveDashboardNew() {
             ))}
           </AppTimeline>
         </AppSectionCard>
-        <AppSectionCard>
+        <AppSectionCard className="min-h-[240px] lg:min-h-[280px]">
           <p className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Entidades</p>
           <p className="mb-3 text-xs text-[var(--text-muted)]">Clientes ativos, em risco e sem contato.</p>
           <AppListBlock
@@ -420,15 +414,6 @@ export default function ExecutiveDashboardNew() {
         </AppSectionCard>
       </section>
 
-      <AppSectionCard className="bg-[var(--surface-base)]/70">
-        <p className="mb-1 text-sm font-semibold text-[var(--text-primary)]">Operação recente</p>
-        <p className="mb-3 text-xs text-[var(--text-muted)]">Bloco de apoio: leitura rápida do que acabou de acontecer.</p>
-        <AppTimeline>
-          {feed.map(item => (
-            <AppTimelineItem key={item}>{item}</AppTimelineItem>
-          ))}
-        </AppTimeline>
-      </AppSectionCard>
     </AppPageShell>
   );
 }
