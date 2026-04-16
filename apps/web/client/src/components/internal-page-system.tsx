@@ -332,14 +332,22 @@ export function AppListBlock({
   return (
     <div className={cn(compact ? "space-y-1.5 min-h-0" : "space-y-2 min-h-[240px] lg:min-h-[280px]", className)}>
       {normalizedItems.map(item => (
-        <div key={item.__key} className={cn("flex items-center justify-between rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/70", compact ? "gap-2 px-2.5 py-2" : "p-3")}>
-          <div>
-            <p className="text-sm font-medium text-[var(--text-primary)]">{item.title}</p>
-            {item.subtitle ? <p className="text-xs text-[var(--text-muted)]">{item.subtitle}</p> : null}
-          </div>
-          <div className="flex items-center gap-2">
-            {item.action}
-            {item.right}
+        <div
+          key={item.__key}
+          className={cn(
+            "rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/70",
+            compact ? "px-2.5 py-2" : "p-3"
+          )}
+        >
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <p className="truncate text-sm font-medium text-[var(--text-primary)]">{item.title}</p>
+              {item.subtitle ? <p className="truncate text-xs text-[var(--text-muted)]">{item.subtitle}</p> : null}
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <div className="shrink-0">{item.action}</div>
+              {item.right ? <div className="shrink-0">{item.right}</div> : null}
+            </div>
           </div>
         </div>
       ))}
