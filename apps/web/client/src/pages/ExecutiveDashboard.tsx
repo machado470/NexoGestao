@@ -55,7 +55,7 @@ export default function ExecutiveDashboard() {
         />
       </KpiErrorBoundary>
 
-      <div className="grid gap-3 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         <AppNextActionCard
           title="Próxima ação recomendada"
           description="Atue primeiro nas O.S. atrasadas para proteger SLA e reduzir efeito em cobrança."
@@ -123,6 +123,20 @@ export default function ExecutiveDashboard() {
               { title: "Pagamento recebido há 8 min", subtitle: "Sem pendência adicional no momento." },
               { title: "Novo agendamento criado há 14 min", subtitle: "Confirmação ainda pendente.", action: <Button size="sm" onClick={() => navigate("/appointments?status=unconfirmed")}>Confirmar</Button> },
               { title: "Mensagem enviada ao cliente há 20 min", subtitle: "Acompanhe resposta em andamento.", action: <Button size="sm" onClick={() => navigate("/timeline?scope=recent")}>Acompanhar</Button> },
+            ]}
+          />
+        </AppSectionBlock>
+
+        <AppSectionBlock title="Alertas críticos" subtitle="Focos de risco operacional e financeiro" ctaLabel="Ver alertas" onCtaClick={() => navigate("/dashboard/operations?filter=critical")} compact>
+          <AppListBlock
+            compact
+            maxItems={3}
+            minItems={0}
+            showPlaceholders={false}
+            items={[
+              { title: "2 cobranças acima de 45 dias", subtitle: "Risco elevado de inadimplência prolongada", action: <Button size="sm" onClick={() => navigate("/finances?status=overdue&aging=45+")}>Negociar</Button> },
+              { title: "3 O.S. críticas sem responsável", subtitle: "Execução travada em demandas prioritárias", action: <Button size="sm" onClick={() => navigate("/service-orders?status=attention&owner=unassigned")}>Atribuir</Button> },
+              { title: "4 clientes VIP sem retorno em 24h", subtitle: "Alto impacto potencial em retenção", action: <Button size="sm" onClick={() => navigate("/whatsapp?segment=vip&status=awaiting-reply")}>Responder</Button> },
             ]}
           />
         </AppSectionBlock>
