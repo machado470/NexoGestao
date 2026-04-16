@@ -537,6 +537,37 @@ wait_http_status() {
   return 1
 }
 
+wait_http_status_with_method() {
+  local label="${1:-endpoint}"
+  local url="${2:-}"
+  local method="${3:-GET}"
+  local body="${4:-}"
+  local max_attempts="${5:-80}"
+  local attempt=0
+  local begin_ts
+  begin_ts="$(date +%s)"
+
+  while [ "$attempt" -lt "$max_attempts" ]; do
+    local code
+    if [ -n "$body" ]; then
+      code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 2 -X "$method" -H "Content-Type: application/json" -d "$body" "$url" || true)"
+    else
+      code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 2 -X "$method" "$url" || true)"
+    fi
+    if [[ "$code" =~ ^[0-9]{3}$ ]] && [ "$code" != "000" ]; then
+      local elapsed
+      elapsed=$(( $(date +%s) - begin_ts ))
+      echo "✅ [probe] ${label} respondeu em ${elapsed}s (HTTP ${code})"
+      return 0
+    fi
+    attempt=$((attempt + 1))
+    sleep 1
+  done
+
+  echo "❌ [probe] ${label} não respondeu a tempo (${url})."
+  return 1
+}
+
 echo "🚀 Iniciando API + Web..."
 API_PORT="$API_PORT" PORT="$API_PORT" pnpm --filter ./apps/api run dev &
 API_PID=$!
@@ -549,10 +580,11 @@ cleanup() {
 trap cleanup EXIT
 
 start_phase "probe:startup-readiness"
-wait_http_ready "api:health" "http://127.0.0.1:${API_PORT}/health" 120 || true
-wait_http_ready "web:root" "http://127.0.0.1:${WEB_PORT}/" 120 || true
-wait_http_status "web:session.me" "http://127.0.0.1:${WEB_PORT}/api/trpc/session.me?batch=1&input=%7B%220%22%3A%7B%7D%7D" 120 || true
-wait_http_status "web:dashboard.status" "http://127.0.0.1:${WEB_PORT}/api/trpc/dashboard.status?batch=1&input=%7B%220%22%3A%7B%7D%7D" 120 || true
+wait_http_ready "api:health" "http://127.0.0.1:${API_PORT}/health" 120
+wait_http_status_with_method "api:auth.login" "http://127.0.0.1:${API_PORT}/auth/login" "POST" '{"email":"","password":""}' 60
+wait_http_ready "web:root" "http://127.0.0.1:${WEB_PORT}/" 120
+wait_http_status "web:session.me" "http://127.0.0.1:${WEB_PORT}/api/trpc/session.me?batch=1&input=%7B%220%22%3A%7B%7D%7D" 120
+wait_http_status "web:dashboard.status" "http://127.0.0.1:${WEB_PORT}/api/trpc/dashboard.status?batch=1&input=%7B%220%22%3A%7B%7D%7D" 120
 end_phase
 
 TOTAL_ELAPSED=$(( $(date +%s) - SCRIPT_START_TS ))

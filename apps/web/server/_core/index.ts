@@ -5,6 +5,7 @@ import type { AddressInfo } from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { registerConsentRoutes } from "./consent";
+import { getNexoApiResolutionMetadata } from "./nexoApiUrl";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { subscribeToNotificationCenterEvents } from "./notificationCenterEvents";
@@ -55,7 +56,11 @@ async function startServer() {
     const finalPort = address?.port ?? port;
     console.log(`[web] Server running on http://localhost:${finalPort}/`);
     console.log(`[web] PORT=${finalPort}`);
-    console.log(`[web] NEXO_API_URL=${process.env.NEXO_API_URL || "http://localhost:3000"}`);
+    const nexoApi = getNexoApiResolutionMetadata();
+    console.log(
+      `[web] NEXO_API_URL resolved=${nexoApi.resolved} configured=${nexoApi.configured ?? "default"} ` +
+        `fallback=${nexoApi.usedFallback} normalizedLocalhost=${nexoApi.normalizedLocalhost}`
+    );
   });
 }
 
