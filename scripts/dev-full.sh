@@ -5,14 +5,43 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 CLEAN_MODE=0
+SKIP_GENERATE="${DEV_FULL_SKIP_GENERATE:-0}"
+SKIP_MIGRATE="${DEV_FULL_SKIP_MIGRATE:-0}"
+SKIP_SEED="${DEV_FULL_SKIP_SEED:-0}"
 for arg in "$@"; do
   if [ "$arg" = "--clean" ]; then
     CLEAN_MODE=1
+  fi
+  if [ "$arg" = "--skip-generate" ]; then
+    SKIP_GENERATE=1
+  fi
+  if [ "$arg" = "--skip-migrate" ]; then
+    SKIP_MIGRATE=1
+  fi
+  if [ "$arg" = "--skip-seed" ]; then
+    SKIP_SEED=1
   fi
 done
 if [ "${DEV_FULL_CLEAN:-0}" = "1" ]; then
   CLEAN_MODE=1
 fi
+
+SCRIPT_START_TS="$(date +%s)"
+phase_start_ts="$SCRIPT_START_TS"
+phase_name="boot"
+
+start_phase() {
+  phase_name="${1:-phase}"
+  phase_start_ts="$(date +%s)"
+  echo "⏱️ [phase:start] ${phase_name}"
+}
+
+end_phase() {
+  local ended_at elapsed
+  ended_at="$(date +%s)"
+  elapsed=$((ended_at - phase_start_ts))
+  echo "✅ [phase:end] ${phase_name} (${elapsed}s)"
+}
 
 if ! command -v docker >/dev/null 2>&1; then
   echo "❌ Docker não encontrado. Instale Docker Desktop/Engine antes de rodar pnpm dev:full."
@@ -396,10 +425,13 @@ ensure_service_running() {
 }
 
 ensure_port_tooling
+start_phase "infra:port-conflict-check"
 kill_external_listener_if_needed "6379" "redis"
 kill_external_listener_if_needed "5432" "postgres"
+end_phase
 
 services_to_up=()
+start_phase "infra:containers"
 for infra_service in postgres redis; do
   if ! ensure_service_running "$infra_service"; then
     services_to_up+=("$infra_service")
@@ -415,11 +447,14 @@ elif [ "${#services_to_up[@]}" -gt 0 ]; then
 else
   echo "✅ Infra já pronta. Nenhuma recriação necessária."
 fi
+end_phase
 
+start_phase "infra:healthchecks"
 wait_for_postgres
 wait_for_redis
 log_infra_ready "postgres"
 log_infra_ready "redis"
+end_phase
 
 fail_if_external_port_block "3000" "API"
 fail_if_external_port_block "3010" "Web"
@@ -430,14 +465,99 @@ if [ "$WEB_PORT" != "3010" ]; then
   fail_if_external_port_block "$WEB_PORT" "Web"
 fi
 
-echo "🗃️ Executando migrations..."
-pnpm --filter ./apps/api run prisma:generate
-pnpm --filter ./apps/api run prisma:migrate:deploy
+if [ "$SKIP_GENERATE" = "1" ]; then
+  echo "⏭️ Prisma generate ignorado (DEV_FULL_SKIP_GENERATE=1 ou --skip-generate)."
+else
+  start_phase "prisma:generate"
+  pnpm --filter ./apps/api run prisma:generate
+  end_phase
+fi
 
-echo "🌱 Executando seed..."
-pnpm --filter ./apps/api run prisma:seed
+if [ "$SKIP_MIGRATE" = "1" ]; then
+  echo "⏭️ Prisma migrate deploy ignorado (DEV_FULL_SKIP_MIGRATE=1 ou --skip-migrate)."
+else
+  start_phase "prisma:migrate:deploy"
+  pnpm --filter ./apps/api run prisma:migrate:deploy
+  end_phase
+fi
+
+if [ "$SKIP_SEED" = "1" ]; then
+  echo "⏭️ Prisma seed ignorado (DEV_FULL_SKIP_SEED=1 ou --skip-seed)."
+else
+  start_phase "prisma:seed"
+  pnpm --filter ./apps/api run prisma:seed
+  end_phase
+fi
+
+wait_http_ready() {
+  local label="${1:-service}"
+  local url="${2:-}"
+  local max_attempts="${3:-80}"
+  local attempt=0
+  local begin_ts
+  begin_ts="$(date +%s)"
+
+  while [ "$attempt" -lt "$max_attempts" ]; do
+    if curl -sS -o /dev/null --max-time 2 "$url" >/dev/null 2>&1; then
+      local elapsed
+      elapsed=$(( $(date +%s) - begin_ts ))
+      echo "✅ [probe] ${label} pronto em ${elapsed}s (${url})"
+      return 0
+    fi
+    attempt=$((attempt + 1))
+    sleep 1
+  done
+
+  echo "⚠️ [probe] ${label} não respondeu a tempo (${url})."
+  return 1
+}
+
+wait_http_status() {
+  local label="${1:-endpoint}"
+  local url="${2:-}"
+  local max_attempts="${3:-80}"
+  local attempt=0
+  local begin_ts
+  begin_ts="$(date +%s)"
+
+  while [ "$attempt" -lt "$max_attempts" ]; do
+    local code
+    code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 2 "$url" || true)"
+    if [[ "$code" =~ ^[0-9]{3}$ ]] && [ "$code" != "000" ]; then
+      local elapsed
+      elapsed=$(( $(date +%s) - begin_ts ))
+      echo "✅ [probe] ${label} respondeu em ${elapsed}s (HTTP ${code})"
+      return 0
+    fi
+    attempt=$((attempt + 1))
+    sleep 1
+  done
+
+  echo "⚠️ [probe] ${label} não respondeu a tempo (${url})."
+  return 1
+}
 
 echo "🚀 Iniciando API + Web..."
-trap 'kill 0' EXIT
 API_PORT="$API_PORT" PORT="$API_PORT" pnpm --filter ./apps/api run dev &
-PORT="$WEB_PORT" NEXO_API_URL="$NEXO_API_URL" pnpm --filter ./apps/web run dev
+API_PID=$!
+PORT="$WEB_PORT" NEXO_API_URL="$NEXO_API_URL" pnpm --filter ./apps/web run dev &
+WEB_PID=$!
+
+cleanup() {
+  kill "$API_PID" "$WEB_PID" >/dev/null 2>&1 || true
+}
+trap cleanup EXIT
+
+start_phase "probe:startup-readiness"
+wait_http_ready "api:health" "http://127.0.0.1:${API_PORT}/health" 120 || true
+wait_http_ready "web:root" "http://127.0.0.1:${WEB_PORT}/" 120 || true
+wait_http_status "web:session.me" "http://127.0.0.1:${WEB_PORT}/api/trpc/session.me?batch=1&input=%7B%220%22%3A%7B%7D%7D" 120 || true
+wait_http_status "web:dashboard.status" "http://127.0.0.1:${WEB_PORT}/api/trpc/dashboard.status?batch=1&input=%7B%220%22%3A%7B%7D%7D" 120 || true
+end_phase
+
+TOTAL_ELAPSED=$(( $(date +%s) - SCRIPT_START_TS ))
+echo "🏁 Boot concluído em ${TOTAL_ELAPSED}s"
+echo "   API: http://127.0.0.1:${API_PORT}"
+echo "   WEB: http://127.0.0.1:${WEB_PORT}"
+
+wait "$WEB_PID"
