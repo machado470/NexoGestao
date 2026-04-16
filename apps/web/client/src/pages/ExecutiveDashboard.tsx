@@ -3,7 +3,7 @@ import { AlertTriangle, ArrowRight, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useRunAction } from "@/hooks/useRunAction";
 import { useRenderWatchdog } from "@/hooks/useRenderWatchdog";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import {
   AppKpiRow,
@@ -12,6 +12,8 @@ import {
   AppStatusBadge,
 } from "@/components/internal-page-system";
 import { KpiErrorBoundary } from "@/components/KpiErrorBoundary";
+import { Progress } from "@/components/ui/progress";
+import { Area, AreaChart, CartesianGrid, Line, ResponsiveContainer, XAxis, YAxis } from "recharts";
 
 type DashboardRow = {
   title: string;
@@ -58,18 +60,32 @@ export default function ExecutiveDashboard() {
   useRenderWatchdog("ExecutiveDashboard");
   const [, navigate] = useLocation();
   const { runAction } = useRunAction();
+  const [flowView, setFlowView] = useState<"orders" | "revenue">("orders");
   const ordensTravadas = 5;
   const clientesSemResposta = 2;
-  const cobrancasPendentes = 12;
   const agendaSemConfirmacao = 4;
-  const osSemCobranca = 8;
-  const clientesSemCobrancaRecente = 6;
-  const cobrancasComAltaConversao = 9;
 
   useEffect(() => {
     // eslint-disable-next-line no-console
     console.info("[RENDER PAGE] executive-dashboard");
   }, []);
+
+  const operationalFlow = [
+    { day: "01 Abr", orders: 22, revenue: 11.2 },
+    { day: "02 Abr", orders: 26, revenue: 13.8 },
+    { day: "03 Abr", orders: 19, revenue: 10.6 },
+    { day: "04 Abr", orders: 30, revenue: 16.4 },
+    { day: "05 Abr", orders: 24, revenue: 12.9 },
+    { day: "06 Abr", orders: 28, revenue: 15.1 },
+    { day: "07 Abr", orders: 34, revenue: 17.8 },
+    { day: "08 Abr", orders: 31, revenue: 16.9 },
+    { day: "09 Abr", orders: 27, revenue: 14.2 },
+    { day: "10 Abr", orders: 35, revenue: 19.6 },
+    { day: "11 Abr", orders: 29, revenue: 15.4 },
+    { day: "12 Abr", orders: 37, revenue: 20.7 },
+    { day: "13 Abr", orders: 33, revenue: 18.2 },
+    { day: "14 Abr", orders: 39, revenue: 22.4 },
+  ];
 
   return (
     <AppPageShell>
@@ -96,7 +112,7 @@ export default function ExecutiveDashboard() {
         />
       </KpiErrorBoundary>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <AppSectionBlock
           title="Próxima ação recomendada"
           subtitle="Prioridade operacional para proteger SLA e reduzir impacto financeiro"
@@ -124,88 +140,124 @@ export default function ExecutiveDashboard() {
         </AppSectionBlock>
 
         <AppSectionBlock
-          title="O que está parado agora"
-          subtitle="Bloqueios que pedem reação no turno atual"
-          ctaLabel="Ver tudo"
-          onCtaClick={() => navigate("/dashboard/operations?filter=blocked")}
-          compact
-          className="flex h-full min-h-[230px] flex-col"
+          title="Fluxo Operacional"
+          subtitle="Últimos 14 dias"
+          className="h-full min-h-[340px] xl:col-span-3"
         >
-          <CompactOperationalRows
-            items={[
-              { title: `${clientesSemResposta} clientes sem resposta`, subtitle: "Esfria oportunidade comercial", status: "Atenção", actionLabel: "Contato", onAction: () => navigate("/whatsapp?status=awaiting-reply") },
-              { title: `${ordensTravadas} ordens travadas`, subtitle: "Impacto direto no SLA", status: "Bloqueado", actionLabel: "Destravar", onAction: () => navigate("/service-orders?status=attention&period=7d") },
-              { title: `${cobrancasPendentes} cobranças pendentes`, subtitle: "Receita aberta sem follow-up", status: "Pendente", actionLabel: "Cobrar", onAction: () => navigate("/finances?status=pending&priority=high") },
-            ]}
-          />
+          <div className="mb-3 flex items-center justify-end gap-1">
+            <Button
+              size="sm"
+              variant={flowView === "orders" ? "default" : "ghost"}
+              className="h-7 rounded-full px-3 text-xs"
+              onClick={() => setFlowView("orders")}
+            >
+              Ordens
+            </Button>
+            <Button
+              size="sm"
+              variant={flowView === "revenue" ? "default" : "ghost"}
+              className="h-7 rounded-full px-3 text-xs"
+              onClick={() => setFlowView("revenue")}
+            >
+              Receita
+            </Button>
+          </div>
+
+          <div className="h-[250px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={operationalFlow} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="flowFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={flowView === "orders" ? "#38bdf8" : "#22c55e"} stopOpacity={0.35} />
+                    <stop offset="100%" stopColor={flowView === "orders" ? "#38bdf8" : "#22c55e"} stopOpacity={0.03} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid stroke="var(--border-subtle)" strokeDasharray="3 3" vertical={false} opacity={0.4} />
+                <XAxis dataKey="day" tick={{ fill: "var(--text-muted)", fontSize: 11 }} tickLine={false} axisLine={false} />
+                <YAxis tick={{ fill: "var(--text-muted)", fontSize: 11 }} tickLine={false} axisLine={false} width={34} />
+                <Area
+                  type="monotone"
+                  dataKey={flowView === "orders" ? "orders" : "revenue"}
+                  stroke={flowView === "orders" ? "#38bdf8" : "#22c55e"}
+                  strokeWidth={2.25}
+                  fill="url(#flowFill)"
+                />
+                <Line
+                  type="monotone"
+                  dataKey={flowView === "orders" ? "orders" : "revenue"}
+                  stroke={flowView === "orders" ? "#7dd3fc" : "#4ade80"}
+                  strokeWidth={1.3}
+                  dot={false}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
         </AppSectionBlock>
 
         <AppSectionBlock
-          title="O que pode virar dinheiro hoje"
-          subtitle="Oportunidades com retorno financeiro imediato"
-          ctaLabel="Ver pipeline"
-          onCtaClick={() => navigate("/finances?view=pipeline")}
-          compact
-          className="flex h-full min-h-[230px] flex-col"
-        >
-          <CompactOperationalRows
-            items={[
-              { title: `${osSemCobranca} O.S. concluídas sem cobrança`, subtitle: "Serviço entregue sem faturamento", status: "Atrasado", actionLabel: "Faturar", onAction: () => navigate("/finances?status=pending&source=service-order") },
-              { title: `${clientesSemCobrancaRecente} clientes sem cobrança recente`, subtitle: "Risco de atraso no ciclo de receita", status: "Atenção", actionLabel: "Reativar", onAction: () => navigate("/finances?segment=active&status=stale") },
-              { title: `${cobrancasComAltaConversao} cobranças com alta conversão`, subtitle: "Janela comercial favorável agora", status: "Alta", actionLabel: "Priorizar", onAction: () => navigate("/finances?status=pending&priority=high") },
-            ]}
-          />
-        </AppSectionBlock>
-
-        <AppSectionBlock
-          title="Itens que exigem atenção"
-          subtitle="Prioridades com impacto direto no dia"
-          ctaLabel="Ver detalhes"
-          onCtaClick={() => navigate("/dashboard/operations?filter=critical")}
-          compact
-          className="flex h-full min-h-[230px] flex-col"
-        >
-          <CompactOperationalRows
-            items={[
-              { title: "5 O.S. atrasadas aguardando execução", subtitle: "Risco direto para SLA e remarcações", status: "Urgente", actionLabel: "Atuar", onAction: () => navigate("/service-orders?status=attention") },
-              { title: "12 cobranças vencidas sem negociação", subtitle: "Pressão sobre caixa e previsibilidade", status: "Em risco", actionLabel: "Cobrar", onAction: () => navigate("/finances?status=overdue") },
-              { title: "2 clientes sem retorno há 7 dias", subtitle: "Churn potencial se não houver contato", status: "Atenção", actionLabel: "Contato", onAction: () => navigate("/whatsapp") },
-              { title: `${agendaSemConfirmacao} agendas sem confirmação`, subtitle: "Risco de no-show no turno atual", status: "Pendente", actionLabel: "Confirmar", onAction: () => navigate("/appointments?status=unconfirmed") },
-            ]}
-          />
-        </AppSectionBlock>
-
-        <AppSectionBlock
-          title="Atividade recente"
-          subtitle="Atualizações operacionais em tempo real"
-          ctaLabel="Ver tudo"
-          onCtaClick={() => navigate("/timeline?scope=recent")}
-          compact
-          className="flex h-full min-h-[230px] flex-col"
-        >
-          <CompactOperationalRows
-            items={[
-              { title: "O.S. #1847 concluída há 3 min", subtitle: "Finalize cobrança vinculada para fechar ciclo", status: "Concluído", actionLabel: "Cobrar", onAction: () => navigate("/finances?serviceOrderId=1847") },
-              { title: "Pagamento recebido há 8 min", subtitle: "Sem pendência adicional no momento", status: "Pago" },
-              { title: "Novo agendamento criado há 14 min", subtitle: "Confirmação ainda pendente", status: "Pendente", actionLabel: "Confirmar", onAction: () => navigate("/appointments?status=unconfirmed") },
-              { title: "Mensagem enviada ao cliente há 20 min", subtitle: "Acompanhe resposta em andamento", status: "Atenção", actionLabel: "Acompanhar", onAction: () => navigate("/timeline?scope=recent") },
-            ]}
-          />
-        </AppSectionBlock>
-
-        <AppSectionBlock
-          title="Alertas críticos"
-          subtitle="Focos de risco operacional e financeiro"
+          title="Alertas Críticos"
+          subtitle="Ver alertas"
           ctaLabel="Ver alertas"
           onCtaClick={() => navigate("/dashboard/operations?filter=critical")}
           compact
-          className="flex h-full min-h-[230px] flex-col"
+          className="flex h-full min-h-[340px] flex-col"
         >
           <CompactOperationalRows
             items={[
-              { title: "2 cobranças acima de 45 dias", subtitle: "Risco elevado de inadimplência prolongada", status: "Em risco", actionLabel: "Negociar", onAction: () => navigate("/finances?status=overdue&aging=45+") },
-              { title: "3 O.S. críticas sem responsável", subtitle: "Execução travada em demandas prioritárias", status: "Bloqueado", actionLabel: "Atribuir", onAction: () => navigate("/service-orders?status=attention&owner=unassigned") },
-              { title: "4 clientes VIP sem retorno em 24h", subtitle: "Alto impacto potencial em retenção", status: "Urgente", actionLabel: "Responder", onAction: () => navigate("/whatsapp?segment=vip&status=awaiting-reply") },
+              { title: "2 cobranças acima de 45 dias", subtitle: "Financeiro • carteira B", status: "Em risco", actionLabel: "Negociar", onAction: () => navigate("/finances?status=overdue&aging=45+") },
+              { title: `${ordensTravadas} O.S. críticas travadas`, subtitle: "Operação de campo • setor norte", status: "Bloqueado", actionLabel: "Atuar", onAction: () => navigate("/service-orders?status=attention&period=7d") },
+              { title: `${clientesSemResposta} clientes VIP sem retorno`, subtitle: "Relacionamento • canal WhatsApp", status: "Urgente", actionLabel: "Responder", onAction: () => navigate("/whatsapp?segment=vip&status=awaiting-reply") },
+              { title: `${agendaSemConfirmacao} agendas sem confirmação`, subtitle: "Agenda • período da tarde", status: "Pendente", actionLabel: "Confirmar", onAction: () => navigate("/appointments?status=unconfirmed") },
+            ]}
+          />
+        </AppSectionBlock>
+
+        <AppSectionBlock
+          title="Performance Equipe"
+          subtitle="Execução do turno em andamento"
+          className="flex h-full min-h-[220px] flex-col"
+        >
+          <div className="space-y-4">
+            {[{ name: "Equipe Alpha", value: 94 }, { name: "Equipe Beta", value: 87 }, { name: "Equipe Gamma", value: 78 }].map(team => (
+              <div key={team.name}>
+                <div className="mb-1.5 flex items-center justify-between text-xs">
+                  <span className="font-medium text-[var(--text-secondary)]">{team.name}</span>
+                  <span className="text-[var(--text-muted)]">{team.value}%</span>
+                </div>
+                <Progress value={team.value} className="h-1.5 rounded-full bg-[var(--surface-base)] [&>div]:bg-gradient-to-r [&>div]:from-cyan-400 [&>div]:to-indigo-500" />
+              </div>
+            ))}
+          </div>
+        </AppSectionBlock>
+
+        <AppSectionBlock
+          title="Agenda Hoje"
+          subtitle="Compromissos operacionais prioritários"
+          compact
+          className="flex h-full min-h-[220px] flex-col"
+        >
+          <CompactOperationalRows
+            items={[
+              { title: "09:00 • Reunião de alinhamento", subtitle: "Sala Estratégia", status: "Confirmado" },
+              { title: "11:30 • Revisão de SLA", subtitle: "Operações", status: "Atenção" },
+              { title: "14:00 • Follow-up financeiro", subtitle: "Contas em atraso", status: "Crítico" },
+              { title: "17:00 • Fechamento do turno", subtitle: "Diretoria", status: "Pendente" },
+            ]}
+          />
+        </AppSectionBlock>
+
+        <AppSectionBlock
+          title="Alertas do Sistema"
+          subtitle="Monitoramento técnico e estabilidade"
+          compact
+          className="flex h-full min-h-[220px] flex-col"
+        >
+          <CompactOperationalRows
+            items={[
+              { title: "Latência acima do esperado", subtitle: "API de cobrança • 312ms", status: "Médio" },
+              { title: "2 integrações aguardando sync", subtitle: "ERP e WhatsApp", status: "Atenção" },
+              { title: "Fila de notificações em alta", subtitle: "Pico nas últimas 2h", status: "Alto" },
+              { title: "Backup diário concluído", subtitle: "Datacenter primário", status: "OK" },
             ]}
           />
         </AppSectionBlock>
