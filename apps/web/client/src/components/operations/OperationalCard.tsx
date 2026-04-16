@@ -46,18 +46,18 @@ function getActionButtonClass(action: ExecutionAction, suggestedActionId?: strin
   const isSuggested = suggestedActionId === action.id;
 
   if (!action.enabled) {
-    return "nexo-cta-secondary !h-9 !rounded-lg !px-3 !text-xs opacity-50 cursor-not-allowed";
+    return "nexo-cta-secondary !h-9 !max-w-full !rounded-lg !px-3 !text-xs opacity-50 cursor-not-allowed";
   }
 
   if (action.intent === "danger") {
-    return "!h-9 !rounded-lg !px-3 !text-xs border border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300";
+    return "!h-9 !max-w-full !rounded-lg !px-3 !text-xs border border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300";
   }
 
   if (action.intent === "primary" || isSuggested) {
-    return "nexo-cta-primary !h-9 !rounded-lg !px-3 !text-xs";
+    return "nexo-cta-primary !h-9 !max-w-full !rounded-lg !px-3 !text-xs";
   }
 
-  return "nexo-cta-secondary !h-9 !rounded-lg !px-3 !text-xs";
+  return "nexo-cta-secondary !h-9 !max-w-full !rounded-lg !px-3 !text-xs";
 }
 
 function getModeLabel(mode: ExecutionAction["mode"]) {
@@ -220,10 +220,10 @@ export function OperationalCard({ decision, source, riskOperationalState }: Oper
         ) : null}
       </div>
 
-      <h3 className="mt-3 text-base font-semibold text-[var(--text-primary)] dark:text-[var(--text-primary)]">
+      <h3 className="mt-3 truncate text-base font-semibold text-[var(--text-primary)] dark:text-[var(--text-primary)]" title={decision.title}>
         {decision.title}
       </h3>
-      <p className="mt-1 text-sm text-[var(--text-secondary)] dark:text-[var(--text-secondary)]">{decision.summary}</p>
+      <p className="mt-1 line-clamp-2 text-sm text-[var(--text-secondary)] dark:text-[var(--text-secondary)]">{decision.summary}</p>
       <p className="mt-1 text-xs text-[var(--text-secondary)] dark:text-[var(--text-muted)]">
         Impacto {decision.impactScore ?? 0}/100 • urgência {decision.urgencyScore ?? 0}/100 • prioridade {decision.contextualPriority ?? "low"}
       </p>
@@ -264,7 +264,7 @@ export function OperationalCard({ decision, source, riskOperationalState }: Oper
         <p className="mt-1 text-xs text-[var(--text-secondary)] dark:text-[var(--text-muted)]">{lastMessage}</p>
       ) : null}
 
-      <div className="mt-4 flex flex-wrap gap-2">
+      <div className="mt-4 flex min-w-0 flex-wrap gap-2">
         {decision.actions.map((action) => {
           const isLoading = executingActionId === action.id;
           const isSuggested = decision.suggestedActionId === action.id;
@@ -279,9 +279,11 @@ export function OperationalCard({ decision, source, riskOperationalState }: Oper
               title={!action.enabled ? action.disabledReason : undefined}
             >
               {isLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
-              {action.label}
-              {isSuggested ? " • recomendado" : ""}
-              {` • ${getModeLabel(action.mode)}`}
+              <span className="max-w-[200px] truncate">
+                {action.label}
+                {isSuggested ? " • recomendado" : ""}
+                {` • ${getModeLabel(action.mode)}`}
+              </span>
             </button>
           );
         })}

@@ -270,14 +270,14 @@ export function AppSectionBlock({
 }) {
   return (
     <AppSectionCard className={cn(compact ? "min-h-0" : "min-h-[240px] lg:min-h-[280px]", className)}>
-      <div className="mb-3 flex items-start justify-between gap-2">
-        <div>
-          <h3 className="text-sm font-semibold text-[var(--text-primary)]">{title}</h3>
-          {subtitle ? <p className="text-xs text-[var(--text-muted)]">{subtitle}</p> : null}
+      <div className="mb-3 flex min-w-0 items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate text-sm font-semibold text-[var(--text-primary)]" title={title}>{title}</h3>
+          {subtitle ? <p className="line-clamp-2 text-xs text-[var(--text-muted)]">{subtitle}</p> : null}
         </div>
         {onCtaClick ? (
-          <Button size="sm" variant="ghost" onClick={onCtaClick}>
-            {ctaLabel ?? "Ver detalhes da operação"}
+          <Button size="sm" variant="ghost" onClick={onCtaClick} className="max-w-full shrink-0">
+            <span className="truncate">{ctaLabel ?? "Ver detalhes da operação"}</span>
           </Button>
         ) : null}
       </div>
@@ -453,19 +453,19 @@ export function AppNextActionCard({
   const tone = nextActionTone[severity];
 
   return (
-    <div className={cn("rounded-lg border p-3", tone.container)}>
+    <div className={cn("min-w-0 rounded-lg border p-3", tone.container)}>
       <p className={cn("text-xs font-semibold uppercase tracking-[0.12em]", tone.badge)}>{severity.toUpperCase()}</p>
-      <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">{title}</p>
+      <p className="mt-1 truncate text-sm font-semibold text-[var(--text-primary)]" title={title}>{title}</p>
       <p
         className="mt-1 text-xs leading-5 text-[var(--text-secondary)]"
         style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}
       >
         {description}
       </p>
-      {metadata ? <p className="mt-1 text-[11px] uppercase tracking-[0.08em] text-[var(--text-muted)]">Origem: {metadata}</p> : null}
-      {automationStatus ? <p className="mt-1 text-[11px] uppercase tracking-[0.08em] text-[var(--text-muted)]">{automationStatus}</p> : null}
-      <Button className="mt-2" size="sm" type="button" variant="default" onClick={action.onClick}>
-        {action.label}
+      {metadata ? <p className="mt-1 truncate text-[11px] uppercase tracking-[0.08em] text-[var(--text-muted)]">Origem: {metadata}</p> : null}
+      {automationStatus ? <p className="mt-1 truncate text-[11px] uppercase tracking-[0.08em] text-[var(--text-muted)]">{automationStatus}</p> : null}
+      <Button className="mt-2 max-w-full" size="sm" type="button" variant="default" onClick={action.onClick}>
+        <span className="truncate">{action.label}</span>
       </Button>
     </div>
   );
