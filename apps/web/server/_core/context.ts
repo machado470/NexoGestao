@@ -21,10 +21,85 @@ export type TrpcContext = {
 export type Context = TrpcContext;
 
 class NexoBootstrapError extends Error {
-  constructor(message: string) {
+  public readonly kind: "unavailable" | "upstream" | "malformed";
+
+  constructor(message: string, kind: "unavailable" | "upstream" | "malformed") {
     super(message);
     this.name = "NexoBootstrapError";
+    this.kind = kind;
   }
+}
+
+const LOG_SUPPRESSION_WINDOW_MS = Number(
+  process.env.NEXO_ME_LOG_SUPPRESSION_MS || 10_000
+);
+const UNAVAILABLE_COOLDOWN_MS = Number(
+  process.env.NEXO_ME_UNAVAILABLE_COOLDOWN_MS || 4_000
+);
+const pendingFetchByToken = new Map<string, Promise<TrpcUser | null>>();
+const unavailableUntilByToken = new Map<string, number>();
+const lastLogByKey = new Map<string, number>();
+
+function logWithSuppression(
+  key: string,
+  level: "warn" | "error",
+  message: string,
+  payload: Record<string, unknown>
+) {
+  const now = Date.now();
+  const previous = lastLogByKey.get(key) ?? 0;
+  const suppressedCount = payload.suppressedCount;
+  const basePayload = {
+    ...payload,
+    suppressedCount,
+  };
+
+  if (now - previous < LOG_SUPPRESSION_WINDOW_MS) {
+    return;
+  }
+
+  lastLogByKey.set(key, now);
+  if (level === "warn") {
+    console.warn(message, basePayload);
+    return;
+  }
+  console.error(message, basePayload);
+}
+
+function isConnectionUnavailableError(error: unknown) {
+  if (!error || typeof error !== "object") return false;
+  const maybe = error as {
+    name?: unknown;
+    code?: unknown;
+    cause?: { code?: unknown; name?: unknown; message?: unknown };
+    message?: unknown;
+  };
+  const code =
+    typeof maybe.code === "string"
+      ? maybe.code
+      : typeof maybe.cause?.code === "string"
+        ? maybe.cause.code
+        : "";
+  const name =
+    typeof maybe.name === "string"
+      ? maybe.name
+      : typeof maybe.cause?.name === "string"
+        ? maybe.cause.name
+        : "";
+  const message =
+    typeof maybe.message === "string"
+      ? maybe.message
+      : typeof maybe.cause?.message === "string"
+        ? maybe.cause.message
+        : "";
+
+  return (
+    code === "ECONNREFUSED" ||
+    code === "ENOTFOUND" ||
+    code === "ECONNRESET" ||
+    name === "AbortError" ||
+    message.toLowerCase().includes("fetch failed")
+  );
 }
 
 export function getNexoTokenFromReq(req: any): string | null {
@@ -101,7 +176,9 @@ function normalizeMePayload(payload: unknown): Omit<TrpcUser, "token"> | null {
 
   const rawUser = isObject(root.user) ? root.user : root;
   const rawPerson = isObject(rawUser.person) ? rawUser.person : null;
-  const rawOrganization = isObject(root.organization) ? root.organization : null;
+  const rawOrganization = isObject(root.organization)
+    ? root.organization
+    : null;
 
   const id = toOptionalString(rawUser.id);
   const organizationId =
@@ -131,78 +208,159 @@ function normalizeMePayload(payload: unknown): Omit<TrpcUser, "token"> | null {
   };
 }
 
+export { NexoBootstrapError };
+
 export async function fetchNexoMe(req: any) {
   const token = getNexoTokenFromReq(req);
   if (!token) return null;
 
-  const NEXO_API_URL = process.env.NEXO_API_URL || "http://127.0.0.1:3000";
-  const timeoutMs = Number(process.env.NEXO_ME_TIMEOUT_MS || 3500);
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  const now = Date.now();
+  const unavailableUntil = unavailableUntilByToken.get(token) ?? 0;
+  if (now < unavailableUntil) {
+    logWithSuppression(
+      `cooldown:${token}`,
+      "warn",
+      "[trpc/context] fetchNexoMe temporarily skipped after upstream connection failure",
+      {
+        remainingMs: unavailableUntil - now,
+      }
+    );
+    throw new NexoBootstrapError(
+      "Skipped /me during cooldown window",
+      "unavailable"
+    );
+  }
 
-  try {
-    const response = await fetch(`${NEXO_API_URL}/me`, {
-      method: "GET",
-      signal: controller.signal,
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
+  const pending = pendingFetchByToken.get(token);
+  if (pending) return pending;
 
-    const text = await response.text();
+  const runner = (async () => {
+    const NEXO_API_URL = process.env.NEXO_API_URL || "http://127.0.0.1:3000";
+    const timeoutMs = Number(process.env.NEXO_ME_TIMEOUT_MS || 3500);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
-    let body: any = null;
     try {
-      body = text ? JSON.parse(text) : null;
-    } catch {
-      body = text;
-    }
-
-    if (!response.ok) {
-      if (response.status === 401) {
-        return null;
-      }
-
-      if (process.env.NODE_ENV !== "production") {
-        console.error("[trpc/context] fetchNexoMe failed", {
-          url: `${NEXO_API_URL}/me`,
-          status: response.status,
-          body,
-        });
-      }
-      throw new NexoBootstrapError(
-        `Unexpected /me response status: ${response.status}`
-      );
-    }
-
-    const normalized = normalizeMePayload(body);
-    if (!normalized) {
-      if (process.env.NODE_ENV !== "production") {
-        console.error("[trpc/context] fetchNexoMe normalize failed", {
-          body,
-        });
-      }
-      throw new NexoBootstrapError("Malformed /me payload");
-    }
-
-    return {
-      token,
-      ...normalized,
-    } satisfies TrpcUser;
-  } catch (error) {
-    if (error instanceof NexoBootstrapError) {
-      throw error;
-    }
-
-    if (process.env.NODE_ENV !== "production") {
-      console.error("[trpc/context] fetchNexoMe exception", {
-        url: `${NEXO_API_URL}/me`,
-        error,
+      const response = await fetch(`${NEXO_API_URL}/me`, {
+        method: "GET",
+        signal: controller.signal,
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
+
+      const text = await response.text();
+
+      let body: any = null;
+      try {
+        body = text ? JSON.parse(text) : null;
+      } catch {
+        body = text;
+      }
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          return null;
+        }
+
+        const errorKind = response.status >= 500 ? "upstream" : "malformed";
+        logWithSuppression(
+          `status:${response.status}`,
+          "error",
+          "[trpc/context] fetchNexoMe failed",
+          {
+            url: `${NEXO_API_URL}/me`,
+            status: response.status,
+            body,
+            errorKind,
+          }
+        );
+        throw new NexoBootstrapError(
+          `Unexpected /me response status: ${response.status}`,
+          errorKind
+        );
+      }
+
+      const normalized = normalizeMePayload(body);
+      if (!normalized) {
+        logWithSuppression(
+          "normalize",
+          "error",
+          "[trpc/context] fetchNexoMe normalize failed",
+          {
+            body,
+          }
+        );
+        throw new NexoBootstrapError("Malformed /me payload", "malformed");
+      }
+
+      return {
+        token,
+        ...normalized,
+      } satisfies TrpcUser;
+    } catch (error) {
+      if (error instanceof NexoBootstrapError) {
+        throw error;
+      }
+
+      if (isConnectionUnavailableError(error)) {
+        unavailableUntilByToken.set(
+          token,
+          Date.now() + UNAVAILABLE_COOLDOWN_MS
+        );
+        logWithSuppression(
+          "connection",
+          "warn",
+          "[trpc/context] fetchNexoMe upstream unavailable; using degraded fallback",
+          {
+            url: `${NEXO_API_URL}/me`,
+            error:
+              error instanceof Error
+                ? {
+                    name: error.name,
+                    message: error.message,
+                    cause: (error as Error & { cause?: unknown }).cause,
+                  }
+                : String(error),
+            cooldownMs: UNAVAILABLE_COOLDOWN_MS,
+          }
+        );
+        throw new NexoBootstrapError(
+          "Unable to reach /me upstream",
+          "unavailable"
+        );
+      }
+
+      logWithSuppression(
+        "unexpected_exception",
+        "error",
+        "[trpc/context] fetchNexoMe unexpected exception",
+        {
+          url: `${NEXO_API_URL}/me`,
+          error:
+            error instanceof Error
+              ? {
+                  name: error.name,
+                  message: error.message,
+                  cause: (error as Error & { cause?: unknown }).cause,
+                }
+              : String(error),
+        }
+      );
+      throw new NexoBootstrapError(
+        "Unable to bootstrap session from /me",
+        "upstream"
+      );
+    } finally {
+      clearTimeout(timeout);
     }
-    throw new NexoBootstrapError("Unable to bootstrap session from /me");
+  })();
+
+  pendingFetchByToken.set(token, runner);
+  try {
+    return await runner;
   } finally {
-    clearTimeout(timeout);
+    pendingFetchByToken.delete(token);
   }
 }
 
@@ -219,11 +377,33 @@ export async function createContext(
     };
   }
 
-  const me = await fetchNexoMe(opts.req);
+  try {
+    const me = await fetchNexoMe(opts.req);
 
-  return {
-    req: opts.req,
-    res: opts.res,
-    user: me ?? null,
-  };
+    return {
+      req: opts.req,
+      res: opts.res,
+      user: me ?? { token },
+    };
+  } catch (error) {
+    if (error instanceof NexoBootstrapError && error.kind === "malformed") {
+      throw error;
+    }
+
+    logWithSuppression(
+      "context_fallback",
+      "warn",
+      "[trpc/context] createContext degraded to token-only auth context",
+      {
+        reason:
+          error instanceof NexoBootstrapError ? error.kind : "unexpected_error",
+      }
+    );
+
+    return {
+      req: opts.req,
+      res: opts.res,
+      user: { token },
+    };
+  }
 }

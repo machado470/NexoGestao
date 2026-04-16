@@ -10,7 +10,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { normalizeRole, type Role } from "@/lib/rbac";
-import { extractPathname, shouldBootstrapSessionForPath } from "@/lib/routeAccess";
+import {
+  extractPathname,
+  shouldBootstrapSessionForPath,
+} from "@/lib/routeAccess";
 import { pushAuditEvent, setAuditField } from "@/lib/renderAudit";
 
 type AuthUser = {
@@ -191,6 +194,34 @@ export function isExpectedUnauthenticatedError(error: unknown): boolean {
   return false;
 }
 
+function isSessionUnavailableError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+
+  const maybeError = error as {
+    data?: { code?: unknown; httpStatus?: unknown };
+    shape?: { data?: { code?: unknown; httpStatus?: unknown } };
+    message?: unknown;
+    cause?: { message?: unknown };
+  };
+
+  const code = maybeError.data?.code ?? maybeError.shape?.data?.code;
+  const httpStatus =
+    maybeError.data?.httpStatus ?? maybeError.shape?.data?.httpStatus;
+  const message =
+    typeof maybeError.message === "string" ? maybeError.message : "";
+  const causeMessage =
+    typeof maybeError.cause?.message === "string"
+      ? maybeError.cause.message
+      : "";
+
+  if (code === "SERVICE_UNAVAILABLE") return true;
+  if (httpStatus === 503) return true;
+  if (message.includes("SESSION_UPSTREAM_UNAVAILABLE")) return true;
+  if (causeMessage.includes("SESSION_UPSTREAM_UNAVAILABLE")) return true;
+
+  return false;
+}
+
 /* ========================= */
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -205,9 +236,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const pathname = useMemo(() => extractPathname(location), [location]);
   const previousAuthStateRef = useRef<AuthBootstrapState | null>(null);
   const meBootstrapStartedAtRef = useRef<number | null>(null);
+  const lastUnavailableLogAtRef = useRef<number>(0);
 
   const shouldBootstrapSession = shouldBootstrapSessionForPath(pathname);
-  const syncEventRef = useRef<(payload: unknown) => Promise<void>>(async () => {});
+  const syncEventRef = useRef<(payload: unknown) => Promise<void>>(
+    async () => {}
+  );
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;
@@ -231,12 +265,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!shouldBootstrapSession || forcedLoggedOut) return;
-    if (meQuery.fetchStatus === "fetching" && meBootstrapStartedAtRef.current === null) {
+    if (
+      meQuery.fetchStatus === "fetching" &&
+      meBootstrapStartedAtRef.current === null
+    ) {
       meBootstrapStartedAtRef.current = Date.now();
       return;
     }
 
-    if (meQuery.fetchStatus !== "idle" && meQuery.fetchStatus !== "paused") return;
+    if (meQuery.fetchStatus !== "idle" && meQuery.fetchStatus !== "paused")
+      return;
     if (meBootstrapStartedAtRef.current === null) return;
 
     const durationMs = Date.now() - meBootstrapStartedAtRef.current;
@@ -499,9 +537,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const isSubmitting = isAuthenticating;
   const meBootstrapError =
-    shouldBootstrapSession && !isExpectedUnauthenticatedError(meQuery.error)
+    shouldBootstrapSession &&
+    !isExpectedUnauthenticatedError(meQuery.error) &&
+    !isSessionUnavailableError(meQuery.error)
       ? meQuery.error
       : null;
+  const meBootstrapUnavailable =
+    shouldBootstrapSession && isSessionUnavailableError(meQuery.error);
 
   const isInitializing =
     shouldBootstrapSession &&
@@ -518,6 +560,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     bootstrapError: meBootstrapError,
     user: userSafe,
   });
+
+  useEffect(() => {
+    if (!meBootstrapUnavailable) return;
+    const now = Date.now();
+    if (now - lastUnavailableLogAtRef.current < 10_000) return;
+    lastUnavailableLogAtRef.current = now;
+    // eslint-disable-next-line no-console
+    console.warn(
+      "[AUTH] session bootstrap degraded due to /me unavailability",
+      {
+        pathname,
+        fetchStatus: meQuery.fetchStatus,
+        fallbackAuthState: userSafe ? "authenticated" : "unauthenticated",
+      }
+    );
+  }, [meBootstrapUnavailable, meQuery.fetchStatus, pathname, userSafe]);
 
   useEffect(() => {
     setAuditField("bootstrapBranch", `auth:${authState}`);
@@ -540,7 +598,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       from: prevState,
       to: authState,
       pathname,
-      readyState: typeof document !== "undefined" ? document.readyState : "unknown",
+      readyState:
+        typeof document !== "undefined" ? document.readyState : "unknown",
       shouldBootstrapSession,
       forcedLoggedOut,
       meFetchStatus: meQuery.fetchStatus,
@@ -580,31 +639,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   ]);
 
   useEffect(() => {
-    if (!shouldBootstrapSession || forcedLoggedOut || !import.meta.env.DEV) return;
+    if (!shouldBootstrapSession || forcedLoggedOut || !import.meta.env.DEV)
+      return;
     // eslint-disable-next-line no-console
     console.info("[AUTH] init", { pathname });
   }, [forcedLoggedOut, pathname, shouldBootstrapSession]);
 
   if (import.meta.env.DEV && isInitializing) {
     // eslint-disable-next-line no-console
-    console.log("[AUTH] loading", { pathname, meFetchStatus: meQuery.fetchStatus });
+    console.log("[AUTH] loading", {
+      pathname,
+      meFetchStatus: meQuery.fetchStatus,
+    });
   }
 
   useEffect(() => {
     if (!import.meta.env.DEV || !isReady) return;
     if (authState === "authenticated") {
       // eslint-disable-next-line no-console
-      console.info("[AUTH] resolved", { state: "authenticated", userId: userSafe?.id ?? null });
+      console.info("[AUTH] resolved", {
+        state: "authenticated",
+        userId: userSafe?.id ?? null,
+      });
       return;
     }
     if (authState === "unauthenticated") {
       // eslint-disable-next-line no-console
-      console.info("[AUTH] resolved", { state: "unauthenticated", pathname });
+      console.info("[AUTH] resolved", {
+        state: "unauthenticated",
+        pathname,
+        degradedBySessionUnavailable: meBootstrapUnavailable,
+      });
       return;
     }
     // eslint-disable-next-line no-console
     console.error("[BOOT ERROR] auth bootstrap", meBootstrapError);
-  }, [authState, isReady, meBootstrapError, pathname, userSafe?.id]);
+  }, [
+    authState,
+    isReady,
+    meBootstrapError,
+    meBootstrapUnavailable,
+    pathname,
+    userSafe?.id,
+  ]);
 
   const value: AuthContextType = {
     user: userSafe,
