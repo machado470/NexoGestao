@@ -133,7 +133,7 @@ export function AppMetricCard({
 
   if (!onClick) return content;
   return (
-    <button type="button" className="text-left" onClick={onClick}>
+    <button type="button" className="h-full w-full text-left" onClick={onClick}>
       {content}
     </button>
   );
@@ -169,14 +169,16 @@ export function AppKpiCard({
 export function AppKpiRow({
   items,
   emphasis = "compact",
+  gridClassName,
 }: {
   items: Array<AppMetricCardItem | { label: string; value: string; trend?: number; context?: string; onClick?: () => void }>;
   emphasis?: "strong" | "compact";
+  gridClassName?: string;
 }) {
   const safeItems = Array.isArray(items) ? items : [];
 
   return (
-    <section className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(320px,1fr))]">
+    <section className={cn("grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(320px,1fr))]", gridClassName)}>
       {safeItems.map((item, index) => {
         if (!item || typeof item !== "object") {
           if (import.meta.env.DEV) {
