@@ -1,6 +1,6 @@
 import { lazy, Suspense } from "react";
 import { useLocation } from "wouter";
-import { AlertTriangle, ArrowRight, ChevronRight } from "lucide-react";
+import { AlertTriangle, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useRunAction } from "@/hooks/useRunAction";
 import { useRenderWatchdog } from "@/hooks/useRenderWatchdog";
@@ -8,7 +8,6 @@ import { useEffect, useState } from "react";
 import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import {
   AppKpiRow,
-  AppNextActionCard,
   AppPageShell,
   AppSectionBlock,
   AppStatusBadge,
@@ -32,27 +31,27 @@ type DashboardRow = {
 
 function CompactOperationalRows({ items }: { items: DashboardRow[] }) {
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-1.5 min-w-0">
       {items.map(item => (
         <div
           key={item.title}
-          className="flex items-center justify-between gap-2 rounded-lg border border-[var(--border-subtle)]/60 bg-[var(--surface-base)]/35 px-2.5 py-2"
+          className="flex min-w-0 items-center justify-between gap-2 overflow-hidden rounded-lg border border-[var(--border-subtle)]/60 bg-[var(--surface-base)]/35 px-2.5 py-2"
         >
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium text-[var(--text-primary)]">{item.title}</p>
             <p className="truncate text-xs text-[var(--text-muted)]">{item.subtitle}</p>
           </div>
 
-          <div className="flex shrink-0 items-center gap-1.5">
+          <div className="flex max-w-full shrink-0 items-center gap-1.5">
             {item.status ? <AppStatusBadge label={item.status} /> : null}
             {item.onAction ? (
               <Button
                 size="sm"
                 variant="outline"
-                className="h-7 rounded-full border-[var(--border-subtle)] px-2.5 text-[11px]"
+                className="h-7 max-w-full rounded-full border-[var(--border-subtle)] px-2.5 text-[11px]"
                 onClick={item.onAction}
               >
-                {item.actionLabel}
+                <span className="truncate">{item.actionLabel}</span>
                 <ChevronRight className="ml-1 h-3.5 w-3.5" />
               </Button>
             ) : null}
@@ -138,35 +137,28 @@ export default function ExecutiveDashboard() {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <AppSectionBlock
           title="Próxima ação recomendada"
-          subtitle="Prioridade operacional para proteger SLA e reduzir impacto financeiro"
-          className="flex h-full min-h-[230px] flex-col rounded-xl border-rose-500/35 bg-gradient-to-b from-rose-500/12 to-[var(--surface-elevated)]"
+          subtitle="Prioridade operacional para proteger SLA e reduzir risco imediato"
+          className="flex h-full min-h-[198px] flex-col rounded-xl border-rose-500/35 bg-gradient-to-b from-rose-500/12 to-[var(--surface-elevated)]"
         >
-          <div className="mb-3">
-            <AppNextActionCard
-              title="Destravar O.S. críticas do turno"
-              description="Comece pelas ordens com maior risco de SLA para liberar o fluxo de cobrança."
-              severity="critical"
-              action={{ label: "Abrir ordens críticas", onClick: () => navigate("/service-orders?status=attention&period=7d") }}
-            />
-          </div>
           <div className="mb-2 inline-flex w-fit items-center gap-1 rounded-full border border-rose-500/35 bg-rose-500/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-rose-400">
             <AlertTriangle className="h-3.5 w-3.5" />
             Prioridade alta
           </div>
-          <p className="text-sm text-[var(--text-secondary)]">
-            Atue primeiro nas O.S. atrasadas para destravar execução crítica e preservar previsibilidade de cobrança.
+          <p className="text-base font-semibold text-[var(--text-primary)]">Destravar O.S. críticas do turno</p>
+          <p className="mt-1 line-clamp-2 text-sm text-[var(--text-secondary)]">
+            5 ordens com risco de SLA e atraso de receita. Atue agora para normalizar o fluxo do dia.
           </p>
-          <div className="mt-3 flex items-center justify-between text-xs text-[var(--text-muted)]">
-            <span>Origem: centro executivo</span>
-            <span>janela: hoje</span>
+          <div className="mt-2 flex items-center gap-2 text-xs text-[var(--text-muted)]">
+            <span>Impacto: alto</span>
+            <span>•</span>
+            <span>{ordensTravadas} ordens</span>
           </div>
           <Button
-            className="mt-4 h-8 self-start rounded-full px-3 text-xs"
+            className="mt-3 h-8 max-w-full self-start rounded-full px-3 text-xs"
             size="sm"
             onClick={() => navigate("/service-orders?status=attention&period=7d")}
           >
-            Abrir ordens críticas
-            <ArrowRight className="ml-1 h-3.5 w-3.5" />
+            <span className="truncate">Abrir ordens críticas</span>
           </Button>
         </AppSectionBlock>
 
@@ -215,10 +207,10 @@ export default function ExecutiveDashboard() {
         >
           <CompactOperationalRows
             items={[
-              { title: "2 cobranças acima de 45 dias", subtitle: "Financeiro • carteira B", status: "Em risco", actionLabel: "Negociar", onAction: () => navigate("/finances?status=overdue&aging=45+") },
-              { title: `${ordensTravadas} O.S. críticas travadas`, subtitle: "Operação de campo • setor norte", status: "Bloqueado", actionLabel: "Atuar", onAction: () => navigate("/service-orders?status=attention&period=7d") },
-              { title: `${clientesSemResposta} clientes VIP sem retorno`, subtitle: "Relacionamento • canal WhatsApp", status: "Urgente", actionLabel: "Responder", onAction: () => navigate("/whatsapp?segment=vip&status=awaiting-reply") },
-              { title: `${agendaSemConfirmacao} agendas sem confirmação`, subtitle: "Agenda • período da tarde", status: "Pendente", actionLabel: "Confirmar", onAction: () => navigate("/appointments?status=unconfirmed") },
+              { title: "2 cobranças acima de 45 dias", subtitle: "Financeiro • carteira B", status: "Em risco", actionLabel: "Abrir", onAction: () => navigate("/finances?status=overdue&aging=45+") },
+              { title: `${ordensTravadas} O.S. críticas travadas`, subtitle: "Operação de campo • setor norte", status: "Bloqueado", actionLabel: "Abrir", onAction: () => navigate("/service-orders?status=attention&period=7d") },
+              { title: `${clientesSemResposta} clientes VIP sem retorno`, subtitle: "Relacionamento • canal WhatsApp", status: "Urgente", actionLabel: "Abrir", onAction: () => navigate("/whatsapp?segment=vip&status=awaiting-reply") },
+              { title: `${agendaSemConfirmacao} agendas sem confirmação`, subtitle: "Agenda • período da tarde", status: "Pendente", actionLabel: "Abrir", onAction: () => navigate("/appointments?status=unconfirmed") },
             ]}
           />
         </AppSectionBlock>
