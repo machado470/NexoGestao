@@ -258,6 +258,7 @@ export function AppSectionBlock({
   className,
   ctaLabel,
   onCtaClick,
+  compact = false,
 }: {
   title: string;
   subtitle?: string;
@@ -265,9 +266,10 @@ export function AppSectionBlock({
   className?: string;
   ctaLabel?: string;
   onCtaClick?: () => void;
+  compact?: boolean;
 }) {
   return (
-    <AppSectionCard className={cn("min-h-[240px] lg:min-h-[280px]", className)}>
+    <AppSectionCard className={cn(compact ? "min-h-0" : "min-h-[240px] lg:min-h-[280px]", className)}>
       <div className="mb-3 flex items-start justify-between gap-2">
         <div>
           <h3 className="text-sm font-semibold text-[var(--text-primary)]">{title}</h3>
@@ -291,11 +293,19 @@ export function AppDataTable({ children }: { children: ReactNode }) {
 export function AppListBlock({
   items,
   className,
+  maxItems = 8,
+  minItems = 5,
+  compact = false,
+  showPlaceholders = true,
 }: {
   items: Array<{ title: string; subtitle?: string; right?: ReactNode; action?: ReactNode }>;
   className?: string;
+  maxItems?: number;
+  minItems?: number;
+  compact?: boolean;
+  showPlaceholders?: boolean;
 }) {
-  const normalizedItems = items.slice(0, 8).map((item, index) => ({
+  const normalizedItems = items.slice(0, maxItems).map((item, index) => ({
     ...item,
     subtitle: item.subtitle ?? "Ação operacional disponível para execução imediata.",
     action: item.action ?? (
@@ -305,7 +315,7 @@ export function AppListBlock({
     ),
     __key: `${item.title}-${index}`,
   }));
-  while (normalizedItems.length < 5) {
+  while (showPlaceholders && normalizedItems.length < minItems) {
     const idx = normalizedItems.length + 1;
     normalizedItems.push({
       title: `Ação complementar ${idx}`,
@@ -320,9 +330,9 @@ export function AppListBlock({
   }
 
   return (
-    <div className={cn("space-y-2 min-h-[240px] lg:min-h-[280px]", className)}>
+    <div className={cn(compact ? "space-y-1.5 min-h-0" : "space-y-2 min-h-[240px] lg:min-h-[280px]", className)}>
       {normalizedItems.map(item => (
-        <div key={item.__key} className="flex items-center justify-between rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/70 p-3">
+        <div key={item.__key} className={cn("flex items-center justify-between rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/70", compact ? "gap-2 px-2.5 py-2" : "p-3")}>
           <div>
             <p className="text-sm font-medium text-[var(--text-primary)]">{item.title}</p>
             {item.subtitle ? <p className="text-xs text-[var(--text-muted)]">{item.subtitle}</p> : null}
@@ -438,10 +448,15 @@ export function AppNextActionCard({
     <div className={cn("rounded-lg border p-3", tone.container)}>
       <p className={cn("text-xs font-semibold uppercase tracking-[0.12em]", tone.badge)}>{severity.toUpperCase()}</p>
       <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">{title}</p>
-      <p className="mt-1 text-xs text-[var(--text-secondary)]">{description}</p>
+      <p
+        className="mt-1 text-xs leading-5 text-[var(--text-secondary)]"
+        style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}
+      >
+        {description}
+      </p>
       {metadata ? <p className="mt-1 text-[11px] uppercase tracking-[0.08em] text-[var(--text-muted)]">Origem: {metadata}</p> : null}
       {automationStatus ? <p className="mt-1 text-[11px] uppercase tracking-[0.08em] text-[var(--text-muted)]">{automationStatus}</p> : null}
-      <Button className="mt-2" type="button" variant="default" onClick={action.onClick}>
+      <Button className="mt-2" size="sm" type="button" variant="default" onClick={action.onClick}>
         {action.label}
       </Button>
     </div>
