@@ -253,31 +253,35 @@ export default function ExecutiveDashboardNew() {
           </div>
         </AppSectionCard>
 
-        <section className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
           {kpis.map((item) => {
             const isUp = item.trend === "up";
             const isDown = item.trend === "down";
             return (
-              <AppSectionCard key={item.label} className="flex h-full flex-col p-3">
-                <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">{item.label}</p>
-                <p className="mt-1 text-3xl font-semibold leading-none text-[var(--text-primary)]">{item.value}</p>
-                <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">{item.description}</p>
-                <div className="mt-1.5 flex items-center justify-between gap-2">
-                  <span className={`inline-flex h-5 items-center gap-1 rounded-md px-1.5 text-[10px] font-medium ${
-                    isUp
-                      ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                      : isDown
-                        ? "bg-rose-500/10 text-rose-700 dark:text-rose-300"
-                      : "bg-muted text-[var(--text-muted)]"
-                  }`}>
-                    {isUp ? <TrendingUp className="h-2.5 w-2.5" /> : isDown ? <TrendingDown className="h-2.5 w-2.5" /> : null}
-                    {item.variation}
-                  </span>
-                  <Button variant="ghost" size="sm" className="h-5 shrink-0 px-1.5 text-[10px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)]" onClick={item.onOpen}>
-                    Abrir <ArrowUpRight className="ml-1 h-3 w-3" />
-                  </Button>
-                </div>
-              </AppSectionCard>
+              <div key={item.label} className="h-full">
+                <AppSectionCard className="flex h-full flex-col justify-between p-3">
+                  <div>
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">{item.label}</p>
+                    <p className="mt-1 text-3xl font-semibold leading-none text-[var(--text-primary)]">{item.value}</p>
+                    <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">{item.description}</p>
+                  </div>
+                  <div className="mt-3 flex items-center justify-between gap-2">
+                    <span className={`inline-flex h-5 items-center gap-1 rounded-md px-1.5 text-[10px] font-medium ${
+                      isUp
+                        ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                        : isDown
+                          ? "bg-rose-500/10 text-rose-700 dark:text-rose-300"
+                          : "bg-muted text-[var(--text-muted)]"
+                    }`}>
+                      {isUp ? <TrendingUp className="h-2.5 w-2.5" /> : isDown ? <TrendingDown className="h-2.5 w-2.5" /> : null}
+                      {item.variation}
+                    </span>
+                    <Button variant="ghost" size="sm" className="h-5 shrink-0 px-1.5 text-[10px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)]" onClick={item.onOpen}>
+                      Abrir <ArrowUpRight className="ml-1 h-3 w-3" />
+                    </Button>
+                  </div>
+                </AppSectionCard>
+              </div>
             );
           })}
         </section>
