@@ -1,7 +1,8 @@
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
-import { fetchNexoMe } from "./_core/context";
+import { fetchNexoMe, NexoBootstrapError } from "./_core/context";
+import { TRPCError } from "@trpc/server";
 import { nexoProxyRouter } from "./routers/nexo-proxy";
 import { financeRouter } from "./routers/finance";
 import { peopleRouter } from "./routers/people";
@@ -46,7 +47,22 @@ export const appRouter = router({
 
   session: router({
     me: publicProcedure.query(async ({ ctx }) => {
-      return await fetchNexoMe(ctx.req);
+      try {
+        return await fetchNexoMe(ctx.req);
+      } catch (error) {
+        if (
+          error instanceof NexoBootstrapError &&
+          error.kind === "unavailable"
+        ) {
+          throw new TRPCError({
+            code: "SERVICE_UNAVAILABLE",
+            message: "SESSION_UPSTREAM_UNAVAILABLE",
+            cause: error,
+          });
+        }
+
+        throw error;
+      }
     }),
 
     logout: publicProcedure.mutation(({ ctx }) => {
