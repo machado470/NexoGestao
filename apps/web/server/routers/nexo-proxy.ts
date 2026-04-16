@@ -3,8 +3,9 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import cookie from "cookie";
 import { getSessionCookieOptions } from "../_core/cookies";
+import { resolveNexoApiUrl } from "../_core/nexoApiUrl";
 
-const NEXO_API_URL = process.env.NEXO_API_URL || "http://localhost:3000";
+const NEXO_API_URL = resolveNexoApiUrl();
 const NEXO_TOKEN_COOKIE = "nexo_token";
 const NEXO_FETCH_TIMEOUT_MS = Number(process.env.NEXO_FETCH_TIMEOUT_MS || 12000);
 

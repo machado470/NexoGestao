@@ -38,6 +38,18 @@ function normalizeErrorMessage(error: unknown): string {
     return "Sua sessão não pôde ser validada. Tente entrar novamente.";
   }
 
+  if (
+    normalized.includes("econnrefused") ||
+    normalized.includes("fetch failed") ||
+    normalized.includes("failed to fetch") ||
+    normalized.includes("falha ao conectar no backend nexo api") ||
+    normalized.includes("backend indisponível") ||
+    normalized.includes("service_unavailable") ||
+    normalized.includes("timeout ao chamar nexo api")
+  ) {
+    return "API indisponível no momento. Verifique se o backend local está ativo e acessível antes de tentar novamente.";
+  }
+
   if (normalized.includes("conta não ativada")) {
     return "Sua conta ainda não está ativada.";
   }
