@@ -127,6 +127,7 @@ export async function nexoFetch<T>(
   path: string,
   init?: RequestInit & { allowAnonymous?: boolean }
 ): Promise<T | null> {
+  const startedAt = Date.now();
   const token = resolveAuthToken(source);
 
   if (!token) {
@@ -194,6 +195,16 @@ export async function nexoFetch<T>(
   }
 
   const text = await res.text();
+  const durationMs = Date.now() - startedAt;
+
+  if (process.env.NODE_ENV === "development") {
+    console.log("[NEXO_FETCH]", {
+      path,
+      status: res.status,
+      durationMs,
+      ok: res.ok,
+    });
+  }
 
   let body: any = null;
   try {

@@ -31,19 +31,6 @@ import { setBootPhase } from "./lib/bootPhase";
 import { extractPathname } from "./lib/routeAccess";
 import { pushAuditEvent, setAuditField } from "./lib/renderAudit";
 
-import CustomersPage from "./pages/CustomersPage";
-import AppointmentsPage from "./pages/AppointmentsPage";
-import ServiceOrdersPage from "./pages/ServiceOrdersPage";
-import PeoplePage from "./pages/PeoplePage";
-import GovernancePage from "./pages/GovernancePage";
-import FinancesPage from "./pages/FinancesPage";
-import ExecutiveDashboard from "./pages/ExecutiveDashboard";
-import WhatsAppPage from "./pages/WhatsAppPage";
-import CalendarPage from "./pages/CalendarPage";
-import SettingsPage from "./pages/SettingsPage";
-import ProfilePage from "./pages/ProfilePage";
-import TimelinePage from "./pages/TimelinePage";
-import BillingPage from "./pages/BillingPage";
 import Landing from "./pages/Landing";
 import About from "./pages/About";
 import ProductPage from "./pages/ProductPage";
@@ -55,6 +42,19 @@ import TermsOfService from "./pages/TermsOfService";
 import RegisterPage from "./pages/Register";
 
 const Login = lazy(() => import("./pages/Login"));
+const CustomersPage = lazy(() => import("./pages/CustomersPage"));
+const AppointmentsPage = lazy(() => import("./pages/AppointmentsPage"));
+const ServiceOrdersPage = lazy(() => import("./pages/ServiceOrdersPage"));
+const PeoplePage = lazy(() => import("./pages/PeoplePage"));
+const GovernancePage = lazy(() => import("./pages/GovernancePage"));
+const FinancesPage = lazy(() => import("./pages/FinancesPage"));
+const ExecutiveDashboard = lazy(() => import("./pages/ExecutiveDashboard"));
+const WhatsAppPage = lazy(() => import("./pages/WhatsAppPage"));
+const CalendarPage = lazy(() => import("./pages/CalendarPage"));
+const SettingsPage = lazy(() => import("./pages/SettingsPage"));
+const ProfilePage = lazy(() => import("./pages/ProfilePage"));
+const TimelinePage = lazy(() => import("./pages/TimelinePage"));
+const BillingPage = lazy(() => import("./pages/BillingPage"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
@@ -419,6 +419,20 @@ function protectedPage(
   };
 }
 
+function lazyProtectedPage(
+  Page: LazyExoticComponent<ComponentType>,
+  options?: {
+    permissions?: Permission[];
+    requireCompletedOnboarding?: boolean;
+    onboardingOnly?: boolean;
+  }
+) {
+  return protectedPage(
+    () => <LazyPage component={Page} fallback={<FullScreenLoader />} />,
+    options
+  );
+}
+
 function publicPage(Page: ComponentType) {
   return function PublicPageRoute() {
     return <MarketingRoute component={Page} />;
@@ -452,62 +466,62 @@ function directAuthPage(Page: ComponentType) {
   };
 }
 
-const CustomersRoute = protectedPage(CustomersPage, {
+const CustomersRoute = lazyProtectedPage(CustomersPage, {
   permissions: ["customers:read"],
   requireCompletedOnboarding: true,
 });
 
-const AppointmentsRoute = protectedPage(AppointmentsPage, {
+const AppointmentsRoute = lazyProtectedPage(AppointmentsPage, {
   permissions: ["appointments:read"],
   requireCompletedOnboarding: true,
 });
 
-const ServiceOrdersRoute = protectedPage(ServiceOrdersPage, {
+const ServiceOrdersRoute = lazyProtectedPage(ServiceOrdersPage, {
   permissions: ["orders:read"],
   requireCompletedOnboarding: true,
 });
 
-const FinancesRoute = protectedPage(FinancesPage, {
+const FinancesRoute = lazyProtectedPage(FinancesPage, {
   permissions: ["finance:read"],
   requireCompletedOnboarding: true,
 });
 
-const PeopleRoute = protectedPage(PeoplePage, {
+const PeopleRoute = lazyProtectedPage(PeoplePage, {
   permissions: ["people:manage"],
   requireCompletedOnboarding: true,
 });
 
-const GovernanceRoute = protectedPage(GovernancePage, {
+const GovernanceRoute = lazyProtectedPage(GovernancePage, {
   permissions: ["governance:read"],
   requireCompletedOnboarding: true,
 });
 
-const ExecutiveDashboardRoute = protectedPage(ExecutiveDashboard, {
+const ExecutiveDashboardRoute = lazyProtectedPage(ExecutiveDashboard, {
   requireCompletedOnboarding: true,
 });
 
-const WhatsAppRoute = protectedPage(WhatsAppPage, {
+const WhatsAppRoute = lazyProtectedPage(WhatsAppPage, {
   requireCompletedOnboarding: true,
 });
 
-const CalendarRoute = protectedPage(CalendarPage, {
+const CalendarRoute = lazyProtectedPage(CalendarPage, {
   permissions: ["appointments:read"],
   requireCompletedOnboarding: true,
 });
 
-const SettingsRoute = protectedPage(SettingsPage, {
+const SettingsRoute = lazyProtectedPage(SettingsPage, {
   requireCompletedOnboarding: true,
 });
-const ProfileRoute = protectedPage(ProfilePage, {
+const ProfileRoute = lazyProtectedPage(ProfilePage, {
   requireCompletedOnboarding: true,
 });
 
-const TimelineRoute = protectedPage(TimelinePage, {
+const TimelineRoute = lazyProtectedPage(TimelinePage, {
   permissions: ["reports:read"],
   requireCompletedOnboarding: true,
 });
 
-const BillingRoute = protectedPage(BillingPage, {
+const BillingRoute = lazyProtectedPage(BillingPage, {
   permissions: ["settings:manage"],
   requireCompletedOnboarding: true,
 });

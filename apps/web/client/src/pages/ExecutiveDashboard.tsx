@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { useLocation } from "wouter";
 import { AlertTriangle, ArrowRight, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,13 +8,19 @@ import { useEffect, useState } from "react";
 import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import {
   AppKpiRow,
+  AppNextActionCard,
   AppPageShell,
   AppSectionBlock,
   AppStatusBadge,
 } from "@/components/internal-page-system";
 import { KpiErrorBoundary } from "@/components/KpiErrorBoundary";
 import { Progress } from "@/components/ui/progress";
-import { Area, AreaChart, CartesianGrid, Line, ResponsiveContainer, XAxis, YAxis } from "recharts";
+
+const OperationalFlowChart = lazy(() =>
+  import("@/components/dashboard/OperationalFlowChart").then(mod => ({
+    default: mod.OperationalFlowChart,
+  }))
+);
 
 type DashboardRow = {
   title: string;
@@ -68,6 +75,22 @@ export default function ExecutiveDashboard() {
   useEffect(() => {
     // eslint-disable-next-line no-console
     console.info("[RENDER PAGE] executive-dashboard");
+    if (typeof window !== "undefined") {
+      window.performance.mark("dashboard:mount");
+      window.requestAnimationFrame(() => {
+        window.performance.mark("dashboard:first-frame");
+        window.performance.measure(
+          "dashboard:mount->first-frame",
+          "dashboard:mount",
+          "dashboard:first-frame"
+        );
+        const [entry] = window.performance.getEntriesByName("dashboard:mount->first-frame").slice(-1);
+        if (entry) {
+          // eslint-disable-next-line no-console
+          console.info("[PERF] dashboard_first_frame_ms", Math.round(entry.duration));
+        }
+      });
+    }
   }, []);
 
   const operationalFlow = [
@@ -118,6 +141,14 @@ export default function ExecutiveDashboard() {
           subtitle="Prioridade operacional para proteger SLA e reduzir impacto financeiro"
           className="flex h-full min-h-[230px] flex-col rounded-xl border-rose-500/35 bg-gradient-to-b from-rose-500/12 to-[var(--surface-elevated)]"
         >
+          <div className="mb-3">
+            <AppNextActionCard
+              title="Destravar O.S. críticas do turno"
+              description="Comece pelas ordens com maior risco de SLA para liberar o fluxo de cobrança."
+              severity="critical"
+              action={{ label: "Abrir ordens críticas", onClick: () => navigate("/service-orders?status=attention&period=7d") }}
+            />
+          </div>
           <div className="mb-2 inline-flex w-fit items-center gap-1 rounded-full border border-rose-500/35 bg-rose-500/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-rose-400">
             <AlertTriangle className="h-3.5 w-3.5" />
             Prioridade alta
@@ -164,33 +195,13 @@ export default function ExecutiveDashboard() {
           </div>
 
           <div className="h-[250px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={operationalFlow} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="flowFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={flowView === "orders" ? "#38bdf8" : "#22c55e"} stopOpacity={0.35} />
-                    <stop offset="100%" stopColor={flowView === "orders" ? "#38bdf8" : "#22c55e"} stopOpacity={0.03} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid stroke="var(--border-subtle)" strokeDasharray="3 3" vertical={false} opacity={0.4} />
-                <XAxis dataKey="day" tick={{ fill: "var(--text-muted)", fontSize: 11 }} tickLine={false} axisLine={false} />
-                <YAxis tick={{ fill: "var(--text-muted)", fontSize: 11 }} tickLine={false} axisLine={false} width={34} />
-                <Area
-                  type="monotone"
-                  dataKey={flowView === "orders" ? "orders" : "revenue"}
-                  stroke={flowView === "orders" ? "#38bdf8" : "#22c55e"}
-                  strokeWidth={2.25}
-                  fill="url(#flowFill)"
-                />
-                <Line
-                  type="monotone"
-                  dataKey={flowView === "orders" ? "orders" : "revenue"}
-                  stroke={flowView === "orders" ? "#7dd3fc" : "#4ade80"}
-                  strokeWidth={1.3}
-                  dot={false}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+            <Suspense
+              fallback={(
+                <div className="h-full w-full animate-pulse rounded-lg border border-[var(--border-subtle)]/60 bg-[var(--surface-base)]/40" />
+              )}
+            >
+              <OperationalFlowChart data={operationalFlow} flowView={flowView} />
+            </Suspense>
           </div>
         </AppSectionBlock>
 

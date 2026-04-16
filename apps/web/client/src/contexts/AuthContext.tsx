@@ -204,6 +204,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const channelRef = useRef<BroadcastChannel | null>(null);
   const pathname = useMemo(() => extractPathname(location), [location]);
   const previousAuthStateRef = useRef<AuthBootstrapState | null>(null);
+  const meBootstrapStartedAtRef = useRef<number | null>(null);
 
   const shouldBootstrapSession = shouldBootstrapSessionForPath(pathname);
   const syncEventRef = useRef<(payload: unknown) => Promise<void>>(async () => {});
@@ -227,6 +228,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     refetchOnReconnect: false,
     staleTime: 60_000,
   });
+
+  useEffect(() => {
+    if (!shouldBootstrapSession || forcedLoggedOut) return;
+    if (meQuery.fetchStatus === "fetching" && meBootstrapStartedAtRef.current === null) {
+      meBootstrapStartedAtRef.current = Date.now();
+      return;
+    }
+
+    if (meQuery.fetchStatus !== "idle" && meQuery.fetchStatus !== "paused") return;
+    if (meBootstrapStartedAtRef.current === null) return;
+
+    const durationMs = Date.now() - meBootstrapStartedAtRef.current;
+    meBootstrapStartedAtRef.current = null;
+
+    if (import.meta.env.DEV) {
+      // eslint-disable-next-line no-console
+      console.info("[PERF] session_me_bootstrap_ms", {
+        durationMs,
+        hasUser: Boolean(meQuery.data),
+        hasError: Boolean(meQuery.error),
+        pathname,
+      });
+    }
+  }, [
+    forcedLoggedOut,
+    meQuery.data,
+    meQuery.error,
+    meQuery.fetchStatus,
+    pathname,
+    shouldBootstrapSession,
+  ]);
 
   const loginMutation = trpc.nexo.auth.login.useMutation();
   const registerMutation = trpc.nexo.auth.register.useMutation();
