@@ -10,14 +10,13 @@ import {
   AppNextActionCard,
   AppPageShell,
   AppSectionBlock,
-  AppStatusBadge,
 } from "@/components/internal-page-system";
 import { KpiErrorBoundary } from "@/components/KpiErrorBoundary";
 
 export default function ExecutiveDashboard() {
   useRenderWatchdog("ExecutiveDashboard");
   const [, navigate] = useLocation();
-  const { runAction, isRunning } = useRunAction();
+  const { runAction } = useRunAction();
   const ordensTravadas = 5;
   const clientesSemResposta = 2;
   const cobrancasPendentes = 12;
@@ -64,91 +63,70 @@ export default function ExecutiveDashboard() {
           metadata="centro executivo"
           action={{ label: "Abrir ordens críticas", onClick: () => navigate("/service-orders?status=attention&period=7d") }}
         />
-        <AppSectionBlock title="O que está parado agora" subtitle="Bloqueios que pedem reação hoje">
+        <AppSectionBlock title="O que está parado agora" subtitle="Bloqueios que pedem reação hoje" compact>
           <AppListBlock
+            compact
+            maxItems={3}
+            minItems={0}
+            showPlaceholders={false}
             items={[
-              { title: `${clientesSemResposta} clientes sem resposta`, subtitle: "Risco de esfriar oportunidade comercial" },
-              { title: `${ordensTravadas} ordens travadas`, subtitle: "Impacto direto no SLA e na agenda" },
-              { title: `${cobrancasPendentes} cobranças pendentes`, subtitle: "Valor em aberto sem follow-up ativo" },
-              { title: `${agendaSemConfirmacao} agendamentos sem confirmação`, subtitle: "Pode virar no-show ainda hoje" },
+              { title: `${clientesSemResposta} clientes sem resposta`, subtitle: "Esfria oportunidade comercial", action: <Button size="sm" variant="outline" onClick={() => navigate("/whatsapp?status=awaiting-reply")}>Contato</Button> },
+              { title: `${ordensTravadas} ordens travadas`, subtitle: "Impacto direto no SLA", action: <Button size="sm" variant="outline" onClick={() => navigate("/service-orders?status=attention&period=7d")}>Destravar</Button> },
+              { title: `${cobrancasPendentes} cobranças pendentes`, subtitle: "Receita aberta sem follow-up", action: <Button size="sm" variant="outline" onClick={() => navigate("/finances?status=pending&priority=high")}>Cobrar</Button> },
             ]}
           />
-          <div className="mt-3">
-            <Button onClick={() => navigate("/dashboard/operations?filter=critical")}>Resolver agora</Button>
+          <div className="mt-2">
+            <Button size="sm" variant="ghost" className="h-auto p-0 text-xs" onClick={() => navigate("/dashboard/operations?filter=blocked")}>Ver todos os bloqueios</Button>
           </div>
         </AppSectionBlock>
 
-        <AppSectionBlock title="O que pode virar dinheiro hoje" subtitle="Oportunidades para gerar caixa ainda no dia">
+        <AppSectionBlock title="O que pode virar dinheiro hoje" subtitle="Oportunidades para gerar caixa ainda no dia" compact>
           <AppListBlock
+            compact
+            maxItems={3}
+            minItems={0}
+            showPlaceholders={false}
             items={[
-              { title: `${osSemCobranca} O.S. concluídas sem cobrança`, subtitle: "Serviço finalizado sem passo financeiro" },
-              { title: `${clientesSemCobrancaRecente} clientes ativos sem cobrança recente`, subtitle: "Risco de atraso no ciclo de receita" },
-              { title: `${cobrancasComAltaConversao} cobranças com alta chance de conversão`, subtitle: "Janela boa para contato imediato" },
+              { title: `${osSemCobranca} O.S. concluídas sem cobrança`, subtitle: "Serviço entregue sem faturamento", action: <Button size="sm" variant="outline" onClick={() => navigate("/finances?status=pending&source=service-order")}>Faturar</Button> },
+              { title: `${clientesSemCobrancaRecente} clientes sem cobrança recente`, subtitle: "Risco de atraso no ciclo de receita", action: <Button size="sm" variant="outline" onClick={() => navigate("/finances?segment=active&status=stale")}>Reativar</Button> },
+              { title: `${cobrancasComAltaConversao} cobranças com alta conversão`, subtitle: "Janela comercial favorável agora", action: <Button size="sm" variant="outline" onClick={() => navigate("/finances?status=pending&priority=high")}>Priorizar</Button> },
             ]}
           />
-          <div className="mt-3">
-            <Button onClick={() => navigate("/finances?status=pending&priority=high")}>Cobrar agora</Button>
+          <div className="mt-2">
+            <Button size="sm" variant="ghost" className="h-auto p-0 text-xs" onClick={() => navigate("/finances?view=pipeline")}>Ver pipeline financeiro</Button>
           </div>
         </AppSectionBlock>
 
-        <AppSectionBlock title="Itens que exigem atenção" subtitle="Prioridades do dia" onCtaClick={() => navigate("/dashboard/operations?filter=critical")}>
+        <AppSectionBlock title="Itens que exigem atenção" subtitle="Prioridades do dia" ctaLabel="Ver detalhes" onCtaClick={() => navigate("/dashboard/operations?filter=critical")} compact>
           <AppListBlock
+            compact
+            maxItems={4}
+            minItems={0}
+            showPlaceholders={false}
             items={[
               { title: "5 O.S. atrasadas aguardando execução", subtitle: "Risco direto para SLA e remarcações.", action: <Button size="sm" onClick={() => navigate("/service-orders?status=attention")}>Atuar</Button> },
               { title: "12 cobranças vencidas sem negociação", subtitle: "Pressão sobre caixa e previsibilidade de receita.", action: <Button size="sm" onClick={() => navigate("/finances?status=overdue")}>Cobrar</Button> },
               { title: "2 clientes sem retorno há 7 dias", subtitle: "Churn potencial se não houver contato agora.", action: <Button size="sm" onClick={() => navigate("/whatsapp")}>Contato</Button> },
+              { title: `${agendaSemConfirmacao} agendas sem confirmação`, subtitle: "Risco de no-show no turno atual.", action: <Button size="sm" onClick={() => navigate("/appointments?status=unconfirmed")}>Confirmar</Button> },
             ]}
           />
         </AppSectionBlock>
 
-        <AppSectionBlock title="Atividade recente" subtitle="Atualizações em tempo real" onCtaClick={() => navigate("/timeline?scope=recent")}>
+        <AppSectionBlock title="Atividade recente" subtitle="Atualizações em tempo real" ctaLabel="Ver tudo" onCtaClick={() => navigate("/timeline?scope=recent")} compact>
           <AppListBlock
+            compact
+            maxItems={4}
+            minItems={0}
+            showPlaceholders={false}
             items={[
               { title: "O.S. #1847 concluída há 3 min", subtitle: "Finalize cobrança vinculada para fechar ciclo.", action: <Button size="sm" onClick={() => navigate("/finances?serviceOrderId=1847")}>Cobrar</Button> },
-              { title: "Pagamento recebido há 8 min", subtitle: "Atualize histórico financeiro da conta.", action: <Button size="sm" onClick={() => navigate("/finances")}>Registrar</Button> },
-              { title: "Novo agendamento criado há 14 min", subtitle: "Confirme cliente e aloque responsável.", action: <Button size="sm" onClick={() => navigate("/appointments")}>Executar</Button> },
-              { title: "Mensagem enviada ao cliente há 20 min", subtitle: "Acompanhe resposta e próximo passo.", action: <Button size="sm" onClick={() => navigate("/timeline?scope=recent")}>Acompanhar</Button> },
+              { title: "Pagamento recebido há 8 min", subtitle: "Sem pendência adicional no momento." },
+              { title: "Novo agendamento criado há 14 min", subtitle: "Confirmação ainda pendente.", action: <Button size="sm" onClick={() => navigate("/appointments?status=unconfirmed")}>Confirmar</Button> },
+              { title: "Mensagem enviada ao cliente há 20 min", subtitle: "Acompanhe resposta em andamento.", action: <Button size="sm" onClick={() => navigate("/timeline?scope=recent")}>Acompanhar</Button> },
             ]}
           />
         </AppSectionBlock>
       </div>
-
-      <AppSectionBlock title="O que resolver agora" subtitle="Foco operacional dominante com execução imediata" className="border-[var(--brand-primary)]/40 bg-[var(--surface-elevated)] p-6 lg:p-8">
-        <AppListBlock
-          items={[
-            { title: "O.S. #1851 · Instalação comercial", subtitle: "Cliente Atlas · Prazo hoje 17:00", right: <AppStatusBadge label="Urgente" />, action: <Button size="sm" onClick={() => void runAction(async () => navigate("/service-orders?os=1851"))} isLoading={isRunning}>Abrir</Button> },
-            { title: "O.S. #1849 · Manutenção preventiva", subtitle: "Equipe Norte · 2h de atraso", right: <AppStatusBadge label="Atrasado" />, action: <Button size="sm" onClick={() => void runAction(async () => navigate("/service-orders?os=1849&action=advance-status"))} isLoading={isRunning}>Avançar status</Button> },
-            { title: "O.S. #1844 · Retorno técnico", subtitle: "Risco de multa contratual", right: <AppStatusBadge label="Em risco" />, action: <Button size="sm" onClick={() => void runAction(async () => navigate("/whatsapp?customer=atlas&context=charge"))} isLoading={isRunning}>Cobrar</Button> },
-          ]}
-        />
-      </AppSectionBlock>
-
-      <AppSectionBlock title="Falhas / bloqueios" subtitle="Execução direta sem sair do fluxo">
-        <AppListBlock
-          items={[
-            {
-              title: "Cliente Atlas com pagamento atrasado",
-              subtitle: "Cobrança vencida há 2 dias",
-              action: <Button size="sm" onClick={() => void runAction(async () => navigate("/finances?status=overdue&customer=atlas"))} isLoading={isRunning}>Resolver agora</Button>,
-            },
-            {
-              title: "O.S. #1849 atrasada",
-              subtitle: "Equipe Norte · SLA em risco",
-              action: <Button size="sm" onClick={() => void runAction(async () => navigate("/service-orders?os=1849&status=delayed"))} isLoading={isRunning}>Resolver agora</Button>,
-            },
-          ]}
-        />
-      </AppSectionBlock>
-
-      <AppSectionBlock title="Próximas decisões das 2 horas" subtitle="Fechamento objetivo para não deixar a operação parar">
-        <AppListBlock
-          items={[
-            { title: "Cobrar clientes com vencimento de hoje", subtitle: "Protege o caixa do fim do dia", action: <Button size="sm" onClick={() => navigate("/finances?window=today")}>Cobrar agora</Button> },
-            { title: "Reatribuir O.S. sem responsável", subtitle: "Evita acúmulo no turno seguinte", action: <Button size="sm" onClick={() => navigate("/service-orders?status=unassigned")}>Resolver agora</Button> },
-            { title: "Confirmar agenda do próximo período", subtitle: "Reduz faltas e remarcações", action: <Button size="sm" onClick={() => navigate("/appointments?status=unconfirmed")}>Confirmar</Button> },
-          ]}
-        />
-      </AppSectionBlock>
     </AppPageShell>
   );
 }
