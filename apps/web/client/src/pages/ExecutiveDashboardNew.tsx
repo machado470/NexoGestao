@@ -52,12 +52,12 @@ function CompactActionItem({
   onAction: () => void;
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-[var(--border)]/70 bg-[var(--surface)] px-3 py-2.5">
+    <div className="flex items-center gap-2.5 rounded-lg border border-[var(--border)]/70 bg-[var(--surface)] px-2.5 py-2">
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-[var(--text-primary)]">{title}</p>
-        <p className="line-clamp-2 text-xs text-[var(--text-muted)]">{description}</p>
+        <p className="line-clamp-1 text-xs text-[var(--text-muted)]">{description}</p>
       </div>
-      <Button variant="ghost" size="sm" className="h-7 shrink-0 whitespace-nowrap px-2.5 text-xs" onClick={onAction}>
+      <Button variant="ghost" size="sm" className="h-6 shrink-0 whitespace-nowrap px-2 text-[11px]" onClick={onAction}>
         {actionLabel}
       </Button>
     </div>
@@ -228,10 +228,10 @@ export default function ExecutiveDashboardNew() {
   return (
     <AppPageShell>
       <AppPageHeader>
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
             <h1 className="nexo-page-header-title">Centro de decisão operacional</h1>
-            <p className="nexo-page-header-description">Direção executiva para agir rápido no ciclo Cliente → Agendamento → O.S. → Cobrança.</p>
+            <p className="nexo-page-header-description line-clamp-1">Direção executiva para agir rápido no ciclo Cliente → Agendamento → O.S. → Cobrança.</p>
           </div>
           <Button size="sm" onClick={() => void executeNextAction()} disabled={isExecutingNext || nextActions.length === 0}>
             {isExecutingNext ? "Executando..." : "Executar próxima ação"}
@@ -239,99 +239,101 @@ export default function ExecutiveDashboardNew() {
         </div>
       </AppPageHeader>
 
-      <AppSectionCard className="border-[var(--brand-primary)]/35 bg-[var(--surface-elevated)] px-4 py-4 md:px-5 md:py-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <p className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--text-muted)]">Direção executiva</p>
-            <p className="text-base font-semibold text-[var(--text-primary)] md:text-lg">Visão consolidada para manter a operação previsível hoje</p>
-            <p className="mt-1 line-clamp-2 text-sm text-[var(--text-muted)]">{operationalState.summary} · {appointmentsToday} agendamentos hoje e variação de {formatDelta(percentDelta(appointmentsToday, appointmentsYesterday))} vs ontem.</p>
-          </div>
-          <Button size="sm" variant="outline" className="shrink-0" onClick={() => void executeNextAction()} disabled={isExecutingNext || nextActions.length === 0}>
-            {isExecutingNext ? "Executando..." : "Executar próxima ação"}
-          </Button>
-        </div>
-      </AppSectionCard>
-
-      <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-        {kpis.map((item) => {
-          const isUp = item.trend === "up";
-          const isDown = item.trend === "down";
-          return (
-            <AppSectionCard key={item.label} className="flex h-full min-h-[132px] flex-col p-3.5">
-              <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">{item.label}</p>
-              <p className="mt-1.5 text-[1.65rem] font-semibold leading-none text-[var(--text-primary)]">{item.value}</p>
-              <p className="mt-1 text-xs text-[var(--text-muted)]">{item.description}</p>
-              <div className="mt-2 flex items-center justify-between gap-2">
-                <span className={`inline-flex h-6 items-center gap-1 rounded-md px-1.5 text-[11px] font-medium ${
-                  isUp
-                    ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                    : isDown
-                      ? "bg-rose-500/10 text-rose-700 dark:text-rose-300"
-                    : "bg-muted text-[var(--text-muted)]"
-                }`}>
-                  {isUp ? <TrendingUp className="h-3 w-3" /> : isDown ? <TrendingDown className="h-3 w-3" /> : null}
-                  {item.variation}
-                </span>
-                <Button variant="ghost" size="sm" className="h-6 shrink-0 px-1.5 text-[11px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)]" onClick={item.onOpen}>
-                  Abrir <ArrowUpRight className="ml-1 h-3 w-3" />
-                </Button>
-              </div>
-            </AppSectionCard>
-          );
-        })}
-      </section>
-
-      <section className="grid gap-3 lg:grid-cols-3">
-        <AppSectionCard className="p-4">
-          <p className="text-sm font-semibold text-[var(--text-primary)]">Próxima ação recomendada</p>
-          <p className="mb-3 text-xs text-[var(--text-muted)]">Foco imediato para destravar execução e receita.</p>
-          <div className="space-y-2">
-            {(nextActions.length > 0
-              ? nextActions.slice(0, 3).map((action) => ({
-                title: action.title,
-                description: action.description,
-                actionLabel: "Resolver",
-                onAction: () => void executeAction(action.executionAction),
-              }))
-              : [{ title: "Nenhuma ação crítica agora", description: "A operação está estável no momento.", actionLabel: "Agenda", onAction: () => navigate("/appointments") }]).map((item) => (
-              <CompactActionItem key={item.title} {...item} />
-            ))}
+      <div className="space-y-4">
+        <AppSectionCard className="border-[var(--brand-primary)]/35 bg-[var(--surface-elevated)] px-4 py-3 md:px-4 md:py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--text-muted)]">Direção executiva</p>
+              <p className="text-sm font-semibold text-[var(--text-primary)] md:text-base">Visão consolidada para manter a operação previsível hoje</p>
+              <p className="mt-0.5 line-clamp-2 text-xs text-[var(--text-muted)]">{operationalState.summary} · {appointmentsToday} agendamentos hoje e variação de {formatDelta(percentDelta(appointmentsToday, appointmentsYesterday))} vs ontem.</p>
+            </div>
+            <Button size="sm" variant="outline" className="shrink-0" onClick={() => void executeNextAction()} disabled={isExecutingNext || nextActions.length === 0}>
+              {isExecutingNext ? "Executando..." : "Executar próxima ação"}
+            </Button>
           </div>
         </AppSectionCard>
 
-        <AppSectionCard className="p-4">
-          <p className="text-sm font-semibold text-[var(--text-primary)]">O que está parado agora</p>
-          <p className="mb-3 text-xs text-[var(--text-muted)]">Itens sem avanço que exigem intervenção curta.</p>
-          <div className="space-y-2">
-            {(bottlenecks.length > 0
-              ? bottlenecks.slice(0, 3).map((item) => ({
-                title: item.label,
-                description: `Impacto atual: ${item.value}`,
-                actionLabel: "Atuar",
-                onAction: () => navigate(item.href),
-              }))
-              : [{ title: "Sem gargalos críticos", description: "Nenhum bloqueio operacional relevante identificado.", actionLabel: "Financeiro", onAction: () => navigate("/finances") }]).map((item) => (
-              <CompactActionItem key={item.title} {...item} />
-            ))}
-          </div>
-        </AppSectionCard>
+        <section className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {kpis.map((item) => {
+            const isUp = item.trend === "up";
+            const isDown = item.trend === "down";
+            return (
+              <AppSectionCard key={item.label} className="flex h-full flex-col p-3">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">{item.label}</p>
+                <p className="mt-1 text-3xl font-semibold leading-none text-[var(--text-primary)]">{item.value}</p>
+                <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">{item.description}</p>
+                <div className="mt-1.5 flex items-center justify-between gap-2">
+                  <span className={`inline-flex h-5 items-center gap-1 rounded-md px-1.5 text-[10px] font-medium ${
+                    isUp
+                      ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                      : isDown
+                        ? "bg-rose-500/10 text-rose-700 dark:text-rose-300"
+                      : "bg-muted text-[var(--text-muted)]"
+                  }`}>
+                    {isUp ? <TrendingUp className="h-2.5 w-2.5" /> : isDown ? <TrendingDown className="h-2.5 w-2.5" /> : null}
+                    {item.variation}
+                  </span>
+                  <Button variant="ghost" size="sm" className="h-5 shrink-0 px-1.5 text-[10px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)]" onClick={item.onOpen}>
+                    Abrir <ArrowUpRight className="ml-1 h-3 w-3" />
+                  </Button>
+                </div>
+              </AppSectionCard>
+            );
+          })}
+        </section>
 
-        <AppSectionCard className="p-4">
-          <p className="text-sm font-semibold text-[var(--text-primary)]">O que pode virar dinheiro hoje</p>
-          <p className="mb-3 text-xs text-[var(--text-muted)]">Prioridades comerciais e financeiras de giro rápido.</p>
-          <div className="space-y-2">
-            {opportunities.slice(0, 3).map((opportunity, index) => (
-              <CompactActionItem
-                key={opportunity}
-                title={opportunity}
-                description="Acompanhe este ponto agora para elevar conversão ou recebimento no dia."
-                actionLabel={index === 0 ? "Cobrar" : "Abrir"}
-                onAction={() => navigate(index === 0 ? "/finances" : "/service-orders")}
-              />
-            ))}
-          </div>
-        </AppSectionCard>
-      </section>
+        <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <AppSectionCard className="flex h-full flex-col p-3">
+            <p className="text-sm font-medium text-[var(--text-primary)]">Próxima ação recomendada</p>
+            <p className="mb-2 text-xs text-[var(--text-muted)]">Foco imediato para destravar execução e receita.</p>
+            <div className="space-y-2">
+              {(nextActions.length > 0
+                ? nextActions.slice(0, 3).map((action) => ({
+                  title: action.title,
+                  description: action.description,
+                  actionLabel: "Resolver",
+                  onAction: () => void executeAction(action.executionAction),
+                }))
+                : [{ title: "Nenhuma ação crítica agora", description: "A operação está estável no momento.", actionLabel: "Agenda", onAction: () => navigate("/appointments") }]).map((item) => (
+                <CompactActionItem key={item.title} {...item} />
+              ))}
+            </div>
+          </AppSectionCard>
+
+          <AppSectionCard className="flex h-full flex-col p-3">
+            <p className="text-sm font-medium text-[var(--text-primary)]">O que está parado agora</p>
+            <p className="mb-2 text-xs text-[var(--text-muted)]">Itens sem avanço que exigem intervenção curta.</p>
+            <div className="space-y-2">
+              {(bottlenecks.length > 0
+                ? bottlenecks.slice(0, 3).map((item) => ({
+                  title: item.label,
+                  description: `Impacto atual: ${item.value}`,
+                  actionLabel: "Atuar",
+                  onAction: () => navigate(item.href),
+                }))
+                : [{ title: "Sem gargalos críticos", description: "Nenhum bloqueio operacional relevante identificado.", actionLabel: "Financeiro", onAction: () => navigate("/finances") }]).map((item) => (
+                <CompactActionItem key={item.title} {...item} />
+              ))}
+            </div>
+          </AppSectionCard>
+
+          <AppSectionCard className="flex h-full flex-col p-3">
+            <p className="text-sm font-medium text-[var(--text-primary)]">O que pode virar dinheiro hoje</p>
+            <p className="mb-2 text-xs text-[var(--text-muted)]">Prioridades comerciais e financeiras de giro rápido.</p>
+            <div className="space-y-2">
+              {opportunities.slice(0, 3).map((opportunity, index) => (
+                <CompactActionItem
+                  key={opportunity}
+                  title={opportunity}
+                  description="Acompanhe este ponto agora para elevar conversão ou recebimento no dia."
+                  actionLabel={index === 0 ? "Cobrar" : "Abrir"}
+                  onAction={() => navigate(index === 0 ? "/finances" : "/service-orders")}
+                />
+              ))}
+            </div>
+          </AppSectionCard>
+        </section>
+      </div>
     </AppPageShell>
   );
 }
