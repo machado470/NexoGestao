@@ -32,11 +32,56 @@ trap cleanup EXIT
 
 port_in_use() {
   local port="$1"
+
   if command -v lsof >/dev/null 2>&1; then
     lsof -nP -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1
     return $?
   fi
-  ss -ltn "( sport = :$port )" 2>/dev/null | awk 'NR>1 {found=1} END {exit found?0:1}'
+
+  if command -v ss >/dev/null 2>&1; then
+    ss -ltn 2>/dev/null | awk -v p=":$port" 'NR>1 && $4 ~ p {found=1} END {exit found?0:1}'
+    return $?
+  fi
+
+  if command -v node >/dev/null 2>&1; then
+    node -e "const net=require('net');const s=net.createServer();s.once('error',()=>process.exit(0));s.once('listening',()=>s.close(()=>process.exit(1)));s.listen($port,'127.0.0.1');" >/dev/null 2>&1
+    return $?
+  fi
+
+  return 1
+}
+
+port_owner() {
+  local port="$1"
+
+  if command -v lsof >/dev/null 2>&1; then
+    local lsof_out
+    lsof_out="$(lsof -nP -iTCP:"$port" -sTCP:LISTEN 2>/dev/null | tail -n +2 | head -n 1 || true)"
+    if [ -n "$lsof_out" ]; then
+      echo "$lsof_out"
+      return 0
+    fi
+  fi
+
+  if command -v ss >/dev/null 2>&1; then
+    local ss_out
+    ss_out="$(ss -ltnp 2>/dev/null | awk -v p=":$port" '$4 ~ p {print; exit}' || true)"
+    if [ -n "$ss_out" ]; then
+      echo "$ss_out"
+      return 0
+    fi
+  fi
+
+  if docker info >/dev/null 2>&1; then
+    local d_out
+    d_out="$(docker ps --format '{{.Names}}\t{{.Ports}}' | awk -v p=":""$port" '$0 ~ p {print; exit}' || true)"
+    if [ -n "$d_out" ]; then
+      echo "docker $d_out"
+      return 0
+    fi
+  fi
+
+  return 1
 }
 
 container_on_port() {
@@ -59,13 +104,11 @@ is_nexo_pid() {
   [[ "$cmd" == *"$ROOT_DIR"* ]] || [[ "$cmd" == *"apps/api"* ]] || [[ "$cmd" == *"apps/web"* ]]
 }
 
-kill_nexo_pids_on_port_if_opt_in() {
-  local port="$1"
-  [ "$ALLOW_KILL" = "1" ] || return 0
-  command -v lsof >/dev/null 2>&1 || return 0
-
+kill_nexo_node_fallback() {
+  local label="$1"
   local killed_any=0
-  while read -r pid; do
+
+  while read -r pid _; do
     [ -n "$pid" ] || continue
     if is_nexo_pid "$pid"; then
       kill "$pid" >/dev/null 2>&1 || true
@@ -73,11 +116,37 @@ kill_nexo_pids_on_port_if_opt_in() {
       kill -9 "$pid" >/dev/null 2>&1 || true
       killed_any=1
     fi
-  done < <(lsof -t -nP -iTCP:"$port" -sTCP:LISTEN 2>/dev/null | sort -u)
+  done < <(ps -eo pid=,args= | awk '/[n]ode/ {print $1" "$0}')
 
   if [ "$killed_any" = "1" ]; then
-    log "[BOOT] limpeza opt-in aplicada na porta $port"
+    log "[BOOT] limpeza fallback aplicada: processos node do projeto finalizados ($label)."
   fi
+}
+
+kill_nexo_pids_on_port_if_opt_in() {
+  local port="$1"
+  [ "$ALLOW_KILL" = "1" ] || return 0
+
+  if command -v lsof >/dev/null 2>&1; then
+    local killed_any=0
+    while read -r pid; do
+      [ -n "$pid" ] || continue
+      if is_nexo_pid "$pid"; then
+        kill "$pid" >/dev/null 2>&1 || true
+        sleep 1
+        kill -9 "$pid" >/dev/null 2>&1 || true
+        killed_any=1
+      fi
+    done < <(lsof -t -nP -iTCP:"$port" -sTCP:LISTEN 2>/dev/null | sort -u)
+
+    if [ "$killed_any" = "1" ]; then
+      log "[BOOT] limpeza opt-in aplicada na porta $port"
+    fi
+
+    return 0
+  fi
+
+  kill_nexo_node_fallback "porta $port"
 }
 
 assert_port_available() {
@@ -88,10 +157,15 @@ assert_port_available() {
     return 0
   fi
 
-  local cname
-  cname="$(container_on_port "$port" || true)"
-  if [ -n "$cname" ] && [[ "$cname" != nexogestao_* ]] && [[ "$cname" != nexogestao-* ]]; then
-    fail "$label: porta $port ocupada por container externo ($cname)."
+  local owner=""
+  owner="$(port_owner "$port" || true)"
+
+  if docker info >/dev/null 2>&1; then
+    local cname
+    cname="$(container_on_port "$port" || true)"
+    if [ -n "$cname" ] && [[ "$cname" != nexogestao_* ]] && [[ "$cname" != nexogestao-* ]]; then
+      fail "$label: porta $port ocupada por container externo ($cname). ${owner:+Processo: $owner}"
+    fi
   fi
 
   if [ "$label" = "API" ] || [ "$label" = "WEB" ]; then
@@ -101,7 +175,7 @@ assert_port_available() {
     fi
   fi
 
-  fail "$label: porta $port ocupada."
+  fail "$label: porta $port ocupada. ${owner:+Processo: $owner}. Dica: rode 'pnpm dev:ports' para detalhes."
 }
 
 wait_tcp() {
@@ -146,16 +220,21 @@ if [ "$ALLOW_KILL" = "1" ]; then
 fi
 
 # 3) subir containers
+if ! docker info >/dev/null 2>&1; then
+  fail "Docker não está rodando. Inicie o Docker Desktop/daemon antes de executar 'pnpm dev'."
+fi
+
 if [ "$RESET_MODE" = "1" ]; then
   log "[BOOT] reset de infraestrutura (postgres/redis)..."
   docker compose down --volumes --remove-orphans >/dev/null 2>&1 || true
 fi
-log "[BOOT] subindo infraestrutura (postgres/redis)..."
-docker compose up -d postgres redis >/dev/null
+
+log "[BOOT] subindo infraestrutura (postgres/redis) via docker-compose.yml..."
+docker compose -f docker-compose.yml up -d postgres redis >/dev/null
 
 # 4) validar infra
-wait_tcp 127.0.0.1 5432 60 || fail "Postgres não respondeu na porta 5432."
-wait_tcp 127.0.0.1 6379 60 || fail "Redis não respondeu na porta 6379."
+wait_tcp 127.0.0.1 5432 60 || fail "Banco PostgreSQL não disponível na porta 5432. Verifique: pnpm dev:logs"
+wait_tcp 127.0.0.1 6379 60 || fail "Redis não disponível na porta 6379. Verifique: pnpm dev:logs"
 
 # 5) subir API
 log "[BOOT] iniciando API..."
@@ -163,10 +242,10 @@ API_PORT="$API_PORT" PORT="$API_PORT" pnpm --filter ./apps/api run dev > "$API_L
 API_PID=$!
 
 # 6) esperar processo vivo + porta + /health
-kill -0 "$API_PID" >/dev/null 2>&1 || fail "API encerrou no boot. Logs: $API_LOG_FILE"
-wait_tcp 127.0.0.1 "$API_PORT" 120 || fail "API não abriu porta $API_PORT. Logs: $API_LOG_FILE"
+kill -0 "$API_PID" >/dev/null 2>&1 || fail "API falhou no boot. Veja logs: $API_LOG_FILE"
+wait_tcp 127.0.0.1 "$API_PORT" 120 || fail "API não abriu porta $API_PORT. Veja logs: $API_LOG_FILE"
 log "[READY] API porta OK"
-wait_http "http://127.0.0.1:${API_PORT}/health" 120 || fail "API não respondeu /health. Logs: $API_LOG_FILE"
+wait_http "http://127.0.0.1:${API_PORT}/health" 120 || fail "API falhou no /health. Veja logs: $API_LOG_FILE"
 log "[READY] API /health OK"
 
 # 7) subir WEB
@@ -175,8 +254,8 @@ PORT="$WEB_PORT" NEXO_API_URL="$NEXO_API_URL" pnpm --filter ./apps/web run dev >
 WEB_PID=$!
 
 # 8) validar root web
-kill -0 "$WEB_PID" >/dev/null 2>&1 || fail "WEB encerrou no boot. Logs: $WEB_LOG_FILE"
-wait_http "http://127.0.0.1:${WEB_PORT}/" 120 || fail "WEB não respondeu /. Logs: $WEB_LOG_FILE"
+kill -0 "$WEB_PID" >/dev/null 2>&1 || fail "WEB falhou no boot. Veja logs: $WEB_LOG_FILE"
+wait_http "http://127.0.0.1:${WEB_PORT}/" 120 || fail "WEB não respondeu /. Veja logs: $WEB_LOG_FILE"
 log "[READY] WEB OK"
 
 # Optional integrations (non-blocking)
