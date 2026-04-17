@@ -17,9 +17,12 @@ function parseCorsOrigins(raw?: string): string[] {
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap')
+  const bootStartedAt = Date.now()
 
   try {
+    logger.log('Bootstrap iniciado: criando aplicação Nest...')
     const app = await NestFactory.create(AppModule, { rawBody: true })
+    logger.log(`NestFactory.create concluído em ${Date.now() - bootStartedAt}ms`)
 
     app.use(
       helmet({
@@ -61,9 +64,12 @@ async function bootstrap() {
     const portRaw = process.env.API_PORT || process.env.PORT || '3000'
     const port = Number(portRaw) || 3000
 
+    logger.log(`Iniciando listener HTTP em 0.0.0.0:${port}...`)
     await app.listen(port, '0.0.0.0')
+    const totalMs = Date.now() - bootStartedAt
 
     logger.log(`API online na porta ${port}`)
+    logger.log(`Bootstrap total: ${totalMs}ms`)
     logger.log(`API_PORT=${process.env.API_PORT || 'não definido'} | PORT=${process.env.PORT || 'não definido'}`)
     logger.log(`CORS_ORIGINS: ${origins.join(', ')}`)
     logger.log(`NODE_ENV: ${process.env.NODE_ENV || 'development'}`)
