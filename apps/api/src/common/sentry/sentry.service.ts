@@ -17,7 +17,7 @@ export class SentryService implements OnModuleInit {
   async onModuleInit() {
     const dsn = this.config.get<string>('SENTRY_DSN')
     if (!dsn) {
-      this.logger.warn('SENTRY_DSN não configurado — monitoramento desativado')
+      this.logger.warn('[OPTIONAL][optional-disabled] SENTRY_DSN não configurado — monitoramento desativado')
       return
     }
 
@@ -47,9 +47,9 @@ export class SentryService implements OnModuleInit {
 
       this.sentry = Sentry
       this.initialized = true
-      this.logger.log(`Sentry inicializado (env: ${this.config.get('SENTRY_ENVIRONMENT', 'production')})`)
+      this.logger.log(`[BOOT] Sentry inicializado (env: ${this.config.get('SENTRY_ENVIRONMENT', 'production')})`)
     } catch (err) {
-      this.logger.warn(`Falha ao inicializar Sentry: ${err.message}`)
+      this.logger.warn(`[OPTIONAL][warn-local] Falha ao inicializar Sentry: ${err.message}`)
     }
   }
 

@@ -2,6 +2,14 @@
 
 Este projeto está preparado para operar em **modo degradado seguro** quando integrações externas não estiverem configuradas.
 
+## Convenções de log no boot local
+
+- `[BOOT]`: etapas normais de inicialização.
+- `[READY]`: aplicação pronta para uso.
+- `[OPTIONAL]`: integração opcional indisponível, sem bloquear boot.
+- `[WARN-LOCAL]`: aviso local de ambiente (ex.: WSL em `/mnt/*`).
+- `[FATAL]`: falha real de startup.
+
 ## Integrações prontas
 
 - Stripe (checkout + webhook com assinatura).
@@ -70,7 +78,10 @@ Sem configuração, o botão aparece desabilitado com mensagem explícita.
 
 - `GET /health`: saúde geral (db, prisma, queue).
 - `GET /health/readiness`: status de integração sem expor segredo:
+  - `status: ok` em boot local quando núcleo crítico está operacional;
   - `stripe: configured|missing`
   - `googleAuth: configured|missing`
   - `email: configured|missing`
-  - `whatsapp: configured|missing`
+  - `whatsapp: configured|configured_mock|misconfigured`
+
+> Observação: integrações opcionais ausentes (Google OAuth, Stripe, Resend, Z-API, Sentry) **não** devem marcar startup como falha fatal em ambiente local.

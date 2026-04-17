@@ -33,8 +33,8 @@ export class ZApiWhatsAppProvider implements WhatsAppProvider {
 
     const missing = this.getMissingConfig()
     if (missing.length > 0) {
-      this.logger.warn(
-        `[Z-API] Configuração incompleta (${missing.join(', ')}). Mensagens não serão enviadas até corrigir o .env.`,
+      this.logger.log(
+        `[OPTIONAL][integration-missing-config] [Z-API] Configuração incompleta (${missing.join(', ')}). Mensagens não serão enviadas até corrigir o .env.`,
       )
     }
   }

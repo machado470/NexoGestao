@@ -39,10 +39,10 @@ export class PaymentsService {
 
     if (secretKey) {
       this.stripe = new Stripe(secretKey, { apiVersion: '2024-06-20' })
-      this.logger.log('Stripe inicializado no PaymentsService')
+      this.logger.log('[BOOT] Stripe inicializado no PaymentsService')
     } else {
       this.stripe = null
-      this.logger.warn('Stripe não configurado no PaymentsService')
+      this.logger.warn('[OPTIONAL][integration-missing-config] Stripe não configurado no PaymentsService')
     }
   }
 

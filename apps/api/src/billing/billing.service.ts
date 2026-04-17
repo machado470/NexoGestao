@@ -85,9 +85,9 @@ export class BillingService {
 
     if (secretKey) {
       this.stripe = new Stripe(secretKey, { apiVersion: '2024-06-20' })
-      this.logger.log('Stripe inicializado')
+      this.logger.log('[BOOT] Stripe inicializado')
     } else {
-      this.logger.warn('Stripe não configurado — modo simulado')
+      this.logger.warn('[OPTIONAL][simulated-mode] Stripe não configurado — billing em modo simulado')
     }
 
   }

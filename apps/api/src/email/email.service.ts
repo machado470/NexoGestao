@@ -23,7 +23,7 @@ export class EmailService {
   async send(options: EmailOptions): Promise<{ success: boolean; messageId?: string; error?: string }> {
     try {
       if (!this.resendApiKey) {
-        this.logger.warn('RESEND_API_KEY não configurada. E-mail não será enviado.')
+        this.logger.warn('[OPTIONAL][integration-missing-config] RESEND_API_KEY não configurada. E-mail não será enviado.')
         return { success: false, error: 'RESEND_API_KEY não configurada' }
       }
 
