@@ -18,8 +18,6 @@ RUN npm install -g pnpm @nestjs/cli
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/api/package.json apps/api/package.json
 
-# patches precisam existir antes do install (pnpm patchedDependencies)
-COPY patches ./patches
 
 RUN pnpm install --frozen-lockfile
 

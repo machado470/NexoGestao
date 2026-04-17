@@ -9,7 +9,6 @@ RUN npm install -g pnpm
 # Copiar arquivos de manifesto do workspace
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/api/package.json apps/api/package.json
-COPY patches ./patches
 
 # Instalar dependências
 RUN pnpm install --frozen-lockfile
@@ -41,7 +40,6 @@ RUN npm install -g pnpm
 # Copiar arquivos de manifesto para instalar apenas as dependências de produção
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/api/package.json apps/api/package.json
-COPY patches ./patches
 
 # Instalar somente dependências de produção
 RUN pnpm install --prod --frozen-lockfile
