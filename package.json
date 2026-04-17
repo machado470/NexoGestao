@@ -17,6 +17,7 @@
     "web:dev": "pnpm --filter ./apps/web dev:bff",
     "web:build": "pnpm --filter ./apps/web build",
     "dev:full": "./scripts/dev-full.sh",
+    "dev:reset": "NEXO_KILL_STALE_DEV_PROCESSES=1 ./scripts/dev-full.sh",
     "dev:fast": "./scripts/dev-fast.sh",
     "dev:infra": "docker compose up -d postgres redis",
     "dev:api": "API_PORT=${API_PORT:-3000} PORT=${API_PORT:-3000} pnpm --filter ./apps/api run dev",
