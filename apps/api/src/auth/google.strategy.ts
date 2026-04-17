@@ -22,7 +22,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
 
     if (!googleOAuthEnv.clientId || !googleOAuthEnv.clientSecret || !googleOAuthEnv.redirectUrl) {
       this.logger.warn(
-        'Google OAuth sem configuração completa. Endpoints serão rejeitados até configurar GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET (ou GOOGLE_SECRET)/GOOGLE_REDIRECT_URL (ou GOOGLE_REDIRECT_URI).',
+        '[OPTIONAL][integration-missing-config] Google OAuth sem configuração completa. Endpoints serão rejeitados até configurar GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET (ou GOOGLE_SECRET)/GOOGLE_REDIRECT_URL (ou GOOGLE_REDIRECT_URI).',
       )
     }
   }

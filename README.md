@@ -106,7 +106,9 @@ Fluxo atual do `dev:full`:
 - detecta e reaproveita containers Nexo legados/compose (`nexogestao-postgres`, `nexogestao-redis`, `nexogestao_postgres`, `nexogestao_redis`);
 - recria apenas o que estiver faltando (ou tudo no modo `--clean`);
 - falha com mensagem objetiva quando a porta está ocupada por processo/container externo;
-- valida saúde de Postgres/Redis antes de seguir para migrations, seed, API e Web.
+- valida saúde de Postgres/Redis antes de seguir para migrations, seed, API e Web;
+- executa readiness em fases para API: processo ativo → porta aberta → `/health` → `/health/readiness` → endpoint leve de autenticação;
+- aplica timeout maior automaticamente em ambientes WSL montados em `/mnt/*`.
 
 4. Em outro terminal, execute os testes de integração com infra real:
 

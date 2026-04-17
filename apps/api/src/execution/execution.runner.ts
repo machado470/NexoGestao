@@ -27,6 +27,7 @@ export class ExecutionRunner {
   private readonly blockedRecentCooldownMap = new Map<string, number>()
   private readonly blockedLogSuppression = new Map<string, { until: number; blockedCountDuringWindow: number }>()
   private readonly blockedReasonCounters = new Map<string, number>()
+  private readonly manualModeBlockedSummary = new Map<string, { count: number; nextLogAt: number }>()
   private readonly priorityOrder: Record<ExecutionPriority, number> = {
     critical: 0,
     high: 1,
@@ -133,6 +134,34 @@ export class ExecutionRunner {
   private incrementBlockedReason(reasonCode: string) {
     const current = this.blockedReasonCounters.get(reasonCode) ?? 0
     this.blockedReasonCounters.set(reasonCode, current + 1)
+  }
+
+  private maybeLogManualModeBlockedSummary(orgId: string, reasonCode: string) {
+    if (reasonCode !== 'mode_manual_explicit_configuration') return
+    const now = Date.now()
+    const summaryIntervalMs = 60_000
+    const current = this.manualModeBlockedSummary.get(orgId) ?? {
+      count: 0,
+      nextLogAt: now + summaryIntervalMs,
+    }
+    current.count += 1
+
+    if (now >= current.nextLogAt) {
+      this.logger.log(
+        JSON.stringify({
+          event: 'execution_runner_manual_mode_summary',
+          orgId,
+          reasonCode,
+          blockedCountLastWindow: current.count,
+          windowMs: summaryIntervalMs,
+          note: 'runner em modo manual por configuração explícita (resumo periódico)',
+        }),
+      )
+      current.count = 0
+      current.nextLogAt = now + summaryIntervalMs
+    }
+
+    this.manualModeBlockedSummary.set(orgId, current)
   }
 
   constructor(
@@ -1105,6 +1134,7 @@ export class ExecutionRunner {
     correlationId?: string,
   ) {
     this.incrementBlockedReason(reasonCode)
+    this.maybeLogManualModeBlockedSummary(candidate.orgId, reasonCode)
     await this.events.recordEvent(candidate.orgId, {
       eventType,
       entityType: candidate.entityType,

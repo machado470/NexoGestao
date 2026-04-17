@@ -81,10 +81,11 @@ export function createWhatsAppProvider(): WhatsAppProvider {
 
   switch (readiness.providerResolved) {
     case 'zapi':
-      logger.log('[WhatsApp] Provider selecionado: Z-API')
-      if (!readiness.credentialsReady) {
+      if (readiness.credentialsReady) {
+        logger.log('[BOOT] [WhatsApp] Provider selecionado: Z-API')
+      } else {
         logger.warn(
-          `[WhatsApp] Z-API selecionado, mas variáveis ausentes: ${readiness.missingEnv.join(', ')}`,
+          `[OPTIONAL][integration-missing-config] [WhatsApp] Z-API selecionado sem credenciais completas; execução seguirá em modo degradado.`,
         )
       }
       return new ZApiWhatsAppProvider()
@@ -93,10 +94,10 @@ export function createWhatsAppProvider(): WhatsAppProvider {
     default:
       if (!readiness.isProviderKnown) {
         logger.warn(
-          `[WhatsApp] Provider desconhecido: "${readiness.providerRequested}". Usando mock.`,
+          `[OPTIONAL][warn-local] [WhatsApp] Provider desconhecido: "${readiness.providerRequested}". Usando mock.`,
         )
       } else {
-        logger.log('[WhatsApp] Provider selecionado: Mock (sem envio real)')
+        logger.log('[OPTIONAL][simulated-mode] [WhatsApp] Provider selecionado: Mock (sem envio real)')
       }
       return new MockWhatsAppProvider()
   }

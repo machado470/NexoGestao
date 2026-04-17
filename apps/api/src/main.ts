@@ -20,9 +20,9 @@ async function bootstrap() {
   const bootStartedAt = Date.now()
 
   try {
-    logger.log('Bootstrap iniciado: criando aplicação Nest...')
+    logger.log('[BOOT] Bootstrap iniciado: criando aplicação Nest...')
     const app = await NestFactory.create(AppModule, { rawBody: true })
-    logger.log(`NestFactory.create concluído em ${Date.now() - bootStartedAt}ms`)
+    logger.log(`[BOOT] NestFactory.create concluído em ${Date.now() - bootStartedAt}ms`)
 
     app.use(
       helmet({
@@ -64,20 +64,20 @@ async function bootstrap() {
     const portRaw = process.env.API_PORT || process.env.PORT || '3000'
     const port = Number(portRaw) || 3000
 
-    logger.log(`Iniciando listener HTTP em 0.0.0.0:${port}...`)
+    logger.log(`[BOOT] Iniciando listener HTTP em 0.0.0.0:${port}...`)
     await app.listen(port, '0.0.0.0')
     const totalMs = Date.now() - bootStartedAt
 
-    logger.log(`API online na porta ${port}`)
-    logger.log(`Bootstrap total: ${totalMs}ms`)
-    logger.log(`API_PORT=${process.env.API_PORT || 'não definido'} | PORT=${process.env.PORT || 'não definido'}`)
-    logger.log(`CORS_ORIGINS: ${origins.join(', ')}`)
-    logger.log(`NODE_ENV: ${process.env.NODE_ENV || 'development'}`)
+    logger.log(`[READY] API online na porta ${port}`)
+    logger.log(`[READY] Bootstrap total: ${totalMs}ms`)
+    logger.log(`[BOOT] API_PORT=${process.env.API_PORT || 'não definido'} | PORT=${process.env.PORT || 'não definido'}`)
+    logger.log(`[BOOT] CORS_ORIGINS: ${origins.join(', ')}`)
+    logger.log(`[BOOT] NODE_ENV: ${process.env.NODE_ENV || 'development'}`)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     const stack = err instanceof Error ? err.stack : 'Sem stack disponível'
 
-    logger.error('Erro fatal no bootstrap')
+    logger.error('[FATAL] Erro fatal no bootstrap')
     logger.error(message)
     const errno = err as NodeJS.ErrnoException | undefined
     if (errno?.code === 'EADDRINUSE') {

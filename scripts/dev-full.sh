@@ -784,6 +784,29 @@ wait_port_ready() {
   return 1
 }
 
+wait_process_started() {
+  local label="${1:-processo}"
+  local process_pid="${2:-}"
+  local max_attempts="${3:-15}"
+  local attempt=0
+  local begin_ts
+  begin_ts="$(date +%s)"
+
+  while [ "$attempt" -lt "$max_attempts" ]; do
+    if [ -n "$process_pid" ] && kill -0 "$process_pid" >/dev/null 2>&1; then
+      local elapsed
+      elapsed=$(( $(date +%s) - begin_ts ))
+      echo "✅ [BOOT] ${label} iniciou em ${elapsed}s (pid=${process_pid})"
+      return 0
+    fi
+    attempt=$((attempt + 1))
+    sleep 1
+  done
+
+  echo "❌ [FATAL] ${label} não iniciou processo a tempo."
+  return 1
+}
+
 show_recent_logs() {
   local title="${1:-logs}"
   local file="${2:-}"
@@ -853,36 +876,53 @@ trap cleanup EXIT
 
 API_PORT="$API_PORT" PORT="$API_PORT" pnpm --filter ./apps/api run dev > >(tee "$API_LOG_FILE") 2>&1 &
 API_PID=$!
-echo "✅ [proc] api iniciado (pid=${API_PID})"
+echo "✅ [BOOT] api spawn solicitado (pid=${API_PID})"
 
 start_phase "probe:startup-readiness"
 API_PORT_ATTEMPTS="${DEV_FULL_API_PORT_ATTEMPTS:-180}"
 API_HEALTH_ATTEMPTS="${DEV_FULL_API_HEALTH_ATTEMPTS:-180}"
+API_READINESS_ATTEMPTS="${DEV_FULL_API_READINESS_ATTEMPTS:-180}"
+API_AUTH_ATTEMPTS="${DEV_FULL_API_AUTH_ATTEMPTS:-120}"
 WEB_ROOT_ATTEMPTS="${DEV_FULL_WEB_ROOT_ATTEMPTS:-180}"
 WEB_SESSION_ATTEMPTS="${DEV_FULL_WEB_SESSION_ATTEMPTS:-180}"
 WEB_DASHBOARD_ATTEMPTS="${DEV_FULL_WEB_DASHBOARD_ATTEMPTS:-180}"
+is_wsl_mnt=0
 if [[ "$ROOT_DIR" == /mnt/* ]]; then
-  API_PORT_ATTEMPTS="${DEV_FULL_API_PORT_ATTEMPTS:-300}"
-  API_HEALTH_ATTEMPTS="${DEV_FULL_API_HEALTH_ATTEMPTS:-300}"
-  WEB_ROOT_ATTEMPTS="${DEV_FULL_WEB_ROOT_ATTEMPTS:-300}"
-  WEB_SESSION_ATTEMPTS="${DEV_FULL_WEB_SESSION_ATTEMPTS:-300}"
-  WEB_DASHBOARD_ATTEMPTS="${DEV_FULL_WEB_DASHBOARD_ATTEMPTS:-300}"
-  echo "⚠️ [wsl-mnt] Ajustando janelas de readiness para ambiente /mnt/* (watch mode e I/O podem ficar mais lentos)."
+  is_wsl_mnt=1
+fi
+if [ "$is_wsl_mnt" = "1" ]; then
+  API_PORT_ATTEMPTS="${DEV_FULL_API_PORT_ATTEMPTS:-360}"
+  API_HEALTH_ATTEMPTS="${DEV_FULL_API_HEALTH_ATTEMPTS:-360}"
+  API_READINESS_ATTEMPTS="${DEV_FULL_API_READINESS_ATTEMPTS:-360}"
+  API_AUTH_ATTEMPTS="${DEV_FULL_API_AUTH_ATTEMPTS:-180}"
+  WEB_ROOT_ATTEMPTS="${DEV_FULL_WEB_ROOT_ATTEMPTS:-360}"
+  WEB_SESSION_ATTEMPTS="${DEV_FULL_WEB_SESSION_ATTEMPTS:-360}"
+  WEB_DASHBOARD_ATTEMPTS="${DEV_FULL_WEB_DASHBOARD_ATTEMPTS:-360}"
+  echo "⚠️ [WARN-LOCAL] [wsl-mnt] Timeouts de readiness ampliados para /mnt/* (I/O + watch mais lentos)."
 fi
 
+wait_process_started "api:process" "$API_PID" 20 || {
+  abort_with_logs "api" "process_not_started" "Processo da API não permaneceu ativo após spawn" "$API_LOG_FILE"
+}
 wait_port_ready "api:port" "127.0.0.1" "$API_PORT" "$API_PORT_ATTEMPTS" "$API_PID" || {
   abort_with_logs "api" "port_probe_failed" "API não abriu porta ${API_PORT} durante bootstrap" "$API_LOG_FILE"
 }
 wait_http_ready "api:health" "http://127.0.0.1:${API_PORT}/health" "$API_HEALTH_ATTEMPTS" "$API_PID" || {
   abort_with_logs "api" "health_probe_failed" "API não respondeu /health durante bootstrap" "$API_LOG_FILE"
 }
-wait_http_status_with_method "api:auth.login" "http://127.0.0.1:${API_PORT}/auth/login" "POST" '{"email":"","password":""}' 60 "$API_PID" || {
+wait_http_ready "api:readiness" "http://127.0.0.1:${API_PORT}/health/readiness" "$API_READINESS_ATTEMPTS" "$API_PID" || {
+  abort_with_logs "api" "readiness_probe_failed" "API não respondeu /health/readiness durante bootstrap" "$API_LOG_FILE"
+}
+wait_http_status_with_method "api:auth.login" "http://127.0.0.1:${API_PORT}/auth/login" "POST" '{"email":"","password":""}' "$API_AUTH_ATTEMPTS" "$API_PID" || {
   abort_with_logs "api" "auth_probe_failed" "API respondeu fora do esperado em /auth/login durante bootstrap" "$API_LOG_FILE"
 }
 
 PORT="$WEB_PORT" NEXO_API_URL="$NEXO_API_URL" pnpm --filter ./apps/web run dev > >(tee "$WEB_LOG_FILE") 2>&1 &
 WEB_PID=$!
-echo "✅ [proc] web iniciado (pid=${WEB_PID})"
+echo "✅ [BOOT] web spawn solicitado (pid=${WEB_PID})"
+wait_process_started "web:process" "$WEB_PID" 20 || {
+  abort_with_logs "web" "process_not_started" "Processo da Web/BFF não permaneceu ativo após spawn" "$WEB_LOG_FILE"
+}
 
 wait_http_ready "web:root" "http://127.0.0.1:${WEB_PORT}/" "$WEB_ROOT_ATTEMPTS" "$WEB_PID" || {
   abort_with_logs "web" "root_probe_failed" "Web/BFF não respondeu raiz na porta ${WEB_PORT}" "$WEB_LOG_FILE"
@@ -896,7 +936,7 @@ wait_http_status "web:dashboard.status" "http://127.0.0.1:${WEB_PORT}/api/trpc/d
 end_phase
 
 TOTAL_ELAPSED=$(( $(date +%s) - SCRIPT_START_TS ))
-echo "🏁 Boot concluído em ${TOTAL_ELAPSED}s"
+echo "🏁 [READY] Boot concluído em ${TOTAL_ELAPSED}s"
 echo "   API: http://127.0.0.1:${API_PORT}"
 echo "   WEB: http://127.0.0.1:${WEB_PORT}"
 echo "🩺 Monitorando processos em foreground (api pid=${API_PID} | web pid=${WEB_PID})"

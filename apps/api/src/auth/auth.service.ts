@@ -35,7 +35,7 @@ export class AuthService {
       this.resend = new Resend(resendApiKey)
     } else {
       this.logger.warn(
-        'RESEND_API_KEY ausente. Recuperação por e-mail ficará desabilitada.',
+        '[OPTIONAL][integration-missing-config] RESEND_API_KEY ausente. Recuperação por e-mail ficará desabilitada.',
       )
     }
 

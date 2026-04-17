@@ -121,13 +121,17 @@ export class HealthController {
         ? 'configured'
         : 'misconfigured'
 
-    const readinessStatus = whatsappReadiness.mode === 'real' && !whatsappReadiness.isReady
-      ? 'degraded'
-      : 'ok'
-
     return {
-      status: readinessStatus,
+      status: 'ok',
       timestamp: new Date().toISOString(),
+      critical: {
+        api: 'configured',
+        database: 'validated_via_/health',
+        queue: 'validated_via_/health',
+      },
+      notes: [
+        '[READY] /health/readiness reflete prontidão de boot sem bloquear por integrações opcionais.',
+      ],
       integrations: {
         stripe: stripeConfigured ? 'configured' : 'missing',
         googleAuth: googleAuthConfigured ? 'configured' : 'missing',
