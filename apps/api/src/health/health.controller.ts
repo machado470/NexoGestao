@@ -1,4 +1,4 @@
-import { Controller, Get, Optional } from '@nestjs/common'
+import { Controller, Get, Logger, Optional, Query } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { PrismaService } from '../prisma/prisma.service'
 import { MetricsService } from '../common/metrics/metrics.service'
@@ -10,6 +10,8 @@ import { CommercialPolicyService } from '../common/commercial/commercial-policy.
 
 @Controller('health')
 export class HealthController {
+  private readonly logger = new Logger(HealthController.name)
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly metrics: MetricsService,
@@ -24,17 +26,23 @@ export class HealthController {
   }
 
   @Get()
-  async health() {
+  async health(@Query('details') details?: string) {
     const startedAt = Date.now()
+    const includeDetails = details === '1' || details === 'true'
 
     let database = { ok: false as boolean, latencyMs: 0 }
     let prismaClient = { ok: false as boolean }
+    const queueStartedAt = Date.now()
     const queueSummary = this.queueService
-      ? await this.queueService.getQueueStatus().catch(() => ({ ok: false }))
+      ? await this.queueService.getQueueStatus().catch((error: unknown) => ({
+          ok: false,
+          reason: error instanceof Error ? error.message : String(error),
+        }))
       : { ok: true, reason: 'queue_service_not_bound' }
     const queue = {
       ok: (queueSummary as any)?.ok === false ? false : true,
       provider: 'bullmq',
+      latencyMs: Date.now() - queueStartedAt,
       summary: queueSummary,
     }
 
@@ -49,18 +57,47 @@ export class HealthController {
 
     const ok = database.ok && prismaClient.ok && queue.ok
 
+    let diagnostics: Record<string, unknown> | undefined
+    if (includeDetails) {
+      const diagnosticsStartedAt = Date.now()
+      diagnostics = {
+        tenantOperations: this.tenantOps.snapshot(),
+      }
+
+      try {
+        const commercial = await Promise.race([
+          this.commercial.getAdminTenantCommercialOverview(),
+          new Promise((resolve) =>
+            setTimeout(() => resolve({ timeout: true, reason: 'commercial_overview_timeout' }), 1500),
+          ),
+        ])
+        diagnostics.commercial = commercial
+      } catch (error) {
+        this.logger.warn(`Falha ao coletar diagnóstico comercial no /health?details=1: ${
+          error instanceof Error ? error.message : String(error)
+        }`)
+        diagnostics.commercial = {
+          ok: false,
+          reason: error instanceof Error ? error.message : String(error),
+        }
+      }
+
+      diagnostics.latencyMs = Date.now() - diagnosticsStartedAt
+    }
+
     return {
       status: ok ? 'ok' : 'degraded',
+      mode: includeDetails ? 'detailed' : 'startup',
       uptime: process.uptime(),
       timestamp: new Date().toISOString(),
+      latencyMs: Date.now() - startedAt,
       checks: {
         database,
         prismaClient,
         queue,
       },
       metrics: this.metrics.snapshot(),
-      tenantOperations: this.tenantOps.snapshot(),
-      commercial: await this.commercial.getAdminTenantCommercialOverview(),
+      diagnostics,
     }
   }
 

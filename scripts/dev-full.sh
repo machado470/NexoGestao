@@ -4,6 +4,12 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+if [[ "$ROOT_DIR" == /mnt/* ]]; then
+  echo "⚠️ Projeto executando em filesystem montado do Windows (${ROOT_DIR})."
+  echo "   Em WSL isso pode degradar I/O, watch mode e tempo de bootstrap (especialmente Nest/Vite)."
+  echo "   Recomendação: mover o repo para ~/NexoGestao dentro do filesystem Linux do WSL."
+fi
+
 CLEAN_MODE=0
 SKIP_GENERATE="${DEV_FULL_SKIP_GENERATE:-0}"
 SKIP_MIGRATE="${DEV_FULL_SKIP_MIGRATE:-0}"
@@ -493,11 +499,16 @@ wait_http_ready() {
   local label="${1:-service}"
   local url="${2:-}"
   local max_attempts="${3:-80}"
+  local process_pid="${4:-}"
   local attempt=0
   local begin_ts
   begin_ts="$(date +%s)"
 
   while [ "$attempt" -lt "$max_attempts" ]; do
+    if [ -n "$process_pid" ] && ! kill -0 "$process_pid" >/dev/null 2>&1; then
+      echo "❌ [probe] ${label} abortado: processo alvo encerrou antes da readiness."
+      return 1
+    fi
     if curl -sS -o /dev/null --max-time 2 "$url" >/dev/null 2>&1; then
       local elapsed
       elapsed=$(( $(date +%s) - begin_ts ))
@@ -568,10 +579,55 @@ wait_http_status_with_method() {
   return 1
 }
 
+wait_port_ready() {
+  local label="${1:-service}"
+  local host="${2:-127.0.0.1}"
+  local port="${3:-3000}"
+  local max_attempts="${4:-120}"
+  local process_pid="${5:-}"
+  local attempt=0
+  local begin_ts
+  begin_ts="$(date +%s)"
+
+  while [ "$attempt" -lt "$max_attempts" ]; do
+    if [ -n "$process_pid" ] && ! kill -0 "$process_pid" >/dev/null 2>&1; then
+      echo "❌ [probe] ${label} abortado: processo alvo encerrou antes de abrir porta ${port}."
+      return 1
+    fi
+
+    if node -e "const net=require('net'); const s=net.createConnection({host:'${host}',port:${port}}); s.on('connect',()=>{s.end();process.exit(0)}); s.on('error',()=>process.exit(1)); setTimeout(()=>process.exit(1),900);" >/dev/null 2>&1; then
+      local elapsed
+      elapsed=$(( $(date +%s) - begin_ts ))
+      echo "✅ [probe] ${label} escutando em ${elapsed}s (${host}:${port})"
+      return 0
+    fi
+
+    attempt=$((attempt + 1))
+    sleep 1
+  done
+
+  echo "❌ [probe] ${label} não abriu porta a tempo (${host}:${port})."
+  return 1
+}
+
+show_recent_logs() {
+  local title="${1:-logs}"
+  local file="${2:-}"
+  local lines="${3:-120}"
+
+  [ -f "$file" ] || return 0
+  echo "----- ${title} (últimas ${lines} linhas) -----"
+  tail -n "$lines" "$file" || true
+  echo "----- fim ${title} -----"
+}
+
 echo "🚀 Iniciando API + Web..."
-API_PORT="$API_PORT" PORT="$API_PORT" pnpm --filter ./apps/api run dev &
+API_LOG_FILE="$(mktemp -t nexogestao-api-dev-full.XXXX.log)"
+WEB_LOG_FILE="$(mktemp -t nexogestao-web-dev-full.XXXX.log)"
+echo "ℹ️ Logs de startup: api=${API_LOG_FILE} | web=${WEB_LOG_FILE}"
+API_PORT="$API_PORT" PORT="$API_PORT" pnpm --filter ./apps/api run dev > >(tee "$API_LOG_FILE") 2>&1 &
 API_PID=$!
-PORT="$WEB_PORT" NEXO_API_URL="$NEXO_API_URL" pnpm --filter ./apps/web run dev &
+PORT="$WEB_PORT" NEXO_API_URL="$NEXO_API_URL" pnpm --filter ./apps/web run dev > >(tee "$WEB_LOG_FILE") 2>&1 &
 WEB_PID=$!
 
 cleanup() {
@@ -580,7 +636,21 @@ cleanup() {
 trap cleanup EXIT
 
 start_phase "probe:startup-readiness"
-wait_http_ready "api:health" "http://127.0.0.1:${API_PORT}/health" 120
+API_PORT_ATTEMPTS="${DEV_FULL_API_PORT_ATTEMPTS:-180}"
+API_HEALTH_ATTEMPTS="${DEV_FULL_API_HEALTH_ATTEMPTS:-180}"
+if [[ "$ROOT_DIR" == /mnt/* ]]; then
+  API_PORT_ATTEMPTS="${DEV_FULL_API_PORT_ATTEMPTS:-300}"
+  API_HEALTH_ATTEMPTS="${DEV_FULL_API_HEALTH_ATTEMPTS:-300}"
+fi
+
+wait_port_ready "api:port" "127.0.0.1" "$API_PORT" "$API_PORT_ATTEMPTS" "$API_PID" || {
+  show_recent_logs "api" "$API_LOG_FILE" 180
+  exit 1
+}
+wait_http_ready "api:health" "http://127.0.0.1:${API_PORT}/health" "$API_HEALTH_ATTEMPTS" "$API_PID" || {
+  show_recent_logs "api" "$API_LOG_FILE" 180
+  exit 1
+}
 wait_http_status_with_method "api:auth.login" "http://127.0.0.1:${API_PORT}/auth/login" "POST" '{"email":"","password":""}' 60
 wait_http_ready "web:root" "http://127.0.0.1:${WEB_PORT}/" 120
 wait_http_status "web:session.me" "http://127.0.0.1:${WEB_PORT}/api/trpc/session.me?batch=1&input=%7B%220%22%3A%7B%7D%7D" 120
