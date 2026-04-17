@@ -6,10 +6,9 @@ WORKDIR /app
 # Instalar pnpm
 RUN npm install -g pnpm
 
-# Copiar manifestos e patches
+# Copiar manifestos
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json apps/web/package.json
-COPY patches ./patches
 
 # Instalar dependências
 RUN pnpm install --frozen-lockfile
