@@ -108,8 +108,20 @@ if (result.status === 0) {
 }
 
 if (isGenerate) {
-  console.warn('\n[prisma-cli wrapper] Prisma engine download blocked in this environment; using API fallback Prisma client typings for compilation/tests.')
-  process.exit(0)
+  const allowFallback = process.env.PRISMA_CLIENT_FALLBACK_ALLOWED === '1'
+  if (allowFallback) {
+    console.warn(
+      '\n[prisma-cli wrapper] prisma generate falhou, mas PRISMA_CLIENT_FALLBACK_ALLOWED=1 está ativo. Prosseguindo para cenários controlados de CI/teste.',
+    )
+    process.exit(0)
+  }
+
+  console.error(
+    '\n[prisma-cli wrapper] prisma generate falhou e o fallback está desabilitado para desenvolvimento local.',
+  )
+  console.error(
+    '[prisma-cli wrapper] Corrija a causa raiz (schema/env/engine/path) ou habilite explicitamente PRISMA_CLIENT_FALLBACK_ALLOWED=1 apenas em CI/testes controlados.',
+  )
 }
 
 process.exit(result.status ?? 1)

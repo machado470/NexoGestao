@@ -15,12 +15,7 @@
     "noImplicitAny": false,
     "strictPropertyInitialization": false,
     "incremental": false,
-    "baseUrl": ".",
-    "paths": {
-      "@prisma/client": [
-        "../../node_modules/.prisma/client"
-      ]
-    }
+    "baseUrl": "."
   },
   "include": [
     "src/**/*.ts"
