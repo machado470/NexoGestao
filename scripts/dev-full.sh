@@ -263,7 +263,7 @@ fi
 
 # 3) subir containers
 if ! docker info >/dev/null 2>&1; then
-  fail "Docker não está rodando. Inicie o Docker Desktop/daemon antes de executar 'pnpm dev'."
+  fail "Docker indisponível no ambiente atual. No WSL, abra o Docker Desktop e habilite a integração da distro em Settings > Resources > WSL Integration; depois valide com 'docker --version' e 'docker info'."
 fi
 
 if [ "$RESET_MODE" = "1" ]; then
