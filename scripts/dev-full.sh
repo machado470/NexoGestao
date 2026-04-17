@@ -18,6 +18,35 @@ WEB_PID=""
 log() { echo "$1"; }
 fail() { echo "[ERROR] $1"; exit 1; }
 
+ensure_env_file() {
+  if [ -f .env ]; then
+    return 0
+  fi
+
+  if [ ! -f .env.example ]; then
+    fail ".env ausente e .env.example não encontrado para bootstrap automático."
+  fi
+
+  cp .env.example .env
+  log "[BOOT] .env ausente; criado automaticamente a partir de .env.example"
+}
+
+validate_required_env() {
+  local required=(DATABASE_URL REDIS_URL API_PORT PORT)
+  local missing=()
+
+  for key in "${required[@]}"; do
+    local value="${!key:-}"
+    if [ -z "${value// }" ]; then
+      missing+=("$key")
+    fi
+  done
+
+  if [ "${#missing[@]}" -gt 0 ]; then
+    fail "Variáveis obrigatórias ausentes no ambiente/.env: ${missing[*]}"
+  fi
+}
+
 cleanup() {
   local code="$?"
   if [ -n "$API_PID" ] && kill -0 "$API_PID" >/dev/null 2>&1; then
@@ -166,6 +195,13 @@ assert_port_available() {
     if [ -n "$cname" ] && [[ "$cname" != nexogestao_* ]] && [[ "$cname" != nexogestao-* ]]; then
       fail "$label: porta $port ocupada por container externo ($cname). ${owner:+Processo: $owner}"
     fi
+
+    if [ "$label" = "Postgres" ] || [ "$label" = "Redis" ]; then
+      if [ -n "$cname" ] && ([[ "$cname" == nexogestao_* ]] || [[ "$cname" == nexogestao-* ]]); then
+        log "[BOOT] $label já está publicado na porta $port via container $cname; seguindo bootstrap."
+        return 0
+      fi
+    fi
   fi
 
   if [ "$label" = "API" ] || [ "$label" = "WEB" ]; then
@@ -208,6 +244,12 @@ wait_http() {
 }
 
 # 1) checar portas
+ensure_env_file
+set -a
+source ./.env
+set +a
+validate_required_env
+
 assert_port_available 5432 "Postgres"
 assert_port_available 6379 "Redis"
 assert_port_available "$API_PORT" "API"

@@ -62,6 +62,15 @@ import { SentryModule } from './common/sentry/sentry.module'
 import { CommercialModule } from './commercial/commercial.module'
 
 const IS_DEVELOPMENT = (process.env.NODE_ENV ?? '').toLowerCase() === 'development'
+const IS_TEST = (process.env.NODE_ENV ?? '').toLowerCase() === 'test'
+
+function getEnvFilePath(): string[] {
+  if (IS_TEST) {
+    return ['../../.env.test', '.env.test', '../../.env', '../../.env.docker', '.env', '.env.docker']
+  }
+
+  return ['../../.env', '../../.env.local', '../../.env.docker', '.env', '.env.local', '.env.docker']
+}
 
 class AllowAllThrottlerGuard implements CanActivate {
   canActivate() {
@@ -75,14 +84,7 @@ class AllowAllThrottlerGuard implements CanActivate {
 
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: [
-        '../../.env.test',
-        '.env.test',
-        '../../.env',
-        '../../.env.docker',
-        '.env',
-        '.env.docker',
-      ],
+      envFilePath: getEnvFilePath(),
     }),
 
     ThrottlerModule.forRoot([
