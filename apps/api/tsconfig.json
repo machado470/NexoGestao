@@ -27,6 +27,22 @@
   ],
   "exclude": [
     "node_modules",
-    "dist"
-  ]
+    "dist",
+    "coverage",
+    "test",
+    "**/*.spec.ts"
+  ],
+  "watchOptions": {
+    "excludeDirectories": [
+      "**/node_modules",
+      "**/.git",
+      "**/.turbo",
+      "dist",
+      "coverage",
+      "test"
+    ],
+    "excludeFiles": [
+      "src/**/*.spec.ts"
+    ]
+  }
 }

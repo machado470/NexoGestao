@@ -18,8 +18,18 @@ function parseCorsOrigins(raw?: string): string[] {
 async function bootstrap() {
   const logger = new Logger('Bootstrap')
   const bootStartedAt = Date.now()
+  const cwd = process.cwd()
+  const runningFromWindowsMount = /^\/mnt\/[a-z]\//i.test(cwd)
 
   try {
+    logger.log(`[BOOT] Processo iniciado em cwd=${cwd}`)
+    if (runningFromWindowsMount) {
+      logger.warn(
+        '[BOOT][WSL] Repositório em filesystem montado do Windows (/mnt/*). ' +
+          'No watch mode do TypeScript/Nest isso pode causar compilação inicial muito lenta. ' +
+          'Para previsibilidade, prefira ~/NexoGestao dentro do FS nativo do WSL.',
+      )
+    }
     logger.log('[BOOT] Bootstrap iniciado: criando aplicação Nest...')
     const app = await NestFactory.create(AppModule, { rawBody: true })
     logger.log(`[BOOT] NestFactory.create concluído em ${Date.now() - bootStartedAt}ms`)

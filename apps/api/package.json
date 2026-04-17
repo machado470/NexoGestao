@@ -4,7 +4,8 @@
   "private": true,
   "license": "MIT",
   "scripts": {
-    "dev": "nest start --watch",
+    "dev": "nest start --watch --preserveWatchOutput",
+    "dev:tsc": "pnpm exec tsc -p tsconfig.json --watch --preserveWatchOutput",
     "build": "rm -rf dist && pnpm exec nest build",
     "start": "node dist/main.js",
     "prisma:generate": "prisma generate --schema ../../prisma/schema.prisma",

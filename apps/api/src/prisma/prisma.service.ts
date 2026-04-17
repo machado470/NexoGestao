@@ -22,6 +22,13 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
   }
 
   async onModuleInit() {
+    if (!process.env.DATABASE_URL) {
+      this.logger.error(
+        'DATABASE_URL não configurada. Encerrando bootstrap sem retries de conexão do Prisma.',
+      )
+      throw new Error('DATABASE_URL não configurada')
+    }
+
     const maxAttempts = 12
     const baseDelayMs = 500
 
