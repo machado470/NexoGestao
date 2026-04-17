@@ -43,16 +43,16 @@ while [ "$i" -lt "$DB_WAIT_SECONDS" ]; do
   sleep 1
 done
 
-# ---- migrations
-log "running prisma generate"
-pnpm run prisma:generate
-
+# ---- migrations + generate
 if [ "${AUTO_MIGRATE:-0}" = "1" ]; then
   log "AUTO_MIGRATE=1 -> running prisma:migrate:deploy"
   pnpm run prisma:migrate:deploy
 else
   log "AUTO_MIGRATE disabled"
 fi
+
+log "running prisma generate"
+pnpm run prisma:generate
 
 # ---- seed
 if [ "${SEED_MODE:-}" != "" ]; then

@@ -278,24 +278,38 @@ docker compose -f docker-compose.yml up -d postgres redis >/dev/null
 wait_tcp 127.0.0.1 5432 60 || fail "Banco PostgreSQL não disponível na porta 5432. Verifique: pnpm dev:logs"
 wait_tcp 127.0.0.1 6379 60 || fail "Redis não disponível na porta 6379. Verifique: pnpm dev:logs"
 
-# 5) subir API
+# 5) sincronizar Prisma (migrations -> generate -> seed opcional)
+log "[BOOT] aplicando migrations Prisma..."
+pnpm --filter @nexogestao/api prisma migrate deploy
+
+log "[BOOT] gerando Prisma Client real..."
+pnpm --filter @nexogestao/api prisma generate
+
+if [ "${NEXO_DEV_SEED:-0}" = "1" ]; then
+  log "[BOOT] NEXO_DEV_SEED=1 -> rodando seed Prisma..."
+  pnpm --filter @nexogestao/api prisma db seed
+else
+  log "[BOOT] seed Prisma desabilitado (defina NEXO_DEV_SEED=1 para habilitar)."
+fi
+
+# 6) subir API
 log "[BOOT] iniciando API..."
 API_PORT="$API_PORT" PORT="$API_PORT" pnpm --filter ./apps/api run dev > "$API_LOG_FILE" 2>&1 &
 API_PID=$!
 
-# 6) esperar processo vivo + porta + /health
+# 7) esperar processo vivo + porta + /health
 kill -0 "$API_PID" >/dev/null 2>&1 || fail "API falhou no boot. Veja logs: $API_LOG_FILE"
 wait_tcp 127.0.0.1 "$API_PORT" 120 || fail "API não abriu porta $API_PORT. Veja logs: $API_LOG_FILE"
 log "[READY] API porta OK"
 wait_http "http://127.0.0.1:${API_PORT}/health" 120 || fail "API falhou no /health. Veja logs: $API_LOG_FILE"
 log "[READY] API /health OK"
 
-# 7) subir WEB
+# 8) subir WEB
 log "[BOOT] iniciando WEB..."
 PORT="$WEB_PORT" NEXO_API_URL="$NEXO_API_URL" pnpm --filter ./apps/web run dev > "$WEB_LOG_FILE" 2>&1 &
 WEB_PID=$!
 
-# 8) validar root web
+# 9) validar root web
 kill -0 "$WEB_PID" >/dev/null 2>&1 || fail "WEB falhou no boot. Veja logs: $WEB_LOG_FILE"
 wait_http "http://127.0.0.1:${WEB_PORT}/" 120 || fail "WEB não respondeu /. Veja logs: $WEB_LOG_FILE"
 log "[READY] WEB OK"
@@ -306,7 +320,7 @@ log "[READY] WEB OK"
 [ -n "${WHATSAPP_PROVIDER:-}${ZAPI_INSTANCE_ID:-}" ] || log "[OPTIONAL] WhatsApp não configurado"
 [ -n "${SENTRY_DSN:-}" ] || log "[OPTIONAL] Sentry não configurado"
 
-# 9) status geral
+# 10) status geral
 log ""
 log "[SUCCESS] ambiente pronto:"
 log "- API: http://localhost:${API_PORT}"
