@@ -30,7 +30,7 @@ Critérios obrigatórios de sucesso:
 
 ## 1) Subir sistema completo
 - [ ] Executar `pnpm install`
-- [ ] Executar `pnpm dev:full`
+- [ ] Executar `pnpm dev`
 - [ ] Confirmar logs da API:
   - [ ] `DB conectado (Prisma)`
   - [ ] `Redis conectado`
@@ -80,6 +80,6 @@ Critérios obrigatórios de sucesso:
 - [ ] Validar isolamento por organização (tenant)
 
 ## 11) Testes de integração com infra real
-- [ ] Com `pnpm dev:full` ativo, em outro terminal executar:
+- [ ] Com `pnpm dev` ativo, em outro terminal executar:
   - `pnpm --filter ./apps/api exec jest test/integration --runInBand`
 - [ ] Confirmar suíte verde sem `ECONNREFUSED`
