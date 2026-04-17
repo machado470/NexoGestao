@@ -14,6 +14,7 @@ CLEAN_MODE=0
 SKIP_GENERATE="${DEV_FULL_SKIP_GENERATE:-0}"
 SKIP_MIGRATE="${DEV_FULL_SKIP_MIGRATE:-0}"
 SKIP_SEED="${DEV_FULL_SKIP_SEED:-0}"
+AUTO_KILL_STALE_DEV_PROCESSES="${NEXO_KILL_STALE_DEV_PROCESSES:-0}"
 for arg in "$@"; do
   if [ "$arg" = "--clean" ]; then
     CLEAN_MODE=1
@@ -180,6 +181,11 @@ fi
 
 echo "ℹ️ Portas locais: API=${API_PORT} | WEB=${WEB_PORT}"
 echo "ℹ️ NEXO_API_URL=${NEXO_API_URL}"
+if [ "$AUTO_KILL_STALE_DEV_PROCESSES" = "1" ]; then
+  echo "ℹ️ Auto-limpeza de processos legados habilitada (NEXO_KILL_STALE_DEV_PROCESSES=1)."
+else
+  echo "ℹ️ Auto-limpeza de processos legados desabilitada. Para habilitar: NEXO_KILL_STALE_DEV_PROCESSES=1 pnpm dev:full"
+fi
 
 ensure_port_tooling() {
   if command -v lsof >/dev/null 2>&1; then
@@ -228,6 +234,164 @@ process_on_port() {
   fi
 
   return 0
+}
+
+pid_command() {
+  local pid="${1:-}"
+  ps -p "$pid" -o args= 2>/dev/null | sed 's/^[[:space:]]*//'
+}
+
+pid_cwd() {
+  local pid="${1:-}"
+  readlink -f "/proc/${pid}/cwd" 2>/dev/null || true
+}
+
+listening_pids_on_port() {
+  local port="${1:-}"
+  if ! command -v lsof >/dev/null 2>&1; then
+    return 0
+  fi
+  lsof -t -nP -iTCP:"$port" -sTCP:LISTEN 2>/dev/null | sort -u
+}
+
+is_pid_nexo_dev_process() {
+  local pid="${1:-}"
+  local cmd cwd root_real
+  cmd="$(pid_command "$pid")"
+  cwd="$(pid_cwd "$pid")"
+  root_real="$(readlink -f "$ROOT_DIR" 2>/dev/null || echo "$ROOT_DIR")"
+
+  [ -n "$cmd" ] || return 1
+
+  local command_has_dev_runtime=1
+  if [[ "$cmd" =~ (node|pnpm|vite|nest|tsx|turbo) ]]; then
+    command_has_dev_runtime=0
+  fi
+
+  local command_has_nexo_markers=1
+  if [[ "$cmd" == *"$ROOT_DIR"* ]] || [[ "$cmd" == *"$root_real"* ]] || [[ "$cmd" == *"apps/api"* ]] || [[ "$cmd" == *"apps/web"* ]] || [[ "$cmd" == *"dev:bff"* ]] || [[ "$cmd" == *"nest start"* ]] || [[ "$cmd" == *"pnpm --filter ./apps/api"* ]] || [[ "$cmd" == *"pnpm --filter ./apps/web"* ]]; then
+    command_has_nexo_markers=0
+  fi
+
+  local cwd_is_project=1
+  if [ -n "$cwd" ]; then
+    if [[ "$cwd" == "$ROOT_DIR"* ]] || [[ "$cwd" == "$root_real"* ]]; then
+      cwd_is_project=0
+    fi
+  fi
+
+  if [ "$command_has_dev_runtime" -eq 0 ] && { [ "$command_has_nexo_markers" -eq 0 ] || [ "$cwd_is_project" -eq 0 ]; }; then
+    return 0
+  fi
+
+  return 1
+}
+
+log_port_pid_summary() {
+  local port="${1:-}"
+  local pid="${2:-}"
+  local classification="${3:-unknown}"
+  local cmd
+  cmd="$(pid_command "$pid")"
+  if [ -z "$cmd" ]; then
+    cmd="<comando indisponível>"
+  fi
+  echo "   - porta=${port} pid=${pid} class=${classification} cmd=${cmd}"
+}
+
+terminate_pids_gracefully() {
+  local reason="${1:-stale}"
+  shift
+  local pids=("$@")
+  if [ "${#pids[@]}" -eq 0 ]; then
+    return 0
+  fi
+
+  echo "⚠️ ${reason}: enviando SIGTERM para PID(s): ${pids[*]}"
+  kill "${pids[@]}" >/dev/null 2>&1 || true
+  sleep 1
+
+  local survivors=()
+  local pid
+  for pid in "${pids[@]}"; do
+    if kill -0 "$pid" >/dev/null 2>&1; then
+      survivors+=("$pid")
+    fi
+  done
+
+  if [ "${#survivors[@]}" -gt 0 ]; then
+    echo "⚠️ ${reason}: PID(s) ainda vivos após SIGTERM, enviando SIGKILL: ${survivors[*]}"
+    kill -9 "${survivors[@]}" >/dev/null 2>&1 || true
+    sleep 1
+  fi
+}
+
+handle_dev_port_conflict() {
+  local port="${1:-}"
+  local purpose="${2:-Dev}"
+  local enable_hint="NEXO_KILL_STALE_DEV_PROCESSES=1 pnpm dev:full"
+
+  if ! port_in_use "$port"; then
+    return 0
+  fi
+
+  local cname
+  cname="$(container_on_port "$port" || true)"
+  if [ -n "$cname" ]; then
+    echo "❌ ${purpose}: porta ${port} ocupada por container externo (${cname})."
+    echo "   Abortando por segurança. Pare/remova o container e tente novamente."
+    exit 1
+  fi
+
+  if ! command -v lsof >/dev/null 2>&1; then
+    fail_if_external_port_block "$port" "$purpose"
+    return 0
+  fi
+
+  mapfile -t pids < <(listening_pids_on_port "$port")
+  if [ "${#pids[@]}" -eq 0 ]; then
+    fail_if_external_port_block "$port" "$purpose"
+    return 0
+  fi
+
+  local nexo_pids=()
+  local external_pids=()
+  local pid
+  for pid in "${pids[@]}"; do
+    if is_pid_nexo_dev_process "$pid"; then
+      nexo_pids+=("$pid")
+      log_port_pid_summary "$port" "$pid" "nexo"
+    else
+      external_pids+=("$pid")
+      log_port_pid_summary "$port" "$pid" "external"
+    fi
+  done
+
+  if [ "${#external_pids[@]}" -gt 0 ]; then
+    echo "❌ ${purpose}: processo externo detectado na porta ${port}; abortando por segurança."
+    echo "   Dica: somente processos claramente do NexoGestao podem ser encerrados automaticamente."
+    exit 1
+  fi
+
+  if [ "${#nexo_pids[@]}" -eq 0 ]; then
+    fail_if_external_port_block "$port" "$purpose"
+    return 0
+  fi
+
+  if [ "$AUTO_KILL_STALE_DEV_PROCESSES" != "1" ]; then
+    echo "❌ ${purpose}: processo(s) legado(s) do Nexo detectado(s) na porta ${port}."
+    echo "   Por segurança, o script não remove automaticamente sem opt-in."
+    echo "   Use: ${enable_hint}"
+    exit 1
+  fi
+
+  terminate_pids_gracefully "${purpose}: limpando processo(s) antigo(s) do Nexo na porta ${port}" "${nexo_pids[@]}"
+  if port_in_use "$port"; then
+    echo "❌ ${purpose}: falha ao liberar porta ${port} mesmo após tentativa de limpeza automática."
+    exit 1
+  fi
+  echo "✅ ${purpose}: processo(s) antigo(s) do Nexo detectado(s) na porta ${port}, removido(s) automaticamente."
+  log_port_conflict_resolved "$port" "killed_nexo_pids=${nexo_pids[*]}"
 }
 
 lsof_dump_port() {
@@ -462,13 +626,13 @@ log_infra_ready "postgres"
 log_infra_ready "redis"
 end_phase
 
-fail_if_external_port_block "3000" "API"
-fail_if_external_port_block "3010" "Web"
+handle_dev_port_conflict "3000" "API"
+handle_dev_port_conflict "3010" "Web/BFF"
 if [ "$API_PORT" != "3000" ]; then
-  fail_if_external_port_block "$API_PORT" "API"
+  handle_dev_port_conflict "$API_PORT" "API"
 fi
 if [ "$WEB_PORT" != "3010" ]; then
-  fail_if_external_port_block "$WEB_PORT" "Web"
+  handle_dev_port_conflict "$WEB_PORT" "Web/BFF"
 fi
 
 if [ "$SKIP_GENERATE" = "1" ]; then
