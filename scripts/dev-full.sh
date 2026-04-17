@@ -527,11 +527,16 @@ wait_http_status() {
   local label="${1:-endpoint}"
   local url="${2:-}"
   local max_attempts="${3:-80}"
+  local process_pid="${4:-}"
   local attempt=0
   local begin_ts
   begin_ts="$(date +%s)"
 
   while [ "$attempt" -lt "$max_attempts" ]; do
+    if [ -n "$process_pid" ] && ! kill -0 "$process_pid" >/dev/null 2>&1; then
+      echo "❌ [probe] ${label} abortado: processo alvo encerrou antes da readiness."
+      return 1
+    fi
     local code
     code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 2 "$url" || true)"
     if [[ "$code" =~ ^[0-9]{3}$ ]] && [ "$code" != "000" ]; then
@@ -554,11 +559,16 @@ wait_http_status_with_method() {
   local method="${3:-GET}"
   local body="${4:-}"
   local max_attempts="${5:-80}"
+  local process_pid="${6:-}"
   local attempt=0
   local begin_ts
   begin_ts="$(date +%s)"
 
   while [ "$attempt" -lt "$max_attempts" ]; do
+    if [ -n "$process_pid" ] && ! kill -0 "$process_pid" >/dev/null 2>&1; then
+      echo "❌ [probe] ${label} abortado: processo alvo encerrou antes da readiness."
+      return 1
+    fi
     local code
     if [ -n "$body" ]; then
       code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 2 -X "$method" -H "Content-Type: application/json" -d "$body" "$url" || true)"
@@ -621,45 +631,137 @@ show_recent_logs() {
   echo "----- fim ${title} -----"
 }
 
+PRIMARY_ABORT_COMPONENT=""
+PRIMARY_ABORT_REASON=""
+PRIMARY_ABORT_DETAILS=""
+
+register_abort_reason() {
+  local component="${1:-unknown}"
+  local reason="${2:-unknown}"
+  local details="${3:-sem detalhes}"
+
+  if [ -z "$PRIMARY_ABORT_COMPONENT" ]; then
+    PRIMARY_ABORT_COMPONENT="$component"
+    PRIMARY_ABORT_REASON="$reason"
+    PRIMARY_ABORT_DETAILS="$details"
+  fi
+}
+
+abort_with_logs() {
+  local component="${1:-unknown}"
+  local reason="${2:-failure}"
+  local details="${3:-sem detalhes}"
+  local log_file="${4:-}"
+
+  register_abort_reason "$component" "$reason" "$details"
+  echo "❌ [abort] component=${component} reason=${reason} details=${details}"
+  if [ -n "$log_file" ]; then
+    show_recent_logs "$component" "$log_file" 180
+  fi
+  exit 1
+}
+
 echo "🚀 Iniciando API + Web..."
 API_LOG_FILE="$(mktemp -t nexogestao-api-dev-full.XXXX.log)"
 WEB_LOG_FILE="$(mktemp -t nexogestao-web-dev-full.XXXX.log)"
 echo "ℹ️ Logs de startup: api=${API_LOG_FILE} | web=${WEB_LOG_FILE}"
-API_PORT="$API_PORT" PORT="$API_PORT" pnpm --filter ./apps/api run dev > >(tee "$API_LOG_FILE") 2>&1 &
-API_PID=$!
-PORT="$WEB_PORT" NEXO_API_URL="$NEXO_API_URL" pnpm --filter ./apps/web run dev > >(tee "$WEB_LOG_FILE") 2>&1 &
-WEB_PID=$!
+
+API_PID=""
+WEB_PID=""
 
 cleanup() {
-  kill "$API_PID" "$WEB_PID" >/dev/null 2>&1 || true
+  local exit_code="$?"
+  if [ "$exit_code" -ne 0 ] && [ -n "$PRIMARY_ABORT_COMPONENT" ]; then
+    echo "🧾 Causa primária registrada: component=${PRIMARY_ABORT_COMPONENT} reason=${PRIMARY_ABORT_REASON} details=${PRIMARY_ABORT_DETAILS}"
+  fi
+
+  if [ -n "${API_PID:-}" ] && kill -0 "$API_PID" >/dev/null 2>&1; then
+    echo "🛑 Encerrando API (pid=${API_PID})"
+    kill "$API_PID" >/dev/null 2>&1 || true
+  fi
+
+  if [ -n "${WEB_PID:-}" ] && kill -0 "$WEB_PID" >/dev/null 2>&1; then
+    echo "🛑 Encerrando Web/BFF (pid=${WEB_PID})"
+    kill "$WEB_PID" >/dev/null 2>&1 || true
+  fi
 }
 trap cleanup EXIT
+
+API_PORT="$API_PORT" PORT="$API_PORT" pnpm --filter ./apps/api run dev > >(tee "$API_LOG_FILE") 2>&1 &
+API_PID=$!
+echo "✅ [proc] api iniciado (pid=${API_PID})"
 
 start_phase "probe:startup-readiness"
 API_PORT_ATTEMPTS="${DEV_FULL_API_PORT_ATTEMPTS:-180}"
 API_HEALTH_ATTEMPTS="${DEV_FULL_API_HEALTH_ATTEMPTS:-180}"
+WEB_ROOT_ATTEMPTS="${DEV_FULL_WEB_ROOT_ATTEMPTS:-180}"
+WEB_SESSION_ATTEMPTS="${DEV_FULL_WEB_SESSION_ATTEMPTS:-180}"
+WEB_DASHBOARD_ATTEMPTS="${DEV_FULL_WEB_DASHBOARD_ATTEMPTS:-180}"
 if [[ "$ROOT_DIR" == /mnt/* ]]; then
   API_PORT_ATTEMPTS="${DEV_FULL_API_PORT_ATTEMPTS:-300}"
   API_HEALTH_ATTEMPTS="${DEV_FULL_API_HEALTH_ATTEMPTS:-300}"
+  WEB_ROOT_ATTEMPTS="${DEV_FULL_WEB_ROOT_ATTEMPTS:-300}"
+  WEB_SESSION_ATTEMPTS="${DEV_FULL_WEB_SESSION_ATTEMPTS:-300}"
+  WEB_DASHBOARD_ATTEMPTS="${DEV_FULL_WEB_DASHBOARD_ATTEMPTS:-300}"
+  echo "⚠️ [wsl-mnt] Ajustando janelas de readiness para ambiente /mnt/* (watch mode e I/O podem ficar mais lentos)."
 fi
 
 wait_port_ready "api:port" "127.0.0.1" "$API_PORT" "$API_PORT_ATTEMPTS" "$API_PID" || {
-  show_recent_logs "api" "$API_LOG_FILE" 180
-  exit 1
+  abort_with_logs "api" "port_probe_failed" "API não abriu porta ${API_PORT} durante bootstrap" "$API_LOG_FILE"
 }
 wait_http_ready "api:health" "http://127.0.0.1:${API_PORT}/health" "$API_HEALTH_ATTEMPTS" "$API_PID" || {
-  show_recent_logs "api" "$API_LOG_FILE" 180
-  exit 1
+  abort_with_logs "api" "health_probe_failed" "API não respondeu /health durante bootstrap" "$API_LOG_FILE"
 }
-wait_http_status_with_method "api:auth.login" "http://127.0.0.1:${API_PORT}/auth/login" "POST" '{"email":"","password":""}' 60
-wait_http_ready "web:root" "http://127.0.0.1:${WEB_PORT}/" 120
-wait_http_status "web:session.me" "http://127.0.0.1:${WEB_PORT}/api/trpc/session.me?batch=1&input=%7B%220%22%3A%7B%7D%7D" 120
-wait_http_status "web:dashboard.status" "http://127.0.0.1:${WEB_PORT}/api/trpc/dashboard.status?batch=1&input=%7B%220%22%3A%7B%7D%7D" 120
+wait_http_status_with_method "api:auth.login" "http://127.0.0.1:${API_PORT}/auth/login" "POST" '{"email":"","password":""}' 60 "$API_PID" || {
+  abort_with_logs "api" "auth_probe_failed" "API respondeu fora do esperado em /auth/login durante bootstrap" "$API_LOG_FILE"
+}
+
+PORT="$WEB_PORT" NEXO_API_URL="$NEXO_API_URL" pnpm --filter ./apps/web run dev > >(tee "$WEB_LOG_FILE") 2>&1 &
+WEB_PID=$!
+echo "✅ [proc] web iniciado (pid=${WEB_PID})"
+
+wait_http_ready "web:root" "http://127.0.0.1:${WEB_PORT}/" "$WEB_ROOT_ATTEMPTS" "$WEB_PID" || {
+  abort_with_logs "web" "root_probe_failed" "Web/BFF não respondeu raiz na porta ${WEB_PORT}" "$WEB_LOG_FILE"
+}
+wait_http_status "web:session.me" "http://127.0.0.1:${WEB_PORT}/api/trpc/session.me?batch=1&input=%7B%220%22%3A%7B%7D%7D" "$WEB_SESSION_ATTEMPTS" "$WEB_PID" || {
+  abort_with_logs "web" "session_probe_failed" "Web/BFF não respondeu session.me" "$WEB_LOG_FILE"
+}
+wait_http_status "web:dashboard.status" "http://127.0.0.1:${WEB_PORT}/api/trpc/dashboard.status?batch=1&input=%7B%220%22%3A%7B%7D%7D" "$WEB_DASHBOARD_ATTEMPTS" "$WEB_PID" || {
+  abort_with_logs "web" "dashboard_probe_failed" "Web/BFF não respondeu dashboard.status" "$WEB_LOG_FILE"
+}
 end_phase
 
 TOTAL_ELAPSED=$(( $(date +%s) - SCRIPT_START_TS ))
 echo "🏁 Boot concluído em ${TOTAL_ELAPSED}s"
 echo "   API: http://127.0.0.1:${API_PORT}"
 echo "   WEB: http://127.0.0.1:${WEB_PORT}"
+echo "🩺 Monitorando processos em foreground (api pid=${API_PID} | web pid=${WEB_PID})"
 
-wait "$WEB_PID"
+set +e
+while true; do
+  wait -n "$API_PID" "$WEB_PID"
+  terminated_status=$?
+
+  api_alive=0
+  web_alive=0
+  if kill -0 "$API_PID" >/dev/null 2>&1; then
+    api_alive=1
+  fi
+  if kill -0 "$WEB_PID" >/dev/null 2>&1; then
+    web_alive=1
+  fi
+
+  if [ "$api_alive" -eq 0 ]; then
+    register_abort_reason "api" "process_exit" "API encerrou (pid=${API_PID}, status=${terminated_status})"
+    echo "❌ [proc] api encerrou (pid=${API_PID}, status=${terminated_status})"
+    show_recent_logs "api" "$API_LOG_FILE" 180
+    exit "$terminated_status"
+  fi
+
+  if [ "$web_alive" -eq 0 ]; then
+    register_abort_reason "web" "process_exit" "Web/BFF encerrou (pid=${WEB_PID}, status=${terminated_status})"
+    echo "❌ [proc] web encerrou (pid=${WEB_PID}, status=${terminated_status})"
+    show_recent_logs "web" "$WEB_LOG_FILE" 180
+    exit "$terminated_status"
+  fi
+done
