@@ -1,12 +1,36 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const rawArgs = process.argv.slice(2)
 const hasSchemaArg = rawArgs.some((arg) => arg === '--schema' || arg.startsWith('--schema='))
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
+
+function parseEnvContent(content) {
+  const parsed = {}
+  for (const rawLine of content.split(/\r?\n/)) {
+    const line = rawLine.trim()
+    if (!line || line.startsWith('#')) continue
+
+    const equalIdx = line.indexOf('=')
+    if (equalIdx <= 0) continue
+
+    const key = line.slice(0, equalIdx).trim()
+    let value = line.slice(equalIdx + 1).trim()
+
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1)
+    }
+
+    parsed[key] = value
+  }
+  return parsed
+}
 
 function findWorkspaceRoot(startDir) {
   let cursor = startDir
@@ -42,6 +66,27 @@ function resolveSchemaPath() {
 const schemaPath = resolveSchemaPath()
 const args = !hasSchemaArg && schemaPath ? [...rawArgs, '--schema', schemaPath] : rawArgs
 const isGenerate = args[0] === 'generate'
+const workspaceRoot = findWorkspaceRoot(process.cwd()) ?? findWorkspaceRoot(scriptDir)
+
+function loadEnvFromFiles() {
+  if (!workspaceRoot) return {}
+
+  const candidates = [
+    path.resolve(workspaceRoot, '.env'),
+    path.resolve(workspaceRoot, '.env.local'),
+    path.resolve(process.cwd(), '.env'),
+    path.resolve(process.cwd(), '.env.local'),
+  ]
+
+  const loaded = {}
+  for (const filePath of candidates) {
+    if (!existsSync(filePath)) continue
+    const content = readFileSync(filePath, 'utf8')
+    Object.assign(loaded, parseEnvContent(content))
+  }
+
+  return loaded
+}
 
 if (!hasSchemaArg && !schemaPath) {
   console.warn(
@@ -52,6 +97,7 @@ if (!hasSchemaArg && !schemaPath) {
 const result = spawnSync('pnpm', ['exec', 'prisma', ...args], {
   stdio: 'inherit',
   env: {
+    ...loadEnvFromFiles(),
     ...process.env,
     PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING: process.env.PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING ?? '1',
   },
