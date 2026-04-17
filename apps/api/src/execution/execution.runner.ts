@@ -139,10 +139,10 @@ export class ExecutionRunner {
   private maybeLogManualModeBlockedSummary(orgId: string, reasonCode: string) {
     if (reasonCode !== 'mode_manual_explicit_configuration') return
     const now = Date.now()
-    const summaryIntervalMs = 60_000
+    const summaryIntervalMs = 5 * 60_000
     const current = this.manualModeBlockedSummary.get(orgId) ?? {
       count: 0,
-      nextLogAt: now + summaryIntervalMs,
+      nextLogAt: now,
     }
     current.count += 1
 
@@ -150,11 +150,12 @@ export class ExecutionRunner {
       this.logger.log(
         JSON.stringify({
           event: 'execution_runner_manual_mode_summary',
+          logClass: '[WARN-LOCAL]',
           orgId,
           reasonCode,
           blockedCountLastWindow: current.count,
           windowMs: summaryIntervalMs,
-          note: 'runner em modo manual por configuração explícita (resumo periódico)',
+          note: 'runner em modo manual por configuração explícita (resumo periódico, sem flood por ciclo)',
         }),
       )
       current.count = 0

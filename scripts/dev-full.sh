@@ -879,27 +879,29 @@ API_PID=$!
 echo "✅ [BOOT] api spawn solicitado (pid=${API_PID})"
 
 start_phase "probe:startup-readiness"
-API_PORT_ATTEMPTS="${DEV_FULL_API_PORT_ATTEMPTS:-180}"
-API_HEALTH_ATTEMPTS="${DEV_FULL_API_HEALTH_ATTEMPTS:-180}"
-API_READINESS_ATTEMPTS="${DEV_FULL_API_READINESS_ATTEMPTS:-180}"
-API_AUTH_ATTEMPTS="${DEV_FULL_API_AUTH_ATTEMPTS:-120}"
-WEB_ROOT_ATTEMPTS="${DEV_FULL_WEB_ROOT_ATTEMPTS:-180}"
-WEB_SESSION_ATTEMPTS="${DEV_FULL_WEB_SESSION_ATTEMPTS:-180}"
-WEB_DASHBOARD_ATTEMPTS="${DEV_FULL_WEB_DASHBOARD_ATTEMPTS:-180}"
+API_PORT_ATTEMPTS="${DEV_FULL_API_PORT_ATTEMPTS:-240}"
+API_HEALTH_ATTEMPTS="${DEV_FULL_API_HEALTH_ATTEMPTS:-240}"
+API_READINESS_ATTEMPTS="${DEV_FULL_API_READINESS_ATTEMPTS:-240}"
+API_AUTH_ATTEMPTS="${DEV_FULL_API_AUTH_ATTEMPTS:-180}"
+WEB_ROOT_ATTEMPTS="${DEV_FULL_WEB_ROOT_ATTEMPTS:-240}"
+WEB_SESSION_ATTEMPTS="${DEV_FULL_WEB_SESSION_ATTEMPTS:-240}"
+WEB_DASHBOARD_ATTEMPTS="${DEV_FULL_WEB_DASHBOARD_ATTEMPTS:-240}"
+STRICT_API_AUTH_PROBE="${DEV_FULL_STRICT_API_AUTH_PROBE:-0}"
 is_wsl_mnt=0
 if [[ "$ROOT_DIR" == /mnt/* ]]; then
   is_wsl_mnt=1
 fi
 if [ "$is_wsl_mnt" = "1" ]; then
-  API_PORT_ATTEMPTS="${DEV_FULL_API_PORT_ATTEMPTS:-360}"
-  API_HEALTH_ATTEMPTS="${DEV_FULL_API_HEALTH_ATTEMPTS:-360}"
-  API_READINESS_ATTEMPTS="${DEV_FULL_API_READINESS_ATTEMPTS:-360}"
-  API_AUTH_ATTEMPTS="${DEV_FULL_API_AUTH_ATTEMPTS:-180}"
-  WEB_ROOT_ATTEMPTS="${DEV_FULL_WEB_ROOT_ATTEMPTS:-360}"
-  WEB_SESSION_ATTEMPTS="${DEV_FULL_WEB_SESSION_ATTEMPTS:-360}"
-  WEB_DASHBOARD_ATTEMPTS="${DEV_FULL_WEB_DASHBOARD_ATTEMPTS:-360}"
+  API_PORT_ATTEMPTS="${DEV_FULL_API_PORT_ATTEMPTS:-420}"
+  API_HEALTH_ATTEMPTS="${DEV_FULL_API_HEALTH_ATTEMPTS:-420}"
+  API_READINESS_ATTEMPTS="${DEV_FULL_API_READINESS_ATTEMPTS:-420}"
+  API_AUTH_ATTEMPTS="${DEV_FULL_API_AUTH_ATTEMPTS:-240}"
+  WEB_ROOT_ATTEMPTS="${DEV_FULL_WEB_ROOT_ATTEMPTS:-420}"
+  WEB_SESSION_ATTEMPTS="${DEV_FULL_WEB_SESSION_ATTEMPTS:-420}"
+  WEB_DASHBOARD_ATTEMPTS="${DEV_FULL_WEB_DASHBOARD_ATTEMPTS:-420}"
   echo "⚠️ [WARN-LOCAL] [wsl-mnt] Timeouts de readiness ampliados para /mnt/* (I/O + watch mais lentos)."
 fi
+echo "ℹ️ [BOOT] Timeouts readiness (segundos aproximados): api.port=${API_PORT_ATTEMPTS}s api.health=${API_HEALTH_ATTEMPTS}s api.readiness=${API_READINESS_ATTEMPTS}s api.auth=${API_AUTH_ATTEMPTS}s web.root=${WEB_ROOT_ATTEMPTS}s"
 
 wait_process_started "api:process" "$API_PID" 20 || {
   abort_with_logs "api" "process_not_started" "Processo da API não permaneceu ativo após spawn" "$API_LOG_FILE"
@@ -913,9 +915,13 @@ wait_http_ready "api:health" "http://127.0.0.1:${API_PORT}/health" "$API_HEALTH_
 wait_http_ready "api:readiness" "http://127.0.0.1:${API_PORT}/health/readiness" "$API_READINESS_ATTEMPTS" "$API_PID" || {
   abort_with_logs "api" "readiness_probe_failed" "API não respondeu /health/readiness durante bootstrap" "$API_LOG_FILE"
 }
-wait_http_status_with_method "api:auth.login" "http://127.0.0.1:${API_PORT}/auth/login" "POST" '{"email":"","password":""}' "$API_AUTH_ATTEMPTS" "$API_PID" || {
-  abort_with_logs "api" "auth_probe_failed" "API respondeu fora do esperado em /auth/login durante bootstrap" "$API_LOG_FILE"
-}
+if ! wait_http_status_with_method "api:auth.login" "http://127.0.0.1:${API_PORT}/auth/login" "POST" '{"email":"","password":""}' "$API_AUTH_ATTEMPTS" "$API_PID"; then
+  if [ "$STRICT_API_AUTH_PROBE" = "1" ]; then
+    abort_with_logs "api" "auth_probe_failed" "API respondeu fora do esperado em /auth/login durante bootstrap (modo estrito)" "$API_LOG_FILE"
+  else
+    echo "⚠️ [WARN-LOCAL] [probe:optional] Falha no probe /auth/login não é fatal no modo local (use DEV_FULL_STRICT_API_AUTH_PROBE=1 para exigir)."
+  fi
+fi
 
 PORT="$WEB_PORT" NEXO_API_URL="$NEXO_API_URL" pnpm --filter ./apps/web run dev > >(tee "$WEB_LOG_FILE") 2>&1 &
 WEB_PID=$!

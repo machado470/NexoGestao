@@ -110,6 +110,11 @@ Fluxo atual do `dev:full`:
 - executa readiness em fases para API: processo ativo → porta aberta → `/health` → `/health/readiness` → endpoint leve de autenticação;
 - aplica timeout maior automaticamente em ambientes WSL montados em `/mnt/*`.
 
+Notas de operação local:
+- ausência de integrações opcionais (Google OAuth, Stripe, Resend, Z-API, Sentry) aparece como `[OPTIONAL]` e **não** aborta startup;
+- o probe de `/auth/login` é não-fatal por padrão no local (pode ser estrito com `DEV_FULL_STRICT_API_AUTH_PROBE=1`);
+- bootstrap em watch mode pode levar ~40–50s (ou mais em WSL `/mnt/*`), com timeout já ajustado para esse cenário.
+
 4. Em outro terminal, execute os testes de integração com infra real:
 
 ```bash
