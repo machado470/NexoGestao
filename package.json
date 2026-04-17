@@ -18,11 +18,15 @@
     "web:build": "pnpm --filter ./apps/web build",
     "dev:full": "./scripts/dev-full.sh",
     "dev:reset": "NEXO_DEV_RESET=1 NEXO_KILL_STALE_DEV_PROCESSES=1 ./scripts/dev-full.sh",
-    "dev:infra": "docker compose up -d postgres redis",
+    "dev:infra": "docker compose -f docker-compose.yml up -d postgres redis",
     "dev:api": "API_PORT=3000 PORT=3000 pnpm --filter ./apps/api run dev",
     "dev:web": "PORT=3010 NEXO_API_URL=http://127.0.0.1:3000 pnpm --filter ./apps/web run dev",
     "web:dev:bff": "pnpm --filter ./apps/web dev:bff",
-    "web:dev:client": "pnpm --filter ./apps/web dev:client"
+    "web:dev:client": "pnpm --filter ./apps/web dev:client",
+    "dev:doctor": "./scripts/doctor.sh",
+    "dev:ports": "./scripts/dev-ports.sh",
+    "dev:health": "./scripts/dev-health.sh",
+    "dev:logs": "./scripts/dev-logs.sh"
   },
   "prisma": {
     "seed": "tsx prisma/seed-pilot.ts"
