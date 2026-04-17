@@ -42,7 +42,7 @@ export class PaymentsService {
       this.logger.log('[BOOT] Stripe inicializado no PaymentsService')
     } else {
       this.stripe = null
-      this.logger.warn('[OPTIONAL][integration-missing-config] Stripe não configurado no PaymentsService')
+      this.logger.warn('[OPTIONAL][simulated-mode] Stripe não configurado no PaymentsService (fluxo de checkout online desabilitado)')
     }
   }
 

@@ -12,9 +12,16 @@ interface EmailOptions {
 export class EmailService {
   private readonly logger = new Logger(EmailService.name)
   private resendApiKey: string
+  private readonly resendConfigured: boolean
 
   constructor(private configService: ConfigService) {
     this.resendApiKey = this.configService.get<string>('RESEND_API_KEY') || ''
+    this.resendConfigured = this.resendApiKey.trim().length > 0
+    if (!this.resendConfigured) {
+      this.logger.warn(
+        '[OPTIONAL][integration-missing-config] RESEND_API_KEY não configurada. Serviço de e-mail ativo em modo degradado.',
+      )
+    }
   }
 
   /**
@@ -22,8 +29,7 @@ export class EmailService {
    */
   async send(options: EmailOptions): Promise<{ success: boolean; messageId?: string; error?: string }> {
     try {
-      if (!this.resendApiKey) {
-        this.logger.warn('[OPTIONAL][integration-missing-config] RESEND_API_KEY não configurada. E-mail não será enviado.')
+      if (!this.resendConfigured) {
         return { success: false, error: 'RESEND_API_KEY não configurada' }
       }
 

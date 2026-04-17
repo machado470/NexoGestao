@@ -49,7 +49,7 @@ export class SentryService implements OnModuleInit {
       this.initialized = true
       this.logger.log(`[BOOT] Sentry inicializado (env: ${this.config.get('SENTRY_ENVIRONMENT', 'production')})`)
     } catch (err) {
-      this.logger.warn(`[OPTIONAL][warn-local] Falha ao inicializar Sentry: ${err.message}`)
+      this.logger.warn(`[OPTIONAL][WARN-LOCAL] Falha ao inicializar Sentry: ${err.message}`)
     }
   }
 

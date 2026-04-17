@@ -29,12 +29,25 @@ export class HealthController {
   async health(@Query('details') details?: string) {
     const startedAt = Date.now()
     const includeDetails = details === '1' || details === 'true'
+    const queueTimeoutMs = 1200
 
     let database = { ok: false as boolean, latencyMs: 0 }
     let prismaClient = { ok: false as boolean }
     const queueStartedAt = Date.now()
     const queueSummary = this.queueService
-      ? await this.queueService.getQueueStatus().catch((error: unknown) => ({
+      ? await Promise.race([
+          this.queueService.getQueueStatus(),
+          new Promise((resolve) =>
+            setTimeout(
+              () =>
+                resolve({
+                  ok: false,
+                  reason: `queue_status_timeout_${queueTimeoutMs}ms`,
+                }),
+              queueTimeoutMs,
+            ),
+          ),
+        ]).catch((error: unknown) => ({
           ok: false,
           reason: error instanceof Error ? error.message : String(error),
         }))
@@ -131,6 +144,7 @@ export class HealthController {
       },
       notes: [
         '[READY] /health/readiness reflete prontidão de boot sem bloquear por integrações opcionais.',
+        '[OPTIONAL] Stripe/Google OAuth/Resend/WhatsApp/Sentry ausentes não impedem startup local.',
       ],
       integrations: {
         stripe: stripeConfigured ? 'configured' : 'missing',

@@ -94,7 +94,7 @@ export function createWhatsAppProvider(): WhatsAppProvider {
     default:
       if (!readiness.isProviderKnown) {
         logger.warn(
-          `[OPTIONAL][warn-local] [WhatsApp] Provider desconhecido: "${readiness.providerRequested}". Usando mock.`,
+          `[OPTIONAL][WARN-LOCAL] [WhatsApp] Provider desconhecido: "${readiness.providerRequested}". Usando mock.`,
         )
       } else {
         logger.log('[OPTIONAL][simulated-mode] [WhatsApp] Provider selecionado: Mock (sem envio real)')

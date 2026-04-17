@@ -30,13 +30,6 @@ export class ZApiWhatsAppProvider implements WhatsAppProvider {
     this.instanceId = process.env.ZAPI_INSTANCE_ID ?? ''
     this.token = process.env.ZAPI_TOKEN ?? ''
     this.clientToken = process.env.ZAPI_CLIENT_TOKEN ?? ''
-
-    const missing = this.getMissingConfig()
-    if (missing.length > 0) {
-      this.logger.log(
-        `[OPTIONAL][integration-missing-config] [Z-API] Configuração incompleta (${missing.join(', ')}). Mensagens não serão enviadas até corrigir o .env.`,
-      )
-    }
   }
 
   private getMissingConfig(): string[] {
