@@ -1,10 +1,19 @@
 import type { ComponentProps, ReactNode } from "react";
-import { ArrowDownRight, ArrowRight, ArrowUpRight, TriangleAlert } from "lucide-react";
+import {
+  ArrowDownRight,
+  ArrowRight,
+  ArrowUpRight,
+  TriangleAlert,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { AppPageShell, AppSectionCard, AppSkeleton as BaseSkeleton } from "@/components/app-system";
+import {
+  AppPageShell,
+  AppSectionCard,
+  AppSkeleton as BaseSkeleton,
+} from "@/components/app-system";
 import {
   AppCardCTA,
   AppEmptyState as AppBaseEmptyState,
@@ -42,9 +51,20 @@ export function AppPageHeader({
   );
 }
 
-export function AppFiltersBar({ children, className }: { children: ReactNode; className?: string }) {
+export function AppFiltersBar({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
   return (
-    <div className={cn("nexo-card-informative flex flex-wrap items-center justify-between gap-2 rounded-xl p-3", className)}>
+    <div
+      className={cn(
+        "nexo-card-informative flex flex-wrap items-center justify-between gap-2 rounded-xl p-3",
+        className
+      )}
+    >
       {children}
     </div>
   );
@@ -67,7 +87,13 @@ export type AppMetricCardItem = {
   ctaLabel?: string;
 };
 
-function MetricTrendBadge({ trend, delta }: { trend?: MetricTrend; delta?: string }) {
+function MetricTrendBadge({
+  trend,
+  delta,
+}: {
+  trend?: MetricTrend;
+  delta?: string;
+}) {
   if (!delta || !trend) return null;
   return (
     <span
@@ -110,13 +136,27 @@ export function AppMetricCard({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">{title}</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
+            {title}
+          </p>
           {loading ? (
-            <div className="mt-3 h-8 w-28 rounded-md bg-[var(--surface-elevated)]/70" aria-hidden />
+            <div
+              className="mt-3 h-8 w-28 rounded-md bg-[var(--surface-elevated)]/70"
+              aria-hidden
+            />
           ) : (
-            <p className={cn("mt-2 font-semibold tracking-tight text-[var(--text-primary)]", emphasis === "strong" ? "text-3xl md:text-[2rem]" : "text-2xl")}>{value}</p>
+            <p
+              className={cn(
+                "mt-2 font-semibold tracking-tight text-[var(--text-primary)]",
+                emphasis === "strong" ? "text-3xl md:text-[2rem]" : "text-2xl"
+              )}
+            >
+              {value}
+            </p>
           )}
-          {hint ? <p className="mt-1 text-xs text-[var(--text-muted)]">{hint}</p> : null}
+          {hint ? (
+            <p className="mt-1 text-xs text-[var(--text-muted)]">{hint}</p>
+          ) : null}
         </div>
         {icon ? <div className="nexo-icon-tile">{icon}</div> : null}
       </div>
@@ -124,8 +164,12 @@ export function AppMetricCard({
       {delta || footer || onClick ? (
         <div className="mt-3 flex items-center justify-between gap-2">
           <MetricTrendBadge trend={trend} delta={delta} />
-          {footer ? <div className="text-xs text-[var(--text-muted)]">{footer}</div> : null}
-          {onClick ? <AppCardCTA label={ctaLabel ?? "Abrir"} onClick={onClick} /> : null}
+          {footer ? (
+            <div className="text-xs text-[var(--text-muted)]">{footer}</div>
+          ) : null}
+          {onClick ? (
+            <AppCardCTA label={ctaLabel ?? "Abrir"} onClick={onClick} />
+          ) : null}
         </div>
       ) : null}
     </article>
@@ -152,8 +196,11 @@ export function AppKpiCard({
   context: string;
   onClick?: () => void;
 }) {
-  const direction: MetricTrend = trend > 0 ? "up" : trend < 0 ? "down" : "neutral";
-  const delta = Number.isFinite(trend) ? `${trend >= 0 ? "+" : ""}${trend.toFixed(1).replace(".", ",")}%` : undefined;
+  const direction: MetricTrend =
+    trend > 0 ? "up" : trend < 0 ? "down" : "neutral";
+  const delta = Number.isFinite(trend)
+    ? `${trend >= 0 ? "+" : ""}${trend.toFixed(1).replace(".", ",")}%`
+    : undefined;
   return (
     <AppMetricCard
       title={label}
@@ -171,40 +218,76 @@ export function AppKpiRow({
   emphasis = "compact",
   gridClassName,
 }: {
-  items: Array<AppMetricCardItem | { label: string; value: string; trend?: number; context?: string; onClick?: () => void }>;
+  items: Array<
+    | AppMetricCardItem
+    | {
+        label: string;
+        value: string;
+        trend?: number;
+        context?: string;
+        onClick?: () => void;
+      }
+  >;
   emphasis?: "strong" | "compact";
   gridClassName?: string;
 }) {
   const safeItems = Array.isArray(items) ? items : [];
 
   return (
-    <section className={cn("grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(320px,1fr))]", gridClassName)}>
+    <section
+      className={cn(
+        "grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(320px,1fr))]",
+        gridClassName
+      )}
+    >
       {safeItems.map((item, index) => {
         if (!item || typeof item !== "object") {
           if (import.meta.env.DEV) {
             // eslint-disable-next-line no-console
-            console.error("[kpi] item inválido recebido em AppKpiRow", { item, index });
+            console.error("[kpi] item inválido recebido em AppKpiRow", {
+              item,
+              index,
+            });
           }
           return null;
         }
 
-        const normalized: AppMetricCardItem = "title" in item
-          ? item
-          : {
-              title: item.label,
-              value: item.value,
-              hint: item.context,
-              onClick: item.onClick,
-              delta: typeof item.trend === "number" ? `${item.trend >= 0 ? "+" : ""}${item.trend.toFixed(1).replace(".", ",")}%` : undefined,
-              trend: typeof item.trend === "number" ? (item.trend > 0 ? "up" : item.trend < 0 ? "down" : "neutral") : undefined,
-            };
+        const normalized: AppMetricCardItem =
+          "title" in item
+            ? item
+            : {
+                title: item.label,
+                value: item.value,
+                hint: item.context,
+                onClick: item.onClick,
+                delta:
+                  typeof item.trend === "number"
+                    ? `${item.trend >= 0 ? "+" : ""}${item.trend.toFixed(1).replace(".", ",")}%`
+                    : undefined,
+                trend:
+                  typeof item.trend === "number"
+                    ? item.trend > 0
+                      ? "up"
+                      : item.trend < 0
+                        ? "down"
+                        : "neutral"
+                    : undefined,
+              };
 
         const safeTitle =
-          typeof normalized.title === "string" && normalized.title.trim().length > 0
+          typeof normalized.title === "string" &&
+          normalized.title.trim().length > 0
             ? normalized.title
             : `Métrica ${index + 1}`;
 
-        return <AppMetricCard key={`${safeTitle}-${index}`} {...normalized} title={safeTitle} emphasis={normalized.emphasis ?? emphasis} />;
+        return (
+          <AppMetricCard
+            key={`${safeTitle}-${index}`}
+            {...normalized}
+            title={safeTitle}
+            emphasis={normalized.emphasis ?? emphasis}
+          />
+        );
       })}
     </section>
   );
@@ -231,10 +314,14 @@ export function AppChartPanel({
     <AppSectionCard>
       <div className="mb-3 flex items-start justify-between gap-2">
         <div>
-          <h2 className="text-sm font-semibold text-[var(--text-primary)]">{title}</h2>
+          <h2 className="text-sm font-semibold text-[var(--text-primary)]">
+            {title}
+          </h2>
           <p className="text-xs text-[var(--text-muted)]">{description}</p>
         </div>
-        {typeof trendValue === "number" ? <AppTrendIndicator value={trendValue} /> : null}
+        {typeof trendValue === "number" ? (
+          <AppTrendIndicator value={trendValue} />
+        ) : null}
       </div>
       {children}
       {trendLabel || onCtaClick ? (
@@ -269,15 +356,36 @@ export function AppSectionBlock({
   compact?: boolean;
 }) {
   return (
-    <AppSectionCard className={cn(compact ? "min-h-0" : "min-h-[240px] lg:min-h-[280px]", className)}>
+    <AppSectionCard
+      className={cn(
+        compact ? "min-h-0" : "min-h-[240px] lg:min-h-[280px]",
+        className
+      )}
+    >
       <div className="mb-3 flex min-w-0 items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <h3 className="truncate text-sm font-semibold text-[var(--text-primary)]" title={title}>{title}</h3>
-          {subtitle ? <p className="line-clamp-2 text-xs text-[var(--text-muted)]">{subtitle}</p> : null}
+          <h3
+            className="truncate text-sm font-semibold text-[var(--text-primary)]"
+            title={title}
+          >
+            {title}
+          </h3>
+          {subtitle ? (
+            <p className="line-clamp-2 text-xs text-[var(--text-muted)]">
+              {subtitle}
+            </p>
+          ) : null}
         </div>
         {onCtaClick ? (
-          <Button size="sm" variant="ghost" onClick={onCtaClick} className="max-w-full shrink-0">
-            <span className="truncate">{ctaLabel ?? "Ver detalhes da operação"}</span>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={onCtaClick}
+            className="max-w-full shrink-0"
+          >
+            <span className="truncate">
+              {ctaLabel ?? "Ver detalhes da operação"}
+            </span>
           </Button>
         ) : null}
       </div>
@@ -287,7 +395,11 @@ export function AppSectionBlock({
 }
 
 export function AppDataTable({ children }: { children: ReactNode }) {
-  return <div className="overflow-x-auto rounded-xl border border-[var(--border-subtle)]">{children}</div>;
+  return (
+    <div className="overflow-x-auto rounded-xl border border-[var(--border-subtle)]">
+      {children}
+    </div>
+  );
 }
 
 export function AppListBlock({
@@ -298,7 +410,12 @@ export function AppListBlock({
   compact = false,
   showPlaceholders = true,
 }: {
-  items: Array<{ title: string; subtitle?: string; right?: ReactNode; action?: ReactNode }>;
+  items: Array<{
+    title: string;
+    subtitle?: string;
+    right?: ReactNode;
+    action?: ReactNode;
+  }>;
   className?: string;
   maxItems?: number;
   minItems?: number;
@@ -307,7 +424,8 @@ export function AppListBlock({
 }) {
   const normalizedItems = items.slice(0, maxItems).map((item, index) => ({
     ...item,
-    subtitle: item.subtitle ?? "Ação operacional disponível para execução imediata.",
+    subtitle:
+      item.subtitle ?? "Ação operacional disponível para execução imediata.",
     action: item.action ?? (
       <Button size="sm" variant="outline">
         Executar
@@ -319,7 +437,8 @@ export function AppListBlock({
     const idx = normalizedItems.length + 1;
     normalizedItems.push({
       title: `Ação complementar ${idx}`,
-      subtitle: "Preencha este espaço com uma ação direta do fluxo operacional.",
+      subtitle:
+        "Preencha este espaço com uma ação direta do fluxo operacional.",
       action: (
         <Button size="sm" variant="outline">
           Definir ação
@@ -330,7 +449,14 @@ export function AppListBlock({
   }
 
   return (
-    <div className={cn(compact ? "space-y-1.5 min-h-0" : "space-y-2 min-h-[240px] lg:min-h-[280px]", className)}>
+    <div
+      className={cn(
+        compact
+          ? "space-y-1.5 min-h-0"
+          : "space-y-2 min-h-[240px] lg:min-h-[280px]",
+        className
+      )}
+    >
       {normalizedItems.map(item => (
         <div
           key={item.__key}
@@ -341,8 +467,14 @@ export function AppListBlock({
         >
           <div className="flex items-center justify-between gap-2">
             <div className="flex-1 min-w-0">
-              <p className="truncate text-sm font-medium text-[var(--text-primary)]">{item.title}</p>
-              {item.subtitle ? <p className="truncate text-xs text-[var(--text-muted)]">{item.subtitle}</p> : null}
+              <p className="truncate text-sm font-medium text-[var(--text-primary)]">
+                {item.title}
+              </p>
+              {item.subtitle ? (
+                <p className="truncate text-xs text-[var(--text-muted)]">
+                  {item.subtitle}
+                </p>
+              ) : null}
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <div className="shrink-0">{item.action}</div>
@@ -355,12 +487,28 @@ export function AppListBlock({
   );
 }
 
-export function AppAlertList({ alerts }: { alerts: Array<{ text: string; tone?: "warning" | "danger" | "info" }> }) {
+export function AppAlertList({
+  alerts,
+}: {
+  alerts: Array<{ text: string; tone?: "warning" | "danger" | "info" }>;
+}) {
   return (
     <div className="space-y-2">
       {alerts.map(alert => (
-        <div key={alert.text} className="flex items-start gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/70 p-3">
-          <TriangleAlert className={cn("mt-0.5 h-4 w-4", alert.tone === "danger" ? "text-rose-500" : alert.tone === "warning" ? "text-amber-500" : "text-sky-500")} />
+        <div
+          key={alert.text}
+          className="flex items-start gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/70 p-3"
+        >
+          <TriangleAlert
+            className={cn(
+              "mt-0.5 h-4 w-4",
+              alert.tone === "danger"
+                ? "text-rose-500"
+                : alert.tone === "warning"
+                  ? "text-amber-500"
+                  : "text-sky-500"
+            )}
+          />
           <p className="text-sm text-[var(--text-primary)]">{alert.text}</p>
         </div>
       ))}
@@ -372,30 +520,50 @@ export function AppRecentActivity({ items }: { items: string[] }) {
   return (
     <ul className="space-y-2">
       {items.map(item => (
-        <li key={item} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/60 p-3 text-sm text-[var(--text-secondary)]">{item}</li>
+        <li
+          key={item}
+          className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/60 p-3 text-sm text-[var(--text-secondary)]"
+        >
+          {item}
+        </li>
       ))}
     </ul>
   );
 }
 
 const statusTone: Record<string, string> = {
-  saudável: "bg-emerald-500/15 text-emerald-500 border-emerald-500/30",
-  atenção: "bg-amber-500/15 text-amber-500 border-amber-500/30",
-  "em risco": "bg-rose-500/15 text-rose-500 border-rose-500/30",
-  bloqueado: "bg-rose-500/20 text-rose-500 border-rose-500/40",
-  concluído: "bg-emerald-500/15 text-emerald-500 border-emerald-500/30",
-  pendente: "bg-zinc-500/15 text-zinc-500 border-zinc-500/30",
-  urgente: "bg-rose-500/15 text-rose-600 border-rose-500/30",
-  alta: "bg-rose-500/15 text-rose-600 border-rose-500/30",
-  média: "bg-amber-500/15 text-amber-600 border-amber-500/30",
-  atrasado: "bg-orange-500/15 text-orange-500 border-orange-500/30",
-  baixa: "bg-zinc-500/15 text-zinc-500 border-zinc-500/30",
-  pago: "bg-emerald-500/15 text-emerald-500 border-emerald-500/30",
-  falhou: "bg-rose-500/15 text-rose-500 border-rose-500/30",
+  "prioridade alta":
+    "bg-[var(--dashboard-danger)]/16 text-[var(--dashboard-danger)] border-[var(--dashboard-danger)]/38",
+  "em risco":
+    "bg-[var(--dashboard-danger)]/14 text-[var(--dashboard-danger)] border-[var(--dashboard-danger)]/35",
+  bloqueado:
+    "bg-[var(--dashboard-danger)]/18 text-[var(--dashboard-danger)] border-[var(--dashboard-danger)]/44",
+  urgente:
+    "bg-[var(--dashboard-danger)]/16 text-[var(--dashboard-danger)] border-[var(--dashboard-danger)]/38",
+  atenção:
+    "bg-[var(--dashboard-warning)]/14 text-[var(--dashboard-warning)] border-[var(--dashboard-warning)]/34",
+  pendente:
+    "bg-[var(--dashboard-neutral)]/14 text-[var(--dashboard-neutral)] border-[var(--dashboard-neutral)]/34",
+  confirmado:
+    "bg-[var(--dashboard-info)]/16 text-[var(--dashboard-info)] border-[var(--dashboard-info)]/34",
+  ok: "bg-[var(--dashboard-success)]/16 text-[var(--dashboard-success)] border-[var(--dashboard-success)]/36",
+  saudável:
+    "bg-[var(--dashboard-success)]/16 text-[var(--dashboard-success)] border-[var(--dashboard-success)]/36",
+  concluído:
+    "bg-[var(--dashboard-success)]/16 text-[var(--dashboard-success)] border-[var(--dashboard-success)]/36",
+  pago: "bg-[var(--dashboard-success)]/16 text-[var(--dashboard-success)] border-[var(--dashboard-success)]/36",
+  médio:
+    "bg-[var(--dashboard-warning)]/14 text-[var(--dashboard-warning)] border-[var(--dashboard-warning)]/34",
+  alta: "bg-[var(--dashboard-danger)]/16 text-[var(--dashboard-danger)] border-[var(--dashboard-danger)]/38",
+  alto: "bg-[var(--dashboard-danger)]/16 text-[var(--dashboard-danger)] border-[var(--dashboard-danger)]/38",
+  falhou:
+    "bg-[var(--dashboard-danger)]/14 text-[var(--dashboard-danger)] border-[var(--dashboard-danger)]/35",
 };
 
 function normalizeStatusLabel(label: string) {
   const raw = label.trim().toLowerCase();
+  if (raw === "high priority" || raw === "prioridade alta")
+    return "Prioridade alta";
   if (raw === "critical" || raw === "crítico") return "Em risco";
   if (raw === "overdue" || raw === "atrasado") return "Atenção";
   if (raw === "healthy") return "Saudável";
@@ -403,20 +571,40 @@ function normalizeStatusLabel(label: string) {
   if (raw === "done" || raw === "paid") return "Concluído";
   if (raw === "pending") return "Pendente";
   if (raw === "blocked") return "Bloqueado";
+  if (raw === "confirmed") return "Confirmado";
+  if (raw === "medium") return "Médio";
+  if (raw === "high") return "Alto";
+  if (raw === "success") return "OK";
   return label;
 }
 
 export function AppStatusBadge({ label }: { label: string }) {
-  const normalized = typeof label === "string" && label.trim().length > 0 ? normalizeStatusLabel(label) : "Pendente";
+  const normalized =
+    typeof label === "string" && label.trim().length > 0
+      ? normalizeStatusLabel(label)
+      : "Pendente";
   const safeLabel = normalized.trim().length > 0 ? normalized : "Pendente";
-  return <Badge className={cn("border", statusTone[safeLabel.toLowerCase()] ?? "")}>{safeLabel}</Badge>;
+  return (
+    <Badge
+      className={cn(
+        "h-6 rounded-full px-2.5 py-0 text-[10px] font-semibold tracking-[0.08em] uppercase border",
+        statusTone[safeLabel.toLowerCase()] ??
+          "bg-[var(--dashboard-neutral)]/14 text-[var(--dashboard-neutral)] border-[var(--dashboard-neutral)]/34"
+      )}
+    >
+      {safeLabel}
+    </Badge>
+  );
 }
 
 export const AppPriorityBadge = AppStatusBadge;
 
 type AppNextActionSeverity = "low" | "medium" | "high" | "critical";
 
-const nextActionTone: Record<AppNextActionSeverity, { container: string; badge: string }> = {
+const nextActionTone: Record<
+  AppNextActionSeverity,
+  { container: string; badge: string }
+> = {
   low: {
     container: "border-emerald-500/30 bg-emerald-500/10",
     badge: "text-emerald-300",
@@ -454,17 +642,48 @@ export function AppNextActionCard({
 
   return (
     <div className={cn("min-w-0 rounded-lg border p-3", tone.container)}>
-      <p className={cn("text-xs font-semibold uppercase tracking-[0.12em]", tone.badge)}>{severity.toUpperCase()}</p>
-      <p className="mt-1 truncate text-sm font-semibold text-[var(--text-primary)]" title={title}>{title}</p>
+      <p
+        className={cn(
+          "text-xs font-semibold uppercase tracking-[0.12em]",
+          tone.badge
+        )}
+      >
+        {severity.toUpperCase()}
+      </p>
+      <p
+        className="mt-1 truncate text-sm font-semibold text-[var(--text-primary)]"
+        title={title}
+      >
+        {title}
+      </p>
       <p
         className="mt-1 text-xs leading-5 text-[var(--text-secondary)]"
-        style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}
+        style={{
+          display: "-webkit-box",
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: "vertical",
+          overflow: "hidden",
+        }}
       >
         {description}
       </p>
-      {metadata ? <p className="mt-1 truncate text-[11px] uppercase tracking-[0.08em] text-[var(--text-muted)]">Origem: {metadata}</p> : null}
-      {automationStatus ? <p className="mt-1 truncate text-[11px] uppercase tracking-[0.08em] text-[var(--text-muted)]">{automationStatus}</p> : null}
-      <Button className="mt-2 max-w-full" size="sm" type="button" variant="default" onClick={action.onClick}>
+      {metadata ? (
+        <p className="mt-1 truncate text-[11px] uppercase tracking-[0.08em] text-[var(--text-muted)]">
+          Origem: {metadata}
+        </p>
+      ) : null}
+      {automationStatus ? (
+        <p className="mt-1 truncate text-[11px] uppercase tracking-[0.08em] text-[var(--text-muted)]">
+          {automationStatus}
+        </p>
+      ) : null}
+      <Button
+        className="mt-2 max-w-full"
+        size="sm"
+        type="button"
+        variant="default"
+        onClick={action.onClick}
+      >
         <span className="truncate">{action.label}</span>
       </Button>
     </div>
@@ -472,10 +691,20 @@ export function AppNextActionCard({
 }
 
 export function AppInsightPanel({ children }: { children: ReactNode }) {
-  return <div className="rounded-lg border border-orange-500/25 bg-orange-500/8 p-3 text-sm text-[var(--text-primary)]">{children}</div>;
+  return (
+    <div className="rounded-lg border border-orange-500/25 bg-orange-500/8 p-3 text-sm text-[var(--text-primary)]">
+      {children}
+    </div>
+  );
 }
 
-export function AppEmptyState({ title, description }: { title: string; description: string }) {
+export function AppEmptyState({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
   return <AppBaseEmptyState title={title} description={description} />;
 }
 
@@ -488,7 +717,9 @@ export function AppPageLoadingState({
 }) {
   return (
     <AppSectionCard className="space-y-2">
-      <p className="text-sm font-semibold text-[var(--text-primary)]">{title}</p>
+      <p className="text-sm font-semibold text-[var(--text-primary)]">
+        {title}
+      </p>
       <p className="text-sm text-[var(--text-secondary)]">{description}</p>
       <BaseLoadingState rows={4} />
     </AppSectionCard>
@@ -508,19 +739,37 @@ export function AppPageErrorState({
 }) {
   return (
     <AppSectionCard className="space-y-3">
-      <p className="text-sm font-semibold text-[var(--text-primary)]">{title}</p>
+      <p className="text-sm font-semibold text-[var(--text-primary)]">
+        {title}
+      </p>
       <p className="text-sm text-[var(--text-secondary)]">{description}</p>
-      <Button variant="outline" onClick={onAction}>{actionLabel}</Button>
+      <Button variant="outline" onClick={onAction}>
+        {actionLabel}
+      </Button>
     </AppSectionCard>
   );
 }
 
-export function AppPageEmptyState({ title, description }: { title: string; description: string }) {
+export function AppPageEmptyState({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
   return <AppBaseEmptyState title={title} description={description} />;
 }
 
-export function AppSkeleton({ className, ...props }: ComponentProps<typeof BaseSkeleton>) {
-  return <BaseSkeleton className={cn("bg-[var(--surface-elevated)]/70", className)} {...props} />;
+export function AppSkeleton({
+  className,
+  ...props
+}: ComponentProps<typeof BaseSkeleton>) {
+  return (
+    <BaseSkeleton
+      className={cn("bg-[var(--surface-elevated)]/70", className)}
+      {...props}
+    />
+  );
 }
 
 export { AppPageShell, Input, AppRowActions };
