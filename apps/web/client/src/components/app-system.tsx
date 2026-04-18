@@ -157,7 +157,7 @@ export function AppRowActionsDropdown({
           type="button"
           variant="outline"
           size="icon"
-          className="h-8 w-8 border-[var(--border-subtle)] text-[var(--text-secondary)]"
+          className="h-8 w-8 border-[var(--border-subtle)] bg-[var(--surface-base)] text-[var(--text-secondary)] hover:bg-[var(--accent-soft)] hover:text-[var(--text-primary)]"
           aria-label={triggerLabel}
         >
           <MoreHorizontal className="h-4 w-4" />
@@ -166,13 +166,15 @@ export function AppRowActionsDropdown({
       <DropdownMenuContent
         align="end"
         sideOffset={8}
-        className={cn("min-w-[190px]", contentClassName)}
+        collisionPadding={12}
+        className={cn("min-w-[220px] p-2", contentClassName)}
       >
         {items.map(item => (
           <DropdownMenuItem
             key={item.label}
             disabled={item.disabled}
             onSelect={item.onSelect}
+            className="px-3 py-2.5"
           >
             {item.label}
           </DropdownMenuItem>

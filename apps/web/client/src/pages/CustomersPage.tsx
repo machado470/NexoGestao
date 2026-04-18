@@ -114,19 +114,6 @@ function getContactUrgencyTone(days: number, state: ContactState) {
   return "border-[var(--border-subtle)] text-[var(--text-secondary)]";
 }
 
-function getSecondaryAction(snapshot: CustomerOperationalSnapshot): {
-  label: string;
-  path: string;
-} {
-  if (snapshot.primaryActionLabel === "Cobrar agora")
-    return { label: "WhatsApp", path: "/whatsapp" };
-  if (snapshot.primaryActionLabel === "Criar agendamento")
-    return { label: "Abrir workspace", path: "/customers" };
-  if (snapshot.primaryActionLabel === "Enviar WhatsApp")
-    return { label: "Criar agendamento", path: "/appointments" };
-  return { label: "Criar O.S.", path: "/service-orders" };
-}
-
 export default function CustomersPage() {
   const [, navigate] = useLocation();
   const [createOpen, setCreateOpen] = useState(false);
@@ -620,11 +607,11 @@ export default function CustomersPage() {
                       aria-label="Selecionar todos"
                     />
                   </th>
-                  <th className="p-3">Cliente</th>
-                  <th className="p-3">Contato</th>
-                  <th className="p-3">Contexto</th>
-                  <th className="p-3">Status</th>
-                  <th className="p-3 text-right">Ações</th>
+                  <th className="w-[22%] p-3">Cliente</th>
+                  <th className="w-[20%] p-3">Contato</th>
+                  <th className="w-[31%] p-3">Contexto</th>
+                  <th className="w-[21%] p-3">Status</th>
+                  <th className="w-[74px] p-3 text-right">Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -633,28 +620,47 @@ export default function CustomersPage() {
                   const snapshot = snapshotByCustomerId.get(customerId);
                   if (!snapshot) return null;
 
-                  const secondaryAction = getSecondaryAction(snapshot);
                   const primaryAction = (() => {
                     if (snapshot.primaryActionLabel === "Cobrar agora") {
-                      return () =>
-                        navigate(
-                          `/finances?customerId=${customerId}&filter=overdue`
-                        );
+                      return {
+                        label: "Cobrar agora · prioritário",
+                        onSelect: () =>
+                          navigate(
+                            `/finances?customerId=${customerId}&filter=overdue`
+                          ),
+                      };
                     }
                     if (snapshot.primaryActionLabel === "Criar agendamento") {
-                      return () =>
-                        navigate(`/appointments?customerId=${customerId}`);
+                      return {
+                        label: "Criar agendamento · prioritário",
+                        onSelect: () =>
+                          navigate(`/appointments?customerId=${customerId}`),
+                      };
                     }
                     if (snapshot.primaryActionLabel === "Enviar WhatsApp") {
-                      return () =>
-                        navigate(`/whatsapp?customerId=${customerId}`);
+                      return {
+                        label: "Enviar WhatsApp · prioritário",
+                        onSelect: () =>
+                          navigate(`/whatsapp?customerId=${customerId}`),
+                      };
                     }
-                    return () =>
-                      setSelectedCustomer({
-                        id: customerId,
-                        name: String(customer?.name ?? "Cliente"),
-                      });
+                    return {
+                      label: "Abrir workspace · prioritário",
+                      onSelect: () => {
+                        setTimelineExpanded(false);
+                        setSelectedCustomer({
+                          id: customerId,
+                          name: String(customer?.name ?? "Cliente"),
+                        });
+                      },
+                    };
                   })();
+                  const billingActionLabel =
+                    snapshot.overdueCharges > 0
+                      ? "Cobrar agora"
+                      : snapshot.pendingCharges > 0
+                        ? "Ver cobrança pendente"
+                        : "Ver cobranças";
 
                   return (
                     <tr
@@ -712,10 +718,10 @@ export default function CustomersPage() {
                         </div>
                       </td>
                       <td className="p-3 align-top">
-                        <p className="line-clamp-1 font-medium text-[var(--text-primary)]">
+                        <p className="font-medium text-[var(--text-primary)]">
                           {snapshot.contextLabel}
                         </p>
-                        <p className="mt-0.5 line-clamp-1 text-xs text-[var(--text-secondary)]">
+                        <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
                           Próxima: {snapshot.primaryActionLabel}
                         </p>
                         {snapshot.financialPendingCents > 0 ? (
@@ -740,37 +746,15 @@ export default function CustomersPage() {
                         </div>
                       </td>
                       <td className="p-3 align-top">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <Button
-                            type="button"
-                            size="sm"
-                            className="h-8 px-3 text-xs"
-                            onClick={primaryAction}
-                          >
-                            {snapshot.primaryActionLabel}
-                          </Button>
-                          <SecondaryButton
-                            type="button"
-                            className="h-8 px-2.5 text-xs"
-                            onClick={() => {
-                              if (secondaryAction.path === "/customers") {
-                                setTimelineExpanded(false);
-                                setSelectedCustomer({
-                                  id: customerId,
-                                  name: String(customer?.name ?? "Cliente"),
-                                });
-                                return;
-                              }
-                              navigate(
-                                `${secondaryAction.path}?customerId=${customerId}`
-                              );
-                            }}
-                          >
-                            {secondaryAction.label}
-                          </SecondaryButton>
+                        <div className="flex items-center justify-end">
                           <AppRowActionsDropdown
                             triggerLabel="Mais ações"
+                            contentClassName="min-w-[248px]"
                             items={[
+                              {
+                                label: primaryAction.label,
+                                onSelect: primaryAction.onSelect,
+                              },
                               {
                                 label: "Abrir workspace",
                                 onSelect: () => {
@@ -782,7 +766,7 @@ export default function CustomersPage() {
                                 },
                               },
                               {
-                                label: "Ver cobranças",
+                                label: billingActionLabel,
                                 onSelect: () =>
                                   navigate(
                                     `/finances?customerId=${customerId}`
@@ -807,6 +791,13 @@ export default function CustomersPage() {
                                 onSelect: () =>
                                   navigate(
                                     `/whatsapp?customerId=${customerId}`
+                                  ),
+                              },
+                              {
+                                label: "Criar agendamento",
+                                onSelect: () =>
+                                  navigate(
+                                    `/appointments?customerId=${customerId}`
                                   ),
                               },
                             ]}
