@@ -12,6 +12,7 @@ import {
 } from "@/components/internal-page-system";
 import { KpiErrorBoundary } from "@/components/KpiErrorBoundary";
 import { OperationalRadialMetric } from "@/components/dashboard/OperationalRadialMetric";
+import { ExecutiveTrendChart } from "@/components/dashboard/ExecutiveTrendChart";
 
 export default function ExecutiveDashboard() {
   useRenderWatchdog("ExecutiveDashboard");
@@ -124,6 +125,8 @@ export default function ExecutiveDashboard() {
         />
       </KpiErrorBoundary>
 
+      <ExecutiveTrendChart />
+
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         <AppSectionBlock
           title="Central de Alertas"
@@ -183,7 +186,10 @@ export default function ExecutiveDashboard() {
           <div className="flex h-full flex-col justify-between">
             <div className="flex flex-wrap items-center justify-between gap-6">
               {teamPerformance.map(team => (
-                <div key={team.name} className="flex flex-col items-center gap-2">
+                <div
+                  key={team.name}
+                  className="flex flex-col items-center gap-2"
+                >
                   <OperationalRadialMetric
                     value={team.value}
                     label={team.name}
@@ -237,7 +243,10 @@ export default function ExecutiveDashboard() {
                 status: "Pendente",
               },
             ].map(item => (
-              <li key={item.time} className="flex items-center justify-between gap-3">
+              <li
+                key={item.time}
+                className="flex items-center justify-between gap-3"
+              >
                 <div className="flex min-w-0 items-center gap-3">
                   <span className="text-sm font-semibold tabular-nums text-[var(--text-primary)]">
                     {item.time}
