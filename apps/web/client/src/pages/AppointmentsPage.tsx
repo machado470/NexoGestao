@@ -4,6 +4,7 @@ import { trpc } from "@/lib/trpc";
 import { normalizeArrayPayload } from "@/lib/query-helpers";
 import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
 import { CreateAppointmentModal } from "@/components/CreateAppointmentModal";
+import { AppRowActionsDropdown } from "@/components/app-system";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedbackButton";
@@ -15,7 +16,6 @@ import {
   AppPageEmptyState,
   AppPageErrorState,
   AppPageLoadingState,
-  AppRowActions,
   AppSectionBlock,
   AppStatusBadge,
 } from "@/components/internal-page-system";
@@ -178,9 +178,22 @@ export default function AppointmentsPage() {
                     ? "Confirmar"
                     : status === "CONFIRMED"
                       ? "Criar O.S."
-                      : hasConflict
-                        ? "Reagendar"
-                        : "Enviar WhatsApp";
+                      : "Enviar WhatsApp";
+                  const priorityLabel = hasConflict || status === "SCHEDULED" ? "HIGH" : "MEDIUM";
+                  const priorityTone = hasConflict || status === "SCHEDULED"
+                    ? "border-rose-500/35 bg-rose-500/10 text-rose-300"
+                    : "border-amber-500/35 bg-amber-500/10 text-amber-300";
+                  const handlePrimaryAction = () => {
+                    if (nextAction === "Criar O.S.") {
+                      navigate(`/service-orders?customerId=${appointment.customerId}&appointmentId=${appointment.id}`);
+                      return;
+                    }
+                    if (nextAction === "Confirmar") {
+                      navigate(`/whatsapp?customerId=${appointment.customerId}`);
+                      return;
+                    }
+                    navigate(`/whatsapp?customerId=${appointment.customerId}`);
+                  };
                   return (
                   <tr key={String(appointment?.id)} className="border-t border-[var(--border-subtle)]">
                     <td className="p-3">
@@ -193,42 +206,23 @@ export default function AppointmentsPage() {
                     </td>
                     <td><AppStatusBadge label={operationalState || getOperationalSeverityLabel(severity)} /></td>
                     <td>{appointment?.endsAt ? new Date(String(appointment.endsAt)).toLocaleString("pt-BR") : "—"}</td>
-                    <td className="p-3">
-                      <div className="space-y-1.5">
-                        <div className={`rounded-lg border px-2.5 py-2 ${
-                          hasConflict
-                            ? "border-rose-500/40 bg-rose-500/12"
-                            : status === "CONFIRMED"
-                              ? "border-amber-500/35 bg-amber-500/10"
-                              : "border-orange-500/35 bg-orange-500/10"
-                        }`}>
-                          <p className={`text-[11px] font-semibold uppercase tracking-[0.12em] ${
-                            hasConflict
-                              ? "text-rose-300"
-                              : status === "CONFIRMED"
-                                ? "text-amber-300"
-                                : "text-orange-300"
-                          }`}>
-                            {hasConflict ? "HIGH" : status === "CONFIRMED" ? "MEDIUM" : "HIGH"}
-                          </p>
-                          <div className="mt-1 flex items-center justify-between gap-2">
-                            <p className="truncate text-xs font-semibold text-[var(--text-primary)]">Próxima ação</p>
-                            <button
-                              className="nexo-cta-primary h-7 px-2.5 text-xs"
-                              onClick={() => navigate(nextAction === "Criar O.S." ? `/service-orders?customerId=${appointment.customerId}&appointmentId=${appointment.id}` : `/whatsapp?customerId=${appointment.customerId}`)}
-                            >
-                              {nextAction}
-                            </button>
-                          </div>
-                          <p className="mt-1 truncate text-[11px] text-[var(--text-muted)]">
-                            {hasConflict ? "Resolver conflito antes da execução." : "Mantenha o fluxo de execução ativo."}
-                          </p>
-                        </div>
-                        <AppRowActions
-                          actions={[
-                            { label: "Criar O.S.", onClick: () => navigate(`/service-orders?customerId=${appointment.customerId}&appointmentId=${appointment.id}`) },
-                            { label: "Enviar WhatsApp", onClick: () => navigate(`/whatsapp?customerId=${appointment.customerId}`) },
-                            { label: "Reagendar", onClick: () => setOpenCreate(true) },
+                    <td className="p-3 align-middle">
+                      <div className="flex items-center justify-end gap-2">
+                        <span className={`inline-flex h-6 items-center rounded-full border px-2.5 text-[10px] font-semibold tracking-[0.08em] ${priorityTone}`}>
+                          {priorityLabel}
+                        </span>
+                        <button
+                          className="nexo-cta-primary h-8 px-3 text-xs"
+                          onClick={handlePrimaryAction}
+                        >
+                          {nextAction}
+                        </button>
+                        <AppRowActionsDropdown
+                          triggerLabel="Mais ações"
+                          items={[
+                            { label: "Criar O.S.", onSelect: () => navigate(`/service-orders?customerId=${appointment.customerId}&appointmentId=${appointment.id}`) },
+                            { label: "Enviar WhatsApp", onSelect: () => navigate(`/whatsapp?customerId=${appointment.customerId}`) },
+                            { label: "Reagendar", onSelect: () => setOpenCreate(true) },
                           ]}
                         />
                       </div>
