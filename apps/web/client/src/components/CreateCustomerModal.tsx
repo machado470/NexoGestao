@@ -34,6 +34,7 @@ export default function CreateCustomerModal({
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [notes, setNotes] = useState("");
+  const [nextStep, setNextStep] = useState<"schedule" | "message" | "billing" | "only_register">("schedule");
   const [createdCustomer, setCreatedCustomer] = useState<{
     id: string;
     name: string;
@@ -57,6 +58,7 @@ export default function CreateCustomerModal({
     setPhone("");
     setEmail("");
     setNotes("");
+    setNextStep("schedule");
   };
 
   const hasDraft =
@@ -140,8 +142,18 @@ export default function CreateCustomerModal({
 
       toast.success(`Cliente criado: ${createdName}`, {
         action: {
-          label: "Ver cliente",
+          label:
+            nextStep === "schedule"
+              ? "Criar agendamento"
+              : nextStep === "message"
+                ? "Enviar mensagem"
+                : nextStep === "billing"
+                  ? "Criar cobrança"
+                  : "Ver cliente",
           onClick: async () => {
+            if (nextStep === "schedule") return navigate(`/appointments?customerId=${createdId}&source=customer_created`);
+            if (nextStep === "message") return navigate(`/whatsapp?customerId=${createdId}&source=customer_created`);
+            if (nextStep === "billing") return navigate(`/finances?customerId=${createdId}&source=customer_created`);
             await onCreated?.({ id: createdId, name: createdName });
             close();
           },
@@ -149,10 +161,26 @@ export default function CreateCustomerModal({
       });
       notify.successPersistent(
         "Cliente criado e sincronizado",
-        "Próximo passo recomendado: abrir o workspace do cliente e criar a primeira O.S.",
+        nextStep === "schedule"
+          ? "Próximo passo escolhido: criar agendamento para manter continuidade."
+          : nextStep === "message"
+            ? "Próximo passo escolhido: iniciar contato contextual por WhatsApp."
+            : nextStep === "billing"
+              ? "Próximo passo escolhido: criar cobrança para ativar o fluxo financeiro."
+              : "Cadastro concluído. Abra o workspace para seguir com operação.",
         {
-          label: "Criar O.S.",
+          label:
+            nextStep === "schedule"
+              ? "Abrir agenda"
+              : nextStep === "message"
+                ? "Abrir WhatsApp"
+                : nextStep === "billing"
+                  ? "Abrir financeiro"
+                  : "Criar O.S.",
           onClick: () => {
+            if (nextStep === "schedule") return navigate(`/appointments?customerId=${createdId}`);
+            if (nextStep === "message") return navigate(`/whatsapp?customerId=${createdId}`);
+            if (nextStep === "billing") return navigate(`/finances?customerId=${createdId}`);
             navigate(`/service-orders?customerId=${createdId}`);
           },
         }
@@ -162,7 +190,7 @@ export default function CreateCustomerModal({
       track("create_customer", {
         screen: "customers",
         customerId: createdId,
-        nextStep: "create_service_order",
+        nextStep,
       });
       setCreatedCustomer({ id: createdId, name: createdName });
       reset();
@@ -265,7 +293,7 @@ export default function CreateCustomerModal({
                   Salvando...
                 </span>
               ) : (
-                "Criar"
+                "Criar cliente e continuar"
               )}
             </Button>
           </>
@@ -311,6 +339,11 @@ export default function CreateCustomerModal({
               <p className="text-xs text-[var(--text-muted)]">
                 Pode mandar com +55 ou só números. O backend normaliza.
               </p>
+              {phone.trim().length >= 10 ? (
+                <p className="text-xs text-[var(--accent-primary)]">
+                  Número válido para iniciar fluxo de WhatsApp após o cadastro.
+                </p>
+              ) : null}
             </div>
 
             <div className="space-y-2">
@@ -333,6 +366,57 @@ export default function CreateCustomerModal({
                 placeholder="Informações úteis sobre o cliente"
                 rows={4}
               />
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-[var(--text-primary)]">Próximo passo</p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {[
+                  {
+                    id: "schedule" as const,
+                    label: "Criar agendamento",
+                    hint: "Mantém a continuidade da operação na agenda.",
+                  },
+                  {
+                    id: "message" as const,
+                    label: "Enviar mensagem inicial",
+                    hint: "Inicia contato contextual no WhatsApp.",
+                  },
+                  {
+                    id: "billing" as const,
+                    label: "Criar cobrança",
+                    hint: "Ativa camada financeira do fluxo.",
+                  },
+                  {
+                    id: "only_register" as const,
+                    label: "Apenas cadastrar",
+                    hint: "Finaliza cadastro sem próxima ação automática.",
+                  },
+                ].map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => setNextStep(option.id)}
+                    className={`rounded-lg border p-3 text-left transition-colors ${
+                      nextStep === option.id
+                        ? "border-[var(--accent-primary)] bg-[var(--accent-soft)]/55"
+                        : "border-[var(--border-subtle)] hover:border-[var(--accent-primary)]/35"
+                    }`}
+                  >
+                    <p className="text-sm font-medium text-[var(--text-primary)]">{option.label}</p>
+                    <p className="mt-1 text-xs text-[var(--text-secondary)]">{option.hint}</p>
+                  </button>
+                ))}
+              </div>
+              {nextStep === "schedule" ? (
+                <p className="text-xs text-[var(--text-muted)]">Após criar, vamos preparar o fluxo para abrir agenda.</p>
+              ) : null}
+              {nextStep === "message" ? (
+                <p className="text-xs text-[var(--text-muted)]">Após criar, o contato pode seguir direto para o WhatsApp contextual.</p>
+              ) : null}
+              {nextStep === "billing" ? (
+                <p className="text-xs text-[var(--text-muted)]">Após criar, já será possível iniciar a cobrança deste cliente.</p>
+              ) : null}
             </div>
           </>
         ) : null}
