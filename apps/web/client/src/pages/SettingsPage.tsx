@@ -1,12 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { normalizeArrayPayload, normalizeObjectPayload } from "@/lib/query-helpers";
-import { AppFiltersBar, AppKpiRow, AppNextActionCard, AppPageLoadingState, AppSectionBlock, AppStatusBadge, Input } from "@/components/internal-page-system";
+import {
+  AppFiltersBar,
+  AppKpiRow,
+  AppListBlock,
+  AppPageLoadingState,
+  AppSectionBlock,
+  AppStatusBadge,
+  Input,
+} from "@/components/internal-page-system";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
 
 export default function SettingsPage() {
   const utils = trpc.useUtils();
@@ -37,61 +45,69 @@ export default function SettingsPage() {
 
   if (settingsQuery.isLoading) {
     return (
-      <PageWrapper title="Configurações" subtitle="Administração da organização, usuários, integrações e preferências.">
-        <AppSectionBlock title="Carregando" subtitle="Sincronizando organização.">
+      <PageWrapper title="Configurações" subtitle="Administração da organização.">
+        <AppSectionBlock title="Carregando" subtitle="Sincronizando organização" compact>
           <AppPageLoadingState description="Carregando configurações..." />
         </AppSectionBlock>
       </PageWrapper>
     );
   }
 
+  const integrationsReady = [readiness?.stripe?.configured, readiness?.twilio?.configured].filter(Boolean).length;
+
   return (
-    <PageWrapper title="Configurações" subtitle="Administração da organização, usuários, integrações e preferências.">
+    <PageWrapper title="Configurações" subtitle="Central administrativa previsível e escaneável.">
       <OperationalTopCard
         contextLabel="Direção administrativa"
-        title="Parâmetros organizacionais"
-        description="Padronize timezone, estado da organização e integrações em uma única superfície."
+        title="Parâmetros da organização"
+        description="Gerencie nome, timezone, membros e integrações no padrão oficial do app."
+        chips={
+          <>
+            <AppStatusBadge label={`${members.length} membros`} />
+            <AppStatusBadge label={`${integrationsReady}/2 integrações prontas`} />
+          </>
+        }
         primaryAction={(
           <Button isLoading={updateMutation.isPending} onClick={() => updateMutation.mutate({ organizationName, timezone })}>
             Salvar alterações
           </Button>
         )}
       />
+
       <AppKpiRow
         items={[
-          { title: "Organização", value: String(organizationName || "Não definida"), hint: "identidade da operação" },
-          { title: "Membros", value: String(members.length), hint: "time com acesso ativo" },
-          {
-            title: "Integrações prontas",
-            value: `${[readiness?.stripe?.configured, readiness?.twilio?.configured].filter(Boolean).length}/2`,
-            hint: "Stripe e WhatsApp/Twilio",
-          },
-          { title: "Timezone", value: String(timezone), hint: "fuso usado em agenda e cobranças" },
+          { title: "Organização", value: String(organizationName || "Não definida"), hint: "identidade operacional" },
+          { title: "Membros", value: String(members.length), hint: "acesso ativo" },
+          { title: "Integrações", value: `${integrationsReady}/2`, hint: "Stripe + WhatsApp/Twilio" },
+          { title: "Timezone", value: String(timezone), hint: "agenda e cobrança" },
         ]}
       />
 
-      <AppSectionBlock title="Resumo administrativo" subtitle="Pendências e próximos passos sem linguagem técnica">
-        <div className="grid gap-2 md:grid-cols-3">
-          <div className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Cobrança automática: <strong>{readiness?.stripe?.configured ? "ativa" : "pendente"}</strong></div>
-          <div className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Canal WhatsApp: <strong>{readiness?.twilio?.configured ? "ativo" : "pendente"}</strong></div>
-          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm">Próxima ação: <strong>{readiness?.stripe?.configured && readiness?.twilio?.configured ? "revisar usuários e permissões" : "concluir integrações pendentes"}</strong></div>
-        </div>
-      </AppSectionBlock>
-
-      <AppSectionBlock title="Próxima ação administrativa" subtitle="Evite gargalo operacional por configuração incompleta">
-        <AppNextActionCard
-          title={readiness?.stripe?.configured ? "Revisar equipe e permissões" : "Concluir integração de cobrança"}
-          description={readiness?.stripe?.configured ? "Com Stripe ativo, foque em membros, papéis e notificações." : "Sem Stripe configurado, o upgrade automático fica indisponível no billing."}
-          severity={readiness?.stripe?.configured ? "medium" : "high"}
-          metadata="configurações"
-          action={{
-            label: readiness?.stripe?.configured ? "Revisar membros" : "Ver integrações",
-            onClick: () => window.scrollTo({ top: 820, behavior: "smooth" }),
-          }}
+      <AppSectionBlock title="Resumo operacional" subtitle="Saúde de configuração sem ruído" compact>
+        <AppListBlock
+          compact
+          minItems={3}
+          items={[
+            {
+              title: "Cobrança automática",
+              subtitle: readiness?.stripe?.configured ? "Stripe configurado." : "Stripe pendente.",
+              right: <AppStatusBadge label={readiness?.stripe?.configured ? "Concluído" : "Pendente"} />,
+            },
+            {
+              title: "Canal WhatsApp",
+              subtitle: readiness?.twilio?.configured ? "Twilio configurado." : "Twilio pendente.",
+              right: <AppStatusBadge label={readiness?.twilio?.configured ? "Concluído" : "Pendente"} />,
+            },
+            {
+              title: "Próxima ação",
+              subtitle: integrationsReady === 2 ? "Revisar usuários e permissões." : "Concluir integrações pendentes.",
+              action: <Button size="sm" variant="outline">Executar</Button>,
+            },
+          ]}
         />
       </AppSectionBlock>
 
-      <AppSectionBlock title="Administração do sistema" subtitle="Estrutura em seções claras">
+      <AppSectionBlock title="Seções administrativas" subtitle="Configurações agrupadas por contexto">
         <Tabs defaultValue="organizacao">
           <TabsList>
             <TabsTrigger value="organizacao">Organização</TabsTrigger>
@@ -111,25 +127,34 @@ export default function SettingsPage() {
                 Reverter
               </Button>
             </AppFiltersBar>
-            <p className="text-sm text-[var(--text-secondary)]">Estado atual: <AppStatusBadge label="Concluído" /></p>
           </TabsContent>
 
-          <TabsContent value="usuarios" className="pt-3 text-sm text-[var(--text-secondary)]">
-            <div className="space-y-2">
-              <p>Total de membros: {members.length}</p>
-              <p>Convites e papéis seguem o controle de autenticação da organização.</p>
-            </div>
+          <TabsContent value="usuarios" className="pt-3">
+            <AppListBlock
+              compact
+              items={members.slice(0, 6).map((member: any, index) => ({
+                title: String(member?.name ?? member?.email ?? `Membro ${index + 1}`),
+                subtitle: String(member?.role ?? "Sem papel definido"),
+                right: <AppStatusBadge label={member?.active === false ? "Inativo" : "Ativo"} />,
+                action: <Button size="sm" variant="outline">Gerenciar</Button>,
+              }))}
+            />
           </TabsContent>
 
-          <TabsContent value="integracoes" className="pt-3 text-sm text-[var(--text-secondary)]">
-            <div className="space-y-2">
-              <p>Stripe: <AppStatusBadge label={readiness?.stripe?.configured ? "Concluído" : "Pendente"} /></p>
-              <p>WhatsApp/Twilio: <AppStatusBadge label={readiness?.twilio?.configured ? "Concluído" : "Pendente"} /></p>
-            </div>
+          <TabsContent value="integracoes" className="pt-3">
+            <AppListBlock
+              compact
+              items={[
+                { title: "Stripe", subtitle: "Cobrança e assinatura", right: <AppStatusBadge label={readiness?.stripe?.configured ? "Concluído" : "Pendente"} />, action: <Button size="sm" variant="outline">Abrir</Button> },
+                { title: "WhatsApp/Twilio", subtitle: "Comunicação com clientes", right: <AppStatusBadge label={readiness?.twilio?.configured ? "Concluído" : "Pendente"} />, action: <Button size="sm" variant="outline">Abrir</Button> },
+              ]}
+            />
           </TabsContent>
 
-          <TabsContent value="notificacoes" className="pt-3 text-sm text-[var(--text-secondary)]">
-            Alertas de risco, atraso e cobrança seguem a política definida em Governança.
+          <TabsContent value="notificacoes" className="pt-3">
+            <p className="text-sm text-[var(--text-secondary)]">
+              Alertas de risco, atraso e cobrança seguem a política definida em Governança.
+            </p>
           </TabsContent>
         </Tabs>
       </AppSectionBlock>

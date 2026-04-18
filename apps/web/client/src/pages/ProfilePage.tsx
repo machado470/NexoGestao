@@ -1,19 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { normalizeObjectPayload } from "@/lib/query-helpers";
+import { PageWrapper } from "@/components/operating-system/Wrappers";
+import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import {
-  AppFiltersBar,
   AppKpiRow,
-  AppNextActionCard,
-  AppPageHeader,
+  AppListBlock,
   AppPageLoadingState,
-  AppPageShell,
-  AppRecentActivity,
   AppSectionBlock,
+  AppStatusBadge,
   Input,
 } from "@/components/internal-page-system";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
 
 export default function ProfilePage() {
   const utils = trpc.useUtils();
@@ -38,76 +37,95 @@ export default function ProfilePage() {
 
   if (meQuery.isLoading || settingsQuery.isLoading) {
     return (
-      <AppPageShell>
-        <AppPageHeader title="Perfil" description="Dados pessoais, segurança e preferências individuais." />
-        <AppSectionBlock title="Carregando" subtitle="Buscando dados de perfil.">
-          <AppPageLoadingState description="Sincronizando dados do usuário..." />
+      <PageWrapper title="Perfil" subtitle="Dados pessoais e segurança da conta.">
+        <AppSectionBlock title="Carregando" subtitle="Sincronizando perfil" compact>
+          <AppPageLoadingState description="Buscando dados do usuário..." />
         </AppSectionBlock>
-      </AppPageShell>
+      </PageWrapper>
     );
   }
 
   return (
-    <AppPageShell>
-      <AppPageHeader title="Perfil" description="Sua identidade no sistema, segurança de acesso e ajustes pessoais." />
-      <AppKpiRow
-        items={[
-          { title: "Perfil", value: String(me.name ?? me.fullName ?? "Usuário"), hint: "identidade da sessão atual" },
-          { title: "E-mail", value: String(me.emailVerifiedAt ? "Verificado" : "Pendente"), hint: "segurança de acesso" },
-          { title: "Função", value: String(me.role ?? "Usuário"), hint: "permissão operacional" },
-          { title: "Timezone", value: String(timezone || "America/Sao_Paulo"), hint: "preferência aplicada no produto" },
-        ]}
-      />
-      <div className="grid gap-3 xl:grid-cols-2">
-        <AppSectionBlock title="Dados pessoais" subtitle="Identidade da sessão autenticada">
-          <AppFiltersBar>
-            <Input value={String(me.name ?? me.fullName ?? "")} readOnly className="max-w-sm" />
-            <Input value={String(me.email ?? "")} readOnly className="max-w-sm" />
-            <Input value={String(me.role ?? "USER")} readOnly className="max-w-xs" />
-          </AppFiltersBar>
-        </AppSectionBlock>
-        <AppSectionBlock title="Segurança" subtitle="Estado atual de proteção da conta">
-          <AppFiltersBar>
-            <Input value={String(me.emailVerifiedAt ? "E-mail verificado" : "E-mail pendente")} readOnly className="max-w-sm" />
-            <Input value={String(me.lastLoginAt ? new Date(String(me.lastLoginAt)).toLocaleString("pt-BR") : "Sem registro")} readOnly className="max-w-sm" />
-            <Button variant="outline" disabled>
-              Alteração de senha em liberação
-            </Button>
-          </AppFiltersBar>
-        </AppSectionBlock>
-      </div>
-
-      <div className="grid gap-3 xl:grid-cols-3">
-        <AppNextActionCard
-          title="Próxima ação recomendada"
-          description={me.emailVerifiedAt ? "Revise preferências para manter alertas e horários corretos." : "Valide seu e-mail para reduzir risco de perda de acesso."}
-          severity={me.emailVerifiedAt ? "low" : "high"}
-          metadata="perfil"
-          action={{
-            label: me.emailVerifiedAt ? "Revisar preferências" : "Validar conta",
-            onClick: () => window.scrollTo({ top: 720, behavior: "smooth" }),
-          }}
-        />
-        <AppSectionBlock title="Preferências" subtitle="Ajustes pessoais sincronizados com organização" className="xl:col-span-2">
-        <AppFiltersBar>
-          <Input placeholder="Ex.: America/Sao_Paulo" className="max-w-sm" value={timezone} onChange={(event) => setTimezone(event.target.value)} />
+    <PageWrapper title="Perfil" subtitle="Conta pessoal no sistema com leitura clara e confiável.">
+      <OperationalTopCard
+        contextLabel="Conta pessoal"
+        title={String(me.name ?? me.fullName ?? "Usuário")}
+        description="Identidade, segurança e preferências individuais em uma única superfície."
+        chips={
+          <>
+            <AppStatusBadge label={me.emailVerifiedAt ? "E-mail verificado" : "E-mail pendente"} />
+            <AppStatusBadge label={String(me.role ?? "Usuário")} />
+          </>
+        }
+        primaryAction={
           <Button
             onClick={() => updateSettings.mutate({ timezone })}
-            isLoading={updateSettings.isPending}
+            disabled={updateSettings.isPending}
           >
-            Salvar alterações do perfil
+            {updateSettings.isPending ? "Salvando..." : "Salvar preferências"}
           </Button>
-        </AppFiltersBar>
+        }
+      />
+
+      <AppKpiRow
+        items={[
+          { title: "Nome", value: String(me.name ?? me.fullName ?? "Usuário"), hint: "identidade da sessão" },
+          { title: "E-mail", value: String(me.email ?? "—"), hint: "conta principal" },
+          { title: "Função", value: String(me.role ?? "Usuário"), hint: "nível de acesso" },
+          { title: "Timezone", value: timezone, hint: "preferência de horário" },
+        ]}
+      />
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <AppSectionBlock title="Dados do usuário" subtitle="Informações básicas da conta" compact>
+          <div className="grid gap-3 md:grid-cols-2">
+            <Input value={String(me.name ?? me.fullName ?? "")} readOnly />
+            <Input value={String(me.email ?? "")} readOnly />
+            <Input value={String(me.role ?? "USER")} readOnly />
+            <Input
+              placeholder="Ex.: America/Sao_Paulo"
+              value={timezone}
+              onChange={(event) => setTimezone(event.target.value)}
+            />
+          </div>
+        </AppSectionBlock>
+
+        <AppSectionBlock title="Segurança e acesso" subtitle="Estado atual da conta" compact>
+          <AppListBlock
+            compact
+            minItems={3}
+            items={[
+              {
+                title: me.emailVerifiedAt ? "E-mail validado" : "Validação pendente",
+                subtitle: me.emailVerifiedAt ? "Conta apta para recuperação segura." : "Valide o e-mail para reduzir risco de acesso.",
+                right: <AppStatusBadge label={me.emailVerifiedAt ? "Concluído" : "Pendente"} />,
+                action: <Button variant="outline" size="sm" disabled>Validar</Button>,
+              },
+              {
+                title: "Senha",
+                subtitle: "Fluxo de alteração disponível na política de segurança.",
+                action: <Button variant="outline" size="sm" disabled>Alterar senha</Button>,
+              },
+              {
+                title: "Último login",
+                subtitle: me.lastLoginAt ? new Date(String(me.lastLoginAt)).toLocaleString("pt-BR") : "Sem registro",
+                action: <Button variant="outline" size="sm" disabled>Ver sessões</Button>,
+              },
+            ]}
+          />
         </AppSectionBlock>
       </div>
 
-      <AppSectionBlock title="Atividade e contexto" subtitle="Histórico recente do usuário">
-        <AppRecentActivity items={[
-          me.lastLoginAt ? `Último login em ${new Date(String(me.lastLoginAt)).toLocaleString("pt-BR")}` : "Sem registro recente de login",
-          me.emailVerifiedAt ? "E-mail validado com sucesso" : "Validação de e-mail pendente",
-          settings.timezone ? `Timezone atual: ${String(settings.timezone)}` : "Timezone padrão da organização",
-        ]} />
+      <AppSectionBlock title="Atividade recente" subtitle="Contexto da conta no sistema" compact>
+        <AppListBlock
+          compact
+          items={[
+            { title: "Acesso", subtitle: me.lastLoginAt ? `Último login em ${new Date(String(me.lastLoginAt)).toLocaleString("pt-BR")}` : "Sem registro recente" },
+            { title: "Segurança", subtitle: me.emailVerifiedAt ? "E-mail verificado com sucesso" : "Validação de e-mail pendente" },
+            { title: "Preferência", subtitle: `Timezone atual: ${String(settings.timezone ?? timezone)}` },
+          ]}
+        />
       </AppSectionBlock>
-    </AppPageShell>
+    </PageWrapper>
   );
 }

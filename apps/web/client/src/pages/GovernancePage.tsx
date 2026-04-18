@@ -13,6 +13,7 @@ import {
   AppPageEmptyState,
   AppPageErrorState,
   AppPageLoadingState,
+  AppPriorityBadge,
   AppSectionBlock,
   AppStatusBadge,
 } from "@/components/internal-page-system";
@@ -126,6 +127,21 @@ export default function GovernancePage() {
         ]}
       />
       </KpiErrorBoundary>
+
+
+      <AppSectionBlock title="Estado operacional atual" subtitle="Por que a governança está neste estado e o que fazer agora" compact>
+        <div className="space-y-3 text-sm text-[var(--text-secondary)]">
+          <div className="flex flex-wrap items-center gap-2">
+            <span>Estado:</span>
+            <AppStatusBadge label={latestRisk >= 80 ? "SUSPENDED" : latestRisk >= 60 ? "RESTRICTED" : latestRisk >= 35 ? "WARNING" : "NORMAL"} />
+            <AppPriorityBadge label={latestRisk >= 80 ? "Alta" : latestRisk >= 60 ? "Média" : "Baixa"} />
+          </div>
+          <p>
+            Sinais principais: {entitiesAtRisk.length} entidades em risco, {metric(summary, "activeAlerts", "alertsCount")} alertas ativos e {recommendations.length} recomendações.
+          </p>
+          <p>Próximo passo recomendado: {recommendations[0] ? String(recommendations[0]?.title ?? recommendations[0]?.action ?? "Executar revisão de governança") : "Reexecutar governança para gerar plano de contenção"}.</p>
+        </div>
+      </AppSectionBlock>
 
       <div className="grid gap-3 xl:grid-cols-3">
         <AppChartPanel title="Evolução do risco" description="Histórico compacto das últimas execuções.">

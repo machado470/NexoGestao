@@ -8,6 +8,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedbackButton";
+import { Button } from "@/components/design-system";
 import {
   AppChartPanel,
   AppDataTable,
@@ -118,7 +119,7 @@ export default function FinancesPage() {
     .map((item) => ({
       title: `${String(item?.customer?.name ?? "Cliente")} · ${formatCurrency(Number(item?.amountCents ?? 0))}`,
       subtitle: `Aberta · vence ${item?.dueDate ? new Date(String(item?.dueDate)).toLocaleDateString("pt-BR") : "sem data"}`,
-      action: <button className="nexo-cta-secondary" onClick={() => navigate(`/whatsapp?customerId=${item?.customerId}&chargeId=${item?.id}`)}>Cobrar</button>,
+      action: <Button size="sm" variant="outline" onClick={() => navigate(`/whatsapp?customerId=${item?.customerId}&chargeId=${item?.id}`)}>Cobrar</Button>,
     }));
   const cobrancasVencidas = charges
     .filter((item) => String(item?.status ?? "").toUpperCase() === "OVERDUE")
@@ -126,7 +127,7 @@ export default function FinancesPage() {
     .map((item) => ({
       title: `${String(item?.customer?.name ?? "Cliente")} · ${formatCurrency(Number(item?.amountCents ?? 0))}`,
       subtitle: `Vencida em ${item?.dueDate ? new Date(String(item?.dueDate)).toLocaleDateString("pt-BR") : "data não informada"}`,
-      action: <button className="nexo-cta-secondary" onClick={() => navigate(`/whatsapp?customerId=${item?.customerId}&chargeId=${item?.id}`)}>Resolver</button>,
+      action: <Button size="sm" variant="outline" onClick={() => navigate(`/whatsapp?customerId=${item?.customerId}&chargeId=${item?.id}`)}>Resolver</Button>,
     }));
   const cobrancasProximas = charges
     .filter((item) => {
@@ -140,7 +141,7 @@ export default function FinancesPage() {
     .map((item) => ({
       title: `${String(item?.customer?.name ?? "Cliente")} · ${formatCurrency(Number(item?.amountCents ?? 0))}`,
       subtitle: `Próxima · vence ${item?.dueDate ? new Date(String(item?.dueDate)).toLocaleDateString("pt-BR") : "sem data"}`,
-      action: <button className="nexo-cta-secondary" onClick={() => navigate(`/whatsapp?customerId=${item?.customerId}&chargeId=${item?.id}`)}>Lembrar</button>,
+      action: <Button size="sm" variant="outline" onClick={() => navigate(`/whatsapp?customerId=${item?.customerId}&chargeId=${item?.id}`)}>Lembrar</Button>,
     }));
 
   usePageDiagnostics({
@@ -253,7 +254,7 @@ export default function FinancesPage() {
         <AppListBlock
           items={[...cobrancasVencidas, ...cobrancasAbertas, ...cobrancasProximas].slice(0, 6).length > 0
             ? [...cobrancasVencidas, ...cobrancasAbertas, ...cobrancasProximas].slice(0, 6)
-            : [{ title: "Sem cobranças na fila", subtitle: "Crie cobrança para alimentar o fluxo de receita.", action: <button className="nexo-cta-secondary" onClick={() => setOpenCreate(true)}>Criar cobrança</button> }]}
+            : [{ title: "Sem cobranças na fila", subtitle: "Crie cobrança para alimentar o fluxo de receita.", action: <Button size="sm" variant="outline" onClick={() => setOpenCreate(true)}>Criar cobrança</Button> }]}
         />
       </AppSectionBlock>
 

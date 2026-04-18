@@ -10,6 +10,7 @@ import {
   AppKpiRow,
   AppListBlock,
   AppLoadingState,
+  AppStatusBadge,
   AppNextActionCard,
   AppSectionBlock,
   Input,
@@ -301,17 +302,17 @@ export default function TimelinePage() {
                       <p className="mt-1 text-xs text-[var(--text-muted)]">
                         {toLabel(event?.entityType, "Entidade")} #{toLabel(event?.entityId, "—")} · {toLabel(event?.actorName, "Sistema")} · {event?.createdAt ? new Date(String(event.createdAt)).toLocaleString("pt-BR") : "sem data"}
                       </p>
-                      <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                        Status: {String(event?.status ?? event?.executionMode ?? "manual").toLowerCase().includes("fail")
-                          ? "falha"
+                      <div className="mt-2">
+                        <AppStatusBadge label={String(event?.status ?? event?.executionMode ?? "manual").toLowerCase().includes("fail")
+                          ? "Falha"
                           : String(event?.status ?? event?.executionMode ?? "").toLowerCase().includes("block")
-                            ? "bloqueado"
+                            ? "Bloqueado"
                             : String(event?.status ?? event?.executionMode ?? "").toLowerCase().includes("ignore")
-                              ? "ignorado"
+                              ? "Ignorado"
                               : String(event?.executionMode ?? event?.source ?? "").toLowerCase().includes("auto")
-                                ? "automático"
-                                : "manual"}
-                      </p>
+                                ? "Automático"
+                                : "Manual"} />
+                      </div>
                     </li>
                   ))}
                 </ul>

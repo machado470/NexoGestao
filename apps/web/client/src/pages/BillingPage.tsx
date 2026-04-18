@@ -1,14 +1,20 @@
 import { useMemo } from "react";
-import { AlertTriangle, CheckCircle2, CreditCard, Loader2 } from "lucide-react";
+import { AlertTriangle, CreditCard, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { useProductAnalytics } from "@/hooks/useProductAnalytics";
-import { SurfaceSection } from "@/components/PagePattern";
 import { EmptyState } from "@/components/EmptyState";
 import { Button } from "@/components/design-system";
 import { getQueryUiState, normalizeArrayPayload } from "@/lib/query-helpers";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
+import {
+  AppDataTable,
+  AppKpiRow,
+  AppListBlock,
+  AppSectionBlock,
+  AppStatusBadge,
+} from "@/components/internal-page-system";
 
 type PlanName = "STARTER" | "PRO" | "SCALE" | "FREE";
 
@@ -26,25 +32,19 @@ const PLAN_BASE_PRICE_CENTS: Record<PlanName, number> = {
   SCALE: 99900,
 };
 
-function formatCurrency(cents: number) {
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  }).format((cents ?? 0) / 100);
-}
-
-function planTone(currentPlan: string, plan: string) {
-  return currentPlan === plan
-    ? "border-orange-400 bg-orange-50/70 dark:border-orange-500/60 dark:bg-orange-900/20"
-    : "border-white/10 bg-[var(--nexo-surface-2)]";
-}
-
 const PLAN_GAIN: Record<PlanName, string> = {
   FREE: "Para começar a testar o fluxo.",
   STARTER: "Estrutura inicial para operar sem perder cobranças.",
   PRO: "Escala comercial com mais capacidade e previsibilidade.",
   SCALE: "Máxima escala para operação com múltiplos times.",
 };
+
+function formatCurrency(cents: number) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format((cents ?? 0) / 100);
+}
 
 export default function BillingPage() {
   const { track } = useProductAnalytics();
@@ -136,14 +136,6 @@ export default function BillingPage() {
     { label: "Usuários", usage: limits?.usage?.users },
   ];
 
-  const hasExceededUsage = usageItems.some((item) => {
-    const used = Number(item.usage?.used ?? 0);
-    const limit = Number(item.usage?.limit ?? 0);
-    if (item.usage?.unlimited) return false;
-    if (!Number.isFinite(used) || !Number.isFinite(limit) || limit <= 0) return false;
-    return used >= limit;
-  });
-
   const currentPlan = String(status?.plan ?? limits?.plan ?? "FREE").toUpperCase();
   const subscriptionStatus = String(status?.status ?? "ACTIVE").toUpperCase();
   const stripeConfigured = readinessQuery.data?.integrations?.stripe === "configured";
@@ -163,12 +155,6 @@ export default function BillingPage() {
       toast.error("Stripe indisponível neste ambiente. Use cobrança manual em Finanças.");
       return;
     }
-    track("upgrade_click", {
-      screen: "billing",
-      targetPlan: planName,
-      currentPlan,
-      blockedByLimit: blockedItems.map((item) => item.label),
-    });
     track("checkout_started", {
       screen: "billing",
       entryPoint: "plan_card",
@@ -181,92 +167,133 @@ export default function BillingPage() {
     });
   };
 
-  const heroPrimaryAction: PlanName = blockedItems.length > 0 ? "PRO" : "STARTER";
-  const planoLiberaHoje = [
-    `Clientes: ${limits?.limits?.customers ?? "—"}`,
-    `Usuários: ${limits?.limits?.users ?? "—"}`,
-    `Mensagens: ${limits?.limits?.messages ?? "—"}`,
-    `Ordens: ${limits?.limits?.serviceOrders ?? "—"}`,
-    `Agenda: ${limits?.limits?.appointments ?? "—"}`,
-  ];
-
   return (
     <PageWrapper
       title="Assinatura e plano"
-      subtitle="Controle plano, limites e upgrade com fluxo orientado a receita sem sair da operação."
+      subtitle="Controle plano, limites e cobrança com leitura clara e previsível."
     >
       <OperationalTopCard
         contextLabel="Direção comercial"
-        title="Plano e faturamento"
-        description="Controle trial, limites e upgrade com fluxo orientado a receita e sem sair da operação."
-        chips={
+        title="Billing transparente"
+        description="Plano atual, status da assinatura e próxima cobrança com ações seguras."
+        chips={(
           <>
-            <span className="rounded-full border px-3 py-1 text-xs text-[var(--text-secondary)]">
-              Plano: {currentPlan}
-            </span>
-            <span className="rounded-full border px-3 py-1 text-xs text-[var(--text-secondary)]">
-              Limites em risco: {blockedItems.length}
-            </span>
+            <AppStatusBadge label={`Plano ${currentPlan}`} />
+            <AppStatusBadge label={`Assinatura ${subscriptionStatus}`} />
+            <AppStatusBadge label={`Integrações prontas ${stripeConfigured ? "1/1" : "0/1"}`} />
           </>
-        }
+        )}
         primaryAction={
           <Button
             type="button"
             disabled={checkoutMutation.isPending || !stripeConfigured}
-            onClick={() => void handleUpgrade(heroPrimaryAction)}
+            onClick={() => void handleUpgrade(blockedItems.length > 0 ? "PRO" : "STARTER")}
           >
-            {checkoutMutation.isPending ? "Processando..." : "Fazer upgrade agora"}
+            {checkoutMutation.isPending ? "Processando..." : "Alterar plano"}
           </Button>
         }
       />
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-        <div className="nexo-card-kpi p-4"><p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Plano atual</p><p className="relative mt-2 text-2xl font-bold tracking-tight">{currentPlan}</p></div>
-        <div className="nexo-card-kpi p-4"><p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Limites em risco</p><p className="relative mt-2 text-2xl font-bold tracking-tight">{blockedItems.length}</p></div>
-        <div className="nexo-card-kpi p-4"><p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Modo</p><p className="relative mt-2 text-2xl font-bold tracking-tight">{isTrial ? "Trial" : "Ativo"}</p></div>
-        <div className="nexo-card-kpi p-4"><p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Próxima ação</p><p className="relative mt-2 text-xl font-bold tracking-tight">{blockedItems.length > 0 ? "Upgrade urgente" : "Revisar limites"}</p></div>
-      </div>
-      <div className="grid gap-3 lg:grid-cols-2">
-        <SurfaceSection>
-          <p className="text-sm font-semibold text-[var(--text-primary)]">O que seu plano libera hoje</p>
-          <p className="mt-1 text-xs text-[var(--text-muted)]">Capacidade operacional disponível para manter a rotina sem travar.</p>
-          <ul className="mt-3 space-y-1 text-sm text-[var(--text-secondary)]">
-            {planoLiberaHoje.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
-        </SurfaceSection>
-        <SurfaceSection className="border-amber-500/40 bg-amber-500/10">
-          <p className="text-sm font-semibold text-[var(--text-primary)]">O que está travado no plano atual</p>
-          <p className="mt-1 text-xs text-[var(--text-muted)]">
-            {blockedItems.length > 0
-              ? `Limites atingidos em ${blockedItems.map((item) => item.label).join(", ")}. Isso bloqueia novas ações e reduz receita.`
-              : "Sem bloqueio crítico agora. Próxima ação é prevenir travas com folga de limite."}
-          </p>
-          <div className="mt-3">
-            <Button type="button" onClick={() => void handleUpgrade(heroPrimaryAction)} disabled={checkoutMutation.isPending || !stripeConfigured}>
-              {blockedItems.length > 0 ? "Liberar agora" : "Fazer upgrade agora"}
-            </Button>
-          </div>
-        </SurfaceSection>
-      </div>
+      <AppKpiRow
+        items={[
+          { title: "Plano atual", value: currentPlan, hint: "assinatura ativa" },
+          { title: "Status", value: subscriptionStatus, hint: "estado de cobrança" },
+          {
+            title: "Próxima cobrança",
+            value: limits?.trial?.endsAt
+              ? new Date(limits.trial.endsAt).toLocaleDateString("pt-BR")
+              : "Não informada",
+            hint: "próximo marco financeiro",
+          },
+          {
+            title: "Método de pagamento",
+            value: stripeConfigured ? "Stripe ativo" : "Pendente",
+            hint: "canal de cobrança",
+            tone: stripeConfigured ? "default" : "important",
+          },
+        ]}
+      />
+
       {!stripeConfigured ? (
-        <SurfaceSection className="border-amber-300/60 bg-amber-50 text-amber-900 dark:border-amber-600/50 dark:bg-amber-900/20 dark:text-amber-200">
-          Checkout online indisponível: Stripe não configurado. Alternativa segura: registre cobranças e pagamentos manualmente na tela de Finanças.
-        </SurfaceSection>
-      ) : null}
-      {["PAST_DUE", "SUSPENDED", "CANCELED"].includes(subscriptionStatus) ? (
-        <SurfaceSection className="border-red-300/60 bg-red-50 text-red-900 dark:border-red-600/50 dark:bg-red-900/20 dark:text-red-200">
-          Política comercial ativa para esta organização ({subscriptionStatus}). Alguns recursos premium podem ser bloqueados até regularizar a assinatura.
-        </SurfaceSection>
+        <AppSectionBlock title="Atenção" subtitle="Checkout online indisponível no ambiente" compact>
+          <p className="text-sm text-[var(--text-secondary)]">
+            Stripe não configurado. Alternativa segura: registrar cobranças e pagamentos no Financeiro.
+          </p>
+        </AppSectionBlock>
       ) : null}
 
-      {queryState.shouldBlockForError ? (
-        <SurfaceSection>
+      <div className="grid gap-4 xl:grid-cols-3">
+        <AppSectionBlock title="Plano atual e limites" subtitle="Capacidade operacional disponível" className="xl:col-span-2">
+          <AppDataTable>
+            <table className="w-full min-w-[680px] text-sm">
+              <thead>
+                <tr className="border-b border-[var(--border-subtle)] text-left text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                  <th className="px-3 py-2">Recurso</th>
+                  <th className="px-3 py-2">Uso</th>
+                  <th className="px-3 py-2">Limite</th>
+                  <th className="px-3 py-2">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {usageItems.map((item) => {
+                  const used = Number(item.usage?.used ?? 0);
+                  const limit = Number(item.usage?.limit ?? 0);
+                  const unlimited = Boolean(item.usage?.unlimited);
+                  const atLimit = !unlimited && Number.isFinite(limit) && limit > 0 && used >= limit;
+                  return (
+                    <tr key={item.label} className="border-b border-[var(--border-subtle)]/60">
+                      <td className="px-3 py-2 text-[var(--text-primary)]">{item.label}</td>
+                      <td className="px-3 py-2">{item.usage?.used ?? "—"}</td>
+                      <td className="px-3 py-2">{unlimited ? "∞" : item.usage?.limit ?? "—"}</td>
+                      <td className="px-3 py-2"><AppStatusBadge label={atLimit ? "No limite" : "Disponível"} /></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </AppDataTable>
+        </AppSectionBlock>
+
+        <AppSectionBlock title="Ações de gerenciamento" subtitle="Fluxo previsível de billing" compact>
+          <AppListBlock
+            compact
+            minItems={4}
+            items={[
+              {
+                title: "Alterar plano",
+                subtitle: "Ajuste capacidade para manter receita sem bloqueio.",
+                action: <Button type="button" variant="outline" onClick={() => void handleUpgrade("PRO")}>Alterar</Button>,
+              },
+              {
+                title: "Atualizar pagamento",
+                subtitle: stripeConfigured ? "Método ativo no Stripe." : "Checkout indisponível sem Stripe.",
+                action: <Button type="button" variant="outline" disabled={!stripeConfigured}>Atualizar</Button>,
+              },
+              {
+                title: "Ver histórico",
+                subtitle: "Consulte faturas e rastreie status de cobrança.",
+                action: <Button type="button" variant="outline">Histórico</Button>,
+              },
+              {
+                title: "Cancelar assinatura",
+                subtitle: "Acesso mantém até o fim do ciclo atual.",
+                action: (
+                  <Button type="button" variant="outline" disabled={currentPlan === "FREE" || cancelMutation.isPending} onClick={() => cancelMutation.mutate()}>
+                    {cancelMutation.isPending ? "Cancelando..." : "Cancelar"}
+                  </Button>
+                ),
+              },
+            ]}
+          />
+        </AppSectionBlock>
+      </div>
+
+      <AppSectionBlock title="Planos disponíveis" subtitle="Comparação clara para decisão" compact>
+        {queryState.shouldBlockForError ? (
           <EmptyState
             icon={<AlertTriangle className="h-7 w-7" />}
             title="Falha ao carregar billing"
-            description="Não foi possível carregar planos e status agora. Tente novamente para restaurar a leitura."
+            description="Não foi possível carregar planos e status agora."
             action={{
               label: "Tentar novamente",
               onClick: () => {
@@ -278,123 +305,71 @@ export default function BillingPage() {
               },
             }}
           />
-        </SurfaceSection>
-      ) : null}
-
-      {queryState.isInitialLoading ? (
-        <SurfaceSection className="p-8 text-sm text-[var(--text-muted)] dark:text-[var(--text-muted)]">
-          <Loader2 className="mr-2 inline h-4 w-4 animate-spin" />
-          Carregando status de assinatura...
-        </SurfaceSection>
-      ) : null}
-
-      {!queryState.isInitialLoading ? (
-        <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {plans.map((plan: any) => {
-            const name = String(plan.name ?? "FREE").toUpperCase();
-            const isCurrent = name === currentPlan;
-            const canUpgrade = !isCurrent && name !== "FREE";
-
-            return (
-              <article key={name} className={`nexo-card-operational ${planTone(currentPlan, name)}`}>
-                <h2 className="text-base font-semibold">{name}</h2>
-                <p className="mt-1 text-sm text-[var(--text-muted)] dark:text-[var(--text-muted)]">
-                  {formatCurrency(PLAN_BASE_PRICE_CENTS[name as PlanName] ?? 0)} / mês
-                </p>
-                <p className="mt-2 text-xs text-[var(--text-secondary)] dark:text-[var(--text-secondary)]">{PLAN_GAIN[name as PlanName]}</p>
-                <div className="mt-4 space-y-2 text-xs">
-                  <p>Clientes: {limits?.limits?.customers ?? "—"}</p>
-                  <p>Agendamentos: {limits?.limits?.appointments ?? "—"}</p>
-                  <p>Mensagens: {limits?.limits?.messages ?? "—"}</p>
-                  <p>Ordens de serviço: {limits?.limits?.serviceOrders ?? "—"}</p>
-                  <p>Usuários: {limits?.limits?.users ?? "—"}</p>
-                </div>
-                <div className="mt-4">
-                  {isCurrent ? (
-                    <span className="inline-flex items-center gap-1 text-xs text-emerald-600">
-                      <CheckCircle2 className="h-3.5 w-3.5" /> Plano em uso
-                    </span>
-                  ) : (
-                    <Button
-                      type="button"
-                      className="w-full"
-                      disabled={!canUpgrade || checkoutMutation.isPending || !stripeConfigured}
-                      onClick={() => void handleUpgrade(name as PlanName)}
-                    >
-                      <CreditCard className="h-4 w-4" />
-                      {checkoutMutation.isPending ? "Processando..." : "Continuar crescendo"}
-                    </Button>
-                  )}
-                </div>
-              </article>
-            );
-          })}
-        </section>
-      ) : null}
-
-      <SurfaceSection className="space-y-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="mt-1 text-xs text-[var(--text-secondary)] dark:text-[var(--text-secondary)]">
-              Seu upgrade libera mais execução, mais cobranças e mais receita confirmada sem bloqueio.
-            </p>
+        ) : queryState.isInitialLoading ? (
+          <div className="p-2 text-sm text-[var(--text-muted)]">
+            <Loader2 className="mr-2 inline h-4 w-4 animate-spin" /> Carregando status de assinatura...
           </div>
-          <div className="nexo-card-informative rounded-xl px-3 py-2 text-sm">
-            Plano atual: <strong>{currentPlan}</strong>
-          </div>
-        </div>
-        {isTrial ? (
-          <p className="mt-3 inline-flex items-center gap-2 rounded-lg bg-amber-100 px-3 py-2 text-xs text-amber-900 dark:bg-amber-900/30 dark:text-amber-200">
-            <AlertTriangle className="h-4 w-4" />
-            Trial ativo até {new Date(limits?.trial?.endsAt).toLocaleDateString("pt-BR")}.
-          </p>
-        ) : null}
-        {hasExceededUsage ? (
-          <p className="mt-2 inline-flex items-center gap-2 rounded-lg bg-amber-100 px-3 py-2 text-xs text-amber-900 dark:bg-amber-900/30 dark:text-amber-200">
-            <AlertTriangle className="h-4 w-4" />
-            Limite do plano atingido em pelo menos um recurso. Motivo do bloqueio: {blockedItems.map((item) => item.label).join(", ")}.
-          </p>
-        ) : null}
-        <div className="mt-2 grid gap-2 text-sm md:grid-cols-2">
-          {usageItems.map((item) => {
-            const used = item.usage?.used ?? "—";
-            const limit = item.usage?.unlimited ? "∞" : item.usage?.limit ?? "—";
-            const limitNumber = Number(item.usage?.limit ?? 0);
-            const usedNumber = Number(item.usage?.used ?? 0);
-            const atLimit =
-              !item.usage?.unlimited &&
-              Number.isFinite(limitNumber) &&
-              limitNumber > 0 &&
-              Number.isFinite(usedNumber) &&
-              usedNumber >= limitNumber;
+        ) : (
+          <AppDataTable>
+            <table className="w-full min-w-[760px] text-sm">
+              <thead>
+                <tr className="border-b border-[var(--border-subtle)] text-left text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                  <th className="px-3 py-2">Plano</th>
+                  <th className="px-3 py-2">Valor</th>
+                  <th className="px-3 py-2">Ganho operacional</th>
+                  <th className="px-3 py-2">Status</th>
+                  <th className="px-3 py-2">Ação</th>
+                </tr>
+              </thead>
+              <tbody>
+                {plans.map((plan: any) => {
+                  const name = String(plan.name ?? "FREE").toUpperCase() as PlanName;
+                  const isCurrent = name === currentPlan;
+                  return (
+                    <tr key={name} className="border-b border-[var(--border-subtle)]/60">
+                      <td className="px-3 py-2 font-medium text-[var(--text-primary)]">{name}</td>
+                      <td className="px-3 py-2">{formatCurrency(PLAN_BASE_PRICE_CENTS[name] ?? 0)}/mês</td>
+                      <td className="px-3 py-2 text-[var(--text-secondary)]">{PLAN_GAIN[name]}</td>
+                      <td className="px-3 py-2"><AppStatusBadge label={isCurrent ? "Em uso" : "Disponível"} /></td>
+                      <td className="px-3 py-2">
+                        {isCurrent ? (
+                          <span className="text-xs text-[var(--text-muted)]">Plano atual</span>
+                        ) : (
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="gap-1"
+                            disabled={checkoutMutation.isPending || !stripeConfigured || name === "FREE"}
+                            onClick={() => void handleUpgrade(name)}
+                          >
+                            <CreditCard className="h-3.5 w-3.5" /> Escolher
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </AppDataTable>
+        )}
+      </AppSectionBlock>
 
-            return (
-              <p key={item.label} className={atLimit ? "font-medium text-amber-600 dark:text-amber-300" : ""}>
-                {item.label}: {used} / {limit}
+      {(isTrial || blockedItems.length > 0) ? (
+        <AppSectionBlock title="Risco comercial" subtitle="Pontos que podem bloquear expansão" compact>
+          <div className="space-y-2 text-sm text-[var(--text-secondary)]">
+            {isTrial ? (
+              <p className="inline-flex items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
+                <AlertTriangle className="h-4 w-4" />
+                Trial ativo até {new Date(limits?.trial?.endsAt).toLocaleDateString("pt-BR")}.
               </p>
-            );
-          })}
-        </div>
-        {blockedItems.length > 0 ? (
-          <div className="mt-3 rounded-lg border border-red-400/40 bg-red-500/10 p-3 text-xs text-red-200">
-            <p className="font-semibold">Motivo do bloqueio atual</p>
-            <p>
-              Você atingiu: {blockedItems.map((item) => item.label).join(", ")}.
-              Upgrade libera novas criações e evita travas no fluxo cliente → O.S. → cobrança → pagamento.
-            </p>
+            ) : null}
+            {blockedItems.length > 0 ? (
+              <p>Limites atingidos em: {blockedItems.map((item) => item.label).join(", ")}.</p>
+            ) : null}
           </div>
-        ) : null}
-        {currentPlan !== "FREE" ? (
-          <Button
-            type="button"
-            variant="outline"
-            disabled={cancelMutation.isPending}
-            onClick={() => cancelMutation.mutate()}
-          >
-            {cancelMutation.isPending ? "Cancelando..." : "Cancelar assinatura"}
-          </Button>
-        ) : null}
-      </SurfaceSection>
+        </AppSectionBlock>
+      ) : null}
     </PageWrapper>
   );
 }
