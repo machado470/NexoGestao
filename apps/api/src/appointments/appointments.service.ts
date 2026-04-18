@@ -254,6 +254,7 @@ export class AppointmentsService {
     createdBy: string | null
     personId: string | null
     customerId: string
+    assignedToPersonId?: string
     startsAt: string
     endsAt?: string
     status?: AppointmentStatus
@@ -308,6 +309,7 @@ export class AppointmentsService {
       idempotencyKey,
       payload: {
         customerId: params.customerId,
+        assignedToPersonId: params.assignedToPersonId ?? null,
         startsAt: startsAt.toISOString(),
         endsAt: endsAt.toISOString(),
         status,
@@ -346,6 +348,7 @@ export class AppointmentsService {
         metadata: {
           actorUserId: params.createdBy,
           actorPersonId: params.personId,
+          assignedToPersonId: params.assignedToPersonId ?? null,
           createdBy: params.createdBy,
           startsAt: created.startsAt,
           endsAt: created.endsAt,

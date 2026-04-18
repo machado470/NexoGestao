@@ -58,6 +58,7 @@ export class AppointmentsController {
       createdBy: actorUserId,
       personId: actorPersonId,
       customerId: body.customerId,
+      assignedToPersonId: body.assignedToPersonId,
       startsAt: body.startsAt,
       endsAt: body.endsAt,
       status: body.status as any,

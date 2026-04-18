@@ -14,6 +14,10 @@ export class CreateAppointmentDto {
   @IsNotEmpty()
   customerId!: string
 
+  @IsOptional()
+  @IsString()
+  assignedToPersonId?: string
+
   // ISO string (validação final no service com Date)
   @IsString()
   @IsNotEmpty()
