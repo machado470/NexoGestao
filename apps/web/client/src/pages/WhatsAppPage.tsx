@@ -32,6 +32,7 @@ import { OperationalTopCard } from "@/components/operating-system/OperationalTop
 import {
   AppEmptyState,
   AppLoadingState,
+  AppSecondaryTabs,
   AppStatusBadge,
 } from "@/components/internal-page-system";
 
@@ -597,44 +598,15 @@ export default function WhatsAppPage() {
 }
 
 function WorkspaceModeTabs({ activeView, onChange }: { activeView: WorkspaceView; onChange: (value: WorkspaceView) => void }) {
+  const tabItems: Array<{ value: WorkspaceView; label: string }> = [
+    { value: "conversations", label: "Conversas" },
+    { value: "chat", label: "Conversar" },
+    { value: "context", label: "Contexto" },
+    { value: "automations", label: "Executar" },
+    { value: "history", label: "Histórico" },
+  ];
   return (
-    <nav className="rounded-[999px] border border-[var(--border-subtle)] bg-[var(--surface-elevated)]/35 p-1">
-      <div className="grid grid-cols-2 gap-1 md:grid-cols-5">
-        <WorkspaceModeButton label="Conversas" active={activeView === "conversations"} onClick={() => onChange("conversations")} />
-        <WorkspaceModeButton label="Conversar" active={activeView === "chat"} onClick={() => onChange("chat")} icon={Send} />
-        <WorkspaceModeButton label="Contexto" icon={Info} active={activeView === "context"} onClick={() => onChange("context")} />
-        <WorkspaceModeButton label="Executar" icon={WandSparkles} active={activeView === "automations"} onClick={() => onChange("automations")} />
-        <WorkspaceModeButton label="Histórico" icon={History} active={activeView === "history"} onClick={() => onChange("history")} />
-      </div>
-    </nav>
-  );
-}
-
-function WorkspaceModeButton({
-  label,
-  active,
-  onClick,
-  icon: Icon,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-  icon?: typeof Info;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "relative inline-flex h-10 items-center justify-center gap-2 rounded-full border px-5 text-sm font-medium transition-all duration-200 ease-out",
-        active
-          ? "border-[var(--accent-primary)]/35 bg-[var(--accent-soft)] text-[var(--accent-primary)] after:absolute after:bottom-[-6px] after:left-[20%] after:h-[2px] after:w-[60%] after:rounded-[2px] after:bg-[var(--accent-primary)] after:content-['']"
-          : "border-[var(--border-subtle)] bg-transparent text-[var(--text-secondary)] hover:border-[var(--border-emphasis)] hover:bg-[var(--surface-elevated)]/50 hover:text-[var(--text-primary)]"
-      )}
-    >
-      {Icon ? <Icon className="size-4" /> : null}
-      <span>{label}</span>
-    </button>
+    <AppSecondaryTabs items={tabItems} value={activeView} onChange={onChange} />
   );
 }
 

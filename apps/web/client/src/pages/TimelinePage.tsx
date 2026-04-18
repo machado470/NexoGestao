@@ -10,6 +10,7 @@ import {
   AppKpiRow,
   AppListBlock,
   AppLoadingState,
+  AppSecondaryTabs,
   AppStatusBadge,
   AppNextActionCard,
   AppSectionBlock,
@@ -34,6 +35,7 @@ export default function TimelinePage() {
   const [, navigate] = useLocation();
   const [filter, setFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
+  const [activeTab, setActiveTab] = useState<"all" | "finance" | "service_order" | "appointment" | "whatsapp" | "governance">("all");
   const [periodFilter, setPeriodFilter] = useState("all");
   const [entityFilter, setEntityFilter] = useState("all");
   const [events, setEvents] = useState<any[]>([]);
@@ -70,6 +72,11 @@ export default function TimelinePage() {
     return events.filter((event) => {
       const date = safeDate(event?.createdAt);
       if (typeFilter !== "all" && String(event?.type ?? event?.action ?? "").toLowerCase() !== typeFilter) return false;
+      if (activeTab !== "all") {
+        const bucket = `${String(event?.type ?? "").toLowerCase()} ${String(event?.entityType ?? "").toLowerCase()} ${String(event?.action ?? "").toLowerCase()}`;
+        if (activeTab === "governance" && !bucket.includes("govern")) return false;
+        if (activeTab !== "governance" && !bucket.includes(activeTab.replace("_", "")) && !bucket.includes(activeTab)) return false;
+      }
       if (entityFilter !== "all" && String(event?.entityType ?? "").toLowerCase() !== entityFilter) return false;
       
       if (periodFilter === "24h" && (!date || Date.now() - date.getTime() > 1000 * 60 * 60 * 24)) return false;
@@ -89,7 +96,7 @@ export default function TimelinePage() {
         .join(" ");
       return text.includes(q);
     });
-  }, [entityFilter, events, filter, periodFilter, typeFilter]);
+  }, [activeTab, entityFilter, events, filter, periodFilter, typeFilter]);
 
   const groupedEvents = useMemo(() => {
     const groups = new Map<string, any[]>();
@@ -176,6 +183,18 @@ export default function TimelinePage() {
         ]}
       />
       </KpiErrorBoundary>
+      <AppSecondaryTabs
+        items={[
+          { value: "all", label: "Todos" },
+          { value: "finance", label: "Financeiro" },
+          { value: "service_order", label: "O.S." },
+          { value: "appointment", label: "Agendamento" },
+          { value: "whatsapp", label: "Comunicação" },
+          { value: "governance", label: "Governança" },
+        ]}
+        value={activeTab}
+        onChange={setActiveTab}
+      />
 
       <AppSectionBlock
         title="O que deu problema"

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
-import { Area, AreaChart, CartesianGrid, XAxis } from "recharts";
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, XAxis } from "recharts";
 import { trpc } from "@/lib/trpc";
 import { CreateChargeModal } from "@/components/CreateChargeModal";
 import { normalizeArrayPayload, normalizeObjectPayload } from "@/lib/query-helpers";
@@ -18,6 +18,7 @@ import {
   AppPageEmptyState,
   AppPageErrorState,
   AppPageLoadingState,
+  AppSecondaryTabs,
   AppRowActions,
   AppSectionBlock,
   AppStatusBadge,
@@ -44,6 +45,7 @@ export default function FinancesPage() {
   useRenderWatchdog("FinancesPage");
   const [, navigate] = useLocation();
   const [openCreate, setOpenCreate] = useState(false);
+  const [activeTab, setActiveTab] = useState<"overview" | "pending" | "overdue" | "paid" | "reports">("overview");
   const utils = trpc.useUtils();
 
   const chargesQuery = trpc.finance.charges.list.useQuery({ page: 1, limit: 100 }, { retry: false });
@@ -52,6 +54,12 @@ export default function FinancesPage() {
   const payCharge = trpc.finance.charges.pay.useMutation();
 
   const charges = useMemo(() => normalizeArrayPayload<any>(chargesQuery.data), [chargesQuery.data]);
+  const filteredCharges = useMemo(() => {
+    if (activeTab === "overview" || activeTab === "reports") return charges;
+    if (activeTab === "pending") return charges.filter(item => String(item?.status ?? "").toUpperCase() === "PENDING");
+    if (activeTab === "overdue") return charges.filter(item => String(item?.status ?? "").toUpperCase() === "OVERDUE");
+    return charges.filter(item => String(item?.status ?? "").toUpperCase() === "PAID");
+  }, [activeTab, charges]);
   const stats = useMemo(() => normalizeObjectPayload<any>(statsQuery.data) ?? {}, [statsQuery.data]);
   const hasChargeData = charges.length > 0;
   const showChargesInitialLoading = chargesQuery.isLoading && !hasChargeData;
@@ -65,6 +73,14 @@ export default function FinancesPage() {
   const revenueSafe = useMemo(
     () => safeChartData<{ label: string; revenue: number }>(revenueDataParsed, ["revenue"]),
     [revenueDataParsed]
+  );
+  const statusDistribution = useMemo(
+    () => ([
+      { label: "Pendentes", value: charges.filter(item => String(item?.status ?? "").toUpperCase() === "PENDING").length },
+      { label: "Vencidas", value: charges.filter(item => String(item?.status ?? "").toUpperCase() === "OVERDUE").length },
+      { label: "Pagas", value: charges.filter(item => String(item?.status ?? "").toUpperCase() === "PAID").length },
+    ]),
+    [charges]
   );
   const current30 = getWindow(30, 0);
   const previous30 = getWindow(30, 1);
@@ -235,12 +251,24 @@ export default function FinancesPage() {
           hint: "cobranças vencidas",
           tone: Number(stats.overdueCount ?? 0) > 0 ? "critical" : "default",
         },
-        { title: "Recebidas", value: formatCurrency(receivedTotal), hint: "somatório de cobranças pagas" },
-        { title: "Próx. a vencer", value: String(dueSoon), hint: "vencimento em até 7 dias" },
+        { title: "Recebidas", value: String(charges.filter(item => String(item?.status ?? "").toUpperCase() === "PAID").length), hint: "quantidade de cobranças pagas" },
       ]} />
       </KpiErrorBoundary>
 
-      <AppSectionBlock
+      <AppSecondaryTabs
+        items={[
+          { value: "overview", label: "Visão geral" },
+          { value: "pending", label: "Pendentes" },
+          { value: "overdue", label: "Vencidas" },
+          { value: "paid", label: "Pagas" },
+          { value: "reports", label: "Relatórios" },
+        ]}
+        value={activeTab}
+        onChange={setActiveTab}
+      />
+
+      {(activeTab === "overview" || activeTab === "overdue" || activeTab === "pending") ? (
+        <AppSectionBlock
         title="Dinheiro em risco"
         subtitle="Bloco principal: atraso e vencimento que ameaçam o caixa imediato"
         className="border-rose-500/35 bg-rose-500/8 p-6 lg:p-8 lg:col-span-2"
@@ -257,6 +285,7 @@ export default function FinancesPage() {
             : [{ title: "Sem cobranças na fila", subtitle: "Crie cobrança para alimentar o fluxo de receita.", action: <Button size="sm" variant="outline" onClick={() => setOpenCreate(true)}>Criar cobrança</Button> }]}
         />
       </AppSectionBlock>
+      ) : null}
 
       <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(320px,1fr))]">
         <AppNextActionCard
@@ -292,6 +321,16 @@ export default function FinancesPage() {
             </ChartErrorBoundary>
           )}
         </AppChartPanel>
+        <AppChartPanel title="Distribuição por status" description="Saúde da carteira entre pendências, atraso e recebimento.">
+          <ChartContainer className="h-[240px] w-full" config={{ value: { label: "Cobranças" } }}>
+            <BarChart data={statusDistribution}>
+              <CartesianGrid vertical={false} />
+              <XAxis dataKey="label" tickLine={false} axisLine={false} />
+              <ChartTooltip content={<ChartTooltipContent />} />
+              <Bar dataKey="value" fill="var(--brand-primary)" radius={[6, 6, 0, 0]} />
+            </BarChart>
+          </ChartContainer>
+        </AppChartPanel>
       </div>
 
       <TrpcSectionErrorBoundary context="finances:charges-table">
@@ -304,7 +343,7 @@ export default function FinancesPage() {
             actionLabel="Tentar novamente"
             onAction={() => void chargesQuery.refetch()}
           />
-        ) : charges.length === 0 ? (
+        ) : filteredCharges.length === 0 ? (
           <AppPageEmptyState title="Nenhum dado disponível ainda" description="Ação recomendada: criar cobrança" />
         ) : (
           <AppDataTable>
@@ -315,7 +354,7 @@ export default function FinancesPage() {
                 </tr>
               </thead>
               <tbody>
-                {charges.map((charge) => {
+                {filteredCharges.map((charge) => {
                   const status = String(charge?.status ?? "").toUpperCase();
                   const isOverdue = status === "OVERDUE";
                   const nextAction = isOverdue ? "Cobrar" : status === "PENDING" ? "Enviar lembrete" : "Marcar como paga";

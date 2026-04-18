@@ -22,6 +22,7 @@ import {
   AppPageEmptyState,
   AppPageErrorState,
   AppPageLoadingState,
+  AppSecondaryTabs,
   AppSectionBlock,
   AppStatusBadge,
 } from "@/components/internal-page-system";
@@ -114,6 +115,7 @@ export default function CustomersPage() {
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
   const [timelineExpanded, setTimelineExpanded] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [activeTab, setActiveTab] = useState<"overview" | "agenda" | "service_orders" | "financial" | "history">("overview");
 
   const customersQuery = trpc.nexo.customers.list.useQuery(undefined, {
     retry: false,
@@ -462,6 +464,22 @@ export default function CustomersPage() {
         searchValue={searchTerm}
         onSearchChange={setSearchTerm}
         searchPlaceholder="Buscar por nome, telefone, email ou ID"
+      />
+      <AppSecondaryTabs
+        items={[
+          { value: "overview", label: "Visão geral" },
+          { value: "agenda", label: "Agenda" },
+          { value: "service_orders", label: "O.S." },
+          { value: "financial", label: "Financeiro" },
+          { value: "history", label: "Histórico" },
+        ]}
+        value={activeTab}
+        onChange={value => {
+          setActiveTab(value);
+          if (value === "financial") setActiveFilter("billing");
+          else if (value === "agenda") setActiveFilter("no_schedule");
+          else if (value === "overview") setActiveFilter("all");
+        }}
       />
 
       <AppSectionBlock
