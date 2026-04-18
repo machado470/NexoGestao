@@ -28,7 +28,12 @@ import { Button, Badge } from "@/components/design-system";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
-import { AppEmptyState, AppLoadingState } from "@/components/internal-page-system";
+import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
+import {
+  AppEmptyState,
+  AppLoadingState,
+  AppStatusBadge,
+} from "@/components/internal-page-system";
 
 type ConversationFilter = "all" | "no_reply" | "billing" | "appointment" | "service_order" | "failures" | "suggestions";
 type MessageSendStatus = "queued" | "sent" | "delivered" | "failed" | "unknown";
@@ -503,24 +508,27 @@ export default function WhatsAppPage() {
   return (
     <PageWrapper title="WhatsApp Operacional" subtitle="">
       <section className="space-y-4">
-        <header className="rounded-2xl border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface-elevated)_58%,var(--surface-primary))] px-5 py-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="space-y-1">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">Central de execução</p>
-              <p className="text-sm font-semibold text-[var(--text-primary)]">Conversa, decisão e ação no mesmo fluxo operacional</p>
-            </div>
-            {selectedCustomer ? (
+        <OperationalTopCard
+          contextLabel="Central de execução"
+          title="Conversa, decisão e ação no mesmo fluxo operacional"
+          description="WhatsApp conectado a cliente, cobrança, agendamento e ordem de serviço sem sair do contexto."
+          chips={
+            selectedCustomer ? (
               <div className="inline-flex items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)] px-3 py-2">
-                <p className="text-sm font-medium text-[var(--text-primary)]">{String(selectedCustomer.name ?? "Cliente")}</p>
-                <Badge>{failed > 0 ? "Falha" : delivered > 0 ? "Saudável" : "Sem resposta"}</Badge>
+                <p className="text-sm font-medium text-[var(--text-primary)]">
+                  {String(selectedCustomer.name ?? "Cliente")}
+                </p>
+                <AppStatusBadge
+                  label={failed > 0 ? "Falhou" : delivered > 0 ? "Saudável" : "Pendente"}
+                />
               </div>
-            ) : null}
-          </div>
-        </header>
+            ) : null
+          }
+        />
 
         <WorkspaceModeTabs activeView={activeWorkspaceView} onChange={setActiveWorkspaceView} />
 
-        <main className="min-h-[74vh] rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-primary)]">
+        <main className="min-h-[74vh] rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-base)]">
           {activeWorkspaceView === "conversations" ? (
             <ConversationsView
               filteredConversations={filteredConversations}
@@ -590,7 +598,7 @@ export default function WhatsAppPage() {
 
 function WorkspaceModeTabs({ activeView, onChange }: { activeView: WorkspaceView; onChange: (value: WorkspaceView) => void }) {
   return (
-    <nav className="rounded-[999px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] p-1">
+    <nav className="rounded-[999px] border border-[var(--border-subtle)] bg-[var(--surface-elevated)]/35 p-1">
       <div className="grid grid-cols-2 gap-1 md:grid-cols-5">
         <WorkspaceModeButton label="Conversas" active={activeView === "conversations"} onClick={() => onChange("conversations")} />
         <WorkspaceModeButton label="Conversar" active={activeView === "chat"} onClick={() => onChange("chat")} icon={Send} />
@@ -620,8 +628,8 @@ function WorkspaceModeButton({
       className={cn(
         "relative inline-flex h-10 items-center justify-center gap-2 rounded-full border px-5 text-sm font-medium transition-all duration-200 ease-out",
         active
-          ? "border-[rgba(255,140,0,0.26)] bg-[rgba(255,140,0,0.18)] text-[#ff8c00] after:absolute after:bottom-[-6px] after:left-[20%] after:h-[2px] after:w-[60%] after:rounded-[2px] after:bg-[#ff8c00] after:content-['']"
-          : "border-[rgba(255,255,255,0.08)] bg-transparent text-[rgba(255,255,255,0.64)] hover:border-[rgba(255,255,255,0.14)] hover:bg-[rgba(255,255,255,0.035)] hover:text-[rgba(255,255,255,0.84)]"
+          ? "border-[var(--accent-primary)]/35 bg-[var(--accent-soft)] text-[var(--accent-primary)] after:absolute after:bottom-[-6px] after:left-[20%] after:h-[2px] after:w-[60%] after:rounded-[2px] after:bg-[var(--accent-primary)] after:content-['']"
+          : "border-[var(--border-subtle)] bg-transparent text-[var(--text-secondary)] hover:border-[var(--border-emphasis)] hover:bg-[var(--surface-elevated)]/50 hover:text-[var(--text-primary)]"
       )}
     >
       {Icon ? <Icon className="size-4" /> : null}
@@ -682,7 +690,7 @@ function ConversationsView({
           />
         </div>
 
-        <div className="mt-4 flex gap-1 overflow-x-auto rounded-[999px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="mt-4 flex gap-1 overflow-x-auto rounded-[999px] border border-[var(--border-subtle)] bg-[var(--surface-elevated)]/35 p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {FILTERS.map((filter) => (
             <button
               key={filter.key}
@@ -691,8 +699,8 @@ function ConversationsView({
               className={cn(
                 "h-7 shrink-0 whitespace-nowrap rounded-full border px-2.5 text-[12px] font-medium transition-all duration-200 ease-out",
                 activeFilter === filter.key
-                  ? "border-[rgba(255,140,0,0.2)] bg-[rgba(255,140,0,0.1)] text-[rgba(255,140,0,0.92)]"
-                  : "border-[rgba(255,255,255,0.06)] bg-transparent text-[rgba(255,255,255,0.52)] hover:border-[rgba(255,255,255,0.11)] hover:bg-[rgba(255,255,255,0.03)] hover:text-[rgba(255,255,255,0.72)]"
+                  ? "border-[var(--accent-primary)]/30 bg-[var(--accent-soft)] text-[var(--accent-primary)]"
+                  : "border-[var(--border-subtle)] bg-transparent text-[var(--text-secondary)] hover:border-[var(--border-emphasis)] hover:bg-[var(--surface-elevated)]/50 hover:text-[var(--text-primary)]"
               )}
             >
               {filter.label}
@@ -1034,9 +1042,9 @@ function AutomationsWorkspaceView({
     <div className="min-h-[74vh] space-y-6 px-6 py-6 md:px-8">
       <section
         tabIndex={0}
-        className="rounded-2xl border border-[rgba(255,140,0,0.25)] bg-[color-mix(in_srgb,var(--surface-elevated)_60%,var(--surface-primary))] p-6 shadow-sm transition-colors duration-200 hover:border-[rgba(255,140,0,0.45)] active:border-[rgba(255,140,0,0.7)] active:shadow-[0_0_0_1px_rgba(255,140,0,0.15)] focus-visible:border-[rgba(255,140,0,0.7)] focus-visible:shadow-[0_0_0_1px_rgba(255,140,0,0.15)]"
+        className="rounded-2xl border border-[var(--accent-primary)]/30 bg-[color-mix(in_srgb,var(--surface-elevated)_60%,var(--surface-primary))] p-6 shadow-sm transition-colors duration-200 hover:border-[var(--accent-primary)]/45 active:border-[var(--accent-primary)]/70 focus-visible:border-[var(--accent-primary)]/70"
       >
-        <p className="inline-flex items-center gap-1 border-l-[3px] border-[#ff8c00] pl-2 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+        <p className="inline-flex items-center gap-1 border-l-[3px] border-[var(--accent-primary)] pl-2 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
           <Sparkles className="size-3.5" />
           melhor próxima ação
         </p>

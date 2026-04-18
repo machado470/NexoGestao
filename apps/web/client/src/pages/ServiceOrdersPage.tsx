@@ -126,7 +126,6 @@ export default function ServiceOrdersPage() {
       <AppSectionBlock
         title="Travadas"
         subtitle="Bloco principal: ordens que mais pressionam SLA e precisam de ação direta agora"
-        className="p-6 lg:p-8"
       >
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-[var(--text-secondary)]">{semResponsavel} sem responsável · {semAvanco} sem avanço · {aguardandoCliente} aguardando cliente.</p>
@@ -139,7 +138,7 @@ export default function ServiceOrdersPage() {
         />
       </AppSectionBlock>
 
-      <section className="grid gap-3 xl:grid-cols-2">
+      <section className="grid gap-4 xl:grid-cols-2">
         <AppSectionBlock title="Top O.S. para executar agora" subtitle="Prioridade alta com ação operacional direta">
           <AppListBlock
             items={topOS.length > 0

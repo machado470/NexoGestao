@@ -9,12 +9,12 @@ import {
 import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
 import {
   Button,
-  NexoStatusBadge,
   SecondaryButton,
 } from "@/components/design-system";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { ActionBarWrapper } from "@/components/operating-system/ActionBar";
 import { ContextPanel } from "@/components/operating-system/ContextPanel";
+import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import { AppRowActionsDropdown, AppCheckbox } from "@/components/app-system";
 import {
   AppDataTable,
@@ -23,6 +23,7 @@ import {
   AppPageErrorState,
   AppPageLoadingState,
   AppSectionBlock,
+  AppStatusBadge,
 } from "@/components/internal-page-system";
 
 type CustomerRecord = Record<string, any>;
@@ -47,7 +48,6 @@ type NextAction =
 type CustomerOperationalSnapshot = {
   customerId: string;
   status: OperationalStatus;
-  statusTone: "success" | "warning" | "danger" | "neutral";
   contextLabel: string;
   nextActionReason: string;
   contactState: ContactState;
@@ -63,6 +63,7 @@ type CustomerOperationalSnapshot = {
   latestChargeCents: number;
   lastInteractionDays: number;
   behaviorLabel: "Responde rápido" | "Responde lento" | "Baixa interação";
+  segmentTag: "Carteira ativa" | "Cobrança crítica" | "Reativação";
   priorityScore: number;
 };
 
@@ -86,15 +87,6 @@ function contactLabelFromState(state: ContactState, days: number) {
   return `Sem resposta há ${days} dias`;
 }
 
-function getStatusTone(
-  status: OperationalStatus
-): "success" | "warning" | "danger" | "neutral" {
-  if (status === "Saudável") return "success";
-  if (status === "Em risco") return "danger";
-  if (status === "Atenção") return "warning";
-  return "neutral";
-}
-
 function normalizeWorkspace(input: unknown) {
   return (normalizeObjectPayload<any>(input) ?? {}) as Record<string, any>;
 }
@@ -103,14 +95,11 @@ function listFrom(input: unknown) {
   return normalizeArrayPayload<any>(input);
 }
 
-function getContactUrgencyTone(days: number, state: ContactState) {
-  if (state === "responded")
-    return "border-[var(--dashboard-success)]/35 bg-[var(--dashboard-success)]/10 text-[var(--dashboard-success)]";
-  if (days >= 5)
-    return "border-[var(--dashboard-danger)]/40 bg-[var(--dashboard-danger)]/10 text-[var(--dashboard-danger)]";
-  if (days >= 3)
-    return "border-[var(--dashboard-warning)]/40 bg-[var(--dashboard-warning)]/10 text-[var(--dashboard-warning)]";
-  return "border-[var(--border-subtle)] text-[var(--text-secondary)]";
+function getContactUrgencyLabel(days: number, state: ContactState) {
+  if (state === "responded") return "Saudável";
+  if (days >= 5) return "Urgente";
+  if (days >= 3) return "Atenção";
+  return "Pendente";
 }
 
 export default function CustomersPage() {
@@ -240,6 +229,12 @@ export default function CustomersPage() {
           if (contactDays >= 5) return "Baixa interação";
           return "Responde lento";
         })();
+      const segmentTag: CustomerOperationalSnapshot["segmentTag"] =
+        overdueCharges > 0
+          ? "Cobrança crítica"
+          : !hasFutureSchedule || contactState !== "responded"
+            ? "Reativação"
+            : "Carteira ativa";
 
       let status: OperationalStatus = "Saudável";
       let contextLabel = "Fluxo operacional saudável";
@@ -280,7 +275,6 @@ export default function CustomersPage() {
       return {
         customerId,
         status,
-        statusTone: getStatusTone(status),
         contextLabel,
         nextActionReason,
         contactState,
@@ -296,6 +290,7 @@ export default function CustomersPage() {
         latestChargeCents,
         lastInteractionDays,
         behaviorLabel,
+        segmentTag,
         priorityScore,
       };
     });
@@ -441,38 +436,33 @@ export default function CustomersPage() {
       title="Clientes"
       subtitle="Operação da carteira para entender contexto e agir sem ruído."
     >
-      <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] px-4 py-4 md:px-5">
-        <div className="space-y-3">
-          <div className="space-y-1">
-            <h1 className="text-xl font-semibold text-[var(--text-primary)]">
-              Clientes
-            </h1>
-            <p className="text-sm text-[var(--text-secondary)]">
-              Carteira operacional com leitura rápida de contexto, status e
-              próxima ação.
-            </p>
-            <p className="text-xs text-[var(--text-muted)]">
-              {overdueCustomers} com cobrança vencida · {withoutFutureSchedule}{" "}
-              sem continuidade de agenda
-            </p>
-          </div>
-          <ActionBarWrapper
-            className="border border-[var(--border-subtle)] bg-transparent p-0"
-            searchValue={searchTerm}
-            onSearchChange={setSearchTerm}
-            searchPlaceholder="Buscar por nome, telefone, email ou ID"
-            primaryAction={
-              <Button
-                type="button"
-                onClick={() => setCreateOpen(true)}
-                className="h-10 whitespace-nowrap px-4"
-              >
-                Novo cliente
-              </Button>
-            }
-          />
-        </div>
-      </section>
+      <OperationalTopCard
+        contextLabel="Direção de carteira"
+        title="Centro do cliente"
+        description="Carteira operacional com leitura rápida de contexto, status e próxima ação."
+        chips={
+          <p className="text-xs text-[var(--text-muted)]">
+            {overdueCustomers} com cobrança vencida · {withoutFutureSchedule}{" "}
+            sem continuidade de agenda
+          </p>
+        }
+        primaryAction={
+          <Button
+            type="button"
+            onClick={() => setCreateOpen(true)}
+            className="h-10 whitespace-nowrap px-4"
+          >
+            Novo cliente
+          </Button>
+        }
+      />
+
+      <ActionBarWrapper
+        className="border border-[var(--border-subtle)] bg-[var(--surface-base)] p-0"
+        searchValue={searchTerm}
+        onSearchChange={setSearchTerm}
+        searchPlaceholder="Buscar por nome, telefone, email ou ID"
+      />
 
       <AppSectionBlock
         title="Carteira de clientes"
@@ -693,10 +683,7 @@ export default function CustomersPage() {
                             <span className="text-xs text-[var(--text-muted)]">
                               ID {customerId.slice(0, 8)}
                             </span>
-                            <NexoStatusBadge
-                              tone={snapshot.statusTone}
-                              label={snapshot.status}
-                            />
+                            <AppStatusBadge label={snapshot.status} />
                           </div>
                         </button>
                       </td>
@@ -726,15 +713,18 @@ export default function CustomersPage() {
                         ) : null}
                       </td>
                       <td className="p-3 align-top">
-                        <span
-                          className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${getContactUrgencyTone(snapshot.contactDays, snapshot.contactState)}`}
-                        >
-                          {snapshot.overdueCharges > 0
-                            ? "Cobrança vencida"
-                            : !snapshot.hasFutureSchedule
-                              ? "Sem agendamento futuro"
-                              : snapshot.contactLabel}
-                        </span>
+                        <AppStatusBadge
+                          label={
+                            snapshot.overdueCharges > 0
+                              ? "Em risco"
+                              : !snapshot.hasFutureSchedule
+                                ? "Pendente"
+                                : getContactUrgencyLabel(
+                                    snapshot.contactDays,
+                                    snapshot.contactState
+                                  )
+                          }
+                        />
                       </td>
                       <td className="p-3 align-top">
                         <div className="flex items-center justify-end">

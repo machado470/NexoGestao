@@ -129,25 +129,25 @@ export function AppMetricCard({
   const content = (
     <article
       className={cn(
-        "nexo-card-kpi h-full p-4",
+        "nexo-card-kpi flex h-full min-h-[156px] flex-col p-4 md:p-5",
         tone === "important" && "nexo-card-kpi--important",
         tone === "critical" && "nexo-card-kpi--critical"
       )}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
+      <div className="flex min-h-0 flex-1 items-start justify-between gap-3">
+        <div className="min-w-0 space-y-1.5">
+          <p className="truncate text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
             {title}
           </p>
           {loading ? (
             <div
-              className="mt-3 h-8 w-28 rounded-md bg-[var(--surface-elevated)]/70"
+              className="h-8 w-28 rounded-md bg-[var(--surface-elevated)]/70"
               aria-hidden
             />
           ) : (
             <p
               className={cn(
-                "mt-2 font-semibold tracking-tight text-[var(--text-primary)]",
+                "font-semibold leading-none tracking-tight text-[var(--text-primary)]",
                 emphasis === "strong" ? "text-3xl md:text-[2rem]" : "text-2xl"
               )}
             >
@@ -162,11 +162,15 @@ export function AppMetricCard({
       </div>
 
       {delta || footer || onClick ? (
-        <div className="mt-3 flex items-center justify-between gap-2">
-          <MetricTrendBadge trend={trend} delta={delta} />
-          {footer ? (
-            <div className="text-xs text-[var(--text-muted)]">{footer}</div>
-          ) : null}
+        <div className="mt-4 flex min-h-7 flex-wrap items-center justify-between gap-2 border-t border-[var(--border-subtle)]/70 pt-3">
+          <div className="min-w-0">
+            <MetricTrendBadge trend={trend} delta={delta} />
+            {footer ? (
+              <div className="truncate text-xs text-[var(--text-muted)]">
+                {footer}
+              </div>
+            ) : null}
+          </div>
           {onClick ? (
             <AppCardCTA label={ctaLabel ?? "Abrir"} onClick={onClick} />
           ) : null}
@@ -358,20 +362,22 @@ export function AppSectionBlock({
   return (
     <AppSectionCard
       className={cn(
-        compact ? "min-h-0" : "min-h-[240px] lg:min-h-[280px]",
+        compact
+          ? "min-h-0 rounded-xl p-4 md:p-5"
+          : "min-h-[240px] rounded-xl p-5 md:p-6",
         className
       )}
     >
-      <div className="mb-3 flex min-w-0 items-start justify-between gap-2">
+      <div className="mb-4 flex min-w-0 items-start justify-between gap-3 border-b border-[var(--border-subtle)]/70 pb-3">
         <div className="min-w-0 flex-1">
           <h3
-            className="truncate text-sm font-semibold text-[var(--text-primary)]"
+            className="truncate text-sm font-semibold tracking-tight text-[var(--text-primary)]"
             title={title}
           >
             {title}
           </h3>
           {subtitle ? (
-            <p className="line-clamp-2 text-xs text-[var(--text-muted)]">
+            <p className="mt-1 line-clamp-2 text-xs text-[var(--text-muted)]">
               {subtitle}
             </p>
           ) : null}
@@ -396,7 +402,7 @@ export function AppSectionBlock({
 
 export function AppDataTable({ children }: { children: ReactNode }) {
   return (
-    <div className="overflow-x-auto rounded-xl border border-[var(--border-subtle)]">
+    <div className="overflow-x-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)]">
       {children}
     </div>
   );
@@ -452,8 +458,8 @@ export function AppListBlock({
     <div
       className={cn(
         compact
-          ? "space-y-1.5 min-h-0"
-          : "space-y-2 min-h-[240px] lg:min-h-[280px]",
+          ? "min-h-0 space-y-2"
+          : "min-h-[220px] space-y-2.5",
         className
       )}
     >
@@ -462,23 +468,23 @@ export function AppListBlock({
           key={item.__key}
           className={cn(
             "rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/70",
-            compact ? "px-2.5 py-2" : "p-3"
+            compact ? "px-3 py-2.5" : "px-3.5 py-3"
           )}
         >
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex-1 min-w-0">
-              <p className="truncate text-sm font-medium text-[var(--text-primary)]">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium leading-5 text-[var(--text-primary)]">
                 {item.title}
               </p>
               {item.subtitle ? (
-                <p className="truncate text-xs text-[var(--text-muted)]">
+                <p className="mt-0.5 line-clamp-2 text-xs text-[var(--text-muted)]">
                   {item.subtitle}
                 </p>
               ) : null}
             </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <div className="shrink-0">{item.action}</div>
+            <div className="flex shrink-0 items-center gap-2 self-center">
               {item.right ? <div className="shrink-0">{item.right}</div> : null}
+              <div className="shrink-0">{item.action}</div>
             </div>
           </div>
         </div>
@@ -587,7 +593,7 @@ export function AppStatusBadge({ label }: { label: string }) {
   return (
     <Badge
       className={cn(
-        "h-6 rounded-full px-2.5 py-0 text-[10px] font-semibold tracking-[0.08em] uppercase border",
+        "inline-flex h-6 items-center rounded-full border px-2.5 py-0 text-[10px] font-semibold uppercase tracking-[0.08em]",
         statusTone[safeLabel.toLowerCase()] ??
           "bg-[var(--dashboard-neutral)]/14 text-[var(--dashboard-neutral)] border-[var(--dashboard-neutral)]/34"
       )}
@@ -597,7 +603,23 @@ export function AppStatusBadge({ label }: { label: string }) {
   );
 }
 
-export const AppPriorityBadge = AppStatusBadge;
+export function AppPriorityBadge({ label }: { label: string }) {
+  const normalized = String(label ?? "").trim().toLowerCase();
+  const mapped =
+    normalized === "critical" || normalized === "urgent" || normalized === "p0"
+      ? "Urgente"
+      : normalized === "high" || normalized === "alta" || normalized === "p1"
+        ? "Alta"
+        : normalized === "medium" ||
+            normalized === "média" ||
+            normalized === "p2"
+          ? "Médio"
+          : normalized === "low" || normalized === "baixa" || normalized === "p3"
+            ? "Baixo"
+            : label;
+
+  return <AppStatusBadge label={mapped} />;
+}
 
 type AppNextActionSeverity = "low" | "medium" | "high" | "critical";
 
