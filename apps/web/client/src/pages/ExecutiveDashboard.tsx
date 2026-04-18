@@ -11,7 +11,6 @@ import {
   AppStatusBadge,
 } from "@/components/internal-page-system";
 import { KpiErrorBoundary } from "@/components/KpiErrorBoundary";
-import { OperationalRadialMetric } from "@/components/dashboard/OperationalRadialMetric";
 import { ExecutiveTrendChart } from "@/components/dashboard/ExecutiveTrendChart";
 import { WhatsAppOverviewCard } from "@/components/dashboard/WhatsAppOverviewCard";
 
@@ -86,27 +85,10 @@ export default function ExecutiveDashboard() {
                 navigate("/service-orders?status=attention&period=7d"),
             },
             {
-              title: "SLA",
-              value: (
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-2xl font-semibold tracking-tight text-[var(--text-primary)]">
-                    92,8%
-                  </span>
-                  <OperationalRadialMetric
-                    value={93}
-                    label="SLA"
-                    size={70}
-                    thickness={8}
-                    color="var(--dashboard-success)"
-                    className="gap-0"
-                    labelClassName="sr-only"
-                    valueClassName="text-xs"
-                  />
-                </div>
-              ),
-              delta: "+2,1%",
-              trend: "up",
-              hint: "estável · últimos 30 dias",
+              label: "SLA",
+              value: "92,8%",
+              trend: 2.1,
+              context: "estável · últimos 30 dias",
               onClick: () => navigate("/service-orders?metric=sla&period=30d"),
             },
             {
