@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import {
-  ArrowLeft,
   Bot,
   Check,
   CheckCheck,
@@ -11,8 +10,8 @@ import {
   Info,
   Search,
   Send,
-  WandSparkles,
   UserRound,
+  WandSparkles,
   Workflow,
 } from "lucide-react";
 
@@ -22,23 +21,16 @@ import { buildIdempotencyKey } from "@/lib/idempotency";
 import { invalidateOperationalGraph } from "@/lib/operationalConsistency";
 import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
 import { cn } from "@/lib/utils";
-import {
-  formatDelta,
-  getWindow,
-  inRange,
-  percentDelta,
-  trendFromDelta,
-} from "@/lib/operational/kpi";
 import { Button, Badge } from "@/components/design-system";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
-import { AppEmptyState, AppKpiRow, AppLoadingState } from "@/components/internal-page-system";
+import { AppEmptyState, AppLoadingState } from "@/components/internal-page-system";
 
 type ConversationFilter = "all" | "no_reply" | "billing" | "appointment" | "service_order" | "failures" | "suggestions";
 type MessageSendStatus = "queued" | "sent" | "delivered" | "failed" | "unknown";
 type MessageKind = "incoming" | "outgoing" | "automation" | "event";
-type WorkspaceTab = "context" | "automation" | "history";
+type WorkspaceView = "conversations" | "chat" | "context" | "automations" | "history";
 
 const QUICK_ACTIONS = [
   {
@@ -180,7 +172,7 @@ export default function WhatsAppPage() {
   const [content, setContent] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [activeFilter, setActiveFilter] = useState<ConversationFilter>("all");
-  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<WorkspaceTab>("context");
+  const [activeWorkspaceView, setActiveWorkspaceView] = useState<WorkspaceView>(queryCustomerId ? "chat" : "conversations");
 
   const selectedCustomer = customers.find((item) => String(item?.id) === selectedCustomerId);
 
@@ -194,17 +186,6 @@ export default function WhatsAppPage() {
 
   const failed = selectedMessages.filter((item) => normalizeMessageStatus(item?.status) === "failed").length;
   const delivered = selectedMessages.filter((item) => normalizeMessageStatus(item?.status) === "delivered").length;
-
-  const current7 = getWindow(7, 0);
-  const previous7 = getWindow(7, 1);
-  const current7Messages = selectedMessages.filter((item) => inRange(safeDate(item?.createdAt), current7.start, current7.end));
-  const previous7Messages = selectedMessages.filter((item) => inRange(safeDate(item?.createdAt), previous7.start, previous7.end));
-  const current7DeliveryRate = current7Messages.length === 0
-    ? 0
-    : (current7Messages.filter((item) => normalizeMessageStatus(item?.status) === "delivered").length / current7Messages.length) * 100;
-  const previous7DeliveryRate = previous7Messages.length === 0
-    ? 0
-    : (previous7Messages.filter((item) => normalizeMessageStatus(item?.status) === "delivered").length / previous7Messages.length) * 100;
 
   usePageDiagnostics({
     page: "whatsapp",
@@ -472,368 +453,374 @@ export default function WhatsAppPage() {
   return (
     <PageWrapper
       title="WhatsApp Operacional"
-      subtitle="Central de conversa operacional com contexto, histórico e automações no mesmo fluxo."
+      subtitle="Workspace de execução com modos de trabalho para conversas, chat, contexto, automações e histórico."
     >
-      <AppKpiRow
-        items={[
-          {
-            title: "Mensagens enviadas",
-            value: String(selectedMessages.length),
-            delta: formatDelta(percentDelta(current7Messages.length, previous7Messages.length)),
-            trend: trendFromDelta(percentDelta(current7Messages.length, previous7Messages.length)),
-            hint: "7 dias vs período anterior",
-          },
-          {
-            title: "Taxa de entrega",
-            value: `${current7DeliveryRate.toFixed(1).replace(".", ",")}%`,
-            delta: formatDelta(percentDelta(current7DeliveryRate, previous7DeliveryRate)),
-            trend: trendFromDelta(percentDelta(current7DeliveryRate, previous7DeliveryRate)),
-            hint: "mensagens entregues / enviadas (7d)",
-          },
-          { title: "Falhas de envio", value: String(failed), hint: "status FAILED" },
-          { title: "Automações prontas", value: String(conversationSuggestions.length), hint: "sugestões para esta conversa" },
-        ]}
-      />
-
-      <section className="grid min-h-[74vh] gap-4 md:grid-cols-[340px_minmax(0,1fr)]">
-        <aside className={cn(
-          "flex min-h-0 flex-col rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-primary)]",
-          selectedCustomerId ? "hidden md:flex" : "flex"
-        )}>
-          <div className="border-b border-[var(--border-subtle)] p-4">
-            <p className="text-sm font-semibold text-[var(--text-primary)]">Conversas</p>
-            <p className="text-xs text-[var(--text-secondary)]">Inbox operacional com prioridade e contexto</p>
-            <div className="relative mt-3">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-[var(--text-muted)]" />
-              <Input
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="Buscar cliente ou telefone"
-                className="pl-8"
-              />
+      <section className="space-y-4">
+        <header className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-primary)] px-5 py-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-[var(--text-primary)]">Workspace operacional</p>
+              <p className="text-xs text-[var(--text-secondary)]">
+                Navegue por janelas de trabalho sem colunas fixas para focar em uma operação por vez.
+              </p>
             </div>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {FILTERS.map((filter) => (
-                <button
-                  key={filter.key}
-                  type="button"
-                  onClick={() => setActiveFilter(filter.key)}
-                  className={cn(
-                    "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
-                    activeFilter === filter.key
-                      ? "border-[var(--border-emphasis)] bg-[var(--surface-elevated)] text-[var(--text-primary)]"
-                      : "border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                  )}
-                >
-                  {filter.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="min-h-0 flex-1 overflow-y-auto px-3 py-2">
-            {filteredConversations.length === 0 ? (
-              <AppEmptyState
-                title="Nenhuma conversa encontrada"
-                description="Ajuste o filtro ou a busca para localizar uma conversa operacional."
-              />
-            ) : (
-              <div className="space-y-2">
-                {filteredConversations.map((conversation) => (
-                  <button
-                    key={conversation.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedCustomerId(conversation.id);
-                      setActiveWorkspaceTab("context");
-                    }}
-                    className={cn(
-                      "w-full rounded-xl border px-3 py-3.5 text-left transition-colors",
-                      selectedCustomerId === conversation.id
-                        ? "border-[var(--border-emphasis)] bg-[var(--surface-elevated)]"
-                        : "border-transparent hover:border-[var(--border-subtle)] hover:bg-[var(--surface-elevated)]/40"
-                    )}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="line-clamp-1 text-sm font-semibold text-[var(--text-primary)]">{conversation.name}</p>
-                      <span className="shrink-0 text-[11px] text-[var(--text-muted)]">{fmtTime(conversation.lastInteraction)}</span>
-                    </div>
-                    <p className="mt-1 line-clamp-2 text-xs text-[var(--text-secondary)]">{conversation.snippet}</p>
-                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                      <Badge>{conversation.state}</Badge>
-                      {conversation.contextBadge ? <Badge>{conversation.contextBadge}</Badge> : null}
-                    </div>
-                  </button>
-                ))}
+            {selectedCustomer ? (
+              <div className="inline-flex items-center gap-2 rounded-xl border border-[var(--border-subtle)] px-3 py-2">
+                <p className="text-sm font-medium text-[var(--text-primary)]">{String(selectedCustomer.name ?? "Cliente")}</p>
+                <Badge>{failed > 0 ? "Falha" : delivered > 0 ? "Saudável" : "Sem resposta"}</Badge>
               </div>
-            )}
+            ) : null}
           </div>
-        </aside>
+        </header>
 
-        <main className={cn(
-          "flex min-h-0 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-primary)]",
-          !selectedCustomerId ? "hidden md:flex" : "flex"
-        )}>
-          {!selectedCustomer ? (
-            <div className="flex h-full items-center justify-center p-6">
-              <AppEmptyState
-                title="Nenhuma conversa selecionada"
-                description="Selecione um cliente na lista para abrir o chat operacional com contexto e automações."
-              />
-            </div>
-          ) : (
-            <>
-              <header className="flex items-center justify-between gap-3 border-b border-[var(--border-subtle)] px-5 py-4">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedCustomerId("")}
-                      className="inline-flex rounded-md p-1 text-[var(--text-muted)] md:hidden"
-                      aria-label="Voltar para lista de conversas"
-                    >
-                      <ArrowLeft className="size-4" />
-                    </button>
-                    <p className="truncate text-sm font-semibold text-[var(--text-primary)]">{String(selectedCustomer.name ?? "Cliente")}</p>
-                    <Badge>{failed > 0 ? "Falha" : delivered > 0 ? "Saudável" : "Sem resposta"}</Badge>
-                  </div>
-                  <p className="truncate text-xs text-[var(--text-secondary)]">{String(selectedCustomer.phone ?? "Telefone não informado")}</p>
-                </div>
+        <WorkspaceModeTabs activeView={activeWorkspaceView} onChange={setActiveWorkspaceView} />
 
-                <div className="flex items-center gap-2">
-                  <Button type="button" variant="outline" size="sm" onClick={() => setSearchTerm(String(selectedCustomer.name ?? ""))}>
-                    Abrir cliente
-                  </Button>
-                </div>
-              </header>
+        <main className="min-h-[74vh] rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-primary)]">
+          {activeWorkspaceView === "conversations" ? (
+            <ConversationsView
+              filteredConversations={filteredConversations}
+              selectedCustomerId={selectedCustomerId}
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              activeFilter={activeFilter}
+              onFilterChange={setActiveFilter}
+              onSelectConversation={(conversationId) => {
+                setSelectedCustomerId(conversationId);
+                setActiveWorkspaceView("chat");
+              }}
+            />
+          ) : null}
 
-              <div className="min-h-0 flex-1 overflow-hidden">
-                <div className="grid h-full min-h-0 grid-rows-[minmax(0,1fr)_minmax(250px,0.45fr)]">
-                  <div className="min-h-0 overflow-y-auto px-5 py-4">
-                    {messagesQuery.isLoading ? (
-                      <AppLoadingState rows={5} />
-                    ) : sortedMessages.length === 0 ? (
-                      <div className="flex h-full items-center justify-center">
-                        <div className="w-full max-w-2xl rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--surface-elevated)]/30 p-8 text-center">
-                          <p className="text-base font-semibold text-[var(--text-primary)]">Conversa pronta para operação</p>
-                          <p className="mt-2 text-sm text-[var(--text-secondary)]">
-                            Inicie o contato com uma ação rápida no composer ou execute uma automação sugerida no workspace abaixo.
-                          </p>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {sortedMessages.map((message) => {
-                          if (message._kind === "event") {
-                            return (
-                              <div key={String(message?.id)} className="mx-auto w-full max-w-[82%] rounded-lg border border-dashed border-[var(--border-subtle)] bg-[var(--surface-elevated)]/60 px-3 py-2 text-center">
-                                <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">Evento operacional</p>
-                                <p className="mt-1 text-xs text-[var(--text-secondary)]">{String(message?.content ?? "Atualização registrada na operação.")}</p>
-                                <p className="mt-1 text-[11px] text-[var(--text-muted)]">{fmtDateTime(message?.createdAt)}</p>
-                              </div>
-                            );
-                          }
+          {activeWorkspaceView === "chat" ? (
+            <ChatView
+              selectedCustomer={selectedCustomer}
+              messages={sortedMessages}
+              isLoading={messagesQuery.isLoading}
+              content={content}
+              onContentChange={setContent}
+              onSend={() => void sendMessage()}
+              isSending={sendMutation.isPending}
+              quickActions={QUICK_ACTIONS}
+              onQuickAction={setContent}
+              onOpenConversations={() => setActiveWorkspaceView("conversations")}
+            />
+          ) : null}
 
-                          const fromClient = message._kind === "incoming";
-                          return (
-                            <div key={String(message?.id)} className={cn("flex", fromClient ? "justify-start" : "justify-end")}>
-                              <div
-                                className={cn(
-                                  "max-w-[78%] rounded-2xl border px-3 py-2.5",
-                                  fromClient
-                                    ? "border-[var(--border-subtle)] bg-[var(--surface-elevated)]"
-                                    : "border-[var(--border-emphasis)] bg-[color-mix(in_srgb,var(--surface-elevated)_86%,var(--bg-surface))]"
-                                )}
-                              >
-                                <div className="mb-1 flex items-center gap-1 text-[11px] text-[var(--text-muted)]">
-                                  {fromClient ? <UserRound className="size-3" /> : message._kind === "automation" ? <Bot className="size-3" /> : <Send className="size-3" />}
-                                  <span>{fromClient ? "Cliente" : message._kind === "automation" ? "Automação" : "Operador"}</span>
-                                </div>
-                                <p className="text-sm text-[var(--text-primary)]">{String(message?.content ?? "")}</p>
-                                <div className="mt-2 flex items-center justify-end gap-1 text-[11px] text-[var(--text-muted)]">
-                                  <span>{fmtTime(message?.createdAt)}</span>
-                                  {!fromClient ? (
-                                    <span className={cn("inline-flex items-center gap-1", statusTone(message._deliveryStatus))}>
-                                      {statusIcon(message._deliveryStatus)}
-                                      {statusLabel(message._deliveryStatus)}
-                                    </span>
-                                  ) : null}
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                  <div className="border-t border-[var(--border-subtle)] px-5 py-4">
-                    <WorkspaceTabs
-                      activeTab={activeWorkspaceTab}
-                      onChange={setActiveWorkspaceTab}
-                      selectedCustomer={selectedCustomer}
-                      selectedMessages={sortedMessages}
-                      chargePendingForSelected={chargePendingForSelected}
-                      futureAppointmentForSelected={futureAppointmentForSelected}
-                      recentServiceOrder={recentServiceOrder}
-                      conversationSuggestions={conversationSuggestions}
-                      historyEvents={historyEvents}
-                      onApplySuggestion={(preview) => setContent(preview)}
-                      onExecuteSuggestion={(item) => void executeSuggestedMessage(item.customerId, item.preview)}
-                    />
-                  </div>
-                </div>
-              </div>
+          {activeWorkspaceView === "context" ? (
+            <ContextWorkspaceView
+              selectedCustomer={selectedCustomer}
+              selectedMessages={sortedMessages}
+              chargePendingForSelected={chargePendingForSelected}
+              futureAppointmentForSelected={futureAppointmentForSelected}
+              recentServiceOrder={recentServiceOrder}
+            />
+          ) : null}
 
-              <footer className="border-t border-[var(--border-subtle)] px-5 py-4">
-                <div className="mb-3 flex flex-wrap gap-2">
-                  {QUICK_ACTIONS.map((action) => (
-                    <button
-                      key={action.key}
-                      type="button"
-                      onClick={() => setContent(action.content)}
-                      className="rounded-full border border-[var(--border-subtle)] px-2.5 py-1 text-xs text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
-                    >
-                      {action.label}
-                    </button>
-                  ))}
-                </div>
-                <div className="space-y-3">
-                  <Textarea
-                    value={content}
-                    onChange={(event) => setContent(event.target.value)}
-                    placeholder="Escreva a mensagem ou use uma ação rápida..."
-                    className="min-h-[96px] resize-y"
-                  />
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs text-[var(--text-muted)]">Template sugerido, contexto e mensagem livre no mesmo fluxo.</p>
-                    <Button type="button" onClick={() => void sendMessage()} disabled={sendMutation.isPending}>
-                      <Send className="mr-1 size-4" />
-                      Enviar
-                    </Button>
-                  </div>
-                </div>
-              </footer>
-            </>
-          )}
+          {activeWorkspaceView === "automations" ? (
+            <AutomationsWorkspaceView
+              selectedCustomer={selectedCustomer}
+              conversationSuggestions={conversationSuggestions}
+              onApplySuggestion={(preview) => {
+                setContent(preview);
+                setActiveWorkspaceView("chat");
+              }}
+              onExecuteSuggestion={(item) => {
+                void executeSuggestedMessage(item.customerId, item.preview);
+                setActiveWorkspaceView("chat");
+              }}
+            />
+          ) : null}
+
+          {activeWorkspaceView === "history" ? (
+            <HistoryWorkspaceView selectedCustomer={selectedCustomer} historyEvents={historyEvents} />
+          ) : null}
         </main>
       </section>
     </PageWrapper>
   );
 }
 
-function WorkspaceTabs({
-  activeTab,
-  onChange,
-  selectedCustomer,
-  selectedMessages,
-  chargePendingForSelected,
-  futureAppointmentForSelected,
-  recentServiceOrder,
-  conversationSuggestions,
-  historyEvents,
-  onApplySuggestion,
-  onExecuteSuggestion,
-}: {
-  activeTab: WorkspaceTab;
-  onChange: (value: WorkspaceTab) => void;
-  selectedCustomer: any;
-  selectedMessages: Array<any>;
-  chargePendingForSelected: boolean;
-  futureAppointmentForSelected: boolean;
-  recentServiceOrder: any;
-  conversationSuggestions: Array<{ id: string; customerId: string; title: string; reason: string; urgency: "Alta" | "Média"; origin: string; preview: string }>;
-  historyEvents: Array<{ id: string; label: string; detail: string; at: string }>;
-  onApplySuggestion: (preview: string) => void;
-  onExecuteSuggestion: (item: { customerId: string; preview: string }) => void;
-}) {
-  if (!selectedCustomer) {
-    return (
-      <div className="flex h-full items-center justify-center p-2">
-        <AppEmptyState
-          title="Contexto indisponível"
-          description="Selecione uma conversa para acompanhar contexto, automações e histórico operacional."
-        />
-      </div>
-    );
-  }
-
+function WorkspaceModeTabs({ activeView, onChange }: { activeView: WorkspaceView; onChange: (value: WorkspaceView) => void }) {
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className="inline-flex w-full flex-wrap gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)]/35 p-1.5">
-        <WorkspaceTabButton
-          icon={Info}
-          label="Contexto"
-          active={activeTab === "context"}
-          onClick={() => onChange("context")}
-        />
-        <WorkspaceTabButton
-          icon={WandSparkles}
-          label="Automações"
-          active={activeTab === "automation"}
-          onClick={() => onChange("automation")}
-        />
-        <WorkspaceTabButton
-          icon={History}
-          label="Histórico"
-          active={activeTab === "history"}
-          onClick={() => onChange("history")}
-        />
+    <nav className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)]/35 p-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <WorkspaceModeButton label="Conversas" active={activeView === "conversations"} onClick={() => onChange("conversations")} />
+        <WorkspaceModeButton label="Chat" active={activeView === "chat"} onClick={() => onChange("chat")} />
+        <WorkspaceModeButton label="Contexto" icon={Info} active={activeView === "context"} onClick={() => onChange("context")} />
+        <WorkspaceModeButton label="Automações" icon={WandSparkles} active={activeView === "automations"} onClick={() => onChange("automations")} />
+        <WorkspaceModeButton label="Histórico" icon={History} active={activeView === "history"} onClick={() => onChange("history")} />
       </div>
-
-      <div className="mt-3 min-h-0 flex-1 overflow-y-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)] p-4">
-        {activeTab === "context" ? (
-          <ContextPanel
-            selectedCustomer={selectedCustomer}
-            selectedMessages={selectedMessages}
-            chargePendingForSelected={chargePendingForSelected}
-            futureAppointmentForSelected={futureAppointmentForSelected}
-            recentServiceOrder={recentServiceOrder}
-          />
-        ) : null}
-
-        {activeTab === "automation" ? (
-          <AutomationPanel
-            conversationSuggestions={conversationSuggestions}
-            onApplySuggestion={onApplySuggestion}
-            onExecuteSuggestion={onExecuteSuggestion}
-          />
-        ) : null}
-
-        {activeTab === "history" ? <HistoryTimeline historyEvents={historyEvents} /> : null}
-      </div>
-    </div>
+    </nav>
   );
 }
 
-function WorkspaceTabButton({
-  icon: Icon,
+function WorkspaceModeButton({
   label,
   active,
   onClick,
+  icon: Icon,
 }: {
-  icon: typeof Info;
   label: string;
   active: boolean;
   onClick: () => void;
+  icon?: typeof Info;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       className={cn(
-        "inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors",
+        "inline-flex items-center gap-2 rounded-xl border px-3.5 py-2 text-sm font-medium transition-colors",
         active
-          ? "border-[var(--border-emphasis)] bg-[var(--surface-primary)] text-[var(--text-primary)]"
-          : "border-transparent text-[var(--text-secondary)] hover:border-[var(--border-subtle)] hover:text-[var(--text-primary)]"
+          ? "border-[var(--border-emphasis)] bg-[var(--surface-primary)] text-[var(--text-primary)] shadow-sm"
+          : "border-transparent text-[var(--text-secondary)] hover:border-[var(--border-subtle)] hover:bg-[var(--surface-primary)]/70 hover:text-[var(--text-primary)]"
       )}
     >
-      <Icon className="size-3.5" />
+      {Icon ? <Icon className="size-4" /> : null}
       {label}
     </button>
   );
 }
 
-function ContextPanel({
+function ConversationsView({
+  filteredConversations,
+  selectedCustomerId,
+  searchTerm,
+  onSearchChange,
+  activeFilter,
+  onFilterChange,
+  onSelectConversation,
+}: {
+  filteredConversations: Array<{
+    id: string;
+    name: string;
+    phone: string;
+    lastInteraction: Date | null;
+    snippet: string;
+    state: string;
+    contextBadge: string | null;
+  }>;
+  selectedCustomerId: string;
+  searchTerm: string;
+  onSearchChange: (value: string) => void;
+  activeFilter: ConversationFilter;
+  onFilterChange: (value: ConversationFilter) => void;
+  onSelectConversation: (id: string) => void;
+}) {
+  return (
+    <div className="flex h-full min-h-[74vh] flex-col">
+      <div className="border-b border-[var(--border-subtle)] px-6 py-5">
+        <p className="text-base font-semibold text-[var(--text-primary)]">Central de conversas</p>
+        <p className="mt-1 text-sm text-[var(--text-secondary)]">Inbox operacional em tela cheia com busca, prioridade e contexto visual.</p>
+
+        <div className="relative mt-4 max-w-xl">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--text-muted)]" />
+          <Input
+            value={searchTerm}
+            onChange={(event) => onSearchChange(event.target.value)}
+            placeholder="Buscar cliente ou telefone"
+            className="h-11 pl-9"
+          />
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-2.5">
+          {FILTERS.map((filter) => (
+            <button
+              key={filter.key}
+              type="button"
+              onClick={() => onFilterChange(filter.key)}
+              className={cn(
+                "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                activeFilter === filter.key
+                  ? "border-[var(--border-emphasis)] bg-[var(--surface-elevated)] text-[var(--text-primary)]"
+                  : "border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              )}
+            >
+              {filter.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-6">
+        {filteredConversations.length === 0 ? (
+          <AppEmptyState
+            title="Nenhuma conversa encontrada"
+            description="Ajuste o filtro ou a busca para localizar uma conversa operacional."
+          />
+        ) : (
+          <div className="space-y-3">
+            {filteredConversations.map((conversation) => (
+              <button
+                key={conversation.id}
+                type="button"
+                onClick={() => onSelectConversation(conversation.id)}
+                className={cn(
+                  "w-full rounded-2xl border px-4 py-4 text-left transition-colors",
+                  selectedCustomerId === conversation.id
+                    ? "border-[var(--border-emphasis)] bg-[var(--surface-elevated)]"
+                    : "border-[var(--border-subtle)] hover:border-[var(--border-emphasis)]/50 hover:bg-[var(--surface-elevated)]/45"
+                )}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-[var(--text-primary)]">{conversation.name}</p>
+                    <p className="mt-0.5 text-xs text-[var(--text-muted)]">{conversation.phone}</p>
+                  </div>
+                  <span className="shrink-0 text-xs text-[var(--text-muted)]">{fmtTime(conversation.lastInteraction)}</span>
+                </div>
+                <p className="mt-2 text-sm text-[var(--text-secondary)]">{conversation.snippet}</p>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <Badge>{conversation.state}</Badge>
+                  {conversation.contextBadge ? <Badge>{conversation.contextBadge}</Badge> : null}
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ChatView({
+  selectedCustomer,
+  messages,
+  isLoading,
+  content,
+  onContentChange,
+  onSend,
+  isSending,
+  quickActions,
+  onQuickAction,
+  onOpenConversations,
+}: {
+  selectedCustomer: any;
+  messages: Array<any>;
+  isLoading: boolean;
+  content: string;
+  onContentChange: (value: string) => void;
+  onSend: () => void;
+  isSending: boolean;
+  quickActions: ReadonlyArray<{ key: string; label: string; content: string }>;
+  onQuickAction: (value: string) => void;
+  onOpenConversations: () => void;
+}) {
+  if (!selectedCustomer) {
+    return (
+      <div className="flex min-h-[74vh] items-center justify-center p-8">
+        <div className="space-y-4 text-center">
+          <AppEmptyState
+            title="Nenhuma conversa selecionada"
+            description="Abra a janela de Conversas para escolher um cliente e iniciar o atendimento operacional."
+          />
+          <Button type="button" variant="outline" onClick={onOpenConversations}>
+            Ir para Conversas
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid min-h-[74vh] grid-rows-[auto_minmax(0,1fr)_auto]">
+      <header className="border-b border-[var(--border-subtle)] px-6 py-4">
+        <p className="text-sm font-semibold text-[var(--text-primary)]">{String(selectedCustomer.name ?? "Cliente")}</p>
+        <p className="mt-0.5 text-xs text-[var(--text-secondary)]">{String(selectedCustomer.phone ?? "Telefone não informado")}</p>
+      </header>
+
+      <div className="min-h-0 overflow-y-auto px-5 py-5 md:px-8">
+        {isLoading ? (
+          <AppLoadingState rows={6} />
+        ) : messages.length === 0 ? (
+          <div className="flex h-full items-center justify-center">
+            <div className="w-full max-w-3xl rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--surface-elevated)]/30 p-10 text-center">
+              <p className="text-base font-semibold text-[var(--text-primary)]">Conversa pronta para operação</p>
+              <p className="mt-2 text-sm text-[var(--text-secondary)]">
+                Inicie o contato com uma ação rápida no composer ou use a janela de Automações para executar uma sugestão.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="mx-auto w-full max-w-4xl space-y-4">
+            {messages.map((message) => {
+              if (message._kind === "event") {
+                return (
+                  <div key={String(message?.id)} className="mx-auto w-full max-w-[90%] rounded-lg border border-dashed border-[var(--border-subtle)] bg-[var(--surface-elevated)]/60 px-3 py-2 text-center">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">Evento operacional</p>
+                    <p className="mt-1 text-xs text-[var(--text-secondary)]">{String(message?.content ?? "Atualização registrada na operação.")}</p>
+                    <p className="mt-1 text-[11px] text-[var(--text-muted)]">{fmtDateTime(message?.createdAt)}</p>
+                  </div>
+                );
+              }
+
+              const fromClient = message._kind === "incoming";
+              return (
+                <div key={String(message?.id)} className={cn("flex", fromClient ? "justify-start" : "justify-end")}>
+                  <div
+                    className={cn(
+                      "max-w-[80%] rounded-2xl border px-4 py-3",
+                      fromClient
+                        ? "border-[var(--border-subtle)] bg-[var(--surface-elevated)]"
+                        : "border-[var(--border-emphasis)] bg-[color-mix(in_srgb,var(--surface-elevated)_86%,var(--bg-surface))]"
+                    )}
+                  >
+                    <div className="mb-1 flex items-center gap-1 text-[11px] text-[var(--text-muted)]">
+                      {fromClient ? <UserRound className="size-3" /> : message._kind === "automation" ? <Bot className="size-3" /> : <Send className="size-3" />}
+                      <span>{fromClient ? "Cliente" : message._kind === "automation" ? "Automação" : "Operador"}</span>
+                    </div>
+                    <p className="text-sm leading-relaxed text-[var(--text-primary)]">{String(message?.content ?? "")}</p>
+                    <div className="mt-2 flex items-center justify-end gap-1 text-[11px] text-[var(--text-muted)]">
+                      <span>{fmtTime(message?.createdAt)}</span>
+                      {!fromClient ? (
+                        <span className={cn("inline-flex items-center gap-1", statusTone(message._deliveryStatus))}>
+                          {statusIcon(message._deliveryStatus)}
+                          {statusLabel(message._deliveryStatus)}
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <footer className="border-t border-[var(--border-subtle)] bg-[var(--surface-primary)] px-5 py-4 md:px-6">
+        <div className="mb-3 flex flex-wrap gap-2">
+          {quickActions.map((action) => (
+            <button
+              key={action.key}
+              type="button"
+              onClick={() => onQuickAction(action.content)}
+              className="rounded-full border border-[var(--border-subtle)] px-3 py-1.5 text-xs text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
+            >
+              {action.label}
+            </button>
+          ))}
+        </div>
+        <div className="space-y-3">
+          <Textarea
+            value={content}
+            onChange={(event) => onContentChange(event.target.value)}
+            placeholder="Escreva a mensagem ou use uma ação rápida..."
+            className="min-h-[120px] resize-y"
+          />
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs text-[var(--text-muted)]">Template sugerido, contexto e mensagem livre no mesmo fluxo operacional.</p>
+            <Button type="button" onClick={onSend} disabled={isSending}>
+              <Send className="mr-1 size-4" />
+              Enviar
+            </Button>
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+function ContextWorkspaceView({
   selectedCustomer,
   selectedMessages,
   chargePendingForSelected,
@@ -846,6 +833,17 @@ function ContextPanel({
   futureAppointmentForSelected: boolean;
   recentServiceOrder: any;
 }) {
+  if (!selectedCustomer) {
+    return (
+      <div className="flex min-h-[74vh] items-center justify-center p-8">
+        <AppEmptyState
+          title="Contexto indisponível"
+          description="Selecione uma conversa para acompanhar os dados operacionais do cliente."
+        />
+      </div>
+    );
+  }
+
   const contextRows = [
     { label: "Cliente", value: String(selectedCustomer?.name ?? "—") },
     { label: "Telefone", value: String(selectedCustomer?.phone ?? "—") },
@@ -855,115 +853,163 @@ function ContextPanel({
     { label: "Agendamento futuro", value: futureAppointmentForSelected ? "Sim" : "Não" },
     { label: "O.S. recente", value: recentServiceOrder ? String(recentServiceOrder?.status ?? "Registrada") : "Sem O.S. recente" },
     { label: "Responsável interno", value: String(selectedCustomer?.ownerName ?? "Operação Nexo") },
+    { label: "Observações", value: String(selectedCustomer?.notes ?? "Sem observações registradas") },
   ];
 
   return (
-    <div className="divide-y divide-[var(--border-subtle)]">
-      {contextRows.map((row) => (
-        <div key={row.label} className="grid gap-1 py-2.5 md:grid-cols-[220px_minmax(0,1fr)] md:items-start">
-          <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">{row.label}</p>
-          <p className="text-sm text-[var(--text-primary)]">{row.value}</p>
-        </div>
-      ))}
+    <div className="min-h-[74vh] px-6 py-6 md:px-8">
+      <div className="max-w-5xl">
+        <p className="text-base font-semibold text-[var(--text-primary)]">Contexto operacional</p>
+        <p className="mt-1 text-sm text-[var(--text-secondary)]">Dados de atendimento organizados em leitura vertical para tomada de decisão rápida.</p>
+      </div>
+
+      <div className="mt-6 divide-y divide-[var(--border-subtle)] rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)]/20 px-4 md:px-6">
+        {contextRows.map((row) => (
+          <div key={row.label} className="grid gap-2 py-4 md:grid-cols-[220px_minmax(0,1fr)] md:items-start">
+            <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">{row.label}</p>
+            <p className="text-sm text-[var(--text-primary)]">{row.value}</p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
 
-function AutomationPanel({
+function AutomationsWorkspaceView({
+  selectedCustomer,
   conversationSuggestions,
   onApplySuggestion,
   onExecuteSuggestion,
 }: {
-  conversationSuggestions: Array<{ id: string; customerId: string; title: string; reason: string; urgency: "Alta" | "Média"; origin: string; preview: string }>;
+  selectedCustomer: any;
+  conversationSuggestions: Array<{ id: string; customerId: string; title: string; reason: string; urgency: "Alta" | "Média"; origin: string; impact: string; preview: string }>;
   onApplySuggestion: (preview: string) => void;
   onExecuteSuggestion: (item: { customerId: string; preview: string }) => void;
 }) {
+  if (!selectedCustomer) {
+    return (
+      <div className="flex min-h-[74vh] items-center justify-center p-8">
+        <AppEmptyState
+          title="Automações indisponíveis"
+          description="Selecione uma conversa para exibir sugestões acionáveis desta operação."
+        />
+      </div>
+    );
+  }
+
   if (conversationSuggestions.length === 0) {
     return (
-      <AppEmptyState
-        title="Nenhuma automação disponível"
-        description="Quando houver gatilho de cobrança, atraso ou reativação, ele aparecerá aqui para execução rápida."
-      />
+      <div className="flex min-h-[74vh] items-center justify-center p-8">
+        <AppEmptyState
+          title="Nenhuma automação disponível"
+          description="Quando houver gatilho de cobrança, atraso ou reativação, ele aparecerá aqui para execução rápida."
+        />
+      </div>
     );
   }
 
   const [primarySuggestion, ...secondarySuggestions] = conversationSuggestions;
+
   return (
-    <div className="space-y-3">
-      <article className="rounded-xl border border-[var(--border-emphasis)] bg-[var(--surface-elevated)]/55 p-4">
-        <div className="flex items-start justify-between gap-2">
-          <p className="text-sm font-semibold text-[var(--text-primary)]">{primarySuggestion.title}</p>
+    <div className="min-h-[74vh] space-y-6 px-6 py-6 md:px-8">
+      <section className="rounded-2xl border border-[var(--border-emphasis)] bg-[var(--surface-elevated)]/55 p-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="max-w-3xl">
+            <p className="text-base font-semibold text-[var(--text-primary)]">{primarySuggestion.title}</p>
+            <p className="mt-1 text-sm text-[var(--text-secondary)]">{primarySuggestion.reason}</p>
+            <p className="mt-1 text-sm text-[var(--text-secondary)]">{primarySuggestion.impact}</p>
+          </div>
           <Badge>{primarySuggestion.urgency}</Badge>
         </div>
-        <p className="mt-1 text-xs text-[var(--text-secondary)]">{primarySuggestion.reason}</p>
-        <p className="mt-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-primary)] p-2.5 text-xs text-[var(--text-secondary)]">
-          {primarySuggestion.preview}
-        </p>
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-          <span className="inline-flex items-center gap-1 text-[11px] text-[var(--text-muted)]">
-            <Workflow className="size-3.5" />
+
+        <div className="mt-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)] p-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">Prévia da ação</p>
+          <p className="mt-2 text-sm text-[var(--text-primary)]">{primarySuggestion.preview}</p>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+          <span className="inline-flex items-center gap-1 text-xs text-[var(--text-muted)]">
+            <Workflow className="size-4" />
             Origem: {primarySuggestion.origin}
           </span>
           <div className="flex gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={() => onApplySuggestion(primarySuggestion.preview)}>
-              Usar
+            <Button type="button" variant="outline" onClick={() => onApplySuggestion(primarySuggestion.preview)}>
+              Usar no chat
             </Button>
-            <Button type="button" size="sm" onClick={() => onExecuteSuggestion(primarySuggestion)}>
-              Executar agora
+            <Button type="button" onClick={() => onExecuteSuggestion(primarySuggestion)}>
+              Executar automação
             </Button>
           </div>
         </div>
-      </article>
+      </section>
 
       {secondarySuggestions.length > 0 ? (
-        <div className="space-y-2">
+        <section className="space-y-3">
+          <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">Outras sugestões</p>
           {secondarySuggestions.map((item) => (
-            <article key={item.id} className="rounded-xl border border-[var(--border-subtle)] p-3">
-              <div className="flex items-start justify-between gap-2">
-                <p className="text-sm font-semibold text-[var(--text-primary)]">{item.title}</p>
+            <article key={item.id} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)] px-4 py-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-[var(--text-primary)]">{item.title}</p>
+                  <p className="mt-1 text-xs text-[var(--text-secondary)]">{item.reason}</p>
+                </div>
                 <Badge>{item.urgency}</Badge>
               </div>
-              <p className="mt-1 text-xs text-[var(--text-secondary)]">{item.reason}</p>
-              <p className="mt-2 text-xs text-[var(--text-secondary)]">{item.preview}</p>
-              <div className="mt-2 flex items-center justify-between">
-                <span className="text-[11px] text-[var(--text-muted)]">Origem: {item.origin}</span>
+              <p className="mt-2 text-sm text-[var(--text-secondary)]">{item.preview}</p>
+              <div className="mt-3 flex items-center justify-between gap-2">
+                <span className="text-xs text-[var(--text-muted)]">Origem: {item.origin}</span>
                 <Button type="button" variant="outline" size="sm" onClick={() => onApplySuggestion(item.preview)}>
                   Usar
                 </Button>
               </div>
             </article>
           ))}
-        </div>
+        </section>
       ) : null}
     </div>
   );
 }
 
-function HistoryTimeline({ historyEvents }: { historyEvents: Array<{ id: string; label: string; detail: string; at: string }> }) {
+function HistoryWorkspaceView({ selectedCustomer, historyEvents }: { selectedCustomer: any; historyEvents: Array<{ id: string; label: string; detail: string; at: string }> }) {
+  if (!selectedCustomer) {
+    return (
+      <div className="flex min-h-[74vh] items-center justify-center p-8">
+        <AppEmptyState
+          title="Histórico indisponível"
+          description="Selecione uma conversa para visualizar a timeline operacional auditável."
+        />
+      </div>
+    );
+  }
+
   if (historyEvents.length === 0) {
     return (
-      <AppEmptyState
-        title="Sem histórico recente"
-        description="Os eventos operacionais desta conversa aparecerão aqui conforme a execução avança."
-      />
+      <div className="flex min-h-[74vh] items-center justify-center p-8">
+        <AppEmptyState
+          title="Sem histórico recente"
+          description="Os eventos operacionais desta conversa aparecerão aqui conforme a execução avança."
+        />
+      </div>
     );
   }
 
   return (
-    <div className="space-y-1">
-      {historyEvents.map((event, index) => (
-        <article key={event.id} className="relative grid gap-2 pb-4 pl-7 last:pb-0">
-          {index < historyEvents.length - 1 ? (
-            <span className="absolute bottom-0 left-[8px] top-6 w-px bg-[var(--border-subtle)]" aria-hidden />
-          ) : null}
-          <span className="absolute left-0 top-1.5 inline-flex size-4 items-center justify-center rounded-full border border-[var(--border-emphasis)] bg-[var(--surface-primary)]" aria-hidden>
-            <span className="size-1.5 rounded-full bg-[var(--text-primary)]" />
-          </span>
-          <p className="text-sm font-semibold text-[var(--text-primary)]">{event.label}</p>
-          <p className="text-xs text-[var(--text-secondary)]">{event.detail}</p>
-          <p className="text-[11px] text-[var(--text-muted)]">{event.at}</p>
-        </article>
-      ))}
+    <div className="min-h-[74vh] px-6 py-6 md:px-8">
+      <div className="max-w-4xl space-y-4">
+        {historyEvents.map((event, index) => (
+          <article key={event.id} className="relative grid gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)] p-4 pl-10">
+            {index < historyEvents.length - 1 ? (
+              <span className="absolute -bottom-4 left-[17px] top-7 w-px bg-[var(--border-subtle)]" aria-hidden />
+            ) : null}
+            <span className="absolute left-3 top-4 inline-flex size-4 items-center justify-center rounded-full border border-[var(--border-emphasis)] bg-[var(--surface-primary)]" aria-hidden>
+              <span className="size-1.5 rounded-full bg-[var(--text-primary)]" />
+            </span>
+            <p className="text-sm font-semibold text-[var(--text-primary)]">{event.label}</p>
+            <p className="text-sm text-[var(--text-secondary)]">{event.detail}</p>
+            <p className="text-xs text-[var(--text-muted)]">{event.at}</p>
+          </article>
+        ))}
+      </div>
     </div>
   );
 }
