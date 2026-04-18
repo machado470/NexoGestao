@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/design-system";
 import { Loader2 } from "lucide-react";
@@ -9,6 +9,7 @@ import { registerActionFlowEvent } from "@/lib/actionFlow";
 import { FormModal } from "@/components/app-modal-system";
 import { AppField, AppForm, AppSelect } from "@/components/app-system";
 import { invalidateOperationalGraph } from "@/lib/operationalConsistency";
+import { normalizeArrayPayload } from "@/lib/query-helpers";
 
 interface CreateAppointmentModalProps {
   isOpen: boolean;
@@ -28,6 +29,7 @@ type AppointmentStatus =
 
 const INITIAL_FORM = {
   customerId: "",
+  assignedToPersonId: "",
   startsAt: "",
   endsAt: "",
   status: "SCHEDULED" as AppointmentStatus,
@@ -44,6 +46,21 @@ export function CreateAppointmentModal({
 }: CreateAppointmentModalProps) {
   const [formData, setFormData] = useState(INITIAL_FORM);
   const utils = trpc.useUtils();
+  const peopleQuery = trpc.people.list.useQuery(undefined, {
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+  const collaboratorOptions = useMemo(
+    () =>
+      normalizeArrayPayload<any>(peopleQuery.data)
+        .filter((person: any) => person?.active !== false)
+        .map((person: any) => ({
+          value: String(person.id),
+          label: String(person.name ?? "Colaborador"),
+        }))
+        .sort((a, b) => a.label.localeCompare(b.label, "pt-BR")),
+    [peopleQuery.data]
+  );
 
   useEffect(() => {
     if (!isOpen) return;
@@ -81,8 +98,19 @@ export function CreateAppointmentModal({
       return;
     }
 
+    if (
+      formData.assignedToPersonId &&
+      !collaboratorOptions.some(
+        option => option.value === formData.assignedToPersonId
+      )
+    ) {
+      toast.error("Selecione um colaborador válido");
+      return;
+    }
+
     const payload = {
       customerId: formData.customerId,
+      assignedToPersonId: formData.assignedToPersonId || undefined,
       startsAt: formData.startsAt,
       endsAt: formData.endsAt || undefined,
       status: formData.status,
@@ -101,6 +129,7 @@ export function CreateAppointmentModal({
       const optimistic = {
         id: tempId,
         customerId: payload.customerId,
+        assignedToPersonId: payload.assignedToPersonId,
         startsAt: payload.startsAt,
         endsAt: payload.endsAt,
         status: payload.status,
@@ -197,6 +226,30 @@ export function CreateAppointmentModal({
               label: customer.name,
             }))}
           />
+        </AppField>
+
+        <AppField label="Responsável pelo atendimento">
+          <div className="space-y-1.5">
+            <AppSelect
+              value={formData.assignedToPersonId || undefined}
+              onValueChange={assignedToPersonId =>
+                setFormData({ ...formData, assignedToPersonId })
+              }
+              placeholder="Selecione um colaborador"
+              options={collaboratorOptions}
+            />
+            {formData.assignedToPersonId ? (
+              <button
+                type="button"
+                className="text-xs text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]"
+                onClick={() =>
+                  setFormData({ ...formData, assignedToPersonId: "" })
+                }
+              >
+                Limpar responsável
+              </button>
+            ) : null}
+          </div>
         </AppField>
 
         <AppField label="Data/Hora Início *">

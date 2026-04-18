@@ -269,6 +269,7 @@ const customerUpdateInput = customerCreateInput
 
 const appointmentCreateInput = z.object({
   customerId: z.string().min(1),
+  assignedToPersonId: z.string().min(1).optional(),
   startsAt: z.string().min(1),
   endsAt: z.string().optional(),
   status: z.enum(["SCHEDULED", "CONFIRMED", "CANCELED", "DONE", "NO_SHOW"]).optional(),
