@@ -1,10 +1,8 @@
-import { lazy, Suspense } from "react";
+import { useEffect } from "react";
 import { useLocation } from "wouter";
-import { AlertTriangle, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useRunAction } from "@/hooks/useRunAction";
 import { useRenderWatchdog } from "@/hooks/useRenderWatchdog";
-import { useEffect, useState } from "react";
 import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import {
   AppKpiRow,
@@ -15,68 +13,10 @@ import {
 import { KpiErrorBoundary } from "@/components/KpiErrorBoundary";
 import { OperationalRadialMetric } from "@/components/dashboard/OperationalRadialMetric";
 
-const OperationalFlowChart = lazy(() =>
-  import("@/components/dashboard/OperationalFlowChart").then(mod => ({
-    default: mod.OperationalFlowChart,
-  }))
-);
-
-type DashboardRow = {
-  title: string;
-  subtitle: string;
-  status?: string;
-  actionLabel?: string;
-  onAction?: () => void;
-  meta?: string;
-};
-
-function CompactOperationalRows({ items }: { items: DashboardRow[] }) {
-  return (
-    <div className="space-y-2 min-w-0">
-      {items.map(item => (
-        <div
-          key={item.title}
-          className="flex min-w-0 items-center justify-between gap-2 overflow-hidden rounded-xl border border-[var(--dashboard-row-border)] bg-[var(--dashboard-row-bg)] px-3 py-2.5"
-        >
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-[var(--text-primary)]">
-              {item.title}
-            </p>
-            <p className="truncate text-xs text-[var(--text-secondary)]">
-              {item.subtitle}
-            </p>
-            {item.meta ? (
-              <p className="truncate text-[11px] text-[var(--text-muted)]">
-                {item.meta}
-              </p>
-            ) : null}
-          </div>
-
-          <div className="flex max-w-full shrink-0 items-center gap-2">
-            {item.status ? <AppStatusBadge label={item.status} /> : null}
-            {item.onAction ? (
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-7 max-w-full rounded-full px-2.5 text-[11px] text-[var(--text-secondary)] hover:bg-[var(--dashboard-row-hover)] hover:text-[var(--text-primary)]"
-                onClick={item.onAction}
-              >
-                <span className="truncate">{item.actionLabel}</span>
-                <ChevronRight className="ml-1 h-3.5 w-3.5" />
-              </Button>
-            ) : null}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export default function ExecutiveDashboard() {
   useRenderWatchdog("ExecutiveDashboard");
   const [, navigate] = useLocation();
   const { runAction } = useRunAction();
-  const [flowView, setFlowView] = useState<"orders" | "revenue">("orders");
   const ordensTravadas = 5;
   const clientesSemResposta = 2;
   const agendaSemConfirmacao = 4;
@@ -111,23 +51,6 @@ export default function ExecutiveDashboard() {
       });
     }
   }, []);
-
-  const operationalFlow = [
-    { day: "01 Abr", orders: 22, revenue: 11.2 },
-    { day: "02 Abr", orders: 26, revenue: 13.8 },
-    { day: "03 Abr", orders: 19, revenue: 10.6 },
-    { day: "04 Abr", orders: 30, revenue: 16.4 },
-    { day: "05 Abr", orders: 24, revenue: 12.9 },
-    { day: "06 Abr", orders: 28, revenue: 15.1 },
-    { day: "07 Abr", orders: 34, revenue: 17.8 },
-    { day: "08 Abr", orders: 31, revenue: 16.9 },
-    { day: "09 Abr", orders: 27, revenue: 14.2 },
-    { day: "10 Abr", orders: 35, revenue: 19.6 },
-    { day: "11 Abr", orders: 29, revenue: 15.4 },
-    { day: "12 Abr", orders: 37, revenue: 20.7 },
-    { day: "13 Abr", orders: 33, revenue: 18.2 },
-    { day: "14 Abr", orders: 39, revenue: 22.4 },
-  ];
 
   return (
     <AppPageShell>
@@ -201,243 +124,173 @@ export default function ExecutiveDashboard() {
         />
       </KpiErrorBoundary>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         <AppSectionBlock
-          title="Próxima ação recomendada"
-          subtitle="Prioridade operacional para proteger SLA e reduzir risco imediato"
-          className="nexo-dashboard-priority-card flex h-full min-h-[198px] flex-col"
-        >
-          <div className="mb-2 inline-flex h-6 w-fit items-center gap-1 rounded-full border border-[var(--dashboard-danger)]/38 bg-[var(--dashboard-danger)]/14 px-2.5 py-0 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--dashboard-danger)]">
-            <AlertTriangle className="h-3.5 w-3.5" />
-            Prioridade alta
-          </div>
-          <p className="text-base font-semibold text-[var(--text-primary)]">
-            Destravar O.S. críticas do turno
-          </p>
-          <p className="mt-1 line-clamp-2 text-sm text-[var(--text-secondary)]">
-            5 ordens em risco de SLA com impacto direto em receita do dia.
-            Priorize o desbloqueio agora.
-          </p>
-          <div className="mt-2 flex items-center gap-2 text-xs text-[var(--text-muted)]">
-            <span>Impacto: alto</span>
-            <span>•</span>
-            <span>{ordensTravadas} ordens</span>
-          </div>
-          <Button
-            className="mt-3 h-8 max-w-full self-start rounded-full px-3 text-xs"
-            size="sm"
-            onClick={() =>
-              navigate("/service-orders?status=attention&period=7d")
-            }
-          >
-            <span className="truncate">Abrir ordens críticas</span>
-          </Button>
-        </AppSectionBlock>
-
-        <AppSectionBlock
-          title="Fluxo Operacional"
-          subtitle="Últimos 14 dias"
-          className="h-full min-h-[340px] xl:col-span-3"
-        >
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[var(--dashboard-row-border)] bg-[var(--dashboard-row-bg)] px-3 py-1 text-[11px] text-[var(--text-secondary)]">
-              <span
-                className="inline-block h-2.5 w-2.5 rounded-full"
-                style={{ background: "var(--dashboard-info)" }}
-              />
-              {flowView === "orders"
-                ? "Ordens executadas por dia"
-                : "Receita operacional por dia"}
-            </div>
-            <div className="inline-flex items-center gap-1 rounded-full border border-[var(--dashboard-row-border)] bg-[var(--dashboard-row-bg)] p-1">
-              <Button
-                size="sm"
-                variant={flowView === "orders" ? "default" : "ghost"}
-                className={
-                  flowView === "orders"
-                    ? "h-7 rounded-full px-3 text-xs"
-                    : "h-7 rounded-full px-3 text-xs text-[var(--text-secondary)] hover:bg-[var(--dashboard-row-hover)]"
-                }
-                onClick={() => setFlowView("orders")}
-              >
-                Ordens
-              </Button>
-              <Button
-                size="sm"
-                variant={flowView === "revenue" ? "default" : "ghost"}
-                className={
-                  flowView === "revenue"
-                    ? "h-7 rounded-full px-3 text-xs"
-                    : "h-7 rounded-full px-3 text-xs text-[var(--text-secondary)] hover:bg-[var(--dashboard-row-hover)]"
-                }
-                onClick={() => setFlowView("revenue")}
-              >
-                Receita
-              </Button>
-            </div>
-          </div>
-
-          <div className="h-[250px] w-full">
-            <Suspense
-              fallback={
-                <div className="h-full w-full animate-pulse rounded-lg border border-[var(--border-subtle)]/60 bg-[var(--surface-base)]/40" />
-              }
-            >
-              <OperationalFlowChart
-                data={operationalFlow}
-                flowView={flowView}
-              />
-            </Suspense>
-          </div>
-        </AppSectionBlock>
-
-        <AppSectionBlock
-          title="Alertas Críticos"
-          subtitle="Ver alertas"
-          ctaLabel="Ver alertas"
+          title="Central de Alertas"
+          subtitle="Prioridades críticas para execução imediata"
+          className="flex h-full min-h-[280px] flex-col p-6 md:p-8"
+          ctaLabel="Abrir operação"
           onCtaClick={() => navigate("/dashboard/operations?filter=critical")}
-          compact
-          className="flex h-full min-h-[340px] flex-col"
         >
-          <CompactOperationalRows
-            items={[
-              {
-                title: "2 cobranças acima de 45 dias",
-                subtitle: "Financeiro • carteira B",
-                status: "Em risco",
-                actionLabel: "Abrir",
-                onAction: () => navigate("/finances?status=overdue&aging=45+"),
-                meta: "Severidade financeira alta",
-              },
-              {
-                title: `${ordensTravadas} O.S. críticas travadas`,
-                subtitle: "Operação de campo • setor norte",
-                status: "Bloqueado",
-                actionLabel: "Abrir",
-                onAction: () =>
-                  navigate("/service-orders?status=attention&period=7d"),
-                meta: "Atraso acumulado do turno",
-              },
-              {
-                title: `${clientesSemResposta} clientes VIP sem retorno`,
-                subtitle: "Relacionamento • canal WhatsApp",
-                status: "Urgente",
-                actionLabel: "Abrir",
-                onAction: () =>
-                  navigate("/whatsapp?segment=vip&status=awaiting-reply"),
-                meta: "Risco de churn imediato",
-              },
-              {
-                title: `${agendaSemConfirmacao} agendas sem confirmação`,
-                subtitle: "Agenda • período da tarde",
-                status: "Pendente",
-                actionLabel: "Abrir",
-                onAction: () => navigate("/appointments?status=unconfirmed"),
-                meta: "Confirmação pendente de equipe",
-              },
-            ]}
-          />
+          <ul className="space-y-4">
+            <li className="border-l-2 border-[var(--dashboard-danger)] pl-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-[var(--text-primary)]">
+                    {ordensTravadas} O.S. críticas travadas
+                  </p>
+                  <p className="text-xs text-[var(--text-secondary)]">
+                    Setor norte • impacto direto no SLA do turno.
+                  </p>
+                </div>
+                <AppStatusBadge label="Urgente" />
+              </div>
+            </li>
+            <li className="border-l-2 border-[var(--dashboard-warning)] pl-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-[var(--text-primary)]">
+                    2 cobranças acima de 45 dias
+                  </p>
+                  <p className="text-xs text-[var(--text-secondary)]">
+                    Carteira B • risco de caixa acumulado.
+                  </p>
+                </div>
+                <AppStatusBadge label="Atenção" />
+              </div>
+            </li>
+            <li className="border-l-2 border-[var(--dashboard-info)] pl-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-[var(--text-primary)]">
+                    {clientesSemResposta} clientes VIP sem retorno
+                  </p>
+                  <p className="text-xs text-[var(--text-secondary)]">
+                    Relacionamento • janela de contato próxima.
+                  </p>
+                </div>
+                <AppStatusBadge label="Monitorar" />
+              </div>
+            </li>
+          </ul>
         </AppSectionBlock>
 
         <AppSectionBlock
-          title="Performance Equipe"
-          subtitle="Execução do turno em andamento"
-          className="flex h-full min-h-[220px] flex-col"
+          title="Performance Operacional"
+          subtitle="Execução consolidada das equipes do turno"
+          className="flex h-full min-h-[280px] flex-col p-6 md:p-8"
         >
-          <div className="grid grid-cols-3 gap-3">
-            {teamPerformance.map(team => (
-              <div
-                key={team.name}
-                className="rounded-xl border border-[var(--dashboard-row-border)] bg-[var(--dashboard-row-bg)] px-2 py-3"
-              >
-                <OperationalRadialMetric
-                  value={team.value}
-                  label={team.name}
-                  size={84}
-                  thickness={9}
-                  color={
-                    team.value >= 90
-                      ? "var(--dashboard-success)"
-                      : team.value >= 84
-                        ? "var(--dashboard-info)"
-                        : "var(--dashboard-warning)"
-                  }
-                />
-              </div>
-            ))}
+          <div className="flex h-full flex-col justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-6">
+              {teamPerformance.map(team => (
+                <div key={team.name} className="flex flex-col items-center gap-2">
+                  <OperationalRadialMetric
+                    value={team.value}
+                    label={team.name}
+                    size={112}
+                    thickness={10}
+                    color={
+                      team.value >= 90
+                        ? "var(--dashboard-success)"
+                        : team.value >= 84
+                          ? "var(--dashboard-info)"
+                          : "var(--dashboard-warning)"
+                    }
+                    className="gap-1"
+                  />
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-[var(--text-muted)]">
+              Meta operacional: manter todas as equipes acima de 85% no turno.
+            </p>
           </div>
         </AppSectionBlock>
 
         <AppSectionBlock
-          title="Agenda Hoje"
-          subtitle="Compromissos operacionais prioritários"
-          compact
-          className="flex h-full min-h-[220px] flex-col"
+          title="Agenda Operacional"
+          subtitle="Compromissos com horário e status de execução"
+          className="flex h-full min-h-[280px] flex-col p-6 md:p-8"
+          ctaLabel="Abrir agenda"
+          onCtaClick={() => navigate("/appointments")}
         >
-          <CompactOperationalRows
-            items={[
+          <ul className="space-y-3">
+            {[
               {
-                title: "09:00 • Reunião de alinhamento",
-                subtitle: "Sala Estratégia",
+                time: "09:00",
+                title: "Reunião de alinhamento do turno",
                 status: "Confirmado",
-                meta: "Líderes de operação e financeiro",
               },
               {
-                title: "11:30 • Revisão de SLA",
-                subtitle: "Operações",
+                time: "11:30",
+                title: "Revisão de SLA e bloqueios",
                 status: "Atenção",
-                meta: "Meta mínima 92%",
               },
               {
-                title: "14:00 • Follow-up financeiro",
-                subtitle: "Contas em atraso",
+                time: "14:00",
+                title: "Follow-up financeiro da carteira",
                 status: "Em risco",
-                meta: "Carteira acima de 30 dias",
               },
               {
-                title: "17:00 • Fechamento do turno",
-                subtitle: "Diretoria",
+                time: "17:00",
+                title: "Fechamento executivo do dia",
                 status: "Pendente",
-                meta: "Consolidação de indicadores",
               },
-            ]}
-          />
+            ].map(item => (
+              <li key={item.time} className="flex items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="text-sm font-semibold tabular-nums text-[var(--text-primary)]">
+                    {item.time}
+                  </span>
+                  <p className="truncate text-sm text-[var(--text-secondary)]">
+                    {item.title}
+                  </p>
+                </div>
+                <AppStatusBadge label={item.status} />
+              </li>
+            ))}
+          </ul>
         </AppSectionBlock>
 
         <AppSectionBlock
-          title="Alertas do Sistema"
-          subtitle="Monitoramento técnico e estabilidade"
-          compact
-          className="flex h-full min-h-[220px] flex-col"
+          title="Resumo Operacional"
+          subtitle="Indicadores centrais com leitura financeira do ciclo"
+          className="flex h-full min-h-[280px] flex-col p-6 md:p-8"
         >
-          <CompactOperationalRows
-            items={[
-              {
-                title: "Latência acima do esperado",
-                subtitle: "API de cobrança • 312ms",
-                status: "Médio",
-                meta: "Monitorar até 18:00",
-              },
-              {
-                title: "2 integrações aguardando sync",
-                subtitle: "ERP e WhatsApp",
-                status: "Atenção",
-                meta: "Próxima janela em 15 min",
-              },
-              {
-                title: "Fila de notificações em alta",
-                subtitle: "Pico nas últimas 2h",
-                status: "Alto",
-                meta: "Escalonamento ativo",
-              },
-              {
-                title: "Backup diário concluído",
-                subtitle: "Datacenter primário",
-                status: "OK",
-                meta: "Última execução 05:02",
-              },
-            ]}
-          />
+          <div className="space-y-6">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                Receita operacional do período
+              </p>
+              <p className="mt-1 text-3xl font-semibold tracking-tight text-[var(--text-primary)]">
+                R$ 187,4k
+              </p>
+              <p className="text-xs text-[var(--dashboard-success)]">
+                +15,6% vs. período anterior
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <div className="mb-1 flex items-center justify-between text-xs text-[var(--text-secondary)]">
+                  <span>Ordens concluídas</span>
+                  <span>124 / 140</span>
+                </div>
+                <div className="h-2 rounded-full bg-[var(--dashboard-row-bg)]">
+                  <div className="h-full w-[88%] rounded-full bg-[var(--dashboard-info)]" />
+                </div>
+              </div>
+              <div>
+                <div className="mb-1 flex items-center justify-between text-xs text-[var(--text-secondary)]">
+                  <span>Agenda confirmada</span>
+                  <span>{`${100 - agendaSemConfirmacao * 4}%`}</span>
+                </div>
+                <div className="h-2 rounded-full bg-[var(--dashboard-row-bg)]">
+                  <div className="h-full w-[84%] rounded-full bg-[var(--dashboard-success)]" />
+                </div>
+              </div>
+            </div>
+          </div>
         </AppSectionBlock>
       </div>
     </AppPageShell>
