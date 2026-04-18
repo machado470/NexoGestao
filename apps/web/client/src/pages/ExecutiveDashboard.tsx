@@ -13,7 +13,7 @@ import {
   AppStatusBadge,
 } from "@/components/internal-page-system";
 import { KpiErrorBoundary } from "@/components/KpiErrorBoundary";
-import { Progress } from "@/components/ui/progress";
+import { OperationalRadialMetric } from "@/components/dashboard/OperationalRadialMetric";
 
 const OperationalFlowChart = lazy(() =>
   import("@/components/dashboard/OperationalFlowChart").then(mod => ({
@@ -80,6 +80,11 @@ export default function ExecutiveDashboard() {
   const ordensTravadas = 5;
   const clientesSemResposta = 2;
   const agendaSemConfirmacao = 4;
+  const teamPerformance = [
+    { name: "Equipe Alpha", value: 94 },
+    { name: "Equipe Beta", value: 87 },
+    { name: "Equipe Gamma", value: 78 },
+  ];
 
   useEffect(() => {
     // eslint-disable-next-line no-console
@@ -161,10 +166,27 @@ export default function ExecutiveDashboard() {
                 navigate("/service-orders?status=attention&period=7d"),
             },
             {
-              label: "SLA",
-              value: "92,8%",
-              trend: 2.1,
-              context: "estável · últimos 30 dias",
+              title: "SLA",
+              value: (
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-2xl font-semibold tracking-tight text-[var(--text-primary)]">
+                    92,8%
+                  </span>
+                  <OperationalRadialMetric
+                    value={93}
+                    label="SLA"
+                    size={70}
+                    thickness={8}
+                    color="var(--dashboard-success)"
+                    className="gap-0"
+                    labelClassName="sr-only"
+                    valueClassName="text-xs"
+                  />
+                </div>
+              ),
+              delta: "+2,1%",
+              trend: "up",
+              hint: "estável · últimos 30 dias",
               onClick: () => navigate("/service-orders?metric=sla&period=30d"),
             },
             {
@@ -217,31 +239,42 @@ export default function ExecutiveDashboard() {
           subtitle="Últimos 14 dias"
           className="h-full min-h-[340px] xl:col-span-3"
         >
-          <div className="mb-3 flex items-center justify-end gap-1">
-            <Button
-              size="sm"
-              variant={flowView === "orders" ? "default" : "ghost"}
-              className={
-                flowView === "orders"
-                  ? "h-7 rounded-full px-3 text-xs"
-                  : "h-7 rounded-full px-3 text-xs text-[var(--text-secondary)] hover:bg-[var(--dashboard-row-hover)]"
-              }
-              onClick={() => setFlowView("orders")}
-            >
-              Ordens
-            </Button>
-            <Button
-              size="sm"
-              variant={flowView === "revenue" ? "default" : "ghost"}
-              className={
-                flowView === "revenue"
-                  ? "h-7 rounded-full px-3 text-xs"
-                  : "h-7 rounded-full px-3 text-xs text-[var(--text-secondary)] hover:bg-[var(--dashboard-row-hover)]"
-              }
-              onClick={() => setFlowView("revenue")}
-            >
-              Receita
-            </Button>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[var(--dashboard-row-border)] bg-[var(--dashboard-row-bg)] px-3 py-1 text-[11px] text-[var(--text-secondary)]">
+              <span
+                className="inline-block h-2.5 w-2.5 rounded-full"
+                style={{ background: "var(--dashboard-info)" }}
+              />
+              {flowView === "orders"
+                ? "Ordens executadas por dia"
+                : "Receita operacional por dia"}
+            </div>
+            <div className="inline-flex items-center gap-1 rounded-full border border-[var(--dashboard-row-border)] bg-[var(--dashboard-row-bg)] p-1">
+              <Button
+                size="sm"
+                variant={flowView === "orders" ? "default" : "ghost"}
+                className={
+                  flowView === "orders"
+                    ? "h-7 rounded-full px-3 text-xs"
+                    : "h-7 rounded-full px-3 text-xs text-[var(--text-secondary)] hover:bg-[var(--dashboard-row-hover)]"
+                }
+                onClick={() => setFlowView("orders")}
+              >
+                Ordens
+              </Button>
+              <Button
+                size="sm"
+                variant={flowView === "revenue" ? "default" : "ghost"}
+                className={
+                  flowView === "revenue"
+                    ? "h-7 rounded-full px-3 text-xs"
+                    : "h-7 rounded-full px-3 text-xs text-[var(--text-secondary)] hover:bg-[var(--dashboard-row-hover)]"
+                }
+                onClick={() => setFlowView("revenue")}
+              >
+                Receita
+              </Button>
+            </div>
           </div>
 
           <div className="h-[250px] w-full">
@@ -311,24 +344,24 @@ export default function ExecutiveDashboard() {
           subtitle="Execução do turno em andamento"
           className="flex h-full min-h-[220px] flex-col"
         >
-          <div className="space-y-4">
-            {[
-              { name: "Equipe Alpha", value: 94 },
-              { name: "Equipe Beta", value: 87 },
-              { name: "Equipe Gamma", value: 78 },
-            ].map(team => (
-              <div key={team.name}>
-                <div className="mb-1.5 flex items-center justify-between text-xs">
-                  <span className="font-medium text-[var(--text-secondary)]">
-                    {team.name}
-                  </span>
-                  <span className="font-semibold text-[var(--text-primary)]">
-                    {team.value}%
-                  </span>
-                </div>
-                <Progress
+          <div className="grid grid-cols-3 gap-3">
+            {teamPerformance.map(team => (
+              <div
+                key={team.name}
+                className="rounded-xl border border-[var(--dashboard-row-border)] bg-[var(--dashboard-row-bg)] px-2 py-3"
+              >
+                <OperationalRadialMetric
                   value={team.value}
-                  className="h-1.5 rounded-full bg-[var(--dashboard-progress-track)] [&>div]:bg-[var(--dashboard-progress-fill)]"
+                  label={team.name}
+                  size={84}
+                  thickness={9}
+                  color={
+                    team.value >= 90
+                      ? "var(--dashboard-success)"
+                      : team.value >= 84
+                        ? "var(--dashboard-info)"
+                        : "var(--dashboard-warning)"
+                  }
                 />
               </div>
             ))}
