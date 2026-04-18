@@ -17,6 +17,7 @@ import {
   AppPageErrorState,
   AppPageLoadingState,
   AppSectionBlock,
+  AppPriorityBadge,
   AppStatusBadge,
 } from "@/components/internal-page-system";
 import { formatDelta, getDayWindow, getWindow, inRange, percentDelta, safeDate, trendFromDelta } from "@/lib/operational/kpi";
@@ -180,9 +181,6 @@ export default function AppointmentsPage() {
                       ? "Criar O.S."
                       : "Enviar WhatsApp";
                   const priorityLabel = hasConflict || status === "SCHEDULED" ? "HIGH" : "MEDIUM";
-                  const priorityTone = hasConflict || status === "SCHEDULED"
-                    ? "border-rose-500/35 bg-rose-500/10 text-rose-300"
-                    : "border-amber-500/35 bg-amber-500/10 text-amber-300";
                   const handlePrimaryAction = () => {
                     if (nextAction === "Criar O.S.") {
                       navigate(`/service-orders?customerId=${appointment.customerId}&appointmentId=${appointment.id}`);
@@ -194,7 +192,7 @@ export default function AppointmentsPage() {
                   <tr key={String(appointment?.id)} className="border-t border-[var(--border-subtle)]">
                     <td className="p-3">
                       {new Date(String(appointment?.startsAt)).toLocaleString("pt-BR")}
-                      {hasConflict ? <p className="text-xs text-rose-300">Conflito de horário detectado</p> : null}
+                      {hasConflict ? <p className="text-xs text-[var(--dashboard-danger)]">Conflito de horário detectado</p> : null}
                     </td>
                     <td>
                       <p>{String(appointment?.customer?.name ?? "Cliente")}</p>
@@ -204,9 +202,7 @@ export default function AppointmentsPage() {
                     <td>{appointment?.endsAt ? new Date(String(appointment.endsAt)).toLocaleString("pt-BR") : "—"}</td>
                     <td className="p-3 align-middle">
                       <div className="flex items-center justify-end gap-2">
-                        <span className={`inline-flex h-6 items-center rounded-full border px-2.5 text-[10px] font-semibold tracking-[0.08em] ${priorityTone}`}>
-                          {priorityLabel}
-                        </span>
+                        <AppPriorityBadge label={priorityLabel} />
                         <AppRowActionsDropdown
                           triggerLabel="Mais ações"
                           contentClassName="min-w-[232px]"
