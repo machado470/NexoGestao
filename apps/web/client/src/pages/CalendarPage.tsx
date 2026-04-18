@@ -15,13 +15,13 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { Button } from "@/components/design-system";
 import {
-  CalendarDays,
   Plus,
   MessageCircle,
   Briefcase,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PageHero, PageShell, SurfaceSection } from "@/components/PagePattern";
+import { PageWrapper } from "@/components/operating-system/Wrappers";
+import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import { CreateAppointmentModal } from "@/components/CreateAppointmentModal";
 import {
   Dialog,
@@ -42,7 +42,7 @@ import {
   getConcurrencyErrorMessage,
   isConcurrentConflictError,
 } from "@/lib/concurrency";
-import { AppKpiRow, AppSectionBlock } from "@/components/internal-page-system";
+import { AppKpiRow, AppListBlock, AppSectionBlock, AppStatusBadge } from "@/components/internal-page-system";
 
 const STATUS_COLORS: Record<string, string> = {
   SCHEDULED: "#f97316",
@@ -426,164 +426,110 @@ export default function CalendarPage() {
     [navigate]
   );
 
+  const todayItems = rawAppointments
+    .filter((item) => {
+      const start = new Date(item.startsAt);
+      const now = new Date();
+      return start.toDateString() === now.toDateString();
+    })
+    .slice(0, 5)
+    .map((item) => ({
+      title: `${item.customer?.name ?? "Cliente"} · ${new Date(item.startsAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`,
+      subtitle: getStatusLabel(item.status),
+      right: <AppStatusBadge label={getStatusLabel(item.status)} />,
+      action: <Button type="button" size="sm" variant="outline" onClick={() => navigate(`/appointments?id=${item.id}`)}>Abrir</Button>,
+    }));
+
   return (
-    <PageShell>
-      <PageHero
-        eyebrow="Agenda"
-        title={
-          <span className="inline-flex items-center gap-2">
-            <CalendarDays className="h-8 w-8 text-orange-500" />
-            Calendário
-          </span>
-        }
-        description="Agenda operacional conectada com atendimento, execução e contato com o cliente."
-        actions={
+    <PageWrapper title="Calendário" subtitle="Leitura visual da agenda operacional conectada à execução.">
+      <OperationalTopCard
+        contextLabel="Direção de agenda"
+        title="Calendário operacional"
+        description="Visão da rotina diária com ações diretas para cliente, agendamento e O.S."
+        primaryAction={
           <Button
             onClick={() => {
               const now = new Date();
               const end = new Date(now.getTime() + 60 * 60 * 1000);
-
-              setCreateModal({
-                open: true,
-                startStr: formatDateTimeLocalInput(now),
-                endStr: formatDateTimeLocalInput(end),
-              });
+              setCreateModal({ open: true, startStr: formatDateTimeLocalInput(now), endStr: formatDateTimeLocalInput(end) });
             }}
-            className="gap-2 bg-orange-500 text-white hover:bg-orange-600"
+            className="gap-2"
           >
-            <Plus className="h-4 w-4" />
-            Novo Agendamento
+            <Plus className="h-4 w-4" /> Novo agendamento
           </Button>
         }
       />
 
-      <SurfaceSection className="space-y-6">
-        <AppKpiRow
-          items={[
-            { title: "Agendados", value: String(scheduledCount), hint: "aguardando confirmação" },
-            { title: "Confirmados", value: String(confirmedCount), hint: "prontos para atendimento" },
-            { title: "Concluídos", value: String(doneCount), hint: "execução finalizada" },
-            { title: "Não compareceu", value: String(noShowCount), hint: "pedem reação comercial" },
-          ]}
-        />
+      <AppKpiRow
+        items={[
+          { title: "Agendados", value: String(scheduledCount), hint: "aguardando confirmação" },
+          { title: "Confirmados", value: String(confirmedCount), hint: "prontos para atendimento" },
+          { title: "Concluídos", value: String(doneCount), hint: "execução finalizada" },
+          { title: "Conflitos/No-show", value: String(noShowCount), hint: "pedem reação comercial" },
+        ]}
+      />
 
-        <AppSectionBlock title="Leitura operacional da agenda" subtitle="O que priorizar hoje">
-          <div className="grid gap-2 md:grid-cols-3">
-            <div className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Atendimentos prontos para O.S.: <strong>{confirmedCount}</strong></div>
-            <div className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Clientes sem comparecimento: <strong>{noShowCount}</strong></div>
-            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm">Próxima ação: <strong>{noShowCount > 0 ? "reativar cliente por WhatsApp" : "converter confirmados em execução"}</strong></div>
-          </div>
+      <div className="grid gap-4 xl:grid-cols-3">
+        <AppSectionBlock title="Calendário da operação" subtitle="Agenda integrada ao fluxo de execução" className="xl:col-span-2">
+          {appointmentsQuery.error ? (
+            <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm text-red-200">Não foi possível carregar os agendamentos. {appointmentsQuery.error.message}</p>
+                <Button variant="outline" onClick={() => void appointmentsQuery.refetch()}>Tentar novamente</Button>
+              </div>
+            </div>
+          ) : (
+            <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4">
+              {appointmentsQuery.isLoading ? (
+                <CalendarSkeleton />
+              ) : (
+                <FullCalendar
+                  ref={calendarRef}
+                  plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+                  initialView="timeGridWeek"
+                  headerToolbar={{ left: "prev,next today", center: "title", right: "dayGridMonth,timeGridWeek,timeGridDay" }}
+                  buttonText={{ today: "Hoje", month: "Mês", week: "Semana", day: "Dia" }}
+                  locale="pt-br"
+                  firstDay={0}
+                  slotMinTime="06:00:00"
+                  slotMaxTime="22:00:00"
+                  allDaySlot={false}
+                  editable
+                  selectable
+                  selectMirror
+                  dayMaxEvents
+                  weekends
+                  events={events}
+                  dateClick={handleDateClick}
+                  eventClick={handleEventClick}
+                  eventDrop={handleEventDrop}
+                  eventTimeFormat={{ hour: "2-digit", minute: "2-digit", meridiem: false, hour12: false }}
+                  height="auto"
+                  eventClassNames="cursor-pointer hover:opacity-90 transition-opacity"
+                />
+              )}
+            </div>
+          )}
         </AppSectionBlock>
 
-        {appointmentsQuery.error ? (
-          <SurfaceSection className="rounded-xl border border-red-500/40 bg-red-500/10 p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="text-sm text-red-200">
-                Não foi possível carregar os agendamentos.{" "}
-                {appointmentsQuery.error.message}
-              </p>
-              <Button
-                variant="outline"
-                className="border-red-400/40"
-                onClick={() => void appointmentsQuery.refetch()}
-              >
-                Tentar novamente
-              </Button>
-            </div>
-          </SurfaceSection>
-        ) : null}
-
-        {customersQuery.error ? (
-          <SurfaceSection className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="text-sm text-amber-100">
-                Falha ao carregar clientes. O modal de criação pode ficar sem
-                opções até recarregar.
-              </p>
-              <Button
-                variant="outline"
-                className="border-amber-400/40"
-                onClick={() => void customersQuery.refetch()}
-              >
-                Recarregar clientes
-              </Button>
-            </div>
-          </SurfaceSection>
-        ) : null}
-
-        <div className="flex flex-wrap gap-3">
-          {(
-            [
-              ["SCHEDULED", "Agendado"],
-              ["CONFIRMED", "Confirmado"],
-              ["DONE", "Concluído"],
-              ["CANCELED", "Cancelado"],
-              ["NO_SHOW", "Não compareceu"],
-            ] as const
-          ).map(([status, label]) => (
-            <div key={status} className="flex items-center gap-1.5">
-              <div
-                className="h-3 w-3 rounded-full"
-                style={{ backgroundColor: STATUS_COLORS[status] }}
-              />
-              <span className="text-xs text-gray-600 dark:text-gray-400">
-                {label}
+        <AppSectionBlock title="Agenda do dia e conflitos" subtitle="Itens do dia para reação rápida" compact>
+          <AppListBlock
+            compact
+            items={todayItems.length > 0 ? todayItems : [{ title: "Sem agenda para hoje", subtitle: "Use novo agendamento para preencher a rotina.", action: <Button size="sm" variant="outline" onClick={() => setCreateModal({ open: true, startStr: formatDateTimeLocalInput(new Date()), endStr: formatDateTimeLocalInput(new Date(Date.now() + 60*60*1000)) })}>Agendar</Button> }]}
+          />
+          <div className="mt-3 flex flex-wrap gap-2">
+            {([ ["SCHEDULED", "Agendado"], ["CONFIRMED", "Confirmado"], ["DONE", "Concluído"], ["CANCELED", "Cancelado"], ["NO_SHOW", "Não compareceu"] ] as const).map(([status, label]) => (
+              <span key={status} className="inline-flex items-center gap-1 text-xs text-[var(--text-muted)]">
+                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: STATUS_COLORS[status] }} />{label}
               </span>
-            </div>
-          ))}
-        </div>
-
-        <SurfaceSection className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4">
-          {appointmentsQuery.isLoading ? (
-            <CalendarSkeleton />
-          ) : (
-            <FullCalendar
-              ref={calendarRef}
-              plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-              initialView="timeGridWeek"
-              headerToolbar={{
-                left: "prev,next today",
-                center: "title",
-                right: "dayGridMonth,timeGridWeek,timeGridDay",
-              }}
-              buttonText={{
-                today: "Hoje",
-                month: "Mês",
-                week: "Semana",
-                day: "Dia",
-              }}
-              locale="pt-br"
-              firstDay={0}
-              slotMinTime="06:00:00"
-              slotMaxTime="22:00:00"
-              allDaySlot={false}
-              editable
-              selectable
-              selectMirror
-              dayMaxEvents
-              weekends
-              events={events}
-              dateClick={handleDateClick}
-              eventClick={handleEventClick}
-              eventDrop={handleEventDrop}
-              eventTimeFormat={{
-                hour: "2-digit",
-                minute: "2-digit",
-                meridiem: false,
-                hour12: false,
-              }}
-              height="auto"
-              eventClassNames="cursor-pointer hover:opacity-90 transition-opacity"
-            />
-          )}
-        </SurfaceSection>
-      </SurfaceSection>
+            ))}
+          </div>
+        </AppSectionBlock>
+      </div>
 
       <CreateAppointmentModal
         isOpen={createModal.open}
-        onClose={() =>
-          setCreateModal({ open: false, startStr: "", endStr: "" })
-        }
+        onClose={() => setCreateModal({ open: false, startStr: "", endStr: "" })}
         onSuccess={handleCreateSuccess}
         customers={customers}
         initialStartsAt={createModal.startStr}
@@ -597,6 +543,6 @@ export default function CalendarPage() {
         onOpenExecution={handleOpenExecution}
         onOpenWhatsApp={handleOpenWhatsApp}
       />
-    </PageShell>
+    </PageWrapper>
   );
 }
