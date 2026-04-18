@@ -12,7 +12,6 @@ import {
   AppDataTable,
   AppKpiRow,
   AppListBlock,
-  AppNextActionCard,
   AppPageEmptyState,
   AppPageErrorState,
   AppPageLoadingState,
@@ -60,8 +59,6 @@ export default function AppointmentsPage() {
     acc[slot] = (acc[slot] ?? 0) + 1;
     return acc;
   }, {});
-  const conflicts = Object.values(appointmentsBySlot).filter((count) => count > 1).length;
-  const done = appointments.filter((item) => String(item?.status ?? "").toUpperCase() === "DONE").length;
   const now = new Date();
   const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const dayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
@@ -100,6 +97,7 @@ export default function AppointmentsPage() {
       />
 
       <AppKpiRow
+        gridClassName="grid-cols-1 md:grid-cols-2 xl:grid-cols-4"
         items={[
           {
             title: "Agendamentos hoje",
@@ -123,7 +121,7 @@ export default function AppointmentsPage() {
       <AppSectionBlock
         title="Agenda do dia"
         subtitle="Bloco principal: lista direta com ação imediata para executar sem dispersão"
-        className="border-[var(--brand-primary)]/40 bg-[var(--surface-elevated)] p-6 lg:p-8 lg:col-span-2"
+        className="border-[var(--brand-primary)]/40 bg-[var(--surface-elevated)] p-4 lg:col-span-2"
       >
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <p className="text-xs text-[var(--text-muted)]">Comece por aqui: confirme, execute ou reagende e mantenha o dia fluindo.</p>
@@ -131,6 +129,8 @@ export default function AppointmentsPage() {
         </div>
         <AppListBlock
           className="col-span-full"
+          compact
+          showPlaceholders={false}
           items={agendaDoDia.length > 0
             ? agendaDoDia.map((item) => ({
                 title: `${safeDate(item?.startsAt)?.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) ?? "--:--"} · ${String(item?.customer?.name ?? "Cliente")}`,
@@ -140,35 +140,6 @@ export default function AppointmentsPage() {
             : [{ title: "Sem agenda hoje", subtitle: "Crie novos horários para preencher a operação.", action: <button className="nexo-cta-secondary" onClick={() => setOpenCreate(true)}>Criar</button> }]}
         />
       </AppSectionBlock>
-
-      <AppSectionBlock title="Resumo operacional da agenda" subtitle="Bloco secundário para orientar ajustes">
-        <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(320px,1fr))]">
-          <div className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Conflitos de horário: <strong>{conflicts}</strong></div>
-          <div className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Pendentes de confirmação: <strong>{scheduled}</strong></div>
-          <div className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Prontos para virar O.S.: <strong>{confirmed}</strong></div>
-          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm">Próxima ação: <strong>{conflicts > 0 ? "reorganizar conflitos" : "converter confirmados em O.S."}</strong></div>
-        </div>
-      </AppSectionBlock>
-
-      <section className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(320px,1fr))]">
-        <AppSectionBlock title="Gargalos de atraso e conflito" subtitle="Atrasados, conflitos e itens sem dono para destravar" className="lg:col-span-2">
-          <AppListBlock
-            className="col-span-full"
-            items={gargalosAgenda.length > 0
-              ? gargalosAgenda
-              : [{ title: "Sem gargalos críticos agora", subtitle: "Mantenha a rotina e monitore novos conflitos.", action: <button className="nexo-cta-secondary" onClick={() => navigate("/service-orders")}>Próxima etapa</button> }]}
-          />
-        </AppSectionBlock>
-        <AppSectionBlock title="Fechamentos com ação" subtitle="Concluídos e próximos passos para manter a agenda densa">
-          <AppListBlock
-            items={[
-              { title: `${done} atendimentos concluídos`, subtitle: "Consolide no histórico e avance para cobrança.", action: <button className="nexo-cta-secondary" onClick={() => navigate("/service-orders?status=done")}>Ver concluídos</button> },
-              { title: `${confirmed} confirmados prontos`, subtitle: "Converta confirmados em ordens de serviço.", action: <button className="nexo-cta-secondary" onClick={() => navigate("/service-orders")}>Gerar O.S.</button> },
-              { title: `${scheduled} pendentes de confirmação`, subtitle: "Reduza risco de no-show com contato ativo.", action: <button className="nexo-cta-secondary" onClick={() => navigate("/whatsapp")}>Cobrar confirmação</button> },
-            ]}
-          />
-        </AppSectionBlock>
-      </section>
 
       <AppSectionBlock title="Fila de agendamentos" subtitle="Sincronizada em tempo real com backend">
         {showInitialLoading ? (
@@ -223,17 +194,36 @@ export default function AppointmentsPage() {
                     <td><AppStatusBadge label={operationalState || getOperationalSeverityLabel(severity)} /></td>
                     <td>{appointment?.endsAt ? new Date(String(appointment.endsAt)).toLocaleString("pt-BR") : "—"}</td>
                     <td className="p-3">
-                      <div className="space-y-2">
-                        <AppNextActionCard
-                          title="Próxima ação"
-                          description={hasConflict ? "Resolver conflito antes da execução." : "Mantenha o fluxo de execução ativo."}
-                          severity={hasConflict ? "critical" : status === "CONFIRMED" ? "medium" : "high"}
-                          metadata="agendamento"
-                          action={{
-                            label: nextAction,
-                            onClick: () => navigate(nextAction === "Criar O.S." ? `/service-orders?customerId=${appointment.customerId}&appointmentId=${appointment.id}` : `/whatsapp?customerId=${appointment.customerId}`),
-                          }}
-                        />
+                      <div className="space-y-1.5">
+                        <div className={`rounded-lg border px-2.5 py-2 ${
+                          hasConflict
+                            ? "border-rose-500/40 bg-rose-500/12"
+                            : status === "CONFIRMED"
+                              ? "border-amber-500/35 bg-amber-500/10"
+                              : "border-orange-500/35 bg-orange-500/10"
+                        }`}>
+                          <p className={`text-[11px] font-semibold uppercase tracking-[0.12em] ${
+                            hasConflict
+                              ? "text-rose-300"
+                              : status === "CONFIRMED"
+                                ? "text-amber-300"
+                                : "text-orange-300"
+                          }`}>
+                            {hasConflict ? "HIGH" : status === "CONFIRMED" ? "MEDIUM" : "HIGH"}
+                          </p>
+                          <div className="mt-1 flex items-center justify-between gap-2">
+                            <p className="truncate text-xs font-semibold text-[var(--text-primary)]">Próxima ação</p>
+                            <button
+                              className="nexo-cta-primary h-7 px-2.5 text-xs"
+                              onClick={() => navigate(nextAction === "Criar O.S." ? `/service-orders?customerId=${appointment.customerId}&appointmentId=${appointment.id}` : `/whatsapp?customerId=${appointment.customerId}`)}
+                            >
+                              {nextAction}
+                            </button>
+                          </div>
+                          <p className="mt-1 truncate text-[11px] text-[var(--text-muted)]">
+                            {hasConflict ? "Resolver conflito antes da execução." : "Mantenha o fluxo de execução ativo."}
+                          </p>
+                        </div>
                         <AppRowActions
                           actions={[
                             { label: "Criar O.S.", onClick: () => navigate(`/service-orders?customerId=${appointment.customerId}&appointmentId=${appointment.id}`) },
@@ -249,6 +239,17 @@ export default function AppointmentsPage() {
             </table>
           </AppDataTable>
         )}
+      </AppSectionBlock>
+
+      <AppSectionBlock title="Gargalos" subtitle="Atrasados, conflitos e itens sem dono para destravar">
+        <AppListBlock
+          className="col-span-full"
+          compact
+          showPlaceholders={false}
+          items={gargalosAgenda.length > 0
+            ? gargalosAgenda
+            : [{ title: "Sem gargalos críticos agora", subtitle: "Mantenha a rotina e monitore novos conflitos.", action: <button className="nexo-cta-secondary" onClick={() => navigate("/service-orders")}>Próxima etapa</button> }]}
+        />
       </AppSectionBlock>
 
       <CreateAppointmentModal
