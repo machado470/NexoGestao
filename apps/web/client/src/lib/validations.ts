@@ -11,6 +11,16 @@ export const customerSchema = z.object({
     .or(z.literal("")),
   phone: z.string().trim().min(10, "Telefone inválido"),
   notes: z.string().trim().optional(),
+  cpfCnpj: z
+    .string()
+    .trim()
+    .optional()
+    .refine((value) => {
+      if (!value) return true;
+      const digits = value.replace(/\D/g, "");
+      return digits.length === 11 || digits.length === 14;
+    }, "CPF/CNPJ inválido"),
+  address: z.string().trim().max(240, "Endereço deve ter no máximo 240 caracteres").optional(),
 });
 
 export type CustomerFormData = z.infer<typeof customerSchema>;

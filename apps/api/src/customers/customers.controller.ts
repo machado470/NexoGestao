@@ -78,6 +78,8 @@ export class CustomersController {
       phone: body.phone,
       email: body.email,
       notes: body.notes,
+      cpfCnpj: body.cpfCnpj,
+      address: body.address,
       idempotencyKey: body.idempotencyKey ?? idempotencyKeyHeader,
     })
   }

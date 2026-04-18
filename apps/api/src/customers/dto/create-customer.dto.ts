@@ -24,6 +24,16 @@ export class CreateCustomerDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(32)
+  cpfCnpj?: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(240)
+  address?: string
+
+  @IsOptional()
+  @IsString()
   @MaxLength(200)
   idempotencyKey?: string
 }
