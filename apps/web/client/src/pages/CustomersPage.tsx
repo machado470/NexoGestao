@@ -62,7 +62,6 @@ type CustomerOperationalSnapshot = {
   financialPotentialCents: number;
   latestChargeCents: number;
   lastInteractionDays: number;
-  segmentTag: "Recorrente" | "Inativo" | "Premium";
   behaviorLabel: "Responde rápido" | "Responde lento" | "Baixa interação";
   priorityScore: number;
 };
@@ -235,12 +234,6 @@ export default function CustomersPage() {
       const latestChargeCents =
         chargeStats.latestChargeCents || Math.max((seed % 6) * 20000, 12000);
 
-      const segmentTag = ((): CustomerOperationalSnapshot["segmentTag"] => {
-        if (seed % 4 === 0) return "Premium";
-        if (seed % 3 === 0) return "Inativo";
-        return "Recorrente";
-      })();
-
       const behaviorLabel =
         ((): CustomerOperationalSnapshot["behaviorLabel"] => {
           if (contactState === "responded") return "Responde rápido";
@@ -302,7 +295,6 @@ export default function CustomersPage() {
         financialPotentialCents,
         latestChargeCents,
         lastInteractionDays,
-        segmentTag,
         behaviorLabel,
         priorityScore,
       };
@@ -701,9 +693,10 @@ export default function CustomersPage() {
                             <span className="text-xs text-[var(--text-muted)]">
                               ID {customerId.slice(0, 8)}
                             </span>
-                            <span className="rounded-full border border-[var(--border-subtle)] px-2 py-0.5 text-[10px] font-medium text-[var(--text-secondary)]">
-                              {snapshot.segmentTag}
-                            </span>
+                            <NexoStatusBadge
+                              tone={snapshot.statusTone}
+                              label={snapshot.status}
+                            />
                           </div>
                         </button>
                       </td>
@@ -719,7 +712,7 @@ export default function CustomersPage() {
                       </td>
                       <td className="p-3 align-top">
                         <p className="font-medium text-[var(--text-primary)]">
-                          {snapshot.contextLabel}
+                          {snapshot.nextActionReason}
                         </p>
                         <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
                           Próxima: {snapshot.primaryActionLabel}
@@ -733,17 +726,15 @@ export default function CustomersPage() {
                         ) : null}
                       </td>
                       <td className="p-3 align-top">
-                        <div className="flex flex-wrap gap-1.5">
-                          <NexoStatusBadge
-                            tone={snapshot.statusTone}
-                            label={snapshot.status}
-                          />
-                          <span
-                            className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${getContactUrgencyTone(snapshot.contactDays, snapshot.contactState)}`}
-                          >
-                            {snapshot.contactLabel}
-                          </span>
-                        </div>
+                        <span
+                          className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${getContactUrgencyTone(snapshot.contactDays, snapshot.contactState)}`}
+                        >
+                          {snapshot.overdueCharges > 0
+                            ? "Cobrança vencida"
+                            : !snapshot.hasFutureSchedule
+                              ? "Sem agendamento futuro"
+                              : snapshot.contactLabel}
+                        </span>
                       </td>
                       <td className="p-3 align-top">
                         <div className="flex items-center justify-end">
