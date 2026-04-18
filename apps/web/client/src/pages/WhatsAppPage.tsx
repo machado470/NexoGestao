@@ -618,10 +618,10 @@ function WorkspaceModeButton({
       type="button"
       onClick={onClick}
       className={cn(
-        "inline-flex h-11 items-center justify-center gap-2 rounded-full border px-3.5 text-sm font-medium transition-all",
+        "relative inline-flex h-10 items-center justify-center gap-2 rounded-full border px-5 text-sm font-medium transition-all duration-200 ease-out",
         active
-          ? "border-[rgba(255,140,0,0.25)] bg-[rgba(255,140,0,0.12)] text-[#ff8c00]"
-          : "border-[rgba(255,255,255,0.08)] bg-transparent text-[rgba(255,255,255,0.6)] hover:border-[rgba(255,255,255,0.15)] hover:bg-[rgba(255,255,255,0.04)] hover:text-[rgba(255,255,255,0.85)]"
+          ? "border-[rgba(255,140,0,0.26)] bg-[rgba(255,140,0,0.18)] text-[#ff8c00] after:absolute after:bottom-[-6px] after:left-[20%] after:h-[2px] after:w-[60%] after:rounded-[2px] after:bg-[#ff8c00] after:content-['']"
+          : "border-[rgba(255,255,255,0.08)] bg-transparent text-[rgba(255,255,255,0.64)] hover:border-[rgba(255,255,255,0.14)] hover:bg-[rgba(255,255,255,0.035)] hover:text-[rgba(255,255,255,0.84)]"
       )}
     >
       {Icon ? <Icon className="size-4" /> : null}
@@ -682,17 +682,17 @@ function ConversationsView({
           />
         </div>
 
-        <div className="mt-4 inline-flex flex-wrap gap-1 rounded-[999px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] p-1">
+        <div className="mt-4 flex gap-1 overflow-x-auto rounded-[999px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {FILTERS.map((filter) => (
             <button
               key={filter.key}
               type="button"
               onClick={() => onFilterChange(filter.key)}
               className={cn(
-                "rounded-full border px-3 py-1.5 text-xs font-medium transition-all",
+                "h-7 shrink-0 whitespace-nowrap rounded-full border px-2.5 text-[12px] font-medium transition-all duration-200 ease-out",
                 activeFilter === filter.key
-                  ? "border-[rgba(255,140,0,0.25)] bg-[rgba(255,140,0,0.12)] text-[#ff8c00]"
-                  : "border-[rgba(255,255,255,0.08)] bg-transparent text-[rgba(255,255,255,0.6)] hover:border-[rgba(255,255,255,0.15)] hover:bg-[rgba(255,255,255,0.04)] hover:text-[rgba(255,255,255,0.85)]"
+                  ? "border-[rgba(255,140,0,0.2)] bg-[rgba(255,140,0,0.1)] text-[rgba(255,140,0,0.92)]"
+                  : "border-[rgba(255,255,255,0.06)] bg-transparent text-[rgba(255,255,255,0.52)] hover:border-[rgba(255,255,255,0.11)] hover:bg-[rgba(255,255,255,0.03)] hover:text-[rgba(255,255,255,0.72)]"
               )}
             >
               {filter.label}
