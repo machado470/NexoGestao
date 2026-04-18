@@ -1032,8 +1032,11 @@ function AutomationsWorkspaceView({
 
   return (
     <div className="min-h-[74vh] space-y-6 px-6 py-6 md:px-8">
-      <section className="rounded-2xl border border-[var(--border-emphasis)] bg-[linear-gradient(130deg,color-mix(in_srgb,var(--surface-elevated)_78%,var(--surface-primary))_20%,var(--surface-primary)_100%)] p-6">
-        <p className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+      <section
+        tabIndex={0}
+        className="rounded-2xl border border-[rgba(255,140,0,0.25)] bg-[color-mix(in_srgb,var(--surface-elevated)_60%,var(--surface-primary))] p-6 shadow-sm transition-colors duration-200 hover:border-[rgba(255,140,0,0.45)] active:border-[rgba(255,140,0,0.7)] active:shadow-[0_0_0_1px_rgba(255,140,0,0.15)] focus-visible:border-[rgba(255,140,0,0.7)] focus-visible:shadow-[0_0_0_1px_rgba(255,140,0,0.15)]"
+      >
+        <p className="inline-flex items-center gap-1 border-l-[3px] border-[#ff8c00] pl-2 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
           <Sparkles className="size-3.5" />
           melhor próxima ação
         </p>
