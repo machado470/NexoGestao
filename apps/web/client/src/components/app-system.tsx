@@ -95,10 +95,7 @@ export function AppSectionCard({
   ...props
 }: ComponentProps<"section">) {
   return (
-    <section
-      className={cn("nexo-card-kpi p-4 md:p-5", className)}
-      {...props}
-    />
+    <section className={cn("nexo-card-kpi p-4 md:p-5", className)} {...props} />
   );
 }
 
@@ -147,9 +144,11 @@ export const AppStatusBadge = NexoStatusBadge;
 export function AppRowActionsDropdown({
   triggerLabel = "Ações",
   items,
+  contentClassName,
 }: {
   triggerLabel?: string;
   items: Array<{ label: string; onSelect: () => void; disabled?: boolean }>;
+  contentClassName?: string;
 }) {
   return (
     <DropdownMenu>
@@ -158,12 +157,17 @@ export function AppRowActionsDropdown({
           type="button"
           variant="outline"
           size="icon"
+          className="h-8 w-8 border-[var(--border-subtle)] text-[var(--text-secondary)]"
           aria-label={triggerLabel}
         >
           <MoreHorizontal className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
+      <DropdownMenuContent
+        align="end"
+        sideOffset={8}
+        className={cn("min-w-[190px]", contentClassName)}
+      >
         {items.map(item => (
           <DropdownMenuItem
             key={item.label}
@@ -382,15 +386,33 @@ export const AppActivityFeed = AppTimeline;
 
 type AppOperationalState = "NORMAL" | "WARNING" | "RESTRICTED" | "SUSPENDED";
 
-const operationalStateTone: Record<AppOperationalState, { badgeTone: ComponentProps<typeof AppStatusBadge>["tone"]; borderClass: string }> = {
+const operationalStateTone: Record<
+  AppOperationalState,
+  {
+    badgeTone: ComponentProps<typeof AppStatusBadge>["tone"];
+    borderClass: string;
+  }
+> = {
   NORMAL: { badgeTone: "success", borderClass: "border-[var(--success)]/30" },
   WARNING: { badgeTone: "warning", borderClass: "border-[var(--warning)]/30" },
   RESTRICTED: { badgeTone: "accent", borderClass: "border-[var(--accent)]/35" },
   SUSPENDED: { badgeTone: "danger", borderClass: "border-[var(--danger)]/35" },
 };
 
-export function AppOperationalStateBadge({ state, className }: { state: AppOperationalState; className?: string }) {
-  return <AppStatusBadge className={className} tone={operationalStateTone[state].badgeTone} label={state} />;
+export function AppOperationalStateBadge({
+  state,
+  className,
+}: {
+  state: AppOperationalState;
+  className?: string;
+}) {
+  return (
+    <AppStatusBadge
+      className={className}
+      tone={operationalStateTone[state].badgeTone}
+      label={state}
+    />
+  );
 }
 
 export function AppOperationalStateCard({
@@ -407,18 +429,30 @@ export function AppOperationalStateCard({
   className?: string;
 }) {
   return (
-    <AppSectionCard className={cn("min-h-[240px] lg:min-h-[280px] space-y-3", operationalStateTone[state].borderClass, className)}>
+    <AppSectionCard
+      className={cn(
+        "min-h-[240px] lg:min-h-[280px] space-y-3",
+        operationalStateTone[state].borderClass,
+        className
+      )}
+    >
       <div className="flex items-center justify-between gap-3">
-        <p className="text-sm font-semibold text-[var(--text-primary)]">Estado operacional</p>
+        <p className="text-sm font-semibold text-[var(--text-primary)]">
+          Estado operacional
+        </p>
         <AppOperationalStateBadge state={state} />
       </div>
       <p className="text-sm text-[var(--text-secondary)]">{summary}</p>
       <div className="nexo-card-informative p-3 text-xs text-[var(--text-secondary)]">
-        <strong className="text-[var(--text-primary)]">Impacto:</strong> {impact}
+        <strong className="text-[var(--text-primary)]">Impacto:</strong>{" "}
+        {impact}
       </div>
       {recommendation ? (
         <p className="text-xs text-[var(--text-muted)]">
-          <strong className="text-[var(--text-primary)]">Recomendado agora:</strong> {recommendation}
+          <strong className="text-[var(--text-primary)]">
+            Recomendado agora:
+          </strong>{" "}
+          {recommendation}
         </p>
       ) : null}
     </AppSectionCard>
@@ -432,7 +466,9 @@ export function AppOperationalStatePanel({
   children: ReactNode;
   className?: string;
 }) {
-  return <div className={cn("grid gap-3 lg:grid-cols-3", className)}>{children}</div>;
+  return (
+    <div className={cn("grid gap-3 lg:grid-cols-3", className)}>{children}</div>
+  );
 }
 
 export type AppNextActionItem = {
@@ -476,13 +512,18 @@ export function AppNextActionButton({
         action.onRun?.();
       }}
     >
-      {action.action && isExecuting(action.action.id) ? "Executando..." : "Executar"}
+      {action.action && isExecuting(action.action.id)
+        ? "Executando..."
+        : "Executar"}
     </Button>
   );
 }
 
 export function AppNextActionCard({ action }: { action: AppNextActionItem }) {
-  const tone: Record<AppNextActionItem["severity"], ComponentProps<typeof AppStatusBadge>["tone"]> = {
+  const tone: Record<
+    AppNextActionItem["severity"],
+    ComponentProps<typeof AppStatusBadge>["tone"]
+  > = {
     healthy: "success",
     pending: "warning",
     overdue: "accent",
@@ -492,8 +533,13 @@ export function AppNextActionCard({ action }: { action: AppNextActionItem }) {
   return (
     <article className="nexo-card-informative flex items-start justify-between gap-3 p-3">
       <div className="space-y-1">
-        <AppStatusBadge label={action.severity.toUpperCase()} tone={tone[action.severity]} />
-        <p className="text-sm font-semibold text-[var(--text-primary)]">{action.title}</p>
+        <AppStatusBadge
+          label={action.severity.toUpperCase()}
+          tone={tone[action.severity]}
+        />
+        <p className="text-sm font-semibold text-[var(--text-primary)]">
+          {action.title}
+        </p>
         <p className="text-xs text-[var(--text-muted)]">{action.description}</p>
       </div>
       <AppNextActionButton action={action} />
@@ -501,9 +547,20 @@ export function AppNextActionCard({ action }: { action: AppNextActionItem }) {
   );
 }
 
-export function AppNextActionList({ actions, className }: { actions: AppNextActionItem[]; className?: string }) {
+export function AppNextActionList({
+  actions,
+  className,
+}: {
+  actions: AppNextActionItem[];
+  className?: string;
+}) {
   if (actions.length === 0) {
-    return <AppEmptyState title="Sem ações imediatas" description="A operação está estável neste momento." />;
+    return (
+      <AppEmptyState
+        title="Sem ações imediatas"
+        description="A operação está estável neste momento."
+      />
+    );
   }
 
   return (
@@ -524,21 +581,30 @@ export function AppEntityContextPanel({
 }) {
   return (
     <AppSectionCard>
-      <p className="text-sm font-semibold text-[var(--text-primary)]">{title}</p>
+      <p className="text-sm font-semibold text-[var(--text-primary)]">
+        {title}
+      </p>
       <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
         {links.map((link, index) => (
           <div key={link.id} className="inline-flex items-center gap-2">
-            <a className={cn("rounded-full border border-[var(--border-soft)] px-3 py-1", link.active && "text-[var(--accent)] border-[var(--accent)]/40")} href={link.href}>
+            <a
+              className={cn(
+                "rounded-full border border-[var(--border-soft)] px-3 py-1",
+                link.active && "text-[var(--accent)] border-[var(--accent)]/40"
+              )}
+              href={link.href}
+            >
               {link.label}
             </a>
-            {index < links.length - 1 ? <span className="text-[var(--text-muted)]">→</span> : null}
+            {index < links.length - 1 ? (
+              <span className="text-[var(--text-muted)]">→</span>
+            ) : null}
           </div>
         ))}
       </div>
     </AppSectionCard>
   );
 }
-
 
 export const AppTabs = Tabs;
 export const AppTabsList = TabsList;
