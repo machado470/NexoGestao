@@ -121,7 +121,7 @@ export default function AppointmentsPage() {
       <AppSectionBlock
         title="Agenda do dia"
         subtitle="Bloco principal: lista direta com ação imediata para executar sem dispersão"
-        className="border-[var(--brand-primary)]/40 bg-[var(--surface-elevated)] p-4 lg:col-span-2"
+        className="lg:col-span-2"
       >
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <p className="text-xs text-[var(--text-muted)]">Comece por aqui: confirme, execute ou reagende e mantenha o dia fluindo.</p>
