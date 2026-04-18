@@ -96,7 +96,7 @@ export function AppSectionCard({
 }: ComponentProps<"section">) {
   return (
     <section
-      className={cn("nexo-card-panel p-4 md:p-5", className)}
+      className={cn("nexo-card-kpi p-4 md:p-5", className)}
       {...props}
     />
   );
