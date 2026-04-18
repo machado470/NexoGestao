@@ -1,39 +1,173 @@
 import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
+import { toast } from "sonner";
+import {
+  ArrowLeft,
+  Bot,
+  Check,
+  CheckCheck,
+  Clock3,
+  Search,
+  Send,
+  UserRound,
+  Workflow,
+} from "lucide-react";
+
 import { trpc } from "@/lib/trpc";
 import { normalizeArrayPayload } from "@/lib/query-helpers";
 import { buildIdempotencyKey } from "@/lib/idempotency";
-import { toast } from "sonner";
-import { Button } from "@/components/design-system";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { PageWrapper } from "@/components/operating-system/Wrappers";
-import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
-import {
-  AppDataTable,
-  AppEmptyState,
-  AppKpiRow,
-  AppLoadingState,
-  AppNextActionCard,
-  AppSectionBlock,
-  AppStatusBadge,
-} from "@/components/internal-page-system";
 import { invalidateOperationalGraph } from "@/lib/operationalConsistency";
 import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
-import { formatDelta, getWindow, inRange, percentDelta, trendFromDelta } from "@/lib/operational/kpi";
+import { cn } from "@/lib/utils";
+import {
+  formatDelta,
+  getWindow,
+  inRange,
+  percentDelta,
+  trendFromDelta,
+} from "@/lib/operational/kpi";
+import { Button, Badge } from "@/components/design-system";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import { PageWrapper } from "@/components/operating-system/Wrappers";
+import { AppEmptyState, AppKpiRow, AppLoadingState } from "@/components/internal-page-system";
+
+type ConversationFilter = "all" | "no_reply" | "billing" | "appointment" | "service_order" | "failures" | "suggestions";
+type MessageSendStatus = "queued" | "sent" | "delivered" | "failed" | "unknown";
+type MessageKind = "incoming" | "outgoing" | "automation" | "event";
+
+const QUICK_ACTIONS = [
+  {
+    key: "confirm_appointment",
+    label: "Confirmar agendamento",
+    content: "Olá! Confirmando seu agendamento para hoje. Qualquer ajuste, me avise por aqui.",
+  },
+  {
+    key: "send_charge",
+    label: "Enviar cobrança",
+    content: "Olá! Segue o lembrete da cobrança pendente. Posso te enviar novamente o link de pagamento?",
+  },
+  {
+    key: "request_reply",
+    label: "Cobrar retorno",
+    content: "Passando para confirmar se conseguiu ver nossa última mensagem. Posso te ajudar com algo agora?",
+  },
+  {
+    key: "delay_notice",
+    label: "Avisar atraso",
+    content: "Atualizando seu atendimento: tivemos um atraso na operação, mas seu caso já está priorizado.",
+  },
+  {
+    key: "confirm_completion",
+    label: "Confirmar conclusão",
+    content: "Concluímos a execução da sua solicitação. Se precisar de ajuste final, responda por aqui.",
+  },
+  {
+    key: "free_message",
+    label: "Mensagem livre",
+    content: "",
+  },
+] as const;
+
+const FILTERS: Array<{ key: ConversationFilter; label: string }> = [
+  { key: "all", label: "Todas" },
+  { key: "no_reply", label: "Sem resposta" },
+  { key: "billing", label: "Cobrança" },
+  { key: "appointment", label: "Agendamento" },
+  { key: "service_order", label: "O.S." },
+  { key: "failures", label: "Falhas" },
+  { key: "suggestions", label: "Sugestões" },
+];
+
+function safeDate(value: unknown) {
+  if (!value) return null;
+  const parsed = new Date(String(value));
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function fmtDateTime(value: unknown) {
+  const parsed = safeDate(value);
+  return parsed ? parsed.toLocaleString("pt-BR") : "Sem registro";
+}
+
+function fmtTime(value: unknown) {
+  const parsed = safeDate(value);
+  return parsed ? parsed.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "--:--";
+}
+
+function normalizeMessageStatus(status: unknown): MessageSendStatus {
+  const normalized = String(status ?? "").toUpperCase();
+  if (normalized === "QUEUED" || normalized === "PENDING") return "queued";
+  if (normalized === "SENT") return "sent";
+  if (normalized === "DELIVERED") return "delivered";
+  if (normalized === "FAILED" || normalized === "ERROR") return "failed";
+  return "unknown";
+}
+
+function detectMessageKind(message: any): MessageKind {
+  const direction = String(message?.direction ?? message?.flow ?? "").toUpperCase();
+  const origin = String(message?.origin ?? message?.source ?? "").toUpperCase();
+  const type = String(message?.type ?? message?.category ?? "").toUpperCase();
+
+  if (type.includes("EVENT") || origin.includes("SYSTEM")) return "event";
+  if (origin.includes("AUTO") || type.includes("AUTO")) return "automation";
+  if (direction.includes("IN") || origin.includes("CUSTOMER") || origin.includes("CLIENT")) return "incoming";
+  return "outgoing";
+}
+
+function statusLabel(status: MessageSendStatus) {
+  switch (status) {
+    case "queued":
+      return "Na fila";
+    case "sent":
+      return "Enviada";
+    case "delivered":
+      return "Entregue";
+    case "failed":
+      return "Falhou";
+    default:
+      return "Sem status";
+  }
+}
+
+function statusTone(status: MessageSendStatus) {
+  switch (status) {
+    case "failed":
+      return "text-rose-500";
+    case "delivered":
+      return "text-emerald-500";
+    case "queued":
+      return "text-amber-500";
+    default:
+      return "text-[var(--text-muted)]";
+  }
+}
+
+function statusIcon(status: MessageSendStatus) {
+  switch (status) {
+    case "queued":
+      return <Clock3 className="size-3.5" />;
+    case "sent":
+      return <Check className="size-3.5" />;
+    case "delivered":
+      return <CheckCheck className="size-3.5" />;
+    case "failed":
+      return <span className="text-[10px] font-bold leading-none">!</span>;
+    default:
+      return null;
+  }
+}
 
 export default function WhatsAppPage() {
-  const safeDate = (value: unknown) => {
-    if (!value) return null;
-    const parsed = new Date(String(value));
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
-  };
   const [location] = useLocation();
   const utils = trpc.useUtils();
   const search = new URLSearchParams(location.split("?")[1] ?? "");
@@ -42,11 +176,16 @@ export default function WhatsAppPage() {
   const customersQuery = trpc.nexo.customers.list.useQuery(undefined, { retry: false });
   const chargesQuery = trpc.finance.charges.list.useQuery({ page: 1, limit: 100 }, { retry: false });
   const serviceOrdersQuery = trpc.nexo.serviceOrders.list.useQuery({ page: 1, limit: 100 }, { retry: false });
-  const customers = useMemo(() => normalizeArrayPayload<any>(customersQuery.data), [customersQuery.data]);
-  const [customerId, setCustomerId] = useState(queryCustomerId);
-  const [content, setContent] = useState("");
 
-  const selectedCustomerId = customerId || String(customers[0]?.id ?? "");
+  const customers = useMemo(() => normalizeArrayPayload<any>(customersQuery.data), [customersQuery.data]);
+  const charges = useMemo(() => normalizeArrayPayload<any>(chargesQuery.data), [chargesQuery.data]);
+  const serviceOrders = useMemo(() => normalizeArrayPayload<any>(serviceOrdersQuery.data), [serviceOrdersQuery.data]);
+
+  const [selectedCustomerId, setSelectedCustomerId] = useState(queryCustomerId || String(customers[0]?.id ?? ""));
+  const [content, setContent] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [activeFilter, setActiveFilter] = useState<ConversationFilter>("all");
+
   const selectedCustomer = customers.find((item) => String(item?.id) === selectedCustomerId);
 
   const messagesQuery = trpc.nexo.whatsapp.messages.useQuery(
@@ -55,93 +194,253 @@ export default function WhatsAppPage() {
   );
   const sendMutation = trpc.nexo.whatsapp.send.useMutation();
 
-  const messages = useMemo(() => normalizeArrayPayload<any>(messagesQuery.data), [messagesQuery.data]);
-  const charges = useMemo(() => normalizeArrayPayload<any>(chargesQuery.data), [chargesQuery.data]);
-  const serviceOrders = useMemo(() => normalizeArrayPayload<any>(serviceOrdersQuery.data), [serviceOrdersQuery.data]);
-  const failed = messages.filter((item) => String(item?.status ?? "").toUpperCase() === "FAILED").length;
-  const delivered = messages.filter((item) => String(item?.status ?? "").toUpperCase() === "DELIVERED").length;
+  const selectedMessages = useMemo(() => normalizeArrayPayload<any>(messagesQuery.data), [messagesQuery.data]);
+
+  const failed = selectedMessages.filter((item) => normalizeMessageStatus(item?.status) === "failed").length;
+  const delivered = selectedMessages.filter((item) => normalizeMessageStatus(item?.status) === "delivered").length;
+
   const current7 = getWindow(7, 0);
   const previous7 = getWindow(7, 1);
-  const current7Messages = messages.filter(item => inRange(safeDate(item?.createdAt), current7.start, current7.end));
-  const previous7Messages = messages.filter(item => inRange(safeDate(item?.createdAt), previous7.start, previous7.end));
-  const current7DeliveryRate = current7Messages.length === 0 ? 0 : (current7Messages.filter(item => String(item?.status ?? "").toUpperCase() === "DELIVERED").length / current7Messages.length) * 100;
-  const previous7DeliveryRate = previous7Messages.length === 0 ? 0 : (previous7Messages.filter(item => String(item?.status ?? "").toUpperCase() === "DELIVERED").length / previous7Messages.length) * 100;
+  const current7Messages = selectedMessages.filter((item) => inRange(safeDate(item?.createdAt), current7.start, current7.end));
+  const previous7Messages = selectedMessages.filter((item) => inRange(safeDate(item?.createdAt), previous7.start, previous7.end));
+  const current7DeliveryRate = current7Messages.length === 0
+    ? 0
+    : (current7Messages.filter((item) => normalizeMessageStatus(item?.status) === "delivered").length / current7Messages.length) * 100;
+  const previous7DeliveryRate = previous7Messages.length === 0
+    ? 0
+    : (previous7Messages.filter((item) => normalizeMessageStatus(item?.status) === "delivered").length / previous7Messages.length) * 100;
+
   usePageDiagnostics({
     page: "whatsapp",
     isLoading: messagesQuery.isLoading,
     hasError: Boolean(messagesQuery.error),
-    isEmpty: !messagesQuery.isLoading && !messagesQuery.error && messages.length === 0,
-    dataCount: messages.length,
+    isEmpty: !messagesQuery.isLoading && !messagesQuery.error && selectedMessages.length === 0,
+    dataCount: selectedMessages.length,
   });
 
   const automationSuggestions = useMemo(() => {
     const now = Date.now();
-    const items: Array<{ id: string; customerId: string; title: string; reason: string; impact: string; urgency: string; preview: string }> = [];
+    const items: Array<{
+      id: string;
+      customerId: string;
+      title: string;
+      reason: string;
+      impact: string;
+      urgency: "Alta" | "Média";
+      preview: string;
+      origin: string;
+    }> = [];
 
     for (const charge of charges) {
       if (String(charge?.status ?? "").toUpperCase() !== "OVERDUE") continue;
-      const cid = String(charge?.customerId ?? "");
-      const customer = customers.find(item => String(item?.id) === cid);
-      if (!cid || !customer?.phone) continue;
+      const customerId = String(charge?.customerId ?? "");
+      const customer = customers.find((item) => String(item?.id) === customerId);
+      if (!customerId || !customer?.phone) continue;
       const value = Number(charge?.amountCents ?? 0) / 100;
       items.push({
-        id: `overdue-${String(charge?.id ?? cid)}`,
-        customerId: cid,
+        id: `overdue-${String(charge?.id ?? customerId)}`,
+        customerId,
         title: `Cobrança vencida · ${String(customer?.name ?? "Cliente")}`,
         reason: "Cobrança vencida detectada",
-        impact: value > 0 ? `Impacto financeiro: R$ ${value.toFixed(2)}` : "Impacto financeiro imediato",
-        urgency: "Urgência: alta",
-        preview: `Olá, identificamos cobrança em aberto. Podemos regularizar hoje para evitar bloqueios?`,
+        impact: value > 0 ? `Impacto financeiro: R$ ${value.toFixed(2).replace(".", ",")}` : "Impacto financeiro imediato",
+        urgency: "Alta",
+        preview: "Olá, identificamos cobrança em aberto. Podemos regularizar hoje para evitar bloqueios?",
+        origin: "Financeiro",
       });
     }
 
-    for (const order of serviceOrders) {
-      const status = String(order?.status ?? "").toUpperCase();
+    for (const serviceOrder of serviceOrders) {
+      const status = String(serviceOrder?.status ?? "").toUpperCase();
       if (status !== "OVERDUE" && status !== "AT_RISK") continue;
-      const cid = String(order?.customerId ?? "");
-      const customer = customers.find(item => String(item?.id) === cid);
-      if (!cid || !customer?.phone) continue;
+      const customerId = String(serviceOrder?.customerId ?? "");
+      const customer = customers.find((item) => String(item?.id) === customerId);
+      if (!customerId || !customer?.phone) continue;
       items.push({
-        id: `so-delay-${String(order?.id ?? cid)}`,
-        customerId: cid,
+        id: `so-delay-${String(serviceOrder?.id ?? customerId)}`,
+        customerId,
         title: `Atraso de O.S. · ${String(customer?.name ?? "Cliente")}`,
         reason: "Ordem em atraso operacional",
         impact: "Impacto em SLA e retenção",
-        urgency: "Urgência: alta",
+        urgency: "Alta",
         preview: "Atualização rápida: sua O.S. está em prioridade máxima e enviamos novo horário estimado.",
+        origin: "Service Desk",
       });
     }
 
     for (const customer of customers) {
-      const cid = String(customer?.id ?? "");
-      if (!cid || !customer?.phone) continue;
+      const customerId = String(customer?.id ?? "");
+      if (!customerId || !customer?.phone) continue;
       const lastContact = safeDate(customer?.lastContactAt);
       if (lastContact && now - lastContact.getTime() < 1000 * 60 * 60 * 24 * 14) continue;
       items.push({
-        id: `no-contact-${cid}`,
-        customerId: cid,
+        id: `no-contact-${customerId}`,
+        customerId,
         title: `Cliente sem contato · ${String(customer?.name ?? "Cliente")}`,
         reason: "Sem interação recente",
         impact: "Oportunidade de reativação",
-        urgency: "Urgência: média",
+        urgency: "Média",
         preview: "Passando para confirmar se está tudo bem e se você precisa de algum suporte nesta semana.",
+        origin: "Relacionamento",
       });
     }
 
-    return items.slice(0, 6);
+    return items.slice(0, 8);
   }, [charges, customers, serviceOrders]);
-  const lastMessage = messages[0];
-  const selectedCustomerMessages = messages.filter(item => String(item?.customerId ?? selectedCustomerId) === selectedCustomerId);
-  const nextSuggestedAction = failed > 0 ? "Reenviar mensagens com falha" : automationSuggestions.length > 0 ? "Executar automação sugerida" : "Enviar follow-up de relacionamento";
+
+  const conversations = useMemo(() => {
+    return customers.map((customer) => {
+      const cid = String(customer?.id ?? "");
+      const relatedCharge = charges.find((charge) => String(charge?.customerId ?? "") === cid && String(charge?.status ?? "").toUpperCase() === "OVERDUE");
+      const relatedServiceOrder = serviceOrders.find((serviceOrder) => {
+        const status = String(serviceOrder?.status ?? "").toUpperCase();
+        return String(serviceOrder?.customerId ?? "") === cid && (status === "OVERDUE" || status === "AT_RISK");
+      });
+      const suggestionsForConversation = automationSuggestions.filter((item) => item.customerId === cid);
+      const hasFailure = cid === selectedCustomerId && failed > 0;
+      const lastContact = safeDate(customer?.lastContactAt);
+      const isNoReply = !lastContact || Date.now() - lastContact.getTime() > 1000 * 60 * 60 * 24 * 3;
+
+      const state = hasFailure
+        ? "Falha"
+        : relatedCharge
+          ? "Cobrança"
+          : relatedServiceOrder
+            ? "O.S."
+            : isNoReply
+              ? "Sem resposta"
+              : "Saudável";
+
+      const contextBadge = relatedServiceOrder
+        ? "Agendamento"
+        : suggestionsForConversation.length > 0
+          ? "Automação sugerida"
+          : null;
+
+      const suggestedSnippet = relatedCharge
+        ? "Cobrança vencida precisa de retorno."
+        : relatedServiceOrder
+          ? "O.S. com risco operacional."
+          : isNoReply
+            ? "Sem interação recente."
+            : "Conversa em andamento.";
+
+      return {
+        id: cid,
+        name: String(customer?.name ?? "Cliente"),
+        phone: String(customer?.phone ?? "—"),
+        lastInteraction: lastContact,
+        snippet: suggestedSnippet,
+        state,
+        contextBadge,
+        suggestionsCount: suggestionsForConversation.length,
+      };
+    });
+  }, [automationSuggestions, charges, customers, failed, selectedCustomerId, serviceOrders]);
+
+  const filteredConversations = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+    return conversations.filter((conversation) => {
+      const filterMatch = (() => {
+        if (activeFilter === "all") return true;
+        if (activeFilter === "no_reply") return conversation.state === "Sem resposta";
+        if (activeFilter === "billing") return conversation.state === "Cobrança";
+        if (activeFilter === "appointment") return conversation.contextBadge === "Agendamento";
+        if (activeFilter === "service_order") return conversation.state === "O.S.";
+        if (activeFilter === "failures") return conversation.state === "Falha";
+        if (activeFilter === "suggestions") return conversation.suggestionsCount > 0;
+        return true;
+      })();
+
+      const searchMatch = !normalizedSearch
+        || conversation.name.toLowerCase().includes(normalizedSearch)
+        || conversation.phone.replace(/\D/g, "").includes(normalizedSearch.replace(/\D/g, ""));
+
+      return filterMatch && searchMatch;
+    });
+  }, [activeFilter, conversations, searchTerm]);
+
+  const conversationSuggestions = useMemo(
+    () => automationSuggestions.filter((item) => item.customerId === selectedCustomerId),
+    [automationSuggestions, selectedCustomerId]
+  );
+
+  const chargePendingForSelected = charges.some(
+    (charge) => String(charge?.customerId ?? "") === selectedCustomerId && String(charge?.status ?? "").toUpperCase() === "OVERDUE"
+  );
+  const futureAppointmentForSelected = serviceOrders.some((item) => {
+    if (String(item?.customerId ?? "") !== selectedCustomerId) return false;
+    const status = String(item?.status ?? "").toUpperCase();
+    return status === "SCHEDULED" || status === "AT_RISK";
+  });
+  const recentServiceOrder = serviceOrders.find((item) => String(item?.customerId ?? "") === selectedCustomerId);
+
+  const sortedMessages = useMemo(() => {
+    return [...selectedMessages]
+      .sort((a, b) => {
+        const left = safeDate(a?.createdAt)?.getTime() ?? 0;
+        const right = safeDate(b?.createdAt)?.getTime() ?? 0;
+        return left - right;
+      })
+      .map((message) => ({
+        ...message,
+        _kind: detectMessageKind(message),
+        _deliveryStatus: normalizeMessageStatus(message?.status),
+      }));
+  }, [selectedMessages]);
+
+  const lastMessage = sortedMessages[sortedMessages.length - 1];
+
+  const historyEvents = useMemo(() => {
+    const events: Array<{ id: string; label: string; detail: string; at: string }> = [];
+
+    if (chargePendingForSelected) {
+      events.push({
+        id: "charge-overdue",
+        label: "Cobrança pendente",
+        detail: "Existe cobrança vencida que pode disparar contato automático.",
+        at: fmtDateTime(new Date()),
+      });
+    }
+
+    if (futureAppointmentForSelected) {
+      events.push({
+        id: "schedule",
+        label: "Agendamento operacional",
+        detail: "Atendimento com status de acompanhamento ativo.",
+        at: fmtDateTime(recentServiceOrder?.updatedAt ?? recentServiceOrder?.createdAt),
+      });
+    }
+
+    const failedMessage = [...sortedMessages].reverse().find((message) => message._deliveryStatus === "failed");
+    if (failedMessage) {
+      events.push({
+        id: "failed-send",
+        label: "Falha de entrega",
+        detail: "Última tentativa de envio retornou falha e requer ação.",
+        at: fmtDateTime(failedMessage?.createdAt),
+      });
+    }
+
+    if (events.length === 0 && sortedMessages.length > 0) {
+      events.push({
+        id: "recent-message",
+        label: "Conversa ativa",
+        detail: "Últimas mensagens sem bloqueios operacionais críticos.",
+        at: fmtDateTime(lastMessage?.createdAt),
+      });
+    }
+
+    return events;
+  }, [chargePendingForSelected, futureAppointmentForSelected, lastMessage?.createdAt, recentServiceOrder?.createdAt, recentServiceOrder?.updatedAt, sortedMessages]);
 
   async function sendMessage() {
     if (!selectedCustomerId || content.trim().length < 2) {
-      toast.error("Falha ao enviar mensagem: selecione cliente e preencha o conteúdo");
+      toast.error("Selecione o cliente e escreva uma mensagem válida para enviar.");
       return;
     }
     const phone = String(selectedCustomer?.phone ?? "").replace(/\D/g, "");
     if (phone.length < 10) {
-      toast.error("Cliente sem número válido para WhatsApp");
+      toast.error("Cliente sem número válido para WhatsApp.");
       return;
     }
 
@@ -152,18 +451,18 @@ export default function WhatsAppPage() {
         idempotencyKey: buildIdempotencyKey("whatsapp.manual_send", selectedCustomerId),
       });
       setContent("");
-      toast.success("Mensagem enviada com sucesso");
+      toast.success("Mensagem enviada com sucesso.");
       await Promise.all([
         messagesQuery.refetch(),
         invalidateOperationalGraph(utils, selectedCustomerId),
       ]);
     } catch (error: any) {
-      toast.error(error?.message || "Falha ao enviar mensagem");
+      toast.error(error?.message || "Falha ao enviar mensagem.");
     }
   }
 
   async function executeSuggestedMessage(customerIdToSend: string, preview: string) {
-    setCustomerId(customerIdToSend);
+    setSelectedCustomerId(customerIdToSend);
     setContent(preview);
     await sendMutation.mutateAsync({
       customerId: customerIdToSend,
@@ -175,23 +474,15 @@ export default function WhatsAppPage() {
   }
 
   return (
-    <PageWrapper title="WhatsApp Operacional" subtitle="Comunicação operacional no mesmo contrato de ação das demais áreas.">
-      <OperationalTopCard
-        contextLabel="Direção de comunicação"
-        title="Envio e rastreio de mensagens"
-        description="Envio real de mensagens com histórico de entrega e falhas."
-        primaryAction={(
-          <Button type="button" onClick={() => void sendMessage()} disabled={sendMutation.isPending}>
-            Enviar mensagem
-          </Button>
-        )}
-      />
-
+    <PageWrapper
+      title="WhatsApp Operacional"
+      subtitle="Central de conversa operacional com contexto, histórico e automações no mesmo fluxo."
+    >
       <AppKpiRow
         items={[
           {
             title: "Mensagens enviadas",
-            value: String(messages.length),
+            value: String(selectedMessages.length),
             delta: formatDelta(percentDelta(current7Messages.length, previous7Messages.length)),
             trend: trendFromDelta(percentDelta(current7Messages.length, previous7Messages.length)),
             hint: "7 dias vs período anterior",
@@ -203,117 +494,365 @@ export default function WhatsAppPage() {
             trend: trendFromDelta(percentDelta(current7DeliveryRate, previous7DeliveryRate)),
             hint: "mensagens entregues / enviadas (7d)",
           },
-          { title: "Conversas com falha", value: String(failed), hint: "status FAILED" },
-          { title: "Follow-ups pendentes", value: String(automationSuggestions.length), hint: "gatilhos prontos para ação" },
+          { title: "Falhas de envio", value: String(failed), hint: "status FAILED" },
+          { title: "Automações prontas", value: String(conversationSuggestions.length), hint: "sugestões para esta conversa" },
         ]}
       />
 
-      <AppSectionBlock title="Novo envio" subtitle="Selecione cliente e envie mensagem real no backend">
-        {customers.length === 0 ? (
-          <AppEmptyState title="Nenhum dado disponível ainda" description="Ação recomendada: criar cliente" />
-        ) : (
-          <div className="space-y-3">
-            <Select value={selectedCustomerId} onValueChange={setCustomerId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione um cliente" />
-              </SelectTrigger>
-              <SelectContent>
-              {customers.map((customer) => (
-                <SelectItem key={String(customer.id)} value={String(customer.id)}>
-                  {String(customer.name ?? "Cliente")}
-                </SelectItem>
+      <section className="grid min-h-[72vh] gap-3 md:grid-cols-[320px_minmax(0,1fr)] xl:grid-cols-[320px_minmax(0,1fr)_360px]">
+        <aside className={cn(
+          "flex min-h-0 flex-col rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-primary)]",
+          selectedCustomerId ? "hidden md:flex" : "flex"
+        )}>
+          <div className="border-b border-[var(--border-subtle)] p-3">
+            <p className="text-sm font-semibold text-[var(--text-primary)]">Conversas</p>
+            <p className="text-xs text-[var(--text-secondary)]">Inbox operacional com prioridade e contexto</p>
+            <div className="relative mt-3">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-[var(--text-muted)]" />
+              <Input
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                placeholder="Buscar cliente ou telefone"
+                className="pl-8"
+              />
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {FILTERS.map((filter) => (
+                <button
+                  key={filter.key}
+                  type="button"
+                  onClick={() => setActiveFilter(filter.key)}
+                  className={cn(
+                    "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
+                    activeFilter === filter.key
+                      ? "border-[var(--border-emphasis)] bg-[var(--surface-elevated)] text-[var(--text-primary)]"
+                      : "border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                  )}
+                >
+                  {filter.label}
+                </button>
               ))}
-              </SelectContent>
-            </Select>
-            <Input
-              value={content}
-              onChange={(event) => setContent(event.target.value)}
-              placeholder="Digite a mensagem"
-            />
-            <Button onClick={() => void sendMessage()} disabled={sendMutation.isPending}>Enviar WhatsApp</Button>
+            </div>
           </div>
-        )}
-      </AppSectionBlock>
 
-      <div className="grid gap-3 xl:grid-cols-2">
-        <AppSectionBlock title="Contexto do cliente selecionado" subtitle="Base para comunicação contextual">
-          {selectedCustomer ? (
-            <div className="space-y-1 text-sm text-[var(--text-secondary)]">
-              <p><span className="text-[var(--text-muted)]">Cliente:</span> {String(selectedCustomer?.name ?? "—")}</p>
-              <p><span className="text-[var(--text-muted)]">Telefone:</span> {String(selectedCustomer?.phone ?? "—")}</p>
-              <p><span className="text-[var(--text-muted)]">Última interação:</span> {lastMessage?.createdAt ? new Date(String(lastMessage.createdAt)).toLocaleString("pt-BR") : "Sem histórico"}</p>
-              <p><span className="text-[var(--text-muted)]">Mensagens no histórico:</span> {selectedCustomerMessages.length}</p>
+          <div className="min-h-0 flex-1 overflow-y-auto p-2">
+            {filteredConversations.length === 0 ? (
+              <AppEmptyState
+                title="Nenhuma conversa encontrada"
+                description="Ajuste o filtro ou a busca para localizar uma conversa operacional."
+              />
+            ) : (
+              <div className="space-y-1">
+                {filteredConversations.map((conversation) => (
+                  <button
+                    key={conversation.id}
+                    type="button"
+                    onClick={() => setSelectedCustomerId(conversation.id)}
+                    className={cn(
+                      "w-full rounded-xl border p-3 text-left transition-colors",
+                      selectedCustomerId === conversation.id
+                        ? "border-[var(--border-emphasis)] bg-[var(--surface-elevated)]"
+                        : "border-transparent hover:border-[var(--border-subtle)] hover:bg-[var(--surface-elevated)]/40"
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="line-clamp-1 text-sm font-semibold text-[var(--text-primary)]">{conversation.name}</p>
+                      <span className="shrink-0 text-[11px] text-[var(--text-muted)]">{fmtTime(conversation.lastInteraction)}</span>
+                    </div>
+                    <p className="mt-1 line-clamp-2 text-xs text-[var(--text-secondary)]">{conversation.snippet}</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      <Badge>{conversation.state}</Badge>
+                      {conversation.contextBadge ? <Badge>{conversation.contextBadge}</Badge> : null}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </aside>
+
+        <main className={cn(
+          "flex min-h-0 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-primary)]",
+          !selectedCustomerId ? "hidden md:flex" : "flex"
+        )}>
+          {!selectedCustomer ? (
+            <div className="flex h-full items-center justify-center p-6">
+              <AppEmptyState
+                title="Nenhuma conversa selecionada"
+                description="Selecione um cliente na lista para abrir o chat operacional com contexto e automações."
+              />
             </div>
           ) : (
-            <AppEmptyState title="Selecione um cliente" description="Escolha um cliente para carregar histórico e contexto de comunicação." />
+            <>
+              <header className="flex items-center justify-between gap-3 border-b border-[var(--border-subtle)] px-4 py-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCustomerId("")}
+                      className="inline-flex rounded-md p-1 text-[var(--text-muted)] md:hidden"
+                      aria-label="Voltar para lista de conversas"
+                    >
+                      <ArrowLeft className="size-4" />
+                    </button>
+                    <p className="truncate text-sm font-semibold text-[var(--text-primary)]">{String(selectedCustomer.name ?? "Cliente")}</p>
+                    <Badge>{failed > 0 ? "Falha" : delivered > 0 ? "Saudável" : "Sem resposta"}</Badge>
+                  </div>
+                  <p className="truncate text-xs text-[var(--text-secondary)]">{String(selectedCustomer.phone ?? "Telefone não informado")}</p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={() => setSearchTerm(String(selectedCustomer.name ?? ""))}>
+                    Abrir cliente
+                  </Button>
+                  <Sheet>
+                    <SheetTrigger asChild>
+                      <Button type="button" variant="outline" size="sm" className="xl:hidden">Contexto</Button>
+                    </SheetTrigger>
+                    <SheetContent side="right" className="w-full max-w-md p-0">
+                      <SheetHeader className="border-b border-[var(--border-subtle)] px-4 py-3">
+                        <SheetTitle>Contexto da conversa</SheetTitle>
+                        <SheetDescription>Painel de contexto, automação e histórico desta conversa.</SheetDescription>
+                      </SheetHeader>
+                      <div className="h-full overflow-y-auto p-4">
+                        <RightPanel
+                          selectedCustomer={selectedCustomer}
+                          selectedMessages={sortedMessages}
+                          chargePendingForSelected={chargePendingForSelected}
+                          futureAppointmentForSelected={futureAppointmentForSelected}
+                          recentServiceOrder={recentServiceOrder}
+                          conversationSuggestions={conversationSuggestions}
+                          historyEvents={historyEvents}
+                          onApplySuggestion={(preview) => setContent(preview)}
+                          onExecuteSuggestion={(item) => void executeSuggestedMessage(item.customerId, item.preview)}
+                        />
+                      </div>
+                    </SheetContent>
+                  </Sheet>
+                </div>
+              </header>
+
+              <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+                {messagesQuery.isLoading ? (
+                  <AppLoadingState rows={5} />
+                ) : sortedMessages.length === 0 ? (
+                  <div className="flex h-full items-center justify-center">
+                    <AppEmptyState
+                      title="Nenhuma mensagem ainda"
+                      description="Use o composer para iniciar a conversa operacional com este cliente."
+                    />
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {sortedMessages.map((message) => {
+                      if (message._kind === "event") {
+                        return (
+                          <div key={String(message?.id)} className="mx-auto w-full max-w-[84%] rounded-lg border border-dashed border-[var(--border-subtle)] bg-[var(--surface-elevated)]/60 px-3 py-2 text-center">
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">Evento operacional</p>
+                            <p className="mt-1 text-xs text-[var(--text-secondary)]">{String(message?.content ?? "Atualização registrada na operação.")}</p>
+                            <p className="mt-1 text-[11px] text-[var(--text-muted)]">{fmtDateTime(message?.createdAt)}</p>
+                          </div>
+                        );
+                      }
+
+                      const fromClient = message._kind === "incoming";
+                      return (
+                        <div key={String(message?.id)} className={cn("flex", fromClient ? "justify-start" : "justify-end")}>
+                          <div
+                            className={cn(
+                              "max-w-[80%] rounded-2xl border px-3 py-2",
+                              fromClient
+                                ? "border-[var(--border-subtle)] bg-[var(--surface-elevated)]"
+                                : "border-[var(--border-emphasis)] bg-[color-mix(in_srgb,var(--surface-elevated)_86%,var(--bg-surface))]"
+                            )}
+                          >
+                            <div className="mb-1 flex items-center gap-1 text-[11px] text-[var(--text-muted)]">
+                              {fromClient ? <UserRound className="size-3" /> : message._kind === "automation" ? <Bot className="size-3" /> : <Send className="size-3" />}
+                              <span>{fromClient ? "Cliente" : message._kind === "automation" ? "Automação" : "Operador"}</span>
+                            </div>
+                            <p className="text-sm text-[var(--text-primary)]">{String(message?.content ?? "")}</p>
+                            <div className="mt-2 flex items-center justify-end gap-1 text-[11px] text-[var(--text-muted)]">
+                              <span>{fmtTime(message?.createdAt)}</span>
+                              {!fromClient ? (
+                                <span className={cn("inline-flex items-center gap-1", statusTone(message._deliveryStatus))}>
+                                  {statusIcon(message._deliveryStatus)}
+                                  {statusLabel(message._deliveryStatus)}
+                                </span>
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <footer className="border-t border-[var(--border-subtle)] p-3">
+                <div className="mb-2 flex flex-wrap gap-2">
+                  {QUICK_ACTIONS.map((action) => (
+                    <button
+                      key={action.key}
+                      type="button"
+                      onClick={() => setContent(action.content)}
+                      className="rounded-full border border-[var(--border-subtle)] px-2.5 py-1 text-xs text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
+                    >
+                      {action.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="space-y-2">
+                  <Textarea
+                    value={content}
+                    onChange={(event) => setContent(event.target.value)}
+                    placeholder="Escreva a mensagem ou use uma ação rápida..."
+                    className="min-h-[86px] resize-y"
+                  />
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs text-[var(--text-muted)]">Template sugerido, contexto e mensagem livre no mesmo fluxo.</p>
+                    <Button type="button" onClick={() => void sendMessage()} disabled={sendMutation.isPending}>
+                      <Send className="mr-1 size-4" />
+                      Enviar
+                    </Button>
+                  </div>
+                </div>
+              </footer>
+            </>
           )}
-        </AppSectionBlock>
-        <AppNextActionCard
-          title="Próxima ação sugerida"
-          description="Combina status de envio, histórico do cliente e gatilhos operacionais."
-          severity={failed > 0 ? "critical" : automationSuggestions.length > 0 ? "high" : "medium"}
-          metadata="whatsapp"
-          action={{
-            label: nextSuggestedAction,
-            onClick: () => {
-              if (automationSuggestions[0]) {
-                void executeSuggestedMessage(automationSuggestions[0].customerId, automationSuggestions[0].preview);
-                return;
-              }
-              void sendMessage();
-            },
-          }}
+        </main>
+
+        <aside className="hidden min-h-0 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-primary)] xl:block">
+          <div className="h-full overflow-y-auto p-3">
+            <RightPanel
+              selectedCustomer={selectedCustomer}
+              selectedMessages={sortedMessages}
+              chargePendingForSelected={chargePendingForSelected}
+              futureAppointmentForSelected={futureAppointmentForSelected}
+              recentServiceOrder={recentServiceOrder}
+              conversationSuggestions={conversationSuggestions}
+              historyEvents={historyEvents}
+              onApplySuggestion={(preview) => setContent(preview)}
+              onExecuteSuggestion={(item) => void executeSuggestedMessage(item.customerId, item.preview)}
+            />
+          </div>
+        </aside>
+      </section>
+    </PageWrapper>
+  );
+}
+
+function RightPanel({
+  selectedCustomer,
+  selectedMessages,
+  chargePendingForSelected,
+  futureAppointmentForSelected,
+  recentServiceOrder,
+  conversationSuggestions,
+  historyEvents,
+  onApplySuggestion,
+  onExecuteSuggestion,
+}: {
+  selectedCustomer: any;
+  selectedMessages: Array<any>;
+  chargePendingForSelected: boolean;
+  futureAppointmentForSelected: boolean;
+  recentServiceOrder: any;
+  conversationSuggestions: Array<{ id: string; customerId: string; title: string; reason: string; urgency: "Alta" | "Média"; origin: string; preview: string }>;
+  historyEvents: Array<{ id: string; label: string; detail: string; at: string }>;
+  onApplySuggestion: (preview: string) => void;
+  onExecuteSuggestion: (item: { customerId: string; preview: string }) => void;
+}) {
+  if (!selectedCustomer) {
+    return (
+      <div className="flex h-full items-center justify-center p-2">
+        <AppEmptyState
+          title="Contexto indisponível"
+          description="Selecione uma conversa para acompanhar contexto, automações e histórico operacional."
         />
       </div>
+    );
+  }
 
-      <AppSectionBlock title="Automações sugeridas" subtitle="Problema detectado → ação pronta com pré-visualização e envio em 1 clique">
-        {automationSuggestions.length === 0 ? (
-          <AppEmptyState title="Sem gatilhos automáticos agora" description="Operação estável: nenhuma cobrança vencida, atraso de O.S. ou cliente sem contato crítico." />
+  return (
+    <Tabs defaultValue="context" className="h-full min-h-0">
+      <TabsList className="grid w-full grid-cols-3">
+        <TabsTrigger value="context">Contexto</TabsTrigger>
+        <TabsTrigger value="automation">Automações</TabsTrigger>
+        <TabsTrigger value="history">Histórico</TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="context" className="mt-3 space-y-2">
+        <PanelItem label="Cliente" value={String(selectedCustomer?.name ?? "—")} />
+        <PanelItem label="Telefone" value={String(selectedCustomer?.phone ?? "—")} />
+        <PanelItem label="Última interação" value={fmtDateTime(selectedMessages[selectedMessages.length - 1]?.createdAt ?? selectedCustomer?.lastContactAt)} />
+        <PanelItem label="Mensagens" value={String(selectedMessages.length)} />
+        <PanelItem label="Cobrança pendente" value={chargePendingForSelected ? "Sim" : "Não"} />
+        <PanelItem label="Agendamento futuro" value={futureAppointmentForSelected ? "Sim" : "Não"} />
+        <PanelItem label="O.S. recente" value={recentServiceOrder ? String(recentServiceOrder?.status ?? "Registrada") : "Sem O.S. recente"} />
+        <PanelItem label="Responsável interno" value={String(selectedCustomer?.ownerName ?? "Operação Nexo")} />
+      </TabsContent>
+
+      <TabsContent value="automation" className="mt-3 space-y-2">
+        {conversationSuggestions.length === 0 ? (
+          <AppEmptyState
+            title="Nenhuma automação disponível"
+            description="Quando houver gatilho de cobrança, atraso ou reativação, ele aparecerá aqui para execução rápida."
+          />
         ) : (
           <div className="space-y-2">
-            {automationSuggestions.map((item) => (
-              <div key={item.id} className="rounded-lg border border-[var(--border-subtle)] p-3">
-                <p className="text-sm font-semibold text-[var(--text-primary)]">{item.title}</p>
-                <p className="text-xs text-[var(--text-muted)]">{item.reason}</p>
-                <p className="mt-1 text-xs text-[var(--text-secondary)]">{item.impact} · {item.urgency}</p>
-                <p className="mt-2 rounded bg-[var(--surface-elevated)] p-2 text-xs text-[var(--text-secondary)]">Prévia: {item.preview}</p>
-                <Button className="mt-2" onClick={() => void executeSuggestedMessage(item.customerId, item.preview)} disabled={sendMutation.isPending}>
-                  Executar envio automático
-                </Button>
-              </div>
+            {conversationSuggestions.map((item) => (
+              <article key={item.id} className="rounded-xl border border-[var(--border-subtle)] p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-sm font-semibold text-[var(--text-primary)]">{item.title}</p>
+                  <Badge>{item.urgency}</Badge>
+                </div>
+                <p className="mt-1 text-xs text-[var(--text-secondary)]">{item.reason}</p>
+                <p className="mt-2 rounded-lg bg-[var(--surface-elevated)] p-2 text-xs text-[var(--text-secondary)]">{item.preview}</p>
+                <div className="mt-2 flex items-center justify-between">
+                  <span className="inline-flex items-center gap-1 text-[11px] text-[var(--text-muted)]">
+                    <Workflow className="size-3.5" />
+                    Origem: {item.origin}
+                  </span>
+                  <div className="flex gap-2">
+                    <Button type="button" variant="outline" size="sm" onClick={() => onApplySuggestion(item.preview)}>
+                      Usar
+                    </Button>
+                    <Button type="button" size="sm" onClick={() => onExecuteSuggestion(item)}>
+                      Executar
+                    </Button>
+                  </div>
+                </div>
+              </article>
             ))}
           </div>
         )}
-      </AppSectionBlock>
+      </TabsContent>
 
-      <AppSectionBlock title="Histórico de mensagens" subtitle="Status reais retornados pela API">
-        {messagesQuery.isLoading ? (
-          <AppLoadingState rows={4} />
-        ) : messages.length === 0 ? (
-          <AppEmptyState title="Nenhum dado disponível ainda" description="Ação recomendada: enviar WhatsApp" />
+      <TabsContent value="history" className="mt-3 space-y-2">
+        {historyEvents.length === 0 ? (
+          <AppEmptyState
+            title="Sem histórico recente"
+            description="Os eventos operacionais desta conversa aparecerão aqui conforme a execução avança."
+          />
         ) : (
-          <AppDataTable>
-            <table className="w-full text-sm">
-              <thead className="bg-[var(--surface-elevated)] text-xs text-[var(--text-muted)]">
-                <tr>
-                  <th className="p-3">Conteúdo</th>
-                  <th>Status</th>
-                  <th>Data</th>
-                </tr>
-              </thead>
-              <tbody>
-                {messages.map((message) => (
-                  <tr key={String(message?.id)} className="border-t border-[var(--border-subtle)]">
-                    <td className="p-3">{String(message?.content ?? "—")}</td>
-                    <td><AppStatusBadge label={String(message?.status ?? "Pendente")} /></td>
-                    <td>{message?.createdAt ? new Date(String(message.createdAt)).toLocaleString("pt-BR") : "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </AppDataTable>
+          historyEvents.map((event) => (
+            <article key={event.id} className="rounded-xl border border-[var(--border-subtle)] p-3">
+              <p className="text-sm font-semibold text-[var(--text-primary)]">{event.label}</p>
+              <p className="mt-1 text-xs text-[var(--text-secondary)]">{event.detail}</p>
+              <p className="mt-2 text-[11px] text-[var(--text-muted)]">{event.at}</p>
+            </article>
+          ))
         )}
-      </AppSectionBlock>
-    </PageWrapper>
+      </TabsContent>
+    </Tabs>
+  );
+}
+
+function PanelItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-[var(--border-subtle)] p-3">
+      <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">{label}</p>
+      <p className="mt-1 text-sm text-[var(--text-primary)]">{value}</p>
+    </div>
   );
 }
