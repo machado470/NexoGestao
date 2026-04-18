@@ -24,6 +24,20 @@ function normalizePhone(v?: string): string {
   return digits
 }
 
+function normalizeCpfCnpj(v?: string): string | null {
+  const digits = (v ?? '').replace(/\D/g, '').trim()
+  if (!digits) return null
+  if (digits.length !== 11 && digits.length !== 14) {
+    throw new BadRequestException('CPF/CNPJ inválido')
+  }
+  return digits
+}
+
+function normalizeAddress(v?: string): string | null {
+  const normalized = (v ?? '').trim()
+  return normalized || null
+}
+
 function isUniqueConflict(err: any): boolean {
   return err?.code === 'P2002'
 }
@@ -185,12 +199,16 @@ export class CustomersService {
     phone: string
     email?: string
     notes?: string
+    cpfCnpj?: string
+    address?: string
     idempotencyKey?: string | null
   }) {
     const name = params.name?.trim()
     const phone = normalizePhone(params.phone)
     const email = normalizeEmail(params.email)
     const notes = (params.notes ?? '').trim() || null
+    const cpfCnpj = normalizeCpfCnpj(params.cpfCnpj)
+    const address = normalizeAddress(params.address)
 
     if (!params.orgId) throw new BadRequestException('orgId é obrigatório')
     if (!name) throw new BadRequestException('Nome é obrigatório')
@@ -229,7 +247,7 @@ export class CustomersService {
       orgId: params.orgId,
       scope: 'customers.create',
       idempotencyKey,
-      payload: { name, phone, email, notes },
+      payload: { name, phone, email, notes, cpfCnpj, address },
     })
     if (idem.mode === 'replay') {
       return idem.response as any
@@ -245,6 +263,8 @@ export class CustomersService {
             phone,
             email,
             notes,
+            cpfCnpj,
+            address,
             active: true,
           },
         })

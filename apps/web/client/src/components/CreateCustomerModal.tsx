@@ -34,6 +34,9 @@ export default function CreateCustomerModal({
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [notes, setNotes] = useState("");
+  const [cpfCnpj, setCpfCnpj] = useState("");
+  const [address, setAddress] = useState("");
+  const [showAdditionalInfo, setShowAdditionalInfo] = useState(false);
   const [nextStep, setNextStep] = useState<
     "schedule" | "message" | "billing" | "only_register"
   >("schedule");
@@ -60,6 +63,9 @@ export default function CreateCustomerModal({
     setPhone("");
     setEmail("");
     setNotes("");
+    setCpfCnpj("");
+    setAddress("");
+    setShowAdditionalInfo(false);
     setNextStep("schedule");
   };
 
@@ -67,6 +73,8 @@ export default function CreateCustomerModal({
     name.trim().length > 0 ||
     phone.trim().length > 0 ||
     email.trim().length > 0 ||
+    cpfCnpj.trim().length > 0 ||
+    address.trim().length > 0 ||
     notes.trim().length > 0;
 
   const close = () => {
@@ -91,6 +99,8 @@ export default function CreateCustomerModal({
       phone: phone.trim(),
       email: email.trim(),
       notes: notes.trim(),
+      cpfCnpj: cpfCnpj.trim(),
+      address: address.trim(),
     });
 
     if (!parsed.success) {
@@ -98,6 +108,10 @@ export default function CreateCustomerModal({
       toast.error(firstError);
       return;
     }
+
+    const normalizedCpfCnpj = parsed.data.cpfCnpj
+      ? parsed.data.cpfCnpj.replace(/\D/g, "")
+      : "";
 
     const previousCustomers = utils.nexo.customers.list.getData(undefined);
 
@@ -109,6 +123,8 @@ export default function CreateCustomerModal({
         phone: parsed.data.phone,
         email: parsed.data.email || null,
         notes: parsed.data.notes?.trim() ? parsed.data.notes.trim() : null,
+        cpfCnpj: normalizedCpfCnpj || null,
+        address: parsed.data.address?.trim() ? parsed.data.address.trim() : null,
         active: true,
         createdAt: new Date().toISOString(),
       };
@@ -126,6 +142,8 @@ export default function CreateCustomerModal({
         phone: parsed.data.phone,
         email: parsed.data.email || undefined,
         notes: parsed.data.notes?.trim() ? parsed.data.notes.trim() : undefined,
+        cpfCnpj: normalizedCpfCnpj || undefined,
+        address: parsed.data.address?.trim() ? parsed.data.address.trim() : undefined,
       });
 
       utils.nexo.customers.list.setData(undefined, (old: any) => {
@@ -381,6 +399,51 @@ export default function CreateCustomerModal({
                 rows={4}
               />
             </div>
+
+            <section className="space-y-2 rounded-lg border border-[var(--border-subtle)]/70 bg-[var(--surface-base)]/45 p-3">
+              <button
+                type="button"
+                onClick={() => setShowAdditionalInfo(prev => !prev)}
+                className="flex w-full items-center justify-between text-left"
+              >
+                <div>
+                  <p className="text-sm font-medium text-[var(--text-secondary)]">
+                    Informações adicionais
+                  </p>
+                  <p className="text-xs text-[var(--text-muted)]">
+                    Opcionais para cobrança e operação presencial.
+                  </p>
+                </div>
+                <span className="text-xs font-medium text-[var(--accent-primary)]">
+                  {showAdditionalInfo ? "Ocultar" : "Adicionar"}
+                </span>
+              </button>
+
+              {showAdditionalInfo ? (
+                <div className="space-y-3 pt-1">
+                  <div className="space-y-2">
+                    <Label htmlFor="customer-cpf-cnpj">CPF/CNPJ</Label>
+                    <Input
+                      id="customer-cpf-cnpj"
+                      value={cpfCnpj}
+                      onChange={e => setCpfCnpj(e.target.value)}
+                      placeholder="Ex.: 123.456.789-00 ou 12.345.678/0001-99"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="customer-address">Endereço</Label>
+                    <Textarea
+                      id="customer-address"
+                      value={address}
+                      onChange={e => setAddress(e.target.value)}
+                      placeholder="Ex.: Rua X, 123, Bairro, Cidade"
+                      rows={2}
+                    />
+                  </div>
+                </div>
+              ) : null}
+            </section>
 
             <div className="space-y-2">
               <p className="text-sm font-medium text-[var(--text-primary)]">

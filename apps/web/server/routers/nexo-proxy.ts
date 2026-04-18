@@ -255,6 +255,8 @@ const customerCreateInput = z.object({
   phone: z.string().min(1),
   email: z.string().email().optional(),
   notes: z.string().optional(),
+  cpfCnpj: z.string().optional(),
+  address: z.string().optional(),
 });
 
 const customerUpdateInput = customerCreateInput

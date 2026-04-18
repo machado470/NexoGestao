@@ -310,6 +310,8 @@ model Customer {
   name             String
   phone            String
   email            String?
+  cpfCnpj          String?
+  address          String?
   notes            String?
   active           Boolean           @default(true)
   createdAt        DateTime          @default(now())
