@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { AppSectionCard } from "@/components/app-system";
 import { cn } from "@/lib/utils";
 
 type OperationalTopCardProps = {
@@ -21,7 +22,7 @@ export function OperationalTopCard({
   className,
 }: OperationalTopCardProps) {
   return (
-    <section className={cn("nexo-card-operational p-4 md:p-5", className)}>
+    <AppSectionCard className={cn(className)}>
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 space-y-3">
           <div>
@@ -49,6 +50,6 @@ export function OperationalTopCard({
           </div>
         ) : null}
       </div>
-    </section>
+    </AppSectionCard>
   );
 }
