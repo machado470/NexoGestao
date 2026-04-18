@@ -4,6 +4,7 @@ import {
   AreaChart,
   CartesianGrid,
   Line,
+  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -74,28 +75,28 @@ const METRIC_OPTIONS: Array<{
   {
     value: "clients",
     label: "Clientes",
-    color: "color-mix(in srgb, var(--dashboard-info) 56%, var(--dashboard-danger) 44%)",
-    strokeWidth: 2.1,
+    color: "var(--color-nexo-purple)",
+    strokeWidth: 2,
     showArea: false,
-    valueFormatter: value => `${formatInteger(value)} novos clientes`,
+    valueFormatter: value => formatInteger(value),
     summaryLabel: "clientes",
   },
   {
     value: "appointments",
     label: "Agendamentos",
     color: "var(--dashboard-success)",
-    strokeWidth: 2.1,
+    strokeWidth: 2,
     showArea: false,
-    valueFormatter: value => `${formatInteger(value)} agendamentos`,
+    valueFormatter: value => formatInteger(value),
     summaryLabel: "agendamentos",
   },
   {
     value: "orders",
     label: "Ordens",
     color: "var(--dashboard-warning)",
-    strokeWidth: 2.1,
+    strokeWidth: 2,
     showArea: false,
-    valueFormatter: value => `${formatInteger(value)} O.S.`,
+    valueFormatter: value => formatInteger(value),
     summaryLabel: "ordens",
   },
 ];
@@ -277,9 +278,21 @@ function buildMockTrendDataset(
       0
     );
 
-    const clients = Math.max(Math.round(revenue / 540), 0);
-    const appointments = Math.max(Math.round(clients * 2.3), 0);
-    const orders = Math.max(Math.round(appointments * 0.76), 0);
+    const growth = config.points > 1 ? index / (config.points - 1) : 0;
+    const clients = Math.max(
+      Math.round(18 + growth * 11 + Math.sin(index / 2.7) * 2.1),
+      0
+    );
+    const appointments = Math.max(
+      Math.round(
+        35 + growth * 9 + Math.sin(index / 2.3) * 3.8 + Math.cos(index / 3.8) * 2
+      ),
+      0
+    );
+    const orders = Math.max(
+      Math.round(26 + growth * 6.5 + Math.sin(index / 1.9) * 2.7),
+      0
+    );
 
     points.push({
       label: config.formatter(pointDate),
@@ -327,6 +340,57 @@ function getPeriodNarrative(
   return `${metricLabel} · ${option?.label ?? "Período"} selecionado · ${granularityLabel.toLowerCase()}.`;
 }
 
+function buildFallbackPointsForMetric(
+  metric: ExecutiveTrendMetric,
+  period: ExecutiveTrendPeriod
+) {
+  const fallback = buildMockTrendDataset(period).points;
+  if (metric === "revenue") return fallback;
+
+  return fallback.map((point, index) => {
+    if (metric === "clients") {
+      return {
+        ...point,
+        clients: Math.max(Math.round(20 + index * 1.1 + Math.sin(index / 2.8) * 2), 1),
+      };
+    }
+    if (metric === "appointments") {
+      return {
+        ...point,
+        appointments: Math.max(
+          Math.round(39 + index * 1.2 + Math.sin(index / 2.2) * 4),
+          1
+        ),
+      };
+    }
+    return {
+      ...point,
+      orders: Math.max(Math.round(29 + index * 0.7 + Math.cos(index / 2.4) * 3), 1),
+    };
+  });
+}
+
+function getYAxisDomain(
+  metric: ExecutiveTrendMetric,
+  values: number[]
+): [number, number] {
+  if (!values.length) return [0, 1];
+
+  const minValue = Math.min(...values);
+  const maxValue = Math.max(...values);
+
+  if (minValue === maxValue) {
+    const offset = metric === "revenue" ? Math.max(400, minValue * 0.12) : 3;
+    return [Math.max(0, Math.floor(minValue - offset)), Math.ceil(maxValue + offset)];
+  }
+
+  const span = maxValue - minValue;
+  const padding = metric === "revenue" ? Math.max(span * 0.2, 500) : Math.max(span * 0.24, 2);
+  const lowerBound = Math.max(0, Math.floor(minValue - padding));
+  const upperBound = Math.ceil(maxValue + padding);
+  return [lowerBound, upperBound];
+}
+
 export function ExecutiveTrendChart({
   className,
   dataByPeriod,
@@ -347,7 +411,18 @@ export function ExecutiveTrendChart({
     METRIC_OPTIONS.find(metric => metric.value === selectedMetric) ??
     METRIC_OPTIONS[0];
 
-  const totalValue = dataset.points.reduce(
+  const safeChartData = useMemo(() => {
+    const candidatePoints = dataset.points.filter(point =>
+      Number.isFinite(getPointValue(point, selectedMetric))
+    );
+    if (candidatePoints.length >= 2) return candidatePoints;
+    return buildFallbackPointsForMetric(selectedMetric, selectedPeriod);
+  }, [dataset.points, selectedMetric, selectedPeriod]);
+
+  const metricValues = safeChartData.map(point => getPointValue(point, selectedMetric));
+  const yAxisDomain = getYAxisDomain(selectedMetric, metricValues);
+
+  const totalValue = safeChartData.reduce(
     (acc, item) => acc + getPointValue(item, selectedMetric),
     0
   );
@@ -356,7 +431,7 @@ export function ExecutiveTrendChart({
   const deltaPercent =
     comparisonValue > 0 ? ((totalValue - comparisonValue) / comparisonValue) * 100 : 0;
 
-  const sortedPoints = [...dataset.points].sort(
+  const sortedPoints = [...safeChartData].sort(
     (a, b) => getPointValue(a, selectedMetric) - getPointValue(b, selectedMetric)
   );
   const worstPoint = sortedPoints[0];
@@ -456,10 +531,86 @@ export function ExecutiveTrendChart({
 
       <div className="h-[320px] w-full md:h-[360px]">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart
-            data={dataset.points}
-            margin={{ top: 8, right: 12, left: 0, bottom: 6 }}
-          >
+          {selectedMetricOption.showArea ? (
+            <AreaChart
+              data={safeChartData}
+              margin={{ top: 8, right: 12, left: 0, bottom: 6 }}
+            >
+              <defs>
+                <linearGradient
+                  id="executive-metric-gradient"
+                  x1="0"
+                  y1="0"
+                  x2="0"
+                  y2="1"
+                >
+                  <stop
+                    offset="5%"
+                    stopColor={selectedMetricOption.color}
+                    stopOpacity={0.28}
+                  />
+                  <stop
+                    offset="95%"
+                    stopColor={selectedMetricOption.color}
+                    stopOpacity={0.03}
+                  />
+                </linearGradient>
+              </defs>
+              <CartesianGrid
+                stroke="var(--border-subtle)"
+                vertical={false}
+                opacity={0.45}
+              />
+              <XAxis
+                dataKey="label"
+                tickLine={false}
+                axisLine={false}
+                minTickGap={24}
+                tick={{ fill: "var(--text-muted)", fontSize: 12 }}
+              />
+              <YAxis
+                tickLine={false}
+                axisLine={false}
+                width={selectedMetric === "revenue" ? 78 : 46}
+                domain={yAxisDomain}
+                tick={{ fill: "var(--text-muted)", fontSize: 12 }}
+                tickFormatter={value =>
+                  selectedMetric === "revenue"
+                    ? formatCompactCurrency(Number(value))
+                    : formatInteger(Number(value))
+                }
+              />
+              <Tooltip
+                contentStyle={{
+                  background: "var(--nexo-card-surface)",
+                  border: "1px solid var(--border-subtle)",
+                  borderRadius: "12px",
+                  boxShadow: "var(--shadow-sm)",
+                }}
+                labelStyle={{ color: "var(--text-primary)", fontWeight: 600 }}
+                formatter={(value: number) =>
+                  selectedMetric === "revenue"
+                    ? formatCurrency(Number(value))
+                    : formatInteger(Number(value))
+                }
+              />
+
+              <Area
+                type="monotone"
+                dataKey={selectedMetric}
+                name={selectedMetricOption.label}
+                stroke={selectedMetricOption.color}
+                strokeWidth={selectedMetricOption.strokeWidth}
+                fill="url(#executive-metric-gradient)"
+                fillOpacity={1}
+                activeDot={{ r: 4 }}
+              />
+            </AreaChart>
+          ) : (
+            <LineChart
+              data={safeChartData}
+              margin={{ top: 8, right: 12, left: 0, bottom: 6 }}
+            >
             <defs>
               <linearGradient
                 id="executive-metric-gradient"
@@ -496,6 +647,7 @@ export function ExecutiveTrendChart({
               tickLine={false}
               axisLine={false}
               width={selectedMetric === "revenue" ? 78 : 46}
+              domain={yAxisDomain}
               tick={{ fill: "var(--text-muted)", fontSize: 12 }}
               tickFormatter={value =>
                 selectedMetric === "revenue"
@@ -512,33 +664,22 @@ export function ExecutiveTrendChart({
               }}
               labelStyle={{ color: "var(--text-primary)", fontWeight: 600 }}
               formatter={(value: number) =>
-                selectedMetricOption.valueFormatter(Number(value))
+                selectedMetric === "revenue"
+                  ? formatCurrency(Number(value))
+                  : formatInteger(Number(value))
               }
             />
-
-            {selectedMetricOption.showArea ? (
-              <Area
-                type="monotone"
-                dataKey={selectedMetric}
-                name={selectedMetricOption.label}
-                stroke={selectedMetricOption.color}
-                strokeWidth={selectedMetricOption.strokeWidth}
-                fill="url(#executive-metric-gradient)"
-                fillOpacity={1}
-                activeDot={{ r: 4 }}
-              />
-            ) : (
-              <Line
-                type="monotone"
-                dataKey={selectedMetric}
-                name={selectedMetricOption.label}
-                stroke={selectedMetricOption.color}
-                strokeWidth={selectedMetricOption.strokeWidth}
-                dot={false}
-                activeDot={{ r: 4 }}
-              />
-            )}
-          </AreaChart>
+            <Line
+              type="monotone"
+              dataKey={selectedMetric}
+              name={selectedMetricOption.label}
+              stroke={selectedMetricOption.color}
+              strokeWidth={2}
+              dot={{ r: 3 }}
+              activeDot={{ r: 5 }}
+            />
+            </LineChart>
+          )}
         </ResponsiveContainer>
       </div>
 

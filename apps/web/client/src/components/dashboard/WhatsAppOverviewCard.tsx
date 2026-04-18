@@ -72,20 +72,20 @@ export function WhatsAppOverviewCard({
       <div className="flex h-full flex-col gap-6">
         <div className="grid grid-cols-3 gap-3">
           <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
-            <p className="text-xs text-[var(--text-muted)]">Enviadas hoje</p>
+            <p className="text-xs font-medium text-[var(--text-secondary)]">Enviadas hoje</p>
             <p className="text-2xl font-semibold tracking-tight text-[var(--text-primary)]">
               {data.sentToday}
             </p>
           </div>
           <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
-            <p className="text-xs text-[var(--text-muted)]">Pendentes</p>
-            <p className="text-2xl font-semibold tracking-tight text-[var(--text-primary)]">
+            <p className="text-xs font-medium text-[var(--text-secondary)]">Pendentes</p>
+            <p className="text-2xl font-semibold tracking-tight text-[var(--dashboard-warning)]">
               {data.pending}
             </p>
           </div>
           <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
-            <p className="text-xs text-[var(--text-muted)]">Falhas</p>
-            <p className="text-2xl font-semibold tracking-tight text-[var(--text-primary)]">
+            <p className="text-xs font-medium text-[var(--text-secondary)]">Falhas</p>
+            <p className="text-2xl font-semibold tracking-tight text-[var(--dashboard-danger)]">
               {data.failed}
             </p>
           </div>
@@ -105,7 +105,7 @@ export function WhatsAppOverviewCard({
                   <p className="truncate text-sm font-semibold text-[var(--text-primary)]">
                     {interaction.customerName}
                   </p>
-                  <p className="truncate text-xs text-[var(--text-secondary)]">
+                  <p className="truncate text-xs text-[var(--text-secondary)] opacity-80">
                     {interaction.action}
                   </p>
                 </div>
@@ -116,9 +116,14 @@ export function WhatsAppOverviewCard({
         </div>
 
         {data.insight ? (
-          <p className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3 text-xs text-[var(--text-secondary)]">
-            Insight: <span className="text-[var(--text-primary)]">{data.insight}</span>
-          </p>
+          <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+              Insight
+            </p>
+            <p className="mt-1 text-xs text-[var(--text-secondary)]">
+              <span className="text-[var(--text-primary)]">{data.insight}</span>
+            </p>
+          </div>
         ) : null}
       </div>
     </AppSectionBlock>
