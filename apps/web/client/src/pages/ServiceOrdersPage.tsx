@@ -13,7 +13,6 @@ import {
   AppDataTable,
   AppKpiRow,
   AppListBlock,
-  AppNextActionCard,
   AppPageEmptyState,
   AppPageErrorState,
   AppPageLoadingState,
@@ -63,10 +62,6 @@ export default function ServiceOrdersPage() {
     const status = String(item?.status ?? "").toUpperCase();
     return status === "OPEN" || status === "ASSIGNED";
   }).length;
-  const valorPotencialCobranca = orders
-    .filter(item => String(item?.status ?? "").toUpperCase() === "DONE" && !item?.financialSummary?.hasCharge)
-    .reduce((acc, item) => acc + Number(item?.financialSummary?.estimatedAmountCents ?? item?.amountCents ?? 0), 0);
-  const valorPotencialFormatado = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(valorPotencialCobranca / 100);
   const topOS = [...orders]
     .sort((a, b) => {
       const priorityDiff = Number(b?.priority ?? 0) - Number(a?.priority ?? 0);
@@ -113,6 +108,7 @@ export default function ServiceOrdersPage() {
       />
 
       <AppKpiRow
+        gridClassName="grid-cols-1 md:grid-cols-2 xl:grid-cols-4"
         items={[
           {
             title: "O.S. abertas",
@@ -124,15 +120,13 @@ export default function ServiceOrdersPage() {
           { title: "Em execução", value: String(inProgress), hint: "equipes com atendimento em campo" },
           { title: "Concluídas", value: String(done), hint: "serviços finalizados" },
           { title: "Prontas p/ cobrança", value: String(pipeline.prontaCobranca), hint: "concluídas e sem cobrança ativa" },
-          { title: "Travadas", value: String(travadas), hint: "pedem desbloqueio imediato" },
-          { title: "Base de clientes", value: String(customers.length), hint: "vinculáveis à execução" },
         ]}
       />
 
       <AppSectionBlock
         title="Travadas"
         subtitle="Bloco principal: ordens que mais pressionam SLA e precisam de ação direta agora"
-        className="border-rose-500/35 bg-rose-500/8 p-6 lg:p-8"
+        className="p-6 lg:p-8"
       >
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-[var(--text-secondary)]">{semResponsavel} sem responsável · {semAvanco} sem avanço · {aguardandoCliente} aguardando cliente.</p>
@@ -144,16 +138,6 @@ export default function ServiceOrdersPage() {
             : [{ title: "Sem travas críticas", subtitle: "Pipeline fluindo no momento.", action: <button className="nexo-cta-secondary" onClick={() => navigate("/finances")}>Seguir para cobrança</button> }]}
         />
       </AppSectionBlock>
-
-      <div className="grid gap-3 xl:grid-cols-2">
-        <AppNextActionCard
-          title="Prontas para cobrar"
-          description={`${pipeline.prontaCobranca} O.S. concluídas sem cobrança ativa${valorPotencialCobranca > 0 ? ` · potencial ${valorPotencialFormatado}` : ""}.`}
-          severity={pipeline.prontaCobranca > 0 ? "high" : "low"}
-          metadata="oportunidade de receita"
-          action={{ label: "Gerar cobrança", onClick: () => navigate("/finances?status=pending&source=service-order") }}
-        />
-      </div>
 
       <section className="grid gap-3 xl:grid-cols-2">
         <AppSectionBlock title="Top O.S. para executar agora" subtitle="Prioridade alta com ação operacional direta">
@@ -254,9 +238,7 @@ export default function ServiceOrdersPage() {
                               ...(nextAction !== "Enviar WhatsApp"
                                 ? [{ label: "Enviar WhatsApp", onSelect: () => navigate(`/whatsapp?customerId=${order.customerId}`) }]
                                 : []),
-                              ...(nextAction !== "Reagendar"
-                                ? [{ label: "Reagendar", onSelect: () => navigate(`/appointments`) }]
-                                : []),
+                              { label: "Reagendar", onSelect: () => navigate(`/appointments`) },
                             ]}
                           />
                         </div>
