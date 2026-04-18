@@ -4,6 +4,7 @@ import { trpc } from "@/lib/trpc";
 import { normalizeArrayPayload } from "@/lib/query-helpers";
 import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
 import CreateServiceOrderModal from "@/components/CreateServiceOrderModal";
+import { AppRowActionsDropdown } from "@/components/app-system";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedbackButton";
@@ -17,7 +18,6 @@ import {
   AppPageErrorState,
   AppPageLoadingState,
   AppPriorityBadge,
-  AppRowActions,
   AppSectionBlock,
   AppStatusBadge,
 } from "@/components/internal-page-system";
@@ -197,37 +197,73 @@ export default function ServiceOrdersPage() {
                   <th className="p-3">Título</th>
                   <th>Cliente</th>
                   <th>Status</th>
-                  <th>Prioridade</th>
-                  <th className="p-3">Ações</th>
+                  <th className="w-[168px] p-3 text-right">Ações</th>
                 </tr>
               </thead>
               <tbody>
-                {orders.map((order) => (
-                  <tr key={String(order?.id)} className="border-t border-[var(--border-subtle)]">
-                    <td className="p-3">{String(order?.title ?? "Sem título")}</td>
-                    <td>{String(order?.customer?.name ?? "—")}</td>
-                    <td><AppStatusBadge label={getOperationalSeverityLabel(getServiceOrderSeverity(order))} /></td>
-                    <td><AppPriorityBadge label={`P${String(order?.priority ?? 2)}`} /></td>
-                    <td className="p-3">
-                      <div className="space-y-2">
-                        <AppNextActionCard
-                          title="Próxima ação"
-                          description={order?.financialSummary?.hasCharge ? "Cobrança já vinculada, mantenha cliente informado." : "Sem cobrança vinculada após execução."}
-                          severity={order?.financialSummary?.hasCharge ? "medium" : "high"}
-                          metadata="ordem de serviço"
-                          action={{
-                            label: String(order?.financialSummary?.hasCharge ? "Enviar WhatsApp" : "Gerar cobrança"),
-                            onClick: () => navigate(order?.financialSummary?.hasCharge ? `/whatsapp?customerId=${order.customerId}` : `/finances?serviceOrderId=${order.id}`),
-                          }}
-                        />
-                        <AppRowActions actions={[
-                          { label: "Gerar cobrança", onClick: () => navigate(`/finances?serviceOrderId=${order.id}`) },
-                          { label: "Enviar WhatsApp", onClick: () => navigate(`/whatsapp?customerId=${order.customerId}`) },
-                        ]} />
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {orders.map((order) => {
+                  const status = String(order?.status ?? "").toUpperCase();
+                  const hasCharge = Boolean(order?.financialSummary?.hasCharge);
+                  const isPending = ["PENDENTE", "SCHEDULED", "OPEN", "ASSIGNED"].includes(status);
+                  const isConfirmed = ["CONFIRMADO", "CONFIRMED", "IN_PROGRESS"].includes(status);
+                  const isDoneWithoutCharge = status === "DONE" && !hasCharge;
+                  const priorityLabel = isDoneWithoutCharge || isPending ? "HIGH" : isConfirmed ? "MEDIUM" : "LOW";
+                  const nextAction = isPending
+                    ? "Confirmar"
+                    : isConfirmed
+                      ? "Criar O.S."
+                      : isDoneWithoutCharge
+                        ? "Gerar cobrança"
+                        : hasCharge
+                          ? "Enviar WhatsApp"
+                          : "Criar O.S.";
+                  const handlePrimaryAction = () => {
+                    if (nextAction === "Confirmar") {
+                      navigate(`/whatsapp?customerId=${order.customerId}`);
+                      return;
+                    }
+                    if (nextAction === "Criar O.S.") {
+                      navigate(`/service-orders?serviceOrderId=${order.id}`);
+                      return;
+                    }
+                    if (nextAction === "Gerar cobrança") {
+                      navigate(`/finances?serviceOrderId=${order.id}`);
+                      return;
+                    }
+                    navigate(`/whatsapp?customerId=${order.customerId}`);
+                  };
+                  return (
+                    <tr key={String(order?.id)} className="border-t border-[var(--border-subtle)]">
+                      <td className="p-3">{String(order?.title ?? "Sem título")}</td>
+                      <td>{String(order?.customer?.name ?? "—")}</td>
+                      <td><AppStatusBadge label={getOperationalSeverityLabel(getServiceOrderSeverity(order))} /></td>
+                      <td className="p-3 align-middle">
+                        <div className="flex items-center justify-end gap-2">
+                          <AppPriorityBadge label={priorityLabel} />
+                          <AppRowActionsDropdown
+                            triggerLabel="Mais ações"
+                            contentClassName="min-w-[220px]"
+                            items={[
+                              { label: `${nextAction} · prioritário`, onSelect: handlePrimaryAction },
+                              ...(nextAction !== "Criar O.S."
+                                ? [{ label: "Criar O.S.", onSelect: () => navigate(`/service-orders?serviceOrderId=${order.id}`) }]
+                                : []),
+                              ...(nextAction !== "Gerar cobrança"
+                                ? [{ label: "Gerar cobrança", onSelect: () => navigate(`/finances?serviceOrderId=${order.id}`) }]
+                                : []),
+                              ...(nextAction !== "Enviar WhatsApp"
+                                ? [{ label: "Enviar WhatsApp", onSelect: () => navigate(`/whatsapp?customerId=${order.customerId}`) }]
+                                : []),
+                              ...(nextAction !== "Reagendar"
+                                ? [{ label: "Reagendar", onSelect: () => navigate(`/appointments`) }]
+                                : []),
+                            ]}
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </AppDataTable>
