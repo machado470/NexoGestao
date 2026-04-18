@@ -590,8 +590,8 @@ export default function WhatsAppPage() {
 
 function WorkspaceModeTabs({ activeView, onChange }: { activeView: WorkspaceView; onChange: (value: WorkspaceView) => void }) {
   return (
-    <nav className="rounded-2xl border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface-elevated)_60%,var(--surface-primary))] p-2">
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
+    <nav className="rounded-[999px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] p-1">
+      <div className="grid grid-cols-2 gap-1 md:grid-cols-5">
         <WorkspaceModeButton label="Conversas" active={activeView === "conversations"} onClick={() => onChange("conversations")} />
         <WorkspaceModeButton label="Conversar" active={activeView === "chat"} onClick={() => onChange("chat")} icon={Send} />
         <WorkspaceModeButton label="Contexto" icon={Info} active={activeView === "context"} onClick={() => onChange("context")} />
@@ -618,10 +618,10 @@ function WorkspaceModeButton({
       type="button"
       onClick={onClick}
       className={cn(
-        "inline-flex h-12 items-center justify-center gap-2 rounded-xl border px-3.5 text-sm font-medium transition-all",
+        "inline-flex h-11 items-center justify-center gap-2 rounded-full border px-3.5 text-sm font-medium transition-all",
         active
-          ? "border-[var(--border-emphasis)] bg-[var(--surface-primary)] text-[var(--text-primary)] shadow-sm"
-          : "border-transparent text-[var(--text-secondary)] hover:border-[var(--border-subtle)] hover:bg-[var(--surface-primary)]/80 hover:text-[var(--text-primary)]"
+          ? "border-[rgba(255,140,0,0.25)] bg-[rgba(255,140,0,0.12)] text-[#ff8c00]"
+          : "border-[rgba(255,255,255,0.08)] bg-transparent text-[rgba(255,255,255,0.6)] hover:border-[rgba(255,255,255,0.15)] hover:bg-[rgba(255,255,255,0.04)] hover:text-[rgba(255,255,255,0.85)]"
       )}
     >
       {Icon ? <Icon className="size-4" /> : null}
@@ -682,7 +682,7 @@ function ConversationsView({
           />
         </div>
 
-        <div className="mt-4 flex flex-wrap gap-2.5">
+        <div className="mt-4 inline-flex flex-wrap gap-1 rounded-[999px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] p-1">
           {FILTERS.map((filter) => (
             <button
               key={filter.key}
@@ -691,8 +691,8 @@ function ConversationsView({
               className={cn(
                 "rounded-full border px-3 py-1.5 text-xs font-medium transition-all",
                 activeFilter === filter.key
-                  ? "border-[var(--border-emphasis)] bg-[var(--surface-elevated)] text-[var(--text-primary)]"
-                  : "border-[var(--border-subtle)] text-[var(--text-secondary)] hover:border-[var(--border-emphasis)]/40 hover:text-[var(--text-primary)]"
+                  ? "border-[rgba(255,140,0,0.25)] bg-[rgba(255,140,0,0.12)] text-[#ff8c00]"
+                  : "border-[rgba(255,255,255,0.08)] bg-transparent text-[rgba(255,255,255,0.6)] hover:border-[rgba(255,255,255,0.15)] hover:bg-[rgba(255,255,255,0.04)] hover:text-[rgba(255,255,255,0.85)]"
               )}
             >
               {filter.label}
