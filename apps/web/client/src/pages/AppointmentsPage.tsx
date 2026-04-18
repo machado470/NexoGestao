@@ -161,7 +161,7 @@ export default function AppointmentsPage() {
                   <th>Cliente</th>
                   <th>Status</th>
                   <th>Fim</th>
-                  <th className="p-3">Ações</th>
+                  <th className="w-[112px] p-3 text-right">Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -188,10 +188,6 @@ export default function AppointmentsPage() {
                       navigate(`/service-orders?customerId=${appointment.customerId}&appointmentId=${appointment.id}`);
                       return;
                     }
-                    if (nextAction === "Confirmar") {
-                      navigate(`/whatsapp?customerId=${appointment.customerId}`);
-                      return;
-                    }
                     navigate(`/whatsapp?customerId=${appointment.customerId}`);
                   };
                   return (
@@ -211,15 +207,14 @@ export default function AppointmentsPage() {
                         <span className={`inline-flex h-6 items-center rounded-full border px-2.5 text-[10px] font-semibold tracking-[0.08em] ${priorityTone}`}>
                           {priorityLabel}
                         </span>
-                        <button
-                          className="nexo-cta-primary h-8 px-3 text-xs"
-                          onClick={handlePrimaryAction}
-                        >
-                          {nextAction}
-                        </button>
                         <AppRowActionsDropdown
                           triggerLabel="Mais ações"
+                          contentClassName="min-w-[232px]"
                           items={[
+                            { label: `${nextAction} · prioritário`, onSelect: handlePrimaryAction },
+                            ...(nextAction !== "Confirmar"
+                              ? [{ label: "Confirmar", onSelect: () => navigate(`/whatsapp?customerId=${appointment.customerId}`) }]
+                              : []),
                             { label: "Criar O.S.", onSelect: () => navigate(`/service-orders?customerId=${appointment.customerId}&appointmentId=${appointment.id}`) },
                             { label: "Enviar WhatsApp", onSelect: () => navigate(`/whatsapp?customerId=${appointment.customerId}`) },
                             { label: "Reagendar", onSelect: () => setOpenCreate(true) },
