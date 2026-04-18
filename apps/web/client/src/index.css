@@ -2211,6 +2211,33 @@ html {
     --nexo-border-strong: var(--border-subtle);
     --nexo-depth-subtle: 0 8px 22px rgba(18, 48, 82, 0.08);
     --nexo-depth-hover: 0 12px 26px rgba(18, 48, 82, 0.12);
+    --dashboard-success: #22c55e;
+    --dashboard-danger: #ef4444;
+    --dashboard-warning: #f59e0b;
+    --dashboard-info: #38bdf8;
+    --dashboard-info-soft: #7dd3fc;
+    --dashboard-neutral: #94a3b8;
+    --dashboard-row-bg: color-mix(
+      in srgb,
+      var(--surface-base) 56%,
+      transparent
+    );
+    --dashboard-row-border: color-mix(
+      in srgb,
+      var(--border-subtle) 92%,
+      transparent
+    );
+    --dashboard-row-hover: color-mix(
+      in srgb,
+      var(--surface-elevated) 68%,
+      transparent
+    );
+    --dashboard-progress-track: color-mix(
+      in srgb,
+      var(--surface-base) 84%,
+      #dce7f6
+    );
+    --dashboard-progress-fill: linear-gradient(90deg, #38bdf8 0%, #60a5fa 100%);
   }
 
   .app-root.dark,
@@ -2233,6 +2260,17 @@ html {
     --nexo-card-muted: #152036;
     --nexo-border-soft: var(--border-soft);
     --nexo-border-strong: var(--border-subtle);
+    --dashboard-success: #4ade80;
+    --dashboard-danger: #fb7185;
+    --dashboard-warning: #fbbf24;
+    --dashboard-info: #60a5fa;
+    --dashboard-info-soft: #93c5fd;
+    --dashboard-neutral: #94a3b8;
+    --dashboard-row-bg: color-mix(in srgb, #101a2d 80%, transparent);
+    --dashboard-row-border: color-mix(in srgb, #7f92bc 28%, transparent);
+    --dashboard-row-hover: color-mix(in srgb, #172742 72%, transparent);
+    --dashboard-progress-track: color-mix(in srgb, #0f172b 84%, #1e293b);
+    --dashboard-progress-fill: linear-gradient(90deg, #60a5fa 0%, #93c5fd 100%);
   }
 }
 
@@ -2335,6 +2373,30 @@ html {
     box-shadow: var(--shadow-medium);
   }
 
+  .app-root .nexo-dashboard-priority-card {
+    border-color: color-mix(
+      in srgb,
+      var(--dashboard-danger) 34%,
+      var(--nexo-border-soft)
+    );
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--dashboard-danger) 10%, var(--nexo-card-surface))
+        0%,
+      var(--nexo-card-surface) 56%
+    );
+  }
+
+  .app-root.dark .nexo-dashboard-priority-card,
+  .app-root[data-theme="dark"] .nexo-dashboard-priority-card {
+    border-color: color-mix(in srgb, var(--dashboard-danger) 40%, #7f92bc 20%);
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--dashboard-danger) 15%, #111d2e) 0%,
+      #10192b 56%
+    );
+  }
+
   .app-root .nexo-modal-header {
     position: sticky;
     top: 0;
@@ -2378,7 +2440,8 @@ html {
     box-shadow: var(--shadow-soft);
   }
 
-  .app-root :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  .app-root
+    :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
     background: var(--surface-elevated);
     border-color: var(--border-subtle);
     color: var(--text-primary);
@@ -2386,13 +2449,24 @@ html {
     appearance: none;
   }
 
-  .app-root :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea)::placeholder {
+  .app-root
+    :where(
+      input:not([type="checkbox"]):not([type="radio"]),
+      select,
+      textarea
+    )::placeholder {
     color: var(--text-muted);
   }
 
-  .app-root :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea):focus-visible {
+  .app-root
+    :where(
+      input:not([type="checkbox"]):not([type="radio"]),
+      select,
+      textarea
+    ):focus-visible {
     border-color: var(--accent-primary);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary) 24%, transparent);
+    box-shadow: 0 0 0 3px
+      color-mix(in srgb, var(--accent-primary) 24%, transparent);
     outline: none;
   }
 
@@ -2598,8 +2672,10 @@ html {
     box-shadow: 0 20px 45px rgba(15, 23, 42, 0.08);
   }
 
-  .nexo-public :where(input:not([type="checkbox"]):not([type="radio"]), textarea),
-  .nexo-auth :where(input:not([type="checkbox"]):not([type="radio"]), textarea) {
+  .nexo-public
+    :where(input:not([type="checkbox"]):not([type="radio"]), textarea),
+  .nexo-auth
+    :where(input:not([type="checkbox"]):not([type="radio"]), textarea) {
     background: #ffffff;
     border-color: #dbe3ee;
     color: #0f172a;
