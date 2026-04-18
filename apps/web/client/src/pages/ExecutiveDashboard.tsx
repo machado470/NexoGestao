@@ -13,6 +13,7 @@ import {
 import { KpiErrorBoundary } from "@/components/KpiErrorBoundary";
 import { OperationalRadialMetric } from "@/components/dashboard/OperationalRadialMetric";
 import { ExecutiveTrendChart } from "@/components/dashboard/ExecutiveTrendChart";
+import { WhatsAppOverviewCard } from "@/components/dashboard/WhatsAppOverviewCard";
 
 export default function ExecutiveDashboard() {
   useRenderWatchdog("ExecutiveDashboard");
@@ -21,11 +22,6 @@ export default function ExecutiveDashboard() {
   const ordensTravadas = 5;
   const clientesSemResposta = 2;
   const agendaSemConfirmacao = 4;
-  const teamPerformance = [
-    { name: "Equipe Alpha", value: 94 },
-    { name: "Equipe Beta", value: 87 },
-    { name: "Equipe Gamma", value: 78 },
-  ];
 
   useEffect(() => {
     // eslint-disable-next-line no-console
@@ -178,40 +174,10 @@ export default function ExecutiveDashboard() {
           </ul>
         </AppSectionBlock>
 
-        <AppSectionBlock
-          title="Performance Operacional"
-          subtitle="Execução consolidada das equipes do turno"
+        <WhatsAppOverviewCard
           className="flex h-full min-h-[280px] flex-col p-6 md:p-8"
-        >
-          <div className="flex h-full flex-col justify-between">
-            <div className="flex flex-wrap items-center justify-between gap-6">
-              {teamPerformance.map(team => (
-                <div
-                  key={team.name}
-                  className="flex flex-col items-center gap-2"
-                >
-                  <OperationalRadialMetric
-                    value={team.value}
-                    label={team.name}
-                    size={112}
-                    thickness={10}
-                    color={
-                      team.value >= 90
-                        ? "var(--dashboard-success)"
-                        : team.value >= 84
-                          ? "var(--dashboard-info)"
-                          : "var(--dashboard-warning)"
-                    }
-                    className="gap-1"
-                  />
-                </div>
-              ))}
-            </div>
-            <p className="text-xs text-[var(--text-muted)]">
-              Meta operacional: manter todas as equipes acima de 85% no turno.
-            </p>
-          </div>
-        </AppSectionBlock>
+          onOpenWhatsApp={() => navigate("/whatsapp")}
+        />
 
         <AppSectionBlock
           title="Agenda Operacional"
