@@ -2,14 +2,17 @@ import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import {
+  AlertTriangle,
   Bot,
   Check,
   CheckCheck,
+  ChevronRight,
   Clock3,
   History,
   Info,
   Search,
   Send,
+  Sparkles,
   UserRound,
   WandSparkles,
   Workflow,
@@ -91,6 +94,13 @@ function fmtTime(value: unknown) {
   return parsed ? parsed.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "--:--";
 }
 
+function sinceDays(value: unknown) {
+  const parsed = safeDate(value);
+  if (!parsed) return null;
+  const diff = Date.now() - parsed.getTime();
+  return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
+}
+
 function normalizeMessageStatus(status: unknown): MessageSendStatus {
   const normalized = String(status ?? "").toUpperCase();
   if (normalized === "QUEUED" || normalized === "PENDING") return "queued";
@@ -152,6 +162,13 @@ function statusIcon(status: MessageSendStatus) {
     default:
       return null;
   }
+}
+
+function stateTone(state: string) {
+  if (state === "Falha") return "text-rose-500";
+  if (state === "Cobrança") return "text-amber-500";
+  if (state === "Sem resposta") return "text-sky-500";
+  return "text-[var(--text-secondary)]";
 }
 
 export default function WhatsAppPage() {
@@ -275,7 +292,8 @@ export default function WhatsAppPage() {
       const suggestionsForConversation = automationSuggestions.filter((item) => item.customerId === cid);
       const hasFailure = cid === selectedCustomerId && failed > 0;
       const lastContact = safeDate(customer?.lastContactAt);
-      const isNoReply = !lastContact || Date.now() - lastContact.getTime() > 1000 * 60 * 60 * 24 * 3;
+      const noReplyDays = lastContact ? Math.floor((Date.now() - lastContact.getTime()) / (1000 * 60 * 60 * 24)) : 99;
+      const isNoReply = !lastContact || noReplyDays > 3;
 
       const state = hasFailure
         ? "Falha"
@@ -298,8 +316,10 @@ export default function WhatsAppPage() {
         : relatedServiceOrder
           ? "O.S. com risco operacional."
           : isNoReply
-            ? "Sem interação recente."
+            ? `Sem interação há ${noReplyDays} dia${noReplyDays === 1 ? "" : "s"}.`
             : "Conversa em andamento.";
+
+      const urgencyScore = Number(Boolean(relatedCharge)) * 4 + Number(Boolean(relatedServiceOrder)) * 3 + Number(hasFailure) * 5 + Number(isNoReply) * 2;
 
       return {
         id: cid,
@@ -310,8 +330,13 @@ export default function WhatsAppPage() {
         state,
         contextBadge,
         suggestionsCount: suggestionsForConversation.length,
+        hasCharge: Boolean(relatedCharge),
+        hasServiceOrder: Boolean(relatedServiceOrder),
+        isNoReply,
+        noReplyDays,
+        urgencyScore,
       };
-    });
+    }).sort((a, b) => b.urgencyScore - a.urgencyScore);
   }, [automationSuggestions, charges, customers, failed, selectedCustomerId, serviceOrders]);
 
   const filteredConversations = useMemo(() => {
@@ -366,9 +391,20 @@ export default function WhatsAppPage() {
   }, [selectedMessages]);
 
   const lastMessage = sortedMessages[sortedMessages.length - 1];
+  const noReplyDays = sinceDays(lastMessage?.createdAt ?? selectedCustomer?.lastContactAt);
+
+  const intelligenceSignals = useMemo(() => {
+    const items: Array<{ id: string; label: string; tone: "danger" | "attention" | "neutral" }> = [];
+    if (chargePendingForSelected) items.push({ id: "charge", label: "Cobrança vencida", tone: "danger" });
+    if (futureAppointmentForSelected) items.push({ id: "so", label: "Operação em risco", tone: "attention" });
+    if ((noReplyDays ?? 0) >= 3) items.push({ id: "no-reply", label: `Sem resposta há ${noReplyDays}d`, tone: "attention" });
+    if (conversationSuggestions.length > 0) items.push({ id: "suggestion", label: `${conversationSuggestions.length} ação sugerida`, tone: "neutral" });
+    if (failed > 0) items.push({ id: "failed", label: `${failed} falha de envio`, tone: "danger" });
+    return items;
+  }, [chargePendingForSelected, futureAppointmentForSelected, noReplyDays, conversationSuggestions.length, failed]);
 
   const historyEvents = useMemo(() => {
-    const events: Array<{ id: string; label: string; detail: string; at: string }> = [];
+    const events: Array<{ id: string; label: string; detail: string; at: string; type: "billing" | "warning" | "automation" | "normal" }> = [];
 
     if (chargePendingForSelected) {
       events.push({
@@ -376,6 +412,7 @@ export default function WhatsAppPage() {
         label: "Cobrança pendente",
         detail: "Existe cobrança vencida que pode disparar contato automático.",
         at: fmtDateTime(new Date()),
+        type: "billing",
       });
     }
 
@@ -385,6 +422,7 @@ export default function WhatsAppPage() {
         label: "Agendamento operacional",
         detail: "Atendimento com status de acompanhamento ativo.",
         at: fmtDateTime(recentServiceOrder?.updatedAt ?? recentServiceOrder?.createdAt),
+        type: "warning",
       });
     }
 
@@ -395,6 +433,17 @@ export default function WhatsAppPage() {
         label: "Falha de entrega",
         detail: "Última tentativa de envio retornou falha e requer ação.",
         at: fmtDateTime(failedMessage?.createdAt),
+        type: "warning",
+      });
+    }
+
+    if (conversationSuggestions.length > 0) {
+      events.push({
+        id: "suggested-action",
+        label: "Próxima ação recomendada",
+        detail: "O sistema detectou oportunidade de automação para acelerar a conversa.",
+        at: fmtDateTime(new Date()),
+        type: "automation",
       });
     }
 
@@ -404,11 +453,12 @@ export default function WhatsAppPage() {
         label: "Conversa ativa",
         detail: "Últimas mensagens sem bloqueios operacionais críticos.",
         at: fmtDateTime(lastMessage?.createdAt),
+        type: "normal",
       });
     }
 
     return events;
-  }, [chargePendingForSelected, futureAppointmentForSelected, lastMessage?.createdAt, recentServiceOrder?.createdAt, recentServiceOrder?.updatedAt, sortedMessages]);
+  }, [chargePendingForSelected, futureAppointmentForSelected, lastMessage?.createdAt, recentServiceOrder?.createdAt, recentServiceOrder?.updatedAt, sortedMessages, conversationSuggestions.length]);
 
   async function sendMessage() {
     if (!selectedCustomerId || content.trim().length < 2) {
@@ -451,21 +501,16 @@ export default function WhatsAppPage() {
   }
 
   return (
-    <PageWrapper
-      title="WhatsApp Operacional"
-      subtitle="Workspace de execução com modos de trabalho para conversas, chat, contexto, automações e histórico."
-    >
+    <PageWrapper title="WhatsApp Operacional" subtitle="">
       <section className="space-y-4">
-        <header className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-primary)] px-5 py-4">
+        <header className="rounded-2xl border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface-elevated)_58%,var(--surface-primary))] px-5 py-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold text-[var(--text-primary)]">Workspace operacional</p>
-              <p className="text-xs text-[var(--text-secondary)]">
-                Navegue por janelas de trabalho sem colunas fixas para focar em uma operação por vez.
-              </p>
+            <div className="space-y-1">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">Central de execução</p>
+              <p className="text-sm font-semibold text-[var(--text-primary)]">Conversa, decisão e ação no mesmo fluxo operacional</p>
             </div>
             {selectedCustomer ? (
-              <div className="inline-flex items-center gap-2 rounded-xl border border-[var(--border-subtle)] px-3 py-2">
+              <div className="inline-flex items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)] px-3 py-2">
                 <p className="text-sm font-medium text-[var(--text-primary)]">{String(selectedCustomer.name ?? "Cliente")}</p>
                 <Badge>{failed > 0 ? "Falha" : delivered > 0 ? "Saudável" : "Sem resposta"}</Badge>
               </div>
@@ -503,6 +548,8 @@ export default function WhatsAppPage() {
               quickActions={QUICK_ACTIONS}
               onQuickAction={setContent}
               onOpenConversations={() => setActiveWorkspaceView("conversations")}
+              signals={intelligenceSignals}
+              noReplyDays={noReplyDays}
             />
           ) : null}
 
@@ -513,6 +560,7 @@ export default function WhatsAppPage() {
               chargePendingForSelected={chargePendingForSelected}
               futureAppointmentForSelected={futureAppointmentForSelected}
               recentServiceOrder={recentServiceOrder}
+              noReplyDays={noReplyDays}
             />
           ) : null}
 
@@ -542,12 +590,12 @@ export default function WhatsAppPage() {
 
 function WorkspaceModeTabs({ activeView, onChange }: { activeView: WorkspaceView; onChange: (value: WorkspaceView) => void }) {
   return (
-    <nav className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)]/35 p-2">
-      <div className="flex flex-wrap items-center gap-2">
+    <nav className="rounded-2xl border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface-elevated)_60%,var(--surface-primary))] p-2">
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
         <WorkspaceModeButton label="Conversas" active={activeView === "conversations"} onClick={() => onChange("conversations")} />
-        <WorkspaceModeButton label="Chat" active={activeView === "chat"} onClick={() => onChange("chat")} />
+        <WorkspaceModeButton label="Conversar" active={activeView === "chat"} onClick={() => onChange("chat")} icon={Send} />
         <WorkspaceModeButton label="Contexto" icon={Info} active={activeView === "context"} onClick={() => onChange("context")} />
-        <WorkspaceModeButton label="Automações" icon={WandSparkles} active={activeView === "automations"} onClick={() => onChange("automations")} />
+        <WorkspaceModeButton label="Executar" icon={WandSparkles} active={activeView === "automations"} onClick={() => onChange("automations")} />
         <WorkspaceModeButton label="Histórico" icon={History} active={activeView === "history"} onClick={() => onChange("history")} />
       </div>
     </nav>
@@ -570,14 +618,14 @@ function WorkspaceModeButton({
       type="button"
       onClick={onClick}
       className={cn(
-        "inline-flex items-center gap-2 rounded-xl border px-3.5 py-2 text-sm font-medium transition-colors",
+        "inline-flex h-12 items-center justify-center gap-2 rounded-xl border px-3.5 text-sm font-medium transition-all",
         active
           ? "border-[var(--border-emphasis)] bg-[var(--surface-primary)] text-[var(--text-primary)] shadow-sm"
-          : "border-transparent text-[var(--text-secondary)] hover:border-[var(--border-subtle)] hover:bg-[var(--surface-primary)]/70 hover:text-[var(--text-primary)]"
+          : "border-transparent text-[var(--text-secondary)] hover:border-[var(--border-subtle)] hover:bg-[var(--surface-primary)]/80 hover:text-[var(--text-primary)]"
       )}
     >
       {Icon ? <Icon className="size-4" /> : null}
-      {label}
+      <span>{label}</span>
     </button>
   );
 }
@@ -599,6 +647,12 @@ function ConversationsView({
     snippet: string;
     state: string;
     contextBadge: string | null;
+    hasCharge: boolean;
+    hasServiceOrder: boolean;
+    isNoReply: boolean;
+    noReplyDays: number;
+    suggestionsCount: number;
+    urgencyScore: number;
   }>;
   selectedCustomerId: string;
   searchTerm: string;
@@ -610,8 +664,13 @@ function ConversationsView({
   return (
     <div className="flex h-full min-h-[74vh] flex-col">
       <div className="border-b border-[var(--border-subtle)] px-6 py-5">
-        <p className="text-base font-semibold text-[var(--text-primary)]">Central de conversas</p>
-        <p className="mt-1 text-sm text-[var(--text-secondary)]">Inbox operacional em tela cheia com busca, prioridade e contexto visual.</p>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="text-base font-semibold text-[var(--text-primary)]">Radar de conversas</p>
+            <p className="mt-1 text-sm text-[var(--text-secondary)]">Priorize cobranças, riscos operacionais e clientes sem retorno com leitura instantânea.</p>
+          </div>
+          <Badge>{filteredConversations.length} em foco</Badge>
+        </div>
 
         <div className="relative mt-4 max-w-xl">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--text-muted)]" />
@@ -630,10 +689,10 @@ function ConversationsView({
               type="button"
               onClick={() => onFilterChange(filter.key)}
               className={cn(
-                "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                "rounded-full border px-3 py-1.5 text-xs font-medium transition-all",
                 activeFilter === filter.key
                   ? "border-[var(--border-emphasis)] bg-[var(--surface-elevated)] text-[var(--text-primary)]"
-                  : "border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                  : "border-[var(--border-subtle)] text-[var(--text-secondary)] hover:border-[var(--border-emphasis)]/40 hover:text-[var(--text-primary)]"
               )}
             >
               {filter.label}
@@ -649,31 +708,46 @@ function ConversationsView({
             description="Ajuste o filtro ou a busca para localizar uma conversa operacional."
           />
         ) : (
-          <div className="space-y-3">
+          <div className="divide-y divide-[var(--border-subtle)] rounded-2xl border border-[var(--border-subtle)]/70">
             {filteredConversations.map((conversation) => (
               <button
                 key={conversation.id}
                 type="button"
                 onClick={() => onSelectConversation(conversation.id)}
                 className={cn(
-                  "w-full rounded-2xl border px-4 py-4 text-left transition-colors",
+                  "group relative w-full px-4 py-4 text-left transition-all md:px-5",
                   selectedCustomerId === conversation.id
-                    ? "border-[var(--border-emphasis)] bg-[var(--surface-elevated)]"
-                    : "border-[var(--border-subtle)] hover:border-[var(--border-emphasis)]/50 hover:bg-[var(--surface-elevated)]/45"
+                    ? "bg-[color-mix(in_srgb,var(--surface-elevated)_76%,var(--surface-primary))]"
+                    : "hover:bg-[var(--surface-elevated)]/35"
                 )}
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold text-[var(--text-primary)]">{conversation.name}</p>
-                    <p className="mt-0.5 text-xs text-[var(--text-muted)]">{conversation.phone}</p>
+                  <div className="space-y-1.5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-semibold text-[var(--text-primary)]">{conversation.name}</p>
+                      {conversation.hasCharge ? <Badge>Cobrança</Badge> : null}
+                      {conversation.hasServiceOrder ? <Badge>O.S.</Badge> : null}
+                      {conversation.suggestionsCount > 0 ? <Badge>{conversation.suggestionsCount} sugestão(ões)</Badge> : null}
+                    </div>
+                    <p className="text-xs text-[var(--text-muted)]">{conversation.phone}</p>
                   </div>
-                  <span className="shrink-0 text-xs text-[var(--text-muted)]">{fmtTime(conversation.lastInteraction)}</span>
+                  <div className="text-right">
+                    <span className="text-xs text-[var(--text-muted)]">{fmtTime(conversation.lastInteraction)}</span>
+                    <p className={cn("mt-1 text-xs font-medium", stateTone(conversation.state))}>{conversation.state}</p>
+                  </div>
                 </div>
-                <p className="mt-2 text-sm text-[var(--text-secondary)]">{conversation.snippet}</p>
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <Badge>{conversation.state}</Badge>
-                  {conversation.contextBadge ? <Badge>{conversation.contextBadge}</Badge> : null}
+
+                <div className="mt-3 flex items-start justify-between gap-4">
+                  <p className="text-sm text-[var(--text-secondary)]">{conversation.snippet}</p>
+                  <span className="inline-flex items-center gap-1 text-xs text-[var(--text-muted)]">
+                    Abrir
+                    <ChevronRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
+                  </span>
                 </div>
+
+                {conversation.isNoReply ? (
+                  <p className="mt-2 text-xs text-amber-500">Sem retorno há {conversation.noReplyDays} dia{conversation.noReplyDays === 1 ? "" : "s"}.</p>
+                ) : null}
               </button>
             ))}
           </div>
@@ -694,6 +768,8 @@ function ChatView({
   quickActions,
   onQuickAction,
   onOpenConversations,
+  signals,
+  noReplyDays,
 }: {
   selectedCustomer: any;
   messages: Array<any>;
@@ -705,6 +781,8 @@ function ChatView({
   quickActions: ReadonlyArray<{ key: string; label: string; content: string }>;
   onQuickAction: (value: string) => void;
   onOpenConversations: () => void;
+  signals: Array<{ id: string; label: string; tone: "danger" | "attention" | "neutral" }>;
+  noReplyDays: number | null;
 }) {
   if (!selectedCustomer) {
     return (
@@ -712,7 +790,7 @@ function ChatView({
         <div className="space-y-4 text-center">
           <AppEmptyState
             title="Nenhuma conversa selecionada"
-            description="Abra a janela de Conversas para escolher um cliente e iniciar o atendimento operacional."
+            description="Abra o modo Conversas para escolher um cliente e iniciar o atendimento operacional."
           />
           <Button type="button" variant="outline" onClick={onOpenConversations}>
             Ir para Conversas
@@ -724,21 +802,42 @@ function ChatView({
 
   return (
     <div className="grid min-h-[74vh] grid-rows-[auto_minmax(0,1fr)_auto]">
-      <header className="border-b border-[var(--border-subtle)] px-6 py-4">
-        <p className="text-sm font-semibold text-[var(--text-primary)]">{String(selectedCustomer.name ?? "Cliente")}</p>
-        <p className="mt-0.5 text-xs text-[var(--text-secondary)]">{String(selectedCustomer.phone ?? "Telefone não informado")}</p>
+      <header className="border-b border-[var(--border-subtle)] px-5 py-4 md:px-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-base font-semibold text-[var(--text-primary)]">{String(selectedCustomer.name ?? "Cliente")}</p>
+            <p className="mt-0.5 text-xs text-[var(--text-secondary)]">{String(selectedCustomer.phone ?? "Telefone não informado")}</p>
+            <p className="mt-2 text-xs text-[var(--text-muted)]">{noReplyDays !== null ? `Último retorno há ${noReplyDays} dia(s)` : "Sem histórico de resposta"}</p>
+          </div>
+          <div className="flex max-w-xl flex-wrap justify-end gap-2">
+            {signals.map((signal) => (
+              <span
+                key={signal.id}
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs",
+                  signal.tone === "danger"
+                    ? "border-rose-500/35 bg-rose-500/10 text-rose-500"
+                    : signal.tone === "attention"
+                      ? "border-amber-500/35 bg-amber-500/10 text-amber-500"
+                      : "border-[var(--border-subtle)] bg-[var(--surface-elevated)]/65 text-[var(--text-secondary)]"
+                )}
+              >
+                {signal.tone === "danger" ? <AlertTriangle className="size-3.5" /> : <Sparkles className="size-3.5" />}
+                {signal.label}
+              </span>
+            ))}
+          </div>
+        </div>
       </header>
 
-      <div className="min-h-0 overflow-y-auto px-5 py-5 md:px-8">
+      <div className="min-h-0 overflow-y-auto bg-[linear-gradient(to_bottom,color-mix(in_srgb,var(--surface-elevated)_28%,transparent),transparent_140px)] px-4 py-5 md:px-7">
         {isLoading ? (
-          <AppLoadingState rows={6} />
+          <AppLoadingState rows={7} />
         ) : messages.length === 0 ? (
-          <div className="flex h-full items-center justify-center">
-            <div className="w-full max-w-3xl rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--surface-elevated)]/30 p-10 text-center">
-              <p className="text-base font-semibold text-[var(--text-primary)]">Conversa pronta para operação</p>
-              <p className="mt-2 text-sm text-[var(--text-secondary)]">
-                Inicie o contato com uma ação rápida no composer ou use a janela de Automações para executar uma sugestão.
-              </p>
+          <div className="mx-auto flex h-full w-full max-w-4xl flex-col justify-end">
+            <div className="mx-auto mb-4 inline-flex items-center gap-2 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-elevated)]/50 px-3 py-1 text-xs text-[var(--text-secondary)]">
+              <Bot className="size-3.5" />
+              Sem mensagens ainda — a conversa está pronta para começar.
             </div>
           </div>
         ) : (
@@ -746,10 +845,14 @@ function ChatView({
             {messages.map((message) => {
               if (message._kind === "event") {
                 return (
-                  <div key={String(message?.id)} className="mx-auto w-full max-w-[90%] rounded-lg border border-dashed border-[var(--border-subtle)] bg-[var(--surface-elevated)]/60 px-3 py-2 text-center">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">Evento operacional</p>
-                    <p className="mt-1 text-xs text-[var(--text-secondary)]">{String(message?.content ?? "Atualização registrada na operação.")}</p>
-                    <p className="mt-1 text-[11px] text-[var(--text-muted)]">{fmtDateTime(message?.createdAt)}</p>
+                  <div key={String(message?.id)} className="mx-auto flex w-full items-center gap-3 py-1">
+                    <span className="h-px flex-1 bg-[var(--border-subtle)]" />
+                    <p className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-primary)] px-3 py-1 text-[11px] text-[var(--text-secondary)]">
+                      <Workflow className="size-3.5" />
+                      {String(message?.content ?? "Evento operacional")}
+                    </p>
+                    <span className="text-[11px] text-[var(--text-muted)]">{fmtTime(message?.createdAt)}</span>
+                    <span className="h-px flex-1 bg-[var(--border-subtle)]" />
                   </div>
                 );
               }
@@ -759,15 +862,15 @@ function ChatView({
                 <div key={String(message?.id)} className={cn("flex", fromClient ? "justify-start" : "justify-end")}>
                   <div
                     className={cn(
-                      "max-w-[80%] rounded-2xl border px-4 py-3",
+                      "max-w-[82%] rounded-2xl px-4 py-3",
                       fromClient
-                        ? "border-[var(--border-subtle)] bg-[var(--surface-elevated)]"
-                        : "border-[var(--border-emphasis)] bg-[color-mix(in_srgb,var(--surface-elevated)_86%,var(--bg-surface))]"
+                        ? "rounded-tl-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)]/75"
+                        : "rounded-tr-md border border-[var(--border-emphasis)] bg-[color-mix(in_srgb,var(--surface-elevated)_82%,var(--bg-surface))]"
                     )}
                   >
                     <div className="mb-1 flex items-center gap-1 text-[11px] text-[var(--text-muted)]">
                       {fromClient ? <UserRound className="size-3" /> : message._kind === "automation" ? <Bot className="size-3" /> : <Send className="size-3" />}
-                      <span>{fromClient ? "Cliente" : message._kind === "automation" ? "Automação" : "Operador"}</span>
+                      <span>{fromClient ? "Cliente" : message._kind === "automation" ? "Automação" : "Operação"}</span>
                     </div>
                     <p className="text-sm leading-relaxed text-[var(--text-primary)]">{String(message?.content ?? "")}</p>
                     <div className="mt-2 flex items-center justify-end gap-1 text-[11px] text-[var(--text-muted)]">
@@ -787,29 +890,29 @@ function ChatView({
         )}
       </div>
 
-      <footer className="border-t border-[var(--border-subtle)] bg-[var(--surface-primary)] px-5 py-4 md:px-6">
-        <div className="mb-3 flex flex-wrap gap-2">
-          {quickActions.map((action) => (
-            <button
-              key={action.key}
-              type="button"
-              onClick={() => onQuickAction(action.content)}
-              className="rounded-full border border-[var(--border-subtle)] px-3 py-1.5 text-xs text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
-            >
-              {action.label}
-            </button>
-          ))}
-        </div>
-        <div className="space-y-3">
-          <Textarea
-            value={content}
-            onChange={(event) => onContentChange(event.target.value)}
-            placeholder="Escreva a mensagem ou use uma ação rápida..."
-            className="min-h-[120px] resize-y"
-          />
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-xs text-[var(--text-muted)]">Template sugerido, contexto e mensagem livre no mesmo fluxo operacional.</p>
-            <Button type="button" onClick={onSend} disabled={isSending}>
+      <footer className="border-t border-[var(--border-subtle)] bg-[var(--surface-primary)] px-4 py-4 md:px-6">
+        <div className="mx-auto w-full max-w-4xl space-y-3">
+          <div className="flex flex-wrap gap-2">
+            {quickActions.map((action) => (
+              <button
+                key={action.key}
+                type="button"
+                onClick={() => onQuickAction(action.content)}
+                className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-elevated)]/40 px-3 py-1.5 text-xs text-[var(--text-secondary)] transition-all hover:border-[var(--border-emphasis)]/40 hover:text-[var(--text-primary)]"
+              >
+                {action.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-end gap-2 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)]/45 px-3 py-3">
+            <Textarea
+              value={content}
+              onChange={(event) => onContentChange(event.target.value)}
+              placeholder="Escreva a mensagem, ajuste uma sugestão ou acione uma resposta rápida..."
+              className="min-h-[64px] flex-1 resize-none border-0 bg-transparent p-0 shadow-none focus-visible:ring-0"
+            />
+            <Button type="button" onClick={onSend} disabled={isSending || content.trim().length < 2} className="h-10 rounded-xl px-4">
               <Send className="mr-1 size-4" />
               Enviar
             </Button>
@@ -826,12 +929,14 @@ function ContextWorkspaceView({
   chargePendingForSelected,
   futureAppointmentForSelected,
   recentServiceOrder,
+  noReplyDays,
 }: {
   selectedCustomer: any;
   selectedMessages: Array<any>;
   chargePendingForSelected: boolean;
   futureAppointmentForSelected: boolean;
   recentServiceOrder: any;
+  noReplyDays: number | null;
 }) {
   if (!selectedCustomer) {
     return (
@@ -848,9 +953,7 @@ function ContextWorkspaceView({
     { label: "Cliente", value: String(selectedCustomer?.name ?? "—") },
     { label: "Telefone", value: String(selectedCustomer?.phone ?? "—") },
     { label: "Última interação", value: fmtDateTime(selectedMessages[selectedMessages.length - 1]?.createdAt ?? selectedCustomer?.lastContactAt) },
-    { label: "Mensagens enviadas", value: String(selectedMessages.length) },
-    { label: "Cobrança pendente", value: chargePendingForSelected ? "Sim" : "Não" },
-    { label: "Agendamento futuro", value: futureAppointmentForSelected ? "Sim" : "Não" },
+    { label: "Mensagens no histórico", value: String(selectedMessages.length) },
     { label: "O.S. recente", value: recentServiceOrder ? String(recentServiceOrder?.status ?? "Registrada") : "Sem O.S. recente" },
     { label: "Responsável interno", value: String(selectedCustomer?.ownerName ?? "Operação Nexo") },
     { label: "Observações", value: String(selectedCustomer?.notes ?? "Sem observações registradas") },
@@ -858,14 +961,31 @@ function ContextWorkspaceView({
 
   return (
     <div className="min-h-[74vh] px-6 py-6 md:px-8">
-      <div className="max-w-5xl">
-        <p className="text-base font-semibold text-[var(--text-primary)]">Contexto operacional</p>
-        <p className="mt-1 text-sm text-[var(--text-secondary)]">Dados de atendimento organizados em leitura vertical para tomada de decisão rápida.</p>
+      <div className="max-w-5xl space-y-4">
+        <div className="space-y-1">
+          <p className="text-base font-semibold text-[var(--text-primary)]">Contexto para decisão</p>
+          <p className="text-sm text-[var(--text-secondary)]">Priorize o que impacta resposta, cobrança e execução antes de responder no chat.</p>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-3">
+          <section className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3">
+            <p className="text-[11px] uppercase tracking-wide text-rose-500">Criticidade</p>
+            <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">{chargePendingForSelected ? "Cobrança pendente" : "Sem cobrança crítica"}</p>
+          </section>
+          <section className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
+            <p className="text-[11px] uppercase tracking-wide text-amber-500">Operação</p>
+            <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">{futureAppointmentForSelected ? "Agendamento em acompanhamento" : "Sem risco imediato"}</p>
+          </section>
+          <section className="rounded-xl border border-sky-500/30 bg-sky-500/10 p-3">
+            <p className="text-[11px] uppercase tracking-wide text-sky-500">Relacionamento</p>
+            <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">{(noReplyDays ?? 0) >= 3 ? `Sem resposta há ${noReplyDays} dias` : "Contato recente"}</p>
+          </section>
+        </div>
       </div>
 
-      <div className="mt-6 divide-y divide-[var(--border-subtle)] rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)]/20 px-4 md:px-6">
+      <div className="mt-6 divide-y divide-[var(--border-subtle)] rounded-2xl border border-[var(--border-subtle)]/80">
         {contextRows.map((row) => (
-          <div key={row.label} className="grid gap-2 py-4 md:grid-cols-[220px_minmax(0,1fr)] md:items-start">
+          <div key={row.label} className="grid gap-2 px-4 py-4 md:grid-cols-[220px_minmax(0,1fr)] md:items-start md:px-6">
             <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">{row.label}</p>
             <p className="text-sm text-[var(--text-primary)]">{row.value}</p>
           </div>
@@ -912,18 +1032,22 @@ function AutomationsWorkspaceView({
 
   return (
     <div className="min-h-[74vh] space-y-6 px-6 py-6 md:px-8">
-      <section className="rounded-2xl border border-[var(--border-emphasis)] bg-[var(--surface-elevated)]/55 p-6">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+      <section className="rounded-2xl border border-[var(--border-emphasis)] bg-[linear-gradient(130deg,color-mix(in_srgb,var(--surface-elevated)_78%,var(--surface-primary))_20%,var(--surface-primary)_100%)] p-6">
+        <p className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+          <Sparkles className="size-3.5" />
+          melhor próxima ação
+        </p>
+        <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
           <div className="max-w-3xl">
-            <p className="text-base font-semibold text-[var(--text-primary)]">{primarySuggestion.title}</p>
+            <p className="text-lg font-semibold text-[var(--text-primary)]">{primarySuggestion.title}</p>
             <p className="mt-1 text-sm text-[var(--text-secondary)]">{primarySuggestion.reason}</p>
             <p className="mt-1 text-sm text-[var(--text-secondary)]">{primarySuggestion.impact}</p>
           </div>
           <Badge>{primarySuggestion.urgency}</Badge>
         </div>
 
-        <div className="mt-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)] p-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">Prévia da ação</p>
+        <div className="mt-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)]/85 p-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">Mensagem sugerida</p>
           <p className="mt-2 text-sm text-[var(--text-primary)]">{primarySuggestion.preview}</p>
         </div>
 
@@ -934,43 +1058,51 @@ function AutomationsWorkspaceView({
           </span>
           <div className="flex gap-2">
             <Button type="button" variant="outline" onClick={() => onApplySuggestion(primarySuggestion.preview)}>
-              Usar no chat
+              Revisar no chat
             </Button>
             <Button type="button" onClick={() => onExecuteSuggestion(primarySuggestion)}>
-              Executar automação
+              Executar agora
             </Button>
           </div>
         </div>
       </section>
 
       {secondarySuggestions.length > 0 ? (
-        <section className="space-y-3">
-          <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">Outras sugestões</p>
-          {secondarySuggestions.map((item) => (
-            <article key={item.id} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)] px-4 py-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-[var(--text-primary)]">{item.title}</p>
-                  <p className="mt-1 text-xs text-[var(--text-secondary)]">{item.reason}</p>
+        <section className="space-y-2">
+          <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">Opções secundárias</p>
+          <div className="divide-y divide-[var(--border-subtle)] rounded-xl border border-[var(--border-subtle)]/70">
+            {secondarySuggestions.map((item) => (
+              <article key={item.id} className="px-4 py-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-[var(--text-primary)]">{item.title}</p>
+                    <p className="mt-1 text-xs text-[var(--text-secondary)]">{item.reason}</p>
+                  </div>
+                  <Badge>{item.urgency}</Badge>
                 </div>
-                <Badge>{item.urgency}</Badge>
-              </div>
-              <p className="mt-2 text-sm text-[var(--text-secondary)]">{item.preview}</p>
-              <div className="mt-3 flex items-center justify-between gap-2">
-                <span className="text-xs text-[var(--text-muted)]">Origem: {item.origin}</span>
-                <Button type="button" variant="outline" size="sm" onClick={() => onApplySuggestion(item.preview)}>
-                  Usar
-                </Button>
-              </div>
-            </article>
-          ))}
+                <p className="mt-2 text-sm text-[var(--text-secondary)]">{item.preview}</p>
+                <div className="mt-3 flex items-center justify-between gap-2">
+                  <span className="text-xs text-[var(--text-muted)]">Origem: {item.origin}</span>
+                  <Button type="button" variant="outline" size="sm" onClick={() => onApplySuggestion(item.preview)}>
+                    Levar ao chat
+                  </Button>
+                </div>
+              </article>
+            ))}
+          </div>
         </section>
       ) : null}
     </div>
   );
 }
 
-function HistoryWorkspaceView({ selectedCustomer, historyEvents }: { selectedCustomer: any; historyEvents: Array<{ id: string; label: string; detail: string; at: string }> }) {
+function HistoryWorkspaceView({
+  selectedCustomer,
+  historyEvents,
+}: {
+  selectedCustomer: any;
+  historyEvents: Array<{ id: string; label: string; detail: string; at: string; type: "billing" | "warning" | "automation" | "normal" }>;
+}) {
   if (!selectedCustomer) {
     return (
       <div className="flex min-h-[74vh] items-center justify-center p-8">
@@ -995,20 +1127,35 @@ function HistoryWorkspaceView({ selectedCustomer, historyEvents }: { selectedCus
 
   return (
     <div className="min-h-[74vh] px-6 py-6 md:px-8">
-      <div className="max-w-4xl space-y-4">
-        {historyEvents.map((event, index) => (
-          <article key={event.id} className="relative grid gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)] p-4 pl-10">
-            {index < historyEvents.length - 1 ? (
-              <span className="absolute -bottom-4 left-[17px] top-7 w-px bg-[var(--border-subtle)]" aria-hidden />
-            ) : null}
-            <span className="absolute left-3 top-4 inline-flex size-4 items-center justify-center rounded-full border border-[var(--border-emphasis)] bg-[var(--surface-primary)]" aria-hidden>
-              <span className="size-1.5 rounded-full bg-[var(--text-primary)]" />
-            </span>
-            <p className="text-sm font-semibold text-[var(--text-primary)]">{event.label}</p>
-            <p className="text-sm text-[var(--text-secondary)]">{event.detail}</p>
-            <p className="text-xs text-[var(--text-muted)]">{event.at}</p>
-          </article>
-        ))}
+      <div className="max-w-4xl">
+        <p className="mb-4 text-base font-semibold text-[var(--text-primary)]">Linha do tempo operacional</p>
+        <div className="space-y-1">
+          {historyEvents.map((event, index) => (
+            <article key={event.id} className="relative grid gap-1 rounded-lg px-4 py-3 pl-11 hover:bg-[var(--surface-elevated)]/35">
+              {index < historyEvents.length - 1 ? (
+                <span className="absolute -bottom-5 left-[21px] top-8 w-px bg-[var(--border-subtle)]" aria-hidden />
+              ) : null}
+              <span
+                className={cn(
+                  "absolute left-3 top-3.5 inline-flex size-5 items-center justify-center rounded-full border",
+                  event.type === "billing"
+                    ? "border-rose-500/40 bg-rose-500/15 text-rose-500"
+                    : event.type === "warning"
+                      ? "border-amber-500/40 bg-amber-500/15 text-amber-500"
+                      : event.type === "automation"
+                        ? "border-violet-500/40 bg-violet-500/15 text-violet-500"
+                        : "border-[var(--border-subtle)] bg-[var(--surface-primary)] text-[var(--text-muted)]"
+                )}
+                aria-hidden
+              >
+                {event.type === "automation" ? <Bot className="size-3" /> : <Clock3 className="size-3" />}
+              </span>
+              <p className="text-sm font-semibold text-[var(--text-primary)]">{event.label}</p>
+              <p className="text-sm text-[var(--text-secondary)]">{event.detail}</p>
+              <p className="text-xs text-[var(--text-muted)]">{event.at}</p>
+            </article>
+          ))}
+        </div>
       </div>
     </div>
   );
