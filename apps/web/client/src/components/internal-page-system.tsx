@@ -70,6 +70,49 @@ export function AppFiltersBar({
   );
 }
 
+export function AppSecondaryTabs<T extends string>({
+  items,
+  value,
+  onChange,
+  className,
+}: {
+  items: Array<{ value: T; label: string }>;
+  value: T;
+  onChange: (value: T) => void;
+  className?: string;
+}) {
+  return (
+    <nav
+      className={cn(
+        "overflow-x-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)]/35 p-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        className
+      )}
+      aria-label="Navegação secundária"
+    >
+      <div className="flex min-w-max items-center gap-1.5">
+        {items.map(item => {
+          const isActive = item.value === value;
+          return (
+            <button
+              key={item.value}
+              type="button"
+              onClick={() => onChange(item.value)}
+              className={cn(
+                "relative inline-flex h-9 shrink-0 items-center justify-center rounded-lg border px-4 text-sm font-medium transition-colors",
+                isActive
+                  ? "border-[var(--accent-primary)]/35 bg-[var(--surface-primary)] text-white shadow-[inset_0_-2px_0_0_var(--accent-primary)]"
+                  : "border-transparent bg-transparent text-white/70 hover:border-[var(--border-subtle)] hover:bg-[var(--surface-primary)]/40 hover:text-white"
+              )}
+            >
+              <span>{item.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}
+
 type MetricTrend = "up" | "down" | "neutral";
 
 export type AppMetricCardItem = {
@@ -129,7 +172,7 @@ export function AppMetricCard({
   const content = (
     <article
       className={cn(
-        "nexo-card-kpi flex h-full min-h-[156px] flex-col p-4 md:p-5",
+        "nexo-card-kpi flex h-full min-h-[138px] flex-col p-4 md:p-5",
         tone === "important" && "nexo-card-kpi--important",
         tone === "critical" && "nexo-card-kpi--critical"
       )}

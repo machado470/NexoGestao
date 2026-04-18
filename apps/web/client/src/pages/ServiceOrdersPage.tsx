@@ -17,6 +17,7 @@ import {
   AppPageErrorState,
   AppPageLoadingState,
   AppPriorityBadge,
+  AppSecondaryTabs,
   AppSectionBlock,
   AppStatusBadge,
 } from "@/components/internal-page-system";
@@ -25,6 +26,7 @@ import { formatDelta, getWindow, inRange, percentDelta, safeDate, trendFromDelta
 export default function ServiceOrdersPage() {
   const [, navigate] = useLocation();
   const [openCreate, setOpenCreate] = useState(false);
+  const [activeTab, setActiveTab] = useState<"pipeline" | "execution" | "done" | "blocked" | "history">("pipeline");
   const customersQuery = trpc.nexo.customers.list.useQuery(undefined, { retry: false });
   const peopleQuery = trpc.people.list.useQuery(undefined, { retry: false });
   const serviceOrdersQuery = trpc.nexo.serviceOrders.list.useQuery({ page: 1, limit: 100 }, { retry: false });
@@ -95,6 +97,13 @@ export default function ServiceOrdersPage() {
         action: <button className="nexo-cta-secondary" onClick={() => navigate(`/whatsapp?customerId=${item?.customerId}`)}>Cobrar retorno</button>,
       })),
   ].slice(0, 7);
+  const visibleOrders = useMemo(() => {
+    if (activeTab === "pipeline") return orders;
+    if (activeTab === "execution") return orders.filter(item => String(item?.status ?? "").toUpperCase() === "IN_PROGRESS");
+    if (activeTab === "done") return orders.filter(item => String(item?.status ?? "").toUpperCase() === "DONE");
+    if (activeTab === "blocked") return orders.filter(item => ["BLOCKED", "ON_HOLD", "PAUSED"].includes(String(item?.status ?? "").toUpperCase()));
+    return [...orders].sort((a, b) => (safeDate(b?.updatedAt)?.getTime() ?? 0) - (safeDate(a?.updatedAt)?.getTime() ?? 0));
+  }, [activeTab, orders]);
 
   return (
     <PageWrapper title="Ordens de Serviço" subtitle="Centro da operação: execução, cobrança e próxima ação sem ruído.">
@@ -122,8 +131,20 @@ export default function ServiceOrdersPage() {
           { title: "Prontas p/ cobrança", value: String(pipeline.prontaCobranca), hint: "concluídas e sem cobrança ativa" },
         ]}
       />
+      <AppSecondaryTabs
+        items={[
+          { value: "pipeline", label: "Pipeline" },
+          { value: "execution", label: "Em execução" },
+          { value: "done", label: "Concluídas" },
+          { value: "blocked", label: "Travadas" },
+          { value: "history", label: "Histórico" },
+        ]}
+        value={activeTab}
+        onChange={setActiveTab}
+      />
 
-      <AppSectionBlock
+      {(activeTab === "pipeline" || activeTab === "blocked") ? (
+        <AppSectionBlock
         title="Travadas"
         subtitle="Bloco principal: ordens que mais pressionam SLA e precisam de ação direta agora"
       >
@@ -137,7 +158,9 @@ export default function ServiceOrdersPage() {
             : [{ title: "Sem travas críticas", subtitle: "Pipeline fluindo no momento.", action: <button className="nexo-cta-secondary" onClick={() => navigate("/finances")}>Seguir para cobrança</button> }]}
         />
       </AppSectionBlock>
+      ) : null}
 
+      {(activeTab === "pipeline" || activeTab === "execution") ? (
       <section className="grid gap-4 xl:grid-cols-2">
         <AppSectionBlock title="Top O.S. para executar agora" subtitle="Prioridade alta com ação operacional direta">
           <AppListBlock
@@ -160,6 +183,7 @@ export default function ServiceOrdersPage() {
           />
         </AppSectionBlock>
       </section>
+      ) : null}
 
       <AppSectionBlock title="Pipeline operacional" subtitle="Cada O.S. com ação real">
         {showInitialLoading ? (
@@ -170,7 +194,7 @@ export default function ServiceOrdersPage() {
             actionLabel="Tentar novamente"
             onAction={() => void serviceOrdersQuery.refetch()}
           />
-        ) : orders.length === 0 ? (
+        ) : visibleOrders.length === 0 ? (
           <AppPageEmptyState title="Nenhum dado disponível ainda" description="Ação recomendada: criar ordem de serviço" />
         ) : (
           <AppDataTable>
@@ -184,7 +208,7 @@ export default function ServiceOrdersPage() {
                 </tr>
               </thead>
               <tbody>
-                {orders.map((order) => {
+                {visibleOrders.map((order) => {
                   const status = String(order?.status ?? "").toUpperCase();
                   const hasCharge = Boolean(order?.financialSummary?.hasCharge);
                   const isPending = ["PENDENTE", "SCHEDULED", "OPEN", "ASSIGNED"].includes(status);

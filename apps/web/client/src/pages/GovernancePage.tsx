@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Line, LineChart, CartesianGrid, XAxis } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { trpc } from "@/lib/trpc";
@@ -14,6 +14,7 @@ import {
   AppPageErrorState,
   AppPageLoadingState,
   AppPriorityBadge,
+  AppSecondaryTabs,
   AppSectionBlock,
   AppStatusBadge,
 } from "@/components/internal-page-system";
@@ -39,6 +40,7 @@ export default function GovernancePage() {
   useRenderWatchdog("GovernancePage");
   const summaryQuery = trpc.governance.summary.useQuery(undefined, { retry: false });
   const runsQuery = trpc.governance.runs.useQuery({ limit: 12 }, { retry: false });
+  const [activeTab, setActiveTab] = useState<"overview" | "alerts" | "executions" | "history">("overview");
 
   const summary = useMemo(
     () => (normalizeObjectPayload<any>(summaryQuery.data) ?? {}) as Record<string, any>,
@@ -127,6 +129,16 @@ export default function GovernancePage() {
         ]}
       />
       </KpiErrorBoundary>
+      <AppSecondaryTabs
+        items={[
+          { value: "overview", label: "Visão geral" },
+          { value: "alerts", label: "Alertas" },
+          { value: "executions", label: "Execuções" },
+          { value: "history", label: "Histórico" },
+        ]}
+        value={activeTab}
+        onChange={setActiveTab}
+      />
 
 
       <AppSectionBlock title="Estado operacional atual" subtitle="Por que a governança está neste estado e o que fazer agora" compact>
@@ -143,6 +155,7 @@ export default function GovernancePage() {
         </div>
       </AppSectionBlock>
 
+      {(activeTab === "overview" || activeTab === "history") ? (
       <div className="grid gap-3 xl:grid-cols-3">
         <AppChartPanel title="Evolução do risco" description="Histórico compacto das últimas execuções.">
           {runsQuery.isLoading && !hasRunsData ? (
@@ -189,8 +202,10 @@ export default function GovernancePage() {
           action={{ label: "Aplicar ação", onClick: () => void Promise.all([summaryQuery.refetch(), runsQuery.refetch()]) }}
         />
       </div>
+      ) : null}
 
       <TrpcSectionErrorBoundary context="governance:entity-recommendations">
+      {(activeTab === "overview" || activeTab === "alerts" || activeTab === "executions") ? (
       <div className="grid gap-3 xl:grid-cols-2">
         <AppSectionBlock title="Entidades em risco" subtitle="Itens reais apontados pela governança">
           {summaryQuery.isLoading && !hasSummaryData ? (
@@ -241,6 +256,8 @@ export default function GovernancePage() {
           )}
         </AppSectionBlock>
       </div>
+      ) : null}
+      {(activeTab === "overview" || activeTab === "alerts") ? (
       <div className="mt-3 grid gap-3 xl:grid-cols-3">
         <AppSectionBlock title="Gargalos operacionais" subtitle="Onde a operação está travando">
           {bottlenecks.length === 0 ? <AppPageEmptyState title="Sem gargalos críticos" description="Nenhum gargalo estrutural detectado na leitura atual." /> : (
@@ -277,6 +294,7 @@ export default function GovernancePage() {
           )}
         </AppSectionBlock>
       </div>
+      ) : null}
       <div className="mt-3">
         <AppNextActionCard
           title="Prioridade executiva"

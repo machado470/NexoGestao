@@ -7,13 +7,13 @@ import {
   AppKpiRow,
   AppListBlock,
   AppPageLoadingState,
+  AppSecondaryTabs,
   AppSectionBlock,
   AppStatusBadge,
   Input,
 } from "@/components/internal-page-system";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 
 export default function SettingsPage() {
@@ -28,6 +28,7 @@ export default function SettingsPage() {
 
   const [organizationName, setOrganizationName] = useState("");
   const [timezone, setTimezone] = useState("America/Sao_Paulo");
+  const [activeTab, setActiveTab] = useState<"organizacao" | "usuarios" | "integracoes" | "notificacoes">("organizacao");
 
   useEffect(() => {
     setOrganizationName(String(settings.organizationName ?? settings.name ?? ""));
@@ -108,15 +109,20 @@ export default function SettingsPage() {
       </AppSectionBlock>
 
       <AppSectionBlock title="Seções administrativas" subtitle="Configurações agrupadas por contexto">
-        <Tabs defaultValue="organizacao">
-          <TabsList>
-            <TabsTrigger value="organizacao">Organização</TabsTrigger>
-            <TabsTrigger value="usuarios">Usuários</TabsTrigger>
-            <TabsTrigger value="integracoes">Integrações</TabsTrigger>
-            <TabsTrigger value="notificacoes">Notificações</TabsTrigger>
-          </TabsList>
+        <AppSecondaryTabs
+          items={[
+            { value: "organizacao", label: "Geral" },
+            { value: "usuarios", label: "Permissões" },
+            { value: "integracoes", label: "Integrações" },
+            { value: "notificacoes", label: "Notificações" },
+          ]}
+          value={activeTab}
+          onChange={setActiveTab}
+          className="mb-3"
+        />
 
-          <TabsContent value="organizacao" className="space-y-3 pt-3">
+          {activeTab === "organizacao" ? (
+            <div className="space-y-3 pt-1">
             <AppFiltersBar>
               <Input className="max-w-sm" placeholder="Ex.: Nexo Serviços" value={organizationName} onChange={(event) => setOrganizationName(event.target.value)} />
               <Input className="max-w-xs" placeholder="Ex.: America/Sao_Paulo" value={timezone} onChange={(event) => setTimezone(event.target.value)} />
@@ -127,9 +133,11 @@ export default function SettingsPage() {
                 Reverter
               </Button>
             </AppFiltersBar>
-          </TabsContent>
+            </div>
+          ) : null}
 
-          <TabsContent value="usuarios" className="pt-3">
+          {activeTab === "usuarios" ? (
+            <div className="pt-1">
             <AppListBlock
               compact
               items={members.slice(0, 6).map((member: any, index) => ({
@@ -139,9 +147,11 @@ export default function SettingsPage() {
                 action: <Button size="sm" variant="outline">Gerenciar</Button>,
               }))}
             />
-          </TabsContent>
+            </div>
+          ) : null}
 
-          <TabsContent value="integracoes" className="pt-3">
+          {activeTab === "integracoes" ? (
+            <div className="pt-1">
             <AppListBlock
               compact
               items={[
@@ -149,14 +159,16 @@ export default function SettingsPage() {
                 { title: "WhatsApp/Twilio", subtitle: "Comunicação com clientes", right: <AppStatusBadge label={readiness?.twilio?.configured ? "Concluído" : "Pendente"} />, action: <Button size="sm" variant="outline">Abrir</Button> },
               ]}
             />
-          </TabsContent>
+            </div>
+          ) : null}
 
-          <TabsContent value="notificacoes" className="pt-3">
+          {activeTab === "notificacoes" ? (
+            <div className="pt-1">
             <p className="text-sm text-[var(--text-secondary)]">
               Alertas de risco, atraso e cobrança seguem a política definida em Governança.
             </p>
-          </TabsContent>
-        </Tabs>
+            </div>
+          ) : null}
       </AppSectionBlock>
     </PageWrapper>
   );
