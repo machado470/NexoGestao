@@ -3,7 +3,6 @@ import {
   Area,
   AreaChart,
   CartesianGrid,
-  Legend,
   Line,
   ResponsiveContainer,
   Tooltip,
@@ -13,21 +12,30 @@ import {
 import { AppSectionCard } from "@/components/app-system";
 import { cn } from "@/lib/utils";
 
-type ExecutiveTrendPeriod = "1d" | "7d" | "14d" | "30d" | "all";
+type ExecutiveTrendPeriod =
+  | "1d"
+  | "7d"
+  | "14d"
+  | "30d"
+  | "60d"
+  | "90d"
+  | "all";
+
+type ExecutiveTrendMetric = "revenue" | "clients" | "appointments" | "orders";
 
 type ExecutiveTrendPoint = {
   label: string;
   timestamp: string;
   revenue: number;
-  completedOrders: number;
-  generatedCharges: number;
-  receivedPayments: number;
+  clients: number;
+  appointments: number;
+  orders: number;
 };
 
 type ExecutiveTrendDataset = {
   points: ExecutiveTrendPoint[];
-  comparisonRevenue: number;
   granularityLabel: string;
+  comparisonByMetric?: Partial<Record<ExecutiveTrendMetric, number>>;
 };
 
 type ExecutiveTrendChartProps = {
@@ -40,7 +48,56 @@ const PERIOD_OPTIONS: Array<{ value: ExecutiveTrendPeriod; label: string }> = [
   { value: "7d", label: "7D" },
   { value: "14d", label: "14D" },
   { value: "30d", label: "30D" },
+  { value: "60d", label: "60D" },
+  { value: "90d", label: "90D" },
   { value: "all", label: "Todo período" },
+];
+
+const METRIC_OPTIONS: Array<{
+  value: ExecutiveTrendMetric;
+  label: string;
+  color: string;
+  strokeWidth: number;
+  showArea: boolean;
+  valueFormatter: (value: number) => string;
+  summaryLabel: string;
+}> = [
+  {
+    value: "revenue",
+    label: "Receita",
+    color: "var(--dashboard-info)",
+    strokeWidth: 2.4,
+    showArea: true,
+    valueFormatter: value => formatCurrency(value),
+    summaryLabel: "receita",
+  },
+  {
+    value: "clients",
+    label: "Clientes",
+    color: "color-mix(in srgb, var(--dashboard-info) 56%, var(--dashboard-danger) 44%)",
+    strokeWidth: 2.1,
+    showArea: false,
+    valueFormatter: value => `${formatInteger(value)} novos clientes`,
+    summaryLabel: "clientes",
+  },
+  {
+    value: "appointments",
+    label: "Agendamentos",
+    color: "var(--dashboard-success)",
+    strokeWidth: 2.1,
+    showArea: false,
+    valueFormatter: value => `${formatInteger(value)} agendamentos`,
+    summaryLabel: "agendamentos",
+  },
+  {
+    value: "orders",
+    label: "Ordens",
+    color: "var(--dashboard-warning)",
+    strokeWidth: 2.1,
+    showArea: false,
+    valueFormatter: value => `${formatInteger(value)} O.S.`,
+    summaryLabel: "ordens",
+  },
 ];
 
 function formatCompactCurrency(value: number) {
@@ -64,6 +121,14 @@ function formatInteger(value: number) {
   return new Intl.NumberFormat("pt-BR").format(value);
 }
 
+function getPointValue(
+  point: ExecutiveTrendPoint | undefined,
+  metric: ExecutiveTrendMetric
+) {
+  if (!point) return 0;
+  return point[metric];
+}
+
 function buildMockTrendDataset(
   period: ExecutiveTrendPeriod
 ): ExecutiveTrendDataset {
@@ -76,10 +141,8 @@ function buildMockTrendDataset(
       points: number;
       stepInHours: number;
       formatter: (date: Date) => string;
-      baseRevenue: number;
-      cycle: number;
       granularityLabel: string;
-      comparisonFactor: number;
+      comparisonFactorByMetric: Record<ExecutiveTrendMetric, number>;
     }
   > = {
     "1d": {
@@ -90,10 +153,13 @@ function buildMockTrendDataset(
           hour: "2-digit",
           minute: "2-digit",
         }),
-      baseRevenue: 6400,
-      cycle: 6,
       granularityLabel: "Granularidade por hora",
-      comparisonFactor: 0.94,
+      comparisonFactorByMetric: {
+        revenue: 0.94,
+        clients: 0.93,
+        appointments: 0.92,
+        orders: 0.91,
+      },
     },
     "7d": {
       points: 7,
@@ -103,10 +169,13 @@ function buildMockTrendDataset(
           day: "2-digit",
           month: "2-digit",
         }),
-      baseRevenue: 14800,
-      cycle: 2.4,
       granularityLabel: "Granularidade diária",
-      comparisonFactor: 0.91,
+      comparisonFactorByMetric: {
+        revenue: 0.91,
+        clients: 0.9,
+        appointments: 0.9,
+        orders: 0.89,
+      },
     },
     "14d": {
       points: 14,
@@ -116,10 +185,13 @@ function buildMockTrendDataset(
           day: "2-digit",
           month: "2-digit",
         }),
-      baseRevenue: 13200,
-      cycle: 3.1,
       granularityLabel: "Granularidade diária",
-      comparisonFactor: 0.92,
+      comparisonFactorByMetric: {
+        revenue: 0.92,
+        clients: 0.9,
+        appointments: 0.91,
+        orders: 0.9,
+      },
     },
     "30d": {
       points: 30,
@@ -129,23 +201,61 @@ function buildMockTrendDataset(
           day: "2-digit",
           month: "2-digit",
         }),
-      baseRevenue: 12100,
-      cycle: 5.2,
       granularityLabel: "Granularidade diária",
-      comparisonFactor: 0.9,
+      comparisonFactorByMetric: {
+        revenue: 0.9,
+        clients: 0.89,
+        appointments: 0.9,
+        orders: 0.89,
+      },
     },
-    all: {
-      points: 24,
+    "60d": {
+      points: 9,
       stepInHours: 24 * 7,
       formatter: date =>
         date.toLocaleDateString("pt-BR", {
-          month: "short",
           day: "2-digit",
+          month: "short",
         }),
-      baseRevenue: 18900,
-      cycle: 4.4,
       granularityLabel: "Granularidade semanal",
-      comparisonFactor: 0.88,
+      comparisonFactorByMetric: {
+        revenue: 0.9,
+        clients: 0.9,
+        appointments: 0.89,
+        orders: 0.9,
+      },
+    },
+    "90d": {
+      points: 13,
+      stepInHours: 24 * 7,
+      formatter: date =>
+        date.toLocaleDateString("pt-BR", {
+          day: "2-digit",
+          month: "short",
+        }),
+      granularityLabel: "Granularidade semanal",
+      comparisonFactorByMetric: {
+        revenue: 0.88,
+        clients: 0.89,
+        appointments: 0.89,
+        orders: 0.88,
+      },
+    },
+    all: {
+      points: 12,
+      stepInHours: 24 * 30,
+      formatter: date =>
+        date.toLocaleDateString("pt-BR", {
+          month: "short",
+          year: "2-digit",
+        }),
+      granularityLabel: "Granularidade mensal",
+      comparisonFactorByMetric: {
+        revenue: 0.87,
+        clients: 0.88,
+        appointments: 0.88,
+        orders: 0.87,
+      },
     },
   };
 
@@ -157,121 +267,185 @@ function buildMockTrendDataset(
         (config.points - 1 - index) * config.stepInHours * 60 * 60 * 1000
     );
 
-    const seasonality = Math.sin(index / config.cycle) * 0.17;
+    const seasonality = Math.sin(index / 2.6) * 0.16;
     const trend = index / config.points;
     const weekdayFactor =
-      pointDate.getDay() === 0 ? 0.87 : pointDate.getDay() === 6 ? 0.91 : 1;
+      pointDate.getDay() === 0 ? 0.85 : pointDate.getDay() === 6 ? 0.9 : 1;
 
     const revenue = Math.max(
-      Math.round(
-        config.baseRevenue * (1 + seasonality + trend * 0.15) * weekdayFactor
-      ),
+      Math.round(10200 * (1 + seasonality + trend * 0.2) * weekdayFactor),
       0
     );
 
-    const completedOrders = Math.max(Math.round(revenue / 164), 0);
-    const generatedCharges = Math.max(Math.round(completedOrders * 1.05), 0);
-    const receivedPayments = Math.max(Math.round(revenue * 0.92), 0);
+    const clients = Math.max(Math.round(revenue / 540), 0);
+    const appointments = Math.max(Math.round(clients * 2.3), 0);
+    const orders = Math.max(Math.round(appointments * 0.76), 0);
 
     points.push({
       label: config.formatter(pointDate),
       timestamp: pointDate.toISOString(),
       revenue,
-      completedOrders,
-      generatedCharges,
-      receivedPayments,
+      clients,
+      appointments,
+      orders,
     });
   }
 
-  const totalRevenue = points.reduce((acc, point) => acc + point.revenue, 0);
+  const totalsByMetric: Record<ExecutiveTrendMetric, number> = {
+    revenue: points.reduce((acc, point) => acc + point.revenue, 0),
+    clients: points.reduce((acc, point) => acc + point.clients, 0),
+    appointments: points.reduce((acc, point) => acc + point.appointments, 0),
+    orders: points.reduce((acc, point) => acc + point.orders, 0),
+  };
+
+  const comparisonByMetric: Record<ExecutiveTrendMetric, number> = {
+    revenue: Math.round(
+      totalsByMetric.revenue * config.comparisonFactorByMetric.revenue
+    ),
+    clients: Math.round(
+      totalsByMetric.clients * config.comparisonFactorByMetric.clients
+    ),
+    appointments: Math.round(
+      totalsByMetric.appointments * config.comparisonFactorByMetric.appointments
+    ),
+    orders: Math.round(totalsByMetric.orders * config.comparisonFactorByMetric.orders),
+  };
 
   return {
     points,
     granularityLabel: config.granularityLabel,
-    comparisonRevenue: Math.round(totalRevenue * config.comparisonFactor),
+    comparisonByMetric,
   };
 }
 
 function getPeriodNarrative(
+  metricLabel: string,
   period: ExecutiveTrendPeriod,
   granularityLabel: string
 ) {
   const option = PERIOD_OPTIONS.find(item => item.value === period);
-  return `${option?.label ?? "Período"} selecionado · ${granularityLabel.toLowerCase()}.`;
+  return `${metricLabel} · ${option?.label ?? "Período"} selecionado · ${granularityLabel.toLowerCase()}.`;
 }
 
 export function ExecutiveTrendChart({
   className,
   dataByPeriod,
 }: ExecutiveTrendChartProps) {
-  const [period, setPeriod] = useState<ExecutiveTrendPeriod>("30d");
+  const [selectedMetric, setSelectedMetric] = useState<ExecutiveTrendMetric>(
+    "revenue"
+  );
+  const [selectedPeriod, setSelectedPeriod] =
+    useState<ExecutiveTrendPeriod>("30d");
 
   const dataset = useMemo(() => {
-    const customData = dataByPeriod?.[period];
+    const customData = dataByPeriod?.[selectedPeriod];
     if (customData) return customData;
-    return buildMockTrendDataset(period);
-  }, [dataByPeriod, period]);
+    return buildMockTrendDataset(selectedPeriod);
+  }, [dataByPeriod, selectedPeriod]);
 
-  const totalRevenue = dataset.points.reduce(
-    (acc, item) => acc + item.revenue,
-    0
-  );
-  const totalOrders = dataset.points.reduce(
-    (acc, item) => acc + item.completedOrders,
-    0
-  );
-  const totalPayments = dataset.points.reduce(
-    (acc, item) => acc + item.receivedPayments,
+  const selectedMetricOption =
+    METRIC_OPTIONS.find(metric => metric.value === selectedMetric) ??
+    METRIC_OPTIONS[0];
+
+  const totalValue = dataset.points.reduce(
+    (acc, item) => acc + getPointValue(item, selectedMetric),
     0
   );
 
-  const revenueDeltaPercent =
-    dataset.comparisonRevenue > 0
-      ? ((totalRevenue - dataset.comparisonRevenue) /
-          dataset.comparisonRevenue) *
-        100
-      : 0;
+  const comparisonValue = dataset.comparisonByMetric?.[selectedMetric] ?? 0;
+  const deltaPercent =
+    comparisonValue > 0 ? ((totalValue - comparisonValue) / comparisonValue) * 100 : 0;
 
-  const sortedByRevenue = [...dataset.points].sort(
-    (a, b) => a.revenue - b.revenue
+  const sortedPoints = [...dataset.points].sort(
+    (a, b) => getPointValue(a, selectedMetric) - getPointValue(b, selectedMetric)
   );
-  const worstPoint = sortedByRevenue[0];
-  const bestPoint = sortedByRevenue[sortedByRevenue.length - 1];
+  const worstPoint = sortedPoints[0];
+  const bestPoint = sortedPoints[sortedPoints.length - 1];
+
+  const formatSummaryValue = (value: number) => {
+    if (selectedMetric === "revenue") return formatCurrency(value);
+    return formatInteger(value);
+  };
 
   return (
     <AppSectionCard className={cn("p-5 md:p-6", className)}>
-      <div className="mb-5 flex flex-col gap-4 md:mb-6 md:flex-row md:items-start md:justify-between">
-        <div>
-          <h3 className="text-base font-semibold text-[var(--text-primary)] md:text-lg">
-            Visão operacional
-          </h3>
-          <p className="mt-1 text-xs text-[var(--text-muted)] md:text-sm">
-            {getPeriodNarrative(period, dataset.granularityLabel)}
-          </p>
+      <div className="mb-5 flex flex-col gap-4 md:mb-6 md:gap-3">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h3 className="text-base font-semibold text-[var(--text-primary)] md:text-lg">
+              Visão operacional
+            </h3>
+            <p className="mt-1 text-xs text-[var(--text-muted)] md:text-sm">
+              {getPeriodNarrative(
+                selectedMetricOption.label,
+                selectedPeriod,
+                dataset.granularityLabel
+              )}
+            </p>
+          </div>
+
+          <div
+            className="-mx-1 flex w-full gap-2 overflow-x-auto px-1 pb-1 md:mx-0 md:w-auto md:justify-end"
+            role="tablist"
+            aria-label="Seleção de período do gráfico"
+          >
+            {PERIOD_OPTIONS.map(option => {
+              const isActive = option.value === selectedPeriod;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  onClick={() => setSelectedPeriod(option.value)}
+                  className={cn(
+                    "rounded-full border px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition-all duration-200",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--dashboard-info)] focus-visible:ring-offset-2",
+                    "focus-visible:ring-offset-[var(--nexo-card-surface)]",
+                    isActive
+                      ? "border-[var(--dashboard-info)] bg-[var(--dashboard-row-bg)] text-[var(--text-primary)]"
+                      : "border-[var(--border-subtle)] bg-transparent text-[var(--text-secondary)] hover:border-[var(--dashboard-row-border)] hover:bg-[var(--dashboard-row-hover)] hover:text-[var(--text-primary)]"
+                  )}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         <div
-          className="-mx-1 flex w-full gap-2 overflow-x-auto px-1 pb-1 md:mx-0 md:w-auto md:justify-end"
+          className="-mx-1 flex w-full gap-2 overflow-x-auto px-1 pb-1"
           role="tablist"
-          aria-label="Seleção de período do gráfico"
+          aria-label="Seleção de métrica do gráfico"
         >
-          {PERIOD_OPTIONS.map(option => {
-            const isActive = option.value === period;
+          {METRIC_OPTIONS.map(option => {
+            const isActive = option.value === selectedMetric;
             return (
               <button
                 key={option.value}
                 type="button"
                 role="tab"
                 aria-selected={isActive}
-                onClick={() => setPeriod(option.value)}
+                onClick={() => setSelectedMetric(option.value)}
                 className={cn(
                   "rounded-full border px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition-all duration-200",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--dashboard-info)] focus-visible:ring-offset-2",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
+                  "focus-visible:ring-[var(--dashboard-info)]",
                   "focus-visible:ring-offset-[var(--nexo-card-surface)]",
                   isActive
-                    ? "border-[var(--dashboard-info)] bg-[var(--dashboard-row-bg)] text-[var(--text-primary)]"
+                    ? "text-[var(--text-primary)]"
                     : "border-[var(--border-subtle)] bg-transparent text-[var(--text-secondary)] hover:border-[var(--dashboard-row-border)] hover:bg-[var(--dashboard-row-hover)] hover:text-[var(--text-primary)]"
                 )}
+                style={
+                  isActive
+                    ? {
+                        borderColor: option.color,
+                        backgroundColor: "var(--dashboard-row-bg)",
+                        boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${option.color} 24%, transparent)`,
+                      }
+                    : undefined
+                }
               >
                 {option.label}
               </button>
@@ -288,7 +462,7 @@ export function ExecutiveTrendChart({
           >
             <defs>
               <linearGradient
-                id="executive-revenue-gradient"
+                id="executive-metric-gradient"
                 x1="0"
                 y1="0"
                 x2="0"
@@ -296,13 +470,13 @@ export function ExecutiveTrendChart({
               >
                 <stop
                   offset="5%"
-                  stopColor="var(--dashboard-info)"
-                  stopOpacity={0.3}
+                  stopColor={selectedMetricOption.color}
+                  stopOpacity={0.28}
                 />
                 <stop
                   offset="95%"
-                  stopColor="var(--dashboard-info)"
-                  stopOpacity={0.02}
+                  stopColor={selectedMetricOption.color}
+                  stopOpacity={0.03}
                 />
               </linearGradient>
             </defs>
@@ -319,14 +493,16 @@ export function ExecutiveTrendChart({
               tick={{ fill: "var(--text-muted)", fontSize: 12 }}
             />
             <YAxis
-              yAxisId="currency"
               tickLine={false}
               axisLine={false}
-              width={70}
+              width={selectedMetric === "revenue" ? 78 : 46}
               tick={{ fill: "var(--text-muted)", fontSize: 12 }}
-              tickFormatter={value => formatCompactCurrency(Number(value))}
+              tickFormatter={value =>
+                selectedMetric === "revenue"
+                  ? formatCompactCurrency(Number(value))
+                  : formatInteger(Number(value))
+              }
             />
-            <YAxis yAxisId="ops" hide domain={[0, "auto"]} />
             <Tooltip
               contentStyle={{
                 background: "var(--nexo-card-surface)",
@@ -335,60 +511,33 @@ export function ExecutiveTrendChart({
                 boxShadow: "var(--shadow-sm)",
               }}
               labelStyle={{ color: "var(--text-primary)", fontWeight: 600 }}
-              formatter={(value: number, name: string) => {
-                if (name === "Receita operacional")
-                  return formatCurrency(Number(value));
-                return formatInteger(Number(value));
-              }}
-            />
-            <Legend
-              verticalAlign="top"
-              wrapperStyle={{
-                paddingBottom: 14,
-                color: "var(--text-secondary)",
-                fontSize: "12px",
-              }}
+              formatter={(value: number) =>
+                selectedMetricOption.valueFormatter(Number(value))
+              }
             />
 
-            <Area
-              yAxisId="currency"
-              type="monotone"
-              dataKey="revenue"
-              name="Receita operacional"
-              stroke="var(--dashboard-info)"
-              strokeWidth={2.2}
-              fill="url(#executive-revenue-gradient)"
-              fillOpacity={1}
-              activeDot={{ r: 4 }}
-            />
-            <Line
-              yAxisId="ops"
-              type="monotone"
-              dataKey="receivedPayments"
-              name="Pagamentos recebidos"
-              stroke="var(--dashboard-success)"
-              strokeWidth={2}
-              dot={false}
-            />
-            <Line
-              yAxisId="ops"
-              type="monotone"
-              dataKey="completedOrders"
-              name="Ordens concluídas"
-              stroke="var(--dashboard-warning)"
-              strokeWidth={1.8}
-              strokeDasharray="5 4"
-              dot={false}
-            />
-            <Line
-              yAxisId="ops"
-              type="monotone"
-              dataKey="generatedCharges"
-              name="Cobranças geradas"
-              stroke="var(--text-muted)"
-              strokeWidth={1.6}
-              dot={false}
-            />
+            {selectedMetricOption.showArea ? (
+              <Area
+                type="monotone"
+                dataKey={selectedMetric}
+                name={selectedMetricOption.label}
+                stroke={selectedMetricOption.color}
+                strokeWidth={selectedMetricOption.strokeWidth}
+                fill="url(#executive-metric-gradient)"
+                fillOpacity={1}
+                activeDot={{ r: 4 }}
+              />
+            ) : (
+              <Line
+                type="monotone"
+                dataKey={selectedMetric}
+                name={selectedMetricOption.label}
+                stroke={selectedMetricOption.color}
+                strokeWidth={selectedMetricOption.strokeWidth}
+                dot={false}
+                activeDot={{ r: 4 }}
+              />
+            )}
           </AreaChart>
         </ResponsiveContainer>
       </div>
@@ -401,12 +550,12 @@ export function ExecutiveTrendChart({
           <p
             className={cn(
               "mt-1 text-sm font-semibold",
-              revenueDeltaPercent >= 0
+              deltaPercent >= 0
                 ? "text-[var(--dashboard-success)]"
                 : "text-[var(--dashboard-danger)]"
             )}
           >
-            {`${revenueDeltaPercent >= 0 ? "+" : ""}${revenueDeltaPercent.toFixed(1).replace(".", ",")}%`}
+            {`${deltaPercent >= 0 ? "+" : ""}${deltaPercent.toFixed(1).replace(".", ",")}%`}
           </p>
         </div>
 
@@ -415,7 +564,9 @@ export function ExecutiveTrendChart({
             Volume total
           </p>
           <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
-            {`${formatCurrency(totalRevenue)} · ${formatInteger(totalOrders)} ordens · ${formatCurrency(totalPayments)} recebidos`}
+            {selectedMetric === "revenue"
+              ? formatCurrency(totalValue)
+              : `${formatInteger(totalValue)} ${selectedMetricOption.summaryLabel}`}
           </p>
         </div>
 
@@ -424,10 +575,10 @@ export function ExecutiveTrendChart({
             Melhor e pior janela
           </p>
           <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
-            {`Melhor: ${bestPoint.label} · ${formatCurrency(bestPoint.revenue)}`}
+            {`Melhor: ${bestPoint?.label ?? "-"} · ${formatSummaryValue(getPointValue(bestPoint, selectedMetric))}`}
           </p>
           <p className="text-xs text-[var(--text-muted)]">
-            {`Pior: ${worstPoint.label} · ${formatCurrency(worstPoint.revenue)}`}
+            {`Pior: ${worstPoint?.label ?? "-"} · ${formatSummaryValue(getPointValue(worstPoint, selectedMetric))}`}
           </p>
         </div>
       </div>
@@ -437,6 +588,7 @@ export function ExecutiveTrendChart({
 
 export type {
   ExecutiveTrendDataset,
+  ExecutiveTrendMetric,
   ExecutiveTrendPeriod,
   ExecutiveTrendPoint,
 };
