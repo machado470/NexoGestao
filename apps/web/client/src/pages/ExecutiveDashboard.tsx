@@ -18,9 +18,8 @@ export default function ExecutiveDashboard() {
   useRenderWatchdog("ExecutiveDashboard");
   const [, navigate] = useLocation();
   const { runAction } = useRunAction();
-  const ordensTravadas = 5;
-  const clientesSemResposta = 2;
-  const agendaSemConfirmacao = 4;
+  const clientesSemRetorno = 4;
+  const agendaSemConfirmacao = 3;
 
   useEffect(() => {
     // eslint-disable-next-line no-console
@@ -118,39 +117,39 @@ export default function ExecutiveDashboard() {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold text-[var(--text-primary)]">
-                    {ordensTravadas} O.S. críticas travadas
+                    {agendaSemConfirmacao} agendamentos sem confirmação
                   </p>
                   <p className="text-xs text-[var(--text-secondary)]">
-                    Setor norte • impacto direto no SLA do turno.
+                    Janela do turno atual precisa de contato imediato.
                   </p>
                 </div>
-                <AppStatusBadge label="Urgente" />
+                <AppStatusBadge label="URGENTE" />
               </div>
             </li>
             <li className="border-l-2 border-[var(--dashboard-warning)] pl-3">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold text-[var(--text-primary)]">
-                    2 cobranças acima de 45 dias
+                    1 O.S. atrasada há mais de 2h
                   </p>
                   <p className="text-xs text-[var(--text-secondary)]">
-                    Carteira B • risco de caixa acumulado.
+                    Equipe técnica em rota com bloqueio de execução.
                   </p>
                 </div>
-                <AppStatusBadge label="Atenção" />
+                <AppStatusBadge label="ATENÇÃO" />
               </div>
             </li>
             <li className="border-l-2 border-[var(--dashboard-info)] pl-3">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold text-[var(--text-primary)]">
-                    {clientesSemResposta} clientes VIP sem retorno
+                    {clientesSemRetorno} clientes sem retorno pós-serviço
                   </p>
                   <p className="text-xs text-[var(--text-secondary)]">
-                    Relacionamento • janela de contato próxima.
+                    Relacionamento deve fechar ciclo de atendimento.
                   </p>
                 </div>
-                <AppStatusBadge label="Monitorar" />
+                <AppStatusBadge label="MONITORAR" />
               </div>
             </li>
           </ul>
