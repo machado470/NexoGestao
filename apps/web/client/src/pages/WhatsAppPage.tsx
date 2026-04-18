@@ -7,8 +7,11 @@ import {
   Check,
   CheckCheck,
   Clock3,
+  History,
+  Info,
   Search,
   Send,
+  WandSparkles,
   UserRound,
   Workflow,
 } from "lucide-react";
@@ -29,21 +32,13 @@ import {
 import { Button, Badge } from "@/components/design-system";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { AppEmptyState, AppKpiRow, AppLoadingState } from "@/components/internal-page-system";
 
 type ConversationFilter = "all" | "no_reply" | "billing" | "appointment" | "service_order" | "failures" | "suggestions";
 type MessageSendStatus = "queued" | "sent" | "delivered" | "failed" | "unknown";
 type MessageKind = "incoming" | "outgoing" | "automation" | "event";
+type WorkspaceTab = "context" | "automation" | "history";
 
 const QUICK_ACTIONS = [
   {
@@ -185,6 +180,7 @@ export default function WhatsAppPage() {
   const [content, setContent] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [activeFilter, setActiveFilter] = useState<ConversationFilter>("all");
+  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<WorkspaceTab>("context");
 
   const selectedCustomer = customers.find((item) => String(item?.id) === selectedCustomerId);
 
@@ -499,12 +495,12 @@ export default function WhatsAppPage() {
         ]}
       />
 
-      <section className="grid min-h-[72vh] gap-3 md:grid-cols-[320px_minmax(0,1fr)] xl:grid-cols-[320px_minmax(0,1fr)_360px]">
+      <section className="grid min-h-[74vh] gap-4 md:grid-cols-[340px_minmax(0,1fr)]">
         <aside className={cn(
           "flex min-h-0 flex-col rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-primary)]",
           selectedCustomerId ? "hidden md:flex" : "flex"
         )}>
-          <div className="border-b border-[var(--border-subtle)] p-3">
+          <div className="border-b border-[var(--border-subtle)] p-4">
             <p className="text-sm font-semibold text-[var(--text-primary)]">Conversas</p>
             <p className="text-xs text-[var(--text-secondary)]">Inbox operacional com prioridade e contexto</p>
             <div className="relative mt-3">
@@ -516,7 +512,7 @@ export default function WhatsAppPage() {
                 className="pl-8"
               />
             </div>
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-4 flex flex-wrap gap-2">
               {FILTERS.map((filter) => (
                 <button
                   key={filter.key}
@@ -535,21 +531,24 @@ export default function WhatsAppPage() {
             </div>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto p-2">
+          <div className="min-h-0 flex-1 overflow-y-auto px-3 py-2">
             {filteredConversations.length === 0 ? (
               <AppEmptyState
                 title="Nenhuma conversa encontrada"
                 description="Ajuste o filtro ou a busca para localizar uma conversa operacional."
               />
             ) : (
-              <div className="space-y-1">
+              <div className="space-y-2">
                 {filteredConversations.map((conversation) => (
                   <button
                     key={conversation.id}
                     type="button"
-                    onClick={() => setSelectedCustomerId(conversation.id)}
+                    onClick={() => {
+                      setSelectedCustomerId(conversation.id);
+                      setActiveWorkspaceTab("context");
+                    }}
                     className={cn(
-                      "w-full rounded-xl border p-3 text-left transition-colors",
+                      "w-full rounded-xl border px-3 py-3.5 text-left transition-colors",
                       selectedCustomerId === conversation.id
                         ? "border-[var(--border-emphasis)] bg-[var(--surface-elevated)]"
                         : "border-transparent hover:border-[var(--border-subtle)] hover:bg-[var(--surface-elevated)]/40"
@@ -584,7 +583,7 @@ export default function WhatsAppPage() {
             </div>
           ) : (
             <>
-              <header className="flex items-center justify-between gap-3 border-b border-[var(--border-subtle)] px-4 py-3">
+              <header className="flex items-center justify-between gap-3 border-b border-[var(--border-subtle)] px-5 py-4">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <button
@@ -605,91 +604,88 @@ export default function WhatsAppPage() {
                   <Button type="button" variant="outline" size="sm" onClick={() => setSearchTerm(String(selectedCustomer.name ?? ""))}>
                     Abrir cliente
                   </Button>
-                  <Sheet>
-                    <SheetTrigger asChild>
-                      <Button type="button" variant="outline" size="sm" className="xl:hidden">Contexto</Button>
-                    </SheetTrigger>
-                    <SheetContent side="right" className="w-full max-w-md p-0">
-                      <SheetHeader className="border-b border-[var(--border-subtle)] px-4 py-3">
-                        <SheetTitle>Contexto da conversa</SheetTitle>
-                        <SheetDescription>Painel de contexto, automação e histórico desta conversa.</SheetDescription>
-                      </SheetHeader>
-                      <div className="h-full overflow-y-auto p-4">
-                        <RightPanel
-                          selectedCustomer={selectedCustomer}
-                          selectedMessages={sortedMessages}
-                          chargePendingForSelected={chargePendingForSelected}
-                          futureAppointmentForSelected={futureAppointmentForSelected}
-                          recentServiceOrder={recentServiceOrder}
-                          conversationSuggestions={conversationSuggestions}
-                          historyEvents={historyEvents}
-                          onApplySuggestion={(preview) => setContent(preview)}
-                          onExecuteSuggestion={(item) => void executeSuggestedMessage(item.customerId, item.preview)}
-                        />
-                      </div>
-                    </SheetContent>
-                  </Sheet>
                 </div>
               </header>
 
-              <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-                {messagesQuery.isLoading ? (
-                  <AppLoadingState rows={5} />
-                ) : sortedMessages.length === 0 ? (
-                  <div className="flex h-full items-center justify-center">
-                    <AppEmptyState
-                      title="Nenhuma mensagem ainda"
-                      description="Use o composer para iniciar a conversa operacional com este cliente."
+              <div className="min-h-0 flex-1 overflow-hidden">
+                <div className="grid h-full min-h-0 grid-rows-[minmax(0,1fr)_minmax(250px,0.45fr)]">
+                  <div className="min-h-0 overflow-y-auto px-5 py-4">
+                    {messagesQuery.isLoading ? (
+                      <AppLoadingState rows={5} />
+                    ) : sortedMessages.length === 0 ? (
+                      <div className="flex h-full items-center justify-center">
+                        <div className="w-full max-w-2xl rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--surface-elevated)]/30 p-8 text-center">
+                          <p className="text-base font-semibold text-[var(--text-primary)]">Conversa pronta para operação</p>
+                          <p className="mt-2 text-sm text-[var(--text-secondary)]">
+                            Inicie o contato com uma ação rápida no composer ou execute uma automação sugerida no workspace abaixo.
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {sortedMessages.map((message) => {
+                          if (message._kind === "event") {
+                            return (
+                              <div key={String(message?.id)} className="mx-auto w-full max-w-[82%] rounded-lg border border-dashed border-[var(--border-subtle)] bg-[var(--surface-elevated)]/60 px-3 py-2 text-center">
+                                <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">Evento operacional</p>
+                                <p className="mt-1 text-xs text-[var(--text-secondary)]">{String(message?.content ?? "Atualização registrada na operação.")}</p>
+                                <p className="mt-1 text-[11px] text-[var(--text-muted)]">{fmtDateTime(message?.createdAt)}</p>
+                              </div>
+                            );
+                          }
+
+                          const fromClient = message._kind === "incoming";
+                          return (
+                            <div key={String(message?.id)} className={cn("flex", fromClient ? "justify-start" : "justify-end")}>
+                              <div
+                                className={cn(
+                                  "max-w-[78%] rounded-2xl border px-3 py-2.5",
+                                  fromClient
+                                    ? "border-[var(--border-subtle)] bg-[var(--surface-elevated)]"
+                                    : "border-[var(--border-emphasis)] bg-[color-mix(in_srgb,var(--surface-elevated)_86%,var(--bg-surface))]"
+                                )}
+                              >
+                                <div className="mb-1 flex items-center gap-1 text-[11px] text-[var(--text-muted)]">
+                                  {fromClient ? <UserRound className="size-3" /> : message._kind === "automation" ? <Bot className="size-3" /> : <Send className="size-3" />}
+                                  <span>{fromClient ? "Cliente" : message._kind === "automation" ? "Automação" : "Operador"}</span>
+                                </div>
+                                <p className="text-sm text-[var(--text-primary)]">{String(message?.content ?? "")}</p>
+                                <div className="mt-2 flex items-center justify-end gap-1 text-[11px] text-[var(--text-muted)]">
+                                  <span>{fmtTime(message?.createdAt)}</span>
+                                  {!fromClient ? (
+                                    <span className={cn("inline-flex items-center gap-1", statusTone(message._deliveryStatus))}>
+                                      {statusIcon(message._deliveryStatus)}
+                                      {statusLabel(message._deliveryStatus)}
+                                    </span>
+                                  ) : null}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                  <div className="border-t border-[var(--border-subtle)] px-5 py-4">
+                    <WorkspaceTabs
+                      activeTab={activeWorkspaceTab}
+                      onChange={setActiveWorkspaceTab}
+                      selectedCustomer={selectedCustomer}
+                      selectedMessages={sortedMessages}
+                      chargePendingForSelected={chargePendingForSelected}
+                      futureAppointmentForSelected={futureAppointmentForSelected}
+                      recentServiceOrder={recentServiceOrder}
+                      conversationSuggestions={conversationSuggestions}
+                      historyEvents={historyEvents}
+                      onApplySuggestion={(preview) => setContent(preview)}
+                      onExecuteSuggestion={(item) => void executeSuggestedMessage(item.customerId, item.preview)}
                     />
                   </div>
-                ) : (
-                  <div className="space-y-3">
-                    {sortedMessages.map((message) => {
-                      if (message._kind === "event") {
-                        return (
-                          <div key={String(message?.id)} className="mx-auto w-full max-w-[84%] rounded-lg border border-dashed border-[var(--border-subtle)] bg-[var(--surface-elevated)]/60 px-3 py-2 text-center">
-                            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">Evento operacional</p>
-                            <p className="mt-1 text-xs text-[var(--text-secondary)]">{String(message?.content ?? "Atualização registrada na operação.")}</p>
-                            <p className="mt-1 text-[11px] text-[var(--text-muted)]">{fmtDateTime(message?.createdAt)}</p>
-                          </div>
-                        );
-                      }
-
-                      const fromClient = message._kind === "incoming";
-                      return (
-                        <div key={String(message?.id)} className={cn("flex", fromClient ? "justify-start" : "justify-end")}>
-                          <div
-                            className={cn(
-                              "max-w-[80%] rounded-2xl border px-3 py-2",
-                              fromClient
-                                ? "border-[var(--border-subtle)] bg-[var(--surface-elevated)]"
-                                : "border-[var(--border-emphasis)] bg-[color-mix(in_srgb,var(--surface-elevated)_86%,var(--bg-surface))]"
-                            )}
-                          >
-                            <div className="mb-1 flex items-center gap-1 text-[11px] text-[var(--text-muted)]">
-                              {fromClient ? <UserRound className="size-3" /> : message._kind === "automation" ? <Bot className="size-3" /> : <Send className="size-3" />}
-                              <span>{fromClient ? "Cliente" : message._kind === "automation" ? "Automação" : "Operador"}</span>
-                            </div>
-                            <p className="text-sm text-[var(--text-primary)]">{String(message?.content ?? "")}</p>
-                            <div className="mt-2 flex items-center justify-end gap-1 text-[11px] text-[var(--text-muted)]">
-                              <span>{fmtTime(message?.createdAt)}</span>
-                              {!fromClient ? (
-                                <span className={cn("inline-flex items-center gap-1", statusTone(message._deliveryStatus))}>
-                                  {statusIcon(message._deliveryStatus)}
-                                  {statusLabel(message._deliveryStatus)}
-                                </span>
-                              ) : null}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+                </div>
               </div>
 
-              <footer className="border-t border-[var(--border-subtle)] p-3">
-                <div className="mb-2 flex flex-wrap gap-2">
+              <footer className="border-t border-[var(--border-subtle)] px-5 py-4">
+                <div className="mb-3 flex flex-wrap gap-2">
                   {QUICK_ACTIONS.map((action) => (
                     <button
                       key={action.key}
@@ -701,12 +697,12 @@ export default function WhatsAppPage() {
                     </button>
                   ))}
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <Textarea
                     value={content}
                     onChange={(event) => setContent(event.target.value)}
                     placeholder="Escreva a mensagem ou use uma ação rápida..."
-                    className="min-h-[86px] resize-y"
+                    className="min-h-[96px] resize-y"
                   />
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-xs text-[var(--text-muted)]">Template sugerido, contexto e mensagem livre no mesmo fluxo.</p>
@@ -720,28 +716,14 @@ export default function WhatsAppPage() {
             </>
           )}
         </main>
-
-        <aside className="hidden min-h-0 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-primary)] xl:block">
-          <div className="h-full overflow-y-auto p-3">
-            <RightPanel
-              selectedCustomer={selectedCustomer}
-              selectedMessages={sortedMessages}
-              chargePendingForSelected={chargePendingForSelected}
-              futureAppointmentForSelected={futureAppointmentForSelected}
-              recentServiceOrder={recentServiceOrder}
-              conversationSuggestions={conversationSuggestions}
-              historyEvents={historyEvents}
-              onApplySuggestion={(preview) => setContent(preview)}
-              onExecuteSuggestion={(item) => void executeSuggestedMessage(item.customerId, item.preview)}
-            />
-          </div>
-        </aside>
       </section>
     </PageWrapper>
   );
 }
 
-function RightPanel({
+function WorkspaceTabs({
+  activeTab,
+  onChange,
   selectedCustomer,
   selectedMessages,
   chargePendingForSelected,
@@ -752,6 +734,8 @@ function RightPanel({
   onApplySuggestion,
   onExecuteSuggestion,
 }: {
+  activeTab: WorkspaceTab;
+  onChange: (value: WorkspaceTab) => void;
   selectedCustomer: any;
   selectedMessages: Array<any>;
   chargePendingForSelected: boolean;
@@ -774,85 +758,212 @@ function RightPanel({
   }
 
   return (
-    <Tabs defaultValue="context" className="h-full min-h-0">
-      <TabsList className="grid w-full grid-cols-3">
-        <TabsTrigger value="context">Contexto</TabsTrigger>
-        <TabsTrigger value="automation">Automações</TabsTrigger>
-        <TabsTrigger value="history">Histórico</TabsTrigger>
-      </TabsList>
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="inline-flex w-full flex-wrap gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)]/35 p-1.5">
+        <WorkspaceTabButton
+          icon={Info}
+          label="Contexto"
+          active={activeTab === "context"}
+          onClick={() => onChange("context")}
+        />
+        <WorkspaceTabButton
+          icon={WandSparkles}
+          label="Automações"
+          active={activeTab === "automation"}
+          onClick={() => onChange("automation")}
+        />
+        <WorkspaceTabButton
+          icon={History}
+          label="Histórico"
+          active={activeTab === "history"}
+          onClick={() => onChange("history")}
+        />
+      </div>
 
-      <TabsContent value="context" className="mt-3 space-y-2">
-        <PanelItem label="Cliente" value={String(selectedCustomer?.name ?? "—")} />
-        <PanelItem label="Telefone" value={String(selectedCustomer?.phone ?? "—")} />
-        <PanelItem label="Última interação" value={fmtDateTime(selectedMessages[selectedMessages.length - 1]?.createdAt ?? selectedCustomer?.lastContactAt)} />
-        <PanelItem label="Mensagens" value={String(selectedMessages.length)} />
-        <PanelItem label="Cobrança pendente" value={chargePendingForSelected ? "Sim" : "Não"} />
-        <PanelItem label="Agendamento futuro" value={futureAppointmentForSelected ? "Sim" : "Não"} />
-        <PanelItem label="O.S. recente" value={recentServiceOrder ? String(recentServiceOrder?.status ?? "Registrada") : "Sem O.S. recente"} />
-        <PanelItem label="Responsável interno" value={String(selectedCustomer?.ownerName ?? "Operação Nexo")} />
-      </TabsContent>
-
-      <TabsContent value="automation" className="mt-3 space-y-2">
-        {conversationSuggestions.length === 0 ? (
-          <AppEmptyState
-            title="Nenhuma automação disponível"
-            description="Quando houver gatilho de cobrança, atraso ou reativação, ele aparecerá aqui para execução rápida."
+      <div className="mt-3 min-h-0 flex-1 overflow-y-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)] p-4">
+        {activeTab === "context" ? (
+          <ContextPanel
+            selectedCustomer={selectedCustomer}
+            selectedMessages={selectedMessages}
+            chargePendingForSelected={chargePendingForSelected}
+            futureAppointmentForSelected={futureAppointmentForSelected}
+            recentServiceOrder={recentServiceOrder}
           />
-        ) : (
-          <div className="space-y-2">
-            {conversationSuggestions.map((item) => (
-              <article key={item.id} className="rounded-xl border border-[var(--border-subtle)] p-3">
-                <div className="flex items-start justify-between gap-2">
-                  <p className="text-sm font-semibold text-[var(--text-primary)]">{item.title}</p>
-                  <Badge>{item.urgency}</Badge>
-                </div>
-                <p className="mt-1 text-xs text-[var(--text-secondary)]">{item.reason}</p>
-                <p className="mt-2 rounded-lg bg-[var(--surface-elevated)] p-2 text-xs text-[var(--text-secondary)]">{item.preview}</p>
-                <div className="mt-2 flex items-center justify-between">
-                  <span className="inline-flex items-center gap-1 text-[11px] text-[var(--text-muted)]">
-                    <Workflow className="size-3.5" />
-                    Origem: {item.origin}
-                  </span>
-                  <div className="flex gap-2">
-                    <Button type="button" variant="outline" size="sm" onClick={() => onApplySuggestion(item.preview)}>
-                      Usar
-                    </Button>
-                    <Button type="button" size="sm" onClick={() => onExecuteSuggestion(item)}>
-                      Executar
-                    </Button>
-                  </div>
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
-      </TabsContent>
+        ) : null}
 
-      <TabsContent value="history" className="mt-3 space-y-2">
-        {historyEvents.length === 0 ? (
-          <AppEmptyState
-            title="Sem histórico recente"
-            description="Os eventos operacionais desta conversa aparecerão aqui conforme a execução avança."
+        {activeTab === "automation" ? (
+          <AutomationPanel
+            conversationSuggestions={conversationSuggestions}
+            onApplySuggestion={onApplySuggestion}
+            onExecuteSuggestion={onExecuteSuggestion}
           />
-        ) : (
-          historyEvents.map((event) => (
-            <article key={event.id} className="rounded-xl border border-[var(--border-subtle)] p-3">
-              <p className="text-sm font-semibold text-[var(--text-primary)]">{event.label}</p>
-              <p className="mt-1 text-xs text-[var(--text-secondary)]">{event.detail}</p>
-              <p className="mt-2 text-[11px] text-[var(--text-muted)]">{event.at}</p>
-            </article>
-          ))
-        )}
-      </TabsContent>
-    </Tabs>
+        ) : null}
+
+        {activeTab === "history" ? <HistoryTimeline historyEvents={historyEvents} /> : null}
+      </div>
+    </div>
   );
 }
 
-function PanelItem({ label, value }: { label: string; value: string }) {
+function WorkspaceTabButton({
+  icon: Icon,
+  label,
+  active,
+  onClick,
+}: {
+  icon: typeof Info;
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
   return (
-    <div className="rounded-xl border border-[var(--border-subtle)] p-3">
-      <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">{label}</p>
-      <p className="mt-1 text-sm text-[var(--text-primary)]">{value}</p>
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors",
+        active
+          ? "border-[var(--border-emphasis)] bg-[var(--surface-primary)] text-[var(--text-primary)]"
+          : "border-transparent text-[var(--text-secondary)] hover:border-[var(--border-subtle)] hover:text-[var(--text-primary)]"
+      )}
+    >
+      <Icon className="size-3.5" />
+      {label}
+    </button>
+  );
+}
+
+function ContextPanel({
+  selectedCustomer,
+  selectedMessages,
+  chargePendingForSelected,
+  futureAppointmentForSelected,
+  recentServiceOrder,
+}: {
+  selectedCustomer: any;
+  selectedMessages: Array<any>;
+  chargePendingForSelected: boolean;
+  futureAppointmentForSelected: boolean;
+  recentServiceOrder: any;
+}) {
+  const contextRows = [
+    { label: "Cliente", value: String(selectedCustomer?.name ?? "—") },
+    { label: "Telefone", value: String(selectedCustomer?.phone ?? "—") },
+    { label: "Última interação", value: fmtDateTime(selectedMessages[selectedMessages.length - 1]?.createdAt ?? selectedCustomer?.lastContactAt) },
+    { label: "Mensagens enviadas", value: String(selectedMessages.length) },
+    { label: "Cobrança pendente", value: chargePendingForSelected ? "Sim" : "Não" },
+    { label: "Agendamento futuro", value: futureAppointmentForSelected ? "Sim" : "Não" },
+    { label: "O.S. recente", value: recentServiceOrder ? String(recentServiceOrder?.status ?? "Registrada") : "Sem O.S. recente" },
+    { label: "Responsável interno", value: String(selectedCustomer?.ownerName ?? "Operação Nexo") },
+  ];
+
+  return (
+    <div className="divide-y divide-[var(--border-subtle)]">
+      {contextRows.map((row) => (
+        <div key={row.label} className="grid gap-1 py-2.5 md:grid-cols-[220px_minmax(0,1fr)] md:items-start">
+          <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">{row.label}</p>
+          <p className="text-sm text-[var(--text-primary)]">{row.value}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function AutomationPanel({
+  conversationSuggestions,
+  onApplySuggestion,
+  onExecuteSuggestion,
+}: {
+  conversationSuggestions: Array<{ id: string; customerId: string; title: string; reason: string; urgency: "Alta" | "Média"; origin: string; preview: string }>;
+  onApplySuggestion: (preview: string) => void;
+  onExecuteSuggestion: (item: { customerId: string; preview: string }) => void;
+}) {
+  if (conversationSuggestions.length === 0) {
+    return (
+      <AppEmptyState
+        title="Nenhuma automação disponível"
+        description="Quando houver gatilho de cobrança, atraso ou reativação, ele aparecerá aqui para execução rápida."
+      />
+    );
+  }
+
+  const [primarySuggestion, ...secondarySuggestions] = conversationSuggestions;
+  return (
+    <div className="space-y-3">
+      <article className="rounded-xl border border-[var(--border-emphasis)] bg-[var(--surface-elevated)]/55 p-4">
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-sm font-semibold text-[var(--text-primary)]">{primarySuggestion.title}</p>
+          <Badge>{primarySuggestion.urgency}</Badge>
+        </div>
+        <p className="mt-1 text-xs text-[var(--text-secondary)]">{primarySuggestion.reason}</p>
+        <p className="mt-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-primary)] p-2.5 text-xs text-[var(--text-secondary)]">
+          {primarySuggestion.preview}
+        </p>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+          <span className="inline-flex items-center gap-1 text-[11px] text-[var(--text-muted)]">
+            <Workflow className="size-3.5" />
+            Origem: {primarySuggestion.origin}
+          </span>
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => onApplySuggestion(primarySuggestion.preview)}>
+              Usar
+            </Button>
+            <Button type="button" size="sm" onClick={() => onExecuteSuggestion(primarySuggestion)}>
+              Executar agora
+            </Button>
+          </div>
+        </div>
+      </article>
+
+      {secondarySuggestions.length > 0 ? (
+        <div className="space-y-2">
+          {secondarySuggestions.map((item) => (
+            <article key={item.id} className="rounded-xl border border-[var(--border-subtle)] p-3">
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-sm font-semibold text-[var(--text-primary)]">{item.title}</p>
+                <Badge>{item.urgency}</Badge>
+              </div>
+              <p className="mt-1 text-xs text-[var(--text-secondary)]">{item.reason}</p>
+              <p className="mt-2 text-xs text-[var(--text-secondary)]">{item.preview}</p>
+              <div className="mt-2 flex items-center justify-between">
+                <span className="text-[11px] text-[var(--text-muted)]">Origem: {item.origin}</span>
+                <Button type="button" variant="outline" size="sm" onClick={() => onApplySuggestion(item.preview)}>
+                  Usar
+                </Button>
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function HistoryTimeline({ historyEvents }: { historyEvents: Array<{ id: string; label: string; detail: string; at: string }> }) {
+  if (historyEvents.length === 0) {
+    return (
+      <AppEmptyState
+        title="Sem histórico recente"
+        description="Os eventos operacionais desta conversa aparecerão aqui conforme a execução avança."
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-1">
+      {historyEvents.map((event, index) => (
+        <article key={event.id} className="relative grid gap-2 pb-4 pl-7 last:pb-0">
+          {index < historyEvents.length - 1 ? (
+            <span className="absolute bottom-0 left-[8px] top-6 w-px bg-[var(--border-subtle)]" aria-hidden />
+          ) : null}
+          <span className="absolute left-0 top-1.5 inline-flex size-4 items-center justify-center rounded-full border border-[var(--border-emphasis)] bg-[var(--surface-primary)]" aria-hidden>
+            <span className="size-1.5 rounded-full bg-[var(--text-primary)]" />
+          </span>
+          <p className="text-sm font-semibold text-[var(--text-primary)]">{event.label}</p>
+          <p className="text-xs text-[var(--text-secondary)]">{event.detail}</p>
+          <p className="text-[11px] text-[var(--text-muted)]">{event.at}</p>
+        </article>
+      ))}
     </div>
   );
 }
