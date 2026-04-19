@@ -11,9 +11,9 @@ const buttonVariants = cva(
     variants: {
       variant: {
         primary:
-          "bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-primary-hover)]",
+          "border border-[color-mix(in_srgb,var(--accent-primary)_72%,black)] bg-[var(--accent-primary)] text-white shadow-[0_10px_24px_-18px_var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] hover:border-[color-mix(in_srgb,var(--accent-primary)_85%,black)]",
         default:
-          "bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-primary-hover)]",
+          "border border-[color-mix(in_srgb,var(--accent-primary)_72%,black)] bg-[var(--accent-primary)] text-white shadow-[0_10px_24px_-18px_var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] hover:border-[color-mix(in_srgb,var(--accent-primary)_85%,black)]",
         danger:
           "bg-destructive text-destructive-foreground hover:bg-[color-mix(in_srgb,var(--destructive)_86%,black)]",
         destructive:

@@ -34,6 +34,7 @@ import {
   AppLoadingState,
   AppSecondaryTabs,
   AppStatusBadge,
+  appSelectionPillClasses,
 } from "@/components/internal-page-system";
 
 type ConversationFilter = "all" | "no_reply" | "billing" | "appointment" | "service_order" | "failures" | "suggestions";
@@ -669,10 +670,8 @@ function ConversationsView({
               type="button"
               onClick={() => onFilterChange(filter.key)}
               className={cn(
-                "h-7 shrink-0 whitespace-nowrap rounded-full border px-2.5 text-[12px] font-medium transition-all duration-200 ease-out",
-                activeFilter === filter.key
-                  ? "border-[var(--accent-primary)]/30 bg-[var(--accent-soft)] text-[var(--accent-primary)]"
-                  : "border-[var(--border-subtle)] bg-transparent text-[var(--text-secondary)] hover:border-[var(--border-emphasis)] hover:bg-[var(--surface-elevated)]/50 hover:text-[var(--text-primary)]"
+                "h-7 shrink-0 whitespace-nowrap px-2.5 text-[12px]",
+                appSelectionPillClasses(activeFilter === filter.key)
               )}
             >
               {filter.label}
