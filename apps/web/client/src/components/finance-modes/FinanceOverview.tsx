@@ -587,43 +587,40 @@ export function FinanceOverview(props: FinanceOverviewProps) {
               <div
                 key={item.id}
                 className={cn(
-                  "group relative rounded-lg border px-3 py-2 transition-all duration-200 hover:-translate-y-[1px] hover:shadow-[0_8px_24px_rgba(0,0,0,0.18)]",
+                  "group relative mr-auto w-full max-w-3xl rounded-lg border px-3 py-2 transition-all duration-200 hover:-translate-y-[1px] hover:shadow-[0_8px_22px_rgba(0,0,0,0.16)]",
                   item.priority === "critical" &&
-                    "border-rose-500/35 bg-rose-500/10 before:absolute before:bottom-2 before:left-0 before:top-2 before:w-1 before:rounded-r-md before:bg-rose-400/60",
+                    "border-rose-500/35 bg-rose-500/7 before:absolute before:bottom-2 before:left-0 before:top-2 before:w-0.5 before:rounded-r-md before:bg-rose-400/65",
                   item.priority === "attention" &&
-                    "border-amber-500/30 bg-amber-500/7 before:absolute before:bottom-2 before:left-0 before:top-2 before:w-1 before:rounded-r-md before:bg-amber-300/60",
+                    "border-amber-500/30 bg-amber-500/5 before:absolute before:bottom-2 before:left-0 before:top-2 before:w-0.5 before:rounded-r-md before:bg-amber-300/65",
                   item.priority === "healthy" &&
-                    "border-[var(--border-subtle)] bg-[var(--surface-base)]/50 before:absolute before:bottom-2 before:left-0 before:top-2 before:w-1 before:rounded-r-md before:bg-emerald-300/50"
+                    "border-[var(--border-subtle)] bg-[var(--surface-base)]/45 before:absolute before:bottom-2 before:left-0 before:top-2 before:w-0.5 before:rounded-r-md before:bg-emerald-300/55"
                 )}
               >
-                <div className="grid gap-1.5">
-                  <div className="grid gap-1 sm:grid-cols-[minmax(0,1.8fr)_auto_auto_auto] sm:items-center sm:gap-2">
-                    <p className="truncate text-sm font-medium text-[var(--text-primary)]">
-                      {item.client}
-                    </p>
-                    <p className="text-sm font-semibold text-[var(--text-primary)]">
-                      {item.value}
-                    </p>
-                    <p className="text-[11px] text-[var(--text-muted)]">
-                      {item.dueLabel}
-                    </p>
+                <div className="flex min-w-0 flex-col gap-1">
+                  <p className="truncate text-sm font-medium text-[var(--text-primary)]">
+                    {item.client}
+                  </p>
+                  <div className="flex min-w-0 items-center gap-2 text-[11px]">
+                    <p className="font-semibold text-[var(--text-primary)]">{item.value}</p>
+                    <span className="text-[var(--text-muted)]">•</span>
+                    <p className="truncate text-[var(--text-muted)]">{item.dueLabel}</p>
                     <span
                       className={cn(
-                        "inline-flex w-fit items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                        "inline-flex w-fit items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium",
                         item.priority === "critical" &&
-                          "border-rose-500/45 bg-rose-500/15 text-rose-200",
+                          "border-rose-500/45 bg-rose-500/10 text-rose-200",
                         item.priority === "attention" &&
-                          "border-amber-500/45 bg-amber-500/15 text-amber-200",
+                          "border-amber-500/45 bg-amber-500/10 text-amber-200",
                         item.priority === "healthy" &&
-                          "border-emerald-500/40 bg-emerald-500/15 text-emerald-200"
+                          "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
                       )}
                     >
                       {item.priority === "critical" ? (
-                        <AlertTriangle className="h-3.5 w-3.5" />
+                        <AlertTriangle className="h-3 w-3" />
                       ) : item.priority === "attention" ? (
-                        <ArrowUpRight className="h-3.5 w-3.5" />
+                        <ArrowUpRight className="h-3 w-3" />
                       ) : (
-                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        <CheckCircle2 className="h-3 w-3" />
                       )}
                       {item.priority === "critical"
                         ? "Crítica"
@@ -631,7 +628,7 @@ export function FinanceOverview(props: FinanceOverviewProps) {
                           ? "Atenção"
                           : "Saudável"}
                     </span>
-                    <div className="justify-self-end">
+                    <div className="ml-auto shrink-0">
                       <AppRowActionsDropdown
                         triggerLabel={`Mais ações para ${item.client}`}
                         items={[
@@ -657,42 +654,13 @@ export function FinanceOverview(props: FinanceOverviewProps) {
                       />
                     </div>
                   </div>
-                  <div className="grid gap-1 text-[11px] md:grid-cols-[1.2fr,1fr,auto] md:items-center">
-                    <p className="text-[var(--text-secondary)]">{item.summary}</p>
-                    <p className="text-[var(--text-muted)]">
-                      {item.priorityReason}
-                    </p>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-7 w-fit px-2 text-[11px] text-[var(--text-secondary)]"
-                      onClick={item.onAction}
-                    >
-                      {item.recommendedAction}
-                    </Button>
-                  </div>
-                </div>
-                <div className="mt-1 grid gap-1 text-[11px] md:grid-cols-[1.2fr,1fr,1fr]">
-                  <p className="text-[var(--text-secondary)]">
-                    {item.intelligenceLabel}
+                  <p className="truncate text-[11px] text-[var(--text-secondary)]">
+                    {item.priorityReason || item.summary}
                   </p>
-                  <p className="text-[var(--text-muted)]">{item.amountContext}</p>
-                  <p className="text-[var(--text-muted)]">{item.impactLabel}</p>
-                </div>
-                <div className="mt-1 flex flex-wrap items-center gap-1">
-                  {item.contextualActions?.map(action => (
-                    <span
-                      key={`${item.id}-${action}`}
-                      className="rounded-full border border-[var(--border-subtle)]/85 px-2 py-0.5 text-[10px] text-[var(--text-secondary)]"
-                    >
-                      {action}
-                    </span>
-                  ))}
-                  {item.flowContext ? (
-                    <span className="text-[10px] text-[var(--text-muted)]">
-                      {item.flowContext} • {item.dateContext}
-                    </span>
-                  ) : null}
+                  <p className="truncate text-[11px] text-[var(--text-muted)]">
+                    {item.impactLabel}
+                    {item.flowContext ? ` • ${item.flowContext}` : ""}
+                  </p>
                 </div>
               </div>
             ))
