@@ -603,6 +603,9 @@ export default function FinancesPage() {
               overdueTotal={formatCurrency(overdueTotal)}
               openTotal={formatCurrency(openTotal)}
               receivedTotal={formatCurrency(receivedTotal)}
+              overdueTotalValue={overdueTotal}
+              openTotalValue={openTotal}
+              receivedTotalValue={receivedTotal}
             />
           )}
         </>
