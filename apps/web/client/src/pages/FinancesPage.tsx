@@ -16,14 +16,7 @@ import {
 import { toast } from "sonner";
 import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
 import { useRenderWatchdog } from "@/hooks/useRenderWatchdog";
-import {
-  formatDelta,
-  getWindow,
-  inRange,
-  percentDelta,
-  safeDate,
-  trendFromDelta,
-} from "@/lib/operational/kpi";
+import { getWindow, inRange, safeDate } from "@/lib/operational/kpi";
 import { safeChartData } from "@/lib/safeChartData";
 import { setBootPhase } from "@/lib/bootPhase";
 import { FinanceOverview } from "@/components/finance-modes/FinanceOverview";
@@ -171,46 +164,6 @@ export default function FinancesPage() {
     if (!due) return false;
     return due.toDateString() === new Date().toDateString();
   }).length;
-
-  const kpis = [
-    {
-      title: "Recebido no período",
-      value: formatCurrency(receivedCurrent),
-      delta: formatDelta(percentDelta(receivedCurrent, receivedPrevious)),
-      trend: trendFromDelta(percentDelta(receivedCurrent, receivedPrevious)),
-      hint: "30 dias vs período anterior",
-      tone: "important" as const,
-      onClick: () => setMode("paid"),
-      ctaLabel: "Ver pagas",
-    },
-    {
-      title: "Total em aberto",
-      value: formatCurrency(openTotal),
-      hint: "pendentes + vencidas",
-      onClick: () => setMode("pending"),
-      ctaLabel: "Ver pendentes",
-    },
-    {
-      title: "Em atraso",
-      value: String(stats.overdueCount ?? 0),
-      delta: formatDelta(percentDelta(overdueCurrent, overduePrevious)),
-      trend: trendFromDelta(percentDelta(overdueCurrent, overduePrevious)),
-      hint: "cobranças vencidas",
-      tone:
-        Number(stats.overdueCount ?? 0) > 0
-          ? ("critical" as const)
-          : ("default" as const),
-      onClick: () => setMode("overdue"),
-      ctaLabel: "Tratar atraso",
-    },
-    {
-      title: "Pagas no período",
-      value: String(paidCharges.length),
-      hint: "quantidade de cobranças pagas",
-      onClick: () => setMode("paid"),
-      ctaLabel: "Abrir pagas",
-    },
-  ];
 
   const trendByDay = useMemo(() => {
     const map = new Map<
@@ -408,6 +361,10 @@ export default function FinancesPage() {
             intelligenceLabel: hasRecurrentDelay
               ? "Alto risco · atraso recorrente"
               : "Alto risco",
+            amountContext: "Cobrança vencida",
+            dueLabel: dueDateLabel,
+            dateContext:
+              dayDiff > 0 ? `${dayDiff} dia(s) em atraso` : "vence hoje",
             status: "overdue" as const,
             priority: "critical" as const,
             recommendedAction: "Cobrar via WhatsApp" as const,
@@ -421,6 +378,9 @@ export default function FinancesPage() {
             value: formatCurrency(Number(item?.amountCents ?? 0)),
             summary: "Pronta para baixa",
             intelligenceLabel: "Pagador recorrente",
+            amountContext: "Recebimento confirmado",
+            dueLabel: dueDateLabel,
+            dateContext: "baixar no financeiro",
             status: "ready" as const,
             priority: "healthy" as const,
             recommendedAction: "Registrar pagamento" as const,
@@ -441,6 +401,9 @@ export default function FinancesPage() {
           intelligenceLabel: isAttention
             ? "Janela crítica nas próximas 72h"
             : "Monitoramento ativo",
+          amountContext: "Cobrança pendente",
+          dueLabel: dueDateLabel,
+          dateContext: isAttention ? "vence em breve" : "janela programada",
           status: "pending" as const,
           priority: isAttention ? ("attention" as const) : ("healthy" as const),
           recommendedAction: "Agendar lembrete" as const,
@@ -475,7 +438,7 @@ export default function FinancesPage() {
   return (
     <PageWrapper
       title="Financeiro"
-      subtitle="Cobrança, recebimento e carteira."
+      subtitle="Operação de cobrança, risco e execução da carteira."
       primaryAction={
         <ActionFeedbackButton
           state="idle"
@@ -513,7 +476,6 @@ export default function FinancesPage() {
         <>
           {mode === "overview" && (
             <FinanceOverview
-              kpis={kpis}
               revenueData={revenueSafe.data}
               revenueDataByPeriod={trendPeriods}
               revenueLoading={revenueQuery.isLoading}

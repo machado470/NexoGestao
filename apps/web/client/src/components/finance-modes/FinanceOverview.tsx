@@ -4,15 +4,26 @@ import {
   CartesianGrid,
   ComposedChart,
   Line,
+  ReferenceDot,
   XAxis,
   YAxis,
 } from "recharts";
 import type { ReactNode } from "react";
-import { AlertTriangle, ArrowUpRight, CheckCircle2 } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowUpRight,
+  CheckCircle2,
+  ChevronDown,
+  CircleEllipsis,
+  Clock3,
+  Flame,
+  ShieldAlert,
+  Sparkles,
+  Zap,
+} from "lucide-react";
 import { Button } from "@/components/design-system";
 import {
   AppChartPanel,
-  AppKpiRow,
   AppPageEmptyState,
   AppPageErrorState,
   AppPageLoadingState,
@@ -41,6 +52,9 @@ interface QueueItem {
   value: string;
   summary: string;
   intelligenceLabel?: string;
+  amountContext?: string;
+  dueLabel?: string;
+  dateContext?: string;
   status: "overdue" | "pending" | "ready";
   priority: "critical" | "attention" | "healthy";
   recommendedAction:
@@ -51,16 +65,6 @@ interface QueueItem {
 }
 
 interface FinanceOverviewProps {
-  kpis: Array<{
-    title: string;
-    value: string;
-    hint?: string;
-    delta?: string;
-    trend?: "up" | "down" | "neutral";
-    tone?: "default" | "important" | "critical";
-    onClick?: () => void;
-    ctaLabel?: string;
-  }>;
   revenueData: Array<{
     label: string;
     revenue: number;
@@ -110,7 +114,16 @@ export function FinanceOverview(props: FinanceOverviewProps) {
   const dueSoon72hCount = props.queueItems.filter(
     item => item.status === "pending" && item.priority === "attention"
   ).length;
-  const immediateRiskCount = props.risk.overdueCount + props.risk.dueToday;
+  const riskIntensity = Math.min(
+    100,
+    Math.round(
+      ((props.risk.overdueCount * 2 +
+        props.risk.dueToday +
+        props.risk.dueSoon * 0.4) /
+        Math.max(props.queueItems.length, 1)) *
+        42
+    )
+  );
   const riskSummary =
     props.risk.overdueCount > 0
       ? `${props.risk.overdueCount} cobrança(s) vencida(s) exigem ação hoje.`
@@ -123,12 +136,12 @@ export function FinanceOverview(props: FinanceOverviewProps) {
     if (props.risk.overdueCount > 0) {
       return {
         urgencyLabel: "Crítico",
-        headline: "Priorizar vencidas",
+        headline: "Cobrar vencidas",
         immediateContext: `${props.risk.overdueCount} item(ns) crítico(s) agora.`,
         impactContext: `Impacto estimado: ${props.risk.riskAmount}.`,
-        cta: "Ir para vencidas",
+        cta: "Cobrar agora via WhatsApp",
         ctaVariant: "default" as const,
-        onClick: () => props.goToMode("overdue"),
+        onClick: props.cobrarAgora,
       };
     }
     if (props.risk.dueToday > 0 || dueSoon72hCount > 0) {
@@ -138,7 +151,7 @@ export function FinanceOverview(props: FinanceOverviewProps) {
         headline: "Cobrar hoje",
         immediateContext: `${urgentCount} cobrança(s) pedem contato imediato.`,
         impactContext: `Janela sensível: ${props.risk.riskAmount} em monitoramento.`,
-        cta: "Cobrar via WhatsApp",
+        cta: "Cobrar agora via WhatsApp",
         ctaVariant: "outline" as const,
         onClick: props.cobrarAgora,
       };
@@ -163,37 +176,57 @@ export function FinanceOverview(props: FinanceOverviewProps) {
 
   return (
     <div className="space-y-3.5">
-      <AppKpiRow items={props.kpis} />
-
       <AppChartPanel
         title="Receita e previsão"
-        description="Recebido, previsto e vencimentos no período."
+        description="Recebidos, previstos e vencimentos no período selecionado."
       >
-        <div className="mb-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/55 px-3 py-2.5 transition-colors hover:border-[var(--border-strong)]">
-          <p className="text-sm font-semibold text-[var(--text-primary)]">
-            {revenueDeltaPercent >= 0
-              ? `Receita subiu ${Math.abs(revenueDeltaPercent).toFixed(1)}% no período.`
-              : `Receita caiu ${Math.abs(revenueDeltaPercent).toFixed(1)}% no período.`}
-          </p>
-          <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
-            {props.risk.overdueCount > 0
-              ? `${props.risk.riskAmount} em risco agora · priorize vencidas nesta janela.`
-              : dueSoon72hCount > 0
-                ? `${dueSoon72hCount} cobrança(s) vencem nas próximas 72h.`
-                : "Sem risco crítico na janela atual."}
-          </p>
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/35 bg-emerald-500/12 px-3 py-1 text-[11px] font-semibold text-emerald-200">
+            <Sparkles className="h-3.5 w-3.5" />
+            {`${revenueDeltaPercent >= 0 ? "+" : "-"}${Math.abs(revenueDeltaPercent).toFixed(1)}% nos últimos ${period === "7d" ? "7" : period === "30d" ? "30" : period === "90d" ? "90" : "dias do mês"} dias`}
+          </span>
+          <div className="flex flex-wrap gap-1.5">
+            {PERIODS.map(item => (
+              <button
+                key={item.value}
+                type="button"
+                className={appSelectionPillClasses(period === item.value)}
+                onClick={() => setPeriod(item.value)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="mb-2 flex flex-wrap gap-1.5">
-          {PERIODS.map(item => (
-            <button
-              key={item.value}
-              type="button"
-              className={appSelectionPillClasses(period === item.value)}
-              onClick={() => setPeriod(item.value)}
-            >
-              {item.label}
-            </button>
-          ))}
+        <div className="mb-3 grid gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/45 p-3 md:grid-cols-2">
+          <div className="flex items-start gap-2.5 border-b border-[var(--border-subtle)]/70 pb-2 md:border-b-0 md:border-r md:pb-0 md:pr-3">
+            <div className="rounded-md bg-emerald-500/20 p-1.5 text-emerald-200">
+              <ArrowUpRight className="h-3.5 w-3.5" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-[var(--text-primary)]">
+                Boa trajetória de receita
+              </p>
+              <p className="text-[11px] text-[var(--text-secondary)]">
+                Recebimentos acelerando em relação ao ciclo anterior.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-start gap-2.5">
+            <div className="rounded-md bg-amber-500/20 p-1.5 text-amber-200">
+              <AlertTriangle className="h-3.5 w-3.5" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-[var(--text-primary)]">
+                Valor em risco: {props.risk.riskAmount}
+              </p>
+              <p className="text-[11px] text-[var(--text-secondary)]">
+                {props.risk.overdueCount > 0
+                  ? `${props.risk.overdueCount} vencida(s) exigem ação imediata.`
+                  : "Sem criticidade alta no momento."}
+              </p>
+            </div>
+          </div>
         </div>
 
         {props.revenueLoading && data.length === 0 ? (
@@ -218,7 +251,7 @@ export function FinanceOverview(props: FinanceOverviewProps) {
           />
         ) : (
           <ChartContainer
-            className="h-[260px] w-full lg:h-[272px]"
+            className="h-[276px] w-full lg:h-[300px]"
             config={{
               revenue: { label: "Recebido", color: "hsl(var(--accent))" },
               projected: {
@@ -236,9 +269,9 @@ export function FinanceOverview(props: FinanceOverviewProps) {
               margin={{ top: 12, right: 10, bottom: 4, left: -8 }}
             >
               <CartesianGrid
-                strokeDasharray="2 4"
+                strokeDasharray="2 5"
                 vertical={false}
-                stroke="color-mix(in srgb, var(--border-subtle) 45%, transparent)"
+                stroke="color-mix(in srgb, var(--border-subtle) 35%, transparent)"
               />
               <XAxis
                 dataKey="label"
@@ -246,6 +279,7 @@ export function FinanceOverview(props: FinanceOverviewProps) {
                 axisLine={false}
                 minTickGap={22}
                 tickMargin={10}
+                tick={{ fontSize: 11, fill: "var(--text-muted)" }}
               />
               <YAxis
                 tickLine={false}
@@ -257,8 +291,8 @@ export function FinanceOverview(props: FinanceOverviewProps) {
               <ChartTooltip
                 content={
                   <ChartTooltipContent
-                    className="border-[var(--border-subtle)] bg-[var(--surface-elevated)]/95"
-                    labelFormatter={value => `Período ${String(value)}`}
+                    className="rounded-xl border-[var(--border-subtle)] bg-[var(--surface-elevated)]/95 p-2 shadow-xl"
+                    labelFormatter={value => `Data ${String(value)}`}
                     formatter={(value, name, item) => {
                       const metric =
                         name === "revenue"
@@ -275,10 +309,10 @@ export function FinanceOverview(props: FinanceOverviewProps) {
                             })}`;
                       return (
                         <div className="flex w-full items-center justify-between gap-3 text-xs">
-                          <span className="text-muted-foreground">
+                          <span className="text-muted-foreground text-[11px]">
                             {metric}
                           </span>
-                          <span className="font-mono text-foreground">
+                          <span className="font-mono text-foreground text-[11px]">
                             {formatted}
                           </span>
                           {name === "revenue" ? (
@@ -298,14 +332,15 @@ export function FinanceOverview(props: FinanceOverviewProps) {
                 dataKey="projected"
                 stroke="var(--color-projected)"
                 fill="var(--color-projected)"
-                fillOpacity={0.14}
+                fillOpacity={0.08}
                 strokeWidth={2}
+                strokeDasharray="6 6"
               />
               <Line
                 type="monotone"
                 dataKey="revenue"
                 stroke="var(--color-revenue)"
-                strokeWidth={2.5}
+                strokeWidth={2.8}
                 dot={{
                   r: 2.5,
                   fill: "var(--color-revenue)",
@@ -318,27 +353,57 @@ export function FinanceOverview(props: FinanceOverviewProps) {
                   strokeWidth: 2,
                 }}
               />
+              {data.map(item =>
+                item.overdue > 0 ? (
+                  <ReferenceDot
+                    key={`${item.label}-overdue`}
+                    x={item.label}
+                    y={item.revenue}
+                    r={4}
+                    fill="var(--color-overdue)"
+                    stroke="hsl(var(--background))"
+                    strokeWidth={1.5}
+                  />
+                ) : null
+              )}
             </ComposedChart>
           </ChartContainer>
         )}
 
-        <div className="mt-2 text-xs text-[var(--text-muted)]">
-          {totalOverdueEvents > 0
-            ? `${totalOverdueEvents} pontos de vencimento no período selecionado.`
-            : "Sem eventos de vencimento no período selecionado."}
+        <div className="mt-2 flex items-center justify-between text-xs text-[var(--text-muted)]">
+          <span>
+            {totalOverdueEvents > 0
+              ? `${totalOverdueEvents} pontos críticos no período.`
+              : "Sem pontos críticos no período selecionado."}
+          </span>
+          <span className="text-[11px] text-[var(--text-secondary)]">
+            Período ativo: {PERIODS.find(item => item.value === period)?.label}
+          </span>
         </div>
       </AppChartPanel>
 
       <div className="grid gap-2.5 md:grid-cols-2">
         <AppSectionBlock
-          title="Saúde do caixa"
-          subtitle="Risco financeiro imediato."
+          title="Painel de risco"
+          subtitle="Risco financeiro imediato da operação."
           className="h-full"
           compact
         >
           <div className="flex h-full flex-col gap-2">
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]/85">
+                Valor em risco
+              </p>
+              <span className="inline-flex items-center rounded-full border border-rose-500/40 bg-rose-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-rose-200">
+                {props.risk.overdueCount > 0
+                  ? "Crítico"
+                  : props.risk.dueToday > 0
+                    ? "Atenção"
+                    : "Normal"}
+              </span>
+            </div>
             <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]/85">
-              Valor em risco
+              risco financeiro
             </p>
             <p className="text-[2rem] font-semibold leading-none tracking-tight text-[var(--text-primary)]">
               {props.risk.riskAmount}
@@ -346,8 +411,21 @@ export function FinanceOverview(props: FinanceOverviewProps) {
             <p className="text-sm text-[var(--text-secondary)]">
               {riskSummary}
             </p>
+            <div className="space-y-1">
+              <div className="flex items-center justify-between text-[11px] text-[var(--text-secondary)]">
+                <span>Risco financeiro</span>
+                <span>{riskIntensity}%</span>
+              </div>
+              <div className="h-2 rounded-full bg-[var(--surface-base)]">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-amber-400/80 to-rose-500/80"
+                  style={{ width: `${riskIntensity}%` }}
+                />
+              </div>
+            </div>
             <div className="mt-auto grid grid-cols-3 divide-x divide-[var(--border-subtle)] rounded-md border border-[var(--border-subtle)]/85 bg-[var(--surface-base)]/35">
               <div className="px-2 py-1.5">
+                <Clock3 className="mb-1 h-3.5 w-3.5 text-amber-200" />
                 <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
                   Hoje
                 </p>
@@ -356,6 +434,7 @@ export function FinanceOverview(props: FinanceOverviewProps) {
                 </p>
               </div>
               <div className="px-2 py-1.5">
+                <Flame className="mb-1 h-3.5 w-3.5 text-orange-200" />
                 <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
                   7 dias
                 </p>
@@ -364,6 +443,7 @@ export function FinanceOverview(props: FinanceOverviewProps) {
                 </p>
               </div>
               <div className="px-2 py-1.5">
+                <ShieldAlert className="mb-1 h-3.5 w-3.5 text-rose-200" />
                 <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
                   Vencidas
                 </p>
@@ -372,6 +452,14 @@ export function FinanceOverview(props: FinanceOverviewProps) {
                 </p>
               </div>
             </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="mt-2 w-fit"
+              onClick={() => props.goToMode("overdue")}
+            >
+              Ir para vencidas
+            </Button>
           </div>
         </AppSectionBlock>
 
@@ -382,30 +470,47 @@ export function FinanceOverview(props: FinanceOverviewProps) {
           compact
         >
           <div className="flex h-full flex-col gap-2">
-            <span className="inline-flex w-fit items-center rounded-full border border-[var(--border-subtle)]/90 bg-[var(--surface-base)]/45 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[var(--text-secondary)]">
-              {nextBestAction.urgencyLabel}
-            </span>
-            <p className="text-xl font-semibold leading-tight text-[var(--text-primary)]">
-              {nextBestAction.headline}
-            </p>
-            <p className="text-sm text-[var(--text-secondary)]">
-              {nextBestAction.immediateContext}
-            </p>
-            <p className="text-sm font-medium text-[var(--text-primary)]/95">
-              {nextBestAction.impactContext}
-            </p>
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--accent)]">
+                  Ação imediata
+                </span>
+                <p className="text-xl font-semibold leading-tight text-[var(--text-primary)]">
+                  {nextBestAction.headline}
+                </p>
+              </div>
+              <span className="inline-flex w-fit items-center rounded-full border border-[var(--border-subtle)]/90 bg-[var(--surface-base)]/45 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[var(--text-secondary)]">
+                {nextBestAction.urgencyLabel}
+              </span>
+            </div>
+            <div className="flex items-center gap-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/35 p-3">
+              <div className="flex-1">
+                <p className="text-sm text-[var(--text-secondary)]">
+                  {nextBestAction.immediateContext}
+                </p>
+                <p className="text-sm font-medium text-[var(--text-primary)]/95">
+                  {nextBestAction.impactContext}
+                </p>
+              </div>
+              <div className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-base)]/60 p-3 text-[var(--accent)]">
+                <Zap className="h-7 w-7" />
+              </div>
+            </div>
             <Button
-              className="mt-auto w-full shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:ring-2 focus-visible:ring-[var(--accent)]/45"
+              className="mt-auto w-full bg-[var(--accent)] text-white shadow-sm transition-all hover:-translate-y-0.5 hover:brightness-105 hover:shadow-md focus-visible:ring-2 focus-visible:ring-[var(--accent)]/45"
               variant={nextBestAction.ctaVariant}
               onClick={nextBestAction.onClick}
             >
               {nextBestAction.cta}
             </Button>
-            <p className="text-[11px] text-[var(--text-muted)]">
-              {immediateRiskCount > 0
-                ? `${immediateRiskCount} item(ns) pedem acompanhamento nesta visão.`
-                : "Carteira sem alertas críticos nesta leitura."}
-            </p>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="w-fit px-1.5 text-[var(--text-secondary)]"
+              onClick={() => props.goToMode("overdue")}
+            >
+              Ver detalhes
+            </Button>
           </div>
         </AppSectionBlock>
       </div>
@@ -416,6 +521,18 @@ export function FinanceOverview(props: FinanceOverviewProps) {
         className="mt-0.5"
         compact
       >
+        <div className="mb-2 flex items-center justify-between">
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)]/40 px-2.5 py-1 text-[11px] text-[var(--text-secondary)]"
+          >
+            Ordenar: Prioridade
+            <ChevronDown className="h-3.5 w-3.5" />
+          </button>
+          <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-base)]/35 px-2 py-0.5 text-[11px] text-[var(--text-secondary)]">
+            {props.queueItems.length} itens
+          </span>
+        </div>
         <div className="space-y-2">
           {props.queueItems.length > 0 ? (
             props.queueItems.map(item => (
@@ -426,62 +543,81 @@ export function FinanceOverview(props: FinanceOverviewProps) {
                   item.priority === "critical" &&
                     "border-rose-500/35 bg-rose-500/10 before:absolute before:bottom-2 before:left-0 before:top-2 before:w-1 before:rounded-r-md before:bg-rose-400/60",
                   item.priority === "attention" &&
-                    "border-amber-500/30 bg-amber-500/7",
+                    "border-amber-500/30 bg-amber-500/7 before:absolute before:bottom-2 before:left-0 before:top-2 before:w-1 before:rounded-r-md before:bg-amber-300/60",
                   item.priority === "healthy" &&
-                    "border-[var(--border-subtle)] bg-[var(--surface-base)]/50"
+                    "border-[var(--border-subtle)] bg-[var(--surface-base)]/50 before:absolute before:bottom-2 before:left-0 before:top-2 before:w-1 before:rounded-r-md before:bg-emerald-300/50"
                 )}
               >
-                <div className="flex flex-wrap items-center justify-between gap-2.5">
-                  <div className="min-w-0 flex-1">
+                <div className="grid gap-2 sm:grid-cols-[1.6fr,1fr,1fr,auto,auto,auto] sm:items-center">
+                  <div className="min-w-0">
                     <p className="truncate text-sm font-medium text-[var(--text-primary)]">
-                      {item.client} — {item.value}
+                      {item.client}
                     </p>
                     <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">
                       {item.summary}
                     </p>
-                    {item.intelligenceLabel ? (
-                      <p className="mt-0.5 text-[11px] font-medium text-[var(--text-secondary)]">
-                        {item.intelligenceLabel}
-                      </p>
-                    ) : null}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={cn(
-                        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium",
-                        item.priority === "critical" &&
-                          "border-rose-500/45 bg-rose-500/15 text-rose-200",
-                        item.priority === "attention" &&
-                          "border-amber-500/45 bg-amber-500/15 text-amber-200",
-                        item.priority === "healthy" &&
-                          "border-emerald-500/40 bg-emerald-500/15 text-emerald-200"
-                      )}
-                    >
-                      {item.priority === "critical" ? (
-                        <AlertTriangle className="h-3.5 w-3.5" />
-                      ) : item.priority === "attention" ? (
-                        <ArrowUpRight className="h-3.5 w-3.5" />
-                      ) : (
-                        <CheckCircle2 className="h-3.5 w-3.5" />
-                      )}
-                      {item.priority === "critical"
-                        ? "Crítica"
-                        : item.priority === "attention"
-                          ? "Atenção"
-                          : "Saudável"}
-                    </span>
-                    <Button
-                      size="sm"
-                      variant={
-                        item.status === "overdue" ? "default" : "outline"
-                      }
-                      className="transition-transform duration-200 group-hover:-translate-y-0.5 active:translate-y-0"
-                      onClick={item.onAction}
-                    >
-                      {item.recommendedAction}
-                    </Button>
+                  <div>
+                    <p className="text-sm font-semibold text-[var(--text-primary)]">
+                      {item.value}
+                    </p>
+                    <p className="text-[11px] text-[var(--text-muted)]">
+                      {item.amountContext}
+                    </p>
                   </div>
+                  <div>
+                    <p className="text-sm font-medium text-[var(--text-primary)]">
+                      {item.dueLabel}
+                    </p>
+                    <p className="text-[11px] text-[var(--text-muted)]">
+                      {item.dateContext}
+                    </p>
+                  </div>
+                  <span
+                    className={cn(
+                      "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                      item.priority === "critical" &&
+                        "border-rose-500/45 bg-rose-500/15 text-rose-200",
+                      item.priority === "attention" &&
+                        "border-amber-500/45 bg-amber-500/15 text-amber-200",
+                      item.priority === "healthy" &&
+                        "border-emerald-500/40 bg-emerald-500/15 text-emerald-200"
+                    )}
+                  >
+                    {item.priority === "critical" ? (
+                      <AlertTriangle className="h-3.5 w-3.5" />
+                    ) : item.priority === "attention" ? (
+                      <ArrowUpRight className="h-3.5 w-3.5" />
+                    ) : (
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                    )}
+                    {item.priority === "critical"
+                      ? "Crítica"
+                      : item.priority === "attention"
+                        ? "Atenção"
+                        : "Saudável"}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant={item.status === "overdue" ? "default" : "outline"}
+                    className="transition-transform duration-200 group-hover:-translate-y-0.5 active:translate-y-0"
+                    onClick={item.onAction}
+                  >
+                    {item.recommendedAction}
+                  </Button>
+                  <button
+                    type="button"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)]/35 text-[var(--text-muted)]"
+                    aria-label={`Mais ações para ${item.client}`}
+                  >
+                    <CircleEllipsis className="h-4 w-4" />
+                  </button>
                 </div>
+                {item.intelligenceLabel ? (
+                  <p className="mt-2 pl-0.5 text-[11px] font-medium text-[var(--text-secondary)]">
+                    {item.intelligenceLabel}
+                  </p>
+                ) : null}
               </div>
             ))
           ) : (
