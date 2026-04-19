@@ -19,11 +19,11 @@ const buttonVariants = cva(
         destructive:
           "bg-destructive text-destructive-foreground hover:bg-[color-mix(in_srgb,var(--destructive)_86%,black)]",
         neutral:
-          "border border-[var(--border)] bg-[var(--surface-elevated)] text-[var(--text-primary)] hover:border-[var(--accent-soft)] hover:bg-[var(--surface-base)]",
+          "border border-white/20 bg-transparent text-white hover:border-white/35 hover:bg-white/10",
         outline:
-          "border border-[var(--border)] bg-[var(--surface-elevated)] text-[var(--text-primary)] hover:border-[var(--accent-soft)] hover:bg-[var(--surface-base)]",
+          "border border-white/20 bg-transparent text-white hover:border-white/35 hover:bg-white/10",
         secondary:
-          "border border-[var(--border)] bg-[var(--surface-base)] text-[var(--text-primary)] hover:border-[var(--accent-soft)] hover:bg-[var(--surface-elevated)]",
+          "border border-white/20 bg-transparent text-white hover:border-white/35 hover:bg-white/10",
         ghost:
           "text-[var(--text-secondary)] hover:bg-[var(--accent-soft)] hover:text-[var(--text-primary)]",
         link: "text-primary underline-offset-4 hover:underline",

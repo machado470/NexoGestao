@@ -352,7 +352,6 @@ export default function CalendarPage() {
   const scheduledCount = rawAppointments.filter((item) => item.status === "SCHEDULED").length;
   const confirmedCount = rawAppointments.filter((item) => item.status === "CONFIRMED").length;
   const noShowCount = rawAppointments.filter((item) => item.status === "NO_SHOW").length;
-  const doneCount = rawAppointments.filter((item) => item.status === "DONE").length;
 
   const customers = useMemo(() => {
     const payload = customersQuery.data;
@@ -464,9 +463,9 @@ export default function CalendarPage() {
         items={[
           { title: "Agendados", value: String(scheduledCount), hint: "aguardando confirmação" },
           { title: "Confirmados", value: String(confirmedCount), hint: "prontos para atendimento" },
-          { title: "Concluídos", value: String(doneCount), hint: "execução finalizada" },
           { title: "Conflitos/No-show", value: String(noShowCount), hint: "pedem reação comercial" },
         ]}
+        gridClassName="grid-cols-1 md:grid-cols-3"
       />
 
       <div className="grid gap-4 xl:grid-cols-3">

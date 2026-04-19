@@ -172,7 +172,7 @@ export function AppMetricCard({
   const content = (
     <article
       className={cn(
-        "nexo-card-kpi flex h-full min-h-[138px] flex-col p-4 md:p-5",
+        "nexo-card-kpi flex h-full min-h-[118px] flex-col p-3.5 md:p-4",
         tone === "important" && "nexo-card-kpi--important",
         tone === "critical" && "nexo-card-kpi--critical"
       )}
@@ -283,7 +283,7 @@ export function AppKpiRow({
   return (
     <section
       className={cn(
-        "grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(320px,1fr))]",
+        "grid gap-3 grid-cols-1 md:grid-cols-2 xl:grid-cols-4",
         gridClassName
       )}
     >
@@ -406,8 +406,8 @@ export function AppSectionBlock({
     <AppSectionCard
       className={cn(
         compact
-          ? "min-h-0 rounded-xl p-4 md:p-5"
-          : "min-h-[240px] rounded-xl p-5 md:p-6",
+          ? "min-h-0 rounded-xl p-4"
+          : "min-h-0 rounded-xl p-4 md:p-5",
         className
       )}
     >
@@ -457,7 +457,7 @@ export function AppListBlock({
   maxItems = 8,
   minItems = 5,
   compact = false,
-  showPlaceholders = true,
+  showPlaceholders = false,
 }: {
   items: Array<{
     title: string;
@@ -473,8 +473,7 @@ export function AppListBlock({
 }) {
   const normalizedItems = items.slice(0, maxItems).map((item, index) => ({
     ...item,
-    subtitle:
-      item.subtitle ?? "Ação operacional disponível para execução imediata.",
+    subtitle: item.subtitle ?? "Ação operacional disponível para execução.",
     action: item.action ?? (
       <Button size="sm" variant="outline">
         Executar
@@ -488,11 +487,7 @@ export function AppListBlock({
       title: `Ação complementar ${idx}`,
       subtitle:
         "Preencha este espaço com uma ação direta do fluxo operacional.",
-      action: (
-        <Button size="sm" variant="outline">
-          Definir ação
-        </Button>
-      ),
+      action: <Button size="sm" variant="outline">Configurar</Button>,
       __key: `placeholder-${idx}`,
     });
   }

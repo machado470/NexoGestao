@@ -119,10 +119,11 @@ export default function AppointmentsPage() {
         ]}
       />
 
+      <div className="grid gap-4 xl:grid-cols-12">
       <AppSectionBlock
         title="Agenda do dia"
         subtitle="Bloco principal: lista direta com ação imediata para executar sem dispersão"
-        className="lg:col-span-2"
+        className="xl:col-span-8"
       >
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <p className="text-xs text-[var(--text-muted)]">Comece por aqui: confirme, execute ou reagende e mantenha o dia fluindo.</p>
@@ -141,6 +142,18 @@ export default function AppointmentsPage() {
             : [{ title: "Sem agenda hoje", subtitle: "Crie novos horários para preencher a operação.", action: <button className="nexo-cta-secondary" onClick={() => setOpenCreate(true)}>Criar</button> }]}
         />
       </AppSectionBlock>
+
+      <AppSectionBlock title="Conflitos e próximas ações" subtitle="Lateral operacional para destravar o dia" className="xl:col-span-4" compact>
+        <AppListBlock
+          className="col-span-full"
+          compact
+          showPlaceholders={false}
+          items={gargalosAgenda.length > 0
+            ? gargalosAgenda
+            : [{ title: "Sem gargalos críticos agora", subtitle: "Mantenha a rotina e monitore novos conflitos.", action: <button className="nexo-cta-secondary" onClick={() => navigate("/service-orders")}>Próxima etapa</button> }]}
+        />
+      </AppSectionBlock>
+      </div>
 
       <AppSectionBlock title="Fila de agendamentos" subtitle="Sincronizada em tempo real com backend">
         {showInitialLoading ? (
@@ -224,17 +237,6 @@ export default function AppointmentsPage() {
             </table>
           </AppDataTable>
         )}
-      </AppSectionBlock>
-
-      <AppSectionBlock title="Gargalos" subtitle="Atrasados, conflitos e itens sem dono para destravar">
-        <AppListBlock
-          className="col-span-full"
-          compact
-          showPlaceholders={false}
-          items={gargalosAgenda.length > 0
-            ? gargalosAgenda
-            : [{ title: "Sem gargalos críticos agora", subtitle: "Mantenha a rotina e monitore novos conflitos.", action: <button className="nexo-cta-secondary" onClick={() => navigate("/service-orders")}>Próxima etapa</button> }]}
-        />
       </AppSectionBlock>
 
       <CreateAppointmentModal

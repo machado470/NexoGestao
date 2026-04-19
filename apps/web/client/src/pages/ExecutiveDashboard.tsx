@@ -104,11 +104,11 @@ export default function ExecutiveDashboard() {
 
       <ExecutiveTrendChart />
 
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
         <AppSectionBlock
           title="Central de Alertas"
           subtitle="Prioridades críticas para execução imediata"
-          className="flex h-full min-h-[280px] flex-col"
+          className="flex h-full flex-col xl:col-span-8"
           ctaLabel="Abrir operação"
           onCtaClick={() => navigate("/dashboard/operations?filter=critical")}
         >
@@ -156,14 +156,14 @@ export default function ExecutiveDashboard() {
         </AppSectionBlock>
 
         <WhatsAppOverviewCard
-          className="flex h-full min-h-[280px] flex-col"
+          className="flex h-full flex-col xl:col-span-4"
           onOpenWhatsApp={() => navigate("/whatsapp")}
         />
 
         <AppSectionBlock
           title="Agenda Operacional"
           subtitle="Compromissos com horário e status de execução"
-          className="flex h-full min-h-[280px] flex-col"
+          className="flex h-full flex-col xl:col-span-8"
           ctaLabel="Abrir agenda"
           onCtaClick={() => navigate("/appointments")}
         >
@@ -211,7 +211,7 @@ export default function ExecutiveDashboard() {
         <AppSectionBlock
           title="Resumo Operacional"
           subtitle="Indicadores centrais com leitura financeira do ciclo"
-          className="flex h-full min-h-[280px] flex-col"
+          className="flex h-full flex-col xl:col-span-4"
         >
           <div className="space-y-6">
             <div>

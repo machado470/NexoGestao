@@ -196,10 +196,11 @@ export default function TimelinePage() {
         onChange={setActiveTab}
       />
 
+      <div className="grid gap-3 xl:grid-cols-12">
       <AppSectionBlock
         title="O que deu problema"
         subtitle="Bloco principal: eventos críticos que exigem reação imediata antes de qualquer outra leitura"
-        className="border-rose-500/35 bg-rose-500/8 p-6 lg:p-8"
+        className="border-rose-500/20 bg-rose-500/5 xl:col-span-8"
       >
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-[var(--text-secondary)]">{criticalEvents} eventos críticos e {failedRecent} falhas recentes pedindo reação imediata.</p>
@@ -219,7 +220,7 @@ export default function TimelinePage() {
         />
       </AppSectionBlock>
 
-      <div className="space-y-3">
+      <div className="space-y-3 xl:col-span-4">
         <AppNextActionCard
           title="O que precisa de atenção"
           description={`${uniqueEntities} entidades com sinal de atraso e ${semRetorno} eventos marcados como sem retorno.`}
@@ -236,6 +237,7 @@ export default function TimelinePage() {
             ]}
           />
         </AppSectionBlock>
+      </div>
       </div>
 
       <TrpcSectionErrorBoundary context="timeline:events-feed">

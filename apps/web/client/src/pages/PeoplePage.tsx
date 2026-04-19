@@ -195,9 +195,9 @@ export default function PeoplePage() {
         items={[
           { title: "Total de pessoas", value: String(linkedStats?.count ?? 0), hint: "vínculo organizacional" },
           { title: "Pessoas ativas", value: String(activePeople), hint: "em execução" },
-          { title: "Com O.S. atribuídas", value: String(assignedPeople), hint: "ocupação operacional" },
           { title: "Carga média", value: `${avgWorkload} O.S.`, hint: "por pessoa" },
         ]}
+        gridClassName="grid-cols-1 md:grid-cols-3"
       />
 
       <div className="grid gap-4 xl:grid-cols-3">
