@@ -1,23 +1,17 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/design-system";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  X,
-  Loader2,
-  Wallet,
-  CalendarDays,
-  Receipt,
-  AlertCircle,
-} from "lucide-react";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Loader2, MessageCircle, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { chargeSchema } from "@/lib/validations";
 import { registerActionFlowEvent } from "@/lib/actionFlow";
@@ -27,6 +21,7 @@ import { useProductAnalytics } from "@/hooks/useProductAnalytics";
 import { notify } from "@/stores/notificationStore";
 import { buildIdempotencyKey } from "@/lib/idempotency";
 import { resolveOperationFeedback } from "@/lib/operations/operation-feedback";
+import { FormModal } from "@/components/app-modal-system";
 
 interface CreateChargeModalProps {
   isOpen: boolean;
@@ -34,22 +29,43 @@ interface CreateChargeModalProps {
   onSuccess: () => void;
 }
 
+type ChargeMode = "MANUAL" | "RECURRING" | "SERVICE";
+type PostCreateAction = "CREATE_ONLY" | "CREATE_AND_CHARGE" | "CREATE_AND_TRACK";
+
 type FormState = {
+  mode: ChargeMode;
   customerId: string;
   amount: string;
   dueDate: string;
   notes: string;
+  serviceReference: string;
+  postAction: PostCreateAction;
 };
 
 const INITIAL_FORM: FormState = {
+  mode: "MANUAL",
   customerId: "",
   amount: "",
   dueDate: "",
   notes: "",
+  serviceReference: "",
+  postAction: "CREATE_ONLY",
+};
+
+const chargeModeLabels: Record<ChargeMode, string> = {
+  MANUAL: "Cobrança manual",
+  RECURRING: "Cobrança recorrente",
+  SERVICE: "Ligada a serviço",
+};
+
+const postActionLabels: Record<PostCreateAction, string> = {
+  CREATE_ONLY: "Apenas criar",
+  CREATE_AND_CHARGE: "Criar e cobrar agora",
+  CREATE_AND_TRACK: "Criar e acompanhar depois",
 };
 
 function parseAmountToCents(raw: string): number | null {
-  const normalized = raw.replace(",", ".").trim();
+  const normalized = raw.replace(/\s/g, "").replace(/\./g, "").replace(",", ".").trim();
   const amount = Number(normalized);
 
   if (!Number.isFinite(amount) || amount <= 0) {
@@ -82,30 +98,6 @@ function formatDueDatePreview(value: string) {
   });
 }
 
-function SectionTitle({
-  icon: Icon,
-  title,
-  subtitle,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  title: string;
-  subtitle: string;
-}) {
-  return (
-    <div className="mb-3 flex items-start gap-2">
-      <div className="rounded-lg bg-orange-100 p-2 text-orange-600 dark:bg-orange-900/30 dark:text-orange-300">
-        <Icon className="h-4 w-4" />
-      </div>
-      <div>
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-          {title}
-        </h3>
-        <p className="text-xs text-gray-500 dark:text-gray-400">{subtitle}</p>
-      </div>
-    </div>
-  );
-}
-
 export function CreateChargeModal({
   isOpen,
   onClose,
@@ -113,9 +105,11 @@ export function CreateChargeModal({
 }: CreateChargeModalProps) {
   const [, navigate] = useLocation();
   const [formData, setFormData] = useState<FormState>(INITIAL_FORM);
+  const customerSelectRef = useRef<HTMLButtonElement | null>(null);
   const utils = trpc.useUtils();
   const { track } = useProductAnalytics();
   const createCharge = trpc.finance.charges.create.useMutation();
+
   useCriticalActionGuard({
     isPending: createCharge.isPending,
     reason: "Criando cobrança e sincronizando financeiro + cliente.",
@@ -134,8 +128,8 @@ export function CreateChargeModal({
 
   const selectedCustomerName = useMemo(() => {
     return (
-      customers.find((customer: any) => String(customer.id) === formData.customerId)?.name ??
-      "Nenhum cliente selecionado"
+      customers.find((customer: any) => String(customer.id) === formData.customerId)
+        ?.name ?? "Nenhum cliente selecionado"
     );
   }, [customers, formData.customerId]);
 
@@ -147,7 +141,11 @@ export function CreateChargeModal({
     );
   }, [formData.customerId, formData.amount, formData.dueDate]);
 
-  const handleClose = () => {
+  const shortNotes = formData.notes.trim();
+  const summarizedNotes =
+    shortNotes.length > 60 ? `${shortNotes.slice(0, 57)}...` : shortNotes || "Sem observações";
+
+  const resetAndClose = () => {
     if (createCharge.isPending) return;
     setFormData(INITIAL_FORM);
     onClose();
@@ -157,7 +155,9 @@ export function CreateChargeModal({
     const customerId = formData.customerId.trim();
     const amount = formData.amount.trim();
     const dueDate = formData.dueDate;
-    const notes = formData.notes.trim();
+    const notes = [formData.notes.trim(), formData.serviceReference.trim() && `Ref.: ${formData.serviceReference.trim()}`]
+      .filter(Boolean)
+      .join("\n");
 
     const amountCents = parseAmountToCents(amount);
 
@@ -221,26 +221,40 @@ export function CreateChargeModal({
         toast.success(successMessage, {
           action: {
             label: "Ver cobrança",
-            onClick: () =>
-              navigate(`/finances?chargeId=${String((created as any)?.id ?? "")}`),
+            onClick: () => navigate(`/finances?chargeId=${String((created as any)?.id ?? "")}`),
           },
         });
-        notify.successPersistent(
-          "Cobrança criada",
-          "Próximo passo recomendado: enviar cobrança no WhatsApp para acelerar recebimento.",
-          {
-            label: "Enviar WhatsApp",
-            onClick: () => navigate("/whatsapp"),
-          }
-        );
+
+        if (formData.postAction === "CREATE_AND_CHARGE") {
+          notify.successPersistent(
+            "Cobrança criada",
+            "A próxima ação já está pronta: enviar agora no WhatsApp.",
+            {
+              label: "Enviar WhatsApp",
+              onClick: () => navigate("/whatsapp"),
+            }
+          );
+        } else {
+          notify.successPersistent(
+            "Cobrança criada",
+            "Essa cobrança já está disponível no acompanhamento financeiro.",
+            {
+              label: "Abrir financeiro",
+              onClick: () => navigate("/finances"),
+            }
+          );
+        }
+
         registerActionFlowEvent("charge_created");
         track("generate_charge", {
           screen: "finances",
           chargeId: String((created as any)?.id ?? ""),
           customerId,
           amountCents: payload.amountCents,
-          nextStep: "register_payment_or_send_whatsapp",
+          nextStep: formData.postAction,
+          chargeMode: formData.mode,
         });
+
         setFormData(INITIAL_FORM);
         onSuccess();
         onClose();
@@ -248,223 +262,193 @@ export function CreateChargeModal({
       onError: (error) => {
         utils.finance.charges.list.setData(undefined, previousCharges as any);
         toast.error(error.message || "Erro ao criar cobrança");
-        notify.error(
-          "Não foi possível criar a cobrança",
-          "Revise cliente, valor e vencimento e tente novamente.",
-          {
-            label: "Tentar novamente",
-            onClick: () => {
-              void submitCharge();
-            },
-          }
-        );
       },
     });
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => (!open ? handleClose() : null)}>
-      <DialogContent
-        showCloseButton={false}
-        className="max-h-[90vh] max-w-2xl overflow-hidden border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-0 shadow-sm dark:bg-[var(--surface-base)]"
-      >
-        <DialogHeader className="border-b border-gray-200 px-6 py-6 dark:border-zinc-800">
-          <DialogTitle className="flex items-center gap-2 text-xl text-gray-900 dark:text-white">
-            <Wallet className="h-5 w-5 text-orange-500" />
-            Nova Cobrança
-          </DialogTitle>
-          <DialogDescription className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Crie uma cobrança manual com cliente, valor, vencimento e contexto básico.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="max-h-[70vh] overflow-y-auto p-6">
-          <div className="space-y-6">
-            <section className="rounded-xl border border-gray-200 p-4 dark:border-zinc-800">
-              <SectionTitle
-                icon={Receipt}
-                title="Dados da cobrança"
-                subtitle="Defina cliente, valor e vencimento da cobrança manual."
-              />
-
-              <div className="space-y-4">
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-white">
-                    Cliente *
-                  </label>
-                  <select
-                    value={formData.customerId}
-                    onChange={(e) =>
-                      setFormData((state) => ({
-                        ...state,
-                        customerId: e.target.value,
-                      }))
-                    }
-                    className="w-full rounded-lg border border-gray-300 bg-[var(--surface-elevated)] px-3 py-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-                    disabled={createCharge.isPending}
-                  >
-                    <option value="">Selecione um cliente</option>
-                    {customers.map((customer: any) => (
-                      <option key={customer.id} value={customer.id}>
-                        {customer.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-white">
-                      Valor (R$) *
-                    </label>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={formData.amount}
-                      onChange={(e) =>
-                        setFormData((state) => ({
-                          ...state,
-                          amount: e.target.value,
-                        }))
-                      }
-                      className="w-full rounded-lg border border-gray-300 bg-[var(--surface-elevated)] px-3 py-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-                      placeholder="100,00"
-                      disabled={createCharge.isPending}
-                    />
-                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                      Valor atual: {formatCurrencyFromInput(formData.amount)}
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="mb-2 flex items-center gap-2 text-sm font-medium text-gray-900 dark:text-white">
-                      <CalendarDays className="h-4 w-4 text-gray-500" />
-                      Data de vencimento *
-                    </label>
-                    <input
-                      type="date"
-                      value={formData.dueDate}
-                      onChange={(e) =>
-                        setFormData((state) => ({
-                          ...state,
-                          dueDate: e.target.value,
-                        }))
-                      }
-                      className="w-full rounded-lg border border-gray-300 bg-[var(--surface-elevated)] px-3 py-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-                      disabled={createCharge.isPending}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-white">
-                    Notas
-                  </label>
-                  <textarea
-                    value={formData.notes}
-                    onChange={(e) =>
-                      setFormData((state) => ({
-                        ...state,
-                        notes: e.target.value,
-                      }))
-                    }
-                    className="w-full rounded-lg border border-gray-300 bg-[var(--surface-elevated)] px-3 py-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-                    placeholder="Adicione observações sobre a cobrança, referência do serviço ou contexto de emissão"
-                    rows={4}
-                    disabled={createCharge.isPending}
-                  />
-                </div>
-              </div>
-            </section>
-
-            <section className="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/40 dark:bg-amber-950/20">
-              <div className="flex items-start gap-2">
-                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700 dark:text-amber-300" />
-                <div className="space-y-1 text-xs text-amber-900 dark:text-amber-300">
-                  <p className="font-medium">Leitura rápida do que será criado</p>
-                  <p>
-                    Esta ação cria uma cobrança manual, independente do fluxo automático da O.S.,
-                    quando você precisa registrar algo fora da rotina padrão.
-                  </p>
-                </div>
-              </div>
-            </section>
-
-            <section className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-4 dark:border-zinc-800 dark:bg-[var(--surface-base)]">
-              <div className="mb-3 flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 text-orange-500" />
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-                  Resumo antes de criar
-                </h3>
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                    Cliente
-                  </p>
-                  <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
-                    {selectedCustomerName}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                    Valor
-                  </p>
-                  <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
-                    {formatCurrencyFromInput(formData.amount)}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                    Vencimento
-                  </p>
-                  <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
-                    {formatDueDatePreview(formData.dueDate)}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                    Observações
-                  </p>
-                  <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
-                    {formData.notes.trim() || "Sem observações"}
-                  </p>
-                </div>
-              </div>
-            </section>
+    <FormModal
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) resetAndClose();
+      }}
+      closeBlocked={createCharge.isPending}
+      size="lg"
+      initialFocusRef={customerSelectRef}
+      title={
+        <span className="inline-flex items-center gap-2">
+          <Wallet className="h-5 w-5 text-[var(--accent-primary)]" />
+          Nova cobrança
+        </span>
+      }
+      description="Use quando precisar registrar uma cobrança fora da ordem de serviço."
+      footer={
+        <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs text-[var(--text-muted)]">
+            Essa cobrança ficará disponível no acompanhamento financeiro imediatamente.
+          </p>
+          <div className="flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row">
+            <Button type="button" variant="outline" onClick={resetAndClose} disabled={createCharge.isPending}>
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              className="min-w-[210px]"
+              onClick={() => void submitCharge()}
+              disabled={createCharge.isPending || !canSubmit}
+            >
+              {createCharge.isPending ? (
+                <span className="inline-flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Criando...
+                </span>
+              ) : (
+                postActionLabels[formData.postAction]
+              )}
+            </Button>
           </div>
         </div>
-        <DialogFooter className="flex gap-2 border-t border-gray-200 p-6 sm:justify-start dark:border-zinc-800">
-          <Button
-            onClick={() => void submitCharge()}
-            disabled={createCharge.isPending || !canSubmit}
-            className="flex-1 bg-orange-500 text-white hover:bg-orange-600"
-            type="button"
-          >
-            {createCharge.isPending ? (
-              <span className="inline-flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Criando...
-              </span>
-            ) : (
-              "Criar cobrança"
-            )}
-          </Button>
+      }
+    >
+      <div className="space-y-5">
+        <section className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Modo da cobrança</p>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            {(Object.keys(chargeModeLabels) as ChargeMode[]).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                disabled={createCharge.isPending}
+                onClick={() => setFormData((state) => ({ ...state, mode }))}
+                className="rounded-[0.82rem] border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2 text-left text-sm text-[var(--text-primary)] transition hover:border-[var(--accent-primary)]/50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <p className="font-medium">{chargeModeLabels[mode]}</p>
+                <p className="text-xs text-[var(--text-muted)]">
+                  {mode === "MANUAL" && "Fluxo direto para cobrança fora da rotina."}
+                  {mode === "RECURRING" && "Mantém padrão mensal com vencimento previsível."}
+                  {mode === "SERVICE" && "Vincule ao contexto de execução do serviço."}
+                </p>
+              </button>
+            ))}
+          </div>
+        </section>
 
-          <Button
-            onClick={handleClose}
-            variant="outline"
-            type="button"
-            disabled={createCharge.isPending}
-          >
-            Cancelar
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        <section className="space-y-4 rounded-[0.95rem] border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4">
+          <p className="text-sm font-semibold text-[var(--text-primary)]">Dados essenciais</p>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-[var(--text-secondary)]">Cliente *</label>
+            <Select
+              value={formData.customerId}
+              onValueChange={(customerId) => setFormData((state) => ({ ...state, customerId }))}
+              disabled={createCharge.isPending}
+            >
+              <SelectTrigger ref={customerSelectRef}>
+                <SelectValue placeholder="Busque e selecione um cliente" />
+              </SelectTrigger>
+              <SelectContent>
+                {customers.map((customer: any) => (
+                  <SelectItem key={customer.id} value={String(customer.id)}>
+                    {customer.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {!formData.customerId ? (
+              <p className="text-xs text-[var(--text-muted)]">Selecione o cliente para liberar o envio da cobrança.</p>
+            ) : null}
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-[var(--text-secondary)]">Valor *</label>
+              <Input
+                inputMode="decimal"
+                placeholder="100,00"
+                value={formData.amount}
+                onChange={(e) => setFormData((state) => ({ ...state, amount: e.target.value }))}
+                disabled={createCharge.isPending}
+              />
+              <p className="text-xs text-[var(--text-muted)]">Valor atual: {formatCurrencyFromInput(formData.amount)}</p>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-[var(--text-secondary)]">Vencimento *</label>
+              <Input
+                type="date"
+                value={formData.dueDate}
+                onChange={(e) => setFormData((state) => ({ ...state, dueDate: e.target.value }))}
+                disabled={createCharge.isPending}
+              />
+              <p className="text-xs text-[var(--text-muted)]">Prévia: {formatDueDatePreview(formData.dueDate)}</p>
+            </div>
+          </div>
+        </section>
+
+        <section className="space-y-4">
+          <div className="space-y-2">
+            <p className="text-sm font-semibold text-[var(--text-primary)]">Contexto opcional</p>
+            <p className="text-xs text-[var(--text-muted)]">Use apenas se ajudar no acompanhamento e na comunicação.</p>
+          </div>
+
+          {formData.mode === "SERVICE" ? (
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-[var(--text-secondary)]">Referência do serviço</label>
+              <Input
+                placeholder="Ex.: OS #1042 · Troca de compressor"
+                value={formData.serviceReference}
+                onChange={(e) => setFormData((state) => ({ ...state, serviceReference: e.target.value }))}
+                disabled={createCharge.isPending}
+              />
+            </div>
+          ) : null}
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-[var(--text-secondary)]">Observações</label>
+            <Textarea
+              rows={3}
+              placeholder="Ex.: combinado com cliente para envio até 18h"
+              className="max-h-32 resize-y"
+              value={formData.notes}
+              onChange={(e) => setFormData((state) => ({ ...state, notes: e.target.value }))}
+              disabled={createCharge.isPending}
+            />
+          </div>
+        </section>
+
+        <section className="space-y-2 rounded-[0.95rem] border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4">
+          <p className="text-sm font-semibold text-[var(--text-primary)]">Após criar</p>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            {(Object.keys(postActionLabels) as PostCreateAction[]).map((action) => (
+              <button
+                key={action}
+                type="button"
+                onClick={() => setFormData((state) => ({ ...state, postAction: action }))}
+                disabled={createCharge.isPending}
+                className="rounded-[0.82rem] border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2 text-left text-sm text-[var(--text-primary)] transition hover:border-[var(--accent-primary)]/50"
+              >
+                <span className="font-medium">{postActionLabels[action]}</span>
+                {action === "CREATE_AND_CHARGE" ? (
+                  <span className="mt-1 inline-flex items-center gap-1 text-xs text-[var(--text-muted)]">
+                    <MessageCircle className="h-3.5 w-3.5" />
+                    Sugere envio imediato
+                  </span>
+                ) : null}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section className="rounded-[0.95rem] border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4">
+          <p className="text-sm font-semibold text-[var(--text-primary)]">Resumo ao vivo</p>
+          <div className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+            <p><span className="text-[var(--text-muted)]">Cliente:</span> {selectedCustomerName}</p>
+            <p><span className="text-[var(--text-muted)]">Valor:</span> {formatCurrencyFromInput(formData.amount)}</p>
+            <p><span className="text-[var(--text-muted)]">Vencimento:</span> {formatDueDatePreview(formData.dueDate)}</p>
+            <p><span className="text-[var(--text-muted)]">Tipo:</span> {chargeModeLabels[formData.mode]}</p>
+            <p className="sm:col-span-2"><span className="text-[var(--text-muted)]">Observações:</span> {summarizedNotes}</p>
+          </div>
+        </section>
+      </div>
+    </FormModal>
   );
 }

@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ReactNode, RefObject } from "react";
 import { Button } from "@/components/design-system";
 import {
   Dialog,
@@ -29,6 +29,7 @@ export function BaseModal({
   closeBlocked = false,
   fixedHeader = true,
   fixedFooter = true,
+  initialFocusRef,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -40,24 +41,30 @@ export function BaseModal({
   closeBlocked?: boolean;
   fixedHeader?: boolean;
   fixedFooter?: boolean;
+  initialFocusRef?: RefObject<HTMLElement | null>;
 }) {
   return (
     <Dialog
       open={open}
-      onOpenChange={nextOpen => {
+      onOpenChange={(nextOpen) => {
         if (!nextOpen && closeBlocked) return;
         onOpenChange(nextOpen);
       }}
     >
       <DialogContent
-        onEscapeKeyDown={event => {
+        onEscapeKeyDown={(event) => {
           if (closeBlocked) event.preventDefault();
         }}
-        onInteractOutside={event => {
+        onInteractOutside={(event) => {
           if (closeBlocked) event.preventDefault();
+        }}
+        onOpenAutoFocus={(event) => {
+          if (!initialFocusRef?.current) return;
+          event.preventDefault();
+          initialFocusRef.current.focus();
         }}
         className={cn(
-          "flex max-h-[92vh] min-h-[220px] flex-col overflow-hidden p-0",
+          "flex max-h-[90vh] min-h-[220px] flex-col overflow-hidden p-0",
           modalSizeMap[size]
         )}
       >
@@ -139,15 +146,10 @@ export function ModalFooter({
   );
 }
 
-
-export function BaseOperationalModal(props: Omit<Parameters<typeof BaseModal>[0], "fixedHeader" | "fixedFooter">) {
-  return (
-    <BaseModal
-      {...props}
-      fixedHeader
-      fixedFooter
-    />
-  );
+export function BaseOperationalModal(
+  props: Omit<Parameters<typeof BaseModal>[0], "fixedHeader" | "fixedFooter">
+) {
+  return <BaseModal {...props} fixedHeader fixedFooter />;
 }
 
 export function ConfirmModal({
@@ -200,15 +202,16 @@ export function ConfirmModal({
   );
 }
 
-export function FormModal({
+export function QuickActionModal({
   open,
   onOpenChange,
   title,
   description,
   children,
   footer,
-  size = "lg",
+  size = "md",
   closeBlocked = false,
+  initialFocusRef,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -218,6 +221,44 @@ export function FormModal({
   footer: ReactNode;
   size?: keyof typeof modalSizeMap;
   closeBlocked?: boolean;
+  initialFocusRef?: RefObject<HTMLElement | null>;
+}) {
+  return (
+    <BaseModal
+      open={open}
+      onOpenChange={onOpenChange}
+      title={title}
+      description={description}
+      size={size}
+      closeBlocked={closeBlocked}
+      initialFocusRef={initialFocusRef}
+      footer={footer}
+    >
+      <div className="space-y-4">{children}</div>
+    </BaseModal>
+  );
+}
+
+export function FormModal({
+  open,
+  onOpenChange,
+  title,
+  description,
+  children,
+  footer,
+  size = "lg",
+  closeBlocked = false,
+  initialFocusRef,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: ReactNode;
+  description?: ReactNode;
+  children: ReactNode;
+  footer: ReactNode;
+  size?: keyof typeof modalSizeMap;
+  closeBlocked?: boolean;
+  initialFocusRef?: RefObject<HTMLElement | null>;
 }) {
   return (
     <BaseModal
@@ -228,6 +269,7 @@ export function FormModal({
       size={size}
       closeBlocked={closeBlocked}
       footer={footer}
+      initialFocusRef={initialFocusRef}
     >
       {children}
     </BaseModal>
