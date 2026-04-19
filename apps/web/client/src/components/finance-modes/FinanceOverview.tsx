@@ -14,7 +14,6 @@ import {
   ArrowUpRight,
   CheckCircle2,
   ChevronDown,
-  CircleEllipsis,
   Clock3,
   Flame,
   ShieldAlert,
@@ -22,6 +21,7 @@ import {
   Zap,
 } from "lucide-react";
 import { Button } from "@/components/design-system";
+import { AppRowActionsDropdown } from "@/components/app-system";
 import {
   AppChartPanel,
   AppPageEmptyState,
@@ -152,9 +152,8 @@ export function FinanceOverview(props: FinanceOverviewProps) {
         immediateContext: `${props.operationalSignals.overdueCount} cobrança(s) vencida(s) com criticidade financeira.`,
         reason: "Existem pendências vencidas com impacto imediato no caixa.",
         impactContext: `Impacto estimado: ${props.operationalSignals.riskAmount}.`,
-        cta: "Cobrar agora via WhatsApp",
-        ctaVariant: "default" as const,
-        onClick: props.cobrarAgora,
+        primaryActionLabel: "Cobrar via WhatsApp" as const,
+        onPrimaryAction: props.cobrarAgora,
       };
     }
     if (props.operationalSignals.dueToday > 0 || dueSoon72hCount > 0) {
@@ -165,9 +164,8 @@ export function FinanceOverview(props: FinanceOverviewProps) {
         immediateContext: `${urgentCount} cobrança(s) pedem contato imediato.`,
         reason: "Janela crítica nas próximas 72h e risco de virar vencida.",
         impactContext: `Janela sensível: ${props.operationalSignals.riskAmount} em monitoramento.`,
-        cta: "Cobrar agora via WhatsApp",
-        ctaVariant: "outline" as const,
-        onClick: props.cobrarAgora,
+        primaryActionLabel: "Cobrar via WhatsApp" as const,
+        onPrimaryAction: props.cobrarAgora,
       };
     }
     if (props.operationalSignals.awaitingSettlementCount > 0) {
@@ -177,9 +175,8 @@ export function FinanceOverview(props: FinanceOverviewProps) {
         immediateContext: `${props.operationalSignals.awaitingSettlementCount} recebimento(s) aguardando baixa.`,
         reason: "Entrada já confirmada e ainda não refletida no realizado.",
         impactContext: `Impacto estimado: ${props.operationalSignals.awaitingSettlementTotal}.`,
-        cta: "Registrar pagamento",
-        ctaVariant: "outline" as const,
-        onClick: () => props.goToMode("paid"),
+        primaryActionLabel: "Registrar pagamento" as const,
+        onPrimaryAction: () => props.goToMode("paid"),
       };
     }
     return {
@@ -188,9 +185,8 @@ export function FinanceOverview(props: FinanceOverviewProps) {
       immediateContext: "Sem itens críticos no momento.",
       reason: "Fluxo previsível sem pressão imediata no caixa.",
       impactContext: "Ação recomendada: manter acompanhamento periódico.",
-      cta: "Ver pendentes",
-      ctaVariant: "outline" as const,
-      onClick: () => props.goToMode("pending"),
+      primaryActionLabel: "Ver pendentes" as const,
+      onPrimaryAction: () => props.goToMode("pending"),
     };
   }, [
     dueSoon72hCount,
@@ -418,7 +414,7 @@ export function FinanceOverview(props: FinanceOverviewProps) {
           className="h-full"
           compact
         >
-          <div className="flex h-full flex-col gap-4">
+          <div className="flex h-full flex-col gap-3.5">
             <div className="flex items-start justify-between gap-2">
               <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]/85">
                 Valor em risco
@@ -431,16 +427,13 @@ export function FinanceOverview(props: FinanceOverviewProps) {
                     : "Normal"}
               </span>
             </div>
-            <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]/85">
-              risco financeiro
-            </p>
             <p className="text-[2rem] font-semibold leading-none tracking-tight text-[var(--text-primary)]">
               {props.risk.riskAmount}
             </p>
-            <p className="text-sm text-[var(--text-secondary)]">
+            <p className="text-sm leading-snug text-[var(--text-secondary)]">
               {riskSummary}
             </p>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <div className="flex items-center justify-between text-[11px] text-[var(--text-secondary)]">
                 <span>Risco financeiro</span>
                 <span>{riskIntensity}%</span>
@@ -452,31 +445,31 @@ export function FinanceOverview(props: FinanceOverviewProps) {
                 />
               </div>
             </div>
-            <div className="mt-auto grid grid-cols-3 divide-x divide-[var(--border-subtle)] rounded-md border border-[var(--border-subtle)]/85 bg-[var(--surface-base)]/35">
-              <div className="px-2 py-1.5">
-                <Clock3 className="mb-1 h-3.5 w-3.5 text-amber-200" />
+            <div className="mt-0.5 grid grid-cols-3 divide-x divide-[var(--border-subtle)]/90 rounded-md border border-[var(--border-subtle)]/80 bg-[var(--surface-base)]/30">
+              <div className="px-2 py-1">
+                <Clock3 className="mb-0.5 h-3.5 w-3.5 text-amber-200" />
                 <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
                   Hoje
                 </p>
-                <p className="text-base font-semibold leading-tight text-[var(--text-primary)]">
+                <p className="text-sm font-semibold leading-tight text-[var(--text-primary)]">
                   {props.risk.dueToday}
                 </p>
               </div>
-              <div className="px-2 py-1.5">
-                <Flame className="mb-1 h-3.5 w-3.5 text-orange-200" />
+              <div className="px-2 py-1">
+                <Flame className="mb-0.5 h-3.5 w-3.5 text-orange-200" />
                 <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
                   7 dias
                 </p>
-                <p className="text-base font-semibold leading-tight text-[var(--text-primary)]">
+                <p className="text-sm font-semibold leading-tight text-[var(--text-primary)]">
                   {props.risk.dueSoon}
                 </p>
               </div>
-              <div className="px-2 py-1.5">
-                <ShieldAlert className="mb-1 h-3.5 w-3.5 text-rose-200" />
+              <div className="px-2 py-1">
+                <ShieldAlert className="mb-0.5 h-3.5 w-3.5 text-rose-200" />
                 <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
                   Vencidas
                 </p>
-                <p className="text-base font-semibold leading-tight text-[var(--text-primary)]">
+                <p className="text-sm font-semibold leading-tight text-[var(--text-primary)]">
                   {props.risk.overdueCount}
                 </p>
               </div>
@@ -484,7 +477,7 @@ export function FinanceOverview(props: FinanceOverviewProps) {
             <Button
               size="sm"
               variant="outline"
-              className="mt-1 w-fit"
+              className="w-fit"
               onClick={() => props.goToMode("overdue")}
             >
               Ir para vencidas
@@ -498,13 +491,13 @@ export function FinanceOverview(props: FinanceOverviewProps) {
           className="h-full"
           compact
         >
-          <div className="flex h-full flex-col gap-4">
+          <div className="flex h-full flex-col gap-3.5">
             <div className="flex items-start justify-between gap-2">
               <div>
                 <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--accent)]">
                   Ação imediata
                 </span>
-                <p className="text-xl font-semibold leading-tight text-[var(--text-primary)]">
+                <p className="text-lg font-semibold leading-tight text-[var(--text-primary)]">
                   {nextBestAction.headline}
                 </p>
               </div>
@@ -512,37 +505,60 @@ export function FinanceOverview(props: FinanceOverviewProps) {
                 {nextBestAction.urgencyLabel}
               </span>
             </div>
-            <div className="flex items-center gap-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/35 p-3.5">
-              <div className="flex-1">
-                <p className="text-sm text-[var(--text-secondary)]">
+            <div className="flex items-start gap-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/35 p-3">
+              <div className="min-w-0 flex-1 space-y-1">
+                <p className="text-sm leading-snug text-[var(--text-secondary)]">
                   {nextBestAction.immediateContext}
                 </p>
-                <p className="mt-1 text-[11px] text-[var(--text-muted)]">
+                <p className="text-[11px] text-[var(--text-muted)]">
                   Motivo: {nextBestAction.reason}
                 </p>
-                <p className="text-sm font-medium text-[var(--text-primary)]/95">
+                <p className="text-[13px] font-medium text-[var(--text-primary)]/95">
                   {nextBestAction.impactContext}
                 </p>
               </div>
-              <div className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-base)]/60 p-3 text-[var(--accent)]">
-                <Zap className="h-7 w-7" />
+              <div className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-base)]/60 p-2.5 text-[var(--accent)]">
+                <Zap className="h-5 w-5" />
               </div>
             </div>
-            <Button
-              className="mt-auto w-full bg-[var(--accent)] text-white shadow-sm transition-all hover:-translate-y-0.5 hover:brightness-105 hover:shadow-md focus-visible:ring-2 focus-visible:ring-[var(--accent)]/45"
-              variant={nextBestAction.ctaVariant}
-              onClick={nextBestAction.onClick}
-            >
-              {nextBestAction.cta}
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="w-fit px-1.5 text-[var(--text-secondary)]"
-              onClick={() => props.goToMode("overdue")}
-            >
-              Ver detalhes
-            </Button>
+            <div className="mt-auto flex items-center justify-between gap-3 rounded-md border border-[var(--border-subtle)]/85 bg-[var(--surface-base)]/25 px-2.5 py-1.5">
+              <p className="text-[11px] text-[var(--text-secondary)]">
+                Ação recomendada:{" "}
+                <span className="font-medium text-[var(--text-primary)]">
+                  {nextBestAction.primaryActionLabel}
+                </span>
+              </p>
+              <AppRowActionsDropdown
+                triggerLabel="Mais ações da recomendação"
+                contentClassName="min-w-[230px]"
+                items={[
+                  {
+                    label: "Cobrar via WhatsApp",
+                    onSelect: props.cobrarAgora,
+                  },
+                  {
+                    label: "Agendar lembrete",
+                    onSelect: () => props.goToMode("pending"),
+                  },
+                  {
+                    label: "Registrar pagamento",
+                    onSelect: () => props.goToMode("paid"),
+                  },
+                  {
+                    label: "Abrir detalhe da cobrança",
+                    onSelect: () => props.goToMode("overdue"),
+                  },
+                  {
+                    label: "Ver contexto do cliente",
+                    onSelect: () => props.goToMode("pending"),
+                  },
+                  {
+                    label: "Ver origem operacional",
+                    onSelect: nextBestAction.onPrimaryAction,
+                  },
+                ]}
+              />
+            </div>
           </div>
         </AppSectionBlock>
       </div>
@@ -565,13 +581,13 @@ export function FinanceOverview(props: FinanceOverviewProps) {
             {props.queueItems.length} itens
           </span>
         </div>
-        <div className="space-y-2.5">
+        <div className="space-y-2">
           {props.queueItems.length > 0 ? (
             props.queueItems.map(item => (
               <div
                 key={item.id}
                 className={cn(
-                  "group relative rounded-lg border px-3 py-2.5 transition-all duration-200 hover:-translate-y-[1px] hover:shadow-[0_8px_24px_rgba(0,0,0,0.18)]",
+                  "group relative rounded-lg border px-3 py-2 transition-all duration-200 hover:-translate-y-[1px] hover:shadow-[0_8px_24px_rgba(0,0,0,0.18)]",
                   item.priority === "critical" &&
                     "border-rose-500/35 bg-rose-500/10 before:absolute before:bottom-2 before:left-0 before:top-2 before:w-1 before:rounded-r-md before:bg-rose-400/60",
                   item.priority === "attention" &&
@@ -580,81 +596,90 @@ export function FinanceOverview(props: FinanceOverviewProps) {
                     "border-[var(--border-subtle)] bg-[var(--surface-base)]/50 before:absolute before:bottom-2 before:left-0 before:top-2 before:w-1 before:rounded-r-md before:bg-emerald-300/50"
                 )}
               >
-                <div className="grid gap-2 sm:grid-cols-[1.4fr,1fr,1fr,auto,auto,auto] sm:items-center">
-                  <div className="min-w-0">
+                <div className="grid gap-1.5">
+                  <div className="grid gap-1 sm:grid-cols-[minmax(0,1.8fr)_auto_auto_auto] sm:items-center sm:gap-2">
                     <p className="truncate text-sm font-medium text-[var(--text-primary)]">
                       {item.client}
                     </p>
-                    <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">
-                      {item.summary}
-                    </p>
-                  </div>
-                  <div>
                     <p className="text-sm font-semibold text-[var(--text-primary)]">
                       {item.value}
                     </p>
                     <p className="text-[11px] text-[var(--text-muted)]">
-                      {item.amountContext}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-[var(--text-primary)]">
                       {item.dueLabel}
                     </p>
-                    <p className="text-[11px] text-[var(--text-muted)]">
-                      {item.dateContext}
-                    </p>
+                    <span
+                      className={cn(
+                        "inline-flex w-fit items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                        item.priority === "critical" &&
+                          "border-rose-500/45 bg-rose-500/15 text-rose-200",
+                        item.priority === "attention" &&
+                          "border-amber-500/45 bg-amber-500/15 text-amber-200",
+                        item.priority === "healthy" &&
+                          "border-emerald-500/40 bg-emerald-500/15 text-emerald-200"
+                      )}
+                    >
+                      {item.priority === "critical" ? (
+                        <AlertTriangle className="h-3.5 w-3.5" />
+                      ) : item.priority === "attention" ? (
+                        <ArrowUpRight className="h-3.5 w-3.5" />
+                      ) : (
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                      )}
+                      {item.priority === "critical"
+                        ? "Crítica"
+                        : item.priority === "attention"
+                          ? "Atenção"
+                          : "Saudável"}
+                    </span>
+                    <div className="justify-self-end">
+                      <AppRowActionsDropdown
+                        triggerLabel={`Mais ações para ${item.client}`}
+                        items={[
+                          {
+                            label: "Cobrar via WhatsApp",
+                            onSelect: item.onAction,
+                            disabled: item.recommendedAction !== "Cobrar via WhatsApp",
+                          },
+                          {
+                            label: "Agendar lembrete",
+                            onSelect: item.onAction,
+                            disabled: item.recommendedAction !== "Agendar lembrete",
+                          },
+                          {
+                            label: "Registrar pagamento",
+                            onSelect: item.onAction,
+                            disabled: item.recommendedAction !== "Registrar pagamento",
+                          },
+                          { label: "Abrir detalhe da cobrança", onSelect: item.onAction },
+                          { label: "Ver contexto do cliente", onSelect: item.onAction },
+                          { label: "Ver origem operacional", onSelect: item.onAction },
+                        ]}
+                      />
+                    </div>
                   </div>
-                  <span
-                    className={cn(
-                      "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium",
-                      item.priority === "critical" &&
-                        "border-rose-500/45 bg-rose-500/15 text-rose-200",
-                      item.priority === "attention" &&
-                        "border-amber-500/45 bg-amber-500/15 text-amber-200",
-                      item.priority === "healthy" &&
-                        "border-emerald-500/40 bg-emerald-500/15 text-emerald-200"
-                    )}
-                  >
-                    {item.priority === "critical" ? (
-                      <AlertTriangle className="h-3.5 w-3.5" />
-                    ) : item.priority === "attention" ? (
-                      <ArrowUpRight className="h-3.5 w-3.5" />
-                    ) : (
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                    )}
-                    {item.priority === "critical"
-                      ? "Crítica"
-                      : item.priority === "attention"
-                        ? "Atenção"
-                        : "Saudável"}
-                  </span>
-                  <Button
-                    size="sm"
-                    variant={item.status === "overdue" ? "default" : "outline"}
-                    className="transition-transform duration-200 group-hover:-translate-y-0.5 active:translate-y-0"
-                    onClick={item.onAction}
-                  >
-                    {item.recommendedAction}
-                  </Button>
-                  <button
-                    type="button"
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)]/35 text-[var(--text-muted)]"
-                    aria-label={`Mais ações para ${item.client}`}
-                  >
-                    <CircleEllipsis className="h-4 w-4" />
-                  </button>
+                  <div className="grid gap-1 text-[11px] md:grid-cols-[1.2fr,1fr,auto] md:items-center">
+                    <p className="text-[var(--text-secondary)]">{item.summary}</p>
+                    <p className="text-[var(--text-muted)]">
+                      {item.priorityReason}
+                    </p>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 w-fit px-2 text-[11px] text-[var(--text-secondary)]"
+                      onClick={item.onAction}
+                    >
+                      {item.recommendedAction}
+                    </Button>
+                  </div>
                 </div>
-                <div className="mt-1.5 grid gap-1 text-[11px] md:grid-cols-[1.2fr,1fr,1fr]">
+                <div className="mt-1 grid gap-1 text-[11px] md:grid-cols-[1.2fr,1fr,1fr]">
                   <p className="text-[var(--text-secondary)]">
                     {item.intelligenceLabel}
                   </p>
-                  <p className="text-[var(--text-muted)]">
-                    {item.priorityReason}
-                  </p>
+                  <p className="text-[var(--text-muted)]">{item.amountContext}</p>
                   <p className="text-[var(--text-muted)]">{item.impactLabel}</p>
                 </div>
-                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                <div className="mt-1 flex flex-wrap items-center gap-1">
                   {item.contextualActions?.map(action => (
                     <span
                       key={`${item.id}-${action}`}
@@ -665,7 +690,7 @@ export function FinanceOverview(props: FinanceOverviewProps) {
                   ))}
                   {item.flowContext ? (
                     <span className="text-[10px] text-[var(--text-muted)]">
-                      {item.flowContext}
+                      {item.flowContext} • {item.dateContext}
                     </span>
                   ) : null}
                 </div>
