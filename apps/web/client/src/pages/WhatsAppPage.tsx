@@ -310,7 +310,7 @@ export default function WhatsAppPage() {
             ? "O.S."
             : isNoReply
               ? "Sem resposta"
-              : "Saudável";
+              : "Seguro";
 
       const contextBadge = relatedServiceOrder
         ? "Agendamento"
@@ -521,7 +521,7 @@ export default function WhatsAppPage() {
                   {String(selectedCustomer.name ?? "Cliente")}
                 </p>
                 <AppStatusBadge
-                  label={failed > 0 ? "Falhou" : delivered > 0 ? "Saudável" : "Pendente"}
+                  label={failed > 0 ? "Falhou" : delivered > 0 ? "Seguro" : "Pendente"}
                 />
               </div>
             ) : null

@@ -165,7 +165,7 @@ export function getCustomerExplainLayer(workspace: any): ExplainLayerContent {
     };
   }
   return {
-    reason: "Cliente em estado operacional saudável.",
+    reason: "Cliente em estado operacional seguro.",
     conditions: ["Sem cobrança crítica no momento"],
     afterAction: "Mantenha frequência de contato e próxima ação agendada.",
     impact: "Relacionamento estável.",

@@ -603,7 +603,7 @@ const statusTone: Record<string, string> = {
   confirmado:
     "bg-[var(--dashboard-info)]/16 text-[var(--dashboard-info)] border-[var(--dashboard-info)]/34",
   ok: "bg-[var(--dashboard-success)]/16 text-[var(--dashboard-success)] border-[var(--dashboard-success)]/36",
-  saudável:
+  seguro:
     "bg-[var(--dashboard-success)]/16 text-[var(--dashboard-success)] border-[var(--dashboard-success)]/36",
   concluído:
     "bg-[var(--dashboard-success)]/16 text-[var(--dashboard-success)] border-[var(--dashboard-success)]/36",
@@ -622,7 +622,7 @@ function normalizeStatusLabel(label: string) {
     return "Prioridade alta";
   if (raw === "critical" || raw === "crítico") return "Em risco";
   if (raw === "overdue" || raw === "atrasado") return "Atenção";
-  if (raw === "healthy") return "Saudável";
+  if (raw === "healthy") return "Seguro";
   if (raw === "warning") return "Atenção";
   if (raw === "done" || raw === "paid") return "Concluído";
   if (raw === "pending") return "Pendente";
