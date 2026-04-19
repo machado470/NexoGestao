@@ -111,16 +111,16 @@ export function FinanceOverview(props: FinanceOverviewProps) {
   const isRiskHigh = props.risk.overdueCount > 0 || props.risk.dueToday > 0;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <AppKpiRow items={props.kpis} />
 
-      <div className="grid gap-4 xl:grid-cols-12">
-        <div className="xl:col-span-8 space-y-4">
+      <div className="grid gap-3 xl:grid-cols-12">
+        <div className="space-y-3 xl:col-span-8">
           <AppChartPanel
             title="Receita e previsão"
-            description="Evolução real do caixa com entradas previstas e pontos de risco."
+            description="Recebido, previsto e vencimentos no período."
           >
-            <div className="mb-3 flex flex-wrap gap-1.5">
+            <div className="mb-2 flex flex-wrap gap-1.5">
               {PERIODS.map(item => (
                 <button
                   key={item.value}
@@ -155,27 +155,27 @@ export function FinanceOverview(props: FinanceOverviewProps) {
               />
             ) : (
               <ChartContainer
-                className="h-[320px] w-full"
+                className="h-[250px] w-full"
                 config={{
                   revenue: { label: "Recebido", color: "hsl(var(--accent))" },
                   projected: {
                     label: "Previsto",
-                    color: "hsl(var(--primary))",
+                    color: "hsl(194 70% 56%)",
                   },
                   overdue: {
                     label: "Vencidas",
-                    color: "hsl(var(--destructive))",
+                    color: "hsl(6 82% 64%)",
                   },
                 }}
               >
                 <ComposedChart
                   data={data}
-                  margin={{ top: 12, right: 12, bottom: 0, left: -8 }}
+                  margin={{ top: 8, right: 8, bottom: 0, left: -10 }}
                 >
                   <CartesianGrid
-                    strokeDasharray="3 3"
+                    strokeDasharray="2 4"
                     vertical={false}
-                    stroke="color-mix(in srgb, var(--border-subtle) 70%, transparent)"
+                    stroke="color-mix(in srgb, var(--border-subtle) 45%, transparent)"
                   />
                   <XAxis
                     dataKey="label"
@@ -183,11 +183,17 @@ export function FinanceOverview(props: FinanceOverviewProps) {
                     axisLine={false}
                     minTickGap={24}
                   />
-                  <YAxis tickLine={false} axisLine={false} width={48} />
+                  <YAxis
+                    tickLine={false}
+                    axisLine={false}
+                    width={42}
+                    tick={{ fontSize: 11 }}
+                  />
                   <ChartTooltip
                     content={
                       <ChartTooltipContent
-                        labelFormatter={value => `Período: ${String(value)}`}
+                        className="border-[var(--border-subtle)] bg-[var(--surface-elevated)]/95"
+                        labelFormatter={value => `Período ${String(value)}`}
                         formatter={(value, name, item) => {
                           const metric =
                             name === "revenue"
@@ -200,7 +206,7 @@ export function FinanceOverview(props: FinanceOverviewProps) {
                               ? `${Number(value).toLocaleString("pt-BR")}`
                               : `R$ ${Number(value).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
                           return (
-                            <div className="flex w-full items-center justify-between gap-3">
+                            <div className="flex w-full items-center justify-between gap-3 text-xs">
                               <span className="text-muted-foreground">
                                 {metric}
                               </span>
@@ -226,29 +232,38 @@ export function FinanceOverview(props: FinanceOverviewProps) {
                     dataKey="projected"
                     stroke="var(--color-projected)"
                     fill="var(--color-projected)"
-                    fillOpacity={0.12}
+                    fillOpacity={0.16}
                     strokeWidth={2}
                   />
                   <Line
                     type="monotone"
                     dataKey="revenue"
                     stroke="var(--color-revenue)"
-                    strokeWidth={3}
-                    dot={false}
-                    activeDot={{ r: 5 }}
+                    strokeWidth={2.5}
+                    dot={{
+                      r: 2.5,
+                      fill: "var(--color-revenue)",
+                      strokeWidth: 0,
+                    }}
+                    activeDot={{
+                      r: 5,
+                      fill: "var(--color-revenue)",
+                      stroke: "hsl(var(--background))",
+                      strokeWidth: 2,
+                    }}
                   />
                   <Bar
                     dataKey="overdue"
-                    barSize={8}
+                    barSize={7}
                     radius={[8, 8, 0, 0]}
                     fill="var(--color-overdue)"
-                    fillOpacity={0.45}
+                    fillOpacity={0.5}
                   />
                 </ComposedChart>
               </ChartContainer>
             )}
 
-            <div className="mt-3 text-xs text-[var(--text-muted)]">
+            <div className="mt-2 text-xs text-[var(--text-muted)]">
               {totalOverdueEvents > 0
                 ? `${totalOverdueEvents} pontos de vencimento no período selecionado.`
                 : "Sem eventos de vencimento no período selecionado."}
@@ -257,22 +272,28 @@ export function FinanceOverview(props: FinanceOverviewProps) {
 
           <AppChartPanel
             title="Distribuição por status"
-            description="Clique nas barras para navegar no modo da carteira."
+            description="Clique para abrir o modo correspondente."
           >
             <ChartContainer
-              className="h-[260px] w-full"
+              className="h-[205px] w-full"
               config={{ value: { label: "Cobranças" } }}
             >
               <BarChart
                 data={props.statusDistribution}
-                margin={{ left: -12, right: 6, top: 8 }}
+                margin={{ left: -16, right: 4, top: 4, bottom: 0 }}
+                barCategoryGap={18}
               >
-                <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                <CartesianGrid
+                  vertical={false}
+                  strokeDasharray="2 4"
+                  stroke="color-mix(in srgb, var(--border-subtle) 45%, transparent)"
+                />
                 <XAxis dataKey="label" tickLine={false} axisLine={false} />
-                <YAxis tickLine={false} axisLine={false} width={32} />
+                <YAxis tickLine={false} axisLine={false} width={30} />
                 <ChartTooltip
                   content={
                     <ChartTooltipContent
+                      className="border-[var(--border-subtle)] bg-[var(--surface-elevated)]/95"
                       formatter={(value, _name, item) => (
                         <div className="flex w-full items-center justify-between gap-4">
                           <div className="text-muted-foreground">
@@ -284,6 +305,14 @@ export function FinanceOverview(props: FinanceOverviewProps) {
                             </div>
                             <div className="text-xs text-muted-foreground">
                               {String((item as any)?.payload?.total ?? "-")}
+                            </div>
+                            <div className="text-[11px] text-muted-foreground">
+                              {String((item as any)?.payload?.key) === "pending"
+                                ? "Abrir pendentes"
+                                : String((item as any)?.payload?.key) ===
+                                    "overdue"
+                                  ? "Abrir vencidas"
+                                  : "Abrir pagas"}
                             </div>
                           </div>
                         </div>
@@ -302,12 +331,12 @@ export function FinanceOverview(props: FinanceOverviewProps) {
                       key={entry.key}
                       fill={
                         entry.key === "pending"
-                          ? "hsl(var(--accent))"
+                          ? "hsl(214 80% 63%)"
                           : entry.key === "overdue"
-                            ? "hsl(var(--destructive))"
-                            : "hsl(151 65% 43%)"
+                            ? "hsl(6 82% 64%)"
+                            : "hsl(151 56% 46%)"
                       }
-                      fillOpacity={entry.key === "overdue" ? 0.75 : 0.6}
+                      fillOpacity={entry.key === "overdue" ? 0.82 : 0.72}
                     />
                   ))}
                 </Bar>
@@ -316,28 +345,26 @@ export function FinanceOverview(props: FinanceOverviewProps) {
           </AppChartPanel>
         </div>
 
-        <div className="xl:col-span-4 space-y-4">
+        <div className="space-y-3 xl:col-span-4">
           <AppSectionBlock
             title="Saúde do caixa"
-            subtitle="Leitura rápida de risco e priorização imediata."
+            subtitle="Risco financeiro imediato."
+            compact
           >
-            <div className="space-y-3">
-              <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/60 p-3">
-                <p className="text-xs text-[var(--text-muted)]">
-                  Valor em risco imediato
+            <div className="space-y-2.5">
+              <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/55 p-2.5">
+                <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
+                  Valor em risco
                 </p>
-                <p className="mt-1 text-xl font-semibold text-[var(--text-primary)]">
+                <p className="mt-1 text-2xl font-semibold text-[var(--text-primary)]">
                   {props.risk.riskAmount}
                 </p>
               </div>
-              <ul className="space-y-2 text-sm text-[var(--text-secondary)]">
+              <ul className="space-y-1.5 text-sm text-[var(--text-secondary)]">
+                <li>{props.risk.overdueCount} vencida(s) precisam de ação</li>
                 <li>
-                  {props.risk.overdueCount} cobrança(s) vencida(s) exige(m) ação
-                  hoje
-                </li>
-                <li>
-                  {props.risk.dueToday} vencendo hoje · {props.risk.dueSoon} nos
-                  próximos 7 dias
+                  {props.risk.dueToday} hoje · {props.risk.dueSoon} nos próximos
+                  7 dias
                 </li>
               </ul>
               <Button
@@ -352,11 +379,16 @@ export function FinanceOverview(props: FinanceOverviewProps) {
 
           <AppSectionBlock
             title="Próxima melhor ação"
-            subtitle="Conduza o caixa para o cenário saudável."
+            subtitle="Ação operacional da semana."
+            compact
           >
-            <div className="space-y-3">
-              <p className="text-sm text-[var(--text-secondary)]">
-                Priorize cobranças com vencimento hoje e esta semana.
+            <div className="space-y-2.5">
+              <p className="text-sm font-semibold text-[var(--text-primary)]">
+                Cobrar hoje
+              </p>
+              <p className="text-xs text-[var(--text-secondary)]">
+                {props.risk.overdueCount + props.risk.dueToday} item(ns) exigem
+                ação imediata.
               </p>
               <Button
                 className="w-full"
@@ -372,21 +404,22 @@ export function FinanceOverview(props: FinanceOverviewProps) {
 
       <AppSectionBlock
         title="Fila operacional"
-        subtitle="Prioridades do dia para execução direta."
+        subtitle="Prioridades para execução direta."
+        compact
       >
-        <div className="space-y-2.5">
+        <div className="space-y-2">
           {props.queueItems.length > 0 ? (
             props.queueItems.map(item => (
               <div
                 key={item.id}
-                className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/65 px-3.5 py-3"
+                className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/60 px-3 py-2.5"
               >
-                <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center justify-between gap-2.5">
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-[var(--text-primary)]">
+                    <p className="truncate text-sm font-medium text-[var(--text-primary)]">
                       {item.client} · {item.value}
                     </p>
-                    <p className="mt-0.5 text-xs text-[var(--text-muted)]">
+                    <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">
                       Vencimento {item.dueDate} ·{" "}
                       {item.status === "overdue"
                         ? "Vencida"
@@ -398,7 +431,7 @@ export function FinanceOverview(props: FinanceOverviewProps) {
                   <div className="flex items-center gap-2">
                     <span
                       className={cn(
-                        "inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-medium",
+                        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium",
                         item.priority === "critical" &&
                           "border-rose-500/45 bg-rose-500/15 text-rose-200",
                         item.priority === "attention" &&

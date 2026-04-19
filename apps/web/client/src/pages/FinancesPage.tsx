@@ -7,7 +7,6 @@ import {
   normalizeObjectPayload,
 } from "@/lib/query-helpers";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
-import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedbackButton";
 import {
   AppPageErrorState,
@@ -424,21 +423,15 @@ export default function FinancesPage() {
   return (
     <PageWrapper
       title="Financeiro"
-      subtitle="Dinheiro em movimento: cobrança, atraso, recebimento e decisão rápida."
+      subtitle="Cobrança, recebimento e carteira."
+      primaryAction={
+        <ActionFeedbackButton
+          state="idle"
+          idleLabel="Criar cobrança"
+          onClick={() => setOpenCreate(true)}
+        />
+      }
     >
-      <OperationalTopCard
-        contextLabel="Direção de receita"
-        title="Fluxo cobrança → pagamento"
-        description="Agora por contexto operacional: visão, pendências, urgências, histórico e análise."
-        primaryAction={
-          <ActionFeedbackButton
-            state="idle"
-            idleLabel="Criar cobrança agora"
-            onClick={() => setOpenCreate(true)}
-          />
-        }
-      />
-
       <AppSecondaryTabs
         items={[
           { value: "overview", label: "Visão geral" },
