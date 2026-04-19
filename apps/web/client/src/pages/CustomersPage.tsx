@@ -32,7 +32,7 @@ type CustomerRecord = Record<string, any>;
 type ChargeRecord = Record<string, any>;
 
 type ContactState = "responded" | "pending" | "no_response";
-type OperationalStatus = "Saudável" | "Atenção" | "Em risco" | "Sem cobrança";
+type OperationalStatus = "Seguro" | "Atenção" | "Em risco" | "Sem cobrança";
 type OperationalFilter =
   | "all"
   | "risk"
@@ -98,7 +98,7 @@ function listFrom(input: unknown) {
 }
 
 function getContactUrgencyLabel(days: number, state: ContactState) {
-  if (state === "responded") return "Saudável";
+  if (state === "responded") return "Seguro";
   if (days >= 5) return "Urgente";
   if (days >= 3) return "Atenção";
   return "Pendente";
@@ -239,8 +239,8 @@ export default function CustomersPage() {
             ? "Reativação"
             : "Carteira ativa";
 
-      let status: OperationalStatus = "Saudável";
-      let contextLabel = "Fluxo operacional saudável";
+      let status: OperationalStatus = "Seguro";
+      let contextLabel = "Fluxo operacional seguro";
       let primaryActionLabel: NextAction = "Abrir workspace";
       let nextActionReason = "Manter ritmo com revisão rápida do histórico";
 
@@ -349,7 +349,7 @@ export default function CustomersPage() {
         return false;
       if (activeFilter === "no_schedule" && snapshot.hasFutureSchedule)
         return false;
-      if (activeFilter === "healthy" && snapshot.status !== "Saudável")
+      if (activeFilter === "healthy" && snapshot.status !== "Seguro")
         return false;
 
       if (!normalizedSearch) return true;

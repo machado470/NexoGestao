@@ -107,7 +107,7 @@ export function getOperationalSeverityLabel(severity: OperationalSeverity) {
   if (severity === "critical") return "Crítico";
   if (severity === "overdue") return "Atrasado";
   if (severity === "pending") return "Pendente";
-  return "Saudável";
+  return "Seguro";
 }
 
 type ServiceOrderLike = {
@@ -460,7 +460,7 @@ export function getCustomerDecision(item: CustomerLike): OperationalDecision {
   return {
     severity: "healthy",
     title: "Fluxo em andamento",
-    description: "Cliente com ciclo operacional saudável e sem bloqueios imediatos.",
+    description: "Cliente com ciclo operacional seguro e sem bloqueios imediatos.",
     primaryAction: { key: "open_customer", label: "Ver detalhes" },
     secondaryActions: [{ key: "open_service_order", label: "Abrir execução" }],
   };
