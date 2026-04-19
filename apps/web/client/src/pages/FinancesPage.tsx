@@ -287,6 +287,7 @@ export default function FinancesPage() {
       </AppSectionBlock>
       ) : null}
 
+      {(activeTab === "overview" || activeTab === "reports") ? (
       <div className="grid gap-4 xl:grid-cols-12">
         <div className="xl:col-span-8 space-y-4">
         <AppChartPanel title="Receita por mês" description="Evolução mensal para confirmar tendência de entrada.">
@@ -336,6 +337,7 @@ export default function FinancesPage() {
         />
         </div>
       </div>
+      ) : null}
 
       <TrpcSectionErrorBoundary context="finances:charges-table">
       <AppSectionBlock title="Cobranças e pagamentos" subtitle="Fluxo real: cobrança → pagamento → atualização automática">
@@ -350,6 +352,7 @@ export default function FinancesPage() {
         ) : filteredCharges.length === 0 ? (
           <AppPageEmptyState title="Nenhum dado disponível ainda" description="Ação recomendada: criar cobrança" />
         ) : (
+          <div className="max-h-[560px] overflow-y-auto">
           <AppDataTable>
             <table className="w-full text-sm">
               <thead className="bg-[var(--surface-elevated)] text-xs text-[var(--text-muted)]">
@@ -397,6 +400,7 @@ export default function FinancesPage() {
               </tbody>
             </table>
           </AppDataTable>
+          </div>
         )}
       </AppSectionBlock>
       </TrpcSectionErrorBoundary>

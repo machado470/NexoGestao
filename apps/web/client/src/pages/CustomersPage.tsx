@@ -319,6 +319,22 @@ export default function CustomersPage() {
       const snapshot = snapshotByCustomerId.get(customerId);
       if (!snapshot) return false;
 
+      if (activeTab === "agenda" && snapshot.hasFutureSchedule) return false;
+      if (
+        activeTab === "service_orders" &&
+        snapshot.primaryActionLabel !== "Abrir workspace" &&
+        snapshot.primaryActionLabel !== "Enviar WhatsApp"
+      ) {
+        return false;
+      }
+      if (
+        activeTab === "financial" &&
+        !(snapshot.overdueCharges > 0 || snapshot.pendingCharges > 0)
+      ) {
+        return false;
+      }
+      if (activeTab === "history" && snapshot.lastInteractionDays < 2) return false;
+
       if (activeFilter === "risk" && snapshot.status !== "Em risco")
         return false;
       if (
@@ -371,7 +387,7 @@ export default function CustomersPage() {
         );
       return rightSnapshot.priorityScore - leftSnapshot.priorityScore;
     });
-  }, [activeFilter, activeSort, customers, searchTerm, snapshotByCustomerId]);
+  }, [activeFilter, activeSort, activeTab, customers, searchTerm, snapshotByCustomerId]);
 
   const allDisplayedSelected =
     displayedCustomers.length > 0 &&
@@ -484,7 +500,7 @@ export default function CustomersPage() {
       />
 
       <AppSectionBlock
-        title="Carteira de clientes"
+        title={activeTab === "history" ? "Histórico operacional da carteira" : "Carteira de clientes"}
         subtitle="Lista principal para operação diária da carteira"
       >
         <AppFiltersBar className="mb-3 gap-3">
@@ -583,6 +599,7 @@ export default function CustomersPage() {
             description="Ajuste filtros, busca ou crie clientes para ativar o fluxo operacional."
           />
         ) : (
+          <div className="max-h-[540px] overflow-y-auto">
           <AppDataTable>
             <table className="w-full text-sm">
               <thead className="bg-[var(--surface-elevated)] text-left text-xs text-[var(--text-muted)]">
@@ -806,6 +823,7 @@ export default function CustomersPage() {
               </tbody>
             </table>
           </AppDataTable>
+          </div>
         )}
       </AppSectionBlock>
 

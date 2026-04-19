@@ -16,6 +16,7 @@ import {
   AppPageEmptyState,
   AppPageErrorState,
   AppPageLoadingState,
+  AppSecondaryTabs,
   AppSectionBlock,
   AppPriorityBadge,
   AppStatusBadge,
@@ -25,6 +26,7 @@ import { formatDelta, getDayWindow, getWindow, inRange, percentDelta, safeDate, 
 export default function AppointmentsPage() {
   const [, navigate] = useLocation();
   const [openCreate, setOpenCreate] = useState(false);
+  const [activeTab, setActiveTab] = useState<"agenda" | "confirmed" | "pending" | "conflicts" | "history">("agenda");
 
   const customersQuery = trpc.nexo.customers.list.useQuery(undefined, { retry: false });
   const appointmentsQuery = trpc.nexo.appointments.list.useQuery(undefined, { retry: false });
@@ -85,6 +87,24 @@ export default function AppointmentsPage() {
       action: <button className="nexo-cta-secondary" onClick={() => setOpenCreate(true)}>Reatribuir</button>,
     })),
   ].slice(0, 6);
+  const filteredAppointments = useMemo(() => {
+    if (activeTab === "agenda") return appointments;
+    if (activeTab === "confirmed") {
+      return appointments.filter((item) => String(item?.status ?? "").toUpperCase() === "CONFIRMED");
+    }
+    if (activeTab === "pending") {
+      return appointments.filter((item) => String(item?.status ?? "").toUpperCase() === "SCHEDULED");
+    }
+    if (activeTab === "conflicts") {
+      return appointments.filter((item) => {
+        const slot = safeDate(item?.startsAt)?.toISOString().slice(0, 16) ?? "";
+        return Boolean(slot && (appointmentsBySlot[slot] ?? 0) > 1);
+      });
+    }
+    return [...appointments].sort(
+      (a, b) => (safeDate(b?.startsAt)?.getTime() ?? 0) - (safeDate(a?.startsAt)?.getTime() ?? 0)
+    );
+  }, [activeTab, appointments, appointmentsBySlot]);
 
   return (
     <PageWrapper title="Agendamentos" subtitle="Agenda diária com prioridade clara e próximos passos de execução.">
@@ -118,7 +138,19 @@ export default function AppointmentsPage() {
           },
         ]}
       />
+      <AppSecondaryTabs
+        items={[
+          { value: "agenda", label: "Agenda" },
+          { value: "confirmed", label: "Confirmados" },
+          { value: "pending", label: "Pendentes" },
+          { value: "conflicts", label: "Conflitos" },
+          { value: "history", label: "Histórico" },
+        ]}
+        value={activeTab}
+        onChange={setActiveTab}
+      />
 
+      {(activeTab === "agenda" || activeTab === "pending" || activeTab === "conflicts") ? (
       <div className="grid gap-4 xl:grid-cols-12">
       <AppSectionBlock
         title="Agenda do dia"
@@ -154,8 +186,12 @@ export default function AppointmentsPage() {
         />
       </AppSectionBlock>
       </div>
+      ) : null}
 
-      <AppSectionBlock title="Fila de agendamentos" subtitle="Sincronizada em tempo real com backend">
+      <AppSectionBlock
+        title={activeTab === "history" ? "Histórico de agendamentos" : "Fila de agendamentos"}
+        subtitle="Sincronizada em tempo real com backend"
+      >
         {showInitialLoading ? (
           <AppPageLoadingState description="Carregando agendamentos..." />
         ) : showErrorState ? (
@@ -164,9 +200,10 @@ export default function AppointmentsPage() {
             actionLabel="Tentar novamente"
             onAction={() => void appointmentsQuery.refetch()}
           />
-        ) : appointments.length === 0 ? (
+        ) : filteredAppointments.length === 0 ? (
           <AppPageEmptyState title="Nenhum dado disponível ainda" description="Ação recomendada: criar agendamento" />
         ) : (
+          <div className="max-h-[520px] overflow-y-auto">
           <AppDataTable>
             <table className="w-full text-sm">
               <thead className="bg-[var(--surface-elevated)] text-xs text-[var(--text-muted)]">
@@ -179,7 +216,7 @@ export default function AppointmentsPage() {
                 </tr>
               </thead>
               <tbody>
-                {appointments.map((appointment) => {
+                {filteredAppointments.map((appointment) => {
                   const severity = getAppointmentSeverity(appointment);
                   const status = String(appointment?.status ?? "").toUpperCase();
                   const slot = safeDate(appointment?.startsAt)?.toISOString().slice(0, 16) ?? "";
@@ -236,6 +273,7 @@ export default function AppointmentsPage() {
               </tbody>
             </table>
           </AppDataTable>
+          </div>
         )}
       </AppSectionBlock>
 

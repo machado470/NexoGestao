@@ -200,7 +200,10 @@ export default function ServiceOrdersPage() {
       </section>
       ) : null}
 
-      <AppSectionBlock title="Pipeline operacional" subtitle="Cada O.S. com ação real">
+      <AppSectionBlock
+        title={activeTab === "history" ? "Histórico de ordens de serviço" : "Pipeline operacional"}
+        subtitle="Cada O.S. com ação real"
+      >
         {showInitialLoading ? (
           <AppPageLoadingState description="Carregando ordens de serviço..." />
         ) : showErrorState ? (
@@ -212,6 +215,7 @@ export default function ServiceOrdersPage() {
         ) : visibleOrders.length === 0 ? (
           <AppPageEmptyState title="Nenhum dado disponível ainda" description="Ação recomendada: criar ordem de serviço" />
         ) : (
+          <div className="max-h-[560px] overflow-y-auto">
           <AppDataTable>
             <table className="w-full text-sm">
               <thead className="bg-[var(--surface-elevated)] text-xs text-[var(--text-muted)]">
@@ -287,6 +291,7 @@ export default function ServiceOrdersPage() {
               </tbody>
             </table>
           </AppDataTable>
+          </div>
         )}
       </AppSectionBlock>
 

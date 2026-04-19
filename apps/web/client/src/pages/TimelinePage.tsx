@@ -196,6 +196,7 @@ export default function TimelinePage() {
         onChange={setActiveTab}
       />
 
+      {(activeTab === "all" || activeTab === "finance" || activeTab === "governance") ? (
       <div className="grid gap-3 xl:grid-cols-12">
       <AppSectionBlock
         title="O que deu problema"
@@ -239,6 +240,7 @@ export default function TimelinePage() {
         </AppSectionBlock>
       </div>
       </div>
+      ) : null}
 
       <TrpcSectionErrorBoundary context="timeline:events-feed">
       <AppSectionBlock title="Feed de eventos" subtitle="Sem placeholders: somente eventos reais.">
@@ -296,7 +298,7 @@ export default function TimelinePage() {
             ]}
           />
         ) : (
-          <div className="space-y-3">
+          <div className="max-h-[620px] space-y-3 overflow-y-auto pr-1">
             <AppSectionBlock title="Eventos acionáveis" subtitle="Sem espaço vazio: tudo aqui tem próximo passo operacional.">
               <AppListBlock
                 className="col-span-full"
