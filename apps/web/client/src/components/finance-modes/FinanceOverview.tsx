@@ -409,7 +409,7 @@ export function FinanceOverview(props: FinanceOverviewProps) {
 
       <div className="grid gap-8 md:grid-cols-2">
         <AppSectionBlock
-          title="Painel de risco"
+          title="Riscos atuais"
           subtitle="Risco financeiro imediato da operação."
           className="h-full"
           compact
@@ -486,8 +486,8 @@ export function FinanceOverview(props: FinanceOverviewProps) {
         </AppSectionBlock>
 
         <AppSectionBlock
-          title="Próxima melhor ação"
-          subtitle="Decisão recomendada agora."
+          title="O que fazer agora"
+          subtitle="Decisão recomendada com foco em caixa."
           className="h-full"
           compact
         >
