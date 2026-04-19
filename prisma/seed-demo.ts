@@ -250,11 +250,11 @@ async function main() {
 
   // ── Despesas ─────────────────────────────────────────────────────────────
   const despesasData = [
-    { description: 'Material de escritório', amountCents: 8500, category: 'OFFICE', date: daysAgo(20) },
-    { description: 'Aluguel do espaço', amountCents: 150000, category: 'RENT', date: daysAgo(30) },
-    { description: 'Conta de energia', amountCents: 35000, category: 'UTILITIES', date: daysAgo(15) },
-    { description: 'Ferramentas e equipamentos', amountCents: 45000, category: 'EQUIPMENT', date: daysAgo(10) },
-    { description: 'Marketing digital', amountCents: 25000, category: 'MARKETING', date: daysAgo(5) },
+    { title: 'Mercado / insumos', description: 'Material de escritório', amountCents: 8500, category: 'MARKET', type: 'VARIABLE', recurrence: 'NONE', occurredAt: daysAgo(20) },
+    { title: 'Aluguel', description: 'Aluguel do espaço', amountCents: 150000, category: 'HOUSING', type: 'FIXED', recurrence: 'MONTHLY', dueDay: 5, isActive: true, occurredAt: daysAgo(30) },
+    { title: 'Energia', description: 'Conta de energia', amountCents: 35000, category: 'ELECTRICITY', type: 'FIXED', recurrence: 'MONTHLY', dueDay: 8, isActive: true, occurredAt: daysAgo(15) },
+    { title: 'Operacional', description: 'Ferramentas e equipamentos', amountCents: 45000, category: 'OPERATIONS', type: 'VARIABLE', recurrence: 'NONE', occurredAt: daysAgo(10) },
+    { title: 'Internet', description: 'Marketing digital', amountCents: 25000, category: 'INTERNET', type: 'FIXED', recurrence: 'MONTHLY', dueDay: 12, isActive: true, occurredAt: daysAgo(5) },
   ]
 
   for (const d of despesasData) {

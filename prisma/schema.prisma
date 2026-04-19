@@ -468,10 +468,15 @@ model IdempotencyRecord {
 model Expense {
   id              String   @id @default(dbgenerated("gen_random_uuid()"))
   orgId           String
-  description     String
+  title           String
+  description     String?
   amountCents     Int
-  category        String
-  date            DateTime
+  category        ExpenseCategory
+  type            ExpenseType       @default(VARIABLE)
+  recurrence      ExpenseRecurrence @default(NONE)
+  occurredAt      DateTime
+  dueDay          Int?
+  isActive        Boolean           @default(true)
   notes           String?
   receiptUrl      String?
   createdByUserId String?
@@ -480,6 +485,33 @@ model Expense {
 
   User User?        @relation(fields: [createdByUserId], references: [id])
   org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, occurredAt])
+  @@index([orgId, recurrence, isActive])
+  @@index([orgId, category, occurredAt])
+}
+
+enum ExpenseType {
+  FIXED
+  VARIABLE
+}
+
+enum ExpenseRecurrence {
+  NONE
+  MONTHLY
+}
+
+enum ExpenseCategory {
+  HOUSING
+  ELECTRICITY
+  WATER
+  INTERNET
+  PAYROLL
+  MARKET
+  TRANSPORT
+  LEISURE
+  OPERATIONS
+  OTHER
 }
 
 model Invoice {

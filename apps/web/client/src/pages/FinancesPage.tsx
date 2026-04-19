@@ -25,6 +25,7 @@ import { FinanceOverdue } from "@/components/finance-modes/FinanceOverdue";
 import { FinancePaid } from "@/components/finance-modes/FinancePaid";
 import { FinanceReports } from "@/components/finance-modes/FinanceReports";
 import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
+import CreateExpenseModal from "@/components/CreateExpenseModal";
 import {
   type OperationalSeverity,
   getChargeSeverity,
@@ -53,6 +54,7 @@ export default function FinancesPage() {
   useRenderWatchdog("FinancesPage");
   const [, navigate] = useLocation();
   const [openCreate, setOpenCreate] = useState(false);
+  const [openCreateExpense, setOpenCreateExpense] = useState(false);
   const [mode, setMode] = useState<
     "overview" | "pending" | "overdue" | "paid" | "reports"
   >("overview");
@@ -67,6 +69,14 @@ export default function FinancesPage() {
   const revenueQuery = trpc.finance.charges.revenueByMonth.useQuery(undefined, {
     retry: false,
   });
+  const monthlyResultQuery = trpc.expenses.getMonthlyFinancialResult.useQuery(
+    {},
+    { retry: false }
+  );
+  const expensesListQuery = trpc.expenses.listExpenses.useQuery(
+    { page: 1, limit: 6 },
+    { retry: false }
+  );
 
   const charges = useMemo(
     () => normalizeArrayPayload<any>(chargesQuery.data),
@@ -606,6 +616,9 @@ export default function FinancesPage() {
               overdueTotalValue={overdueTotal}
               openTotalValue={openTotal}
               receivedTotalValue={receivedTotal}
+              monthlyResult={normalizeObjectPayload<any>(monthlyResultQuery.data)}
+              expenses={normalizeArrayPayload<any>((expensesListQuery.data as any)?.data)}
+              onCreateExpense={() => setOpenCreateExpense(true)}
             />
           )}
         </>
@@ -619,7 +632,16 @@ export default function FinancesPage() {
             chargesQuery.refetch(),
             statsQuery.refetch(),
             revenueQuery.refetch(),
+            monthlyResultQuery.refetch(),
+            expensesListQuery.refetch(),
           ]);
+        }}
+      />
+      <CreateExpenseModal
+        open={openCreateExpense}
+        onClose={() => setOpenCreateExpense(false)}
+        onCreated={() => {
+          void Promise.all([monthlyResultQuery.refetch(), expensesListQuery.refetch()]);
         }}
       />
     </PageWrapper>

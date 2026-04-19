@@ -573,18 +573,23 @@ async function upsertPayment(params: {
 
 async function upsertExpense(params: {
   orgId: string
-  description: string
+  title: string
+  description?: string
   amountCents: number
-  category: string
-  date: Date
+  category: any
+  type: 'FIXED' | 'VARIABLE'
+  recurrence: 'NONE' | 'MONTHLY'
+  occurredAt: Date
+  dueDay?: number
+  isActive?: boolean
   notes?: string
   createdByUserId?: string
 }) {
   const existing = await prisma.expense.findFirst({
     where: {
       orgId: params.orgId,
-      description: params.description,
-      date: params.date,
+      title: params.title,
+      occurredAt: params.occurredAt,
     },
   })
 
@@ -1073,44 +1078,89 @@ export async function seedPilot() {
   const expenseSeeds = [
     {
       orgId: org.id,
+      title: 'Transporte equipe técnica',
       description: 'Combustível equipe técnica - semana 1',
       amountCents: 18750,
-      category: 'OPERATIONAL',
-      date: atHour(now, -7, 18, 0),
+      category: 'TRANSPORT',
+      type: 'VARIABLE' as const,
+      recurrence: 'NONE' as const,
+      occurredAt: atHour(now, -7, 18, 0),
       notes: 'Abastecimento para 3 veículos utilitários.',
       createdByUserId: financeUser.id,
     },
     {
       orgId: org.id,
+      title: 'Mercado / insumos',
       description: 'Compra de filtros e peças de reposição',
       amountCents: 25490,
-      category: 'SUPPLIES',
-      date: atHour(now, -6, 15, 0),
+      category: 'MARKET',
+      type: 'VARIABLE' as const,
+      recurrence: 'NONE' as const,
+      occurredAt: atHour(now, -6, 15, 0),
       createdByUserId: operatorUser.id,
     },
     {
       orgId: org.id,
+      title: 'Internet e ferramentas',
       description: 'Assinatura plataforma de chamados',
       amountCents: 6990,
-      category: 'INFRASTRUCTURE',
-      date: atHour(now, -5, 10, 0),
+      category: 'INTERNET',
+      type: 'FIXED' as const,
+      recurrence: 'MONTHLY' as const,
+      dueDay: 5,
+      isActive: true,
+      occurredAt: atHour(now, -5, 10, 0),
       notes: 'Plano profissional mensal.',
       createdByUserId: adminUser.id,
     },
     {
       orgId: org.id,
+      title: 'Operacional da semana',
       description: 'Campanha local Google Ads',
       amountCents: 18000,
-      category: 'MARKETING',
-      date: atHour(now, -4, 12, 0),
+      category: 'OPERATIONS',
+      type: 'VARIABLE' as const,
+      recurrence: 'NONE' as const,
+      occurredAt: atHour(now, -4, 12, 0),
       createdByUserId: financeUser.id,
     },
     {
       orgId: org.id,
+      title: 'Funcionários',
       description: 'Vale-transporte equipe operacional',
       amountCents: 22500,
       category: 'PAYROLL',
-      date: atHour(now, -3, 9, 0),
+      type: 'FIXED' as const,
+      recurrence: 'MONTHLY' as const,
+      dueDay: 6,
+      isActive: true,
+      occurredAt: atHour(now, -3, 9, 0),
+      createdByUserId: financeUser.id,
+    },
+    {
+      orgId: org.id,
+      title: 'Aluguel',
+      description: 'Aluguel da operação',
+      amountCents: 450000,
+      category: 'HOUSING',
+      type: 'FIXED' as const,
+      recurrence: 'MONTHLY' as const,
+      dueDay: 5,
+      isActive: true,
+      occurredAt: atHour(now, -10, 9, 0),
+      createdByUserId: adminUser.id,
+    },
+    {
+      orgId: org.id,
+      title: 'Energia',
+      description: 'Conta mensal de energia',
+      amountCents: 69000,
+      category: 'ELECTRICITY',
+      type: 'FIXED' as const,
+      recurrence: 'MONTHLY' as const,
+      dueDay: 10,
+      isActive: true,
+      occurredAt: atHour(now, -9, 9, 0),
       createdByUserId: financeUser.id,
     },
   ]
