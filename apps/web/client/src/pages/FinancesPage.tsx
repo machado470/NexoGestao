@@ -344,11 +344,42 @@ export default function FinancesPage() {
   };
 
   const queueItems = useMemo(() => {
+    const countByCustomer = new Map<string, number>();
+    [...overdueCharges, ...pendingCharges].forEach(charge => {
+      const customerId = String(
+        charge?.customerId ?? charge?.customer?.id ?? ""
+      );
+      if (!customerId) return;
+      countByCustomer.set(
+        customerId,
+        (countByCustomer.get(customerId) ?? 0) + 1
+      );
+    });
+
+    const priorityRank = (status: string, dueDate?: Date | null) => {
+      if (status === "OVERDUE") return 0;
+      if (status === "PENDING") {
+        const dueTime = dueDate?.getTime() ?? Number.MAX_SAFE_INTEGER;
+        const deltaDays = (dueTime - Date.now()) / (1000 * 60 * 60 * 24);
+        if (deltaDays <= 2) return 1;
+        return 2;
+      }
+      return 3;
+    };
+
     const ranked = [...overdueCharges, ...pendingCharges, ...paidCharges]
       .sort((a, b) => {
-        const aDue = safeDate(a?.dueDate)?.getTime() ?? Number.MAX_SAFE_INTEGER;
-        const bDue = safeDate(b?.dueDate)?.getTime() ?? Number.MAX_SAFE_INTEGER;
-        return aDue - bDue;
+        const aDue = safeDate(a?.dueDate);
+        const bDue = safeDate(b?.dueDate);
+        const aStatus = String(a?.status ?? "").toUpperCase();
+        const bStatus = String(b?.status ?? "").toUpperCase();
+        const byPriority =
+          priorityRank(aStatus, aDue) - priorityRank(bStatus, bDue);
+        if (byPriority !== 0) return byPriority;
+        return (
+          (aDue?.getTime() ?? Number.MAX_SAFE_INTEGER) -
+          (bDue?.getTime() ?? Number.MAX_SAFE_INTEGER)
+        );
       })
       .slice(0, 6)
       .map((item, index) => {
@@ -357,15 +388,29 @@ export default function FinancesPage() {
         const dueDateLabel = dueDate
           ? dueDate.toLocaleDateString("pt-BR")
           : "sem data";
+        const dayDiff = dueDate
+          ? Math.floor((Date.now() - dueDate.getTime()) / (1000 * 60 * 60 * 24))
+          : 0;
+        const customerId = String(item?.customerId ?? item?.customer?.id ?? "");
+        const hasRecurrentDelay = (countByCustomer.get(customerId) ?? 0) >= 2;
+
         if (status === "OVERDUE") {
           return {
             id: String(item?.id ?? `overdue-${index}`),
             client: String(item?.customer?.name ?? "Cliente"),
             value: formatCurrency(Number(item?.amountCents ?? 0)),
-            dueDate: dueDateLabel,
+            summary:
+              dayDiff > 0
+                ? `Vencida há ${dayDiff} dia(s)`
+                : dayDiff === 0
+                  ? "Vencida hoje"
+                  : `Vencimento em ${dueDateLabel}`,
+            intelligenceLabel: hasRecurrentDelay
+              ? "Alto risco · atraso recorrente"
+              : "Alto risco",
             status: "overdue" as const,
             priority: "critical" as const,
-            recommendedAction: "Cobrar" as const,
+            recommendedAction: "Cobrar via WhatsApp" as const,
             onAction: () => handleCharge(item),
           };
         }
@@ -374,24 +419,31 @@ export default function FinancesPage() {
             id: String(item?.id ?? `paid-${index}`),
             client: String(item?.customer?.name ?? "Cliente"),
             value: formatCurrency(Number(item?.amountCents ?? 0)),
-            dueDate: dueDateLabel,
+            summary: "Pronta para baixa",
+            intelligenceLabel: "Pagador recorrente",
             status: "ready" as const,
             priority: "healthy" as const,
             recommendedAction: "Registrar pagamento" as const,
             onAction: () => setMode("paid"),
           };
         }
+        const daysUntilDue = dueDate
+          ? Math.ceil((dueDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+          : 99;
+        const isAttention = daysUntilDue <= 2;
         return {
           id: String(item?.id ?? `pending-${index}`),
           client: String(item?.customer?.name ?? "Cliente"),
           value: formatCurrency(Number(item?.amountCents ?? 0)),
-          dueDate: dueDateLabel,
+          summary: isAttention
+            ? `Vence em ${Math.max(daysUntilDue, 0)} dia(s)`
+            : `Vencimento em ${dueDateLabel}`,
+          intelligenceLabel: isAttention
+            ? "Janela crítica nas próximas 72h"
+            : "Monitoramento ativo",
           status: "pending" as const,
-          priority:
-            dueDate && dueDate.getTime() - Date.now() <= 1000 * 60 * 60 * 24 * 2
-              ? ("attention" as const)
-              : ("healthy" as const),
-          recommendedAction: "Lembrar" as const,
+          priority: isAttention ? ("attention" as const) : ("healthy" as const),
+          recommendedAction: "Agendar lembrete" as const,
           onAction: () => handleRemind(item),
         };
       });

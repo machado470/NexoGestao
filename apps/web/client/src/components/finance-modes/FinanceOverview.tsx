@@ -39,10 +39,14 @@ interface QueueItem {
   id: string;
   client: string;
   value: string;
-  dueDate: string;
+  summary: string;
+  intelligenceLabel?: string;
   status: "overdue" | "pending" | "ready";
   priority: "critical" | "attention" | "healthy";
-  recommendedAction: "Cobrar" | "Lembrar" | "Registrar pagamento";
+  recommendedAction:
+    | "Cobrar via WhatsApp"
+    | "Agendar lembrete"
+    | "Registrar pagamento";
   onAction: () => void;
 }
 
@@ -99,16 +103,69 @@ export function FinanceOverview(props: FinanceOverviewProps) {
     (acc, item) => acc + Number(item.overdue ?? 0),
     0
   );
+  const revenueStart = Number(data[0]?.revenue ?? 0);
+  const revenueEnd = Number(data[data.length - 1]?.revenue ?? 0);
+  const revenueDeltaPercent =
+    revenueStart > 0 ? ((revenueEnd - revenueStart) / revenueStart) * 100 : 0;
+  const dueSoon72hCount = props.queueItems.filter(
+    item => item.status === "pending" && item.priority === "attention"
+  ).length;
   const isRiskHigh = props.risk.overdueCount > 0 || props.risk.dueToday > 0;
+  const nextBestAction = useMemo(() => {
+    if (props.risk.overdueCount > 0) {
+      return {
+        headline: "Priorizar vencidas",
+        context: `${props.risk.overdueCount} item(ns) exigem ação imediata · ${props.risk.riskAmount} em risco.`,
+        cta: "Ir para vencidas",
+        onClick: () => props.goToMode("overdue"),
+      };
+    }
+    if (props.risk.dueToday > 0 || dueSoon72hCount > 0) {
+      const urgentCount = props.risk.dueToday + dueSoon72hCount;
+      return {
+        headline: "Cobrar hoje",
+        context: `${urgentCount} cobrança(s) pedem contato agora.`,
+        cta: "Cobrar via WhatsApp",
+        onClick: props.cobrarAgora,
+      };
+    }
+    return {
+      headline: "Registrar recebimento",
+      context: "Sem urgências no caixa. Finalize baixas pendentes.",
+      cta: "Registrar pagamento",
+      onClick: () => props.goToMode("paid"),
+    };
+  }, [
+    dueSoon72hCount,
+    props.cobrarAgora,
+    props.goToMode,
+    props.risk.dueToday,
+    props.risk.overdueCount,
+    props.risk.riskAmount,
+  ]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3.5">
       <AppKpiRow items={props.kpis} />
 
       <AppChartPanel
         title="Receita e previsão"
         description="Recebido, previsto e vencimentos no período."
       >
+        <div className="mb-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/55 px-3 py-2.5 transition-colors hover:border-[var(--border-strong)]">
+          <p className="text-sm font-semibold text-[var(--text-primary)]">
+            {revenueDeltaPercent >= 0
+              ? `Receita subiu ${Math.abs(revenueDeltaPercent).toFixed(1)}% no período.`
+              : `Receita caiu ${Math.abs(revenueDeltaPercent).toFixed(1)}% no período.`}
+          </p>
+          <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
+            {props.risk.overdueCount > 0
+              ? `${props.risk.riskAmount} em risco agora · priorize vencidas nesta janela.`
+              : dueSoon72hCount > 0
+                ? `${dueSoon72hCount} cobrança(s) vencem nas próximas 72h.`
+                : "Sem risco crítico na janela atual."}
+          </p>
+        </div>
         <div className="mb-2 flex flex-wrap gap-1.5">
           {PERIODS.map(item => (
             <button
@@ -255,26 +312,48 @@ export function FinanceOverview(props: FinanceOverviewProps) {
         </div>
       </AppChartPanel>
 
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="grid gap-2.5 md:grid-cols-2">
         <AppSectionBlock
           title="Saúde do caixa"
           subtitle="Risco financeiro imediato."
           className="h-full"
           compact
         >
-          <div className="flex h-full flex-col gap-3">
-            <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/55 p-3">
-              <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
+          <div className="flex h-full flex-col gap-2.5">
+            <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/55 p-3 transition-colors hover:border-[var(--border-strong)]">
+              <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]/90">
                 Valor em risco
               </p>
               <p className="mt-1 text-3xl font-semibold leading-none text-[var(--text-primary)]">
                 {props.risk.riskAmount}
               </p>
             </div>
-            <p className="text-sm text-[var(--text-secondary)]">
-              {props.risk.overdueCount} vencida(s) · {props.risk.dueToday} para
-              hoje · {props.risk.dueSoon} para os próximos 7 dias
-            </p>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)]/40 px-2 py-1.5">
+                <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+                  Hoje
+                </p>
+                <p className="text-sm font-semibold text-[var(--text-primary)]">
+                  {props.risk.dueToday}
+                </p>
+              </div>
+              <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)]/40 px-2 py-1.5">
+                <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+                  7 dias
+                </p>
+                <p className="text-sm font-semibold text-[var(--text-primary)]">
+                  {props.risk.dueSoon}
+                </p>
+              </div>
+              <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)]/40 px-2 py-1.5">
+                <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+                  Vencidas
+                </p>
+                <p className="text-sm font-semibold text-[var(--text-primary)]">
+                  {props.risk.overdueCount}
+                </p>
+              </div>
+            </div>
             <Button
               className="mt-auto w-full"
               variant={isRiskHigh ? "default" : "secondary"}
@@ -287,24 +366,23 @@ export function FinanceOverview(props: FinanceOverviewProps) {
 
         <AppSectionBlock
           title="Próxima melhor ação"
-          subtitle="Ação operacional da semana."
+          subtitle="Decisão recomendada agora."
           className="h-full"
           compact
         >
           <div className="flex h-full flex-col gap-3">
             <p className="text-lg font-semibold leading-tight text-[var(--text-primary)]">
-              Cobrar hoje
+              {nextBestAction.headline}
             </p>
             <p className="text-sm text-[var(--text-secondary)]">
-              {props.risk.overdueCount + props.risk.dueToday} itens exigem ação
-              imediata.
+              {nextBestAction.context}
             </p>
             <Button
               className="mt-auto w-full"
               variant="outline"
-              onClick={props.cobrarAgora}
+              onClick={nextBestAction.onClick}
             >
-              Cobrar agora
+              {nextBestAction.cta}
             </Button>
           </div>
         </AppSectionBlock>
@@ -313,7 +391,7 @@ export function FinanceOverview(props: FinanceOverviewProps) {
       <AppSectionBlock
         title="Fila operacional"
         subtitle="Prioridades para execução direta."
-        className="mt-1"
+        className="mt-0.5"
         compact
       >
         <div className="space-y-2">
@@ -321,21 +399,29 @@ export function FinanceOverview(props: FinanceOverviewProps) {
             props.queueItems.map(item => (
               <div
                 key={item.id}
-                className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/60 px-3 py-2.5"
+                className={cn(
+                  "group relative rounded-lg border px-3 py-3 transition-all duration-200 hover:-translate-y-[1px] hover:shadow-[0_8px_24px_rgba(0,0,0,0.18)]",
+                  item.priority === "critical" &&
+                    "border-rose-500/35 bg-rose-500/10 before:absolute before:bottom-2 before:left-0 before:top-2 before:w-1 before:rounded-r-md before:bg-rose-400/60",
+                  item.priority === "attention" &&
+                    "border-amber-500/30 bg-amber-500/7",
+                  item.priority === "healthy" &&
+                    "border-[var(--border-subtle)] bg-[var(--surface-base)]/50"
+                )}
               >
                 <div className="flex flex-wrap items-center justify-between gap-2.5">
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-[var(--text-primary)]">
-                      {item.client} · {item.value}
+                      {item.client} — {item.value}
                     </p>
                     <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">
-                      Vencimento {item.dueDate} ·{" "}
-                      {item.status === "overdue"
-                        ? "Vencida"
-                        : item.status === "pending"
-                          ? "Pendente"
-                          : "Pronta para baixa"}
+                      {item.summary}
                     </p>
+                    {item.intelligenceLabel ? (
+                      <p className="mt-0.5 text-[11px] font-medium text-[var(--text-secondary)]">
+                        {item.intelligenceLabel}
+                      </p>
+                    ) : null}
                   </div>
                   <div className="flex items-center gap-2">
                     <span
@@ -367,6 +453,7 @@ export function FinanceOverview(props: FinanceOverviewProps) {
                       variant={
                         item.status === "overdue" ? "default" : "outline"
                       }
+                      className="transition-transform duration-200 group-hover:-translate-y-0.5 active:translate-y-0"
                       onClick={item.onAction}
                     >
                       {item.recommendedAction}
