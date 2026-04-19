@@ -110,29 +110,46 @@ export function FinanceOverview(props: FinanceOverviewProps) {
   const dueSoon72hCount = props.queueItems.filter(
     item => item.status === "pending" && item.priority === "attention"
   ).length;
-  const isRiskHigh = props.risk.overdueCount > 0 || props.risk.dueToday > 0;
+  const immediateRiskCount = props.risk.overdueCount + props.risk.dueToday;
+  const riskSummary =
+    props.risk.overdueCount > 0
+      ? `${props.risk.overdueCount} cobrança(s) vencida(s) exigem ação hoje.`
+      : props.risk.dueToday > 0
+        ? `${props.risk.dueToday} cobrança(s) vencem hoje e pedem acompanhamento.`
+        : props.risk.dueSoon > 0
+          ? `${props.risk.dueSoon} cobrança(s) vencem em até 7 dias.`
+          : "Sem pressão imediata no caixa.";
   const nextBestAction = useMemo(() => {
     if (props.risk.overdueCount > 0) {
       return {
+        urgencyLabel: "Crítico",
         headline: "Priorizar vencidas",
-        context: `${props.risk.overdueCount} item(ns) exigem ação imediata · ${props.risk.riskAmount} em risco.`,
+        immediateContext: `${props.risk.overdueCount} item(ns) crítico(s) agora.`,
+        impactContext: `Impacto estimado: ${props.risk.riskAmount}.`,
         cta: "Ir para vencidas",
+        ctaVariant: "default" as const,
         onClick: () => props.goToMode("overdue"),
       };
     }
     if (props.risk.dueToday > 0 || dueSoon72hCount > 0) {
       const urgentCount = props.risk.dueToday + dueSoon72hCount;
       return {
+        urgencyLabel: "Hoje",
         headline: "Cobrar hoje",
-        context: `${urgentCount} cobrança(s) pedem contato agora.`,
+        immediateContext: `${urgentCount} cobrança(s) pedem contato imediato.`,
+        impactContext: `Janela sensível: ${props.risk.riskAmount} em monitoramento.`,
         cta: "Cobrar via WhatsApp",
+        ctaVariant: "outline" as const,
         onClick: props.cobrarAgora,
       };
     }
     return {
+      urgencyLabel: "Estável",
       headline: "Registrar recebimento",
-      context: "Sem urgências no caixa. Finalize baixas pendentes.",
+      immediateContext: "Sem itens críticos no momento.",
+      impactContext: "Ação de rotina para manter o fluxo atualizado.",
       cta: "Registrar pagamento",
+      ctaVariant: "outline" as const,
       onClick: () => props.goToMode("paid"),
     };
   }, [
@@ -319,48 +336,42 @@ export function FinanceOverview(props: FinanceOverviewProps) {
           className="h-full"
           compact
         >
-          <div className="flex h-full flex-col gap-2.5">
-            <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/55 p-3 transition-colors hover:border-[var(--border-strong)]">
-              <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]/90">
-                Valor em risco
-              </p>
-              <p className="mt-1 text-3xl font-semibold leading-none text-[var(--text-primary)]">
-                {props.risk.riskAmount}
-              </p>
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)]/40 px-2 py-1.5">
+          <div className="flex h-full flex-col gap-2">
+            <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]/85">
+              Valor em risco
+            </p>
+            <p className="text-[2rem] font-semibold leading-none tracking-tight text-[var(--text-primary)]">
+              {props.risk.riskAmount}
+            </p>
+            <p className="text-sm text-[var(--text-secondary)]">
+              {riskSummary}
+            </p>
+            <div className="mt-auto grid grid-cols-3 divide-x divide-[var(--border-subtle)] rounded-md border border-[var(--border-subtle)]/85 bg-[var(--surface-base)]/35">
+              <div className="px-2 py-1.5">
                 <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
                   Hoje
                 </p>
-                <p className="text-sm font-semibold text-[var(--text-primary)]">
+                <p className="text-base font-semibold leading-tight text-[var(--text-primary)]">
                   {props.risk.dueToday}
                 </p>
               </div>
-              <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)]/40 px-2 py-1.5">
+              <div className="px-2 py-1.5">
                 <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
                   7 dias
                 </p>
-                <p className="text-sm font-semibold text-[var(--text-primary)]">
+                <p className="text-base font-semibold leading-tight text-[var(--text-primary)]">
                   {props.risk.dueSoon}
                 </p>
               </div>
-              <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)]/40 px-2 py-1.5">
+              <div className="px-2 py-1.5">
                 <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
                   Vencidas
                 </p>
-                <p className="text-sm font-semibold text-[var(--text-primary)]">
+                <p className="text-base font-semibold leading-tight text-[var(--text-primary)]">
                   {props.risk.overdueCount}
                 </p>
               </div>
             </div>
-            <Button
-              className="mt-auto w-full"
-              variant={isRiskHigh ? "default" : "secondary"}
-              onClick={() => props.goToMode("overdue")}
-            >
-              Ir para vencidas
-            </Button>
           </div>
         </AppSectionBlock>
 
@@ -370,20 +381,31 @@ export function FinanceOverview(props: FinanceOverviewProps) {
           className="h-full"
           compact
         >
-          <div className="flex h-full flex-col gap-3">
-            <p className="text-lg font-semibold leading-tight text-[var(--text-primary)]">
+          <div className="flex h-full flex-col gap-2">
+            <span className="inline-flex w-fit items-center rounded-full border border-[var(--border-subtle)]/90 bg-[var(--surface-base)]/45 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[var(--text-secondary)]">
+              {nextBestAction.urgencyLabel}
+            </span>
+            <p className="text-xl font-semibold leading-tight text-[var(--text-primary)]">
               {nextBestAction.headline}
             </p>
             <p className="text-sm text-[var(--text-secondary)]">
-              {nextBestAction.context}
+              {nextBestAction.immediateContext}
+            </p>
+            <p className="text-sm font-medium text-[var(--text-primary)]/95">
+              {nextBestAction.impactContext}
             </p>
             <Button
-              className="mt-auto w-full"
-              variant="outline"
+              className="mt-auto w-full shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:ring-2 focus-visible:ring-[var(--accent)]/45"
+              variant={nextBestAction.ctaVariant}
               onClick={nextBestAction.onClick}
             >
               {nextBestAction.cta}
             </Button>
+            <p className="text-[11px] text-[var(--text-muted)]">
+              {immediateRiskCount > 0
+                ? `${immediateRiskCount} item(ns) pedem acompanhamento nesta visão.`
+                : "Carteira sem alertas críticos nesta leitura."}
+            </p>
           </div>
         </AppSectionBlock>
       </div>
