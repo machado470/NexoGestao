@@ -24,6 +24,12 @@ import { FinancePending } from "@/components/finance-modes/FinancePending";
 import { FinanceOverdue } from "@/components/finance-modes/FinanceOverdue";
 import { FinancePaid } from "@/components/finance-modes/FinancePaid";
 import { FinanceReports } from "@/components/finance-modes/FinanceReports";
+import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
+import {
+  type OperationalSeverity,
+  getChargeSeverity,
+  getOperationalSeverityLabel,
+} from "@/lib/operations/operational-intelligence";
 
 function formatCurrency(cents: number) {
   return new Intl.NumberFormat("pt-BR", {
@@ -164,6 +170,11 @@ export default function FinancesPage() {
     if (!due) return false;
     return due.toDateString() === new Date().toDateString();
   }).length;
+  const awaitingSettlementCount = paidCharges.length;
+  const awaitingSettlementTotal = paidCharges.reduce(
+    (acc, item) => acc + Number(item?.amountCents ?? 0),
+    0
+  );
 
   const trendByDay = useMemo(() => {
     const map = new Map<
@@ -309,25 +320,26 @@ export default function FinancesPage() {
       );
     });
 
-    const priorityRank = (status: string, dueDate?: Date | null) => {
-      if (status === "OVERDUE") return 0;
-      if (status === "PENDING") {
-        const dueTime = dueDate?.getTime() ?? Number.MAX_SAFE_INTEGER;
-        const deltaDays = (dueTime - Date.now()) / (1000 * 60 * 60 * 24);
-        if (deltaDays <= 2) return 1;
-        return 2;
-      }
-      return 3;
-    };
-
     const ranked = [...overdueCharges, ...pendingCharges, ...paidCharges]
       .sort((a, b) => {
         const aDue = safeDate(a?.dueDate);
         const bDue = safeDate(b?.dueDate);
         const aStatus = String(a?.status ?? "").toUpperCase();
         const bStatus = String(b?.status ?? "").toUpperCase();
+        const urgencyScore = (status: string, dueDate?: Date | null) => {
+          const dueTime = dueDate?.getTime() ?? Number.MAX_SAFE_INTEGER;
+          const deltaDays = (dueTime - Date.now()) / (1000 * 60 * 60 * 24);
+          if (status === "OVERDUE") return 100;
+          if (status === "PENDING") {
+            if (deltaDays <= 0) return 82;
+            if (deltaDays <= 3) return 68;
+            if (deltaDays <= 7) return 55;
+            return 40;
+          }
+          return 28;
+        };
         const byPriority =
-          priorityRank(aStatus, aDue) - priorityRank(bStatus, bDue);
+          urgencyScore(bStatus, bDue) - urgencyScore(aStatus, aDue);
         if (byPriority !== 0) return byPriority;
         return (
           (aDue?.getTime() ?? Number.MAX_SAFE_INTEGER) -
@@ -365,9 +377,19 @@ export default function FinancesPage() {
             dueLabel: dueDateLabel,
             dateContext:
               dayDiff > 0 ? `${dayDiff} dia(s) em atraso` : "vence hoje",
+            priorityReason:
+              dayDiff > 0
+                ? `${dayDiff} dia(s) em atraso + impacto direto no caixa`
+                : "Venceu hoje e já compromete fluxo do dia",
+            impactLabel: `Impacto potencial ${formatCurrency(Number(item?.amountCents ?? 0))}`,
             status: "overdue" as const,
             priority: "critical" as const,
             recommendedAction: "Cobrar via WhatsApp" as const,
+            contextualActions: [
+              "Abrir detalhe da cobrança",
+              "Ver contexto do cliente",
+            ] as const,
+            flowContext: String(item?.source ?? "Origem operacional vinculada"),
             onAction: () => handleCharge(item),
           };
         }
@@ -381,9 +403,16 @@ export default function FinancesPage() {
             amountContext: "Recebimento confirmado",
             dueLabel: dueDateLabel,
             dateContext: "baixar no financeiro",
+            priorityReason: "Recebimento confirmado aguardando baixa contábil",
+            impactLabel: `Liberar ${formatCurrency(Number(item?.amountCents ?? 0))} no caixa realizado`,
             status: "ready" as const,
             priority: "healthy" as const,
             recommendedAction: "Registrar pagamento" as const,
+            contextualActions: [
+              "Marcar como acompanhado",
+              "Ver origem operacional",
+            ] as const,
+            flowContext: String(item?.source ?? "Pagamento ligado à ordem de serviço"),
             onAction: () => setMode("paid"),
           };
         }
@@ -404,14 +433,37 @@ export default function FinancesPage() {
           amountContext: "Cobrança pendente",
           dueLabel: dueDateLabel,
           dateContext: isAttention ? "vence em breve" : "janela programada",
+          priorityReason: isAttention
+            ? "Janela crítica nas próximas 72h"
+            : "Cobrança ativa com vencimento futuro",
+          impactLabel: `Risco monitorado ${formatCurrency(Number(item?.amountCents ?? 0))}`,
           status: "pending" as const,
           priority: isAttention ? ("attention" as const) : ("healthy" as const),
           recommendedAction: "Agendar lembrete" as const,
+          contextualActions: [
+            "Cobrar via WhatsApp",
+            "Abrir detalhe da cobrança",
+          ] as const,
+          flowContext: String(item?.source ?? "Fluxo operacional em andamento"),
           onAction: () => handleRemind(item),
         };
       });
     return ranked;
   }, [handleCharge, handleRemind, overdueCharges, paidCharges, pendingCharges]);
+
+  const pageSeverity = useMemo<OperationalSeverity>(() => {
+    if (overdueCharges.length > 0) return "critical";
+    if (dueToday > 0 || dueSoon > 0) return "pending";
+    return "healthy";
+  }, [dueSoon, dueToday, overdueCharges.length]);
+
+  const topSeverityLabel = useMemo(() => {
+    const firstQueueStatus = queueItems[0]?.status;
+    if (firstQueueStatus === "overdue") return getOperationalSeverityLabel("critical");
+    if (firstQueueStatus === "pending") return getOperationalSeverityLabel("pending");
+    if (firstQueueStatus === "ready") return getOperationalSeverityLabel("healthy");
+    return getOperationalSeverityLabel(pageSeverity);
+  }, [pageSeverity, queueItems]);
 
   usePageDiagnostics({
     page: "finances",
@@ -458,6 +510,24 @@ export default function FinancesPage() {
         value={mode}
         onChange={value => setMode(value as typeof mode)}
       />
+      <OperationalTopCard
+        contextLabel="Centro de decisão financeiro"
+        title="Proteja caixa com execução priorizada"
+        description="Conecte receita, risco e cobrança para agir no que mais impacta o caixa agora."
+        chips={
+          <>
+            <span className="text-xs text-[var(--text-secondary)]">
+              Severidade: {getOperationalSeverityLabel(pageSeverity)}
+            </span>
+            <span className="text-xs text-[var(--text-secondary)]">
+              Prioridade atual: {topSeverityLabel}
+            </span>
+            <span className="text-xs text-[var(--text-secondary)]">
+              Referência: {getOperationalSeverityLabel(getChargeSeverity(overdueCharges[0] ?? pendingCharges[0] ?? {}))}
+            </span>
+          </>
+        }
+      />
 
       {showChargesInitialLoading ? (
         <AppPageLoadingState description="Carregando financeiro..." />
@@ -493,6 +563,14 @@ export default function FinancesPage() {
               goToMode={nextMode => setMode(nextMode)}
               openCreate={() => setOpenCreate(true)}
               cobrarAgora={() => handleCharge()}
+              operationalSignals={{
+                overdueCount: overdueCharges.length,
+                dueToday,
+                dueSoon,
+                awaitingSettlementCount,
+                awaitingSettlementTotal: formatCurrency(awaitingSettlementTotal),
+                riskAmount: formatCurrency(overdueTotal),
+              }}
               queueItems={queueItems}
             />
           )}
