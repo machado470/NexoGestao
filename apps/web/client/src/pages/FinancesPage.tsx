@@ -479,7 +479,6 @@ export default function FinancesPage() {
               goToMode={nextMode => setMode(nextMode)}
               openCreate={() => setOpenCreate(true)}
               cobrarAgora={() => handleCharge()}
-              statusDistribution={statusDistribution}
               queueItems={queueItems}
             />
           )}
