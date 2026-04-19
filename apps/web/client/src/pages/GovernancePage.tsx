@@ -140,7 +140,7 @@ export default function GovernancePage() {
         onChange={setActiveTab}
       />
 
-
+      {(activeTab === "overview" || activeTab === "alerts") ? (
       <AppSectionBlock title="Estado operacional atual" subtitle="Por que a governança está neste estado e o que fazer agora" compact>
         <div className="space-y-3 text-sm text-[var(--text-secondary)]">
           <div className="flex flex-wrap items-center gap-2">
@@ -154,6 +154,7 @@ export default function GovernancePage() {
           <p>Próximo passo recomendado: {recommendations[0] ? String(recommendations[0]?.title ?? recommendations[0]?.action ?? "Executar revisão de governança") : "Reexecutar governança para gerar plano de contenção"}.</p>
         </div>
       </AppSectionBlock>
+      ) : null}
 
       {(activeTab === "overview" || activeTab === "history") ? (
       <div className="grid gap-3 xl:grid-cols-12">
@@ -299,6 +300,7 @@ export default function GovernancePage() {
         </AppSectionBlock>
       </div>
       ) : null}
+      {(activeTab === "overview" || activeTab === "executions") ? (
       <div className="mt-3">
         <AppNextActionCard
           title="Prioridade executiva"
@@ -313,6 +315,7 @@ export default function GovernancePage() {
           }}
         />
       </div>
+      ) : null}
       </TrpcSectionErrorBoundary>
     </PageWrapper>
   );
