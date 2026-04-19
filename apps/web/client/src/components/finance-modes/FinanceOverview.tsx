@@ -1,10 +1,7 @@
 import { useMemo, useState } from "react";
 import {
   Area,
-  Bar,
-  BarChart,
   CartesianGrid,
-  Cell,
   ComposedChart,
   Line,
   XAxis,
@@ -88,12 +85,6 @@ interface FinanceOverviewProps {
   goToMode: (mode: "pending" | "overdue" | "paid") => void;
   openCreate: () => void;
   cobrarAgora: () => void;
-  statusDistribution: Array<{
-    label: string;
-    key: "pending" | "overdue" | "paid";
-    value: number;
-    total: string;
-  }>;
   queueItems: QueueItem[];
 }
 
@@ -111,300 +102,218 @@ export function FinanceOverview(props: FinanceOverviewProps) {
   const isRiskHigh = props.risk.overdueCount > 0 || props.risk.dueToday > 0;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <AppKpiRow items={props.kpis} />
 
-      <div className="grid gap-3 xl:grid-cols-12">
-        <div className="space-y-3 xl:col-span-8">
-          <AppChartPanel
-            title="Receita e previsão"
-            description="Recebido, previsto e vencimentos no período."
-          >
-            <div className="mb-2 flex flex-wrap gap-1.5">
-              {PERIODS.map(item => (
-                <button
-                  key={item.value}
-                  type="button"
-                  className={appSelectionPillClasses(period === item.value)}
-                  onClick={() => setPeriod(item.value)}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
+      <AppChartPanel
+        title="Receita e previsão"
+        description="Recebido, previsto e vencimentos no período."
+      >
+        <div className="mb-2 flex flex-wrap gap-1.5">
+          {PERIODS.map(item => (
+            <button
+              key={item.value}
+              type="button"
+              className={appSelectionPillClasses(period === item.value)}
+              onClick={() => setPeriod(item.value)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
 
-            {props.revenueLoading && data.length === 0 ? (
-              <AppPageLoadingState description="Carregando evolução de receita..." />
-            ) : props.revenueError && data.length === 0 ? (
-              <AppPageErrorState
-                description={props.revenueError}
-                actionLabel="Criar cobrança"
-                onAction={props.openCreate}
+        {props.revenueLoading && data.length === 0 ? (
+          <AppPageLoadingState description="Carregando evolução de receita..." />
+        ) : props.revenueError && data.length === 0 ? (
+          <AppPageErrorState
+            description={props.revenueError}
+            actionLabel="Criar cobrança"
+            onAction={props.openCreate}
+          />
+        ) : !props.isRevenueValid ? (
+          <AppPageEmptyState
+            title="Erro ao renderizar gráfico"
+            description={
+              props.revenueInvalidReason ?? "Dados inválidos do gráfico."
+            }
+          />
+        ) : data.length === 0 ? (
+          <AppPageEmptyState
+            title="Ainda sem histórico"
+            description="Registre pagamentos para começar a leitura do caixa."
+          />
+        ) : (
+          <ChartContainer
+            className="h-[260px] w-full lg:h-[272px]"
+            config={{
+              revenue: { label: "Recebido", color: "hsl(var(--accent))" },
+              projected: {
+                label: "Previsto",
+                color: "hsl(194 70% 56%)",
+              },
+              overdue: {
+                label: "Vencidas",
+                color: "hsl(6 82% 64%)",
+              },
+            }}
+          >
+            <ComposedChart
+              data={data}
+              margin={{ top: 12, right: 10, bottom: 4, left: -8 }}
+            >
+              <CartesianGrid
+                strokeDasharray="2 4"
+                vertical={false}
+                stroke="color-mix(in srgb, var(--border-subtle) 45%, transparent)"
               />
-            ) : !props.isRevenueValid ? (
-              <AppPageEmptyState
-                title="Erro ao renderizar gráfico"
-                description={
-                  props.revenueInvalidReason ?? "Dados inválidos do gráfico."
+              <XAxis
+                dataKey="label"
+                tickLine={false}
+                axisLine={false}
+                minTickGap={22}
+                tickMargin={10}
+              />
+              <YAxis
+                tickLine={false}
+                axisLine={false}
+                width={46}
+                tick={{ fontSize: 11 }}
+                tickMargin={8}
+              />
+              <ChartTooltip
+                content={
+                  <ChartTooltipContent
+                    className="border-[var(--border-subtle)] bg-[var(--surface-elevated)]/95"
+                    labelFormatter={value => `Período ${String(value)}`}
+                    formatter={(value, name, item) => {
+                      const metric =
+                        name === "revenue"
+                          ? "Recebido"
+                          : name === "projected"
+                            ? "Previsto"
+                            : "Vencidas";
+                      const formatted =
+                        name === "overdue"
+                          ? `${Number(value).toLocaleString("pt-BR")}`
+                          : `R$ ${Number(value).toLocaleString("pt-BR", {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}`;
+                      return (
+                        <div className="flex w-full items-center justify-between gap-3 text-xs">
+                          <span className="text-muted-foreground">
+                            {metric}
+                          </span>
+                          <span className="font-mono text-foreground">
+                            {formatted}
+                          </span>
+                          {name === "revenue" ? (
+                            <span className="sr-only">
+                              Previsto{" "}
+                              {Number((item as any)?.payload?.projected ?? 0)}
+                            </span>
+                          ) : null}
+                        </div>
+                      );
+                    }}
+                  />
                 }
               />
-            ) : data.length === 0 ? (
-              <AppPageEmptyState
-                title="Ainda sem histórico"
-                description="Registre pagamentos para começar a leitura do caixa."
+              <Area
+                type="monotone"
+                dataKey="projected"
+                stroke="var(--color-projected)"
+                fill="var(--color-projected)"
+                fillOpacity={0.14}
+                strokeWidth={2}
               />
-            ) : (
-              <ChartContainer
-                className="h-[250px] w-full"
-                config={{
-                  revenue: { label: "Recebido", color: "hsl(var(--accent))" },
-                  projected: {
-                    label: "Previsto",
-                    color: "hsl(194 70% 56%)",
-                  },
-                  overdue: {
-                    label: "Vencidas",
-                    color: "hsl(6 82% 64%)",
-                  },
+              <Line
+                type="monotone"
+                dataKey="revenue"
+                stroke="var(--color-revenue)"
+                strokeWidth={2.5}
+                dot={{
+                  r: 2.5,
+                  fill: "var(--color-revenue)",
+                  strokeWidth: 0,
                 }}
-              >
-                <ComposedChart
-                  data={data}
-                  margin={{ top: 8, right: 8, bottom: 0, left: -10 }}
-                >
-                  <CartesianGrid
-                    strokeDasharray="2 4"
-                    vertical={false}
-                    stroke="color-mix(in srgb, var(--border-subtle) 45%, transparent)"
-                  />
-                  <XAxis
-                    dataKey="label"
-                    tickLine={false}
-                    axisLine={false}
-                    minTickGap={24}
-                  />
-                  <YAxis
-                    tickLine={false}
-                    axisLine={false}
-                    width={42}
-                    tick={{ fontSize: 11 }}
-                  />
-                  <ChartTooltip
-                    content={
-                      <ChartTooltipContent
-                        className="border-[var(--border-subtle)] bg-[var(--surface-elevated)]/95"
-                        labelFormatter={value => `Período ${String(value)}`}
-                        formatter={(value, name, item) => {
-                          const metric =
-                            name === "revenue"
-                              ? "Recebido"
-                              : name === "projected"
-                                ? "Previsto"
-                                : "Vencidas";
-                          const formatted =
-                            name === "overdue"
-                              ? `${Number(value).toLocaleString("pt-BR")}`
-                              : `R$ ${Number(value).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-                          return (
-                            <div className="flex w-full items-center justify-between gap-3 text-xs">
-                              <span className="text-muted-foreground">
-                                {metric}
-                              </span>
-                              <span className="font-mono text-foreground">
-                                {formatted}
-                              </span>
-                              {name === "revenue" ? (
-                                <span className="sr-only">
-                                  Previsto{" "}
-                                  {Number(
-                                    (item as any)?.payload?.projected ?? 0
-                                  )}
-                                </span>
-                              ) : null}
-                            </div>
-                          );
-                        }}
-                      />
-                    }
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="projected"
-                    stroke="var(--color-projected)"
-                    fill="var(--color-projected)"
-                    fillOpacity={0.16}
-                    strokeWidth={2}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="revenue"
-                    stroke="var(--color-revenue)"
-                    strokeWidth={2.5}
-                    dot={{
-                      r: 2.5,
-                      fill: "var(--color-revenue)",
-                      strokeWidth: 0,
-                    }}
-                    activeDot={{
-                      r: 5,
-                      fill: "var(--color-revenue)",
-                      stroke: "hsl(var(--background))",
-                      strokeWidth: 2,
-                    }}
-                  />
-                  <Bar
-                    dataKey="overdue"
-                    barSize={7}
-                    radius={[8, 8, 0, 0]}
-                    fill="var(--color-overdue)"
-                    fillOpacity={0.5}
-                  />
-                </ComposedChart>
-              </ChartContainer>
-            )}
+                activeDot={{
+                  r: 5,
+                  fill: "var(--color-revenue)",
+                  stroke: "hsl(var(--background))",
+                  strokeWidth: 2,
+                }}
+              />
+            </ComposedChart>
+          </ChartContainer>
+        )}
 
-            <div className="mt-2 text-xs text-[var(--text-muted)]">
-              {totalOverdueEvents > 0
-                ? `${totalOverdueEvents} pontos de vencimento no período selecionado.`
-                : "Sem eventos de vencimento no período selecionado."}
+        <div className="mt-2 text-xs text-[var(--text-muted)]">
+          {totalOverdueEvents > 0
+            ? `${totalOverdueEvents} pontos de vencimento no período selecionado.`
+            : "Sem eventos de vencimento no período selecionado."}
+        </div>
+      </AppChartPanel>
+
+      <div className="grid gap-3 md:grid-cols-2">
+        <AppSectionBlock
+          title="Saúde do caixa"
+          subtitle="Risco financeiro imediato."
+          className="h-full"
+          compact
+        >
+          <div className="flex h-full flex-col gap-3">
+            <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/55 p-3">
+              <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
+                Valor em risco
+              </p>
+              <p className="mt-1 text-3xl font-semibold leading-none text-[var(--text-primary)]">
+                {props.risk.riskAmount}
+              </p>
             </div>
-          </AppChartPanel>
-
-          <AppChartPanel
-            title="Distribuição por status"
-            description="Clique para abrir o modo correspondente."
-          >
-            <ChartContainer
-              className="h-[205px] w-full"
-              config={{ value: { label: "Cobranças" } }}
+            <p className="text-sm text-[var(--text-secondary)]">
+              {props.risk.overdueCount} vencida(s) · {props.risk.dueToday} para
+              hoje · {props.risk.dueSoon} para os próximos 7 dias
+            </p>
+            <Button
+              className="mt-auto w-full"
+              variant={isRiskHigh ? "default" : "secondary"}
+              onClick={() => props.goToMode("overdue")}
             >
-              <BarChart
-                data={props.statusDistribution}
-                margin={{ left: -16, right: 4, top: 4, bottom: 0 }}
-                barCategoryGap={18}
-              >
-                <CartesianGrid
-                  vertical={false}
-                  strokeDasharray="2 4"
-                  stroke="color-mix(in srgb, var(--border-subtle) 45%, transparent)"
-                />
-                <XAxis dataKey="label" tickLine={false} axisLine={false} />
-                <YAxis tickLine={false} axisLine={false} width={30} />
-                <ChartTooltip
-                  content={
-                    <ChartTooltipContent
-                      className="border-[var(--border-subtle)] bg-[var(--surface-elevated)]/95"
-                      formatter={(value, _name, item) => (
-                        <div className="flex w-full items-center justify-between gap-4">
-                          <div className="text-muted-foreground">
-                            {String((item as any)?.payload?.label ?? "Status")}
-                          </div>
-                          <div className="text-right">
-                            <div className="font-medium">
-                              {Number(value)} cobranças
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              {String((item as any)?.payload?.total ?? "-")}
-                            </div>
-                            <div className="text-[11px] text-muted-foreground">
-                              {String((item as any)?.payload?.key) === "pending"
-                                ? "Abrir pendentes"
-                                : String((item as any)?.payload?.key) ===
-                                    "overdue"
-                                  ? "Abrir vencidas"
-                                  : "Abrir pagas"}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    />
-                  }
-                />
-                <Bar
-                  dataKey="value"
-                  radius={[8, 8, 0, 0]}
-                  onClick={entry => props.goToMode(entry.key)}
-                  className="cursor-pointer"
-                >
-                  {props.statusDistribution.map(entry => (
-                    <Cell
-                      key={entry.key}
-                      fill={
-                        entry.key === "pending"
-                          ? "hsl(214 80% 63%)"
-                          : entry.key === "overdue"
-                            ? "hsl(6 82% 64%)"
-                            : "hsl(151 56% 46%)"
-                      }
-                      fillOpacity={entry.key === "overdue" ? 0.82 : 0.72}
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ChartContainer>
-          </AppChartPanel>
-        </div>
+              Ir para vencidas
+            </Button>
+          </div>
+        </AppSectionBlock>
 
-        <div className="space-y-3 xl:col-span-4">
-          <AppSectionBlock
-            title="Saúde do caixa"
-            subtitle="Risco financeiro imediato."
-            compact
-          >
-            <div className="space-y-2.5">
-              <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/55 p-2.5">
-                <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
-                  Valor em risco
-                </p>
-                <p className="mt-1 text-2xl font-semibold text-[var(--text-primary)]">
-                  {props.risk.riskAmount}
-                </p>
-              </div>
-              <ul className="space-y-1.5 text-sm text-[var(--text-secondary)]">
-                <li>{props.risk.overdueCount} vencida(s) precisam de ação</li>
-                <li>
-                  {props.risk.dueToday} hoje · {props.risk.dueSoon} nos próximos
-                  7 dias
-                </li>
-              </ul>
-              <Button
-                className="w-full"
-                variant={isRiskHigh ? "default" : "secondary"}
-                onClick={() => props.goToMode("overdue")}
-              >
-                Ir para vencidas
-              </Button>
-            </div>
-          </AppSectionBlock>
-
-          <AppSectionBlock
-            title="Próxima melhor ação"
-            subtitle="Ação operacional da semana."
-            compact
-          >
-            <div className="space-y-2.5">
-              <p className="text-sm font-semibold text-[var(--text-primary)]">
-                Cobrar hoje
-              </p>
-              <p className="text-xs text-[var(--text-secondary)]">
-                {props.risk.overdueCount + props.risk.dueToday} item(ns) exigem
-                ação imediata.
-              </p>
-              <Button
-                className="w-full"
-                variant="outline"
-                onClick={props.cobrarAgora}
-              >
-                Cobrar agora
-              </Button>
-            </div>
-          </AppSectionBlock>
-        </div>
+        <AppSectionBlock
+          title="Próxima melhor ação"
+          subtitle="Ação operacional da semana."
+          className="h-full"
+          compact
+        >
+          <div className="flex h-full flex-col gap-3">
+            <p className="text-lg font-semibold leading-tight text-[var(--text-primary)]">
+              Cobrar hoje
+            </p>
+            <p className="text-sm text-[var(--text-secondary)]">
+              {props.risk.overdueCount + props.risk.dueToday} itens exigem ação
+              imediata.
+            </p>
+            <Button
+              className="mt-auto w-full"
+              variant="outline"
+              onClick={props.cobrarAgora}
+            >
+              Cobrar agora
+            </Button>
+          </div>
+        </AppSectionBlock>
       </div>
 
       <AppSectionBlock
         title="Fila operacional"
         subtitle="Prioridades para execução direta."
+        className="mt-1"
         compact
       >
         <div className="space-y-2">
