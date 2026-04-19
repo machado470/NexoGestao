@@ -25,6 +25,7 @@ import {
   AppSecondaryTabs,
   AppSectionBlock,
   AppStatusBadge,
+  appSelectionPillClasses,
 } from "@/components/internal-page-system";
 
 type CustomerRecord = Record<string, any>;
@@ -492,11 +493,7 @@ export default function CustomersPage() {
               <button
                 key={item.key}
                 type="button"
-                className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
-                  activeFilter === item.key
-                    ? "border-[var(--accent-primary)] bg-[var(--accent-soft)] text-[var(--accent-primary)]"
-                    : "border-[var(--border-subtle)] text-[var(--text-secondary)] hover:border-[var(--accent-primary)]/40"
-                }`}
+                className={appSelectionPillClasses(activeFilter === item.key)}
                 onClick={() => setActiveFilter(item.key)}
               >
                 {item.label}

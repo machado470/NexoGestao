@@ -591,8 +591,9 @@ export function AppEntityContextPanel({
           <div key={link.id} className="inline-flex items-center gap-2">
             <a
               className={cn(
-                "rounded-full border border-[var(--border-soft)] px-3 py-1",
-                link.active && "text-[var(--accent)] border-[var(--accent)]/40"
+                "rounded-full border border-[var(--border-soft)] bg-[var(--surface-primary)]/35 px-3 py-1 text-white/72",
+                link.active &&
+                  "border-[color-mix(in_srgb,var(--accent-primary)_72%,black)] bg-[var(--accent-primary)] text-white shadow-[0_8px_18px_-16px_var(--accent-primary)]"
               )}
               href={link.href}
             >

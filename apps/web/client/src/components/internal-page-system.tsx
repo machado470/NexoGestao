@@ -81,6 +81,14 @@ export function AppSecondaryTabs<T extends string>({
   onChange: (value: T) => void;
   className?: string;
 }) {
+  const tabClasses = (isActive: boolean) =>
+    cn(
+      "relative inline-flex h-9 shrink-0 items-center justify-center rounded-lg border px-4 text-sm font-medium transition-colors",
+      isActive
+        ? "border-[color-mix(in_srgb,var(--accent-primary)_72%,black)] bg-[var(--accent-primary)] text-white shadow-[0_8px_18px_-16px_var(--accent-primary)]"
+        : "border-[var(--border-subtle)] bg-[var(--surface-primary)]/45 text-white/72 hover:border-[var(--border-emphasis)] hover:bg-[var(--surface-primary)]/65 hover:text-white"
+    );
+
   return (
     <nav
       className={cn(
@@ -97,12 +105,7 @@ export function AppSecondaryTabs<T extends string>({
               key={item.value}
               type="button"
               onClick={() => onChange(item.value)}
-              className={cn(
-                "relative inline-flex h-9 shrink-0 items-center justify-center rounded-lg border px-4 text-sm font-medium transition-colors",
-                isActive
-                  ? "border-[var(--accent-primary)]/35 bg-[var(--surface-primary)] text-white shadow-[inset_0_-2px_0_0_var(--accent-primary)]"
-                  : "border-transparent bg-transparent text-white/70 hover:border-[var(--border-subtle)] hover:bg-[var(--surface-primary)]/40 hover:text-white"
-              )}
+              className={tabClasses(isActive)}
             >
               <span>{item.label}</span>
             </button>
@@ -110,6 +113,15 @@ export function AppSecondaryTabs<T extends string>({
         })}
       </div>
     </nav>
+  );
+}
+
+export function appSelectionPillClasses(isActive: boolean) {
+  return cn(
+    "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+    isActive
+      ? "border-[color-mix(in_srgb,var(--accent-primary)_72%,black)] bg-[var(--accent-primary)] text-white shadow-[0_8px_18px_-16px_var(--accent-primary)]"
+      : "border-[var(--border-subtle)] bg-[var(--surface-primary)]/35 text-white/72 hover:border-[var(--border-emphasis)] hover:bg-[var(--surface-primary)]/55 hover:text-white"
   );
 }
 
