@@ -4,7 +4,6 @@ import { trpc } from "@/lib/trpc";
 import { normalizeArrayPayload, normalizeObjectPayload } from "@/lib/query-helpers";
 import {
   AppFiltersBar,
-  AppKpiRow,
   AppListBlock,
   AppPageLoadingState,
   AppSecondaryTabs,
@@ -75,14 +74,13 @@ export default function SettingsPage() {
         )}
       />
 
-      <AppKpiRow
-        items={[
-          { title: "Organização", value: String(organizationName || "Não definida"), hint: "identidade operacional" },
-          { title: "Membros", value: String(members.length), hint: "acesso ativo" },
-          { title: "Integrações", value: `${integrationsReady}/2`, hint: "Stripe + WhatsApp/Twilio" },
-          { title: "Timezone", value: String(timezone), hint: "agenda e cobrança" },
-        ]}
-      />
+      <AppSectionBlock title="Resumo administrativo" subtitle="Leitura rápida da conta" compact>
+        <div className="grid gap-2 md:grid-cols-3 text-sm">
+          <p><span className="text-[var(--text-muted)]">Organização:</span> {String(organizationName || "Não definida")}</p>
+          <p><span className="text-[var(--text-muted)]">Membros:</span> {members.length}</p>
+          <p><span className="text-[var(--text-muted)]">Integrações:</span> {integrationsReady}/2</p>
+        </div>
+      </AppSectionBlock>
 
       <AppSectionBlock title="Resumo operacional" subtitle="Saúde de configuração sem ruído" compact>
         <AppListBlock
@@ -102,7 +100,7 @@ export default function SettingsPage() {
             {
               title: "Próxima ação",
               subtitle: integrationsReady === 2 ? "Revisar usuários e permissões." : "Concluir integrações pendentes.",
-              action: <Button size="sm" variant="outline">Executar</Button>,
+              action: <Button size="sm" variant="outline">Revisar</Button>,
             },
           ]}
         />

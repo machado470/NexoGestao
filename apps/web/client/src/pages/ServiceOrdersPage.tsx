@@ -144,9 +144,11 @@ export default function ServiceOrdersPage() {
       />
 
       {(activeTab === "pipeline" || activeTab === "blocked") ? (
+        <section className="grid gap-4 xl:grid-cols-12">
         <AppSectionBlock
         title="Travadas"
         subtitle="Bloco principal: ordens que mais pressionam SLA e precisam de ação direta agora"
+        className="xl:col-span-8"
       >
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-[var(--text-secondary)]">{semResponsavel} sem responsável · {semAvanco} sem avanço · {aguardandoCliente} aguardando cliente.</p>
@@ -158,11 +160,23 @@ export default function ServiceOrdersPage() {
             : [{ title: "Sem travas críticas", subtitle: "Pipeline fluindo no momento.", action: <button className="nexo-cta-secondary" onClick={() => navigate("/finances")}>Seguir para cobrança</button> }]}
         />
       </AppSectionBlock>
+      <AppSectionBlock title="Destravamento e cobrança" subtitle="Prioridades executivas da lateral" className="xl:col-span-4" compact>
+        <AppListBlock
+          compact
+          showPlaceholders={false}
+          items={[
+            { title: `Travadas agora: ${travadas}`, subtitle: "Ataque o topo da fila para reduzir pressão de SLA.", action: <button className="nexo-cta-secondary" onClick={() => navigate("/service-orders?status=blocked")}>Destravar</button> },
+            { title: `Sem responsável: ${semResponsavel}`, subtitle: "Distribua técnico para remover gargalo de execução.", action: <button className="nexo-cta-secondary" onClick={() => setOpenCreate(true)}>Atribuir</button> },
+            { title: `Aguardando cliente: ${aguardandoCliente}`, subtitle: "Cobrança ativa de retorno evita tempo morto.", action: <button className="nexo-cta-secondary" onClick={() => navigate("/whatsapp")}>Cobrar retorno</button> },
+          ]}
+        />
+      </AppSectionBlock>
+      </section>
       ) : null}
 
       {(activeTab === "pipeline" || activeTab === "execution") ? (
-      <section className="grid gap-4 xl:grid-cols-2">
-        <AppSectionBlock title="Top O.S. para executar agora" subtitle="Prioridade alta com ação operacional direta">
+      <section className="grid gap-4 xl:grid-cols-12">
+        <AppSectionBlock title="Top O.S. para executar agora" subtitle="Prioridade alta com ação operacional direta" className="xl:col-span-8">
           <AppListBlock
             items={topOS.length > 0
               ? topOS.map((item) => ({
@@ -173,8 +187,9 @@ export default function ServiceOrdersPage() {
               : [{ title: "Sem O.S. abertas", subtitle: "Crie uma ordem para iniciar execução.", action: <button className="nexo-cta-secondary" onClick={() => setOpenCreate(true)}>Criar O.S.</button> }]}
           />
         </AppSectionBlock>
-        <AppSectionBlock title="Resumo de bloqueio" subtitle="Indicadores com CTA para destrave imediato">
+        <AppSectionBlock title="Resumo de bloqueio" subtitle="Indicadores com CTA para destrave imediato" className="xl:col-span-4" compact>
           <AppListBlock
+            showPlaceholders={false}
             items={[
               { title: `Travadas agora: ${travadas}`, subtitle: "Ataque o topo da fila para reduzir pressão de SLA.", action: <button className="nexo-cta-secondary" onClick={() => navigate("/service-orders?status=blocked")}>Destravar</button> },
               { title: `Sem responsável: ${semResponsavel}`, subtitle: "Distribua técnico para remover gargalo de execução.", action: <button className="nexo-cta-secondary" onClick={() => setOpenCreate(true)}>Atribuir</button> },

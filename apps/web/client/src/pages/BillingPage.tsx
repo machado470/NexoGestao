@@ -205,13 +205,8 @@ export default function BillingPage() {
               : "Não informada",
             hint: "próximo marco financeiro",
           },
-          {
-            title: "Método de pagamento",
-            value: stripeConfigured ? "Stripe ativo" : "Pendente",
-            hint: "canal de cobrança",
-            tone: stripeConfigured ? "default" : "important",
-          },
         ]}
+        gridClassName="grid-cols-1 md:grid-cols-3"
       />
 
       {!stripeConfigured ? (

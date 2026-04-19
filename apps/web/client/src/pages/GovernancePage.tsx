@@ -156,7 +156,8 @@ export default function GovernancePage() {
       </AppSectionBlock>
 
       {(activeTab === "overview" || activeTab === "history") ? (
-      <div className="grid gap-3 xl:grid-cols-3">
+      <div className="grid gap-3 xl:grid-cols-12">
+        <div className="xl:col-span-8">
         <AppChartPanel title="Evolução do risco" description="Histórico compacto das últimas execuções.">
           {runsQuery.isLoading && !hasRunsData ? (
             <AppPageLoadingState description="Carregando histórico de risco..." />
@@ -183,6 +184,8 @@ export default function GovernancePage() {
             </ChartErrorBoundary>
           )}
         </AppChartPanel>
+        </div>
+        <div className="space-y-3 xl:col-span-4">
         <AppNextActionCard
           title="Risco real agora"
           description={entitiesAtRisk.length > 0
@@ -201,13 +204,14 @@ export default function GovernancePage() {
           metadata="próximo passo"
           action={{ label: "Aplicar ação", onClick: () => void Promise.all([summaryQuery.refetch(), runsQuery.refetch()]) }}
         />
+        </div>
       </div>
       ) : null}
 
       <TrpcSectionErrorBoundary context="governance:entity-recommendations">
       {(activeTab === "overview" || activeTab === "alerts" || activeTab === "executions") ? (
-      <div className="grid gap-3 xl:grid-cols-2">
-        <AppSectionBlock title="Entidades em risco" subtitle="Itens reais apontados pela governança">
+      <div className="grid gap-3 xl:grid-cols-12">
+        <AppSectionBlock title="Entidades em risco" subtitle="Itens reais apontados pela governança" className="xl:col-span-8">
           {summaryQuery.isLoading && !hasSummaryData ? (
             <AppPageLoadingState description="Carregando entidades em risco..." />
           ) : summaryQuery.error && !hasSummaryData ? (
@@ -233,7 +237,7 @@ export default function GovernancePage() {
           )}
         </AppSectionBlock>
 
-        <AppSectionBlock title="Ações recomendadas" subtitle="Próximas ações úteis para reduzir risco">
+        <AppSectionBlock title="Ações recomendadas" subtitle="Próximas ações úteis para reduzir risco" className="xl:col-span-4">
           {summaryQuery.isLoading && !hasSummaryData ? (
             <AppPageLoadingState description="Carregando recomendações..." />
           ) : summaryQuery.error && !hasSummaryData ? (

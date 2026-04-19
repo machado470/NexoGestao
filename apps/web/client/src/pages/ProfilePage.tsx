@@ -5,7 +5,6 @@ import { normalizeObjectPayload } from "@/lib/query-helpers";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import {
-  AppKpiRow,
   AppListBlock,
   AppPageLoadingState,
   AppSectionBlock,
@@ -67,14 +66,13 @@ export default function ProfilePage() {
         }
       />
 
-      <AppKpiRow
-        items={[
-          { title: "Nome", value: String(me.name ?? me.fullName ?? "Usuário"), hint: "identidade da sessão" },
-          { title: "E-mail", value: String(me.email ?? "—"), hint: "conta principal" },
-          { title: "Função", value: String(me.role ?? "Usuário"), hint: "nível de acesso" },
-          { title: "Timezone", value: timezone, hint: "preferência de horário" },
-        ]}
-      />
+      <AppSectionBlock title="Resumo da conta" subtitle="Identidade e preferências essenciais" compact>
+        <div className="grid gap-2 md:grid-cols-3 text-sm">
+          <p><span className="text-[var(--text-muted)]">E-mail:</span> {String(me.email ?? "—")}</p>
+          <p><span className="text-[var(--text-muted)]">Função:</span> {String(me.role ?? "Usuário")}</p>
+          <p><span className="text-[var(--text-muted)]">Timezone:</span> {timezone}</p>
+        </div>
+      </AppSectionBlock>
 
       <div className="grid gap-4 xl:grid-cols-2">
         <AppSectionBlock title="Dados do usuário" subtitle="Informações básicas da conta" compact>

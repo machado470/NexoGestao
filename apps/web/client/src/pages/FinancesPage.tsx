@@ -271,7 +271,7 @@ export default function FinancesPage() {
         <AppSectionBlock
         title="Dinheiro em risco"
         subtitle="Bloco principal: atraso e vencimento que ameaçam o caixa imediato"
-        className="border-rose-500/35 bg-rose-500/8 p-6 lg:p-8 lg:col-span-2"
+        className="border-rose-500/20 bg-rose-500/5"
       >
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-[var(--text-secondary)]">
@@ -287,14 +287,8 @@ export default function FinancesPage() {
       </AppSectionBlock>
       ) : null}
 
-      <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(320px,1fr))]">
-        <AppNextActionCard
-          title="Entradas rápidas"
-          description={`${cobrancasRecentes} cobranças abertas nos últimos 3 dias · potencial de ${formatCurrency(recebivelHoje)} para receber ainda hoje.`}
-          severity={recebivelHoje > 0 ? "high" : "medium"}
-          metadata="oportunidade de recebimento"
-          action={{ label: "Enviar cobrança", onClick: () => setOpenCreate(true) }}
-        />
+      <div className="grid gap-4 xl:grid-cols-12">
+        <div className="xl:col-span-8 space-y-4">
         <AppChartPanel title="Receita por mês" description="Evolução mensal para confirmar tendência de entrada.">
           {revenueQuery.isLoading && revenueSafe.data.length === 0 ? (
             <AppPageLoadingState description="Carregando evolução de receita..." />
@@ -331,6 +325,16 @@ export default function FinancesPage() {
             </BarChart>
           </ChartContainer>
         </AppChartPanel>
+        </div>
+        <div className="xl:col-span-4">
+        <AppNextActionCard
+          title="Entradas rápidas"
+          description={`${cobrancasRecentes} cobranças abertas nos últimos 3 dias · potencial de ${formatCurrency(recebivelHoje)} para receber ainda hoje.`}
+          severity={recebivelHoje > 0 ? "high" : "medium"}
+          metadata="oportunidade de recebimento"
+          action={{ label: "Enviar cobrança", onClick: () => setOpenCreate(true) }}
+        />
+        </div>
       </div>
 
       <TrpcSectionErrorBoundary context="finances:charges-table">
