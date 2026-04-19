@@ -61,6 +61,10 @@ interface QueueItem {
     | "Cobrar via WhatsApp"
     | "Agendar lembrete"
     | "Registrar pagamento";
+  priorityReason?: string;
+  impactLabel?: string;
+  contextualActions?: readonly string[];
+  flowContext?: string;
   onAction: () => void;
 }
 
@@ -93,6 +97,14 @@ interface FinanceOverviewProps {
   goToMode: (mode: "pending" | "overdue" | "paid") => void;
   openCreate: () => void;
   cobrarAgora: () => void;
+  operationalSignals: {
+    overdueCount: number;
+    dueToday: number;
+    dueSoon: number;
+    awaitingSettlementCount: number;
+    awaitingSettlementTotal: string;
+    riskAmount: string;
+  };
   queueItems: QueueItem[];
 }
 
@@ -133,54 +145,71 @@ export function FinanceOverview(props: FinanceOverviewProps) {
           ? `${props.risk.dueSoon} cobrança(s) vencem em até 7 dias.`
           : "Sem pressão imediata no caixa.";
   const nextBestAction = useMemo(() => {
-    if (props.risk.overdueCount > 0) {
+    if (props.operationalSignals.overdueCount > 0) {
       return {
         urgencyLabel: "Crítico",
         headline: "Cobrar vencidas",
-        immediateContext: `${props.risk.overdueCount} item(ns) crítico(s) agora.`,
-        impactContext: `Impacto estimado: ${props.risk.riskAmount}.`,
+        immediateContext: `${props.operationalSignals.overdueCount} cobrança(s) vencida(s) com criticidade financeira.`,
+        reason: "Existem pendências vencidas com impacto imediato no caixa.",
+        impactContext: `Impacto estimado: ${props.operationalSignals.riskAmount}.`,
         cta: "Cobrar agora via WhatsApp",
         ctaVariant: "default" as const,
         onClick: props.cobrarAgora,
       };
     }
-    if (props.risk.dueToday > 0 || dueSoon72hCount > 0) {
-      const urgentCount = props.risk.dueToday + dueSoon72hCount;
+    if (props.operationalSignals.dueToday > 0 || dueSoon72hCount > 0) {
+      const urgentCount = props.operationalSignals.dueToday + dueSoon72hCount;
       return {
         urgencyLabel: "Hoje",
         headline: "Cobrar hoje",
         immediateContext: `${urgentCount} cobrança(s) pedem contato imediato.`,
-        impactContext: `Janela sensível: ${props.risk.riskAmount} em monitoramento.`,
+        reason: "Janela crítica nas próximas 72h e risco de virar vencida.",
+        impactContext: `Janela sensível: ${props.operationalSignals.riskAmount} em monitoramento.`,
         cta: "Cobrar agora via WhatsApp",
         ctaVariant: "outline" as const,
         onClick: props.cobrarAgora,
       };
     }
+    if (props.operationalSignals.awaitingSettlementCount > 0) {
+      return {
+        urgencyLabel: "Processar",
+        headline: "Registrar pagamento",
+        immediateContext: `${props.operationalSignals.awaitingSettlementCount} recebimento(s) aguardando baixa.`,
+        reason: "Entrada já confirmada e ainda não refletida no realizado.",
+        impactContext: `Impacto estimado: ${props.operationalSignals.awaitingSettlementTotal}.`,
+        cta: "Registrar pagamento",
+        ctaVariant: "outline" as const,
+        onClick: () => props.goToMode("paid"),
+      };
+    }
     return {
       urgencyLabel: "Estável",
-      headline: "Registrar recebimento",
+      headline: "Monitorar carteira saudável",
       immediateContext: "Sem itens críticos no momento.",
-      impactContext: "Ação de rotina para manter o fluxo atualizado.",
-      cta: "Registrar pagamento",
+      reason: "Fluxo previsível sem pressão imediata no caixa.",
+      impactContext: "Ação recomendada: manter acompanhamento periódico.",
+      cta: "Ver pendentes",
       ctaVariant: "outline" as const,
-      onClick: () => props.goToMode("paid"),
+      onClick: () => props.goToMode("pending"),
     };
   }, [
     dueSoon72hCount,
     props.cobrarAgora,
     props.goToMode,
-    props.risk.dueToday,
-    props.risk.overdueCount,
-    props.risk.riskAmount,
+    props.operationalSignals.awaitingSettlementCount,
+    props.operationalSignals.awaitingSettlementTotal,
+    props.operationalSignals.dueToday,
+    props.operationalSignals.overdueCount,
+    props.operationalSignals.riskAmount,
   ]);
 
   return (
-    <div className="space-y-3.5">
+    <div className="space-y-8">
       <AppChartPanel
         title="Receita e previsão"
         description="Recebidos, previstos e vencimentos no período selecionado."
       >
-        <div className="mb-3 flex items-center justify-between gap-2">
+        <div className="mb-5 flex items-center justify-between gap-3">
           <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/35 bg-emerald-500/12 px-3 py-1 text-[11px] font-semibold text-emerald-200">
             <Sparkles className="h-3.5 w-3.5" />
             {`${revenueDeltaPercent >= 0 ? "+" : "-"}${Math.abs(revenueDeltaPercent).toFixed(1)}% nos últimos ${period === "7d" ? "7" : period === "30d" ? "30" : period === "90d" ? "90" : "dias do mês"} dias`}
@@ -198,8 +227,8 @@ export function FinanceOverview(props: FinanceOverviewProps) {
             ))}
           </div>
         </div>
-        <div className="mb-3 grid gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/45 p-3 md:grid-cols-2">
-          <div className="flex items-start gap-2.5 border-b border-[var(--border-subtle)]/70 pb-2 md:border-b-0 md:border-r md:pb-0 md:pr-3">
+        <div className="mb-5 grid gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/45 p-4 md:grid-cols-2">
+          <div className="flex items-start gap-2.5 border-b border-[var(--border-subtle)]/70 pb-3 md:border-b-0 md:border-r md:pb-0 md:pr-4">
             <div className="rounded-md bg-emerald-500/20 p-1.5 text-emerald-200">
               <ArrowUpRight className="h-3.5 w-3.5" />
             </div>
@@ -251,7 +280,7 @@ export function FinanceOverview(props: FinanceOverviewProps) {
           />
         ) : (
           <ChartContainer
-            className="h-[276px] w-full lg:h-[300px]"
+            className="h-[280px] w-full rounded-xl border border-[var(--border-subtle)]/75 bg-[var(--surface-base)]/25 p-2 lg:h-[310px]"
             config={{
               revenue: { label: "Recebido", color: "hsl(var(--accent))" },
               projected: {
@@ -370,7 +399,7 @@ export function FinanceOverview(props: FinanceOverviewProps) {
           </ChartContainer>
         )}
 
-        <div className="mt-2 flex items-center justify-between text-xs text-[var(--text-muted)]">
+        <div className="mt-4 flex items-center justify-between text-xs text-[var(--text-muted)]">
           <span>
             {totalOverdueEvents > 0
               ? `${totalOverdueEvents} pontos críticos no período.`
@@ -382,14 +411,14 @@ export function FinanceOverview(props: FinanceOverviewProps) {
         </div>
       </AppChartPanel>
 
-      <div className="grid gap-2.5 md:grid-cols-2">
+      <div className="grid gap-8 md:grid-cols-2">
         <AppSectionBlock
           title="Painel de risco"
           subtitle="Risco financeiro imediato da operação."
           className="h-full"
           compact
         >
-          <div className="flex h-full flex-col gap-2">
+          <div className="flex h-full flex-col gap-4">
             <div className="flex items-start justify-between gap-2">
               <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]/85">
                 Valor em risco
@@ -411,7 +440,7 @@ export function FinanceOverview(props: FinanceOverviewProps) {
             <p className="text-sm text-[var(--text-secondary)]">
               {riskSummary}
             </p>
-            <div className="space-y-1">
+            <div className="space-y-2">
               <div className="flex items-center justify-between text-[11px] text-[var(--text-secondary)]">
                 <span>Risco financeiro</span>
                 <span>{riskIntensity}%</span>
@@ -455,7 +484,7 @@ export function FinanceOverview(props: FinanceOverviewProps) {
             <Button
               size="sm"
               variant="outline"
-              className="mt-2 w-fit"
+              className="mt-1 w-fit"
               onClick={() => props.goToMode("overdue")}
             >
               Ir para vencidas
@@ -469,7 +498,7 @@ export function FinanceOverview(props: FinanceOverviewProps) {
           className="h-full"
           compact
         >
-          <div className="flex h-full flex-col gap-2">
+          <div className="flex h-full flex-col gap-4">
             <div className="flex items-start justify-between gap-2">
               <div>
                 <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--accent)]">
@@ -483,10 +512,13 @@ export function FinanceOverview(props: FinanceOverviewProps) {
                 {nextBestAction.urgencyLabel}
               </span>
             </div>
-            <div className="flex items-center gap-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/35 p-3">
+            <div className="flex items-center gap-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/35 p-3.5">
               <div className="flex-1">
                 <p className="text-sm text-[var(--text-secondary)]">
                   {nextBestAction.immediateContext}
+                </p>
+                <p className="mt-1 text-[11px] text-[var(--text-muted)]">
+                  Motivo: {nextBestAction.reason}
                 </p>
                 <p className="text-sm font-medium text-[var(--text-primary)]/95">
                   {nextBestAction.impactContext}
@@ -521,7 +553,7 @@ export function FinanceOverview(props: FinanceOverviewProps) {
         className="mt-0.5"
         compact
       >
-        <div className="mb-2 flex items-center justify-between">
+        <div className="mb-4 flex items-center justify-between">
           <button
             type="button"
             className="inline-flex items-center gap-1 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)]/40 px-2.5 py-1 text-[11px] text-[var(--text-secondary)]"
@@ -533,13 +565,13 @@ export function FinanceOverview(props: FinanceOverviewProps) {
             {props.queueItems.length} itens
           </span>
         </div>
-        <div className="space-y-2">
+        <div className="space-y-2.5">
           {props.queueItems.length > 0 ? (
             props.queueItems.map(item => (
               <div
                 key={item.id}
                 className={cn(
-                  "group relative rounded-lg border px-3 py-3 transition-all duration-200 hover:-translate-y-[1px] hover:shadow-[0_8px_24px_rgba(0,0,0,0.18)]",
+                  "group relative rounded-lg border px-3 py-2.5 transition-all duration-200 hover:-translate-y-[1px] hover:shadow-[0_8px_24px_rgba(0,0,0,0.18)]",
                   item.priority === "critical" &&
                     "border-rose-500/35 bg-rose-500/10 before:absolute before:bottom-2 before:left-0 before:top-2 before:w-1 before:rounded-r-md before:bg-rose-400/60",
                   item.priority === "attention" &&
@@ -548,7 +580,7 @@ export function FinanceOverview(props: FinanceOverviewProps) {
                     "border-[var(--border-subtle)] bg-[var(--surface-base)]/50 before:absolute before:bottom-2 before:left-0 before:top-2 before:w-1 before:rounded-r-md before:bg-emerald-300/50"
                 )}
               >
-                <div className="grid gap-2 sm:grid-cols-[1.6fr,1fr,1fr,auto,auto,auto] sm:items-center">
+                <div className="grid gap-2 sm:grid-cols-[1.4fr,1fr,1fr,auto,auto,auto] sm:items-center">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium text-[var(--text-primary)]">
                       {item.client}
@@ -613,11 +645,30 @@ export function FinanceOverview(props: FinanceOverviewProps) {
                     <CircleEllipsis className="h-4 w-4" />
                   </button>
                 </div>
-                {item.intelligenceLabel ? (
-                  <p className="mt-2 pl-0.5 text-[11px] font-medium text-[var(--text-secondary)]">
+                <div className="mt-1.5 grid gap-1 text-[11px] md:grid-cols-[1.2fr,1fr,1fr]">
+                  <p className="text-[var(--text-secondary)]">
                     {item.intelligenceLabel}
                   </p>
-                ) : null}
+                  <p className="text-[var(--text-muted)]">
+                    {item.priorityReason}
+                  </p>
+                  <p className="text-[var(--text-muted)]">{item.impactLabel}</p>
+                </div>
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                  {item.contextualActions?.map(action => (
+                    <span
+                      key={`${item.id}-${action}`}
+                      className="rounded-full border border-[var(--border-subtle)]/85 px-2 py-0.5 text-[10px] text-[var(--text-secondary)]"
+                    >
+                      {action}
+                    </span>
+                  ))}
+                  {item.flowContext ? (
+                    <span className="text-[10px] text-[var(--text-muted)]">
+                      {item.flowContext}
+                    </span>
+                  ) : null}
+                </div>
               </div>
             ))
           ) : (
