@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing'
 import { NotFoundException } from '@nestjs/common'
 import { ExpensesService } from './expenses.service'
 import { PrismaService } from '../prisma/prisma.service'
+import { TimelineService } from '../timeline/timeline.service'
 
 const mockPrisma = {
   expense: {
@@ -14,7 +15,14 @@ const mockPrisma = {
     groupBy: jest.fn(),
     aggregate: jest.fn(),
   },
+  payment: {
+    aggregate: jest.fn(),
+  },
+  charge: {
+    aggregate: jest.fn(),
+  },
 }
+const mockTimeline = { log: jest.fn() }
 
 describe('ExpensesService', () => {
   let service: ExpensesService
@@ -24,6 +32,7 @@ describe('ExpensesService', () => {
       providers: [
         ExpensesService,
         { provide: PrismaService, useValue: mockPrisma },
+        { provide: TimelineService, useValue: mockTimeline },
       ],
     }).compile()
 
@@ -34,7 +43,7 @@ describe('ExpensesService', () => {
   describe('list', () => {
     it('deve retornar lista paginada de despesas', async () => {
       const mockExpenses = [
-        { id: '1', description: 'Despesa 1', amountCents: 10000, category: 'SUPPLIES', date: new Date() },
+        { id: '1', title: 'Despesa 1', amountCents: 10000, category: 'MARKET', occurredAt: new Date() },
       ]
       mockPrisma.expense.findMany.mockResolvedValue(mockExpenses)
       mockPrisma.expense.count.mockResolvedValue(1)
@@ -52,11 +61,11 @@ describe('ExpensesService', () => {
       mockPrisma.expense.findMany.mockResolvedValue([])
       mockPrisma.expense.count.mockResolvedValue(0)
 
-      await service.list('org-1', { category: 'SUPPLIES' } as any)
+      await service.list('org-1', { category: 'MARKET' } as any)
 
       expect(mockPrisma.expense.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: expect.objectContaining({ category: 'SUPPLIES' }),
+          where: expect.objectContaining({ category: 'MARKET' }),
         })
       )
     })
@@ -66,9 +75,11 @@ describe('ExpensesService', () => {
     it('deve criar uma despesa com sucesso', async () => {
       const dto = {
         description: 'Nova despesa',
+        title: 'Nova despesa',
         amountCents: 5000,
-        category: 'SUPPLIES',
-        date: '2024-01-15',
+        category: 'MARKET',
+        type: 'VARIABLE',
+        occurredAt: '2024-01-15',
       }
       const mockCreated = { id: 'new-id', ...dto }
       mockPrisma.expense.create.mockResolvedValue(mockCreated)
@@ -93,17 +104,17 @@ describe('ExpensesService', () => {
       mockPrisma.expense.findFirst.mockResolvedValue(null)
 
       await expect(
-        service.update('org-1', 'non-existent', { description: 'Updated' })
+        service.update('org-1', 'non-existent', null, { description: 'Updated' })
       ).rejects.toThrow(NotFoundException)
     })
 
     it('deve atualizar despesa existente', async () => {
-      const existing = { id: 'exp-1', orgId: 'org-1', description: 'Old', amountCents: 1000 }
+      const existing = { id: 'exp-1', orgId: 'org-1', title: 'Old', amountCents: 1000 }
       const updated = { ...existing, description: 'Updated' }
       mockPrisma.expense.findFirst.mockResolvedValue(existing)
       mockPrisma.expense.update.mockResolvedValue(updated)
 
-      const result = await service.update('org-1', 'exp-1', { description: 'Updated' })
+      const result = await service.update('org-1', 'exp-1', null, { description: 'Updated' })
 
       expect(result.description).toBe('Updated')
       expect(mockPrisma.expense.update).toHaveBeenCalledWith(
@@ -116,14 +127,14 @@ describe('ExpensesService', () => {
     it('deve lançar NotFoundException se despesa não encontrada', async () => {
       mockPrisma.expense.findFirst.mockResolvedValue(null)
 
-      await expect(service.delete('org-1', 'non-existent')).rejects.toThrow(NotFoundException)
+      await expect(service.delete('org-1', 'non-existent', null)).rejects.toThrow(NotFoundException)
     })
 
     it('deve deletar despesa existente', async () => {
-      mockPrisma.expense.findFirst.mockResolvedValue({ id: 'exp-1' })
+      mockPrisma.expense.findFirst.mockResolvedValue({ id: 'exp-1', recurrence: 'NONE', title: 'A' })
       mockPrisma.expense.delete.mockResolvedValue({ id: 'exp-1' })
 
-      const result = await service.delete('org-1', 'exp-1')
+      const result = await service.delete('org-1', 'exp-1', null)
 
       expect(result).toEqual({ ok: true })
       expect(mockPrisma.expense.delete).toHaveBeenCalledWith({ where: { id: 'exp-1' } })

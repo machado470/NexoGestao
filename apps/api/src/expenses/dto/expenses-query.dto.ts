@@ -1,5 +1,5 @@
 import { IsOptional, IsEnum, IsNumberString, IsDateString } from 'class-validator'
-import { ExpenseCategory } from './create-expense.dto'
+import { ExpenseCategory, ExpenseRecurrenceDto, ExpenseTypeDto } from './create-expense.dto'
 
 export class ExpensesQueryDto {
   @IsNumberString()
@@ -13,6 +13,14 @@ export class ExpensesQueryDto {
   @IsEnum(ExpenseCategory)
   @IsOptional()
   category?: ExpenseCategory
+
+  @IsEnum(ExpenseTypeDto)
+  @IsOptional()
+  type?: ExpenseTypeDto
+
+  @IsEnum(ExpenseRecurrenceDto)
+  @IsOptional()
+  recurrence?: ExpenseRecurrenceDto
 
   @IsDateString()
   @IsOptional()

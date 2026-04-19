@@ -31,8 +31,14 @@ export class ExpensesController {
 
   @Get('summary')
   @Roles('ADMIN')
-  async summary(@Org() orgId: string) {
-    return this.expenses.summary(orgId)
+  async summary(@Org() orgId: string, @Query('month') month?: string) {
+    return this.expenses.summary(orgId, month)
+  }
+
+  @Get('monthly-result')
+  @Roles('ADMIN')
+  async monthlyResult(@Org() orgId: string, @Query('month') month?: string) {
+    return this.expenses.getMonthlyFinancialResult(orgId, month)
   }
 
   @Post()
@@ -50,15 +56,18 @@ export class ExpensesController {
   @Roles('ADMIN')
   async update(
     @Org() orgId: string,
+    @User() user: any,
     @Param('id') id: string,
     @Body() body: Partial<CreateExpenseDto>,
   ) {
-    return this.expenses.update(orgId, id, body)
+    const userId = user?.userId ?? user?.sub ?? null
+    return this.expenses.update(orgId, id, userId, body)
   }
 
   @Delete(':id')
   @Roles('ADMIN')
-  async delete(@Org() orgId: string, @Param('id') id: string) {
-    return this.expenses.delete(orgId, id)
+  async delete(@Org() orgId: string, @User() user: any, @Param('id') id: string) {
+    const userId = user?.userId ?? user?.sub ?? null
+    return this.expenses.delete(orgId, id, userId)
   }
 }
