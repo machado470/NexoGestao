@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { X } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button, SecondaryButton } from "@/components/design-system";
 
@@ -7,6 +7,7 @@ type ModalAction = {
   label: string;
   onClick: () => void;
   disabled?: boolean;
+  processing?: boolean;
 };
 
 type SummaryItem = {
@@ -27,6 +28,7 @@ type Props = {
   secondaryAction?: ModalAction;
   quickActions?: ModalAction[];
   feedback?: ReactNode;
+  feedbackTone?: "neutral" | "success" | "error";
   children: ReactNode;
 };
 
@@ -43,18 +45,25 @@ export function AppOperationalModal({
   secondaryAction,
   quickActions = [],
   feedback,
+  feedbackTone = "neutral",
   children,
 }: Props) {
+  const hasAnyProcessing = Boolean(
+    primaryAction?.processing ||
+      secondaryAction?.processing ||
+      quickActions.some(action => action.processing)
+  );
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="flex h-[92vh] w-[min(96vw,1280px)] max-w-none flex-col gap-0 overflow-hidden border-[var(--border-subtle)] bg-[var(--surface-base)] p-0"
+        className="flex h-[92vh] w-[min(96vw,1280px)] max-w-none flex-col gap-0 overflow-hidden border-[var(--border-subtle)] bg-[var(--surface-base)] p-0 shadow-2xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:zoom-in-[0.99] data-[state=closed]:zoom-out-[0.99]"
         onOpenAutoFocus={event => {
           event.preventDefault();
         }}
       >
         <DialogTitle className="sr-only">{title}</DialogTitle>
-        <header className="sticky top-0 z-20 border-b border-[var(--border-subtle)] bg-[var(--surface-base)] px-6 py-4">
+        <header className="sticky top-0 z-20 border-b border-[var(--border-subtle)] bg-[var(--surface-base)]/95 px-6 py-4 backdrop-blur">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <h2 className="truncate text-lg font-semibold text-[var(--text-primary)]">
@@ -110,16 +119,23 @@ export function AppOperationalModal({
 
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">{children}</div>
 
-        <footer className="sticky bottom-0 z-20 border-t border-[var(--border-subtle)] bg-[var(--surface-base)] px-6 py-4">
+        <footer className="sticky bottom-0 z-20 border-t border-[var(--border-subtle)] bg-[var(--surface-base)]/95 px-6 py-4 backdrop-blur">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap gap-2">
               {primaryAction ? (
                 <Button
                   type="button"
                   onClick={primaryAction.onClick}
-                  disabled={primaryAction.disabled}
-                  className="h-9 px-4"
+                  disabled={
+                    primaryAction.disabled ||
+                    hasAnyProcessing ||
+                    primaryAction.processing
+                  }
+                  className="h-9 min-w-[148px] px-4"
                 >
+                  {primaryAction.processing ? (
+                    <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                  ) : null}
                   {primaryAction.label}
                 </Button>
               ) : null}
@@ -127,9 +143,16 @@ export function AppOperationalModal({
                 <SecondaryButton
                   type="button"
                   onClick={secondaryAction.onClick}
-                  disabled={secondaryAction.disabled}
-                  className="h-9 px-4"
+                  disabled={
+                    secondaryAction.disabled ||
+                    hasAnyProcessing ||
+                    secondaryAction.processing
+                  }
+                  className="h-9 min-w-[122px] px-4"
                 >
+                  {secondaryAction.processing ? (
+                    <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                  ) : null}
                   {secondaryAction.label}
                 </SecondaryButton>
               ) : null}
@@ -138,15 +161,28 @@ export function AppOperationalModal({
                   key={action.label}
                   type="button"
                   onClick={action.onClick}
-                  disabled={action.disabled}
+                  disabled={action.disabled || hasAnyProcessing || action.processing}
                   className="h-9 px-3 text-xs"
                 >
+                  {action.processing ? (
+                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  ) : null}
                   {action.label}
                 </SecondaryButton>
               ))}
             </div>
             {feedback ? (
-              <div className="text-xs text-[var(--text-secondary)]">{feedback}</div>
+              <div
+                className={`rounded-md border px-2.5 py-1.5 text-xs ${
+                  feedbackTone === "success"
+                    ? "border-[var(--dashboard-success)]/40 bg-[var(--dashboard-success)]/10 text-[var(--dashboard-success)]"
+                    : feedbackTone === "error"
+                      ? "border-[var(--dashboard-danger)]/40 bg-[var(--dashboard-danger)]/10 text-[var(--dashboard-danger)]"
+                      : "border-[var(--border-subtle)] bg-[var(--surface-subtle)] text-[var(--text-secondary)]"
+                }`}
+              >
+                {feedback}
+              </div>
             ) : null}
           </div>
         </footer>
