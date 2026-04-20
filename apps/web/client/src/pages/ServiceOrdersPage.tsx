@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { normalizeArrayPayload } from "@/lib/query-helpers";
 import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
+import { useOperationalMemoryState } from "@/hooks/useOperationalMemory";
 import CreateServiceOrderModal from "@/components/CreateServiceOrderModal";
 import ServiceOrderDetailsPanel from "@/components/service-orders/ServiceOrderDetailsPanel";
 import type { ServiceOrder } from "@/components/service-orders/service-order.types";
@@ -12,6 +13,8 @@ import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedba
 import { AppOperationalModal } from "@/components/operating-system/AppOperationalModal";
 import {
   EmptyActionState,
+  explainOperationalError,
+  OperationalAutomationNote,
   OperationalFlowState,
   OperationalInlineFeedback,
   OperationalNextAction,
@@ -29,6 +32,7 @@ import {
   AppSectionBlock,
   AppStatusBadge,
 } from "@/components/internal-page-system";
+import { SecondaryButton } from "@/components/design-system";
 import { getDayWindow, inRange, safeDate } from "@/lib/operational/kpi";
 import {
   getOperationalSeverityLabel,
@@ -101,11 +105,26 @@ function getNextAction(order: any) {
 export default function ServiceOrdersPage() {
   const [location, navigate] = useLocation();
   const [openCreate, setOpenCreate] = useState(false);
-  const [activeTab, setActiveTab] = useState<ServiceOrderTab>("pipeline");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [windowFilter, setWindowFilter] = useState<WindowFilter>("all");
-  const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>("all");
-  const [customerFilter, setCustomerFilter] = useState("all");
+  const [activeTab, setActiveTab] = useOperationalMemoryState<ServiceOrderTab>(
+    "nexo.service-orders.tab.v1",
+    "pipeline"
+  );
+  const [searchTerm, setSearchTerm] = useOperationalMemoryState(
+    "nexo.service-orders.search.v1",
+    ""
+  );
+  const [windowFilter, setWindowFilter] = useOperationalMemoryState<WindowFilter>(
+    "nexo.service-orders.window-filter.v1",
+    "all"
+  );
+  const [priorityFilter, setPriorityFilter] = useOperationalMemoryState<PriorityFilter>(
+    "nexo.service-orders.priority-filter.v1",
+    "all"
+  );
+  const [customerFilter, setCustomerFilter] = useOperationalMemoryState(
+    "nexo.service-orders.customer-filter.v1",
+    "all"
+  );
   const [focusedOrderId, setFocusedOrderId] = useState("");
   const [openOperationalModal, setOpenOperationalModal] = useState(false);
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
@@ -289,7 +308,15 @@ export default function ServiceOrdersPage() {
       setActionFeedbackTone("success");
       await serviceOrdersQuery.refetch();
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Falha na atualização.";
+      const rawMessage = error instanceof Error ? error.message : "Falha na atualização.";
+      const message = explainOperationalError({
+        fallback: rawMessage,
+        cause: `Não foi possível atualizar para ${getStatusLabel(status)}.`,
+        suggestion:
+          status === "DONE"
+            ? "Valide se a execução já foi iniciada e se não há bloqueio ativo."
+            : "Recarregue a ordem e tente novamente.",
+      });
       setActionFeedbackTone("error");
       setActionFeedback(message);
       toast.error(message);
@@ -613,6 +640,16 @@ export default function ServiceOrdersPage() {
                             </td>
                             <td className="p-3 align-top">
                               <div className="flex items-center justify-end gap-2">
+                                <SecondaryButton
+                                  type="button"
+                                  className="h-8 px-2.5 text-xs"
+                                  onClick={event => {
+                                    event.stopPropagation();
+                                    handlePrimaryAction();
+                                  }}
+                                >
+                                  Agir
+                                </SecondaryButton>
                                 <AppRowActionsDropdown
                                   triggerLabel="Mais ações"
                                   contentClassName="min-w-[240px]"
@@ -735,7 +772,16 @@ export default function ServiceOrdersPage() {
                 await serviceOrdersQuery.refetch();
               } catch (error) {
                 setActionFeedbackTone("error");
-                setActionFeedback("Falha ao gerar cobrança.");
+                setActionFeedback(
+                  explainOperationalError({
+                    fallback:
+                      error instanceof Error ? error.message : "Falha ao gerar cobrança.",
+                    cause:
+                      "Não foi possível gerar cobrança porque a ordem ainda não ficou consistente no financeiro.",
+                    suggestion:
+                      "Confirme se a O.S. está concluída e tente gerar novamente em alguns segundos.",
+                  })
+                );
               }
               return;
             }
@@ -766,7 +812,15 @@ export default function ServiceOrdersPage() {
           },
           {
             label: "Cancelar",
-            onClick: () => void executeOrderStatus("CANCELED"),
+            onClick: () => {
+              if (
+                typeof window !== "undefined" &&
+                !window.confirm("Cancelar esta ordem de serviço agora?")
+              ) {
+                return;
+              }
+              void executeOrderStatus("CANCELED");
+            },
             disabled: updateServiceOrder.isPending || !focusedOrder,
           },
         ]}
@@ -836,6 +890,9 @@ export default function ServiceOrdersPage() {
                 : "Ainda não existe cobrança associada a esta O.S.",
             ]}
           />
+          {normalizeStatus(focusedOrder?.status) === "DONE" ? (
+            <OperationalAutomationNote detail="Quando a cobrança é gerada, a O.S. concluída sai automaticamente da fila de atenção e entra no histórico financeiro." />
+          ) : null}
           {!focusedOrder?.financialSummary?.hasCharge ? (
             <EmptyActionState
               title="Nenhuma cobrança gerada ainda"
@@ -850,7 +907,14 @@ export default function ServiceOrdersPage() {
             ) : null}
           </section>
           {actionFeedback ? (
-            <OperationalInlineFeedback tone={actionFeedbackTone}>
+            <OperationalInlineFeedback
+              tone={actionFeedbackTone}
+              nextStep={
+                actionFeedbackTone === "success"
+                  ? "Validar se o status e a trilha financeira foram atualizados na lista principal."
+                  : undefined
+              }
+            >
               {actionFeedback}
             </OperationalInlineFeedback>
           ) : null}

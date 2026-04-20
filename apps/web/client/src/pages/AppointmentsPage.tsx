@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { normalizeArrayPayload } from "@/lib/query-helpers";
 import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
+import { useOperationalMemoryState } from "@/hooks/useOperationalMemory";
 import { CreateAppointmentModal } from "@/components/CreateAppointmentModal";
 import CreateServiceOrderModal from "@/components/CreateServiceOrderModal";
 import { AppRowActionsDropdown } from "@/components/app-system";
@@ -11,6 +12,8 @@ import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedba
 import { AppOperationalModal } from "@/components/operating-system/AppOperationalModal";
 import {
   EmptyActionState,
+  explainOperationalError,
+  OperationalAutomationNote,
   OperationalFlowState,
   OperationalInlineFeedback,
   OperationalNextAction,
@@ -32,6 +35,7 @@ import {
   AppPriorityBadge,
   AppStatusBadge,
 } from "@/components/internal-page-system";
+import { SecondaryButton } from "@/components/design-system";
 import { inRange, safeDate } from "@/lib/operational/kpi";
 import { toast } from "sonner";
 
@@ -84,11 +88,26 @@ function getNextAction(item: AppointmentLike) {
 export default function AppointmentsPage() {
   const [, navigate] = useLocation();
   const [openCreate, setOpenCreate] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabKey>("agenda");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [windowFilter, setWindowFilter] = useState<WindowFilter>("today");
-  const [customerFilter, setCustomerFilter] = useState("all");
+  const [activeTab, setActiveTab] = useOperationalMemoryState<TabKey>(
+    "nexo.appointments.tab.v1",
+    "agenda"
+  );
+  const [searchTerm, setSearchTerm] = useOperationalMemoryState(
+    "nexo.appointments.search.v1",
+    ""
+  );
+  const [statusFilter, setStatusFilter] = useOperationalMemoryState(
+    "nexo.appointments.status-filter.v1",
+    "all"
+  );
+  const [windowFilter, setWindowFilter] = useOperationalMemoryState<WindowFilter>(
+    "nexo.appointments.window-filter.v1",
+    "today"
+  );
+  const [customerFilter, setCustomerFilter] = useOperationalMemoryState(
+    "nexo.appointments.customer-filter.v1",
+    "all"
+  );
   const [focusedAppointmentId, setFocusedAppointmentId] = useState<string>("");
   const [openOperationalModal, setOpenOperationalModal] = useState(false);
   const [openServiceOrderCreate, setOpenServiceOrderCreate] = useState(false);
@@ -282,8 +301,19 @@ export default function AppointmentsPage() {
       setActionFeedbackTone("success");
       await appointmentsQuery.refetch();
     } catch (error) {
-      const message =
+      const rawMessage =
         error instanceof Error ? error.message : "Falha ao atualizar agendamento.";
+      const message = explainOperationalError({
+        fallback: rawMessage,
+        cause:
+          status === "CONFIRMED"
+            ? "Não foi possível confirmar este agendamento no momento."
+            : "Não foi possível cancelar este agendamento no momento.",
+        suggestion:
+          status === "CONFIRMED"
+            ? "Verifique conflito de horário ou status atual e tente novamente."
+            : "Confirme se o agendamento já não foi concluído antes de cancelar.",
+      });
       setActionFeedbackTone("error");
       setActionFeedback(message);
       toast.error(message);
@@ -605,6 +635,16 @@ export default function AppointmentsPage() {
                               </td>
                               <td className="p-3 align-top">
                                 <div className="flex items-center justify-end gap-2">
+                                  <SecondaryButton
+                                    type="button"
+                                    className="h-8 px-2.5 text-xs"
+                                    onClick={event => {
+                                      event.stopPropagation();
+                                      handlePrimaryAction();
+                                    }}
+                                  >
+                                    Agir
+                                  </SecondaryButton>
                                   <AppRowActionsDropdown
                                     triggerLabel="Mais ações"
                                     contentClassName="min-w-[232px]"
@@ -707,7 +747,15 @@ export default function AppointmentsPage() {
         }}
         secondaryAction={{
           label: "Cancelar",
-          onClick: () => void executeStatusUpdate("CANCELED"),
+          onClick: () => {
+            if (
+              typeof window !== "undefined" &&
+              !window.confirm("Cancelar este agendamento agora?")
+            ) {
+              return;
+            }
+            void executeStatusUpdate("CANCELED");
+          },
           disabled: updateAppointment.isPending || !focused,
         }}
         quickActions={[
@@ -806,6 +854,9 @@ export default function AppointmentsPage() {
             ]}
           />
           {String(focused?.item?.status ?? "").toUpperCase() === "CONFIRMED" ? (
+            <OperationalAutomationNote detail="Após criar a O.S., este agendamento sai automaticamente da fila pendente e entra na trilha de execução." />
+          ) : null}
+          {String(focused?.item?.status ?? "").toUpperCase() === "CONFIRMED" ? (
             <EmptyActionState
               title="Atendimento confirmado e pronto para execução"
               description="Ainda não há garantia de execução operacional. Crie uma O.S. para continuar o fluxo."
@@ -824,7 +875,14 @@ export default function AppointmentsPage() {
             </ul>
           </section>
           {actionFeedback ? (
-            <OperationalInlineFeedback tone={actionFeedbackTone}>
+            <OperationalInlineFeedback
+              tone={actionFeedbackTone}
+              nextStep={
+                actionFeedbackTone === "success"
+                  ? "Revisar o próximo item da agenda para manter o ritmo do turno."
+                  : undefined
+              }
+            >
               {actionFeedback}
             </OperationalInlineFeedback>
           ) : null}
