@@ -463,6 +463,66 @@ export default function CustomersPage() {
     .sort((left, right) => right.priorityScore - left.priorityScore)
     .slice(0, 3);
 
+  const tabMeta = {
+    overview: {
+      title: "Visão geral da carteira",
+      description:
+        "Leitura da carteira com risco, prioridade e contexto para tomada de decisão.",
+      ctaLabel: "Novo cliente",
+      onCta: () => setCreateOpen(true),
+      sectionTitle: "Leitura da carteira e fila prioritária",
+      sectionSubtitle:
+        "Risco de clientes, continuidade operacional e próxima ação por prioridade.",
+      listTitle: "Fila prioritária da carteira",
+    },
+    agenda: {
+      title: "Agenda por cliente",
+      description:
+        "Foco operacional em clientes com compromisso e clientes sem agenda futura.",
+      ctaLabel: "Criar agendamento",
+      onCta: () => navigate("/appointments"),
+      sectionTitle: "Continuidade de agenda da carteira",
+      sectionSubtitle:
+        "Quem tem compromisso próximo, quem está sem agenda futura e onde agir primeiro.",
+      listTitle: "Fila de agenda por cliente",
+    },
+    service_orders: {
+      title: "Execução por cliente (O.S.)",
+      description:
+        "Foco em clientes com ordens abertas, travadas e concluídas.",
+      ctaLabel: "Criar O.S.",
+      onCta: () => navigate("/service-orders"),
+      sectionTitle: "Pipeline de execução por cliente",
+      sectionSubtitle:
+        "Clientes que precisam abrir execução, acelerar avanço ou destravar ordens.",
+      listTitle: "Fila de execução por cliente",
+    },
+    financial: {
+      title: "Financeiro por cliente",
+      description:
+        "Leitura de cobrança, pendência, atraso e impacto no caixa por cliente.",
+      ctaLabel: "Ir para cobrança",
+      onCta: () => navigate("/finances?filter=overdue"),
+      sectionTitle: "Cobrança e pendência da carteira",
+      sectionSubtitle:
+        "Priorização financeira por impacto pendente e atraso de recebimento.",
+      listTitle: "Fila financeira por cliente",
+    },
+    history: {
+      title: "Histórico de relacionamento",
+      description:
+        "Timeline operacional de interações, recorrências e contexto histórico por cliente.",
+      ctaLabel: "Abrir timeline",
+      onCta: () => navigate("/timeline"),
+      sectionTitle: "Linha histórica de eventos da carteira",
+      sectionSubtitle:
+        "Recorrência de interação, padrões e sinais para prevenir novo risco.",
+      listTitle: "Clientes com maior histórico recente",
+    },
+  } as const;
+
+  const activeMeta = tabMeta[activeTab];
+
   return (
     <PageWrapper
       title="Centro operacional de clientes"
@@ -470,15 +530,15 @@ export default function CustomersPage() {
     >
       <div className="space-y-4">
         <AppPageHeader
-          title="Centro operacional de clientes"
-          description="Cliente como núcleo da operação: relacionamento, agenda, O.S., cobrança e comunicação em uma leitura única."
+          title={activeMeta.title}
+          description={activeMeta.description}
           cta={
             <Button
               type="button"
-              onClick={() => setCreateOpen(true)}
+              onClick={activeMeta.onCta}
               className="h-10 whitespace-nowrap px-4"
             >
-              Novo cliente
+              {activeMeta.ctaLabel}
             </Button>
           }
         />
@@ -508,80 +568,101 @@ export default function CustomersPage() {
         />
 
         <AppSectionBlock
-          title={
-            activeTab === "agenda"
-              ? "Leitura operacional da agenda da carteira"
-              : activeTab === "service_orders"
-                ? "Leitura operacional das O.S. por cliente"
-                : activeTab === "financial"
-                  ? "Leitura operacional de cobrança da carteira"
-                  : activeTab === "history"
-                    ? "Leitura do histórico operacional"
-                    : "Leitura operacional da carteira"
-          }
-          subtitle={
-            activeTab === "agenda"
-              ? "Foco em clientes sem agenda futura e risco de descontinuidade."
-              : activeTab === "service_orders"
-                ? "Quem exige avanço de execução e abertura de workspace agora."
-                : activeTab === "financial"
-                  ? "Quem concentra impacto no caixa e precisa de ação de cobrança."
-                  : activeTab === "history"
-                    ? "Evolução de interação e recorrências para corrigir padrão."
-                    : "Quem pede ação agora, onde está o risco e qual próximo passo reduz impacto."
-          }
+          title={activeMeta.sectionTitle}
+          subtitle={activeMeta.sectionSubtitle}
         >
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             <article className="rounded-lg border border-[var(--dashboard-danger)]/30 bg-[var(--surface-subtle)] p-3.5">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
-                  Risco de receita
+                  {activeTab === "financial"
+                    ? "Cobrança crítica"
+                    : activeTab === "agenda"
+                      ? "Sem agenda futura"
+                      : activeTab === "service_orders"
+                        ? "Execução em risco"
+                        : activeTab === "history"
+                          ? "Recorrência de risco"
+                          : "Clientes em risco"}
                 </p>
-                <AppStatusBadge label="Em risco" />
+                <AppStatusBadge
+                  label={activeTab === "history" ? "Histórico" : "Em risco"}
+                />
               </div>
               <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
-                {overdueCustomers} cliente(s) com cobrança vencida.
+                {activeTab === "agenda"
+                  ? `${withoutFutureSchedule} cliente(s) sem agenda futura.`
+                  : activeTab === "service_orders"
+                    ? `${displayedCustomers.length} cliente(s) com contexto de execução aberto.`
+                    : activeTab === "history"
+                      ? `${displayedCustomers.length} cliente(s) com eventos relevantes no período.`
+                      : `${overdueCustomers} cliente(s) com cobrança vencida.`}
               </p>
               <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                Priorize cobrança e contato para evitar atraso recorrente no
-                caixa.
+                {activeTab === "agenda"
+                  ? "Sem agenda confirmada, aumenta o risco de quebra operacional."
+                  : activeTab === "service_orders"
+                    ? "Revisar avanço e bloqueio por cliente evita travas no pipeline."
+                    : activeTab === "history"
+                      ? "Eventos históricos orientam correção de padrão e previsibilidade."
+                      : "Priorize cobrança e contato para evitar atraso recorrente no caixa."}
               </p>
             </article>
 
             <article className="rounded-lg border border-[var(--dashboard-warning)]/30 bg-[var(--surface-subtle)] p-3.5">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
-                  Continuidade operacional
+                  {activeTab === "financial"
+                    ? "Impacto pendente"
+                    : activeTab === "agenda"
+                      ? "Compromissos do dia"
+                      : activeTab === "service_orders"
+                        ? "Ordens sem avanço"
+                        : activeTab === "history"
+                          ? "Última interação"
+                          : "Continuidade operacional"}
                 </p>
                 <AppStatusBadge label="Atenção" />
               </div>
               <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
-                {withoutFutureSchedule} cliente(s) sem agendamento futuro.
+                {activeTab === "financial"
+                  ? `${formatMoney(
+                      operationalSnapshots.reduce(
+                        (acc, item) => acc + item.financialPendingCents,
+                        0
+                      )
+                    )} em pendência acumulada.`
+                  : activeTab === "history"
+                    ? `${operationalSnapshots.filter(item => item.lastInteractionDays >= 5).length} cliente(s) sem interação recente.`
+                    : `${withoutFutureSchedule} cliente(s) sem agendamento futuro.`}
               </p>
               <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                Sem agenda confirmada, a carteira perde previsibilidade de
-                execução.
+                {activeTab === "financial"
+                  ? "A carteira financeira orienta cobrança com maior impacto."
+                  : activeTab === "history"
+                    ? "Use o histórico para reduzir perda de continuidade."
+                    : "Sem agenda confirmada, a carteira perde previsibilidade de execução."}
               </p>
             </article>
 
             <article className="rounded-lg border border-[var(--dashboard-info)]/30 bg-[var(--surface-subtle)] p-3.5">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
-                  Próxima ação
+                  CTA principal
                 </p>
                 <AppStatusBadge label="Executar" />
               </div>
               <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
-                Abrir top prioridades e disparar ação por contexto.
+                {activeMeta.ctaLabel}
               </p>
               <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                Financeiro, agenda e WhatsApp já conectados por cliente.
+                Ação dominante da aba para avançar o fluxo sem menu secundário.
               </p>
             </article>
           </div>
           <div className="mt-3 space-y-2.5">
             <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">
-              Fila prioritária da carteira
+              {activeMeta.listTitle}
             </p>
             <div className="space-y-2.5">
               {topPriorityCustomers.length > 0 ? (
