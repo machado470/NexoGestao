@@ -133,6 +133,18 @@ function getPaginationSlots(totalPages: number, currentPage: number) {
   return slots;
 }
 
+function getPaginationButtonClass(active: boolean) {
+  return active
+    ? "min-w-8 rounded-md border border-[var(--accent-primary)] bg-[var(--accent-soft)] px-2 py-1.5 text-xs font-semibold text-[var(--accent-primary)] shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--accent-primary)_24%,transparent)] transition-all"
+    : "min-w-8 rounded-md border border-[var(--border-subtle)] px-2 py-1.5 text-xs font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-subtle)]";
+}
+
+function getOrderRowClass(active: boolean) {
+  return active
+    ? "cursor-pointer border-t border-[var(--border-subtle)] bg-[var(--accent-soft)]/45 transition-colors hover:bg-[var(--accent-soft)]/60"
+    : "cursor-pointer border-t border-[var(--border-subtle)] transition-colors hover:bg-[var(--surface-subtle)]/60";
+}
+
 export default function ServiceOrdersPage() {
   const [location, navigate] = useLocation();
   const [openCreate, setOpenCreate] = useState(false);
@@ -614,9 +626,9 @@ export default function ServiceOrdersPage() {
                         <th className="w-[24%] px-4 py-3 text-left">Ordem</th>
                         <th className="w-[21%] px-4 py-3 text-left">Cliente</th>
                         <th className="w-[19%] px-4 py-3 text-left">Status</th>
-                        <th className="w-[12%] px-4 py-3 text-left">Prioridade</th>
+                        <th className="w-[118px] px-4 py-3 text-left">Prioridade</th>
                         <th className="w-[16%] px-4 py-3 text-left">Próxima ação</th>
-                        <th className="w-[128px] px-4 py-3 text-right">Ações</th>
+                        <th className="w-[156px] px-4 py-3 text-right">Ações</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -639,34 +651,43 @@ export default function ServiceOrdersPage() {
                           setOpenOperationalModal(true);
                         };
 
+                        const isFocused =
+                          String(order?.id ?? "") === focusedOrderId;
+                        const orderTitle = String(order?.title ?? "Sem título");
+                        const customerName = String(
+                          order?.customer?.name ?? "Cliente"
+                        );
+                        const scheduledLabel = order?.scheduledFor
+                          ? `Agendada: ${safeDate(order?.scheduledFor)?.toLocaleDateString("pt-BR")}`
+                          : "Sem data definida";
+                        const shouldShowNextActionTitle = nextAction.length > 52;
+
                         return (
                           <tr
                             key={String(order?.id)}
-                            className="cursor-pointer border-t border-[var(--border-subtle)] transition-colors hover:bg-[var(--surface-subtle)]/60"
+                            className={getOrderRowClass(isFocused)}
                             onClick={() => {
                               setFocusedOrderId(String(order?.id ?? ""));
                               setOpenOperationalModal(true);
                             }}
                           >
                             <td className="px-4 py-3.5 align-top">
-                              <p className="truncate text-[13px] font-semibold text-[var(--text-primary)]">
-                                {String(order?.title ?? "Sem título")}
+                              <p className="truncate text-[13px] font-semibold leading-snug text-[var(--text-primary)]">
+                                {orderTitle}
                               </p>
-                              <p className="mt-1 text-xs text-[var(--text-muted)]">
+                              <p className="mt-1 text-[11px] text-[var(--text-muted)]">
                                 #{String(order?.id ?? "—")}
                               </p>
                             </td>
                             <td className="px-4 py-3.5 align-top">
                               <p
-                                className="truncate text-sm text-[var(--text-primary)]"
-                                title={String(order?.customer?.name ?? "Cliente")}
+                                className="truncate text-sm font-medium text-[var(--text-primary)]"
+                                title={customerName.length > 28 ? customerName : undefined}
                               >
-                                {String(order?.customer?.name ?? "Cliente")}
+                                {customerName}
                               </p>
-                              <p className="mt-1 text-xs text-[var(--text-muted)]">
-                                {order?.scheduledFor
-                                  ? `Agendada: ${safeDate(order?.scheduledFor)?.toLocaleDateString("pt-BR")}`
-                                  : "Sem data definida"}
+                              <p className="mt-1 text-[11px] text-[var(--text-muted)]/90">
+                                {scheduledLabel}
                               </p>
                             </td>
                             <td className="px-4 py-3.5 align-top">
@@ -685,8 +706,8 @@ export default function ServiceOrdersPage() {
                             <td className="px-4 py-3.5 align-top text-xs text-[var(--text-secondary)]">
                               <button
                                 type="button"
-                                className="line-clamp-2 text-left font-medium text-[var(--accent-primary)] hover:underline"
-                                title={nextAction}
+                                className="line-clamp-2 text-left font-medium leading-relaxed text-[var(--accent-primary)] underline-offset-2 hover:underline"
+                                title={shouldShowNextActionTitle ? nextAction : undefined}
                                 onClick={event => {
                                   event.stopPropagation();
                                   handlePrimaryAction();
@@ -699,7 +720,7 @@ export default function ServiceOrdersPage() {
                               <div className="flex items-center justify-end gap-2">
                                 <SecondaryButton
                                   type="button"
-                                  className="h-8 min-w-[74px] px-2.5 text-xs"
+                                  className="h-8 min-w-[88px] px-2.5 text-xs font-semibold tracking-[0.01em]"
                                   onClick={event => {
                                     event.stopPropagation();
                                     handlePrimaryAction();
@@ -762,10 +783,10 @@ export default function ServiceOrdersPage() {
                     Mostrando {totalOrders === 0 ? 0 : pageStart + 1}–{pageEnd} de{" "}
                     {totalOrders}
                   </p>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      className="rounded-md border border-[var(--border-subtle)] px-2.5 py-1.5 text-xs text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-subtle)] disabled:cursor-not-allowed disabled:opacity-50"
+                      className="rounded-md border border-[var(--border-subtle)] px-2.5 py-1.5 text-xs font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-subtle)] disabled:cursor-not-allowed disabled:opacity-50"
                       onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                       disabled={currentPage === 1}
                     >
@@ -775,7 +796,7 @@ export default function ServiceOrdersPage() {
                       slot === "ellipsis" ? (
                         <span
                           key={`ellipsis-${index}`}
-                          className="px-1 text-xs text-[var(--text-muted)]"
+                          className="px-1.5 text-xs text-[var(--text-muted)]"
                         >
                           …
                         </span>
@@ -783,11 +804,7 @@ export default function ServiceOrdersPage() {
                         <button
                           key={`page-${slot}`}
                           type="button"
-                          className={`min-w-8 rounded-md border px-2 py-1.5 text-xs font-medium transition-colors ${
-                            slot === currentPage
-                              ? "border-[var(--accent-primary)] bg-[var(--accent-soft)] text-[var(--accent-primary)]"
-                              : "border-[var(--border-subtle)] text-[var(--text-secondary)] hover:bg-[var(--surface-subtle)]"
-                          }`}
+                          className={getPaginationButtonClass(slot === currentPage)}
                           onClick={() => setCurrentPage(slot)}
                         >
                           {slot}
@@ -796,7 +813,7 @@ export default function ServiceOrdersPage() {
                     )}
                     <button
                       type="button"
-                      className="rounded-md border border-[var(--border-subtle)] px-2.5 py-1.5 text-xs text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-subtle)] disabled:cursor-not-allowed disabled:opacity-50"
+                      className="rounded-md border border-[var(--border-subtle)] px-2.5 py-1.5 text-xs font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-subtle)] disabled:cursor-not-allowed disabled:opacity-50"
                       onClick={() =>
                         setCurrentPage(prev => Math.min(totalPages, prev + 1))
                       }
