@@ -35,9 +35,9 @@ import {
 import { SecondaryButton } from "@/components/design-system";
 import { getDayWindow, inRange, safeDate } from "@/lib/operational/kpi";
 import {
-  getOperationalSeverityLabel,
-  getServiceOrderSeverity,
-} from "@/lib/operations/operational-intelligence";
+  resolveOperationalActionLabel,
+  toSingleLineAction,
+} from "@/lib/operations/operational-list";
 import { toast } from "sonner";
 
 type ServiceOrderTab =
@@ -87,20 +87,20 @@ function getNextAction(order: any) {
   })();
 
   if (["BLOCKED", "ON_HOLD", "PAUSED"].includes(status)) {
-    return "Destravar agora — O.S. bloqueada";
+    return "Destravar O.S.";
   }
-  if (status === "WAITING_CUSTOMER") return "Cobrar retorno — aguardando cliente";
+  if (status === "WAITING_CUSTOMER") return "Cobrar retorno";
   if (["OPEN", "ASSIGNED"].includes(status) && !order?.assignedToPersonId) {
-    return "Atribuir técnico — ordem sem responsável";
+    return "Atribuir técnico";
   }
   if (["OPEN", "ASSIGNED"].includes(status))
     return overdueDays > 0
-      ? `Iniciar hoje — agendada e atrasada há ${overdueDays} dia(s)`
-      : "Iniciar execução — pronta para avanço";
-  if (status === "IN_PROGRESS") return "Acompanhar execução — evitar atraso";
-  if (status === "DONE" && !hasCharge) return "Cobrar agora — O.S. concluída sem cobrança";
-  if (status === "DONE" && hasCharge) return "Notificar cliente — cobrança emitida";
-  return "Revisar histórico operacional";
+      ? "Iniciar hoje"
+      : "Iniciar execução";
+  if (status === "IN_PROGRESS") return "Acompanhar execução";
+  if (status === "DONE" && !hasCharge) return "Cobrar agora";
+  if (status === "DONE" && hasCharge) return "Notificar cliente";
+  return "Abrir detalhe";
 }
 
 function getPrimaryActionLabel(order: any, nextAction: string) {
@@ -660,7 +660,7 @@ export default function ServiceOrdersPage() {
                         const scheduledLabel = order?.scheduledFor
                           ? `Agendada: ${safeDate(order?.scheduledFor)?.toLocaleDateString("pt-BR")}`
                           : "Sem data definida";
-                        const shouldShowNextActionTitle = nextAction.length > 52;
+                        const shouldShowNextActionTitle = nextAction.length > 30;
 
                         return (
                           <tr
@@ -692,11 +692,11 @@ export default function ServiceOrdersPage() {
                             </td>
                             <td className="px-4 py-3.5 align-top">
                               <AppStatusBadge
-                                label={`${getStatusLabel(status)} · ${getOperationalSeverityLabel(getServiceOrderSeverity(order))}`}
+                                label={getStatusLabel(status)}
                               />
                               {status === "DONE" && !hasCharge ? (
-                                <p className="mt-1 text-xs text-[var(--dashboard-danger)]">
-                                  Concluída sem cobrança ativa
+                                <p className="mt-1 truncate text-xs text-[var(--dashboard-danger)]">
+                                  Sem cobrança ativa
                                 </p>
                               ) : null}
                             </td>
@@ -713,7 +713,7 @@ export default function ServiceOrdersPage() {
                                   handlePrimaryAction();
                                 }}
                               >
-                                {nextAction}
+                                {toSingleLineAction(nextAction)}
                               </button>
                             </td>
                             <td className="px-4 py-3.5 align-top">
@@ -726,7 +726,7 @@ export default function ServiceOrdersPage() {
                                     handlePrimaryAction();
                                   }}
                                 >
-                                  {primaryActionLabel}
+                                  {resolveOperationalActionLabel(nextAction, primaryActionLabel)}
                                 </SecondaryButton>
                                 <AppRowActionsDropdown
                                   triggerLabel="Mais ações"
