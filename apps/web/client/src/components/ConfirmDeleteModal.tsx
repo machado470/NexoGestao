@@ -1,13 +1,6 @@
 import { Button } from "@/components/design-system";
 import { AlertCircle, Loader2 } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { BaseModal } from "@/components/app-modal-system";
 
 interface ConfirmDeleteModalProps {
   isOpen: boolean;
@@ -29,56 +22,50 @@ export function ConfirmDeleteModal({
   onCancel,
 }: ConfirmDeleteModalProps) {
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => (!open ? onCancel() : null)}>
-      <DialogContent
-        showCloseButton={false}
-        className="max-w-md border-[var(--border-subtle)] p-0 shadow-sm"
-      >
-        <DialogHeader className="border-b border-[var(--border-subtle)] p-6">
-          <DialogTitle className="flex items-start gap-3 text-lg text-[var(--text-primary)]">
-            <AlertCircle className="mt-0.5 h-5 w-5 text-[var(--color-danger)]" />
-            {title}
-          </DialogTitle>
-        </DialogHeader>
-        <div className="p-6">
-          <p className="mb-4 text-[var(--text-secondary)]">
-            {message}
-          </p>
-          {itemName && (
-            <div className="mb-4 rounded-lg bg-[var(--surface-base)] p-3">
-              <p className="text-sm font-medium text-[var(--text-primary)]">
-                {itemName}
-              </p>
-            </div>
-          )}
-          <p className="text-sm text-[var(--text-muted)]">
-            Esta ação não pode ser desfeita.
-          </p>
+    <BaseModal
+      open={isOpen}
+      onOpenChange={(open) => (!open ? onCancel() : null)}
+      size="sm"
+      closeBlocked={isLoading}
+      title={
+        <div className="flex items-start gap-3">
+          <AlertCircle className="mt-0.5 h-5 w-5 text-[var(--color-danger)]" />
+          <span>{title}</span>
         </div>
-        <DialogFooter className="flex justify-end gap-3 border-t border-[var(--border-subtle)] p-6">
-          <Button
-            onClick={onCancel}
-            disabled={isLoading}
-            variant="outline"
-          >
+      }
+      fixedHeader={false}
+      fixedFooter={false}
+      footer={
+        <>
+          <Button onClick={onCancel} disabled={isLoading} variant="outline">
             Cancelar
           </Button>
-          <Button
-            onClick={onConfirm}
-            disabled={isLoading}
-            variant="danger"
-          >
+          <Button onClick={onConfirm} disabled={isLoading} variant="danger">
             {isLoading ? (
               <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Deletando...
               </>
             ) : (
               "Deletar"
             )}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <p className="text-[var(--text-secondary)]">{message}</p>
+        {itemName ? (
+          <div className="rounded-lg bg-[var(--surface-base)] p-3">
+            <p className="text-sm font-medium text-[var(--text-primary)]">
+              {itemName}
+            </p>
+          </div>
+        ) : null}
+        <p className="text-sm text-[var(--text-muted)]">
+          Esta ação não pode ser desfeita.
+        </p>
+      </div>
+    </BaseModal>
   );
 }
