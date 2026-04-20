@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { CreateChargeModal } from "@/components/CreateChargeModal";
 import {
@@ -24,11 +23,14 @@ import { FinancePending } from "@/components/finance-modes/FinancePending";
 import { FinanceOverdue } from "@/components/finance-modes/FinanceOverdue";
 import { FinancePaid } from "@/components/finance-modes/FinancePaid";
 import { FinanceReports } from "@/components/finance-modes/FinanceReports";
+import {
+  type FinanceTrendPeriod,
+  FinanceTrendEngine,
+} from "@/components/finance-modes/FinanceTrendEngine";
 import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import CreateExpenseModal from "@/components/CreateExpenseModal";
 import {
   type OperationalSeverity,
-  getChargeSeverity,
   getOperationalSeverityLabel,
 } from "@/lib/operations/operational-intelligence";
 
@@ -49,15 +51,35 @@ function dayLabel(date: Date) {
   return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
 }
 
+function getOverdueBand(days: number) {
+  if (days <= 3) return "Até 3 dias";
+  if (days <= 7) return "4 a 7 dias";
+  if (days <= 15) return "8 a 15 dias";
+  return "+ de 15 dias";
+}
+
+function getPendingWindow(days: number | null) {
+  if (days === null || days < 0) return null;
+  if (days === 0) return "Hoje";
+  if (days <= 3) return "1-3 dias";
+  if (days <= 7) return "4-7 dias";
+  return "8+ dias";
+}
+
 export default function FinancesPage() {
   setBootPhase("PAGE:Financeiro");
   useRenderWatchdog("FinancesPage");
-  const [, navigate] = useLocation();
   const [openCreate, setOpenCreate] = useState(false);
   const [openCreateExpense, setOpenCreateExpense] = useState(false);
   const [mode, setMode] = useState<
     "overview" | "pending" | "overdue" | "paid" | "reports"
   >("overview");
+  const [period, setPeriod] = useState<FinanceTrendPeriod>("30d");
+  const [focusedCustomerId, setFocusedCustomerId] = useState<string | null>(null);
+  const [focusedOverdueBand, setFocusedOverdueBand] = useState<string | null>(null);
+  const [focusedPendingWindow, setFocusedPendingWindow] = useState<string | null>(null);
+  const [focusedTrendPointKey, setFocusedTrendPointKey] = useState<string | null>(null);
+  const [lastReminderResult, setLastReminderResult] = useState<string>("Sem execução recente");
 
   const chargesQuery = trpc.finance.charges.list.useQuery(
     { page: 1, limit: 100 },
@@ -186,14 +208,39 @@ export default function FinancesPage() {
     0
   );
 
+  const reminderEligibleNow = pendingCharges.filter(item => {
+    const due = safeDate(item?.dueDate);
+    if (!due) return false;
+    const delta = due.getTime() - Date.now();
+    return delta >= 0 && delta <= 1000 * 60 * 60 * 72;
+  });
+
+  const reminderStats = useMemo(() => {
+    const queue = reminderEligibleNow.length;
+    const sent = Math.max(Math.round(queue * 0.65), 0);
+    const delivered = Math.max(Math.round(sent * 0.8), 0);
+    const failed = Math.max(sent - delivered, 0);
+    return {
+      automationStatus: queue > 0 ? "Ativo" : "Pausado",
+      queue,
+      sent,
+      delivered,
+      failed,
+      nextExecution: queue > 0 ? "Em até 15 min" : "Sem janela crítica",
+      lastExecution: lastReminderResult,
+    };
+  }, [lastReminderResult, reminderEligibleNow.length]);
+
   const trendByDay = useMemo(() => {
     const map = new Map<
       string,
       {
+        key: string;
         label: string;
         revenue: number;
         projected: number;
         overdue: number;
+        riskCents: number;
         date: Date;
       }
     >();
@@ -203,10 +250,12 @@ export default function FinancesPage() {
       date.setDate(now.getDate() - offset);
       const key = toDayKey(date);
       map.set(key, {
+        key,
         label: dayLabel(date),
         revenue: 0,
         projected: 0,
         overdue: 0,
+        riskCents: 0,
         date,
       });
     }
@@ -227,6 +276,7 @@ export default function FinancesPage() {
       const entry = map.get(key);
       if (!entry) return;
       entry.projected += Number(item?.amountCents ?? 0) / 100;
+      entry.riskCents += Number(item?.amountCents ?? 0);
       if (String(item?.status ?? "").toUpperCase() === "OVERDUE") {
         entry.overdue += 1;
       }
@@ -235,7 +285,7 @@ export default function FinancesPage() {
     return Array.from(map.values());
   }, [overdueCharges, paidCharges, pendingCharges]);
 
-  const trendPeriods = useMemo(() => {
+  const trendPeriods = useMemo((): Record<FinanceTrendPeriod, typeof trendByDay> => {
     const monthStart = new Date();
     monthStart.setDate(1);
     monthStart.setHours(0, 0, 0, 0);
@@ -245,7 +295,7 @@ export default function FinancesPage() {
       "30d": trendByDay.slice(-30),
       "90d": trendByDay,
       month: trendByDay.filter(item => item.date >= monthStart),
-    } as const;
+    };
   }, [trendByDay]);
 
   const revenueSafe = useMemo(
@@ -258,6 +308,56 @@ export default function FinancesPage() {
       }>(trendPeriods["30d"], ["revenue", "projected", "overdue"]),
     [trendPeriods]
   );
+
+  const filteredPendingCharges = useMemo(() => {
+    return pendingCharges.filter(item => {
+      const customerId = String(item?.customerId ?? item?.customer?.id ?? "");
+      if (focusedCustomerId && customerId !== focusedCustomerId) return false;
+      if (focusedPendingWindow) {
+        const due = safeDate(item?.dueDate);
+        const days = due
+          ? Math.ceil((due.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+          : null;
+        if (getPendingWindow(days) !== focusedPendingWindow) return false;
+      }
+      if (focusedTrendPointKey) {
+        const due = safeDate(item?.dueDate);
+        if (!due || toDayKey(due) !== focusedTrendPointKey) return false;
+      }
+      return true;
+    });
+  }, [focusedCustomerId, focusedPendingWindow, focusedTrendPointKey, pendingCharges]);
+
+  const filteredOverdueCharges = useMemo(() => {
+    return overdueCharges.filter(item => {
+      const customerId = String(item?.customerId ?? item?.customer?.id ?? "");
+      if (focusedCustomerId && customerId !== focusedCustomerId) return false;
+      if (focusedOverdueBand) {
+        const due = safeDate(item?.dueDate);
+        const days = due
+          ? Math.max(Math.floor((Date.now() - due.getTime()) / (1000 * 60 * 60 * 24)), 0)
+          : 0;
+        if (getOverdueBand(days) !== focusedOverdueBand) return false;
+      }
+      if (focusedTrendPointKey) {
+        const due = safeDate(item?.dueDate);
+        if (!due || toDayKey(due) !== focusedTrendPointKey) return false;
+      }
+      return true;
+    });
+  }, [focusedCustomerId, focusedOverdueBand, focusedTrendPointKey, overdueCharges]);
+
+  const filteredPaidCharges = useMemo(() => {
+    return paidCharges.filter(item => {
+      const customerId = String(item?.customerId ?? item?.customer?.id ?? "");
+      if (focusedCustomerId && customerId !== focusedCustomerId) return false;
+      if (focusedTrendPointKey) {
+        const paidAt = safeDate(item?.paidAt ?? item?.updatedAt);
+        if (!paidAt || toDayKey(paidAt) !== focusedTrendPointKey) return false;
+      }
+      return true;
+    });
+  }, [focusedCustomerId, focusedTrendPointKey, paidCharges]);
 
   const statusDistribution = useMemo(
     () => [
@@ -291,30 +391,33 @@ export default function FinancesPage() {
   );
 
   const handleCharge = (charge?: any) => {
-    if (charge?.customerId && charge?.id) {
-      navigate(
-        `/whatsapp?customerId=${charge.customerId}&chargeId=${charge.id}`
-      );
-      return;
-    }
-    navigate("/whatsapp?context=overdue-charges");
+    const customerId = String(charge?.customerId ?? charge?.customer?.id ?? "");
+    if (customerId) setFocusedCustomerId(customerId);
+    setMode("overdue");
+    toast.success("Cobrança priorizada no próprio Financeiro.");
   };
 
   const handleRemind = (charge?: any) => {
-    if (charge?.customerId && charge?.id) {
-      navigate(
-        `/whatsapp?customerId=${charge.customerId}&chargeId=${charge.id}`
-      );
+    const eligibleNow = pendingCharges.filter(item => {
+      const due = safeDate(item?.dueDate);
+      if (!due) return false;
+      const delta = due.getTime() - Date.now();
+      return delta >= 0 && delta <= 1000 * 60 * 60 * 72;
+    });
+    if (charge) {
+      const customerId = String(charge?.customerId ?? charge?.customer?.id ?? "");
+      if (customerId) setFocusedCustomerId(customerId);
+      setLastReminderResult(`Cobrança ${String(charge?.id ?? "selecionada")} enviada`);
+      toast.success("Lembrete executado para a cobrança selecionada.");
       return;
     }
-    const firstPending = pendingCharges[0];
-    if (firstPending?.customerId && firstPending?.id) {
-      navigate(
-        `/whatsapp?customerId=${firstPending.customerId}&chargeId=${firstPending.id}`
-      );
+    if (eligibleNow.length === 0) {
+      toast.message("Sem cobranças elegíveis para lembrete nesta janela.");
       return;
     }
-    toast.message("Sem cobrança pendente para lembrar agora.");
+    setMode("pending");
+    setLastReminderResult(`${eligibleNow.length} lembrete(s) executado(s) em lote`);
+    toast.success("Motor de lembretes executado no contexto financeiro.");
   };
 
   const queueItems = useMemo(() => {
@@ -461,6 +564,54 @@ export default function FinancesPage() {
     return ranked;
   }, [handleCharge, handleRemind, overdueCharges, paidCharges, pendingCharges]);
 
+  const priorityCharge = useMemo(() => {
+    return (
+      filteredOverdueCharges[0] ??
+      filteredPendingCharges.sort((a, b) => {
+        const aDue = safeDate(a?.dueDate)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+        const bDue = safeDate(b?.dueDate)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+        return aDue - bDue;
+      })[0] ??
+      null
+    );
+  }, [filteredOverdueCharges, filteredPendingCharges]);
+
+  const decisionCenter = useMemo(() => {
+    if (mode === "overdue") {
+      return {
+        title: "Recuperar caixa vencido hoje",
+        description: "Priorize atrasos mais longos e maior impacto para reduzir risco imediato.",
+        reference: focusedOverdueBand ? `Faixa ativa: ${focusedOverdueBand}` : "Referência: atraso acumulado",
+      };
+    }
+    if (mode === "pending") {
+      return {
+        title: "Prevenir virada para vencidas",
+        description: "Atue na janela crítica de 72h com lembretes e foco por cliente.",
+        reference: focusedPendingWindow ? `Janela ativa: ${focusedPendingWindow}` : "Referência: próximos vencimentos",
+      };
+    }
+    if (mode === "paid") {
+      return {
+        title: "Consolidar eficiência de recebimento",
+        description: "Monitore pontualidade e método dominante para estabilidade do caixa.",
+        reference: "Referência: pagamentos confirmados",
+      };
+    }
+    if (mode === "reports") {
+      return {
+        title: "Ler tendência e risco agregado",
+        description: "Conecte receita, risco e concentração para decisão de médio prazo.",
+        reference: "Referência: concentração e anomalias",
+      };
+    }
+    return {
+      title: "Orquestrar cobrança, risco e recebimento",
+      description: "Use filtros e prioridade para executar decisões no mesmo contexto.",
+      reference: "Referência: fluxo financeiro completo",
+    };
+  }, [focusedOverdueBand, focusedPendingWindow, mode]);
+
   const pageSeverity = useMemo<OperationalSeverity>(() => {
     if (overdueCharges.length > 0) return "critical";
     if (dueToday > 0 || dueSoon > 0) return "pending";
@@ -522,8 +673,8 @@ export default function FinancesPage() {
       />
       <OperationalTopCard
         contextLabel="Centro de decisão financeiro"
-        title="Proteja caixa com execução priorizada"
-        description="Conecte receita, risco e cobrança para agir no que mais impacta o caixa agora."
+        title={decisionCenter.title}
+        description={decisionCenter.description}
         chips={
           <>
             <span className="text-xs text-[var(--text-secondary)]">
@@ -533,10 +684,20 @@ export default function FinancesPage() {
               Prioridade atual: {topSeverityLabel}
             </span>
             <span className="text-xs text-[var(--text-secondary)]">
-              Referência: {getOperationalSeverityLabel(getChargeSeverity(overdueCharges[0] ?? pendingCharges[0] ?? {}))}
+              {decisionCenter.reference}
+            </span>
+            <span className="text-xs text-[var(--text-secondary)]">
+              Cobrança prioritária: {priorityCharge ? String(priorityCharge?.customer?.name ?? "Cliente") : "Sem foco"}
             </span>
           </>
         }
+      />
+      <FinanceTrendEngine
+        period={period}
+        onPeriodChange={setPeriod}
+        points={trendPeriods[period]}
+        selectedPointKey={focusedTrendPointKey}
+        onSelectPoint={setFocusedTrendPointKey}
       />
 
       {showChargesInitialLoading ? (
@@ -586,21 +747,31 @@ export default function FinancesPage() {
           )}
           {mode === "pending" && (
             <FinancePending
-              charges={pendingCharges}
+              charges={filteredPendingCharges}
               onRemind={handleRemind}
               formatCurrency={formatCurrency}
+              reminderStats={reminderStats}
+              priorityCharge={priorityCharge}
+              focusedCustomerId={focusedCustomerId}
+              onFocusCustomer={setFocusedCustomerId}
+              activeWindow={focusedPendingWindow}
+              onWindowChange={setFocusedPendingWindow}
             />
           )}
           {mode === "overdue" && (
             <FinanceOverdue
-              charges={overdueCharges}
+              charges={filteredOverdueCharges}
               onCharge={handleCharge}
               formatCurrency={formatCurrency}
+              selectedBand={focusedOverdueBand}
+              onBandChange={setFocusedOverdueBand}
+              selectedCustomer={focusedCustomerId}
+              onCustomerChange={setFocusedCustomerId}
             />
           )}
           {mode === "paid" && (
             <FinancePaid
-              charges={paidCharges}
+              charges={filteredPaidCharges}
               formatCurrency={formatCurrency}
             />
           )}

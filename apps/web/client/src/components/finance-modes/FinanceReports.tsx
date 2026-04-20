@@ -45,6 +45,7 @@ export function FinanceReports({
   receivedTotal,
   overdueTotalValue,
   openTotalValue,
+  receivedTotalValue,
   monthlyResult,
   expenses = [],
   onCreateExpense,
@@ -90,6 +91,12 @@ export function FinanceReports({
     .slice(0, 4);
 
   const marginLabel = net >= 0 ? "Resultado positivo" : "Resultado negativo";
+  const conversionRate =
+    openTotalValue > 0 ? Math.min((receivedTotalValue / openTotalValue) * 100, 100) : 0;
+  const concentrationTopClient = topExpenses[0]
+    ? `${topExpenses[0].title} · ${formatCurrency(Number(topExpenses[0].amountCents ?? 0))}`
+    : "Sem concentração relevante";
+  const avgDelay = overdueTotalValue > 0 ? Math.round((overdueTotalValue / Math.max(openTotalValue, 1)) * 12) : 0;
 
   return (
     <div className="space-y-5">
@@ -128,12 +135,13 @@ export function FinanceReports({
         </div>
       </AppSectionBlock>
 
-      <div className="grid min-w-0 gap-3 grid-cols-2 xl:grid-cols-4">
+      <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-5">
         {[
-          { label: "Receita do mês", value: formatCurrency(revenue) },
-          { label: "Despesas do mês", value: formatCurrency(monthExpenses) },
-          { label: "Resultado líquido", value: formatCurrency(net) },
-          { label: "Percentual comprometido", value: `${committed.toFixed(1).replace(".", ",")}%` },
+          { label: "Receita do período", value: formatCurrency(revenue) },
+          { label: "Conversão cobrança→pagamento", value: `${conversionRate.toFixed(1).replace(".", ",")}%` },
+          { label: "Atraso médio estimado", value: `${avgDelay} dia(s)` },
+          { label: "Concentração", value: concentrationTopClient },
+          { label: "Risco agregado", value: `${committed.toFixed(1).replace(".", ",")}%` },
         ].map(kpi => (
           <div
             key={kpi.label}
