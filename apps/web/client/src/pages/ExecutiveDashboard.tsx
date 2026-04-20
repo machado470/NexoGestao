@@ -1,11 +1,17 @@
 import { useEffect } from "react";
 import { useLocation } from "wouter";
+import {
+  AlertTriangle,
+  ArrowRight,
+  CircleAlert,
+  ShieldAlert,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useRunAction } from "@/hooks/useRunAction";
 import { useRenderWatchdog } from "@/hooks/useRenderWatchdog";
-import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import {
   AppKpiRow,
+  AppPageHeader,
   AppPageShell,
   AppSectionBlock,
   AppStatusBadge,
@@ -14,12 +20,16 @@ import { KpiErrorBoundary } from "@/components/KpiErrorBoundary";
 import { ExecutiveTrendChart } from "@/components/dashboard/ExecutiveTrendChart";
 import { WhatsAppOverviewCard } from "@/components/dashboard/WhatsAppOverviewCard";
 
+const clientesSemRetorno = 4;
+const agendaSemConfirmacao = 3;
+const ordensComBloqueio = 1;
+const ordensAbertas = 18;
+const ordensConcluidas = 124;
+
 export default function ExecutiveDashboard() {
   useRenderWatchdog("ExecutiveDashboard");
   const [, navigate] = useLocation();
   const { runAction } = useRunAction();
-  const clientesSemRetorno = 4;
-  const agendaSemConfirmacao = 3;
 
   useEffect(() => {
     // eslint-disable-next-line no-console
@@ -49,14 +59,23 @@ export default function ExecutiveDashboard() {
 
   return (
     <AppPageShell>
-      <OperationalTopCard
-        contextLabel="Direção executiva"
-        title="Centro de decisão operacional"
-        description="Visão executiva do fluxo Cliente → Agendamento → O.S. → Cobrança → Pagamento."
-        primaryAction={
+      <AppPageHeader
+        title="Executive Dashboard"
+        description="Centro de decisão do fluxo Cliente → Agendamento → O.S. → Cobrança → Pagamento, com foco em risco, gargalo e próxima ação."
+        secondaryActions={
+          <Button
+            variant="outline"
+            onClick={() => navigate("/dashboard/operations")}
+          >
+            Abrir fila operacional
+          </Button>
+        }
+        cta={
           <Button
             onClick={() =>
-              void runAction(async () => navigate("/dashboard/operations"))
+              void runAction(async () =>
+                navigate("/dashboard/operations?filter=critical")
+              )
             }
           >
             Executar próxima ação
@@ -66,7 +85,7 @@ export default function ExecutiveDashboard() {
 
       <KpiErrorBoundary context="executive-dashboard:kpi">
         <AppKpiRow
-          gridClassName="grid-cols-1 md:grid-cols-2 xl:grid-cols-4"
+          gridClassName="grid-cols-1 sm:grid-cols-2 xl:grid-cols-4"
           items={[
             {
               label: "Receita",
@@ -76,10 +95,10 @@ export default function ExecutiveDashboard() {
               onClick: () => navigate("/finances?view=revenue&period=30d"),
             },
             {
-              label: "Ordens",
-              value: "124",
+              label: "Ordens abertas",
+              value: String(ordensAbertas),
               trend: -3.2,
-              context: "-4 hoje · últimos 7 dias",
+              context: `${ordensComBloqueio} com bloqueio · últimos 7 dias`,
               onClick: () =>
                 navigate("/service-orders?status=attention&period=7d"),
             },
@@ -102,68 +121,220 @@ export default function ExecutiveDashboard() {
         />
       </KpiErrorBoundary>
 
-      <ExecutiveTrendChart />
-
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
         <AppSectionBlock
-          title="Central de Alertas"
-          subtitle="Prioridades críticas para execução imediata"
-          className="flex h-full flex-col xl:col-span-8"
+          title="Centro de decisão operacional"
+          subtitle="Prioridade imediata, gargalo principal, próximo passo e risco do turno atual."
+          className="xl:col-span-8"
+          ctaLabel="Abrir execução"
+          onCtaClick={() => navigate("/dashboard/operations?filter=critical")}
+        >
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div className="rounded-lg border border-[var(--dashboard-danger)]/35 bg-[var(--surface-subtle)] p-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                  Prioridade agora
+                </p>
+                <AppStatusBadge label="URGENTE" />
+              </div>
+              <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
+                Confirmar {agendaSemConfirmacao} agendamentos antes do próximo
+                turno.
+              </p>
+              <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                Sem confirmação, a janela de execução perde previsibilidade e
+                pressiona SLA.
+              </p>
+            </div>
+
+            <div className="rounded-lg border border-[var(--dashboard-warning)]/35 bg-[var(--surface-subtle)] p-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                  Gargalo atual
+                </p>
+                <AppStatusBadge label="ATENÇÃO" />
+              </div>
+              <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
+                {ordensComBloqueio} O.S. bloqueada em rota há mais de 2h.
+              </p>
+              <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                Bloqueio impede fechamento de ordem e pode gerar atraso em
+                cadeia.
+              </p>
+            </div>
+
+            <div className="rounded-lg border border-[var(--dashboard-info)]/35 bg-[var(--surface-subtle)] p-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                  Próxima melhor ação
+                </p>
+                <AppStatusBadge label="EXECUTAR" />
+              </div>
+              <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
+                Rebalancear equipe e disparar confirmação automática por
+                WhatsApp.
+              </p>
+              <div className="mt-2 flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+                <ArrowRight className="h-3.5 w-3.5" />
+                <span>
+                  Impacto esperado: recuperar janela de atendimento da manhã.
+                </span>
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-[var(--dashboard-danger)]/25 bg-[var(--surface-subtle)] p-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                  Risco crítico
+                </p>
+                <AppStatusBadge label="EM RISCO" />
+              </div>
+              <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
+                {clientesSemRetorno} clientes sem retorno pós-serviço em
+                carteira ativa.
+              </p>
+              <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                Risco direto de churn e queda de recompra no ciclo atual.
+              </p>
+            </div>
+          </div>
+        </AppSectionBlock>
+
+        <AppSectionBlock
+          title="Pulso executivo"
+          subtitle="Estado geral de execução no turno"
+          className="xl:col-span-4"
+          ctaLabel="Abrir ordens"
+          onCtaClick={() => navigate("/service-orders?status=attention")}
+          compact
+        >
+          <div className="space-y-3">
+            <div className="flex items-start gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
+              <CircleAlert className="mt-0.5 h-4 w-4 text-[var(--dashboard-warning)]" />
+              <div>
+                <p className="text-xs font-semibold text-[var(--text-primary)]">
+                  Execução pressionada por confirmação
+                </p>
+                <p className="text-xs text-[var(--text-secondary)]">
+                  {agendaSemConfirmacao} clientes aguardando contato no horário
+                  crítico.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
+              <AlertTriangle className="mt-0.5 h-4 w-4 text-[var(--dashboard-danger)]" />
+              <div>
+                <p className="text-xs font-semibold text-[var(--text-primary)]">
+                  Bloqueio impactando throughput
+                </p>
+                <p className="text-xs text-[var(--text-secondary)]">
+                  {ordensComBloqueio} ordem aguardando destrava operacional.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
+              <ShieldAlert className="mt-0.5 h-4 w-4 text-[var(--dashboard-info)]" />
+              <div>
+                <p className="text-xs font-semibold text-[var(--text-primary)]">
+                  Capacidade do time
+                </p>
+                <p className="text-xs text-[var(--text-secondary)]">
+                  {ordensConcluidas} ordens concluídas de 140 previstas no
+                  ciclo.
+                </p>
+              </div>
+            </div>
+          </div>
+        </AppSectionBlock>
+
+        <ExecutiveTrendChart className="xl:col-span-8" />
+
+        <AppSectionBlock
+          title="Leitura da tendência"
+          subtitle="Como traduzir a visão do gráfico em decisão operacional"
+          className="xl:col-span-4"
+          ctaLabel="Abrir financeiro"
+          onCtaClick={() => navigate("/finances?view=revenue")}
+          compact
+        >
+          <div className="space-y-3">
+            <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                Tendência dominante
+              </p>
+              <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
+                Receita cresce, mas ordens em atenção reduzem previsibilidade.
+              </p>
+            </div>
+            <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                Janela de intervenção
+              </p>
+              <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                Atuar em confirmação de agenda agora evita efeito cascata nas
+                próximas 4h.
+              </p>
+            </div>
+            <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                Próximo checkpoint
+              </p>
+              <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                Revisar SLA e bloqueios no fechamento das 17:00 com status por
+                equipe.
+              </p>
+            </div>
+          </div>
+        </AppSectionBlock>
+
+        <AppSectionBlock
+          title="Central de alertas"
+          subtitle="Filas que exigem ação no turno atual"
+          className="xl:col-span-5"
           ctaLabel="Abrir operação"
           onCtaClick={() => navigate("/dashboard/operations?filter=critical")}
         >
-          <ul className="space-y-4">
-            <li className="border-l-2 border-[var(--dashboard-danger)] pl-3">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-[var(--text-primary)]">
-                    {agendaSemConfirmacao} agendamentos sem confirmação
-                  </p>
-                  <p className="text-xs text-[var(--text-secondary)]">
-                    Janela do turno atual precisa de contato imediato.
-                  </p>
-                </div>
-                <AppStatusBadge label="URGENTE" />
+          <ul className="space-y-3">
+            <li className="flex items-start justify-between gap-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
+              <div>
+                <p className="text-sm font-semibold text-[var(--text-primary)]">
+                  {agendaSemConfirmacao} agendamentos sem confirmação
+                </p>
+                <p className="text-xs text-[var(--text-secondary)]">
+                  Necessário contato até o meio do turno para evitar remarcação.
+                </p>
               </div>
+              <AppStatusBadge label="URGENTE" />
             </li>
-            <li className="border-l-2 border-[var(--dashboard-warning)] pl-3">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-[var(--text-primary)]">
-                    1 O.S. atrasada há mais de 2h
-                  </p>
-                  <p className="text-xs text-[var(--text-secondary)]">
-                    Equipe técnica em rota com bloqueio de execução.
-                  </p>
-                </div>
-                <AppStatusBadge label="ATENÇÃO" />
+            <li className="flex items-start justify-between gap-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
+              <div>
+                <p className="text-sm font-semibold text-[var(--text-primary)]">
+                  {ordensComBloqueio} O.S. atrasada há mais de 2h
+                </p>
+                <p className="text-xs text-[var(--text-secondary)]">
+                  Necessária tratativa para liberar rota e normalizar execução.
+                </p>
               </div>
+              <AppStatusBadge label="ATENÇÃO" />
             </li>
-            <li className="border-l-2 border-[var(--dashboard-info)] pl-3">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-[var(--text-primary)]">
-                    {clientesSemRetorno} clientes sem retorno pós-serviço
-                  </p>
-                  <p className="text-xs text-[var(--text-secondary)]">
-                    Relacionamento deve fechar ciclo de atendimento.
-                  </p>
-                </div>
-                <AppStatusBadge label="MONITORAR" />
+            <li className="flex items-start justify-between gap-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
+              <div>
+                <p className="text-sm font-semibold text-[var(--text-primary)]">
+                  {clientesSemRetorno} clientes sem retorno pós-serviço
+                </p>
+                <p className="text-xs text-[var(--text-secondary)]">
+                  Priorizar fechamento de ciclo com confirmação de satisfação.
+                </p>
               </div>
+              <AppStatusBadge label="MONITORAR" />
             </li>
           </ul>
         </AppSectionBlock>
 
-        <WhatsAppOverviewCard
-          className="flex h-full flex-col xl:col-span-4"
-          onOpenWhatsApp={() => navigate("/whatsapp")}
-        />
-
         <AppSectionBlock
-          title="Agenda Operacional"
-          subtitle="Compromissos com horário e status de execução"
-          className="flex h-full flex-col xl:col-span-8"
+          title="Agenda operacional"
+          subtitle="Compromissos e checkpoints do dia"
+          className="xl:col-span-4"
           ctaLabel="Abrir agenda"
           onCtaClick={() => navigate("/appointments")}
         >
@@ -208,46 +379,10 @@ export default function ExecutiveDashboard() {
           </ul>
         </AppSectionBlock>
 
-        <AppSectionBlock
-          title="Resumo Operacional"
-          subtitle="Indicadores centrais com leitura financeira do ciclo"
-          className="flex h-full flex-col xl:col-span-4"
-        >
-          <div className="space-y-6">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
-                Receita operacional do período
-              </p>
-              <p className="mt-1 text-3xl font-semibold tracking-tight text-[var(--text-primary)]">
-                R$ 187,4k
-              </p>
-              <p className="text-xs text-[var(--dashboard-success)]">
-                +15,6% vs. período anterior
-              </p>
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <div className="mb-1 flex items-center justify-between text-xs text-[var(--text-secondary)]">
-                  <span>Ordens concluídas</span>
-                  <span>124 / 140</span>
-                </div>
-                <div className="h-2 rounded-full bg-[var(--dashboard-row-bg)]">
-                  <div className="h-full w-[88%] rounded-full bg-[var(--dashboard-info)]" />
-                </div>
-              </div>
-              <div>
-                <div className="mb-1 flex items-center justify-between text-xs text-[var(--text-secondary)]">
-                  <span>Agenda confirmada</span>
-                  <span>{`${100 - agendaSemConfirmacao * 4}%`}</span>
-                </div>
-                <div className="h-2 rounded-full bg-[var(--dashboard-row-bg)]">
-                  <div className="h-full w-[84%] rounded-full bg-[var(--dashboard-success)]" />
-                </div>
-              </div>
-            </div>
-          </div>
-        </AppSectionBlock>
+        <WhatsAppOverviewCard
+          className="xl:col-span-3"
+          onOpenWhatsApp={() => navigate("/whatsapp")}
+        />
       </div>
     </AppPageShell>
   );
