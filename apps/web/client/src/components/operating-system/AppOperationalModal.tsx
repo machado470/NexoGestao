@@ -29,6 +29,8 @@ type Props = {
   quickActions?: ModalAction[];
   feedback?: ReactNode;
   feedbackTone?: "neutral" | "success" | "error";
+  contentLoading?: boolean;
+  loadingLabel?: string;
   children: ReactNode;
 };
 
@@ -46,6 +48,8 @@ export function AppOperationalModal({
   quickActions = [],
   feedback,
   feedbackTone = "neutral",
+  contentLoading = false,
+  loadingLabel = "Preparando contexto operacional...",
   children,
 }: Props) {
   const hasAnyProcessing = Boolean(
@@ -57,7 +61,7 @@ export function AppOperationalModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="flex h-[92vh] w-[min(96vw,1280px)] max-w-none flex-col gap-0 overflow-hidden border-[var(--border-subtle)] bg-[var(--surface-base)] p-0 shadow-2xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:zoom-in-[0.99] data-[state=closed]:zoom-out-[0.99]"
+        className="flex h-[92vh] w-[min(96vw,1280px)] max-w-none flex-col gap-0 overflow-hidden border-[var(--border-subtle)] bg-[var(--surface-base)] p-0 shadow-2xl duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:slide-in-from-bottom-1 data-[state=closed]:slide-out-to-bottom-1 data-[state=open]:zoom-in-[0.995] data-[state=closed]:zoom-out-[0.995]"
         onOpenAutoFocus={event => {
           event.preventDefault();
         }}
@@ -117,7 +121,19 @@ export function AppOperationalModal({
           ) : null}
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+          {contentLoading ? (
+            <div className="space-y-4">
+              <div className="h-3 w-56 animate-pulse rounded bg-[var(--surface-subtle)]" />
+              <div className="h-20 animate-pulse rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)]" />
+              <div className="h-14 animate-pulse rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)]" />
+              <div className="h-28 animate-pulse rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)]" />
+              <p className="text-xs text-[var(--text-muted)]">{loadingLabel}</p>
+            </div>
+          ) : (
+            children
+          )}
+        </div>
 
         <footer className="sticky bottom-0 z-20 border-t border-[var(--border-subtle)] bg-[var(--surface-base)]/95 px-6 py-4 backdrop-blur">
           <div className="flex flex-wrap items-center justify-between gap-2">

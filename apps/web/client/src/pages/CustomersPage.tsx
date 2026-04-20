@@ -9,11 +9,13 @@ import {
   normalizeObjectPayload,
 } from "@/lib/query-helpers";
 import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
+import { useOperationalMemoryState } from "@/hooks/useOperationalMemory";
 import { Button, SecondaryButton } from "@/components/design-system";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { AppOperationalModal } from "@/components/operating-system/AppOperationalModal";
 import {
   EmptyActionState,
+  OperationalAutomationNote,
   OperationalFlowState,
   OperationalInlineFeedback,
   OperationalNextAction,
@@ -112,11 +114,23 @@ export default function CustomersPage() {
     id: string;
     name: string;
   } | null>(null);
-  const [activeFilter, setActiveFilter] = useState<OperationalFilter>("all");
-  const [activeSort, setActiveSort] = useState<OperationalSort>("priority");
+  const [activeFilter, setActiveFilter] = useOperationalMemoryState<OperationalFilter>(
+    "nexo.customers.filter.v1",
+    "all"
+  );
+  const [activeSort, setActiveSort] = useOperationalMemoryState<OperationalSort>(
+    "nexo.customers.sort.v1",
+    "priority"
+  );
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
-  const [timelineExpanded, setTimelineExpanded] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [timelineExpanded, setTimelineExpanded] = useOperationalMemoryState(
+    "nexo.customers.timeline-expanded.v1",
+    false
+  );
+  const [searchTerm, setSearchTerm] = useOperationalMemoryState(
+    "nexo.customers.search.v1",
+    ""
+  );
   const [openAppointmentCreate, setOpenAppointmentCreate] = useState(false);
   const [openServiceOrderCreate, setOpenServiceOrderCreate] = useState(false);
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
@@ -124,9 +138,9 @@ export default function CustomersPage() {
     "neutral" | "success" | "error"
   >("neutral");
   const [isProcessingPrimaryAction, setIsProcessingPrimaryAction] = useState(false);
-  const [activeTab, setActiveTab] = useState<
+  const [activeTab, setActiveTab] = useOperationalMemoryState<
     "overview" | "agenda" | "service_orders" | "financial" | "history"
-  >("overview");
+  >("nexo.customers.tab.v1", "overview");
 
   const customersQuery = trpc.nexo.customers.list.useQuery(undefined, {
     retry: false,
@@ -929,7 +943,17 @@ export default function CustomersPage() {
                               />
                             </td>
                             <td className="p-3 align-top">
-                              <div className="flex items-center justify-end">
+                              <div className="flex items-center justify-end gap-2">
+                                <SecondaryButton
+                                  type="button"
+                                  className="h-8 px-2.5 text-xs"
+                                  onClick={event => {
+                                    event.stopPropagation();
+                                    primaryAction.onSelect();
+                                  }}
+                                >
+                                  Agir
+                                </SecondaryButton>
                                 <AppRowActionsDropdown
                                   triggerLabel="Mais ações"
                                   contentClassName="min-w-[248px]"
@@ -1069,13 +1093,11 @@ export default function CustomersPage() {
           ]}
           feedback={actionFeedback}
           feedbackTone={actionFeedbackTone}
+          contentLoading={workspaceQuery.isLoading}
+          loadingLabel="Carregando visão de cliente, agenda, execução e financeiro..."
         >
           <div className="space-y-4">
-            {workspaceQuery.isLoading ? (
-              <p className="text-sm text-[var(--text-muted)]">
-                Carregando resumo do cliente...
-              </p>
-            ) : workspaceQuery.error ? (
+            {workspaceQuery.error ? (
               <p className="rounded-md border border-[var(--dashboard-danger)]/40 bg-[var(--dashboard-danger)]/10 p-3 text-sm text-[var(--dashboard-danger)]">
                 Não foi possível carregar o detalhe do cliente:{" "}
                 {workspaceQuery.error.message}
@@ -1138,6 +1160,12 @@ export default function CustomersPage() {
                     },
                   ]}
                 />
+                {selectedSnapshot?.overdueCharges ? (
+                  <OperationalAutomationNote detail="Após registrar pagamento, o cliente volta automaticamente para a fila saudável da carteira." />
+                ) : null}
+                {!selectedSnapshot?.hasFutureSchedule ? (
+                  <OperationalAutomationNote detail="Quando um novo agendamento for criado, a prioridade deste cliente será recalculada automaticamente." />
+                ) : null}
                 <OperationalRelationSummary
                   title="Entidades conectadas"
                   items={[
@@ -1178,7 +1206,7 @@ export default function CustomersPage() {
                 {workspaceCharges.length === 0 ? (
                   <EmptyActionState
                     title="Nenhuma cobrança gerada ainda"
-                    description="Sem cobrança ativa para este cliente. Gere cobrança para conectar execução ao financeiro."
+                    description="Sem cobrança ativa por enquanto. Assim que houver O.S. concluída, o próximo passo é gerar cobrança para fechar o ciclo."
                     ctaLabel="Gerar cobrança"
                     onCta={() =>
                       selectedCustomer?.id &&
@@ -1206,7 +1234,14 @@ export default function CustomersPage() {
                   </p>
                 </section>
                 {actionFeedback ? (
-                  <OperationalInlineFeedback tone={actionFeedbackTone}>
+                  <OperationalInlineFeedback
+                    tone={actionFeedbackTone}
+                    nextStep={
+                      actionFeedbackTone === "success"
+                        ? "Acompanhar atualização da timeline e validar próximo passo sugerido."
+                        : undefined
+                    }
+                  >
                     {actionFeedback}
                   </OperationalInlineFeedback>
                 ) : null}

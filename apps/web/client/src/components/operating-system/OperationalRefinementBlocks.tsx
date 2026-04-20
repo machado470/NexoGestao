@@ -118,9 +118,11 @@ export function EmptyActionState({
 
 export function OperationalInlineFeedback({
   tone = "neutral",
+  nextStep,
   children,
 }: {
   tone?: "neutral" | "success" | "error";
+  nextStep?: string;
   children: ReactNode;
 }) {
   return (
@@ -133,7 +135,44 @@ export function OperationalInlineFeedback({
             : "border-[var(--border-subtle)] bg-[var(--surface-subtle)] text-[var(--text-secondary)]"
       }`}
     >
-      {children}
+      <div>{children}</div>
+      {nextStep ? (
+        <p className="mt-1 text-[11px] opacity-90">Próximo passo: {nextStep}</p>
+      ) : null}
     </div>
   );
+}
+
+export function OperationalAutomationNote({
+  label = "Automação operacional",
+  detail,
+}: {
+  label?: string;
+  detail: string;
+}) {
+  return (
+    <section className="rounded-md border border-[var(--accent-primary)]/25 bg-[var(--accent-soft)]/40 p-2.5">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--accent-primary)]">
+        {label}
+      </p>
+      <p className="mt-1 text-xs text-[var(--text-secondary)]">{detail}</p>
+    </section>
+  );
+}
+
+export function explainOperationalError(input: {
+  fallback: string;
+  cause?: string;
+  suggestion?: string;
+  tone?: "technical" | "operational";
+}) {
+  const { fallback, cause, suggestion, tone = "operational" } = input;
+  if (!cause && !suggestion) return fallback;
+  const prefix =
+    tone === "technical"
+      ? "Não foi possível concluir por falha técnica."
+      : "Não foi possível concluir a ação.";
+  return [prefix, cause, suggestion ? `Como resolver: ${suggestion}` : null]
+    .filter(Boolean)
+    .join(" ");
 }
