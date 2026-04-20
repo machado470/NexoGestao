@@ -7,10 +7,11 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
   AppPageShell,
+  AppPageHeader as BasePageHeader,
+  AppFiltersBar as BaseFiltersBar,
   AppSectionCard,
   AppSkeleton as BaseSkeleton,
 } from "@/components/app-system";
@@ -21,6 +22,7 @@ import {
   AppRowActions,
   AppTrendIndicator,
 } from "@/components/app";
+import { NexoStatusBadge } from "@/components/design-system";
 
 export function AppPageHeader({
   title,
@@ -28,26 +30,37 @@ export function AppPageHeader({
   ctaLabel,
   onCta,
   secondaryActions,
+  actions,
+  cta,
 }: {
   title: string;
-  description: string;
+  description?: ReactNode;
   ctaLabel?: string;
   onCta?: () => void;
   secondaryActions?: ReactNode;
+  actions?: ReactNode;
+  cta?: ReactNode;
 }) {
+  const resolvedActions =
+    actions ??
+    cta ??
+    (ctaLabel ? <Button onClick={onCta}>{ctaLabel}</Button> : null);
+
   return (
-    <header className="nexo-page-header nexo-section-reveal">
+    <BasePageHeader>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="nexo-page-header-title">{title}</h1>
-          <p className="nexo-page-header-description">{description}</p>
+          {description ? (
+            <p className="nexo-page-header-description">{description}</p>
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {secondaryActions}
-          {ctaLabel ? <Button onClick={onCta}>{ctaLabel}</Button> : null}
+          {resolvedActions}
         </div>
       </div>
-    </header>
+    </BasePageHeader>
   );
 }
 
@@ -58,16 +71,7 @@ export function AppFiltersBar({
   children: ReactNode;
   className?: string;
 }) {
-  return (
-    <div
-      className={cn(
-        "nexo-card-informative flex flex-wrap items-center justify-between gap-2 rounded-xl p-3",
-        className
-      )}
-    >
-      {children}
-    </div>
-  );
+  return <BaseFiltersBar className={className}>{children}</BaseFiltersBar>;
 }
 
 export function AppSecondaryTabs<T extends string>({
@@ -86,7 +90,7 @@ export function AppSecondaryTabs<T extends string>({
       "relative inline-flex h-9 shrink-0 items-center justify-center rounded-lg border px-4 text-sm font-medium transition-colors",
       isActive
         ? "border-[color-mix(in_srgb,var(--accent-primary)_72%,black)] bg-[var(--accent-primary)] text-white shadow-[0_8px_18px_-16px_var(--accent-primary)]"
-        : "border-[var(--border-subtle)] bg-[var(--surface-primary)]/45 text-white/72 hover:border-[var(--border-emphasis)] hover:bg-[var(--surface-primary)]/65 hover:text-white"
+        : "border-[var(--border-subtle)] bg-[var(--surface-primary)]/45 text-[var(--text-secondary)] hover:border-[var(--border-emphasis)] hover:bg-[var(--surface-primary)]/65 hover:text-[var(--text-primary)]"
     );
 
   return (
@@ -121,7 +125,7 @@ export function appSelectionPillClasses(isActive: boolean) {
     "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
     isActive
       ? "border-[color-mix(in_srgb,var(--accent-primary)_72%,black)] bg-[var(--accent-primary)] text-white shadow-[0_8px_18px_-16px_var(--accent-primary)]"
-      : "border-[var(--border-subtle)] bg-[var(--surface-primary)]/35 text-white/72 hover:border-[var(--border-emphasis)] hover:bg-[var(--surface-primary)]/55 hover:text-white"
+      : "border-[var(--border-subtle)] bg-[var(--surface-primary)]/35 text-[var(--text-secondary)] hover:border-[var(--border-emphasis)] hover:bg-[var(--surface-primary)]/55 hover:text-[var(--text-primary)]"
   );
 }
 
@@ -587,33 +591,25 @@ export function AppRecentActivity({ items }: { items: string[] }) {
   );
 }
 
-const statusTone: Record<string, string> = {
-  "prioridade alta":
-    "bg-[var(--dashboard-danger)]/16 text-[var(--dashboard-danger)] border-[var(--dashboard-danger)]/38",
-  "em risco":
-    "bg-[var(--dashboard-danger)]/14 text-[var(--dashboard-danger)] border-[var(--dashboard-danger)]/35",
-  bloqueado:
-    "bg-[var(--dashboard-danger)]/18 text-[var(--dashboard-danger)] border-[var(--dashboard-danger)]/44",
-  urgente:
-    "bg-[var(--dashboard-danger)]/16 text-[var(--dashboard-danger)] border-[var(--dashboard-danger)]/38",
-  atenção:
-    "bg-[var(--dashboard-warning)]/14 text-[var(--dashboard-warning)] border-[var(--dashboard-warning)]/34",
-  pendente:
-    "bg-[var(--dashboard-neutral)]/14 text-[var(--dashboard-neutral)] border-[var(--dashboard-neutral)]/34",
-  confirmado:
-    "bg-[var(--dashboard-info)]/16 text-[var(--dashboard-info)] border-[var(--dashboard-info)]/34",
-  ok: "bg-[var(--dashboard-success)]/16 text-[var(--dashboard-success)] border-[var(--dashboard-success)]/36",
-  seguro:
-    "bg-[var(--dashboard-success)]/16 text-[var(--dashboard-success)] border-[var(--dashboard-success)]/36",
-  concluído:
-    "bg-[var(--dashboard-success)]/16 text-[var(--dashboard-success)] border-[var(--dashboard-success)]/36",
-  pago: "bg-[var(--dashboard-success)]/16 text-[var(--dashboard-success)] border-[var(--dashboard-success)]/36",
-  médio:
-    "bg-[var(--dashboard-warning)]/14 text-[var(--dashboard-warning)] border-[var(--dashboard-warning)]/34",
-  alta: "bg-[var(--dashboard-danger)]/16 text-[var(--dashboard-danger)] border-[var(--dashboard-danger)]/38",
-  alto: "bg-[var(--dashboard-danger)]/16 text-[var(--dashboard-danger)] border-[var(--dashboard-danger)]/38",
-  falhou:
-    "bg-[var(--dashboard-danger)]/14 text-[var(--dashboard-danger)] border-[var(--dashboard-danger)]/35",
+const statusTone: Record<
+  string,
+  "success" | "warning" | "danger" | "info" | "neutral" | "accent"
+> = {
+  "prioridade alta": "danger",
+  "em risco": "danger",
+  bloqueado: "danger",
+  urgente: "danger",
+  atenção: "warning",
+  pendente: "neutral",
+  confirmado: "info",
+  ok: "success",
+  seguro: "success",
+  concluído: "success",
+  pago: "success",
+  médio: "warning",
+  alta: "danger",
+  alto: "danger",
+  falhou: "danger",
 };
 
 function normalizeStatusLabel(label: string) {
@@ -641,15 +637,11 @@ export function AppStatusBadge({ label }: { label: string }) {
       : "Pendente";
   const safeLabel = normalized.trim().length > 0 ? normalized : "Pendente";
   return (
-    <Badge
-      className={cn(
-        "inline-flex h-6 items-center rounded-full border px-2.5 py-0 text-[10px] font-semibold uppercase tracking-[0.08em]",
-        statusTone[safeLabel.toLowerCase()] ??
-          "bg-[var(--dashboard-neutral)]/14 text-[var(--dashboard-neutral)] border-[var(--dashboard-neutral)]/34"
-      )}
-    >
-      {safeLabel}
-    </Badge>
+    <NexoStatusBadge
+      label={safeLabel}
+      tone={statusTone[safeLabel.toLowerCase()] ?? "neutral"}
+      className="h-6 px-2.5 py-0 text-[10px] font-semibold uppercase tracking-[0.08em]"
+    />
   );
 }
 
