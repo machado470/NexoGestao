@@ -1,13 +1,13 @@
-import { useMemo } from "react";
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import { useMemo, useState } from "react";
 import {
   AppDataTable,
   AppPageEmptyState,
   AppSectionBlock,
   AppStatusBadge,
+  appSelectionPillClasses,
 } from "@/components/internal-page-system";
 import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedbackButton";
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { cn } from "@/lib/utils";
 
 interface FinanceOverdueProps {
   charges: any[];
@@ -34,6 +34,8 @@ export function FinanceOverdue({
   formatCurrency,
   onCharge,
 }: FinanceOverdueProps) {
+  const [selectedBand, setSelectedBand] = useState<string | null>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<string | null>(null);
   const sorted = [...charges].sort(
     (a, b) => getDaysOverdue(b?.dueDate) - getDaysOverdue(a?.dueDate)
   );
@@ -48,18 +50,70 @@ export function FinanceOverdue({
       : 0;
 
   const bucketData = useMemo(() => {
-    const map = new Map<string, number>();
+    const map = new Map<string, { count: number; totalCents: number }>();
     sorted.forEach(item => {
       const label = getBand(getDaysOverdue(item?.dueDate));
-      map.set(label, (map.get(label) ?? 0) + 1);
+      const previous = map.get(label) ?? { count: 0, totalCents: 0 };
+      map.set(label, {
+        count: previous.count + 1,
+        totalCents: previous.totalCents + Number(item?.amountCents ?? 0),
+      });
     });
     return ["Até 3 dias", "4 a 7 dias", "8 a 15 dias", "+ de 15 dias"].map(label => ({
       label,
-      value: map.get(label) ?? 0,
+      count: map.get(label)?.count ?? 0,
+      totalCents: map.get(label)?.totalCents ?? 0,
     }));
   }, [sorted]);
 
-  const topImpact = sorted.slice(0, 4);
+  const topImpact = useMemo(() => {
+    const customerTotals = new Map<
+      string,
+      { customerName: string; totalCents: number; chargesCount: number }
+    >();
+    sorted.forEach(item => {
+      const customerId = String(item?.customer?.id ?? item?.customer?.name ?? "sem-cliente");
+      const customerName = String(item?.customer?.name ?? "Sem cliente");
+      const current = customerTotals.get(customerId) ?? {
+        customerName,
+        totalCents: 0,
+        chargesCount: 0,
+      };
+      customerTotals.set(customerId, {
+        customerName,
+        totalCents: current.totalCents + Number(item?.amountCents ?? 0),
+        chargesCount: current.chargesCount + 1,
+      });
+    });
+    return [...customerTotals.entries()]
+      .map(([customerId, item]) => ({ customerId, ...item }))
+      .sort((a, b) => b.totalCents - a.totalCents)
+      .slice(0, 5);
+  }, [sorted]);
+
+  const maxBandCount = Math.max(...bucketData.map(item => item.count), 1);
+  const topImpactTotal = topImpact.reduce((acc, item) => acc + item.totalCents, 0);
+
+  const filtered = useMemo(
+    () =>
+      sorted.filter(charge => {
+        const inBand = selectedBand ? getBand(getDaysOverdue(charge?.dueDate)) === selectedBand : true;
+        const inCustomer = selectedCustomer
+          ? String(charge?.customer?.id ?? charge?.customer?.name ?? "sem-cliente") === selectedCustomer
+          : true;
+        return inBand && inCustomer;
+      }),
+    [selectedBand, selectedCustomer, sorted]
+  );
+
+  const focusDescription = [
+    selectedBand ? `Faixa: ${selectedBand}` : null,
+    selectedCustomer
+      ? `Cliente: ${topImpact.find(item => item.customerId === selectedCustomer)?.customerName ?? "Selecionado"}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   if (sorted.length === 0) {
     return (
@@ -77,37 +131,46 @@ export function FinanceOverdue({
         subtitle="Recuperação imediata de caixa com foco no que mais pesa."
         className="border-rose-500/30 bg-rose-500/10"
       >
-        <div className="grid gap-3 xl:grid-cols-[1.4fr_1fr]">
-          <div className="grid gap-3 md:grid-cols-4">
-            <div className="rounded-xl border border-rose-400/35 bg-rose-500/15 p-4">
-              <p className="text-xs text-rose-100/80">Total vencido</p>
-              <p className="mt-1 text-2xl font-semibold text-rose-100">{formatCurrency(riskTotal)}</p>
+        <div className="grid gap-3 xl:grid-cols-[1.6fr_1fr]">
+          <div className="grid min-w-0 gap-3 grid-cols-2 xl:grid-cols-4">
+            <div className="min-w-0 overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/45 p-4">
+              <p className="text-xs text-[var(--text-muted)]">Total vencido</p>
+              <p className="mt-1 truncate text-xl font-semibold leading-tight text-[var(--text-primary)] md:text-2xl">
+                {formatCurrency(riskTotal)}
+              </p>
             </div>
-            <div className="rounded-xl border border-rose-400/35 bg-rose-500/15 p-4">
-              <p className="text-xs text-rose-100/80">Quantidade vencida</p>
-              <p className="mt-1 text-2xl font-semibold text-rose-100">{sorted.length}</p>
+            <div className="min-w-0 overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/45 p-4">
+              <p className="text-xs text-[var(--text-muted)]">Quantidade vencida</p>
+              <p className="mt-1 truncate text-xl font-semibold leading-tight text-[var(--text-primary)] md:text-2xl">
+                {sorted.length}
+              </p>
             </div>
-            <div className="rounded-xl border border-rose-400/35 bg-rose-500/15 p-4">
-              <p className="text-xs text-rose-100/80">Maior atraso</p>
-              <p className="mt-1 text-2xl font-semibold text-rose-100">{maxDaysOverdue}d</p>
+            <div className="min-w-0 overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/45 p-4">
+              <p className="text-xs text-[var(--text-muted)]">Maior atraso</p>
+              <p className="mt-1 truncate text-xl font-semibold leading-tight text-[var(--text-primary)] md:text-2xl">
+                {maxDaysOverdue}d
+              </p>
             </div>
-            <div className="rounded-xl border border-rose-400/35 bg-rose-500/15 p-4">
-              <p className="text-xs text-rose-100/80">Impacto no caixa</p>
-              <p className="mt-1 text-2xl font-semibold text-rose-100">
+            <div className="min-w-0 overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/45 p-4">
+              <p className="text-xs text-[var(--text-muted)]">Impacto no caixa</p>
+              <p className="mt-1 truncate text-xl font-semibold leading-tight text-[var(--text-primary)] md:text-2xl">
                 {riskTotal > 0 ? `${Math.min(Math.round((riskTotal / 5000000) * 100), 100)}%` : "0%"}
               </p>
             </div>
           </div>
 
-          <div className="rounded-xl border border-rose-400/40 bg-rose-500/20 p-4">
-            <p className="text-sm font-semibold text-rose-100">O que cobrar primeiro</p>
-            <p className="mt-1 text-xs text-rose-100/80">
+          <div className="min-w-0 overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/35 p-4">
+            <p className="text-sm font-semibold text-[var(--text-primary)]">O que cobrar primeiro</p>
+            <p className="mt-1 text-xs text-[var(--text-secondary)]">
               Comece por cobranças acima da média de atraso ({averageOverdue} dias) e maior valor.
             </p>
+            {focusDescription ? (
+              <p className="mt-2 text-xs font-medium text-[var(--text-primary)]">{focusDescription}</p>
+            ) : null}
             <ActionFeedbackButton
               state="idle"
-              idleLabel="Cobrar prioridade agora"
-              onClick={() => onCharge(sorted[0])}
+              idleLabel={focusDescription ? "Cobrar foco selecionado" : "Cobrar prioridade agora"}
+              onClick={() => onCharge(filtered[0] ?? sorted[0])}
             />
           </div>
         </div>
@@ -116,19 +179,51 @@ export function FinanceOverdue({
       <div className="grid gap-4 xl:grid-cols-2">
         <AppSectionBlock
           title="Faixas de atraso"
-          subtitle="Visual de criticidade para conduzir a rotina de cobrança."
+          subtitle="Visual operacional para conduzir a rotina diária de cobrança."
           compact
           className="border-rose-500/25"
         >
-          <ChartContainer className="h-[220px] w-full" config={{ value: { label: "Cobranças" } }}>
-            <BarChart data={bucketData}>
-              <CartesianGrid vertical={false} strokeDasharray="3 6" />
-              <XAxis dataKey="label" tickLine={false} axisLine={false} />
-              <YAxis tickLine={false} axisLine={false} allowDecimals={false} />
-              <ChartTooltip content={<ChartTooltipContent />} />
-              <Bar dataKey="value" radius={[8, 8, 4, 4]} fill="#fb7185" />
-            </BarChart>
-          </ChartContainer>
+          <div className="space-y-2">
+            {bucketData.map(item => {
+              const isActive = selectedBand === item.label;
+              const width = `${Math.max((item.count / maxBandCount) * 100, item.count > 0 ? 10 : 0)}%`;
+              return (
+                <button
+                  key={item.label}
+                  type="button"
+                  onClick={() => setSelectedBand(isActive ? null : item.label)}
+                  className={cn(
+                    "w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/35 p-3 text-left transition hover:border-[var(--border-emphasis)] hover:bg-[var(--surface-base)]/55",
+                    isActive && "border-rose-500/45 bg-rose-500/10"
+                  )}
+                >
+                  <div className="flex min-w-0 items-center justify-between gap-3">
+                    <span className="truncate text-sm font-medium text-[var(--text-primary)]">{item.label}</span>
+                    <span className="shrink-0 text-xs text-[var(--text-secondary)]">
+                      {item.count} cobrança(s)
+                    </span>
+                  </div>
+                  <div className="mt-2 h-2 rounded-full bg-[var(--surface-elevated)]">
+                    <div className="h-2 rounded-full bg-rose-400/80" style={{ width }} />
+                  </div>
+                  <p className="mt-1 text-xs text-[var(--text-muted)]">
+                    {item.count > 0
+                      ? `${formatCurrency(item.totalCents)} em atraso nessa faixa`
+                      : "Nenhuma cobrança nessa faixa no momento"}
+                  </p>
+                </button>
+              );
+            })}
+            {selectedBand ? (
+              <button
+                type="button"
+                className={appSelectionPillClasses(false)}
+                onClick={() => setSelectedBand(null)}
+              >
+                Limpar faixa
+              </button>
+            ) : null}
+          </div>
         </AppSectionBlock>
 
         <AppSectionBlock
@@ -139,20 +234,34 @@ export function FinanceOverdue({
         >
           <div className="space-y-3">
             {topImpact.map(item => {
-              const value = Number(item?.amountCents ?? 0);
-              const ratio = riskTotal > 0 ? (value / riskTotal) * 100 : 0;
+              const isActive = selectedCustomer === item.customerId;
+              const ratio = topImpactTotal > 0 ? (item.totalCents / topImpactTotal) * 100 : 0;
               return (
-                <div key={String(item?.id)} className="rounded-lg border border-rose-400/25 bg-rose-500/10 p-3">
-                  <div className="flex items-center justify-between text-sm">
-                    <p className="font-medium text-rose-100">{String(item?.customer?.name ?? "Sem cliente")}</p>
-                    <p className="font-semibold text-rose-100">{formatCurrency(value)}</p>
+                <button
+                  key={item.customerId}
+                  type="button"
+                  onClick={() => setSelectedCustomer(isActive ? null : item.customerId)}
+                  className={cn(
+                    "w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/35 p-3 text-left transition hover:border-[var(--border-emphasis)] hover:bg-[var(--surface-base)]/55",
+                    isActive && "border-rose-500/45 bg-rose-500/10"
+                  )}
+                >
+                  <div className="flex min-w-0 items-center justify-between gap-2 text-sm">
+                    <p className="truncate font-medium text-[var(--text-primary)]">{item.customerName}</p>
+                    <p className="shrink-0 font-semibold text-[var(--text-primary)]">{formatCurrency(item.totalCents)}</p>
                   </div>
-                  <div className="mt-2 h-1.5 rounded-full bg-rose-950/40">
-                    <div className="h-1.5 rounded-full bg-rose-300" style={{ width: `${Math.max(ratio, 8)}%` }} />
+                  <p className="mt-1 text-xs text-[var(--text-muted)]">{item.chargesCount} título(s) vencido(s)</p>
+                  <div className="mt-2 h-1.5 rounded-full bg-[var(--surface-elevated)]">
+                    <div className="h-1.5 rounded-full bg-rose-400/80" style={{ width: `${Math.max(ratio, 8)}%` }} />
                   </div>
-                </div>
+                </button>
               );
             })}
+            {topImpact.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-[var(--border-subtle)] p-4 text-xs text-[var(--text-muted)]">
+                Ainda sem concentração relevante por cliente.
+              </div>
+            ) : null}
           </div>
         </AppSectionBlock>
       </div>
@@ -163,9 +272,12 @@ export function FinanceOverdue({
         compact
         className="border-rose-500/25"
       >
+        {focusDescription ? (
+          <p className="mb-3 text-xs text-[var(--text-secondary)]">Filtro ativo: {focusDescription}.</p>
+        ) : null}
         <AppDataTable>
           <table className="w-full text-sm">
-            <thead className="bg-rose-500/10 text-xs text-rose-100">
+            <thead className="bg-[var(--surface-elevated)] text-xs text-[var(--text-muted)]">
               <tr>
                 <th className="p-2.5 text-left">Cliente</th>
                 <th className="text-left">Dias em atraso</th>
@@ -176,16 +288,18 @@ export function FinanceOverdue({
               </tr>
             </thead>
             <tbody>
-              {sorted.map(charge => {
+              {filtered.map(charge => {
                 const days = getDaysOverdue(charge?.dueDate);
                 const priority = days > 15 ? "Máxima" : days > 7 ? "Alta" : "Média";
                 return (
                   <tr
                     key={String(charge?.id)}
-                    className="border-t border-rose-300/30 bg-rose-500/5"
+                    className="border-t border-[var(--border-subtle)] bg-[var(--surface-base)]/20"
                   >
-                    <td className="p-2.5">{String(charge?.customer?.name ?? "—")}</td>
-                    <td className="font-semibold text-rose-200">{days} dias</td>
+                    <td className="min-w-0 p-2.5">
+                      <span className="block truncate">{String(charge?.customer?.name ?? "—")}</span>
+                    </td>
+                    <td className="font-semibold text-[var(--text-primary)]">{days} dias</td>
                     <td>{formatCurrency(Number(charge?.amountCents ?? 0))}</td>
                     <td>
                       {charge?.dueDate
@@ -204,6 +318,13 @@ export function FinanceOverdue({
                   </tr>
                 );
               })}
+              {filtered.length === 0 ? (
+                <tr className="border-t border-[var(--border-subtle)]">
+                  <td colSpan={6} className="p-4 text-center text-xs text-[var(--text-muted)]">
+                    Nenhuma cobrança para os filtros selecionados.
+                  </td>
+                </tr>
+              ) : null}
             </tbody>
           </table>
         </AppDataTable>
