@@ -83,17 +83,19 @@ function CashHealthMetric({
   helper: string;
 }) {
   return (
-    <article className="flex min-h-[118px] min-w-0 flex-col justify-between rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/35 px-3.5 py-3">
+    <article className="flex h-full min-h-[124px] min-w-0 flex-col rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/35 px-3.5 py-3.5">
       <p className="truncate text-[11px] font-medium uppercase tracking-[0.02em] text-[var(--text-muted)]">
         {label}
       </p>
-      <p
-        className="mt-2 truncate text-[1.45rem] font-semibold leading-tight text-[var(--text-primary)] tabular-nums"
-        title={value}
-      >
-        {value}
-      </p>
-      <p className="mt-2 line-clamp-2 text-[11px] leading-relaxed text-[var(--text-muted)]">
+      <div className="mt-2.5 flex min-h-[44px] items-end">
+        <p
+          className="w-full truncate text-[clamp(1.08rem,2.1vw,1.42rem)] font-semibold leading-[1.15] text-[var(--text-primary)] tabular-nums"
+          title={value}
+        >
+          {value}
+        </p>
+      </div>
+      <p className="mt-2.5 line-clamp-2 min-h-[32px] text-[11px] leading-relaxed text-[var(--text-muted)]">
         {helper}
       </p>
     </article>
@@ -896,7 +898,7 @@ export default function FinancesPage() {
             subtitle="Leitura consolidada de estabilidade, risco e tendência para decisão imediata."
             className="xl:col-span-8"
           >
-            <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-4">
+            <div className="grid items-stretch gap-3 pt-0.5 md:grid-cols-2 xl:grid-cols-4">
               <CashHealthMetric
                 label="Saúde geral"
                 value={`${healthyRatio.toFixed(0)}%`}
@@ -925,8 +927,8 @@ export default function FinancesPage() {
             className="xl:col-span-4"
             compact
           >
-            <div className="space-y-3">
-              <div className="flex flex-wrap items-center gap-2">
+            <div className="space-y-3.5">
+              <div className="flex flex-wrap items-center gap-1.5">
                 <AppStatusBadge
                   label={getOperationalSeverityLabel(pageSeverity)}
                 />
@@ -940,22 +942,23 @@ export default function FinancesPage() {
                   }
                 />
               </div>
-              <p className="text-sm text-[var(--text-secondary)]">
+              <p className="text-sm leading-relaxed text-[var(--text-secondary)]">
                 {decisionCenter.description}
               </p>
               <p className="text-xs text-[var(--text-muted)]">
                 {decisionCenter.reference}
               </p>
-              <div className="grid gap-2">
+              <div className="grid gap-1.5 pt-0.5">
                 <ActionFeedbackButton
                   state="idle"
                   idleLabel="Cobrar quem está vencido"
+                  className="h-9 w-full justify-start text-xs font-semibold"
                   onClick={() => setMode("overdue")}
                 />
                 <Button
                   type="button"
                   variant="outline"
-                  className="h-9 justify-start text-xs font-medium text-[var(--text-secondary)]"
+                  className="h-8 justify-start text-xs font-medium text-[var(--text-secondary)]/90"
                   onClick={() => setMode("paid")}
                 >
                   Registrar pagamento
@@ -963,7 +966,7 @@ export default function FinancesPage() {
                 <Button
                   type="button"
                   variant="ghost"
-                  className="h-9 justify-start text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                  className="h-8 justify-start px-2 text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
                   onClick={() => handleRemind()}
                 >
                   Executar lembretes
