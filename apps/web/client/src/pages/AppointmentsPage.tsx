@@ -4,9 +4,11 @@ import { trpc } from "@/lib/trpc";
 import { normalizeArrayPayload } from "@/lib/query-helpers";
 import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
 import { CreateAppointmentModal } from "@/components/CreateAppointmentModal";
+import CreateServiceOrderModal from "@/components/CreateServiceOrderModal";
 import { AppRowActionsDropdown } from "@/components/app-system";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedbackButton";
+import { AppOperationalModal } from "@/components/operating-system/AppOperationalModal";
 import {
   getAppointmentSeverity,
   getOperationalSeverityLabel,
@@ -24,6 +26,7 @@ import {
   AppStatusBadge,
 } from "@/components/internal-page-system";
 import { getDayWindow, inRange, safeDate } from "@/lib/operational/kpi";
+import { toast } from "sonner";
 
 type TabKey = "agenda" | "confirmed" | "pending" | "conflicts" | "history";
 type WindowFilter = "all" | "today" | "next7" | "overdue";
@@ -71,13 +74,18 @@ export default function AppointmentsPage() {
   const [windowFilter, setWindowFilter] = useState<WindowFilter>("today");
   const [customerFilter, setCustomerFilter] = useState("all");
   const [focusedAppointmentId, setFocusedAppointmentId] = useState<string>("");
+  const [openOperationalModal, setOpenOperationalModal] = useState(false);
+  const [openServiceOrderCreate, setOpenServiceOrderCreate] = useState(false);
+  const [actionFeedback, setActionFeedback] = useState<string | null>(null);
 
   const customersQuery = trpc.nexo.customers.list.useQuery(undefined, {
     retry: false,
   });
+  const peopleQuery = trpc.people.list.useQuery(undefined, { retry: false });
   const appointmentsQuery = trpc.nexo.appointments.list.useQuery(undefined, {
     retry: false,
   });
+  const updateAppointment = trpc.nexo.appointments.update.useMutation();
 
   const customers = useMemo(
     () => normalizeArrayPayload<any>(customersQuery.data),
@@ -86,6 +94,10 @@ export default function AppointmentsPage() {
   const appointments = useMemo(
     () => normalizeArrayPayload<AppointmentLike>(appointmentsQuery.data),
     [appointmentsQuery.data]
+  );
+  const people = useMemo(
+    () => normalizeArrayPayload<any>(peopleQuery.data),
+    [peopleQuery.data]
   );
   const hasData = appointments.length > 0;
   const showInitialLoading = appointmentsQuery.isLoading && !hasData;
@@ -253,6 +265,28 @@ export default function AppointmentsPage() {
     filteredAppointments.find(
       ({ item }) => String(item?.id ?? "") === focusedAppointmentId
     ) ?? filteredAppointments[0];
+
+  const executeStatusUpdate = async (status: "CONFIRMED" | "CANCELED") => {
+    if (!focused?.item?.id) return;
+    try {
+      setActionFeedback("Processando ação...");
+      await updateAppointment.mutateAsync({
+        id: String(focused.item.id),
+        status,
+      } as any);
+      setActionFeedback(
+        status === "CONFIRMED"
+          ? "Agendamento confirmado com sucesso."
+          : "Agendamento cancelado com sucesso."
+      );
+      await appointmentsQuery.refetch();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Falha ao atualizar agendamento.";
+      setActionFeedback(message);
+      toast.error(message);
+    }
+  };
 
   const headerCta = (() => {
     if (activeTab === "confirmed") {
@@ -514,22 +548,23 @@ export default function AppointmentsPage() {
                                 : "LOW";
                           const handlePrimaryAction = () => {
                             if (nextAction === "Criar O.S.") {
-                              navigate(
-                                `/service-orders?customerId=${item.customerId}&appointmentId=${item.id}`
-                              );
+                              setFocusedAppointmentId(String(item?.id ?? ""));
+                              setOpenServiceOrderCreate(true);
                               return;
                             }
-                            navigate(`/whatsapp?customerId=${item.customerId}`);
+                            setFocusedAppointmentId(String(item?.id ?? ""));
+                            setOpenOperationalModal(true);
                           };
 
                           return (
-                            <tr
-                              key={String(item?.id)}
-                              className="cursor-pointer border-t border-[var(--border-subtle)] transition-colors hover:bg-[var(--surface-subtle)]/60"
-                              onClick={() =>
-                                setFocusedAppointmentId(String(item?.id ?? ""))
-                              }
-                            >
+                          <tr
+                            key={String(item?.id)}
+                            className="cursor-pointer border-t border-[var(--border-subtle)] transition-colors hover:bg-[var(--surface-subtle)]/60"
+                            onClick={() => {
+                              setFocusedAppointmentId(String(item?.id ?? ""));
+                              setOpenOperationalModal(true);
+                            }}
+                          >
                               <td className="p-3 align-top">
                                 {safeDate(item?.startsAt)?.toLocaleString(
                                   "pt-BR"
@@ -555,7 +590,16 @@ export default function AppointmentsPage() {
                                 <AppPriorityBadge label={priorityLabel} />
                               </td>
                               <td className="align-top text-xs text-[var(--text-secondary)]">
-                                {nextAction}
+                                <button
+                                  type="button"
+                                  className="font-medium text-[var(--accent-primary)] hover:underline"
+                                  onClick={event => {
+                                    event.stopPropagation();
+                                    handlePrimaryAction();
+                                  }}
+                                >
+                                  {nextAction}
+                                </button>
                               </td>
                               <td className="p-3 align-top">
                                 <div className="flex items-center justify-end gap-2">
@@ -597,70 +641,131 @@ export default function AppointmentsPage() {
           </AppSectionBlock>
 
           <AppSectionBlock
-            title="Workspace do agendamento"
-            subtitle="Contexto do item em foco conectado com cliente, execução e comunicação."
+            title="Central operacional do agendamento"
+            subtitle="Clique em um item para abrir detalhe completo sem sair da página."
             compact
           >
-            {focused ? (
-              <div className="space-y-3">
-                <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-semibold text-[var(--text-primary)]">
-                      {String(focused.item?.customer?.name ?? "Cliente")}
-                    </p>
-                    <AppStatusBadge label={focused.operationalState} />
-                  </div>
-                  <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                    Início:{" "}
-                    {safeDate(focused.item?.startsAt)?.toLocaleString(
-                      "pt-BR"
-                    ) ?? "—"}
-                  </p>
-                  <p className="text-xs text-[var(--text-secondary)]">
-                    Fim:{" "}
-                    {safeDate(focused.item?.endsAt)?.toLocaleString("pt-BR") ??
-                      "Não definido"}
-                  </p>
-                  <p className="mt-2 text-xs text-[var(--text-muted)]">
-                    Próxima ação recomendada: {focused.nextAction}.
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 gap-2">
-                  <button
-                    type="button"
-                    className="nexo-cta-primary"
-                    onClick={() =>
-                      navigate(
-                        `/service-orders?customerId=${focused.item?.customerId}&appointmentId=${focused.item?.id}`
-                      )
-                    }
-                  >
-                    Converter em O.S.
-                  </button>
-                  <button
-                    type="button"
-                    className="nexo-cta-secondary"
-                    onClick={() =>
-                      navigate(
-                        `/customers?customerId=${focused.item?.customerId}`
-                      )
-                    }
-                  >
-                    Abrir cliente
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <p className="text-xs text-[var(--text-muted)]">
-                Selecione um agendamento para ver o contexto operacional e
-                executar o próximo passo.
-              </p>
-            )}
+            <p className="text-xs text-[var(--text-muted)]">
+              {focused
+                ? `Em foco: ${String(focused.item?.customer?.name ?? "Cliente")} · ${focused.nextAction}`
+                : "Selecione um agendamento para abrir o detalhe operacional."}
+            </p>
           </AppSectionBlock>
         </div>
       </div>
 
+      <AppOperationalModal
+        open={openOperationalModal && Boolean(focused)}
+        onOpenChange={setOpenOperationalModal}
+        title={String(focused?.item?.title ?? focused?.item?.customer?.name ?? "Agendamento")}
+        subtitle={String(focused?.item?.customer?.name ?? "Cliente não identificado")}
+        status={focused?.operationalState}
+        priority={
+          focused?.hasConflict || focused?.isDelayed
+            ? "Prioridade alta"
+            : "Prioridade operacional"
+        }
+        summary={[
+          {
+            label: "Início",
+            value: safeDate(focused?.item?.startsAt)?.toLocaleString("pt-BR") ?? "—",
+          },
+          {
+            label: "Fim",
+            value: safeDate(focused?.item?.endsAt)?.toLocaleString("pt-BR") ?? "Não definido",
+          },
+          {
+            label: "Status",
+            value: String(focused?.item?.status ?? "—"),
+          },
+          { label: "Próxima ação", value: focused?.nextAction ?? "—" },
+        ]}
+        primaryAction={{
+          label: focused?.nextAction ?? "Executar ação",
+          onClick: () => {
+            if (!focused) return;
+            if (focused.nextAction === "Confirmar") {
+              void executeStatusUpdate("CONFIRMED");
+              return;
+            }
+            if (focused.nextAction === "Criar O.S.") {
+              setOpenServiceOrderCreate(true);
+              return;
+            }
+            navigate(`/whatsapp?customerId=${focused.item?.customerId}`);
+          },
+          disabled: updateAppointment.isPending,
+        }}
+        secondaryAction={{
+          label: "Cancelar",
+          onClick: () => void executeStatusUpdate("CANCELED"),
+          disabled: updateAppointment.isPending || !focused,
+        }}
+        quickActions={[
+          {
+            label: "Remarcar +1 dia",
+            onClick: async () => {
+              if (!focused?.item?.id || !focused.item?.startsAt) return;
+              const start = safeDate(focused.item.startsAt);
+              if (!start) return;
+              const end = safeDate(focused.item.endsAt);
+              start.setDate(start.getDate() + 1);
+              if (end) end.setDate(end.getDate() + 1);
+              try {
+                setActionFeedback("Remarcando agendamento...");
+                await updateAppointment.mutateAsync({
+                  id: String(focused.item.id),
+                  startsAt: start.toISOString(),
+                  endsAt: end?.toISOString(),
+                } as any);
+                setActionFeedback("Agendamento remarcado para o próximo dia.");
+                await appointmentsQuery.refetch();
+              } catch (error) {
+                setActionFeedback("Falha ao remarcar.");
+              }
+            },
+            disabled: updateAppointment.isPending || !focused,
+          },
+          {
+            label: "Criar O.S.",
+            onClick: () => setOpenServiceOrderCreate(true),
+            disabled: !focused,
+          },
+          {
+            label: "WhatsApp",
+            onClick: () =>
+              focused &&
+              navigate(`/whatsapp?customerId=${focused.item?.customerId}`),
+            disabled: !focused,
+          },
+        ]}
+        feedback={actionFeedback}
+      >
+        <div className="space-y-4">
+          <section className="space-y-1.5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+              Contexto operacional
+            </p>
+            <p className="text-sm text-[var(--text-primary)]">
+              {focused?.hasConflict
+                ? "Conflito de agenda detectado. Priorize confirmação ou remarcação."
+                : focused?.isDelayed
+                  ? "Agendamento atrasado. Ação imediata reduz no-show."
+                  : "Fluxo dentro do planejado para execução."}
+            </p>
+          </section>
+          <section className="space-y-1.5 border-t border-[var(--border-subtle)] pt-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+              Timeline curta
+            </p>
+            <ul className="list-disc space-y-1 pl-4 text-xs text-[var(--text-secondary)]">
+              <li>Agendamento criado e vinculado ao cliente.</li>
+              <li>Status atual: {String(focused?.item?.status ?? "—")}.</li>
+              <li>Próxima melhor ação: {focused?.nextAction ?? "—"}.</li>
+            </ul>
+          </section>
+        </div>
+      </AppOperationalModal>
       <CreateAppointmentModal
         isOpen={openCreate}
         onClose={() => setOpenCreate(false)}
@@ -671,6 +776,23 @@ export default function AppointmentsPage() {
           id: String(item.id),
           name: String(item.name ?? "Cliente"),
         }))}
+      />
+      <CreateServiceOrderModal
+        open={openServiceOrderCreate}
+        onClose={() => setOpenServiceOrderCreate(false)}
+        onSuccess={() => {
+          setActionFeedback("O.S. criada com vínculo ao agendamento.");
+        }}
+        customers={customers.map(item => ({
+          id: String(item.id),
+          name: String(item.name ?? "Cliente"),
+        }))}
+        people={people.map(item => ({
+          id: String(item.id),
+          name: String(item.name ?? "Pessoa"),
+        }))}
+        initialCustomerId={focused?.item?.customerId ? String(focused.item.customerId) : null}
+        appointmentId={focused?.item?.id ? String(focused.item.id) : null}
       />
     </PageWrapper>
   );

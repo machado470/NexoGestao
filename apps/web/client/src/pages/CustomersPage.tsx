@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import CreateCustomerModal from "@/components/CreateCustomerModal";
+import { CreateAppointmentModal } from "@/components/CreateAppointmentModal";
+import CreateServiceOrderModal from "@/components/CreateServiceOrderModal";
 import {
   normalizeArrayPayload,
   normalizeObjectPayload,
@@ -9,7 +11,7 @@ import {
 import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
 import { Button, SecondaryButton } from "@/components/design-system";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
-import { ContextPanel } from "@/components/operating-system/ContextPanel";
+import { AppOperationalModal } from "@/components/operating-system/AppOperationalModal";
 import { AppRowActionsDropdown, AppCheckbox } from "@/components/app-system";
 import {
   AppOperationalBar,
@@ -112,6 +114,9 @@ export default function CustomersPage() {
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
   const [timelineExpanded, setTimelineExpanded] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [openAppointmentCreate, setOpenAppointmentCreate] = useState(false);
+  const [openServiceOrderCreate, setOpenServiceOrderCreate] = useState(false);
+  const [actionFeedback, setActionFeedback] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<
     "overview" | "agenda" | "service_orders" | "financial" | "history"
   >("overview");
@@ -119,6 +124,7 @@ export default function CustomersPage() {
   const customersQuery = trpc.nexo.customers.list.useQuery(undefined, {
     retry: false,
   });
+  const peopleQuery = trpc.people.list.useQuery(undefined, { retry: false });
   const chargesQuery = trpc.finance.charges.list.useQuery(
     { page: 1, limit: 200 },
     { retry: false }
@@ -127,6 +133,10 @@ export default function CustomersPage() {
   const customers = useMemo(
     () => normalizeArrayPayload<CustomerRecord>(customersQuery.data),
     [customersQuery.data]
+  );
+  const people = useMemo(
+    () => normalizeArrayPayload<any>(peopleQuery.data),
+    [peopleQuery.data]
   );
   const charges = useMemo(
     () => normalizeArrayPayload<ChargeRecord>(chargesQuery.data),
@@ -446,6 +456,26 @@ export default function CustomersPage() {
         `Comportamento detectado: ${selectedSnapshot.behaviorLabel.toLowerCase()}`,
       ].filter(Boolean) as string[])
     : [];
+
+  const runCustomerPrimaryAction = () => {
+    if (!selectedCustomer?.id || !selectedSnapshot) return;
+    if (selectedSnapshot.primaryActionLabel === "Cobrar agora") {
+      setActionFeedback("Abrindo cobrança do cliente...");
+      navigate(`/finances?customerId=${selectedCustomer.id}&filter=overdue`);
+      return;
+    }
+    if (selectedSnapshot.primaryActionLabel === "Criar agendamento") {
+      setActionFeedback("Abrindo criação de agendamento...");
+      setOpenAppointmentCreate(true);
+      return;
+    }
+    if (selectedSnapshot.primaryActionLabel === "Enviar WhatsApp") {
+      setActionFeedback("Abrindo canal de comunicação...");
+      navigate(`/whatsapp?customerId=${selectedCustomer.id}`);
+      return;
+    }
+    setActionFeedback("Contexto do cliente carregado.");
+  };
 
   const filterItems: Array<{ key: OperationalFilter; label: string }> = [
     { key: "all", label: "Todos" },
@@ -929,11 +959,11 @@ export default function CustomersPage() {
             )}
           </AppSectionBlock>
           <AppSectionBlock
-            title="Workspace e contexto"
+            title="Ação contextual contínua"
             subtitle={
               selectedCustomer
-                ? "Resumo tático do cliente selecionado"
-                : "Selecione um cliente para abrir o painel contextual"
+                ? "Detalhe operacional aberto em modal para executar sem trocar de tela."
+                : "Selecione um cliente para abrir a central operacional."
             }
             compact
           >
@@ -948,7 +978,7 @@ export default function CustomersPage() {
                 <p className="mt-1 text-xs text-[var(--text-secondary)]">
                   {selectedSnapshot
                     ? `${selectedSnapshot.contextLabel} · ${selectedSnapshot.contactLabel}`
-                    : "Abra o workspace para ver timeline, financeiro, agenda e comunicação."}
+                    : "Clique em um cliente na tabela para abrir a central operacional completa."}
                 </p>
               </div>
 
@@ -988,27 +1018,24 @@ export default function CustomersPage() {
               </div>
 
               <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  className="h-8 px-3 text-xs"
+                  onClick={() => selectedCustomer && runCustomerPrimaryAction()}
+                  disabled={!selectedCustomer}
+                >
+                  {selectedSnapshot?.primaryActionLabel ?? "Abrir detalhe"}
+                </Button>
                 <SecondaryButton
                   type="button"
                   className="h-8 px-3 text-xs"
                   onClick={() =>
                     selectedCustomer &&
-                    navigate(`/appointments?customerId=${selectedCustomer.id}`)
+                    setSelectedCustomer({ ...selectedCustomer })
                   }
                   disabled={!selectedCustomer}
                 >
-                  Criar agendamento
-                </SecondaryButton>
-                <SecondaryButton
-                  type="button"
-                  className="h-8 px-3 text-xs"
-                  onClick={() =>
-                    selectedCustomer &&
-                    navigate(`/finances?customerId=${selectedCustomer.id}`)
-                  }
-                  disabled={!selectedCustomer}
-                >
-                  Ir para cobrança
+                  Abrir detalhe operacional
                 </SecondaryButton>
               </div>
             </div>
@@ -1030,145 +1057,73 @@ export default function CustomersPage() {
             }
           }}
         />
-
-        <ContextPanel
+        <AppOperationalModal
           open={Boolean(selectedCustomer)}
           onOpenChange={open => {
             if (!open) {
               setSelectedCustomer(null);
               setTimelineExpanded(false);
+              setActionFeedback(null);
             }
           }}
-          title={
-            selectedCustomer?.name
-              ? `${selectedCustomer.name}`
-              : "Workspace do cliente"
-          }
-          subtitle="Painel operacional para decidir e executar sem sair da carteira."
-          statusLabel={
-            selectedSnapshot
-              ? `${selectedSnapshot.status} · ${selectedSnapshot.nextActionReason}`
-              : undefined
+          title={selectedCustomer?.name ?? "Cliente"}
+          subtitle="Central operacional de cliente para decidir, agir e acompanhar sem sair da carteira."
+          status={selectedSnapshot?.status}
+          priority={
+            selectedSnapshot ? `Prioridade ${selectedSnapshot.priorityScore}` : undefined
           }
           summary={[
             {
               label: "Financeiro",
-              value: workspaceQuery.isLoading
-                ? "Carregando..."
-                : `${workspaceCharges.length} cobranças`,
+              value: workspaceQuery.isLoading ? "Carregando..." : `${workspaceCharges.length} cobranças`,
             },
             {
               label: "Agenda",
-              value: workspaceQuery.isLoading
-                ? "Carregando..."
-                : `${workspaceAppointments.length} agendamentos`,
+              value: workspaceQuery.isLoading ? "Carregando..." : `${workspaceAppointments.length} agendamentos`,
             },
             {
               label: "O.S.",
-              value: workspaceQuery.isLoading
-                ? "Carregando..."
-                : `${workspaceServiceOrders.length} ordens`,
+              value: workspaceQuery.isLoading ? "Carregando..." : `${workspaceServiceOrders.length} ordens`,
             },
             {
               label: "WhatsApp",
-              value: workspaceQuery.isLoading
-                ? "Carregando..."
-                : `${workspaceMessages.length} interações`,
+              value: workspaceQuery.isLoading ? "Carregando..." : `${workspaceMessages.length} interações`,
             },
           ]}
           primaryAction={{
-            label: selectedSnapshot?.primaryActionLabel ?? "Abrir workspace",
-            onClick: () => {
-              const snapshot = snapshotByCustomerId.get(
-                selectedCustomer?.id ?? ""
-              );
-              if (!selectedCustomer?.id || !snapshot) return;
-              if (snapshot.primaryActionLabel === "Cobrar agora")
-                return navigate(
-                  `/finances?customerId=${selectedCustomer.id}&filter=overdue`
-                );
-              if (snapshot.primaryActionLabel === "Criar agendamento")
-                return navigate(
-                  `/appointments?customerId=${selectedCustomer.id}`
-                );
-              if (snapshot.primaryActionLabel === "Enviar WhatsApp")
-                return navigate(`/whatsapp?customerId=${selectedCustomer.id}`);
-              navigate(`/customers/${selectedCustomer.id}`);
-            },
+            label: selectedSnapshot?.primaryActionLabel ?? "Abrir detalhe",
+            onClick: runCustomerPrimaryAction,
             disabled: !selectedCustomer?.id,
           }}
-          secondaryActions={[
+          secondaryAction={{
+            label: "Criar O.S.",
+            onClick: () => setOpenServiceOrderCreate(true),
+            disabled: !selectedCustomer?.id,
+          }}
+          quickActions={[
             {
               label: "Criar agendamento",
-              onClick: () =>
-                selectedCustomer?.id &&
-                navigate(`/appointments?customerId=${selectedCustomer.id}`),
+              onClick: () => setOpenAppointmentCreate(true),
               disabled: !selectedCustomer?.id,
             },
             {
-              label: "Criar O.S.",
+              label: "Cobrança",
               onClick: () =>
                 selectedCustomer?.id &&
-                navigate(`/service-orders?customerId=${selectedCustomer.id}`),
+                navigate(`/finances?customerId=${selectedCustomer.id}&filter=overdue`),
               disabled: !selectedCustomer?.id,
             },
             {
-              label: "Enviar WhatsApp",
+              label: "WhatsApp",
               onClick: () =>
                 selectedCustomer?.id &&
                 navigate(`/whatsapp?customerId=${selectedCustomer.id}`),
               disabled: !selectedCustomer?.id,
             },
           ]}
-          explainLayer={
-            selectedSnapshot
-              ? {
-                  reason: "Priorização operacional do momento",
-                  conditions: explainConditions,
-                  afterAction: `Ação sugerida: ${selectedSnapshot.primaryActionLabel}`,
-                  impact: `${formatMoney(selectedSnapshot.financialPendingCents)} pendente`,
-                  riskOfInaction:
-                    selectedSnapshot.status === "Em risco"
-                      ? "Atraso recorrente"
-                      : "Perda de continuidade",
-                  elapsedTime: `${selectedSnapshot.contactDays} dias sem avanço`,
-                  contextualPriority: `${selectedSnapshot.priorityScore} pts`,
-                }
-              : undefined
-          }
-          timeline={visibleTimeline.map(item => ({
-            id: String(
-              item?.id ?? `${item?.createdAt}-${item?.entityId ?? "event"}`
-            ),
-            label: String(item?.title ?? item?.action ?? "Evento operacional"),
-            description: item?.createdAt
-              ? new Date(String(item.createdAt)).toLocaleString("pt-BR")
-              : "Sem data",
-            source: "system",
-          }))}
-          whatsAppPreview={
-            latestMessage
-              ? {
-                  contextLabel: "Última interação registrada",
-                  contextDescription: latestMessage?.createdAt
-                    ? `Enviado em ${new Date(String(latestMessage.createdAt)).toLocaleString("pt-BR")}`
-                    : "Sem horário identificado",
-                  message: String(
-                    latestMessage?.text ??
-                      latestMessage?.content ??
-                      "Mensagem sem conteúdo"
-                  ),
-                }
-              : {
-                  contextLabel: "Sem interação recente",
-                  contextDescription:
-                    "Sugestão: iniciar contato para manter o fluxo ativo.",
-                  message:
-                    "Olá! Vamos confirmar seu próximo passo no Nexo para manter agenda, execução e cobrança em dia?",
-                }
-          }
+          feedback={actionFeedback}
         >
-          <div className="space-y-4 border-t border-[var(--border-subtle)] pt-4">
+          <div className="space-y-4">
             {workspaceQuery.isLoading ? (
               <p className="text-sm text-[var(--text-muted)]">
                 Carregando resumo do cliente...
@@ -1182,7 +1137,7 @@ export default function CustomersPage() {
               <div className="space-y-4">
                 <section className="space-y-1.5">
                   <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
-                    Resumo do cliente
+                    Resumo e contexto
                   </p>
                   <p className="text-sm text-[var(--text-primary)]">
                     {String(workspaceCustomer?.phone ?? "Sem telefone")} ·{" "}
@@ -1197,7 +1152,22 @@ export default function CustomersPage() {
                 </section>
                 <section className="space-y-1.5 border-t border-[var(--border-subtle)] pt-4">
                   <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
-                    Impacto financeiro
+                    Próxima melhor ação
+                  </p>
+                  <p className="text-sm text-[var(--text-primary)]">
+                    {selectedSnapshot?.nextActionReason ?? "Sem recomendação no momento."}
+                  </p>
+                  {selectedSnapshot ? (
+                    <ul className="mt-1 list-disc space-y-1 pl-4 text-xs text-[var(--text-secondary)]">
+                      {explainConditions.map(condition => (
+                        <li key={condition}>{condition}</li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </section>
+                <section className="space-y-1.5 border-t border-[var(--border-subtle)] pt-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                    Financeiro e cobrança
                   </p>
                   <p className="text-sm text-[var(--text-secondary)]">
                     Pendente:{" "}
@@ -1218,7 +1188,7 @@ export default function CustomersPage() {
                 </section>
                 <section className="space-y-1.5 border-t border-[var(--border-subtle)] pt-4">
                   <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
-                    Agenda e execução
+                    Agenda, O.S. e comunicação
                   </p>
                   <p className="text-sm text-[var(--text-secondary)]">
                     Último agendamento:{" "}
@@ -1249,7 +1219,36 @@ export default function CustomersPage() {
               </div>
             )}
           </div>
-        </ContextPanel>
+        </AppOperationalModal>
+        <CreateAppointmentModal
+          isOpen={openAppointmentCreate}
+          onClose={() => setOpenAppointmentCreate(false)}
+          onSuccess={() => {
+            setActionFeedback("Agendamento criado com sucesso.");
+            void workspaceQuery.refetch();
+          }}
+          customers={customers.map(item => ({
+            id: String(item.id),
+            name: String(item.name ?? "Cliente"),
+          }))}
+        />
+        <CreateServiceOrderModal
+          open={openServiceOrderCreate}
+          onClose={() => setOpenServiceOrderCreate(false)}
+          onSuccess={() => {
+            setActionFeedback("O.S. criada e conectada ao cliente.");
+            void workspaceQuery.refetch();
+          }}
+          customers={customers.map(item => ({
+            id: String(item.id),
+            name: String(item.name ?? "Cliente"),
+          }))}
+          people={people.map(item => ({
+            id: String(item.id),
+            name: String(item.name ?? "Pessoa"),
+          }))}
+          initialCustomerId={selectedCustomer?.id ?? null}
+        />
       </div>
     </PageWrapper>
   );
