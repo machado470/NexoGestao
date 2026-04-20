@@ -8,12 +8,10 @@ import ServiceOrderDetailsPanel from "@/components/service-orders/ServiceOrderDe
 import type { ServiceOrder } from "@/components/service-orders/service-order.types";
 import { AppRowActionsDropdown } from "@/components/app-system";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
-import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
+import { ActionBarWrapper } from "@/components/operating-system/ActionBar";
 import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedbackButton";
 import {
   AppDataTable,
-  AppFiltersBar,
-  AppListBlock,
   AppPageEmptyState,
   AppPageErrorState,
   AppPageHeader,
@@ -25,7 +23,6 @@ import {
   AppStatusBadge,
 } from "@/components/internal-page-system";
 import { getDayWindow, inRange, safeDate } from "@/lib/operational/kpi";
-import { Input } from "@/components/ui/input";
 import {
   getOperationalSeverityLabel,
   getServiceOrderSeverity,
@@ -424,136 +421,13 @@ export default function ServiceOrdersPage() {
           value={activeTab}
           onChange={setActiveTab}
         />
-
-        <OperationalTopCard
-          contextLabel="Direção da execução"
-          title={
-            activeTab === "pipeline"
-              ? "Organizar pipeline e evitar fila parada"
-              : activeTab === "execution"
-                ? "Acelerar ordens em execução"
-                : activeTab === "attention"
-                  ? "Destravar ordens críticas agora"
-                  : activeTab === "done"
-                    ? "Converter concluídas em cobrança"
-                    : "Auditar histórico de execução"
-          }
-          description={
-            activeTab === "pipeline"
-              ? "Foco em atribuição, distribuição da carga e avanço contínuo das ordens abertas."
-              : activeTab === "execution"
-                ? "Acompanhe ordens ativas para reduzir bloqueio e manter previsibilidade do turno."
-                : activeTab === "attention"
-                  ? "Concentre a operação em bloqueios, esperas de cliente e itens sem avanço."
-                  : activeTab === "done"
-                    ? "Valide fechamento, cobrança gerada e comunicação para capturar receita."
-                    : "Use histórico para detectar padrões de atraso e corrigir recorrências."
-          }
-          primaryAction={
-            <ActionFeedbackButton
-              state="idle"
-              idleLabel={
-                activeTab === "execution"
-                  ? "Revisar ordens ativas"
-                  : activeTab === "attention"
-                    ? "Priorizar travadas"
-                    : activeTab === "done"
-                      ? "Abrir prontas p/ cobrança"
-                      : activeTab === "history"
-                        ? "Voltar ao pipeline"
-                        : "Distribuir pipeline"
-              }
-              onClick={() => {
-                if (activeTab === "done") navigate("/finances");
-                else if (activeTab === "history") setActiveTab("pipeline");
-                else if (activeTab === "pipeline") setActiveTab("execution");
-                else setActiveTab("attention");
-              }}
-            />
-          }
-        />
-
-        <AppSectionBlock
-          title={
-            activeTab === "execution"
-              ? "Andamento operacional"
-              : activeTab === "attention"
-                ? "Fila crítica para destravar"
-                : activeTab === "done"
-                  ? "Fechamento e cobrança"
-                  : activeTab === "history"
-                    ? "Linha histórica de execução"
-                    : "Leitura operacional do pipeline"
-          }
-          subtitle={
-            activeTab === "execution"
-              ? "Acompanhe progresso, responsável e próxima ação das ordens em andamento."
-              : activeTab === "attention"
-                ? "Bloqueios, atrasos e ordens sem responsável com risco direto no SLA."
-                : activeTab === "done"
-                  ? "Concluídas prontas para cobrança, comunicação e fechamento."
-                  : activeTab === "history"
-                    ? "Rastreabilidade e padrões de execução ao longo do tempo."
-                    : "Visão do funil ativo para priorizar avanço contínuo."
-          }
-        >
-          <AppListBlock items={topActions} />
-          <div className="mt-3">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">
-              Fila crítica
-            </p>
-            <AppListBlock
-              compact
-              showPlaceholders={false}
-              items={
-                riskList.length > 0
-                  ? riskList.map(item => ({
-                      title: String(item?.title ?? "O.S. sem título"),
-                      subtitle: `${String(item?.customer?.name ?? "Cliente")} · ${getStatusLabel(
-                        normalizeStatus(item?.status)
-                      )}`,
-                      action: (
-                        <button
-                          className="nexo-cta-secondary"
-                          onClick={() =>
-                            setFocusedOrderId(String(item?.id ?? ""))
-                          }
-                        >
-                          Abrir O.S.
-                        </button>
-                      ),
-                    }))
-                  : [
-                      {
-                        title: "Sem ordens críticas",
-                        subtitle:
-                          "A fila de risco está controlada neste momento.",
-                      },
-                    ]
-              }
-            />
-          </div>
-        </AppSectionBlock>
-
-        <div className="space-y-4">
-          <AppSectionBlock
-            title={
-              activeTab === "history"
-                ? "Histórico operacional de O.S."
-                : "Execução das ordens de serviço"
-            }
-            subtitle="Lista principal com filtros de estado, prioridade, cliente e janela para decisão rápida."
-          >
-            <AppFiltersBar className="mb-3 gap-3">
-              <div className="min-w-[220px] flex-1">
-                <Input
-                  value={searchTerm}
-                  onChange={event => setSearchTerm(event.target.value)}
-                  placeholder="Buscar por título, cliente ou ID"
-                  className="h-9"
-                />
-              </div>
-
+        <ActionBarWrapper
+          className="border border-[var(--border-subtle)] bg-[var(--surface-base)] p-0"
+          searchValue={searchTerm}
+          onSearchChange={setSearchTerm}
+          searchPlaceholder="Buscar por título, cliente ou ID"
+          filtersSlot={
+            <>
               <div className="flex flex-wrap items-center gap-2">
                 {[
                   { key: "all", label: "Tudo" },
@@ -599,8 +473,25 @@ export default function ServiceOrdersPage() {
                   </option>
                 ))}
               </select>
-            </AppFiltersBar>
+            </>
+          }
+        />
 
+        <div className="space-y-4">
+          <AppSectionBlock
+            title={
+              activeTab === "pipeline"
+                ? "Pipeline geral de O.S."
+                : activeTab === "execution"
+                  ? "Ordens em andamento"
+                  : activeTab === "attention"
+                    ? "Ordens com atenção imediata"
+                    : activeTab === "done"
+                      ? "Ordens finalizadas"
+                      : "Histórico operacional de O.S."
+            }
+            subtitle="Lista principal com filtros de estado, prioridade, cliente e janela para decisão rápida."
+          >
             {showInitialLoading ? (
               <AppPageLoadingState description="Carregando ordens de serviço..." />
             ) : showErrorState ? (

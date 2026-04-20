@@ -14,7 +14,6 @@ import { ContextPanel } from "@/components/operating-system/ContextPanel";
 import { AppRowActionsDropdown, AppCheckbox } from "@/components/app-system";
 import {
   AppDataTable,
-  AppFiltersBar,
   AppPageEmptyState,
   AppPageErrorState,
   AppPageHeader,
@@ -25,7 +24,6 @@ import {
   AppStatusBadge,
   appSelectionPillClasses,
 } from "@/components/internal-page-system";
-import { Input } from "@/components/ui/input";
 
 type CustomerRecord = Record<string, any>;
 type ChargeRecord = Record<string, any>;
@@ -565,155 +563,40 @@ export default function CustomersPage() {
           searchValue={searchTerm}
           onSearchChange={setSearchTerm}
           searchPlaceholder="Buscar por nome, telefone, email ou ID"
-        />
-
-        <AppSectionBlock
-          title={activeMeta.sectionTitle}
-          subtitle={activeMeta.sectionSubtitle}
-        >
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-            <article className="rounded-lg border border-[var(--dashboard-danger)]/30 bg-[var(--surface-subtle)] p-3.5">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
-                  {activeTab === "financial"
-                    ? "Cobrança crítica"
-                    : activeTab === "agenda"
-                      ? "Sem agenda futura"
-                      : activeTab === "service_orders"
-                        ? "Execução em risco"
-                        : activeTab === "history"
-                          ? "Recorrência de risco"
-                          : "Clientes em risco"}
-                </p>
-                <AppStatusBadge
-                  label={activeTab === "history" ? "Histórico" : "Em risco"}
-                />
-              </div>
-              <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
-                {activeTab === "agenda"
-                  ? `${withoutFutureSchedule} cliente(s) sem agenda futura.`
-                  : activeTab === "service_orders"
-                    ? `${displayedCustomers.length} cliente(s) com contexto de execução aberto.`
-                    : activeTab === "history"
-                      ? `${displayedCustomers.length} cliente(s) com eventos relevantes no período.`
-                      : `${overdueCustomers} cliente(s) com cobrança vencida.`}
-              </p>
-              <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                {activeTab === "agenda"
-                  ? "Sem agenda confirmada, aumenta o risco de quebra operacional."
-                  : activeTab === "service_orders"
-                    ? "Revisar avanço e bloqueio por cliente evita travas no pipeline."
-                    : activeTab === "history"
-                      ? "Eventos históricos orientam correção de padrão e previsibilidade."
-                      : "Priorize cobrança e contato para evitar atraso recorrente no caixa."}
-              </p>
-            </article>
-
-            <article className="rounded-lg border border-[var(--dashboard-warning)]/30 bg-[var(--surface-subtle)] p-3.5">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
-                  {activeTab === "financial"
-                    ? "Impacto pendente"
-                    : activeTab === "agenda"
-                      ? "Compromissos do dia"
-                      : activeTab === "service_orders"
-                        ? "Ordens sem avanço"
-                        : activeTab === "history"
-                          ? "Última interação"
-                          : "Continuidade operacional"}
-                </p>
-                <AppStatusBadge label="Atenção" />
-              </div>
-              <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
-                {activeTab === "financial"
-                  ? `${formatMoney(
-                      operationalSnapshots.reduce(
-                        (acc, item) => acc + item.financialPendingCents,
-                        0
-                      )
-                    )} em pendência acumulada.`
-                  : activeTab === "history"
-                    ? `${operationalSnapshots.filter(item => item.lastInteractionDays >= 5).length} cliente(s) sem interação recente.`
-                    : `${withoutFutureSchedule} cliente(s) sem agendamento futuro.`}
-              </p>
-              <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                {activeTab === "financial"
-                  ? "A carteira financeira orienta cobrança com maior impacto."
-                  : activeTab === "history"
-                    ? "Use o histórico para reduzir perda de continuidade."
-                    : "Sem agenda confirmada, a carteira perde previsibilidade de execução."}
-              </p>
-            </article>
-
-            <article className="rounded-lg border border-[var(--dashboard-info)]/30 bg-[var(--surface-subtle)] p-3.5">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
-                  CTA principal
-                </p>
-                <AppStatusBadge label="Executar" />
-              </div>
-              <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
-                {activeMeta.ctaLabel}
-              </p>
-              <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                Ação dominante da aba para avançar o fluxo sem menu secundário.
-              </p>
-            </article>
-          </div>
-          <div className="mt-3 space-y-2.5">
-            <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">
-              {activeMeta.listTitle}
-            </p>
-            <div className="space-y-2.5">
-              {topPriorityCustomers.length > 0 ? (
-                topPriorityCustomers.map(snapshot => {
-                  const customer = customers.find(
-                    item => String(item?.id ?? "") === snapshot.customerId
-                  );
-                  return (
-                    <button
-                      key={snapshot.customerId}
-                      type="button"
-                      className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3 text-left transition-colors hover:border-[var(--accent-primary)]/35"
-                      onClick={() => {
-                        setTimelineExpanded(false);
-                        setSelectedCustomer({
-                          id: snapshot.customerId,
-                          name: String(customer?.name ?? "Cliente"),
-                        });
-                      }}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="truncate text-sm font-semibold text-[var(--text-primary)]">
-                          {String(customer?.name ?? "Cliente")}
-                        </p>
-                        <AppPriorityBadge
-                          label={
-                            snapshot.status === "Em risco"
-                              ? "urgent"
-                              : snapshot.status === "Atenção"
-                                ? "high"
-                                : "medium"
-                          }
-                        />
-                      </div>
-                      <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                        {snapshot.nextActionReason}
-                      </p>
-                      <p className="mt-1 text-xs text-[var(--text-muted)]">
-                        Próxima: {snapshot.primaryActionLabel}
-                      </p>
-                    </button>
-                  );
-                })
-              ) : (
-                <p className="text-xs text-[var(--text-muted)]">
-                  Sem prioridades críticas no momento.
-                </p>
-              )}
+          filtersSlot={
+            <div className="flex flex-wrap items-center gap-2">
+              {filterItems.map(item => (
+                <button
+                  key={item.key}
+                  type="button"
+                  className={appSelectionPillClasses(activeFilter === item.key)}
+                  onClick={() => setActiveFilter(item.key)}
+                >
+                  {item.label}
+                </button>
+              ))}
+              <label
+                className="ml-2 text-xs font-medium text-[var(--text-secondary)]"
+                htmlFor="customers-sort"
+              >
+                Ordenar
+              </label>
+              <select
+                id="customers-sort"
+                className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-xs text-[var(--text-primary)]"
+                value={activeSort}
+                onChange={event =>
+                  setActiveSort(event.target.value as OperationalSort)
+                }
+              >
+                <option value="priority">Prioridade</option>
+                <option value="financial">Valor financeiro</option>
+                <option value="last_interaction">Última interação</option>
+                <option value="name">Nome</option>
+              </select>
             </div>
-          </div>
-        </AppSectionBlock>
+          }
+        />
 
         <div className="space-y-4">
           <AppSectionBlock
@@ -724,52 +607,6 @@ export default function CustomersPage() {
             }
             subtitle="Lista principal para operação diária da carteira"
           >
-            <AppFiltersBar className="mb-3 gap-3">
-              <div className="min-w-[220px] flex-1">
-                <Input
-                  value={searchTerm}
-                  onChange={event => setSearchTerm(event.target.value)}
-                  placeholder="Buscar por nome, telefone, email ou ID"
-                  className="h-9"
-                />
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                {filterItems.map(item => (
-                  <button
-                    key={item.key}
-                    type="button"
-                    className={appSelectionPillClasses(
-                      activeFilter === item.key
-                    )}
-                    onClick={() => setActiveFilter(item.key)}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-              <div className="flex items-center gap-2">
-                <label
-                  className="text-xs font-medium text-[var(--text-secondary)]"
-                  htmlFor="customers-sort"
-                >
-                  Ordenar por
-                </label>
-                <select
-                  id="customers-sort"
-                  className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-xs text-[var(--text-primary)]"
-                  value={activeSort}
-                  onChange={event =>
-                    setActiveSort(event.target.value as OperationalSort)
-                  }
-                >
-                  <option value="priority">Prioridade</option>
-                  <option value="financial">Valor financeiro</option>
-                  <option value="last_interaction">Última interação</option>
-                  <option value="name">Nome</option>
-                </select>
-              </div>
-            </AppFiltersBar>
-
             {selectedCustomerIds.length > 0 ? (
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--accent-primary)]/25 bg-[var(--accent-soft)]/45 p-2.5">
                 <p className="text-xs font-medium text-[var(--text-primary)]">

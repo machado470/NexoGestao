@@ -1,13 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
-import { Input } from "@/components/ui/input";
 import { trpc } from "@/lib/trpc";
 import { normalizeArrayPayload } from "@/lib/query-helpers";
 import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
 import { CreateAppointmentModal } from "@/components/CreateAppointmentModal";
 import { AppRowActionsDropdown } from "@/components/app-system";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
-import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
+import { ActionBarWrapper } from "@/components/operating-system/ActionBar";
 import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedbackButton";
 import {
   getAppointmentSeverity,
@@ -15,8 +14,6 @@ import {
 } from "@/lib/operations/operational-intelligence";
 import {
   AppDataTable,
-  AppFiltersBar,
-  AppListBlock,
   AppPageEmptyState,
   AppPageErrorState,
   AppPageHeader,
@@ -335,210 +332,13 @@ export default function AppointmentsPage() {
           value={activeTab}
           onChange={setActiveTab}
         />
-
-        <AppSectionBlock
-          title={
-            activeTab === "confirmed"
-              ? "Conversão de confirmados"
-              : activeTab === "pending"
-                ? "Confirmações pendentes"
-                : activeTab === "conflicts"
-                  ? "Destravar conflitos e atrasos"
-                  : activeTab === "history"
-                    ? "Leitura histórica da agenda"
-                    : "Leitura operacional da agenda"
-          }
-          subtitle={
-            activeTab === "confirmed"
-              ? "Próxima etapa do confirmado é execução: converta para O.S. sem perder janela."
-              : activeTab === "pending"
-                ? "Priorize contato ativo para fechar confirmação e manter previsibilidade."
-                : activeTab === "conflicts"
-                  ? "Isole choques de agenda para restaurar capacidade do turno."
-                  : activeTab === "history"
-                    ? "Eventos passados para identificar padrões de cancelamento e no-show."
-                    : "Onde a janela está carregada, o que está em risco e qual ação destrava a operação agora."
-          }
-        >
-          <AppSectionBlock
-            title="Painel de execução"
-            subtitle="Priorize confirmação, risco e conversão em O.S. sem sair do fluxo atual."
-          >
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-              <article className="rounded-lg border border-[var(--dashboard-danger)]/30 bg-[var(--surface-subtle)] p-3.5">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
-                    Janela crítica
-                  </p>
-                  <AppStatusBadge
-                    label={atRiskList.length > 0 ? "Em risco" : "Estável"}
-                  />
-                </div>
-                <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
-                  {atRiskList.length > 0
-                    ? `${atRiskList.length} agendamento(s) exigem reação imediata.`
-                    : "Sem atraso crítico no momento."}
-                </p>
-                <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                  Priorize conflitos, atrasos e confirmação pendente para manter
-                  SLA do dia.
-                </p>
-              </article>
-
-              <article className="rounded-lg border border-[var(--dashboard-warning)]/30 bg-[var(--surface-subtle)] p-3.5">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
-                    Concentração operacional
-                  </p>
-                  <AppStatusBadge
-                    label={
-                      mostLoadedSlot?.[1] && mostLoadedSlot[1] > 1
-                        ? "Atenção"
-                        : "Distribuída"
-                    }
-                  />
-                </div>
-                <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
-                  {mostLoadedSlot
-                    ? `${new Date(mostLoadedSlot[0]).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })} com ${mostLoadedSlot[1]} item(ns).`
-                    : "Sem concentração relevante."}
-                </p>
-                <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                  Use este pico para redistribuir responsável e reduzir choque
-                  de agenda.
-                </p>
-              </article>
-
-              <article className="rounded-lg border border-[var(--dashboard-info)]/30 bg-[var(--surface-subtle)] p-3.5">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
-                    Próxima ação recomendada
-                  </p>
-                  <AppStatusBadge label="Executar" />
-                </div>
-                <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
-                  {requiresExecution > 0
-                    ? `Converter ${requiresExecution} confirmado(s) em execução/O.S.`
-                    : "Focar em confirmação e limpeza de pendências."}
-                </p>
-                <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                  Agendamento confirmado sem execução aberta reduz
-                  previsibilidade operacional.
-                </p>
-              </article>
-            </div>
-          </AppSectionBlock>
-          <div className="mt-3">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">
-              Fila acionável
-            </p>
-            <AppListBlock
-              className="col-span-full"
-              compact
-              showPlaceholders={false}
-              items={
-                atRiskList.length > 0
-                  ? atRiskList.slice(0, 4).map(({ item, nextAction }) => ({
-                      title: `${String(item?.customer?.name ?? "Cliente")} · ${mapOperationalState(item, true)}`,
-                      subtitle: `${safeDate(item?.startsAt)?.toLocaleString("pt-BR") ?? "sem horário"} · Próxima ${nextAction}`,
-                      action: (
-                        <button
-                          className="nexo-cta-secondary"
-                          onClick={() =>
-                            navigate(`/whatsapp?customerId=${item?.customerId}`)
-                          }
-                        >
-                          Atuar
-                        </button>
-                      ),
-                    }))
-                  : [
-                      {
-                        title: "Sem gargalos críticos no momento",
-                        subtitle:
-                          "Acompanhe os confirmados e inicie execução preventiva.",
-                        action: (
-                          <button
-                            className="nexo-cta-secondary"
-                            onClick={() => navigate("/service-orders")}
-                          >
-                            Abrir execução
-                          </button>
-                        ),
-                      },
-                    ]
-              }
-            />
-          </div>
-        </AppSectionBlock>
-
-        <OperationalTopCard
-          contextLabel="Modo ativo da agenda"
-          title={
-            activeTab === "agenda"
-              ? "Orquestrar agenda do turno atual"
-              : activeTab === "confirmed"
-                ? "Converter confirmados em execução"
-                : activeTab === "pending"
-                  ? "Fechar confirmações pendentes"
-                  : activeTab === "conflicts"
-                    ? "Resolver conflitos de horário"
-                    : "Auditar histórico e reincidências"
-          }
-          description={
-            activeTab === "agenda"
-              ? "Visão geral do dia com foco em sequência operacional e prevenção de atrasos."
-              : activeTab === "confirmed"
-                ? "Priorize os confirmados para abrir O.S. e não perder janela de atendimento."
-                : activeTab === "pending"
-                  ? "Concentre esforços em confirmação e lembretes para manter previsibilidade."
-                  : activeTab === "conflicts"
-                    ? "Isole sobreposição e atrasos para destravar capacidade do time."
-                    : "Use histórico para corrigir padrões e reduzir recorrência de falhas."
-          }
-          primaryAction={
-            <ActionFeedbackButton
-              state="idle"
-              idleLabel={
-                activeTab === "confirmed"
-                  ? "Criar O.S. dos confirmados"
-                  : activeTab === "pending"
-                    ? "Executar confirmações"
-                    : activeTab === "conflicts"
-                      ? "Atuar nos conflitos"
-                      : activeTab === "history"
-                        ? "Revisar reincidências"
-                        : "Organizar turno atual"
-              }
-              onClick={() => {
-                if (activeTab === "confirmed") navigate("/service-orders");
-                else if (activeTab === "history") setActiveTab("agenda");
-                else if (activeTab === "pending") setWindowFilter("today");
-                else setActiveTab("conflicts");
-              }}
-            />
-          }
-        />
-
-        <div className="space-y-4">
-          <AppSectionBlock
-            title={
-              activeTab === "history"
-                ? "Histórico de agendamentos"
-                : "Agenda operacional"
-            }
-            subtitle="Lista principal com filtros por estado, janela e cliente para ação rápida."
-          >
-            <AppFiltersBar className="mb-3 gap-3">
-              <div className="min-w-[220px] flex-1">
-                <Input
-                  value={searchTerm}
-                  onChange={event => setSearchTerm(event.target.value)}
-                  placeholder="Buscar por cliente, título ou ID"
-                  className="h-9"
-                />
-              </div>
-
+        <ActionBarWrapper
+          className="border border-[var(--border-subtle)] bg-[var(--surface-base)] p-0"
+          searchValue={searchTerm}
+          onSearchChange={setSearchTerm}
+          searchPlaceholder="Buscar por cliente, título ou ID"
+          filtersSlot={
+            <>
               <div className="flex flex-wrap items-center gap-2">
                 {[
                   { key: "today", label: "Hoje" },
@@ -584,8 +384,25 @@ export default function AppointmentsPage() {
                   </option>
                 ))}
               </select>
-            </AppFiltersBar>
+            </>
+          }
+        />
 
+        <div className="space-y-4">
+          <AppSectionBlock
+            title={
+              activeTab === "agenda"
+                ? "Visão diária da agenda"
+                : activeTab === "confirmed"
+                  ? "Confirmados prontos para execução"
+                  : activeTab === "pending"
+                    ? "Fila de confirmação pendente"
+                    : activeTab === "conflicts"
+                      ? "Conflitos e gargalos da agenda"
+                      : "Histórico de agendamentos"
+            }
+            subtitle="Lista principal com filtros por estado, janela e cliente para ação rápida."
+          >
             {showInitialLoading ? (
               <AppPageLoadingState description="Carregando agendamentos..." />
             ) : showErrorState ? (
