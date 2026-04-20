@@ -73,6 +73,33 @@ function getPendingWindow(days: number | null) {
   return "8+ dias";
 }
 
+function CashHealthMetric({
+  label,
+  value,
+  helper,
+}: {
+  label: string;
+  value: string;
+  helper: string;
+}) {
+  return (
+    <article className="flex min-h-[118px] min-w-0 flex-col justify-between rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/35 px-3.5 py-3">
+      <p className="truncate text-[11px] font-medium uppercase tracking-[0.02em] text-[var(--text-muted)]">
+        {label}
+      </p>
+      <p
+        className="mt-2 truncate text-[1.45rem] font-semibold leading-tight text-[var(--text-primary)] tabular-nums"
+        title={value}
+      >
+        {value}
+      </p>
+      <p className="mt-2 line-clamp-2 text-[11px] leading-relaxed text-[var(--text-muted)]">
+        {helper}
+      </p>
+    </article>
+  );
+}
+
 export default function FinancesPage() {
   setBootPhase("PAGE:Financeiro");
   useRenderWatchdog("FinancesPage");
@@ -869,45 +896,27 @@ export default function FinancesPage() {
             subtitle="Leitura consolidada de estabilidade, risco e tendência para decisão imediata."
             className="xl:col-span-8"
           >
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/35 p-3">
-                <p className="text-xs text-[var(--text-muted)]">Saúde geral</p>
-                <p className="mt-1 text-2xl font-semibold text-[var(--text-primary)]">
-                  {healthyRatio.toFixed(0)}%
-                </p>
-                <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                  Parcela da carteira aberta sem atraso.
-                </p>
-              </div>
-              <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/35 p-3">
-                <p className="text-xs text-[var(--text-muted)]">A receber</p>
-                <p className="mt-1 text-2xl font-semibold text-[var(--text-primary)]">
-                  {formatCurrency(openTotal)}
-                </p>
-                <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                  Pendentes + vencidas no momento.
-                </p>
-              </div>
-              <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/35 p-3">
-                <p className="text-xs text-[var(--text-muted)]">
-                  Valor em risco
-                </p>
-                <p className="mt-1 text-2xl font-semibold text-[var(--text-primary)]">
-                  {formatCurrency(overdueTotal)}
-                </p>
-                <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                  Atrasos com impacto direto no caixa.
-                </p>
-              </div>
-              <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/35 p-3">
-                <p className="text-xs text-[var(--text-muted)]">Recebido</p>
-                <p className="mt-1 text-2xl font-semibold text-[var(--text-primary)]">
-                  {formatCurrency(receivedCurrent)}
-                </p>
-                <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                  Entradas dos últimos 30 dias.
-                </p>
-              </div>
+            <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-4">
+              <CashHealthMetric
+                label="Saúde geral"
+                value={`${healthyRatio.toFixed(0)}%`}
+                helper="Parcela da carteira aberta sem atraso."
+              />
+              <CashHealthMetric
+                label="A receber"
+                value={formatCurrency(openTotal)}
+                helper="Pendentes + vencidas no momento."
+              />
+              <CashHealthMetric
+                label="Valor em risco"
+                value={formatCurrency(overdueTotal)}
+                helper="Atrasos com impacto direto no caixa."
+              />
+              <CashHealthMetric
+                label="Recebido (30 dias)"
+                value={formatCurrency(receivedCurrent)}
+                helper="Entradas confirmadas no último ciclo."
+              />
             </div>
           </AppSectionBlock>
           <AppSectionBlock
@@ -943,16 +952,22 @@ export default function FinancesPage() {
                   idleLabel="Cobrar quem está vencido"
                   onClick={() => setMode("overdue")}
                 />
-                <ActionFeedbackButton
-                  state="idle"
-                  idleLabel="Registrar pagamento"
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-9 justify-start text-xs font-medium text-[var(--text-secondary)]"
                   onClick={() => setMode("paid")}
-                />
-                <ActionFeedbackButton
-                  state="idle"
-                  idleLabel="Executar lembretes"
+                >
+                  Registrar pagamento
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-9 justify-start text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
                   onClick={() => handleRemind()}
-                />
+                >
+                  Executar lembretes
+                </Button>
               </div>
             </div>
           </AppSectionBlock>
