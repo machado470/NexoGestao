@@ -82,11 +82,21 @@ export default function FinancesPage() {
     "overview" | "pending" | "overdue" | "paid" | "reports"
   >("overview");
   const [period, setPeriod] = useState<FinanceTrendPeriod>("30d");
-  const [focusedCustomerId, setFocusedCustomerId] = useState<string | null>(null);
-  const [focusedOverdueBand, setFocusedOverdueBand] = useState<string | null>(null);
-  const [focusedPendingWindow, setFocusedPendingWindow] = useState<string | null>(null);
-  const [focusedTrendPointKey, setFocusedTrendPointKey] = useState<string | null>(null);
-  const [lastReminderResult, setLastReminderResult] = useState<string>("Sem execução recente");
+  const [focusedCustomerId, setFocusedCustomerId] = useState<string | null>(
+    null
+  );
+  const [focusedOverdueBand, setFocusedOverdueBand] = useState<string | null>(
+    null
+  );
+  const [focusedPendingWindow, setFocusedPendingWindow] = useState<
+    string | null
+  >(null);
+  const [focusedTrendPointKey, setFocusedTrendPointKey] = useState<
+    string | null
+  >(null);
+  const [lastReminderResult, setLastReminderResult] = useState<string>(
+    "Sem execução recente"
+  );
 
   const chargesQuery = trpc.finance.charges.list.useQuery(
     { page: 1, limit: 100 },
@@ -292,7 +302,10 @@ export default function FinancesPage() {
     return Array.from(map.values());
   }, [overdueCharges, paidCharges, pendingCharges]);
 
-  const trendPeriods = useMemo((): Record<FinanceTrendPeriod, typeof trendByDay> => {
+  const trendPeriods = useMemo((): Record<
+    FinanceTrendPeriod,
+    typeof trendByDay
+  > => {
     const monthStart = new Date();
     monthStart.setDate(1);
     monthStart.setHours(0, 0, 0, 0);
@@ -333,7 +346,12 @@ export default function FinancesPage() {
       }
       return true;
     });
-  }, [focusedCustomerId, focusedPendingWindow, focusedTrendPointKey, pendingCharges]);
+  }, [
+    focusedCustomerId,
+    focusedPendingWindow,
+    focusedTrendPointKey,
+    pendingCharges,
+  ]);
 
   const filteredOverdueCharges = useMemo(() => {
     return overdueCharges.filter(item => {
@@ -342,7 +360,10 @@ export default function FinancesPage() {
       if (focusedOverdueBand) {
         const due = safeDate(item?.dueDate);
         const days = due
-          ? Math.max(Math.floor((Date.now() - due.getTime()) / (1000 * 60 * 60 * 24)), 0)
+          ? Math.max(
+              Math.floor((Date.now() - due.getTime()) / (1000 * 60 * 60 * 24)),
+              0
+            )
           : 0;
         if (getOverdueBand(days) !== focusedOverdueBand) return false;
       }
@@ -352,7 +373,12 @@ export default function FinancesPage() {
       }
       return true;
     });
-  }, [focusedCustomerId, focusedOverdueBand, focusedTrendPointKey, overdueCharges]);
+  }, [
+    focusedCustomerId,
+    focusedOverdueBand,
+    focusedTrendPointKey,
+    overdueCharges,
+  ]);
 
   const filteredPaidCharges = useMemo(() => {
     return paidCharges.filter(item => {
@@ -412,9 +438,13 @@ export default function FinancesPage() {
       return delta >= 0 && delta <= 1000 * 60 * 60 * 72;
     });
     if (charge) {
-      const customerId = String(charge?.customerId ?? charge?.customer?.id ?? "");
+      const customerId = String(
+        charge?.customerId ?? charge?.customer?.id ?? ""
+      );
       if (customerId) setFocusedCustomerId(customerId);
-      setLastReminderResult(`Cobrança ${String(charge?.id ?? "selecionada")} enviada`);
+      setLastReminderResult(
+        `Cobrança ${String(charge?.id ?? "selecionada")} enviada`
+      );
       toast.success("Lembrete executado para a cobrança selecionada.");
       return;
     }
@@ -423,7 +453,9 @@ export default function FinancesPage() {
       return;
     }
     setMode("pending");
-    setLastReminderResult(`${eligibleNow.length} lembrete(s) executado(s) em lote`);
+    setLastReminderResult(
+      `${eligibleNow.length} lembrete(s) executado(s) em lote`
+    );
     toast.success("Motor de lembretes executado no contexto financeiro.");
   };
 
@@ -532,7 +564,9 @@ export default function FinancesPage() {
               "Marcar como acompanhado",
               "Ver origem operacional",
             ] as const,
-            flowContext: String(item?.source ?? "Pagamento ligado à ordem de serviço"),
+            flowContext: String(
+              item?.source ?? "Pagamento ligado à ordem de serviço"
+            ),
             onAction: () => setMode("paid"),
           };
         }
@@ -587,37 +621,92 @@ export default function FinancesPage() {
     if (mode === "overdue") {
       return {
         title: "Recuperar caixa vencido hoje",
-        description: "Priorize atrasos mais longos e maior impacto para reduzir risco imediato.",
-        reference: focusedOverdueBand ? `Faixa ativa: ${focusedOverdueBand}` : "Referência: atraso acumulado",
+        description:
+          "Priorize atrasos mais longos e maior impacto para reduzir risco imediato.",
+        reference: focusedOverdueBand
+          ? `Faixa ativa: ${focusedOverdueBand}`
+          : "Referência: atraso acumulado",
       };
     }
     if (mode === "pending") {
       return {
         title: "Prevenir virada para vencidas",
-        description: "Atue na janela crítica de 72h com lembretes e foco por cliente.",
-        reference: focusedPendingWindow ? `Janela ativa: ${focusedPendingWindow}` : "Referência: próximos vencimentos",
+        description:
+          "Atue na janela crítica de 72h com lembretes e foco por cliente.",
+        reference: focusedPendingWindow
+          ? `Janela ativa: ${focusedPendingWindow}`
+          : "Referência: próximos vencimentos",
       };
     }
     if (mode === "paid") {
       return {
         title: "Consolidar eficiência de recebimento",
-        description: "Monitore pontualidade e método dominante para estabilidade do caixa.",
+        description:
+          "Monitore pontualidade e método dominante para estabilidade do caixa.",
         reference: "Referência: pagamentos confirmados",
       };
     }
     if (mode === "reports") {
       return {
         title: "Ler tendência e risco agregado",
-        description: "Conecte receita, risco e concentração para decisão de médio prazo.",
+        description:
+          "Conecte receita, risco e concentração para decisão de médio prazo.",
         reference: "Referência: concentração e anomalias",
       };
     }
     return {
       title: "Orquestrar cobrança, risco e recebimento",
-      description: "Use filtros e prioridade para executar decisões no mesmo contexto.",
+      description:
+        "Use filtros e prioridade para executar decisões no mesmo contexto.",
       reference: "Referência: fluxo financeiro completo",
     };
   }, [focusedOverdueBand, focusedPendingWindow, mode]);
+
+  const modeContext = useMemo(() => {
+    if (mode === "pending") {
+      return {
+        title: "Pendentes · prevenção de atraso",
+        description:
+          "Foco em janela crítica, lembretes e carteira com risco de virar vencida.",
+        ctaLabel: "Executar lembretes",
+        onCta: () => handleRemind(),
+      };
+    }
+    if (mode === "overdue") {
+      return {
+        title: "Vencidas · recuperação imediata",
+        description:
+          "Priorize impacto no caixa e ordem de cobrança por atraso e valor.",
+        ctaLabel: "Cobrar vencidas",
+        onCta: () => setMode("overdue"),
+      };
+    }
+    if (mode === "paid") {
+      return {
+        title: "Pagas · performance de recebimento",
+        description:
+          "Acompanhe pontualidade, métodos e consistência dos recebimentos confirmados.",
+        ctaLabel: "Registrar pagamento",
+        onCta: () => setMode("paid"),
+      };
+    }
+    if (mode === "reports") {
+      return {
+        title: "Relatórios · leitura analítica",
+        description:
+          "Concentre análise comparativa, concentração de risco e tendência por período.",
+        ctaLabel: "Atualizar análise",
+        onCta: () => setPeriod("30d"),
+      };
+    }
+    return {
+      title: "Controle financeiro e caixa",
+      description:
+        "Centro operacional para decidir cobrança, recebimento e risco sem perder contexto de cliente, O.S. e execução.",
+      ctaLabel: "Nova cobrança",
+      onCta: () => setOpenCreate(true),
+    };
+  }, [handleRemind, mode]);
 
   const pageSeverity = useMemo<OperationalSeverity>(() => {
     if (overdueCharges.length > 0) return "critical";
@@ -627,9 +716,12 @@ export default function FinancesPage() {
 
   const topSeverityLabel = useMemo(() => {
     const firstQueueStatus = queueItems[0]?.status;
-    if (firstQueueStatus === "overdue") return getOperationalSeverityLabel("critical");
-    if (firstQueueStatus === "pending") return getOperationalSeverityLabel("pending");
-    if (firstQueueStatus === "ready") return getOperationalSeverityLabel("healthy");
+    if (firstQueueStatus === "overdue")
+      return getOperationalSeverityLabel("critical");
+    if (firstQueueStatus === "pending")
+      return getOperationalSeverityLabel("pending");
+    if (firstQueueStatus === "ready")
+      return getOperationalSeverityLabel("healthy");
     return getOperationalSeverityLabel(pageSeverity);
   }, [pageSeverity, queueItems]);
 
@@ -655,7 +747,13 @@ export default function FinancesPage() {
     console.info("[RENDER PAGE] finances");
   }, []);
 
-  const healthyRatio = openTotal > 0 ? Math.max(0, Math.min(100, ((openTotal - overdueTotal) / openTotal) * 100)) : 100;
+  const healthyRatio =
+    openTotal > 0
+      ? Math.max(
+          0,
+          Math.min(100, ((openTotal - overdueTotal) / openTotal) * 100)
+        )
+      : 100;
   const receivedDelta =
     receivedPrevious > 0
       ? ((receivedCurrent - receivedPrevious) / receivedPrevious) * 100
@@ -675,352 +773,497 @@ export default function FinancesPage() {
       subtitle="Operação de cobrança, risco e execução da carteira."
     >
       <div className="space-y-4">
-      <AppPageHeader
-        title="Controle financeiro e caixa"
-        description="Centro operacional para decidir cobrança, recebimento e risco sem perder contexto de cliente, O.S. e execução."
-        secondaryActions={
-          <Button variant="outline" size="sm" onClick={() => setMode("reports")}>
-            Gerar relatório
-          </Button>
-        }
-        cta={
-          <div className="flex items-center gap-2">
-            <ActionFeedbackButton
-              state="idle"
-              idleLabel="Nova despesa"
-              onClick={() => setOpenCreateExpense(true)}
-            />
-            <ActionFeedbackButton
-              state="idle"
-              idleLabel="Nova cobrança"
-              onClick={() => setOpenCreate(true)}
-            />
-          </div>
-        }
-      />
-      <AppKpiRow
-        gridClassName="grid-cols-1 md:grid-cols-2 xl:grid-cols-5"
-        items={[
-          {
-            title: "A receber (aberto)",
-            value: formatCurrency(openTotal),
-            hint: `${pendingCharges.length + overdueCharges.length} cobrança(s) pendente(s)/vencida(s)`,
-            tone: openTotal > 0 ? "important" : "default",
-          },
-          {
-            title: "Em risco (vencidas)",
-            value: formatCurrency(overdueTotal),
-            delta: `${overdueDelta >= 0 ? "+" : ""}${overdueDelta.toFixed(1).replace(".", ",")}%`,
-            trend: overdueDelta > 0 ? "up" : overdueDelta < 0 ? "down" : "neutral",
-            hint: `${overdueCharges.length} vencida(s) na carteira`,
-            tone: overdueCharges.length > 0 ? "critical" : "default",
-          },
-          {
-            title: "Recebido (30 dias)",
-            value: formatCurrency(receivedCurrent),
-            delta: `${receivedDelta >= 0 ? "+" : ""}${receivedDelta.toFixed(1).replace(".", ",")}%`,
-            trend: receivedDelta > 0 ? "up" : receivedDelta < 0 ? "down" : "neutral",
-            hint: `Anterior: ${formatCurrency(receivedPrevious)}`,
-          },
-          {
-            title: "Vence hoje/7 dias",
-            value: `${dueToday}/${dueSoon}`,
-            hint: "hoje / próximos 7 dias",
-            tone: dueToday > 0 ? "critical" : dueSoon > 0 ? "important" : "default",
-          },
-          {
-            title: "Pagas no ciclo",
-            value: formatCurrency(receivedTotal),
-            hint: `${paidCharges.length} cobrança(s) com pagamento confirmado`,
-          },
-        ]}
-      />
-
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-        <AppSectionBlock
-          title="Saúde do caixa"
-          subtitle="Leitura consolidada de estabilidade, risco e tendência para decisão imediata."
-          className="xl:col-span-8"
-        >
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/35 p-3">
-              <p className="text-xs text-[var(--text-muted)]">Saúde geral</p>
-              <p className="mt-1 text-2xl font-semibold text-[var(--text-primary)]">
-                {healthyRatio.toFixed(0)}%
-              </p>
-              <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                Parcela da carteira aberta sem atraso.
-              </p>
-            </div>
-            <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/35 p-3">
-              <p className="text-xs text-[var(--text-muted)]">A receber</p>
-              <p className="mt-1 text-2xl font-semibold text-[var(--text-primary)]">
-                {formatCurrency(openTotal)}
-              </p>
-              <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                Pendentes + vencidas no momento.
-              </p>
-            </div>
-            <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/35 p-3">
-              <p className="text-xs text-[var(--text-muted)]">Valor em risco</p>
-              <p className="mt-1 text-2xl font-semibold text-[var(--text-primary)]">
-                {formatCurrency(overdueTotal)}
-              </p>
-              <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                Atrasos com impacto direto no caixa.
-              </p>
-            </div>
-            <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/35 p-3">
-              <p className="text-xs text-[var(--text-muted)]">Recebido</p>
-              <p className="mt-1 text-2xl font-semibold text-[var(--text-primary)]">
-                {formatCurrency(receivedCurrent)}
-              </p>
-              <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                Entradas dos últimos 30 dias.
-              </p>
-            </div>
-          </div>
-        </AppSectionBlock>
-        <AppSectionBlock
-          title="Próxima melhor ação"
-          subtitle="Bloco de decisão para agir com impacto imediato."
-          className="xl:col-span-4"
-          compact
-        >
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <AppStatusBadge label={getOperationalSeverityLabel(pageSeverity)} />
-              <AppPriorityBadge
-                label={pageSeverity === "critical" ? "Alta" : pageSeverity === "pending" ? "Média" : "Baixa"}
+        <AppPageHeader
+          title={modeContext.title}
+          description={modeContext.description}
+          secondaryActions={
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                setMode(mode === "reports" ? "overview" : "reports")
+              }
+            >
+              {mode === "reports" ? "Voltar à visão geral" : "Gerar relatório"}
+            </Button>
+          }
+          cta={
+            <div className="flex items-center gap-2">
+              <ActionFeedbackButton
+                state="idle"
+                idleLabel={
+                  mode === "reports" ? "Nova despesa" : modeContext.ctaLabel
+                }
+                onClick={
+                  mode === "reports"
+                    ? () => setOpenCreateExpense(true)
+                    : modeContext.onCta
+                }
+              />
+              <ActionFeedbackButton
+                state="idle"
+                idleLabel={
+                  mode === "reports" ? "Nova cobrança" : "Nova despesa"
+                }
+                onClick={() =>
+                  mode === "reports"
+                    ? setOpenCreate(true)
+                    : setOpenCreateExpense(true)
+                }
               />
             </div>
-            <p className="text-sm text-[var(--text-secondary)]">
-              {decisionCenter.description}
-            </p>
-            <p className="text-xs text-[var(--text-muted)]">{decisionCenter.reference}</p>
-            <div className="grid gap-2">
-              <ActionFeedbackButton state="idle" idleLabel="Cobrar quem está vencido" onClick={() => setMode("overdue")} />
-              <ActionFeedbackButton state="idle" idleLabel="Registrar pagamento" onClick={() => setMode("paid")} />
-              <ActionFeedbackButton state="idle" idleLabel="Executar lembretes" onClick={() => handleRemind()} />
-            </div>
-          </div>
-        </AppSectionBlock>
-      </div>
-
-      <AppSecondaryTabs
-        items={[
-          { value: "overview", label: "Visão geral" },
-          { value: "pending", label: "Pendentes" },
-          { value: "overdue", label: "Vencidas" },
-          { value: "paid", label: "Pagas" },
-          { value: "reports", label: "Relatórios" },
-        ]}
-        value={mode}
-        onChange={value => setMode(value as typeof mode)}
-      />
-      <AppFiltersBar className="gap-2">
-        <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--text-secondary)]">
-          <span>Contexto ativo:</span>
-          {focusedCustomerId ? (
-            <AppStatusBadge label={`Cliente ${focusedCustomerId.slice(0, 8)}…`} />
-          ) : null}
-          {focusedPendingWindow ? <AppStatusBadge label={`Janela ${focusedPendingWindow}`} /> : null}
-          {focusedOverdueBand ? <AppStatusBadge label={`Faixa ${focusedOverdueBand}`} /> : null}
-          {focusedTrendPointKey ? <AppStatusBadge label={`Ponto ${focusedTrendPointKey}`} /> : null}
-          {!focusedCustomerId && !focusedPendingWindow && !focusedOverdueBand && !focusedTrendPointKey ? (
-            <span className="text-[var(--text-muted)]">Sem filtros aplicados</span>
-          ) : null}
-        </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => {
-            setFocusedCustomerId(null);
-            setFocusedPendingWindow(null);
-            setFocusedOverdueBand(null);
-            setFocusedTrendPointKey(null);
-          }}
-        >
-          Limpar contexto
-        </Button>
-      </AppFiltersBar>
-      <OperationalTopCard
-        contextLabel="Centro de decisão financeiro"
-        title={decisionCenter.title}
-        description={decisionCenter.description}
-        chips={
-          <>
-            <span className="text-xs text-[var(--text-secondary)]">
-              Severidade: {getOperationalSeverityLabel(pageSeverity)}
-            </span>
-            <span className="text-xs text-[var(--text-secondary)]">
-              Prioridade atual: {topSeverityLabel}
-            </span>
-            <span className="text-xs text-[var(--text-secondary)]">
-              {decisionCenter.reference}
-            </span>
-            <span className="text-xs text-[var(--text-secondary)]">
-              Cobrança prioritária: {priorityCharge ? String(priorityCharge?.customer?.name ?? "Cliente") : "Sem foco"}
-            </span>
-          </>
-        }
-      />
-      <FinanceTrendEngine
-        period={period}
-        onPeriodChange={setPeriod}
-        points={trendPeriods[period]}
-        selectedPointKey={focusedTrendPointKey}
-        onSelectPoint={setFocusedTrendPointKey}
-      />
-      <AppSectionBlock
-        title="Contexto operacional da tendência"
-        subtitle="Leitura orientada para execução: tendência não é só visual, é gatilho de ação."
-        compact
-      >
-        <div className="grid gap-3 md:grid-cols-3">
-          <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/30 p-3">
-            <p className="text-xs text-[var(--text-muted)]">Tendência de recebimento</p>
-            <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
-              {receivedDelta >= 0 ? "Acelerando" : "Desacelerando"}
-            </p>
-            <p className="mt-1 text-xs text-[var(--text-secondary)]">
-              Compare o período atual com os 30 dias anteriores.
-            </p>
-          </div>
-          <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/30 p-3">
-            <p className="text-xs text-[var(--text-muted)]">Impacto operacional</p>
-            <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
-              {overdueCharges.length > 0 ? "Priorizar cobrança imediata" : "Foco em prevenção"}
-            </p>
-            <p className="mt-1 text-xs text-[var(--text-secondary)]">
-              {overdueCharges.length > 0
-                ? `${overdueCharges.length} cobrança(s) vencida(s) no período atual.`
-                : "Sem atrasos ativos neste recorte."}
-            </p>
-          </div>
-          <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/30 p-3">
-            <p className="text-xs text-[var(--text-muted)]">Próximo movimento</p>
-            <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">{decisionCenter.title}</p>
-            <p className="mt-1 text-xs text-[var(--text-secondary)]">{decisionCenter.reference}</p>
-          </div>
-        </div>
-      </AppSectionBlock>
-
-      {showChargesInitialLoading ? (
-        <AppPageLoadingState description="Carregando financeiro..." />
-      ) : null}
-      {showChargesErrorState ? (
-        <AppPageErrorState
-          description={
-            chargesQuery.error?.message ?? "Falha ao carregar cobranças."
           }
-          actionLabel="Tentar novamente"
-          onAction={() => void chargesQuery.refetch()}
         />
-      ) : null}
+        <AppKpiRow
+          gridClassName="grid-cols-1 md:grid-cols-2 xl:grid-cols-5"
+          items={[
+            {
+              title: "A receber (aberto)",
+              value: formatCurrency(openTotal),
+              hint: `${pendingCharges.length + overdueCharges.length} cobrança(s) pendente(s)/vencida(s)`,
+              tone: openTotal > 0 ? "important" : "default",
+            },
+            {
+              title: "Em risco (vencidas)",
+              value: formatCurrency(overdueTotal),
+              delta: `${overdueDelta >= 0 ? "+" : ""}${overdueDelta.toFixed(1).replace(".", ",")}%`,
+              trend:
+                overdueDelta > 0 ? "up" : overdueDelta < 0 ? "down" : "neutral",
+              hint: `${overdueCharges.length} vencida(s) na carteira`,
+              tone: overdueCharges.length > 0 ? "critical" : "default",
+            },
+            {
+              title: "Recebido (30 dias)",
+              value: formatCurrency(receivedCurrent),
+              delta: `${receivedDelta >= 0 ? "+" : ""}${receivedDelta.toFixed(1).replace(".", ",")}%`,
+              trend:
+                receivedDelta > 0
+                  ? "up"
+                  : receivedDelta < 0
+                    ? "down"
+                    : "neutral",
+              hint: `Anterior: ${formatCurrency(receivedPrevious)}`,
+            },
+            {
+              title: "Vence hoje/7 dias",
+              value: `${dueToday}/${dueSoon}`,
+              hint: "hoje / próximos 7 dias",
+              tone:
+                dueToday > 0
+                  ? "critical"
+                  : dueSoon > 0
+                    ? "important"
+                    : "default",
+            },
+            {
+              title: "Pagas no ciclo",
+              value: formatCurrency(receivedTotal),
+              hint: `${paidCharges.length} cobrança(s) com pagamento confirmado`,
+            },
+          ]}
+        />
 
-      {!showChargesInitialLoading && !showChargesErrorState ? (
-        <>
-          {mode === "overview" && (
-            <FinanceOverview
-              revenueData={revenueSafe.data}
-              revenueDataByPeriod={trendPeriods}
-              revenueLoading={revenueQuery.isLoading}
-              revenueError={revenueQuery.error?.message}
-              isRevenueValid={revenueSafe.isValid}
-              revenueInvalidReason={revenueSafe.reason}
-              risk={{
-                riskAmount: formatCurrency(overdueTotal),
-                overdueCount: Number(
-                  stats.overdueCount ?? overdueCharges.length
-                ),
-                dueToday,
-                dueSoon,
-              }}
-              goToMode={nextMode => setMode(nextMode)}
-              openCreate={() => setOpenCreate(true)}
-              cobrarAgora={() => handleCharge()}
-              operationalSignals={{
-                overdueCount: overdueCharges.length,
-                dueToday,
-                dueSoon,
-                awaitingSettlementCount,
-                awaitingSettlementTotal: formatCurrency(awaitingSettlementTotal),
-                riskAmount: formatCurrency(overdueTotal),
-              }}
-              queueItems={queueItems}
-            />
-          )}
-          {mode === "pending" && (
-            <FinancePending
-              charges={filteredPendingCharges}
-              onRemind={handleRemind}
-              formatCurrency={formatCurrency}
-              reminderStats={reminderStats}
-              priorityCharge={priorityCharge}
-              focusedCustomerId={focusedCustomerId}
-              onFocusCustomer={setFocusedCustomerId}
-              activeWindow={focusedPendingWindow}
-              onWindowChange={setFocusedPendingWindow}
-            />
-          )}
-          {mode === "overdue" && (
-            <FinanceOverdue
-              charges={filteredOverdueCharges}
-              onCharge={handleCharge}
-              formatCurrency={formatCurrency}
-              selectedBand={focusedOverdueBand}
-              onBandChange={setFocusedOverdueBand}
-              selectedCustomer={focusedCustomerId}
-              onCustomerChange={setFocusedCustomerId}
-            />
-          )}
-          {mode === "paid" && (
-            <FinancePaid
-              charges={filteredPaidCharges}
-              formatCurrency={formatCurrency}
-            />
-          )}
-          {mode === "reports" && (
-            <FinanceReports
-              revenueData={revenueDataParsed}
-              statusDistribution={statusDistribution.map(
-                ({ label, value }) => ({ label, value })
-              )}
-              overdueTotal={formatCurrency(overdueTotal)}
-              openTotal={formatCurrency(openTotal)}
-              receivedTotal={formatCurrency(receivedTotal)}
-              overdueTotalValue={overdueTotal}
-              openTotalValue={openTotal}
-              receivedTotalValue={receivedTotal}
-              monthlyResult={normalizeObjectPayload<any>(monthlyResultQuery.data)}
-              expenses={normalizeArrayPayload<any>((expensesListQuery.data as any)?.data)}
-              onCreateExpense={() => setOpenCreateExpense(true)}
-            />
-          )}
-        </>
-      ) : null}
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+          <AppSectionBlock
+            title="Saúde do caixa"
+            subtitle="Leitura consolidada de estabilidade, risco e tendência para decisão imediata."
+            className="xl:col-span-8"
+          >
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/35 p-3">
+                <p className="text-xs text-[var(--text-muted)]">Saúde geral</p>
+                <p className="mt-1 text-2xl font-semibold text-[var(--text-primary)]">
+                  {healthyRatio.toFixed(0)}%
+                </p>
+                <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                  Parcela da carteira aberta sem atraso.
+                </p>
+              </div>
+              <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/35 p-3">
+                <p className="text-xs text-[var(--text-muted)]">A receber</p>
+                <p className="mt-1 text-2xl font-semibold text-[var(--text-primary)]">
+                  {formatCurrency(openTotal)}
+                </p>
+                <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                  Pendentes + vencidas no momento.
+                </p>
+              </div>
+              <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/35 p-3">
+                <p className="text-xs text-[var(--text-muted)]">
+                  Valor em risco
+                </p>
+                <p className="mt-1 text-2xl font-semibold text-[var(--text-primary)]">
+                  {formatCurrency(overdueTotal)}
+                </p>
+                <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                  Atrasos com impacto direto no caixa.
+                </p>
+              </div>
+              <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/35 p-3">
+                <p className="text-xs text-[var(--text-muted)]">Recebido</p>
+                <p className="mt-1 text-2xl font-semibold text-[var(--text-primary)]">
+                  {formatCurrency(receivedCurrent)}
+                </p>
+                <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                  Entradas dos últimos 30 dias.
+                </p>
+              </div>
+            </div>
+          </AppSectionBlock>
+          <AppSectionBlock
+            title="Próxima melhor ação"
+            subtitle="Bloco de decisão para agir com impacto imediato."
+            className="xl:col-span-4"
+            compact
+          >
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <AppStatusBadge
+                  label={getOperationalSeverityLabel(pageSeverity)}
+                />
+                <AppPriorityBadge
+                  label={
+                    pageSeverity === "critical"
+                      ? "Alta"
+                      : pageSeverity === "pending"
+                        ? "Média"
+                        : "Baixa"
+                  }
+                />
+              </div>
+              <p className="text-sm text-[var(--text-secondary)]">
+                {decisionCenter.description}
+              </p>
+              <p className="text-xs text-[var(--text-muted)]">
+                {decisionCenter.reference}
+              </p>
+              <div className="grid gap-2">
+                <ActionFeedbackButton
+                  state="idle"
+                  idleLabel="Cobrar quem está vencido"
+                  onClick={() => setMode("overdue")}
+                />
+                <ActionFeedbackButton
+                  state="idle"
+                  idleLabel="Registrar pagamento"
+                  onClick={() => setMode("paid")}
+                />
+                <ActionFeedbackButton
+                  state="idle"
+                  idleLabel="Executar lembretes"
+                  onClick={() => handleRemind()}
+                />
+              </div>
+            </div>
+          </AppSectionBlock>
+        </div>
 
-      <CreateChargeModal
-        isOpen={openCreate}
-        onClose={() => setOpenCreate(false)}
-        onSuccess={() => {
-          void Promise.all([
-            chargesQuery.refetch(),
-            statsQuery.refetch(),
-            revenueQuery.refetch(),
-            monthlyResultQuery.refetch(),
-            expensesListQuery.refetch(),
-          ]);
-        }}
-      />
-      <CreateExpenseModal
-        open={openCreateExpense}
-        onClose={() => setOpenCreateExpense(false)}
-        onCreated={() => {
-          void Promise.all([monthlyResultQuery.refetch(), expensesListQuery.refetch()]);
-        }}
-      />
+        <AppSecondaryTabs
+          items={[
+            { value: "overview", label: "Visão geral" },
+            { value: "pending", label: "Pendentes" },
+            { value: "overdue", label: "Vencidas" },
+            { value: "paid", label: "Pagas" },
+            { value: "reports", label: "Relatórios" },
+          ]}
+          value={mode}
+          onChange={value => setMode(value as typeof mode)}
+        />
+        <AppFiltersBar className="gap-2">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--text-secondary)]">
+            <span>Contexto ativo:</span>
+            {focusedCustomerId ? (
+              <AppStatusBadge
+                label={`Cliente ${focusedCustomerId.slice(0, 8)}…`}
+              />
+            ) : null}
+            {focusedPendingWindow ? (
+              <AppStatusBadge label={`Janela ${focusedPendingWindow}`} />
+            ) : null}
+            {focusedOverdueBand ? (
+              <AppStatusBadge label={`Faixa ${focusedOverdueBand}`} />
+            ) : null}
+            {focusedTrendPointKey ? (
+              <AppStatusBadge label={`Ponto ${focusedTrendPointKey}`} />
+            ) : null}
+            {!focusedCustomerId &&
+            !focusedPendingWindow &&
+            !focusedOverdueBand &&
+            !focusedTrendPointKey ? (
+              <span className="text-[var(--text-muted)]">
+                Sem filtros aplicados
+              </span>
+            ) : null}
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setFocusedCustomerId(null);
+              setFocusedPendingWindow(null);
+              setFocusedOverdueBand(null);
+              setFocusedTrendPointKey(null);
+            }}
+          >
+            Limpar contexto
+          </Button>
+        </AppFiltersBar>
+        <OperationalTopCard
+          contextLabel="Centro de decisão financeiro"
+          title={decisionCenter.title}
+          description={decisionCenter.description}
+          chips={
+            <>
+              <span className="text-xs text-[var(--text-secondary)]">
+                Severidade: {getOperationalSeverityLabel(pageSeverity)}
+              </span>
+              <span className="text-xs text-[var(--text-secondary)]">
+                Prioridade atual: {topSeverityLabel}
+              </span>
+              <span className="text-xs text-[var(--text-secondary)]">
+                {decisionCenter.reference}
+              </span>
+              <span className="text-xs text-[var(--text-secondary)]">
+                Cobrança prioritária:{" "}
+                {priorityCharge
+                  ? String(priorityCharge?.customer?.name ?? "Cliente")
+                  : "Sem foco"}
+              </span>
+            </>
+          }
+        />
+        {mode === "overview" || mode === "reports" ? (
+          <>
+            <FinanceTrendEngine
+              period={period}
+              onPeriodChange={setPeriod}
+              points={trendPeriods[period]}
+              selectedPointKey={focusedTrendPointKey}
+              onSelectPoint={setFocusedTrendPointKey}
+            />
+            <AppSectionBlock
+              title="Contexto operacional da tendência"
+              subtitle="Leitura orientada para execução: tendência não é só visual, é gatilho de ação."
+              compact
+            >
+              <div className="grid gap-3 md:grid-cols-3">
+                <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/30 p-3">
+                  <p className="text-xs text-[var(--text-muted)]">
+                    Tendência de recebimento
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
+                    {receivedDelta >= 0 ? "Acelerando" : "Desacelerando"}
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                    Compare o período atual com os 30 dias anteriores.
+                  </p>
+                </div>
+                <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/30 p-3">
+                  <p className="text-xs text-[var(--text-muted)]">
+                    Impacto operacional
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
+                    {overdueCharges.length > 0
+                      ? "Priorizar cobrança imediata"
+                      : "Foco em prevenção"}
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                    {overdueCharges.length > 0
+                      ? `${overdueCharges.length} cobrança(s) vencida(s) no período atual.`
+                      : "Sem atrasos ativos neste recorte."}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/30 p-3">
+                  <p className="text-xs text-[var(--text-muted)]">
+                    Próximo movimento
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
+                    {decisionCenter.title}
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                    {decisionCenter.reference}
+                  </p>
+                </div>
+              </div>
+            </AppSectionBlock>
+          </>
+        ) : (
+          <AppSectionBlock
+            title={
+              mode === "pending"
+                ? "Janela crítica de cobrança pendente"
+                : mode === "overdue"
+                  ? "Recuperação prioritária de vencidas"
+                  : "Leitura de pontualidade e performance"
+            }
+            subtitle={
+              mode === "pending"
+                ? "Direcione lembretes por janela de vencimento e clientes em risco de atraso."
+                : mode === "overdue"
+                  ? "Aja por impacto no caixa e tempo de atraso para recuperar liquidez."
+                  : "Consolide comportamento de pagamento e consistência da carteira paga."
+            }
+            compact
+          >
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/30 p-3">
+                <p className="text-xs text-[var(--text-muted)]">
+                  Prioridade imediata
+                </p>
+                <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
+                  {decisionCenter.title}
+                </p>
+                <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                  {decisionCenter.reference}
+                </p>
+              </div>
+              <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/30 p-3">
+                <p className="text-xs text-[var(--text-muted)]">
+                  Próxima execução
+                </p>
+                <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
+                  {mode === "pending"
+                    ? `${reminderEligibleNow.length} lembrete(s) elegíveis agora`
+                    : mode === "overdue"
+                      ? `${overdueCharges.length} cobrança(s) vencida(s) para atacar`
+                      : `${paidCharges.length} pagamento(s) confirmados para consolidar`}
+                </p>
+                <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                  {mode === "pending"
+                    ? "Ação preventiva para não virar atraso."
+                    : mode === "overdue"
+                      ? "Ação corretiva com impacto direto no caixa."
+                      : "Ação de estabilidade e previsibilidade de recebimento."}
+                </p>
+              </div>
+            </div>
+          </AppSectionBlock>
+        )}
+
+        {showChargesInitialLoading ? (
+          <AppPageLoadingState description="Carregando financeiro..." />
+        ) : null}
+        {showChargesErrorState ? (
+          <AppPageErrorState
+            description={
+              chargesQuery.error?.message ?? "Falha ao carregar cobranças."
+            }
+            actionLabel="Tentar novamente"
+            onAction={() => void chargesQuery.refetch()}
+          />
+        ) : null}
+
+        {!showChargesInitialLoading && !showChargesErrorState ? (
+          <>
+            {mode === "overview" && (
+              <FinanceOverview
+                revenueData={revenueSafe.data}
+                revenueDataByPeriod={trendPeriods}
+                revenueLoading={revenueQuery.isLoading}
+                revenueError={revenueQuery.error?.message}
+                isRevenueValid={revenueSafe.isValid}
+                revenueInvalidReason={revenueSafe.reason}
+                risk={{
+                  riskAmount: formatCurrency(overdueTotal),
+                  overdueCount: Number(
+                    stats.overdueCount ?? overdueCharges.length
+                  ),
+                  dueToday,
+                  dueSoon,
+                }}
+                goToMode={nextMode => setMode(nextMode)}
+                openCreate={() => setOpenCreate(true)}
+                cobrarAgora={() => handleCharge()}
+                operationalSignals={{
+                  overdueCount: overdueCharges.length,
+                  dueToday,
+                  dueSoon,
+                  awaitingSettlementCount,
+                  awaitingSettlementTotal: formatCurrency(
+                    awaitingSettlementTotal
+                  ),
+                  riskAmount: formatCurrency(overdueTotal),
+                }}
+                queueItems={queueItems}
+              />
+            )}
+            {mode === "pending" && (
+              <FinancePending
+                charges={filteredPendingCharges}
+                onRemind={handleRemind}
+                formatCurrency={formatCurrency}
+                reminderStats={reminderStats}
+                priorityCharge={priorityCharge}
+                focusedCustomerId={focusedCustomerId}
+                onFocusCustomer={setFocusedCustomerId}
+                activeWindow={focusedPendingWindow}
+                onWindowChange={setFocusedPendingWindow}
+              />
+            )}
+            {mode === "overdue" && (
+              <FinanceOverdue
+                charges={filteredOverdueCharges}
+                onCharge={handleCharge}
+                formatCurrency={formatCurrency}
+                selectedBand={focusedOverdueBand}
+                onBandChange={setFocusedOverdueBand}
+                selectedCustomer={focusedCustomerId}
+                onCustomerChange={setFocusedCustomerId}
+              />
+            )}
+            {mode === "paid" && (
+              <FinancePaid
+                charges={filteredPaidCharges}
+                formatCurrency={formatCurrency}
+              />
+            )}
+            {mode === "reports" && (
+              <FinanceReports
+                revenueData={revenueDataParsed}
+                statusDistribution={statusDistribution.map(
+                  ({ label, value }) => ({ label, value })
+                )}
+                overdueTotal={formatCurrency(overdueTotal)}
+                openTotal={formatCurrency(openTotal)}
+                receivedTotal={formatCurrency(receivedTotal)}
+                overdueTotalValue={overdueTotal}
+                openTotalValue={openTotal}
+                receivedTotalValue={receivedTotal}
+                monthlyResult={normalizeObjectPayload<any>(
+                  monthlyResultQuery.data
+                )}
+                expenses={normalizeArrayPayload<any>(
+                  (expensesListQuery.data as any)?.data
+                )}
+                onCreateExpense={() => setOpenCreateExpense(true)}
+              />
+            )}
+          </>
+        ) : null}
+
+        <CreateChargeModal
+          isOpen={openCreate}
+          onClose={() => setOpenCreate(false)}
+          onSuccess={() => {
+            void Promise.all([
+              chargesQuery.refetch(),
+              statsQuery.refetch(),
+              revenueQuery.refetch(),
+              monthlyResultQuery.refetch(),
+              expensesListQuery.refetch(),
+            ]);
+          }}
+        />
+        <CreateExpenseModal
+          open={openCreateExpense}
+          onClose={() => setOpenCreateExpense(false)}
+          onCreated={() => {
+            void Promise.all([
+              monthlyResultQuery.refetch(),
+              expensesListQuery.refetch(),
+            ]);
+          }}
+        />
       </div>
     </PageWrapper>
   );

@@ -15,7 +15,6 @@ import { AppRowActionsDropdown, AppCheckbox } from "@/components/app-system";
 import {
   AppDataTable,
   AppFiltersBar,
-  AppKpiRow,
   AppPageEmptyState,
   AppPageErrorState,
   AppPageHeader,
@@ -460,19 +459,6 @@ export default function CustomersPage() {
     { key: "healthy", label: "Saudáveis" },
   ];
 
-  const customersNeedingAttention = operationalSnapshots.filter(
-    item => item.status !== "Seguro"
-  ).length;
-  const customersWithPendingBilling = operationalSnapshots.filter(
-    item => item.overdueCharges > 0 || item.pendingCharges > 0
-  ).length;
-  const recentRelationship = operationalSnapshots.filter(
-    item => item.contactState === "responded" && item.lastInteractionDays <= 2
-  ).length;
-  const totalFinancialExposure = operationalSnapshots.reduce(
-    (acc, item) => acc + item.financialPendingCents,
-    0
-  );
   const topPriorityCustomers = [...operationalSnapshots]
     .sort((left, right) => right.priorityScore - left.priorityScore)
     .slice(0, 3);
@@ -504,36 +490,6 @@ export default function CustomersPage() {
               Novo cliente
             </Button>
           }
-        />
-
-        <AppKpiRow
-          gridClassName="grid-cols-1 sm:grid-cols-2 xl:grid-cols-4"
-          items={[
-            {
-              title: "Clientes ativos",
-              value: String(customers.length),
-              hint: "Base operacional disponível para execução",
-              tone: "default",
-            },
-            {
-              title: "Exigem atenção",
-              value: String(customersNeedingAttention),
-              hint: `${overdueCustomers} com cobrança vencida`,
-              tone: customersNeedingAttention > 0 ? "important" : "default",
-            },
-            {
-              title: "Cobrança pendente",
-              value: String(customersWithPendingBilling),
-              hint: `${formatMoney(totalFinancialExposure)} em exposição`,
-              tone: customersWithPendingBilling > 0 ? "critical" : "default",
-            },
-            {
-              title: "Relacionamento recente",
-              value: String(recentRelationship),
-              hint: "Clientes com retorno em até 2 dias",
-              tone: "default",
-            },
-          ]}
         />
 
         <ActionBarWrapper

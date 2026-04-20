@@ -85,7 +85,7 @@ export default function ExecutiveDashboard() {
 
       <KpiErrorBoundary context="executive-dashboard:kpi">
         <AppKpiRow
-          gridClassName="grid-cols-1 sm:grid-cols-2 xl:grid-cols-4"
+          gridClassName="grid-cols-1 sm:grid-cols-2 xl:grid-cols-2"
           items={[
             {
               label: "Receita",
