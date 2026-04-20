@@ -9,17 +9,16 @@ import {
 import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
 import { Button, SecondaryButton } from "@/components/design-system";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
-import { ActionBarWrapper } from "@/components/operating-system/ActionBar";
 import { ContextPanel } from "@/components/operating-system/ContextPanel";
 import { AppRowActionsDropdown, AppCheckbox } from "@/components/app-system";
 import {
+  AppOperationalBar,
   AppDataTable,
   AppPageEmptyState,
   AppPageErrorState,
   AppPageHeader,
   AppPageLoadingState,
   AppPriorityBadge,
-  AppSecondaryTabs,
   AppSectionBlock,
   AppStatusBadge,
   appSelectionPillClasses,
@@ -456,6 +455,18 @@ export default function CustomersPage() {
     { key: "no_schedule", label: "Sem agenda" },
     { key: "healthy", label: "Saudáveis" },
   ];
+  const quickFilterItems = filterItems.filter(item =>
+    ["all", "risk", "billing"].includes(item.key)
+  );
+  const advancedFilterItems = filterItems.filter(
+    item => !["all", "risk", "billing"].includes(item.key)
+  );
+  const sortLabels: Record<OperationalSort, string> = {
+    priority: "Prioridade",
+    financial: "Valor financeiro",
+    last_interaction: "Última interação",
+    name: "Nome",
+  };
 
   const topPriorityCustomers = [...operationalSnapshots]
     .sort((left, right) => right.priorityScore - left.priorityScore)
@@ -541,31 +552,27 @@ export default function CustomersPage() {
           }
         />
 
-        <AppSecondaryTabs
-          items={[
+        <AppOperationalBar
+          tabs={[
             { value: "overview", label: "Visão geral" },
             { value: "agenda", label: "Agenda" },
             { value: "service_orders", label: "O.S." },
             { value: "financial", label: "Financeiro" },
             { value: "history", label: "Histórico" },
           ]}
-          value={activeTab}
-          onChange={value => {
+          activeTab={activeTab}
+          onTabChange={value => {
             setActiveTab(value);
             if (value === "financial") setActiveFilter("billing");
             else if (value === "agenda") setActiveFilter("no_schedule");
             else if (value === "overview") setActiveFilter("all");
           }}
-        />
-
-        <ActionBarWrapper
-          className="border border-[var(--border-subtle)] bg-[var(--surface-base)] p-0"
           searchValue={searchTerm}
           onSearchChange={setSearchTerm}
           searchPlaceholder="Buscar por nome, telefone, email ou ID"
-          filtersSlot={
+          quickFilters={
             <div className="flex flex-wrap items-center gap-2">
-              {filterItems.map(item => (
+              {quickFilterItems.map(item => (
                 <button
                   key={item.key}
                   type="button"
@@ -575,27 +582,78 @@ export default function CustomersPage() {
                   {item.label}
                 </button>
               ))}
-              <label
-                className="ml-2 text-xs font-medium text-[var(--text-secondary)]"
-                htmlFor="customers-sort"
-              >
-                Ordenar
-              </label>
-              <select
-                id="customers-sort"
-                className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-xs text-[var(--text-primary)]"
-                value={activeSort}
-                onChange={event =>
-                  setActiveSort(event.target.value as OperationalSort)
-                }
-              >
-                <option value="priority">Prioridade</option>
-                <option value="financial">Valor financeiro</option>
-                <option value="last_interaction">Última interação</option>
-                <option value="name">Nome</option>
-              </select>
             </div>
           }
+          advancedFiltersLabel="Mais filtros"
+          advancedFiltersContent={
+            <>
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                  Filtros de contexto
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {advancedFilterItems.map(item => (
+                    <button
+                      key={item.key}
+                      type="button"
+                      className={appSelectionPillClasses(activeFilter === item.key)}
+                      onClick={() => setActiveFilter(item.key)}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <label
+                  className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]"
+                  htmlFor="customers-sort"
+                >
+                  Ordenação
+                </label>
+                <select
+                  id="customers-sort"
+                  className="h-9 w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-xs text-[var(--text-primary)]"
+                  value={activeSort}
+                  onChange={event =>
+                    setActiveSort(event.target.value as OperationalSort)
+                  }
+                >
+                  <option value="priority">Prioridade</option>
+                  <option value="financial">Valor financeiro</option>
+                  <option value="last_interaction">Última interação</option>
+                  <option value="name">Nome</option>
+                </select>
+              </div>
+            </>
+          }
+          activeFilterChips={[
+            ...(!quickFilterItems.some(item => item.key === activeFilter) &&
+            activeFilter !== "all"
+              ? [
+                  {
+                    key: `filter-${activeFilter}`,
+                    label:
+                      filterItems.find(item => item.key === activeFilter)?.label ??
+                      activeFilter,
+                    onRemove: () => setActiveFilter("all"),
+                  },
+                ]
+              : []),
+            ...(activeSort !== "priority"
+              ? [
+                  {
+                    key: "sort",
+                    label: `Ordenação: ${sortLabels[activeSort]}`,
+                    onRemove: () => setActiveSort("priority"),
+                  },
+                ]
+              : []),
+          ]}
+          onClearAllFilters={() => {
+            setActiveFilter("all");
+            setActiveSort("priority");
+          }}
         />
 
         <div className="space-y-4">

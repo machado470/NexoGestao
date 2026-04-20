@@ -6,20 +6,19 @@ import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
 import { CreateAppointmentModal } from "@/components/CreateAppointmentModal";
 import { AppRowActionsDropdown } from "@/components/app-system";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
-import { ActionBarWrapper } from "@/components/operating-system/ActionBar";
 import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedbackButton";
 import {
   getAppointmentSeverity,
   getOperationalSeverityLabel,
 } from "@/lib/operations/operational-intelligence";
 import {
+  AppOperationalBar,
   AppDataTable,
   AppPageEmptyState,
   AppPageErrorState,
   AppPageHeader,
   AppPageLoadingState,
   appSelectionPillClasses,
-  AppSecondaryTabs,
   AppSectionBlock,
   AppPriorityBadge,
   AppStatusBadge,
@@ -282,6 +281,13 @@ export default function AppointmentsPage() {
     }
     return { label: "Novo agendamento", onClick: () => setOpenCreate(true) };
   })();
+  const selectedCustomerName =
+    customerFilter === "all"
+      ? ""
+      : String(
+          customers.find(item => String(item?.id ?? "") === customerFilter)
+            ?.name ?? "Cliente"
+        );
 
   return (
     <PageWrapper
@@ -321,71 +327,127 @@ export default function AppointmentsPage() {
           }
         />
 
-        <AppSecondaryTabs
-          items={[
+        <AppOperationalBar
+          tabs={[
             { value: "agenda", label: "Agenda" },
             { value: "confirmed", label: "Confirmados" },
             { value: "pending", label: "Pendentes" },
             { value: "conflicts", label: "Conflitos" },
             { value: "history", label: "Histórico" },
           ]}
-          value={activeTab}
-          onChange={setActiveTab}
-        />
-        <ActionBarWrapper
-          className="border border-[var(--border-subtle)] bg-[var(--surface-base)] p-0"
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
           searchValue={searchTerm}
           onSearchChange={setSearchTerm}
           searchPlaceholder="Buscar por cliente, título ou ID"
-          filtersSlot={
-            <>
-              <div className="flex flex-wrap items-center gap-2">
-                {[
-                  { key: "today", label: "Hoje" },
-                  { key: "next7", label: "Próximos 7 dias" },
-                  { key: "overdue", label: "Atrasados" },
-                  { key: "all", label: "Tudo" },
-                ].map(item => (
-                  <button
-                    key={item.key}
-                    type="button"
-                    className={appSelectionPillClasses(
-                      windowFilter === item.key
-                    )}
-                    onClick={() => setWindowFilter(item.key as WindowFilter)}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-
-              <select
-                className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-xs text-[var(--text-primary)]"
-                value={statusFilter}
-                onChange={event => setStatusFilter(event.target.value)}
-              >
-                <option value="all">Todos os status</option>
-                <option value="SCHEDULED">Agendado</option>
-                <option value="CONFIRMED">Confirmado</option>
-                <option value="DONE">Concluído</option>
-                <option value="CANCELED">Cancelado</option>
-                <option value="NO_SHOW">Não compareceu</option>
-              </select>
-
-              <select
-                className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-xs text-[var(--text-primary)]"
-                value={customerFilter}
-                onChange={event => setCustomerFilter(event.target.value)}
-              >
-                <option value="all">Todos os clientes</option>
-                {customers.map(customer => (
-                  <option key={String(customer.id)} value={String(customer.id)}>
-                    {String(customer.name ?? "Cliente")}
-                  </option>
-                ))}
-              </select>
-            </>
+          quickFilters={
+            <div className="flex flex-wrap items-center gap-2">
+              {[
+                { key: "today", label: "Hoje" },
+                { key: "next7", label: "Próx. 7 dias" },
+                { key: "overdue", label: "Atrasados" },
+              ].map(item => (
+                <button
+                  key={item.key}
+                  type="button"
+                  className={appSelectionPillClasses(windowFilter === item.key)}
+                  onClick={() => setWindowFilter(item.key as WindowFilter)}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
           }
+          advancedFiltersLabel="Filtros"
+          advancedFiltersContent={
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                  Janela
+                </label>
+                <select
+                  className="h-9 w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-xs text-[var(--text-primary)]"
+                  value={windowFilter}
+                  onChange={event =>
+                    setWindowFilter(event.target.value as WindowFilter)
+                  }
+                >
+                  <option value="today">Hoje</option>
+                  <option value="next7">Próximos 7 dias</option>
+                  <option value="overdue">Atrasados</option>
+                  <option value="all">Tudo</option>
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                  Status
+                </label>
+                <select
+                  className="h-9 w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-xs text-[var(--text-primary)]"
+                  value={statusFilter}
+                  onChange={event => setStatusFilter(event.target.value)}
+                >
+                  <option value="all">Todos os status</option>
+                  <option value="SCHEDULED">Agendado</option>
+                  <option value="CONFIRMED">Confirmado</option>
+                  <option value="DONE">Concluído</option>
+                  <option value="CANCELED">Cancelado</option>
+                  <option value="NO_SHOW">Não compareceu</option>
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                  Cliente
+                </label>
+                <select
+                  className="h-9 w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-xs text-[var(--text-primary)]"
+                  value={customerFilter}
+                  onChange={event => setCustomerFilter(event.target.value)}
+                >
+                  <option value="all">Todos os clientes</option>
+                  {customers.map(customer => (
+                    <option key={String(customer.id)} value={String(customer.id)}>
+                      {String(customer.name ?? "Cliente")}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          }
+          activeFilterChips={[
+            ...(windowFilter === "all"
+              ? [
+                  {
+                    key: "window-all",
+                    label: "Janela: Tudo",
+                    onRemove: () => setWindowFilter("today"),
+                  },
+                ]
+              : []),
+            ...(statusFilter !== "all"
+              ? [
+                  {
+                    key: "status",
+                    label: `Status: ${statusFilter}`,
+                    onRemove: () => setStatusFilter("all"),
+                  },
+                ]
+              : []),
+            ...(customerFilter !== "all"
+              ? [
+                  {
+                    key: "customer",
+                    label: `Cliente: ${selectedCustomerName}`,
+                    onRemove: () => setCustomerFilter("all"),
+                  },
+                ]
+              : []),
+          ]}
+          onClearAllFilters={() => {
+            setWindowFilter("today");
+            setStatusFilter("all");
+            setCustomerFilter("all");
+          }}
         />
 
         <div className="space-y-4">

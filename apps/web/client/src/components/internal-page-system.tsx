@@ -3,11 +3,16 @@ import {
   ArrowDownRight,
   ArrowRight,
   ArrowUpRight,
+  ChevronDown,
+  Search,
+  SlidersHorizontal,
+  X,
   TriangleAlert,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   AppPageShell,
   AppPageHeader as BasePageHeader,
@@ -117,6 +122,150 @@ export function AppSecondaryTabs<T extends string>({
         })}
       </div>
     </nav>
+  );
+}
+
+export function AppOperationalBar<T extends string>({
+  tabs,
+  activeTab,
+  onTabChange,
+  searchValue,
+  onSearchChange,
+  searchPlaceholder = "Buscar",
+  quickFilters,
+  activeFilterChips,
+  advancedFiltersContent,
+  advancedFiltersLabel = "Filtros",
+  onClearAllFilters,
+  className,
+}: {
+  tabs: Array<{ value: T; label: string }>;
+  activeTab: T;
+  onTabChange: (value: T) => void;
+  searchValue: string;
+  onSearchChange: (value: string) => void;
+  searchPlaceholder?: string;
+  quickFilters?: ReactNode;
+  activeFilterChips?: Array<{
+    key: string;
+    label: string;
+    onRemove?: () => void;
+  }>;
+  advancedFiltersContent?: ReactNode;
+  advancedFiltersLabel?: string;
+  onClearAllFilters?: () => void;
+  className?: string;
+}) {
+  const hasAdvancedFilters = Boolean(advancedFiltersContent);
+  const hasActiveAdvancedFilters = (activeFilterChips?.length ?? 0) > 0;
+
+  const tabClasses = (isActive: boolean) =>
+    cn(
+      "relative inline-flex h-9 shrink-0 items-center justify-center rounded-lg border px-4 text-sm font-medium transition-colors",
+      isActive
+        ? "border-[color-mix(in_srgb,var(--accent-primary)_72%,black)] bg-[var(--accent-primary)] text-white shadow-[0_8px_18px_-16px_var(--accent-primary)]"
+        : "border-[var(--border-subtle)] bg-[var(--surface-primary)]/45 text-[var(--text-secondary)] hover:border-[var(--border-emphasis)] hover:bg-[var(--surface-primary)]/65 hover:text-[var(--text-primary)]"
+    );
+
+  return (
+    <section
+      className={cn(
+        "rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]",
+        className
+      )}
+    >
+      <div className="overflow-x-auto p-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex min-w-max items-center gap-1.5">
+          {tabs.map(tab => {
+            const isActive = tab.value === activeTab;
+            return (
+              <button
+                key={tab.value}
+                type="button"
+                className={tabClasses(isActive)}
+                onClick={() => onTabChange(tab.value)}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="border-t border-[var(--border-subtle)] p-3">
+        <div className="flex flex-col gap-2.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative min-w-[260px] flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
+              <Input
+                value={searchValue}
+                onChange={event => onSearchChange(event.target.value)}
+                placeholder={searchPlaceholder}
+                className="h-9 border-[var(--border-subtle)] bg-[var(--surface-base)] pl-9"
+              />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">{quickFilters}</div>
+
+            {hasAdvancedFilters ? (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-9 gap-1.5 border-[var(--border-subtle)] bg-[var(--surface-base)] text-[var(--text-secondary)] hover:bg-[var(--surface-subtle)] hover:text-[var(--text-primary)]"
+                  >
+                    <SlidersHorizontal className="h-4 w-4" />
+                    {advancedFiltersLabel}
+                    <ChevronDown className="h-4 w-4 text-[var(--text-muted)]" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  align="end"
+                  sideOffset={10}
+                  className="w-[min(92vw,380px)] space-y-3 rounded-xl border-[var(--border-subtle)] bg-[var(--surface-base)] p-3"
+                >
+                  {advancedFiltersContent}
+                </PopoverContent>
+              </Popover>
+            ) : null}
+          </div>
+
+          {hasActiveAdvancedFilters ? (
+            <div className="flex flex-wrap items-center gap-2">
+              {activeFilterChips?.map(chip => (
+                <span
+                  key={chip.key}
+                  className="inline-flex items-center gap-1 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-2.5 py-1 text-xs text-[var(--text-secondary)]"
+                >
+                  {chip.label}
+                  {chip.onRemove ? (
+                    <button
+                      type="button"
+                      onClick={chip.onRemove}
+                      className="rounded-full p-0.5 text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-elevated)] hover:text-[var(--text-primary)]"
+                      aria-label={`Remover ${chip.label}`}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  ) : null}
+                </span>
+              ))}
+              {onClearAllFilters ? (
+                <button
+                  type="button"
+                  onClick={onClearAllFilters}
+                  className="text-xs font-medium text-[var(--text-muted)] underline-offset-2 transition-colors hover:text-[var(--text-primary)] hover:underline"
+                >
+                  Limpar filtros
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </section>
   );
 }
 
