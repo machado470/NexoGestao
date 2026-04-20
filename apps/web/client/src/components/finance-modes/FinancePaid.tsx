@@ -49,7 +49,7 @@ export function FinancePaid({ charges, formatCurrency }: FinancePaidProps) {
   const methodData = useMemo(() => {
     const map = new Map<string, number>();
     sorted.forEach(charge => {
-      const method = String(charge?.paymentMethod ?? "Não informado");
+      const method = String(charge?.paymentMethod ?? "Não informado · dado pendente");
       map.set(method, (map.get(method) ?? 0) + 1);
     });
     return [...map.entries()].map(([label, value]) => ({ label, value }));
@@ -69,7 +69,7 @@ export function FinancePaid({ charges, formatCurrency }: FinancePaidProps) {
       <AppSectionBlock
         title="Resultado de recebimentos"
         subtitle="Leitura de eficiência com histórico consolidado."
-        className="border-emerald-500/25 bg-emerald-500/8"
+        className="border-[var(--border-subtle)] bg-[var(--surface-base)]/30"
       >
         <div className="grid min-w-0 gap-3 grid-cols-2 xl:grid-cols-4">
           <div className="min-w-0 overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/45 p-4">
@@ -105,7 +105,7 @@ export function FinancePaid({ charges, formatCurrency }: FinancePaidProps) {
                   <ChartTooltipContent formatter={value => [formatCurrency(Number(value)), "Recebido"]} />
                 }
               />
-              <Bar dataKey="value" radius={[8, 8, 4, 4]} fill="#34d399" />
+              <Bar dataKey="value" radius={[8, 8, 4, 4]} fill="hsl(152 62% 46%)" />
             </BarChart>
           </ChartContainer>
         </AppSectionBlock>
@@ -159,7 +159,7 @@ export function FinancePaid({ charges, formatCurrency }: FinancePaidProps) {
         </div>
         <AppDataTable>
           <table className="w-full text-sm">
-            <thead className="bg-emerald-500/10 text-xs text-emerald-100">
+            <thead className="bg-[var(--surface-elevated)] text-xs text-[var(--text-muted)]">
               <tr>
                 <th className="p-2.5 text-left">Cliente</th>
                 <th className="text-left">Valor</th>
@@ -172,7 +172,7 @@ export function FinancePaid({ charges, formatCurrency }: FinancePaidProps) {
               {sorted.map(charge => {
                 const delay = delayInDays(charge);
                 return (
-                  <tr key={String(charge?.id)} className="border-t border-emerald-300/40">
+                  <tr key={String(charge?.id)} className="border-t border-[var(--border-subtle)]">
                     <td className="p-2.5">{String(charge?.customer?.name ?? "—")}</td>
                     <td>{formatCurrency(Number(charge?.amountCents ?? 0))}</td>
                     <td>

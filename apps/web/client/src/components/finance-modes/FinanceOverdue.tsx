@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   AppDataTable,
   AppPageEmptyState,
@@ -13,6 +13,10 @@ interface FinanceOverdueProps {
   charges: any[];
   formatCurrency: (cents: number) => string;
   onCharge: (charge?: any) => void;
+  selectedBand: string | null;
+  onBandChange: (band: string | null) => void;
+  selectedCustomer: string | null;
+  onCustomerChange: (customerId: string | null) => void;
 }
 
 function getDaysOverdue(dueDate: unknown) {
@@ -33,9 +37,11 @@ export function FinanceOverdue({
   charges,
   formatCurrency,
   onCharge,
+  selectedBand,
+  onBandChange,
+  selectedCustomer,
+  onCustomerChange,
 }: FinanceOverdueProps) {
-  const [selectedBand, setSelectedBand] = useState<string | null>(null);
-  const [selectedCustomer, setSelectedCustomer] = useState<string | null>(null);
   const sorted = [...charges].sort(
     (a, b) => getDaysOverdue(b?.dueDate) - getDaysOverdue(a?.dueDate)
   );
@@ -129,7 +135,7 @@ export function FinanceOverdue({
       <AppSectionBlock
         title="Cobranças vencidas"
         subtitle="Recuperação imediata de caixa com foco no que mais pesa."
-        className="border-rose-500/30 bg-rose-500/10"
+        className="border-[var(--border-subtle)] bg-[var(--surface-base)]/30"
       >
         <div className="grid gap-3 xl:grid-cols-[1.6fr_1fr]">
           <div className="grid min-w-0 gap-3 grid-cols-2 xl:grid-cols-4">
@@ -181,7 +187,7 @@ export function FinanceOverdue({
           title="Faixas de atraso"
           subtitle="Visual operacional para conduzir a rotina diária de cobrança."
           compact
-          className="border-rose-500/25"
+          className="border-[var(--border-subtle)]"
         >
           <div className="space-y-2">
             {bucketData.map(item => {
@@ -191,10 +197,10 @@ export function FinanceOverdue({
                 <button
                   key={item.label}
                   type="button"
-                  onClick={() => setSelectedBand(isActive ? null : item.label)}
+                  onClick={() => onBandChange(isActive ? null : item.label)}
                   className={cn(
                     "w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/35 p-3 text-left transition hover:border-[var(--border-emphasis)] hover:bg-[var(--surface-base)]/55",
-                    isActive && "border-rose-500/45 bg-rose-500/10"
+                    isActive && "border-[var(--border-emphasis)] bg-[var(--surface-base)]/55"
                   )}
                 >
                   <div className="flex min-w-0 items-center justify-between gap-3">
@@ -204,7 +210,7 @@ export function FinanceOverdue({
                     </span>
                   </div>
                   <div className="mt-2 h-2 rounded-full bg-[var(--surface-elevated)]">
-                    <div className="h-2 rounded-full bg-rose-400/80" style={{ width }} />
+                    <div className="h-2 rounded-full bg-[var(--accent-primary)]/80" style={{ width }} />
                   </div>
                   <p className="mt-1 text-xs text-[var(--text-muted)]">
                     {item.count > 0
@@ -218,7 +224,7 @@ export function FinanceOverdue({
               <button
                 type="button"
                 className={appSelectionPillClasses(false)}
-                onClick={() => setSelectedBand(null)}
+                onClick={() => onBandChange(null)}
               >
                 Limpar faixa
               </button>
@@ -230,7 +236,7 @@ export function FinanceOverdue({
           title="Concentração do vencido"
           subtitle="Clientes que concentram maior recuperação imediata."
           compact
-          className="border-rose-500/25"
+          className="border-[var(--border-subtle)]"
         >
           <div className="space-y-3">
             {topImpact.map(item => {
@@ -240,10 +246,10 @@ export function FinanceOverdue({
                 <button
                   key={item.customerId}
                   type="button"
-                  onClick={() => setSelectedCustomer(isActive ? null : item.customerId)}
+                  onClick={() => onCustomerChange(isActive ? null : item.customerId)}
                   className={cn(
                     "w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/35 p-3 text-left transition hover:border-[var(--border-emphasis)] hover:bg-[var(--surface-base)]/55",
-                    isActive && "border-rose-500/45 bg-rose-500/10"
+                    isActive && "border-[var(--border-emphasis)] bg-[var(--surface-base)]/55"
                   )}
                 >
                   <div className="flex min-w-0 items-center justify-between gap-2 text-sm">
@@ -252,7 +258,7 @@ export function FinanceOverdue({
                   </div>
                   <p className="mt-1 text-xs text-[var(--text-muted)]">{item.chargesCount} título(s) vencido(s)</p>
                   <div className="mt-2 h-1.5 rounded-full bg-[var(--surface-elevated)]">
-                    <div className="h-1.5 rounded-full bg-rose-400/80" style={{ width: `${Math.max(ratio, 8)}%` }} />
+                    <div className="h-1.5 rounded-full bg-[var(--accent-primary)]/80" style={{ width: `${Math.max(ratio, 8)}%` }} />
                   </div>
                 </button>
               );
@@ -270,7 +276,7 @@ export function FinanceOverdue({
         title="Lista de recuperação"
         subtitle="Ação por linha com prioridade explícita de cobrança."
         compact
-        className="border-rose-500/25"
+        className="border-[var(--border-subtle)]"
       >
         {focusDescription ? (
           <p className="mb-3 text-xs text-[var(--text-secondary)]">Filtro ativo: {focusDescription}.</p>
@@ -306,7 +312,7 @@ export function FinanceOverdue({
                         ? new Date(String(charge.dueDate)).toLocaleDateString("pt-BR")
                         : "—"}
                     </td>
-                    <td className="text-xs text-rose-100/90">{priority}</td>
+                    <td className="text-xs text-[var(--text-secondary)]">{priority}</td>
                     <td className="space-y-1.5 p-2.5">
                       <AppStatusBadge label="Vencida" />
                       <ActionFeedbackButton
