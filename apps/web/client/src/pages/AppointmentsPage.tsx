@@ -258,6 +258,34 @@ export default function AppointmentsPage() {
       ({ item }) => String(item?.id ?? "") === focusedAppointmentId
     ) ?? filteredAppointments[0];
 
+  const headerCta = (() => {
+    if (activeTab === "confirmed") {
+      return {
+        label: "Converter em O.S.",
+        onClick: () => navigate("/service-orders"),
+      };
+    }
+    if (activeTab === "pending") {
+      return {
+        label: "Confirmar / contatar",
+        onClick: () => navigate("/whatsapp"),
+      };
+    }
+    if (activeTab === "conflicts") {
+      return {
+        label: "Reorganizar agenda",
+        onClick: () => setWindowFilter("overdue"),
+      };
+    }
+    if (activeTab === "history") {
+      return {
+        label: "Voltar para agenda",
+        onClick: () => setActiveTab("agenda"),
+      };
+    }
+    return { label: "Novo agendamento", onClick: () => setOpenCreate(true) };
+  })();
+
   return (
     <PageWrapper
       title="Agenda operacional"
@@ -265,13 +293,33 @@ export default function AppointmentsPage() {
     >
       <div className="space-y-4">
         <AppPageHeader
-          title="Agenda operacional de agendamentos"
-          description="Visual único para confirmação, risco, execução e próximo passo por cliente."
+          title={
+            activeTab === "confirmed"
+              ? "Agendamentos confirmados"
+              : activeTab === "pending"
+                ? "Pendências de confirmação"
+                : activeTab === "conflicts"
+                  ? "Conflitos de agenda"
+                  : activeTab === "history"
+                    ? "Histórico de agendamentos"
+                    : "Agenda operacional de agendamentos"
+          }
+          description={
+            activeTab === "confirmed"
+              ? "Foco em confirmados para converter em execução/O.S."
+              : activeTab === "pending"
+                ? "Fila acionável para confirmação e contato por cliente."
+                : activeTab === "conflicts"
+                  ? "Choques de agenda, atrasos e risco operacional."
+                  : activeTab === "history"
+                    ? "Concluídos, cancelados e eventos passados para leitura histórica."
+                    : "Visual do turno/dia para sequência operacional e prevenção de atraso."
+          }
           cta={
             <ActionFeedbackButton
               state="idle"
-              idleLabel="Novo agendamento"
-              onClick={() => setOpenCreate(true)}
+              idleLabel={headerCta.label}
+              onClick={headerCta.onClick}
             />
           }
         />
@@ -289,8 +337,28 @@ export default function AppointmentsPage() {
         />
 
         <AppSectionBlock
-          title="Leitura operacional da agenda"
-          subtitle="Onde a janela está carregada, o que está em risco e qual ação destrava a operação agora."
+          title={
+            activeTab === "confirmed"
+              ? "Conversão de confirmados"
+              : activeTab === "pending"
+                ? "Confirmações pendentes"
+                : activeTab === "conflicts"
+                  ? "Destravar conflitos e atrasos"
+                  : activeTab === "history"
+                    ? "Leitura histórica da agenda"
+                    : "Leitura operacional da agenda"
+          }
+          subtitle={
+            activeTab === "confirmed"
+              ? "Próxima etapa do confirmado é execução: converta para O.S. sem perder janela."
+              : activeTab === "pending"
+                ? "Priorize contato ativo para fechar confirmação e manter previsibilidade."
+                : activeTab === "conflicts"
+                  ? "Isole choques de agenda para restaurar capacidade do turno."
+                  : activeTab === "history"
+                    ? "Eventos passados para identificar padrões de cancelamento e no-show."
+                    : "Onde a janela está carregada, o que está em risco e qual ação destrava a operação agora."
+          }
         >
           <AppSectionBlock
             title="Painel de execução"

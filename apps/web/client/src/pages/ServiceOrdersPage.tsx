@@ -347,6 +347,34 @@ export default function ServiceOrdersPage() {
     },
   ];
 
+  const headerCta = (() => {
+    if (activeTab === "execution") {
+      return {
+        label: "Atualizar execução",
+        onClick: () => setWindowFilter("today"),
+      };
+    }
+    if (activeTab === "attention") {
+      return {
+        label: "Destravar operação",
+        onClick: () => setPriorityFilter("high"),
+      };
+    }
+    if (activeTab === "done") {
+      return {
+        label: "Ir para cobrança",
+        onClick: () => navigate("/finances"),
+      };
+    }
+    if (activeTab === "history") {
+      return {
+        label: "Voltar ao pipeline",
+        onClick: () => setActiveTab("pipeline"),
+      };
+    }
+    return { label: "Nova O.S.", onClick: () => setOpenCreate(true) };
+  })();
+
   return (
     <PageWrapper
       title="Ordens de Serviço"
@@ -354,13 +382,33 @@ export default function ServiceOrdersPage() {
     >
       <div className="space-y-4">
         <AppPageHeader
-          title="Painel operacional de ordens de serviço"
-          description="Visual de execução para enxergar gargalos, risco, próxima ação e fechamento financeiro sem quebrar os fluxos atuais."
+          title={
+            activeTab === "execution"
+              ? "Ordens em execução"
+              : activeTab === "attention"
+                ? "Ordens com atenção"
+                : activeTab === "done"
+                  ? "Ordens concluídas"
+                  : activeTab === "history"
+                    ? "Histórico de ordens"
+                    : "Pipeline de ordens de serviço"
+          }
+          description={
+            activeTab === "execution"
+              ? "Foco em andamento, responsável e próxima ação."
+              : activeTab === "attention"
+                ? "Foco em travadas, atrasadas e sem avanço."
+                : activeTab === "done"
+                  ? "Ordens finalizadas prontas para cobrança e fechamento."
+                  : activeTab === "history"
+                    ? "Rastreabilidade de ordens encerradas, canceladas e passadas."
+                    : "Visão ampla do funil das ordens ativas."
+          }
           cta={
             <ActionFeedbackButton
               state="idle"
-              idleLabel="Criar nova O.S."
-              onClick={() => setOpenCreate(true)}
+              idleLabel={headerCta.label}
+              onClick={headerCta.onClick}
             />
           }
         />
@@ -426,8 +474,28 @@ export default function ServiceOrdersPage() {
         />
 
         <AppSectionBlock
-          title="Leitura operacional"
-          subtitle="Onde está o gargalo agora, quais ordens estão em risco e qual ação acelera execução + caixa."
+          title={
+            activeTab === "execution"
+              ? "Andamento operacional"
+              : activeTab === "attention"
+                ? "Fila crítica para destravar"
+                : activeTab === "done"
+                  ? "Fechamento e cobrança"
+                  : activeTab === "history"
+                    ? "Linha histórica de execução"
+                    : "Leitura operacional do pipeline"
+          }
+          subtitle={
+            activeTab === "execution"
+              ? "Acompanhe progresso, responsável e próxima ação das ordens em andamento."
+              : activeTab === "attention"
+                ? "Bloqueios, atrasos e ordens sem responsável com risco direto no SLA."
+                : activeTab === "done"
+                  ? "Concluídas prontas para cobrança, comunicação e fechamento."
+                  : activeTab === "history"
+                    ? "Rastreabilidade e padrões de execução ao longo do tempo."
+                    : "Visão do funil ativo para priorizar avanço contínuo."
+          }
         >
           <AppListBlock items={topActions} />
           <div className="mt-3">
