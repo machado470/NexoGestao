@@ -141,8 +141,8 @@ function getPaginationButtonClass(active: boolean) {
 
 function getOrderRowClass(active: boolean) {
   return active
-    ? "cursor-pointer border-t border-[var(--border-subtle)] bg-[var(--accent-soft)]/45 transition-colors hover:bg-[var(--accent-soft)]/60"
-    : "cursor-pointer border-t border-[var(--border-subtle)] transition-colors hover:bg-[var(--surface-subtle)]/60";
+    ? "cursor-pointer border-t border-[var(--border-subtle)] bg-[var(--accent-soft)]/45 transition-colors hover:bg-[var(--accent-soft)]/60 focus-within:bg-[var(--accent-soft)]/65"
+    : "cursor-pointer border-t border-[var(--border-subtle)] transition-colors hover:bg-[var(--surface-subtle)]/60 focus-within:bg-[var(--surface-subtle)]/70";
 }
 
 export default function ServiceOrdersPage() {
@@ -621,14 +621,14 @@ export default function ServiceOrdersPage() {
               <div className="space-y-3">
                 <AppDataTable>
                   <table className="w-full text-sm">
-                    <thead className="bg-[var(--surface-elevated)] text-xs text-[var(--text-muted)]">
+                    <thead className="bg-[var(--surface-elevated)] text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
                       <tr>
-                        <th className="w-[24%] px-4 py-3 text-left">Ordem</th>
-                        <th className="w-[21%] px-4 py-3 text-left">Cliente</th>
-                        <th className="w-[19%] px-4 py-3 text-left">Status</th>
-                        <th className="w-[118px] px-4 py-3 text-left">Prioridade</th>
-                        <th className="w-[16%] px-4 py-3 text-left">Próxima ação</th>
-                        <th className="w-[156px] px-4 py-3 text-right">Ações</th>
+                        <th className="w-[23%] px-4 py-2.5 text-left align-middle">Ordem</th>
+                        <th className="w-[20%] px-4 py-2.5 text-left align-middle">Cliente</th>
+                        <th className="w-[19%] px-4 py-2.5 text-left align-middle">Status</th>
+                        <th className="w-[13%] px-4 py-2.5 text-left align-middle">Prioridade</th>
+                        <th className="w-[25%] px-4 py-2.5 text-left align-middle">Próxima ação</th>
+                        <th className="w-[156px] px-4 py-2.5 text-right align-middle">Ações</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -672,10 +672,10 @@ export default function ServiceOrdersPage() {
                             }}
                           >
                             <td className="px-4 py-3.5 align-top">
-                              <p className="truncate text-[13px] font-semibold leading-snug text-[var(--text-primary)]">
+                              <p className="truncate text-sm font-semibold leading-5 text-[var(--text-primary)]">
                                 {orderTitle}
                               </p>
-                              <p className="mt-1 text-[11px] text-[var(--text-muted)]">
+                              <p className="mt-1 truncate text-[11px] text-[var(--text-muted)]">
                                 #{String(order?.id ?? "—")}
                               </p>
                             </td>
@@ -686,7 +686,7 @@ export default function ServiceOrdersPage() {
                               >
                                 {customerName}
                               </p>
-                              <p className="mt-1 text-[11px] text-[var(--text-muted)]/90">
+                              <p className="mt-1 truncate text-[11px] text-[var(--text-muted)]/90">
                                 {scheduledLabel}
                               </p>
                             </td>
@@ -706,7 +706,7 @@ export default function ServiceOrdersPage() {
                             <td className="px-4 py-3.5 align-top text-xs text-[var(--text-secondary)]">
                               <button
                                 type="button"
-                                className="line-clamp-2 text-left font-medium leading-relaxed text-[var(--accent-primary)] underline-offset-2 hover:underline"
+                                className="w-full truncate whitespace-nowrap text-left text-sm font-medium leading-5 text-[var(--accent-primary)] underline-offset-2 hover:underline"
                                 title={shouldShowNextActionTitle ? nextAction : undefined}
                                 onClick={event => {
                                   event.stopPropagation();
@@ -720,7 +720,7 @@ export default function ServiceOrdersPage() {
                               <div className="flex items-center justify-end gap-2">
                                 <SecondaryButton
                                   type="button"
-                                  className="h-8 min-w-[88px] px-2.5 text-xs font-semibold tracking-[0.01em]"
+                                  className="h-8 min-w-[104px] whitespace-nowrap px-3 text-xs font-semibold tracking-[0.01em]"
                                   onClick={event => {
                                     event.stopPropagation();
                                     handlePrimaryAction();

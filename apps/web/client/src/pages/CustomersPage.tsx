@@ -783,9 +783,9 @@ export default function CustomersPage() {
             ) : (
               <AppDataTable>
                   <table className="w-full text-sm">
-                    <thead className="bg-[var(--surface-elevated)] text-left text-xs text-[var(--text-muted)]">
+                    <thead className="bg-[var(--surface-elevated)] text-left text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
                       <tr>
-                        <th className="w-10 p-3">
+                        <th className="w-10 px-4 py-2.5 align-middle">
                           <AppCheckbox
                             checked={allDisplayedSelected}
                             onCheckedChange={checked => {
@@ -802,11 +802,11 @@ export default function CustomersPage() {
                             aria-label="Selecionar todos"
                           />
                         </th>
-                        <th className="w-[22%] p-3">Cliente</th>
-                        <th className="w-[20%] p-3">Contato</th>
-                        <th className="w-[18%] p-3">Status</th>
-                        <th className="w-[30%] p-3">Próxima ação</th>
-                        <th className="w-[124px] p-3 text-right">Ações</th>
+                        <th className="w-[23%] px-4 py-2.5 align-middle">Cliente</th>
+                        <th className="w-[20%] px-4 py-2.5 align-middle">Contato</th>
+                        <th className="w-[18%] px-4 py-2.5 align-middle">Status</th>
+                        <th className="w-[25%] px-4 py-2.5 align-middle">Próxima ação</th>
+                        <th className="w-[156px] px-4 py-2.5 text-right align-middle">Ações</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -865,9 +865,13 @@ export default function CustomersPage() {
                         return (
                           <tr
                             key={customerId}
-                            className="border-t border-[var(--border-subtle)] transition-colors hover:bg-[var(--dashboard-row-hover)]/25"
+                            className={`border-t border-[var(--border-subtle)] transition-colors hover:bg-[var(--surface-subtle)]/60 focus-within:bg-[var(--surface-subtle)]/70 ${
+                              selectedCustomerIds.includes(customerId)
+                                ? "bg-[var(--accent-soft)]/40"
+                                : ""
+                            }`}
                           >
-                            <td className="p-3 align-top">
+                            <td className="px-4 py-3.5 align-top">
                               <AppCheckbox
                                 checked={selectedCustomerIds.includes(
                                   customerId
@@ -886,10 +890,10 @@ export default function CustomersPage() {
                                 aria-label={`Selecionar ${String(customer?.name ?? "cliente")}`}
                               />
                             </td>
-                            <td className="p-3 align-top">
+                            <td className="px-4 py-3.5 align-top">
                               <button
                                 type="button"
-                                className="text-left"
+                                className="w-full text-left"
                                 onClick={() => {
                                   setTimelineExpanded(false);
                                   setSelectedCustomer({
@@ -898,25 +902,25 @@ export default function CustomersPage() {
                                   });
                                 }}
                               >
-                                <p className="text-[15px] font-semibold leading-5 text-[var(--text-primary)]">
+                                <p className="truncate text-sm font-semibold leading-5 text-[var(--text-primary)]">
                                   {String(customer?.name ?? "Sem nome")}
                                 </p>
-                                <span className="mt-1 block text-xs text-[var(--text-muted)]">
+                                <span className="mt-1 block truncate text-[11px] text-[var(--text-muted)]">
                                   ID {customerId.slice(0, 8)}
                                 </span>
                               </button>
                             </td>
-                            <td className="p-3 align-top">
+                            <td className="px-4 py-3.5 align-top">
                               <div className="space-y-1">
-                                <p className="text-xs text-[var(--text-secondary)]">
+                                <p className="truncate text-xs text-[var(--text-secondary)]">
                                   {String(customer?.phone ?? "—")}
                                 </p>
-                                <p className="text-xs text-[var(--text-muted)]">
+                                <p className="truncate text-[11px] text-[var(--text-muted)]">
                                   {String(customer?.email ?? "—")}
                                 </p>
                               </div>
                             </td>
-                            <td className="p-3 align-top">
+                            <td className="px-4 py-3.5 align-top">
                               <AppStatusBadge
                                 label={
                                   snapshot.overdueCharges > 0
@@ -930,22 +934,22 @@ export default function CustomersPage() {
                                 }
                               />
                             </td>
-                            <td className="p-3 align-top">
+                            <td className="px-4 py-3.5 align-top">
                               <p
-                                className="truncate text-sm font-medium text-[var(--text-primary)]"
+                                className="truncate whitespace-nowrap text-sm font-medium leading-5 text-[var(--text-primary)]"
                                 title={snapshot.nextActionReason}
                               >
                                 {toSingleLineAction(snapshot.nextActionReason)}
                               </p>
-                              <p className="mt-1 text-xs text-[var(--text-muted)]">
+                              <p className="mt-1 truncate text-[11px] text-[var(--text-muted)]">
                                 {snapshot.contextLabel}
                               </p>
                             </td>
-                            <td className="p-3 align-top">
+                            <td className="px-4 py-3.5 align-top">
                               <div className="flex items-center justify-end gap-2">
                                 <SecondaryButton
                                   type="button"
-                                  className="h-8 min-w-[92px] px-2.5 text-xs"
+                                  className="h-8 min-w-[104px] whitespace-nowrap px-3 text-xs font-semibold"
                                   onClick={event => {
                                     event.stopPropagation();
                                     primaryAction.onSelect();

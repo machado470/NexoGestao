@@ -554,14 +554,14 @@ export default function AppointmentsPage() {
             ) : (
               <AppDataTable>
                   <table className="w-full text-sm">
-                    <thead className="bg-[var(--surface-elevated)] text-xs text-[var(--text-muted)]">
+                    <thead className="bg-[var(--surface-elevated)] text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
                       <tr>
-                        <th className="p-3 text-left">Início</th>
-                        <th className="text-left">Cliente</th>
-                        <th className="text-left">Estado operacional</th>
-                        <th className="text-left">Prioridade</th>
-                        <th className="text-left">Próxima ação</th>
-                        <th className="w-[112px] p-3 text-right">Ações</th>
+                        <th className="w-[19%] px-4 py-2.5 text-left align-middle">Início</th>
+                        <th className="w-[20%] px-4 py-2.5 text-left align-middle">Cliente</th>
+                        <th className="w-[19%] px-4 py-2.5 text-left align-middle">Estado operacional</th>
+                        <th className="w-[13%] px-4 py-2.5 text-left align-middle">Prioridade</th>
+                        <th className="w-[25%] px-4 py-2.5 text-left align-middle">Próxima ação</th>
+                        <th className="w-[156px] px-4 py-2.5 text-right align-middle">Ações</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -595,50 +595,54 @@ export default function AppointmentsPage() {
                           return (
                           <tr
                             key={String(item?.id)}
-                            className="cursor-pointer border-t border-[var(--border-subtle)] transition-colors hover:bg-[var(--surface-subtle)]/60"
+                            className={`cursor-pointer border-t border-[var(--border-subtle)] transition-colors hover:bg-[var(--surface-subtle)]/60 focus-within:bg-[var(--surface-subtle)]/70 ${
+                              String(item?.id ?? "") === focusedAppointmentId
+                                ? "bg-[var(--accent-soft)]/40"
+                                : ""
+                            }`}
                             onClick={() => {
                               setFocusedAppointmentId(String(item?.id ?? ""));
                               setOpenOperationalModal(true);
                             }}
                           >
-                              <td className="p-3 align-top">
-                                <p className="text-sm font-semibold text-[var(--text-primary)]">
+                              <td className="px-4 py-3.5 align-top">
+                                <p className="whitespace-nowrap text-sm font-semibold leading-5 text-[var(--text-primary)]">
                                   {safeDate(item?.startsAt)?.toLocaleTimeString("pt-BR", {
                                     hour: "2-digit",
                                     minute: "2-digit",
                                   }) ?? "—"}
                                 </p>
-                                <p className="text-xs text-[var(--text-muted)]">
+                                <p className="whitespace-nowrap text-[11px] text-[var(--text-muted)]">
                                   {safeDate(item?.startsAt)?.toLocaleDateString("pt-BR") ?? "—"}
                                 </p>
                                 {hasConflict ? (
-                                  <p className="text-xs text-[var(--dashboard-danger)]">
+                                  <p className="mt-1 truncate text-[11px] text-[var(--dashboard-danger)]">
                                     Conflito de horário
                                   </p>
                                 ) : isDelayed ? (
-                                  <p className="text-xs text-[var(--dashboard-danger)]">
+                                  <p className="mt-1 truncate text-[11px] text-[var(--dashboard-danger)]">
                                     Atendimento atrasado
                                   </p>
                                 ) : null}
                               </td>
-                              <td className="align-top">
-                                <p className="font-medium text-[var(--text-primary)]">
+                              <td className="px-4 py-3.5 align-top">
+                                <p className="truncate text-sm font-medium leading-5 text-[var(--text-primary)]">
                                   {String(item?.customer?.name ?? "Cliente")}
                                 </p>
-                                <p className="text-xs text-[var(--text-muted)]">
+                                <p className="mt-1 truncate text-[11px] text-[var(--text-muted)]">
                                   #{String(item?.customerId ?? "—")}
                                 </p>
                               </td>
-                              <td className="align-top">
+                              <td className="px-4 py-3.5 align-top">
                                 <AppStatusBadge label={operationalState} />
                               </td>
-                              <td className="align-top">
+                              <td className="px-4 py-3.5 align-top">
                                 <AppPriorityBadge label={priorityLabel} />
                               </td>
-                              <td className="align-top text-xs text-[var(--text-secondary)]">
+                              <td className="px-4 py-3.5 align-top text-xs text-[var(--text-secondary)]">
                                 <button
                                   type="button"
-                                  className="w-full truncate text-left text-sm font-medium text-[var(--accent-primary)] hover:underline"
+                                  className="w-full truncate whitespace-nowrap text-left text-sm font-medium leading-5 text-[var(--accent-primary)] hover:underline"
                                   onClick={event => {
                                     event.stopPropagation();
                                     handlePrimaryAction();
@@ -648,11 +652,11 @@ export default function AppointmentsPage() {
                                   {toSingleLineAction(nextAction)}
                                 </button>
                               </td>
-                              <td className="p-3 align-top">
+                              <td className="px-4 py-3.5 align-top">
                                 <div className="flex items-center justify-end gap-2">
                                   <SecondaryButton
                                     type="button"
-                                    className="h-8 min-w-[96px] px-2.5 text-xs"
+                                    className="h-8 min-w-[104px] whitespace-nowrap px-3 text-xs font-semibold"
                                     onClick={event => {
                                       event.stopPropagation();
                                       handlePrimaryAction();
