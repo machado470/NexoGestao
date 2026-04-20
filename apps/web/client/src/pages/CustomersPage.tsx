@@ -7,26 +7,26 @@ import {
   normalizeObjectPayload,
 } from "@/lib/query-helpers";
 import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
-import {
-  Button,
-  SecondaryButton,
-} from "@/components/design-system";
+import { Button, SecondaryButton } from "@/components/design-system";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { ActionBarWrapper } from "@/components/operating-system/ActionBar";
 import { ContextPanel } from "@/components/operating-system/ContextPanel";
-import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import { AppRowActionsDropdown, AppCheckbox } from "@/components/app-system";
 import {
   AppDataTable,
   AppFiltersBar,
+  AppKpiRow,
   AppPageEmptyState,
   AppPageErrorState,
+  AppPageHeader,
   AppPageLoadingState,
+  AppPriorityBadge,
   AppSecondaryTabs,
   AppSectionBlock,
   AppStatusBadge,
   appSelectionPillClasses,
 } from "@/components/internal-page-system";
+import { Input } from "@/components/ui/input";
 
 type CustomerRecord = Record<string, any>;
 type ChargeRecord = Record<string, any>;
@@ -116,7 +116,9 @@ export default function CustomersPage() {
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
   const [timelineExpanded, setTimelineExpanded] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [activeTab, setActiveTab] = useState<"overview" | "agenda" | "service_orders" | "financial" | "history">("overview");
+  const [activeTab, setActiveTab] = useState<
+    "overview" | "agenda" | "service_orders" | "financial" | "history"
+  >("overview");
 
   const customersQuery = trpc.nexo.customers.list.useQuery(undefined, {
     retry: false,
@@ -333,7 +335,8 @@ export default function CustomersPage() {
       ) {
         return false;
       }
-      if (activeTab === "history" && snapshot.lastInteractionDays < 2) return false;
+      if (activeTab === "history" && snapshot.lastInteractionDays < 2)
+        return false;
 
       if (activeFilter === "risk" && snapshot.status !== "Em risco")
         return false;
@@ -387,7 +390,14 @@ export default function CustomersPage() {
         );
       return rightSnapshot.priorityScore - leftSnapshot.priorityScore;
     });
-  }, [activeFilter, activeSort, activeTab, customers, searchTerm, snapshotByCustomerId]);
+  }, [
+    activeFilter,
+    activeSort,
+    activeTab,
+    customers,
+    searchTerm,
+    snapshotByCustomerId,
+  ]);
 
   const allDisplayedSelected =
     displayedCustomers.length > 0 &&
@@ -450,618 +460,909 @@ export default function CustomersPage() {
     { key: "healthy", label: "Saudáveis" },
   ];
 
+  const customersNeedingAttention = operationalSnapshots.filter(
+    item => item.status !== "Seguro"
+  ).length;
+  const customersWithPendingBilling = operationalSnapshots.filter(
+    item => item.overdueCharges > 0 || item.pendingCharges > 0
+  ).length;
+  const recentRelationship = operationalSnapshots.filter(
+    item => item.contactState === "responded" && item.lastInteractionDays <= 2
+  ).length;
+  const totalFinancialExposure = operationalSnapshots.reduce(
+    (acc, item) => acc + item.financialPendingCents,
+    0
+  );
+  const topPriorityCustomers = [...operationalSnapshots]
+    .sort((left, right) => right.priorityScore - left.priorityScore)
+    .slice(0, 3);
+
   return (
     <PageWrapper
-      title="Clientes"
-      subtitle="Operação da carteira para entender contexto e agir sem ruído."
+      title="Centro operacional de clientes"
+      subtitle="Cliente como núcleo da operação: relacionamento, agenda, O.S., cobrança e comunicação em uma leitura única."
     >
-      <OperationalTopCard
-        contextLabel="Direção de carteira"
-        title="Centro do cliente"
-        description="Carteira operacional com leitura rápida de contexto, status e próxima ação."
-        chips={
-          <p className="text-xs text-[var(--text-muted)]">
-            {overdueCustomers} com cobrança vencida · {withoutFutureSchedule}{" "}
-            sem continuidade de agenda
-          </p>
-        }
-        primaryAction={
-          <Button
-            type="button"
-            onClick={() => setCreateOpen(true)}
-            className="h-10 whitespace-nowrap px-4"
+      <div className="space-y-4">
+        <AppPageHeader
+          title="Centro operacional de clientes"
+          description="Cliente como núcleo da operação: relacionamento, agenda, O.S., cobrança e comunicação em uma leitura única."
+          secondaryActions={
+            <SecondaryButton
+              type="button"
+              className="h-10 px-4"
+              onClick={() => navigate("/whatsapp?source=customers_hub")}
+            >
+              Comunicação da carteira
+            </SecondaryButton>
+          }
+          cta={
+            <Button
+              type="button"
+              onClick={() => setCreateOpen(true)}
+              className="h-10 whitespace-nowrap px-4"
+            >
+              Novo cliente
+            </Button>
+          }
+        />
+
+        <AppKpiRow
+          gridClassName="grid-cols-1 sm:grid-cols-2 xl:grid-cols-4"
+          items={[
+            {
+              title: "Clientes ativos",
+              value: String(customers.length),
+              hint: "Base operacional disponível para execução",
+              tone: "default",
+            },
+            {
+              title: "Exigem atenção",
+              value: String(customersNeedingAttention),
+              hint: `${overdueCustomers} com cobrança vencida`,
+              tone: customersNeedingAttention > 0 ? "important" : "default",
+            },
+            {
+              title: "Cobrança pendente",
+              value: String(customersWithPendingBilling),
+              hint: `${formatMoney(totalFinancialExposure)} em exposição`,
+              tone: customersWithPendingBilling > 0 ? "critical" : "default",
+            },
+            {
+              title: "Relacionamento recente",
+              value: String(recentRelationship),
+              hint: "Clientes com retorno em até 2 dias",
+              tone: "default",
+            },
+          ]}
+        />
+
+        <ActionBarWrapper
+          className="border border-[var(--border-subtle)] bg-[var(--surface-base)] p-0"
+          searchValue={searchTerm}
+          onSearchChange={setSearchTerm}
+          searchPlaceholder="Buscar por nome, telefone, email ou ID"
+        />
+
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+          <AppSectionBlock
+            className="xl:col-span-8"
+            title="Leitura operacional da carteira"
+            subtitle="Quem pede ação agora, onde está o risco e qual próximo passo reduz impacto."
           >
-            Novo cliente
-          </Button>
-        }
-      />
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+              <article className="rounded-lg border border-[var(--dashboard-danger)]/30 bg-[var(--surface-subtle)] p-3.5">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                    Risco de receita
+                  </p>
+                  <AppStatusBadge label="Em risco" />
+                </div>
+                <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
+                  {overdueCustomers} cliente(s) com cobrança vencida.
+                </p>
+                <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                  Priorize cobrança e contato para evitar atraso recorrente no
+                  caixa.
+                </p>
+              </article>
 
-      <ActionBarWrapper
-        className="border border-[var(--border-subtle)] bg-[var(--surface-base)] p-0"
-        searchValue={searchTerm}
-        onSearchChange={setSearchTerm}
-        searchPlaceholder="Buscar por nome, telefone, email ou ID"
-      />
-      <AppSecondaryTabs
-        items={[
-          { value: "overview", label: "Visão geral" },
-          { value: "agenda", label: "Agenda" },
-          { value: "service_orders", label: "O.S." },
-          { value: "financial", label: "Financeiro" },
-          { value: "history", label: "Histórico" },
-        ]}
-        value={activeTab}
-        onChange={value => {
-          setActiveTab(value);
-          if (value === "financial") setActiveFilter("billing");
-          else if (value === "agenda") setActiveFilter("no_schedule");
-          else if (value === "overview") setActiveFilter("all");
-        }}
-      />
+              <article className="rounded-lg border border-[var(--dashboard-warning)]/30 bg-[var(--surface-subtle)] p-3.5">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                    Continuidade operacional
+                  </p>
+                  <AppStatusBadge label="Atenção" />
+                </div>
+                <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
+                  {withoutFutureSchedule} cliente(s) sem agendamento futuro.
+                </p>
+                <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                  Sem agenda confirmada, a carteira perde previsibilidade de
+                  execução.
+                </p>
+              </article>
 
-      <AppSectionBlock
-        title={activeTab === "history" ? "Histórico operacional da carteira" : "Carteira de clientes"}
-        subtitle="Lista principal para operação diária da carteira"
-      >
-        <AppFiltersBar className="mb-3 gap-3">
-          <div className="flex flex-wrap items-center gap-2">
-            {filterItems.map(item => (
-              <button
-                key={item.key}
-                type="button"
-                className={appSelectionPillClasses(activeFilter === item.key)}
-                onClick={() => setActiveFilter(item.key)}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-          <div className="flex items-center gap-2">
-            <label
-              className="text-xs font-medium text-[var(--text-secondary)]"
-              htmlFor="customers-sort"
-            >
-              Ordenar por
-            </label>
-            <select
-              id="customers-sort"
-              className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-xs text-[var(--text-primary)]"
-              value={activeSort}
-              onChange={event =>
-                setActiveSort(event.target.value as OperationalSort)
-              }
-            >
-              <option value="priority">Prioridade</option>
-              <option value="financial">Valor financeiro</option>
-              <option value="last_interaction">Última interação</option>
-              <option value="name">Nome</option>
-            </select>
-          </div>
-        </AppFiltersBar>
-
-        {selectedCustomerIds.length > 0 ? (
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--accent-primary)]/25 bg-[var(--accent-soft)]/45 p-2.5">
-            <p className="text-xs font-medium text-[var(--text-primary)]">
-              {selectedCustomerIds.length} cliente(s) selecionado(s) para ação
-              em lote
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <SecondaryButton
-                type="button"
-                className="h-8 px-3 text-xs"
-                onClick={() =>
-                  navigate(
-                    `/whatsapp?customerIds=${selectedCustomerIds.join(",")}`
-                  )
-                }
-              >
-                Enviar WhatsApp
-              </SecondaryButton>
-              <SecondaryButton
-                type="button"
-                className="h-8 px-3 text-xs"
-                onClick={() =>
-                  navigate(
-                    `/finances?customerIds=${selectedCustomerIds.join(",")}&filter=overdue`
-                  )
-                }
-              >
-                Cobrar agora
-              </SecondaryButton>
-              <SecondaryButton
-                type="button"
-                className="h-8 px-3 text-xs"
-                onClick={() =>
-                  navigate(
-                    `/appointments?customerIds=${selectedCustomerIds.join(",")}`
-                  )
-                }
-              >
-                Criar agendamento
-              </SecondaryButton>
+              <article className="rounded-lg border border-[var(--dashboard-info)]/30 bg-[var(--surface-subtle)] p-3.5">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                    Próxima ação
+                  </p>
+                  <AppStatusBadge label="Executar" />
+                </div>
+                <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
+                  Abrir top prioridades e disparar ação por contexto.
+                </p>
+                <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                  Financeiro, agenda e WhatsApp já conectados por cliente.
+                </p>
+              </article>
             </div>
-          </div>
-        ) : null}
+          </AppSectionBlock>
 
-        {showInitialLoading ? (
-          <AppPageLoadingState description="Carregando carteira de clientes..." />
-        ) : showErrorState ? (
-          <AppPageErrorState
-            description={
-              customersQuery.error?.message ?? "Falha ao carregar clientes."
-            }
-            actionLabel="Tentar novamente"
-            onAction={() => void customersQuery.refetch()}
-          />
-        ) : displayedCustomers.length === 0 ? (
-          <AppPageEmptyState
-            title="Nenhum cliente encontrado"
-            description="Ajuste filtros, busca ou crie clientes para ativar o fluxo operacional."
-          />
-        ) : (
-          <div className="max-h-[540px] overflow-y-auto">
-          <AppDataTable>
-            <table className="w-full text-sm">
-              <thead className="bg-[var(--surface-elevated)] text-left text-xs text-[var(--text-muted)]">
-                <tr>
-                  <th className="w-10 p-3">
-                    <AppCheckbox
-                      checked={allDisplayedSelected}
-                      onCheckedChange={checked => {
-                        if (checked) {
-                          setSelectedCustomerIds(
-                            displayedCustomers.map(customer =>
-                              String(customer?.id ?? "")
-                            )
-                          );
-                          return;
-                        }
-                        setSelectedCustomerIds([]);
-                      }}
-                      aria-label="Selecionar todos"
-                    />
-                  </th>
-                  <th className="w-[22%] p-3">Cliente</th>
-                  <th className="w-[20%] p-3">Contato</th>
-                  <th className="w-[31%] p-3">Contexto</th>
-                  <th className="w-[21%] p-3">Status</th>
-                  <th className="w-[74px] p-3 text-right">Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {displayedCustomers.map(customer => {
-                  const customerId = String(customer?.id ?? "");
-                  const snapshot = snapshotByCustomerId.get(customerId);
-                  if (!snapshot) return null;
-
-                  const primaryAction = (() => {
-                    if (snapshot.primaryActionLabel === "Cobrar agora") {
-                      return {
-                        label: "Cobrar agora · prioritário",
-                        onSelect: () =>
-                          navigate(
-                            `/finances?customerId=${customerId}&filter=overdue`
-                          ),
-                      };
-                    }
-                    if (snapshot.primaryActionLabel === "Criar agendamento") {
-                      return {
-                        label: "Criar agendamento · prioritário",
-                        onSelect: () =>
-                          navigate(`/appointments?customerId=${customerId}`),
-                      };
-                    }
-                    if (snapshot.primaryActionLabel === "Enviar WhatsApp") {
-                      return {
-                        label: "Enviar WhatsApp · prioritário",
-                        onSelect: () =>
-                          navigate(`/whatsapp?customerId=${customerId}`),
-                      };
-                    }
-                    return {
-                      label: "Abrir workspace · prioritário",
-                      onSelect: () => {
+          <AppSectionBlock
+            className="xl:col-span-4"
+            title="Fila prioritária da carteira"
+            subtitle="Top 3 clientes com maior urgência combinando cobrança, contato e agenda."
+            compact
+          >
+            <div className="space-y-2.5">
+              {topPriorityCustomers.length > 0 ? (
+                topPriorityCustomers.map(snapshot => {
+                  const customer = customers.find(
+                    item => String(item?.id ?? "") === snapshot.customerId
+                  );
+                  return (
+                    <button
+                      key={snapshot.customerId}
+                      type="button"
+                      className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3 text-left transition-colors hover:border-[var(--accent-primary)]/35"
+                      onClick={() => {
                         setTimelineExpanded(false);
                         setSelectedCustomer({
-                          id: customerId,
+                          id: snapshot.customerId,
                           name: String(customer?.name ?? "Cliente"),
                         });
-                      },
-                    };
-                  })();
-                  const billingActionLabel =
-                    snapshot.overdueCharges > 0
-                      ? "Cobrar agora"
-                      : snapshot.pendingCharges > 0
-                        ? "Ver cobrança pendente"
-                        : "Ver cobranças";
-
-                  return (
-                    <tr
-                      key={customerId}
-                      className="border-t border-[var(--border-subtle)] transition-colors hover:bg-[var(--dashboard-row-hover)]/25"
+                      }}
                     >
-                      <td className="p-3 align-top">
-                        <AppCheckbox
-                          checked={selectedCustomerIds.includes(customerId)}
-                          onCheckedChange={checked => {
-                            setSelectedCustomerIds(previous => {
-                              if (checked)
-                                return [...new Set([...previous, customerId])];
-                              return previous.filter(
-                                item => item !== customerId
-                              );
-                            });
-                          }}
-                          aria-label={`Selecionar ${String(customer?.name ?? "cliente")}`}
-                        />
-                      </td>
-                      <td className="p-3 align-top">
-                        <button
-                          type="button"
-                          className="text-left"
-                          onClick={() => {
-                            setTimelineExpanded(false);
-                            setSelectedCustomer({
-                              id: customerId,
-                              name: String(customer?.name ?? "Cliente"),
-                            });
-                          }}
-                        >
-                          <p className="text-[15px] font-semibold leading-5 text-[var(--text-primary)]">
-                            {String(customer?.name ?? "Sem nome")}
-                          </p>
-                          <div className="mt-1 flex flex-wrap items-center gap-2">
-                            <span className="text-xs text-[var(--text-muted)]">
-                              ID {customerId.slice(0, 8)}
-                            </span>
-                            <AppStatusBadge label={snapshot.status} />
-                          </div>
-                        </button>
-                      </td>
-                      <td className="p-3 align-top">
-                        <div className="space-y-1">
-                          <p className="text-xs text-[var(--text-secondary)]">
-                            {String(customer?.phone ?? "—")}
-                          </p>
-                          <p className="text-xs text-[var(--text-muted)]">
-                            {String(customer?.email ?? "—")}
-                          </p>
-                        </div>
-                      </td>
-                      <td className="p-3 align-top">
-                        <p className="font-medium text-[var(--text-primary)]">
-                          {snapshot.nextActionReason}
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="truncate text-sm font-semibold text-[var(--text-primary)]">
+                          {String(customer?.name ?? "Cliente")}
                         </p>
-                        <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
-                          Próxima: {snapshot.primaryActionLabel}
-                        </p>
-                        {snapshot.financialPendingCents > 0 ? (
-                          <p className="mt-1 text-xs text-[var(--text-muted)]">
-                            Impacto:{" "}
-                            {formatMoney(snapshot.financialPendingCents)}{" "}
-                            pendente
-                          </p>
-                        ) : null}
-                      </td>
-                      <td className="p-3 align-top">
-                        <AppStatusBadge
+                        <AppPriorityBadge
                           label={
-                            snapshot.overdueCharges > 0
-                              ? "Em risco"
-                              : !snapshot.hasFutureSchedule
-                                ? "Pendente"
-                                : getContactUrgencyLabel(
-                                    snapshot.contactDays,
-                                    snapshot.contactState
-                                  )
+                            snapshot.status === "Em risco"
+                              ? "urgent"
+                              : snapshot.status === "Atenção"
+                                ? "high"
+                                : "medium"
                           }
                         />
-                      </td>
-                      <td className="p-3 align-top">
-                        <div className="flex items-center justify-end">
-                          <AppRowActionsDropdown
-                            triggerLabel="Mais ações"
-                            contentClassName="min-w-[248px]"
-                            items={[
-                              {
-                                label: primaryAction.label,
-                                onSelect: primaryAction.onSelect,
-                              },
-                              {
-                                label: "Abrir workspace",
-                                onSelect: () => {
+                      </div>
+                      <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                        {snapshot.nextActionReason}
+                      </p>
+                      <p className="mt-1 text-xs text-[var(--text-muted)]">
+                        Próxima: {snapshot.primaryActionLabel}
+                      </p>
+                    </button>
+                  );
+                })
+              ) : (
+                <p className="text-xs text-[var(--text-muted)]">
+                  Sem prioridades críticas no momento.
+                </p>
+              )}
+            </div>
+          </AppSectionBlock>
+        </div>
+
+        <AppSecondaryTabs
+          items={[
+            { value: "overview", label: "Visão geral" },
+            { value: "agenda", label: "Agenda" },
+            { value: "service_orders", label: "O.S." },
+            { value: "financial", label: "Financeiro" },
+            { value: "history", label: "Histórico" },
+          ]}
+          value={activeTab}
+          onChange={value => {
+            setActiveTab(value);
+            if (value === "financial") setActiveFilter("billing");
+            else if (value === "agenda") setActiveFilter("no_schedule");
+            else if (value === "overview") setActiveFilter("all");
+          }}
+        />
+
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+          <AppSectionBlock
+            className="xl:col-span-8"
+            title={
+              activeTab === "history"
+                ? "Histórico operacional da carteira"
+                : "Carteira de clientes"
+            }
+            subtitle="Lista principal para operação diária da carteira"
+          >
+            <AppFiltersBar className="mb-3 gap-3">
+              <div className="min-w-[220px] flex-1">
+                <Input
+                  value={searchTerm}
+                  onChange={event => setSearchTerm(event.target.value)}
+                  placeholder="Buscar por nome, telefone, email ou ID"
+                  className="h-9"
+                />
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {filterItems.map(item => (
+                  <button
+                    key={item.key}
+                    type="button"
+                    className={appSelectionPillClasses(
+                      activeFilter === item.key
+                    )}
+                    onClick={() => setActiveFilter(item.key)}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-2">
+                <label
+                  className="text-xs font-medium text-[var(--text-secondary)]"
+                  htmlFor="customers-sort"
+                >
+                  Ordenar por
+                </label>
+                <select
+                  id="customers-sort"
+                  className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-xs text-[var(--text-primary)]"
+                  value={activeSort}
+                  onChange={event =>
+                    setActiveSort(event.target.value as OperationalSort)
+                  }
+                >
+                  <option value="priority">Prioridade</option>
+                  <option value="financial">Valor financeiro</option>
+                  <option value="last_interaction">Última interação</option>
+                  <option value="name">Nome</option>
+                </select>
+              </div>
+            </AppFiltersBar>
+
+            {selectedCustomerIds.length > 0 ? (
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--accent-primary)]/25 bg-[var(--accent-soft)]/45 p-2.5">
+                <p className="text-xs font-medium text-[var(--text-primary)]">
+                  {selectedCustomerIds.length} cliente(s) selecionado(s) para
+                  ação em lote
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <SecondaryButton
+                    type="button"
+                    className="h-8 px-3 text-xs"
+                    onClick={() =>
+                      navigate(
+                        `/whatsapp?customerIds=${selectedCustomerIds.join(",")}`
+                      )
+                    }
+                  >
+                    Enviar WhatsApp
+                  </SecondaryButton>
+                  <SecondaryButton
+                    type="button"
+                    className="h-8 px-3 text-xs"
+                    onClick={() =>
+                      navigate(
+                        `/finances?customerIds=${selectedCustomerIds.join(",")}&filter=overdue`
+                      )
+                    }
+                  >
+                    Cobrar agora
+                  </SecondaryButton>
+                  <SecondaryButton
+                    type="button"
+                    className="h-8 px-3 text-xs"
+                    onClick={() =>
+                      navigate(
+                        `/appointments?customerIds=${selectedCustomerIds.join(",")}`
+                      )
+                    }
+                  >
+                    Criar agendamento
+                  </SecondaryButton>
+                </div>
+              </div>
+            ) : null}
+
+            {showInitialLoading ? (
+              <AppPageLoadingState description="Carregando carteira de clientes..." />
+            ) : showErrorState ? (
+              <AppPageErrorState
+                description={
+                  customersQuery.error?.message ?? "Falha ao carregar clientes."
+                }
+                actionLabel="Tentar novamente"
+                onAction={() => void customersQuery.refetch()}
+              />
+            ) : displayedCustomers.length === 0 ? (
+              <AppPageEmptyState
+                title="Nenhum cliente encontrado"
+                description="Ajuste filtros, busca ou crie clientes para ativar o fluxo operacional."
+              />
+            ) : (
+              <div className="max-h-[540px] overflow-y-auto">
+                <AppDataTable>
+                  <table className="w-full text-sm">
+                    <thead className="bg-[var(--surface-elevated)] text-left text-xs text-[var(--text-muted)]">
+                      <tr>
+                        <th className="w-10 p-3">
+                          <AppCheckbox
+                            checked={allDisplayedSelected}
+                            onCheckedChange={checked => {
+                              if (checked) {
+                                setSelectedCustomerIds(
+                                  displayedCustomers.map(customer =>
+                                    String(customer?.id ?? "")
+                                  )
+                                );
+                                return;
+                              }
+                              setSelectedCustomerIds([]);
+                            }}
+                            aria-label="Selecionar todos"
+                          />
+                        </th>
+                        <th className="w-[22%] p-3">Cliente</th>
+                        <th className="w-[20%] p-3">Contato</th>
+                        <th className="w-[31%] p-3">Contexto</th>
+                        <th className="w-[21%] p-3">Status</th>
+                        <th className="w-[74px] p-3 text-right">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {displayedCustomers.map(customer => {
+                        const customerId = String(customer?.id ?? "");
+                        const snapshot = snapshotByCustomerId.get(customerId);
+                        if (!snapshot) return null;
+
+                        const primaryAction = (() => {
+                          if (snapshot.primaryActionLabel === "Cobrar agora") {
+                            return {
+                              label: "Cobrar agora · prioritário",
+                              onSelect: () =>
+                                navigate(
+                                  `/finances?customerId=${customerId}&filter=overdue`
+                                ),
+                            };
+                          }
+                          if (
+                            snapshot.primaryActionLabel === "Criar agendamento"
+                          ) {
+                            return {
+                              label: "Criar agendamento · prioritário",
+                              onSelect: () =>
+                                navigate(
+                                  `/appointments?customerId=${customerId}`
+                                ),
+                            };
+                          }
+                          if (
+                            snapshot.primaryActionLabel === "Enviar WhatsApp"
+                          ) {
+                            return {
+                              label: "Enviar WhatsApp · prioritário",
+                              onSelect: () =>
+                                navigate(`/whatsapp?customerId=${customerId}`),
+                            };
+                          }
+                          return {
+                            label: "Abrir workspace · prioritário",
+                            onSelect: () => {
+                              setTimelineExpanded(false);
+                              setSelectedCustomer({
+                                id: customerId,
+                                name: String(customer?.name ?? "Cliente"),
+                              });
+                            },
+                          };
+                        })();
+                        const billingActionLabel =
+                          snapshot.overdueCharges > 0
+                            ? "Cobrar agora"
+                            : snapshot.pendingCharges > 0
+                              ? "Ver cobrança pendente"
+                              : "Ver cobranças";
+
+                        return (
+                          <tr
+                            key={customerId}
+                            className="border-t border-[var(--border-subtle)] transition-colors hover:bg-[var(--dashboard-row-hover)]/25"
+                          >
+                            <td className="p-3 align-top">
+                              <AppCheckbox
+                                checked={selectedCustomerIds.includes(
+                                  customerId
+                                )}
+                                onCheckedChange={checked => {
+                                  setSelectedCustomerIds(previous => {
+                                    if (checked)
+                                      return [
+                                        ...new Set([...previous, customerId]),
+                                      ];
+                                    return previous.filter(
+                                      item => item !== customerId
+                                    );
+                                  });
+                                }}
+                                aria-label={`Selecionar ${String(customer?.name ?? "cliente")}`}
+                              />
+                            </td>
+                            <td className="p-3 align-top">
+                              <button
+                                type="button"
+                                className="text-left"
+                                onClick={() => {
                                   setTimelineExpanded(false);
                                   setSelectedCustomer({
                                     id: customerId,
                                     name: String(customer?.name ?? "Cliente"),
                                   });
-                                },
-                              },
-                              {
-                                label: billingActionLabel,
-                                onSelect: () =>
-                                  navigate(
-                                    `/finances?customerId=${customerId}`
-                                  ),
-                              },
-                              {
-                                label: "Ver agendamentos",
-                                onSelect: () =>
-                                  navigate(
-                                    `/appointments?customerId=${customerId}`
-                                  ),
-                              },
-                              {
-                                label: "Criar O.S.",
-                                onSelect: () =>
-                                  navigate(
-                                    `/service-orders?customerId=${customerId}`
-                                  ),
-                              },
-                              {
-                                label: "Enviar WhatsApp",
-                                onSelect: () =>
-                                  navigate(
-                                    `/whatsapp?customerId=${customerId}`
-                                  ),
-                              },
-                              {
-                                label: "Criar agendamento",
-                                onSelect: () =>
-                                  navigate(
-                                    `/appointments?customerId=${customerId}`
-                                  ),
-                              },
-                            ]}
-                          />
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </AppDataTable>
-          </div>
-        )}
-      </AppSectionBlock>
-
-      <CreateCustomerModal
-        open={createOpen}
-        onOpenChange={setCreateOpen}
-        onCreated={async created => {
-          setCreateOpen(false);
-          await customersQuery.refetch();
-          if (created?.id) {
-            setTimelineExpanded(false);
-            setSelectedCustomer({
-              id: created.id,
-              name: created.name ?? "Cliente",
-            });
-          }
-        }}
-      />
-
-      <ContextPanel
-        open={Boolean(selectedCustomer)}
-        onOpenChange={open => {
-          if (!open) {
-            setSelectedCustomer(null);
-            setTimelineExpanded(false);
-          }
-        }}
-        title={
-          selectedCustomer?.name
-            ? `${selectedCustomer.name}`
-            : "Workspace do cliente"
-        }
-        subtitle="Painel operacional para decidir e executar sem sair da carteira."
-        statusLabel={
-          selectedSnapshot
-            ? `${selectedSnapshot.status} · ${selectedSnapshot.nextActionReason}`
-            : undefined
-        }
-        summary={[
-          {
-            label: "Financeiro",
-            value: workspaceQuery.isLoading
-              ? "Carregando..."
-              : `${workspaceCharges.length} cobranças`,
-          },
-          {
-            label: "Agenda",
-            value: workspaceQuery.isLoading
-              ? "Carregando..."
-              : `${workspaceAppointments.length} agendamentos`,
-          },
-          {
-            label: "O.S.",
-            value: workspaceQuery.isLoading
-              ? "Carregando..."
-              : `${workspaceServiceOrders.length} ordens`,
-          },
-          {
-            label: "WhatsApp",
-            value: workspaceQuery.isLoading
-              ? "Carregando..."
-              : `${workspaceMessages.length} interações`,
-          },
-        ]}
-        primaryAction={{
-          label: selectedSnapshot?.primaryActionLabel ?? "Abrir workspace",
-          onClick: () => {
-            const snapshot = snapshotByCustomerId.get(
-              selectedCustomer?.id ?? ""
-            );
-            if (!selectedCustomer?.id || !snapshot) return;
-            if (snapshot.primaryActionLabel === "Cobrar agora")
-              return navigate(
-                `/finances?customerId=${selectedCustomer.id}&filter=overdue`
-              );
-            if (snapshot.primaryActionLabel === "Criar agendamento")
-              return navigate(
-                `/appointments?customerId=${selectedCustomer.id}`
-              );
-            if (snapshot.primaryActionLabel === "Enviar WhatsApp")
-              return navigate(`/whatsapp?customerId=${selectedCustomer.id}`);
-            navigate(`/customers/${selectedCustomer.id}`);
-          },
-          disabled: !selectedCustomer?.id,
-        }}
-        secondaryActions={[
-          {
-            label: "Criar agendamento",
-            onClick: () =>
-              selectedCustomer?.id &&
-              navigate(`/appointments?customerId=${selectedCustomer.id}`),
-            disabled: !selectedCustomer?.id,
-          },
-          {
-            label: "Criar O.S.",
-            onClick: () =>
-              selectedCustomer?.id &&
-              navigate(`/service-orders?customerId=${selectedCustomer.id}`),
-            disabled: !selectedCustomer?.id,
-          },
-          {
-            label: "Enviar WhatsApp",
-            onClick: () =>
-              selectedCustomer?.id &&
-              navigate(`/whatsapp?customerId=${selectedCustomer.id}`),
-            disabled: !selectedCustomer?.id,
-          },
-        ]}
-        explainLayer={
-          selectedSnapshot
-            ? {
-                reason: "Priorização operacional do momento",
-                conditions: explainConditions,
-                afterAction: `Ação sugerida: ${selectedSnapshot.primaryActionLabel}`,
-                impact: `${formatMoney(selectedSnapshot.financialPendingCents)} pendente`,
-                riskOfInaction:
-                  selectedSnapshot.status === "Em risco"
-                    ? "Atraso recorrente"
-                    : "Perda de continuidade",
-                elapsedTime: `${selectedSnapshot.contactDays} dias sem avanço`,
-                contextualPriority: `${selectedSnapshot.priorityScore} pts`,
-              }
-            : undefined
-        }
-        timeline={visibleTimeline.map(item => ({
-          id: String(
-            item?.id ?? `${item?.createdAt}-${item?.entityId ?? "event"}`
-          ),
-          label: String(item?.title ?? item?.action ?? "Evento operacional"),
-          description: item?.createdAt
-            ? new Date(String(item.createdAt)).toLocaleString("pt-BR")
-            : "Sem data",
-          source: "system",
-        }))}
-        whatsAppPreview={
-          latestMessage
-            ? {
-                contextLabel: "Última interação registrada",
-                contextDescription: latestMessage?.createdAt
-                  ? `Enviado em ${new Date(String(latestMessage.createdAt)).toLocaleString("pt-BR")}`
-                  : "Sem horário identificado",
-                message: String(
-                  latestMessage?.text ??
-                    latestMessage?.content ??
-                    "Mensagem sem conteúdo"
-                ),
-              }
-            : {
-                contextLabel: "Sem interação recente",
-                contextDescription:
-                  "Sugestão: iniciar contato para manter o fluxo ativo.",
-                message:
-                  "Olá! Vamos confirmar seu próximo passo no Nexo para manter agenda, execução e cobrança em dia?",
-              }
-        }
-      >
-        <div className="space-y-4 border-t border-[var(--border-subtle)] pt-4">
-          {workspaceQuery.isLoading ? (
-            <p className="text-sm text-[var(--text-muted)]">
-              Carregando resumo do cliente...
-            </p>
-          ) : workspaceQuery.error ? (
-            <p className="rounded-md border border-[var(--dashboard-danger)]/40 bg-[var(--dashboard-danger)]/10 p-3 text-sm text-[var(--dashboard-danger)]">
-              Não foi possível carregar o detalhe do cliente:{" "}
-              {workspaceQuery.error.message}
-            </p>
-          ) : (
-            <div className="space-y-4">
-              <section className="space-y-1.5">
-                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
-                  Resumo do cliente
+                                }}
+                              >
+                                <p className="text-[15px] font-semibold leading-5 text-[var(--text-primary)]">
+                                  {String(customer?.name ?? "Sem nome")}
+                                </p>
+                                <div className="mt-1 flex flex-wrap items-center gap-2">
+                                  <span className="text-xs text-[var(--text-muted)]">
+                                    ID {customerId.slice(0, 8)}
+                                  </span>
+                                  <AppStatusBadge label={snapshot.status} />
+                                </div>
+                              </button>
+                            </td>
+                            <td className="p-3 align-top">
+                              <div className="space-y-1">
+                                <p className="text-xs text-[var(--text-secondary)]">
+                                  {String(customer?.phone ?? "—")}
+                                </p>
+                                <p className="text-xs text-[var(--text-muted)]">
+                                  {String(customer?.email ?? "—")}
+                                </p>
+                              </div>
+                            </td>
+                            <td className="p-3 align-top">
+                              <p className="font-medium text-[var(--text-primary)]">
+                                {snapshot.nextActionReason}
+                              </p>
+                              <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
+                                Próxima: {snapshot.primaryActionLabel}
+                              </p>
+                              {snapshot.financialPendingCents > 0 ? (
+                                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                                  Impacto:{" "}
+                                  {formatMoney(snapshot.financialPendingCents)}{" "}
+                                  pendente
+                                </p>
+                              ) : null}
+                            </td>
+                            <td className="p-3 align-top">
+                              <AppStatusBadge
+                                label={
+                                  snapshot.overdueCharges > 0
+                                    ? "Em risco"
+                                    : !snapshot.hasFutureSchedule
+                                      ? "Pendente"
+                                      : getContactUrgencyLabel(
+                                          snapshot.contactDays,
+                                          snapshot.contactState
+                                        )
+                                }
+                              />
+                            </td>
+                            <td className="p-3 align-top">
+                              <div className="flex items-center justify-end">
+                                <AppRowActionsDropdown
+                                  triggerLabel="Mais ações"
+                                  contentClassName="min-w-[248px]"
+                                  items={[
+                                    {
+                                      label: primaryAction.label,
+                                      onSelect: primaryAction.onSelect,
+                                    },
+                                    {
+                                      label: "Abrir workspace",
+                                      onSelect: () => {
+                                        setTimelineExpanded(false);
+                                        setSelectedCustomer({
+                                          id: customerId,
+                                          name: String(
+                                            customer?.name ?? "Cliente"
+                                          ),
+                                        });
+                                      },
+                                    },
+                                    {
+                                      label: billingActionLabel,
+                                      onSelect: () =>
+                                        navigate(
+                                          `/finances?customerId=${customerId}`
+                                        ),
+                                    },
+                                    {
+                                      label: "Ver agendamentos",
+                                      onSelect: () =>
+                                        navigate(
+                                          `/appointments?customerId=${customerId}`
+                                        ),
+                                    },
+                                    {
+                                      label: "Criar O.S.",
+                                      onSelect: () =>
+                                        navigate(
+                                          `/service-orders?customerId=${customerId}`
+                                        ),
+                                    },
+                                    {
+                                      label: "Enviar WhatsApp",
+                                      onSelect: () =>
+                                        navigate(
+                                          `/whatsapp?customerId=${customerId}`
+                                        ),
+                                    },
+                                    {
+                                      label: "Criar agendamento",
+                                      onSelect: () =>
+                                        navigate(
+                                          `/appointments?customerId=${customerId}`
+                                        ),
+                                    },
+                                  ]}
+                                />
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </AppDataTable>
+              </div>
+            )}
+          </AppSectionBlock>
+          <AppSectionBlock
+            className="xl:col-span-4"
+            title="Workspace e contexto"
+            subtitle={
+              selectedCustomer
+                ? "Resumo tático do cliente selecionado"
+                : "Selecione um cliente para abrir o painel contextual"
+            }
+            compact
+          >
+            <div className="space-y-3">
+              <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">
+                  Cliente em foco
                 </p>
-                <p className="text-sm text-[var(--text-primary)]">
-                  {String(workspaceCustomer?.phone ?? "Sem telefone")} ·{" "}
-                  {String(workspaceCustomer?.email ?? "Sem e-mail")}
+                <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
+                  {selectedCustomer?.name ?? "Nenhum cliente selecionado"}
                 </p>
-                {selectedSnapshot ? (
-                  <p className="text-xs text-[var(--text-muted)]">
-                    {selectedSnapshot.segmentTag} ·{" "}
-                    {selectedSnapshot.behaviorLabel}
+                <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                  {selectedSnapshot
+                    ? `${selectedSnapshot.contextLabel} · ${selectedSnapshot.contactLabel}`
+                    : "Abra o workspace para ver timeline, financeiro, agenda e comunicação."}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-2.5">
+                  <p className="text-[11px] uppercase tracking-[0.1em] text-[var(--text-muted)]">
+                    Financeiro
                   </p>
-                ) : null}
-              </section>
-              <section className="space-y-1.5 border-t border-[var(--border-subtle)] pt-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
-                  Impacto financeiro
-                </p>
-                <p className="text-sm text-[var(--text-secondary)]">
-                  Pendente:{" "}
-                  {selectedSnapshot
-                    ? formatMoney(selectedSnapshot.financialPendingCents)
-                    : "—"}{" "}
-                  · potencial:{" "}
-                  {selectedSnapshot
-                    ? formatMoney(selectedSnapshot.financialPotentialCents)
-                    : "—"}{" "}
-                  · última cobrança:{" "}
-                  {selectedSnapshot
-                    ? formatMoney(selectedSnapshot.latestChargeCents)
-                    : latestCharge
-                      ? formatMoney(Number(latestCharge?.amountCents ?? 0))
-                      : "—"}
-                </p>
-              </section>
-              <section className="space-y-1.5 border-t border-[var(--border-subtle)] pt-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
-                  Agenda e execução
-                </p>
-                <p className="text-sm text-[var(--text-secondary)]">
-                  Último agendamento:{" "}
-                  {latestAppointment?.startsAt
-                    ? new Date(
-                        String(latestAppointment.startsAt)
-                      ).toLocaleString("pt-BR")
-                    : "não registrado"}{" "}
-                  · última O.S.:{" "}
-                  {String(
-                    latestServiceOrder?.title ??
-                      latestServiceOrder?.id ??
-                      "não registrada"
-                  )}
-                </p>
-              </section>
-              {workspaceTimeline.length > 3 ? (
-                <button
+                  <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
+                    {selectedCustomer ? workspaceCharges.length : 0}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-2.5">
+                  <p className="text-[11px] uppercase tracking-[0.1em] text-[var(--text-muted)]">
+                    Agenda
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
+                    {selectedCustomer ? workspaceAppointments.length : 0}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-2.5">
+                  <p className="text-[11px] uppercase tracking-[0.1em] text-[var(--text-muted)]">
+                    O.S.
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
+                    {selectedCustomer ? workspaceServiceOrders.length : 0}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-2.5">
+                  <p className="text-[11px] uppercase tracking-[0.1em] text-[var(--text-muted)]">
+                    WhatsApp
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
+                    {selectedCustomer ? workspaceMessages.length : 0}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <SecondaryButton
                   type="button"
-                  className="text-left text-xs font-medium text-[var(--accent-primary)]"
-                  onClick={() => setTimelineExpanded(previous => !previous)}
+                  className="h-8 px-3 text-xs"
+                  onClick={() =>
+                    selectedCustomer &&
+                    navigate(`/appointments?customerId=${selectedCustomer.id}`)
+                  }
+                  disabled={!selectedCustomer}
                 >
-                  {timelineExpanded
-                    ? "Ver menos timeline"
-                    : "Ver mais timeline"}
-                </button>
-              ) : null}
+                  Criar agendamento
+                </SecondaryButton>
+                <SecondaryButton
+                  type="button"
+                  className="h-8 px-3 text-xs"
+                  onClick={() =>
+                    selectedCustomer &&
+                    navigate(`/finances?customerId=${selectedCustomer.id}`)
+                  }
+                  disabled={!selectedCustomer}
+                >
+                  Ir para cobrança
+                </SecondaryButton>
+                <SecondaryButton
+                  type="button"
+                  className="h-8 px-3 text-xs"
+                  onClick={() =>
+                    selectedCustomer &&
+                    navigate(`/whatsapp?customerId=${selectedCustomer.id}`)
+                  }
+                  disabled={!selectedCustomer}
+                >
+                  Falar no WhatsApp
+                </SecondaryButton>
+              </div>
             </div>
-          )}
+          </AppSectionBlock>
         </div>
-      </ContextPanel>
+
+        <CreateCustomerModal
+          open={createOpen}
+          onOpenChange={setCreateOpen}
+          onCreated={async created => {
+            setCreateOpen(false);
+            await customersQuery.refetch();
+            if (created?.id) {
+              setTimelineExpanded(false);
+              setSelectedCustomer({
+                id: created.id,
+                name: created.name ?? "Cliente",
+              });
+            }
+          }}
+        />
+
+        <ContextPanel
+          open={Boolean(selectedCustomer)}
+          onOpenChange={open => {
+            if (!open) {
+              setSelectedCustomer(null);
+              setTimelineExpanded(false);
+            }
+          }}
+          title={
+            selectedCustomer?.name
+              ? `${selectedCustomer.name}`
+              : "Workspace do cliente"
+          }
+          subtitle="Painel operacional para decidir e executar sem sair da carteira."
+          statusLabel={
+            selectedSnapshot
+              ? `${selectedSnapshot.status} · ${selectedSnapshot.nextActionReason}`
+              : undefined
+          }
+          summary={[
+            {
+              label: "Financeiro",
+              value: workspaceQuery.isLoading
+                ? "Carregando..."
+                : `${workspaceCharges.length} cobranças`,
+            },
+            {
+              label: "Agenda",
+              value: workspaceQuery.isLoading
+                ? "Carregando..."
+                : `${workspaceAppointments.length} agendamentos`,
+            },
+            {
+              label: "O.S.",
+              value: workspaceQuery.isLoading
+                ? "Carregando..."
+                : `${workspaceServiceOrders.length} ordens`,
+            },
+            {
+              label: "WhatsApp",
+              value: workspaceQuery.isLoading
+                ? "Carregando..."
+                : `${workspaceMessages.length} interações`,
+            },
+          ]}
+          primaryAction={{
+            label: selectedSnapshot?.primaryActionLabel ?? "Abrir workspace",
+            onClick: () => {
+              const snapshot = snapshotByCustomerId.get(
+                selectedCustomer?.id ?? ""
+              );
+              if (!selectedCustomer?.id || !snapshot) return;
+              if (snapshot.primaryActionLabel === "Cobrar agora")
+                return navigate(
+                  `/finances?customerId=${selectedCustomer.id}&filter=overdue`
+                );
+              if (snapshot.primaryActionLabel === "Criar agendamento")
+                return navigate(
+                  `/appointments?customerId=${selectedCustomer.id}`
+                );
+              if (snapshot.primaryActionLabel === "Enviar WhatsApp")
+                return navigate(`/whatsapp?customerId=${selectedCustomer.id}`);
+              navigate(`/customers/${selectedCustomer.id}`);
+            },
+            disabled: !selectedCustomer?.id,
+          }}
+          secondaryActions={[
+            {
+              label: "Criar agendamento",
+              onClick: () =>
+                selectedCustomer?.id &&
+                navigate(`/appointments?customerId=${selectedCustomer.id}`),
+              disabled: !selectedCustomer?.id,
+            },
+            {
+              label: "Criar O.S.",
+              onClick: () =>
+                selectedCustomer?.id &&
+                navigate(`/service-orders?customerId=${selectedCustomer.id}`),
+              disabled: !selectedCustomer?.id,
+            },
+            {
+              label: "Enviar WhatsApp",
+              onClick: () =>
+                selectedCustomer?.id &&
+                navigate(`/whatsapp?customerId=${selectedCustomer.id}`),
+              disabled: !selectedCustomer?.id,
+            },
+          ]}
+          explainLayer={
+            selectedSnapshot
+              ? {
+                  reason: "Priorização operacional do momento",
+                  conditions: explainConditions,
+                  afterAction: `Ação sugerida: ${selectedSnapshot.primaryActionLabel}`,
+                  impact: `${formatMoney(selectedSnapshot.financialPendingCents)} pendente`,
+                  riskOfInaction:
+                    selectedSnapshot.status === "Em risco"
+                      ? "Atraso recorrente"
+                      : "Perda de continuidade",
+                  elapsedTime: `${selectedSnapshot.contactDays} dias sem avanço`,
+                  contextualPriority: `${selectedSnapshot.priorityScore} pts`,
+                }
+              : undefined
+          }
+          timeline={visibleTimeline.map(item => ({
+            id: String(
+              item?.id ?? `${item?.createdAt}-${item?.entityId ?? "event"}`
+            ),
+            label: String(item?.title ?? item?.action ?? "Evento operacional"),
+            description: item?.createdAt
+              ? new Date(String(item.createdAt)).toLocaleString("pt-BR")
+              : "Sem data",
+            source: "system",
+          }))}
+          whatsAppPreview={
+            latestMessage
+              ? {
+                  contextLabel: "Última interação registrada",
+                  contextDescription: latestMessage?.createdAt
+                    ? `Enviado em ${new Date(String(latestMessage.createdAt)).toLocaleString("pt-BR")}`
+                    : "Sem horário identificado",
+                  message: String(
+                    latestMessage?.text ??
+                      latestMessage?.content ??
+                      "Mensagem sem conteúdo"
+                  ),
+                }
+              : {
+                  contextLabel: "Sem interação recente",
+                  contextDescription:
+                    "Sugestão: iniciar contato para manter o fluxo ativo.",
+                  message:
+                    "Olá! Vamos confirmar seu próximo passo no Nexo para manter agenda, execução e cobrança em dia?",
+                }
+          }
+        >
+          <div className="space-y-4 border-t border-[var(--border-subtle)] pt-4">
+            {workspaceQuery.isLoading ? (
+              <p className="text-sm text-[var(--text-muted)]">
+                Carregando resumo do cliente...
+              </p>
+            ) : workspaceQuery.error ? (
+              <p className="rounded-md border border-[var(--dashboard-danger)]/40 bg-[var(--dashboard-danger)]/10 p-3 text-sm text-[var(--dashboard-danger)]">
+                Não foi possível carregar o detalhe do cliente:{" "}
+                {workspaceQuery.error.message}
+              </p>
+            ) : (
+              <div className="space-y-4">
+                <section className="space-y-1.5">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                    Resumo do cliente
+                  </p>
+                  <p className="text-sm text-[var(--text-primary)]">
+                    {String(workspaceCustomer?.phone ?? "Sem telefone")} ·{" "}
+                    {String(workspaceCustomer?.email ?? "Sem e-mail")}
+                  </p>
+                  {selectedSnapshot ? (
+                    <p className="text-xs text-[var(--text-muted)]">
+                      {selectedSnapshot.segmentTag} ·{" "}
+                      {selectedSnapshot.behaviorLabel}
+                    </p>
+                  ) : null}
+                </section>
+                <section className="space-y-1.5 border-t border-[var(--border-subtle)] pt-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                    Impacto financeiro
+                  </p>
+                  <p className="text-sm text-[var(--text-secondary)]">
+                    Pendente:{" "}
+                    {selectedSnapshot
+                      ? formatMoney(selectedSnapshot.financialPendingCents)
+                      : "—"}{" "}
+                    · potencial:{" "}
+                    {selectedSnapshot
+                      ? formatMoney(selectedSnapshot.financialPotentialCents)
+                      : "—"}{" "}
+                    · última cobrança:{" "}
+                    {selectedSnapshot
+                      ? formatMoney(selectedSnapshot.latestChargeCents)
+                      : latestCharge
+                        ? formatMoney(Number(latestCharge?.amountCents ?? 0))
+                        : "—"}
+                  </p>
+                </section>
+                <section className="space-y-1.5 border-t border-[var(--border-subtle)] pt-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                    Agenda e execução
+                  </p>
+                  <p className="text-sm text-[var(--text-secondary)]">
+                    Último agendamento:{" "}
+                    {latestAppointment?.startsAt
+                      ? new Date(
+                          String(latestAppointment.startsAt)
+                        ).toLocaleString("pt-BR")
+                      : "não registrado"}{" "}
+                    · última O.S.:{" "}
+                    {String(
+                      latestServiceOrder?.title ??
+                        latestServiceOrder?.id ??
+                        "não registrada"
+                    )}
+                  </p>
+                </section>
+                {workspaceTimeline.length > 3 ? (
+                  <button
+                    type="button"
+                    className="text-left text-xs font-medium text-[var(--accent-primary)]"
+                    onClick={() => setTimelineExpanded(previous => !previous)}
+                  >
+                    {timelineExpanded
+                      ? "Ver menos timeline"
+                      : "Ver mais timeline"}
+                  </button>
+                ) : null}
+              </div>
+            )}
+          </div>
+        </ContextPanel>
+      </div>
     </PageWrapper>
   );
 }
