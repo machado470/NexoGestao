@@ -8,9 +8,9 @@ import ServiceOrderDetailsPanel from "@/components/service-orders/ServiceOrderDe
 import type { ServiceOrder } from "@/components/service-orders/service-order.types";
 import { AppRowActionsDropdown } from "@/components/app-system";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
-import { ActionBarWrapper } from "@/components/operating-system/ActionBar";
 import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedbackButton";
 import {
+  AppOperationalBar,
   AppDataTable,
   AppPageEmptyState,
   AppPageErrorState,
@@ -18,7 +18,6 @@ import {
   AppPageLoadingState,
   AppPriorityBadge,
   appSelectionPillClasses,
-  AppSecondaryTabs,
   AppSectionBlock,
   AppStatusBadge,
 } from "@/components/internal-page-system";
@@ -371,6 +370,13 @@ export default function ServiceOrdersPage() {
     }
     return { label: "Nova O.S.", onClick: () => setOpenCreate(true) };
   })();
+  const selectedCustomerName =
+    customerFilter === "all"
+      ? ""
+      : String(
+          customers.find(item => String(item?.id ?? "") === customerFilter)
+            ?.name ?? "Cliente"
+        );
 
   return (
     <PageWrapper
@@ -410,71 +416,133 @@ export default function ServiceOrdersPage() {
           }
         />
 
-        <AppSecondaryTabs
-          items={[
+        <AppOperationalBar
+          tabs={[
             { value: "pipeline", label: "Pipeline" },
             { value: "execution", label: "Em execução" },
             { value: "attention", label: "Atenção" },
             { value: "done", label: "Concluídas" },
             { value: "history", label: "Histórico" },
           ]}
-          value={activeTab}
-          onChange={setActiveTab}
-        />
-        <ActionBarWrapper
-          className="border border-[var(--border-subtle)] bg-[var(--surface-base)] p-0"
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
           searchValue={searchTerm}
           onSearchChange={setSearchTerm}
           searchPlaceholder="Buscar por título, cliente ou ID"
-          filtersSlot={
-            <>
-              <div className="flex flex-wrap items-center gap-2">
-                {[
-                  { key: "all", label: "Tudo" },
-                  { key: "today", label: "Hoje" },
-                  { key: "next7", label: "Próximos 7 dias" },
-                  { key: "overdue", label: "Atrasadas" },
-                ].map(item => (
-                  <button
-                    key={item.key}
-                    type="button"
-                    className={appSelectionPillClasses(
-                      windowFilter === item.key
-                    )}
-                    onClick={() => setWindowFilter(item.key as WindowFilter)}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-
-              <select
-                className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-xs text-[var(--text-primary)]"
-                value={priorityFilter}
-                onChange={event =>
-                  setPriorityFilter(event.target.value as PriorityFilter)
-                }
-              >
-                <option value="all">Toda prioridade</option>
-                <option value="high">Alta</option>
-                <option value="medium">Média</option>
-                <option value="low">Baixa</option>
-              </select>
-
-              <select
-                className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-xs text-[var(--text-primary)]"
-                value={customerFilter}
-                onChange={event => setCustomerFilter(event.target.value)}
-              >
-                <option value="all">Todos os clientes</option>
-                {customers.map(customer => (
-                  <option key={String(customer.id)} value={String(customer.id)}>
-                    {String(customer.name ?? "Cliente")}
-                  </option>
-                ))}
-              </select>
-            </>
+          quickFilters={
+            <div className="flex flex-wrap items-center gap-2">
+              {[
+                { key: "all", label: "Tudo" },
+                { key: "today", label: "Hoje" },
+                { key: "overdue", label: "Atrasadas" },
+              ].map(item => (
+                <button
+                  key={item.key}
+                  type="button"
+                  className={appSelectionPillClasses(windowFilter === item.key)}
+                  onClick={() => setWindowFilter(item.key as WindowFilter)}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
           }
+          advancedFiltersLabel="Filtros"
+          advancedFiltersContent={
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                  Janela
+                </label>
+                <select
+                  className="h-9 w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-xs text-[var(--text-primary)]"
+                  value={windowFilter}
+                  onChange={event =>
+                    setWindowFilter(event.target.value as WindowFilter)
+                  }
+                >
+                  <option value="all">Tudo</option>
+                  <option value="today">Hoje</option>
+                  <option value="next7">Próximos 7 dias</option>
+                  <option value="overdue">Atrasadas</option>
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                  Prioridade
+                </label>
+                <select
+                  className="h-9 w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-xs text-[var(--text-primary)]"
+                  value={priorityFilter}
+                  onChange={event =>
+                    setPriorityFilter(event.target.value as PriorityFilter)
+                  }
+                >
+                  <option value="all">Toda prioridade</option>
+                  <option value="high">Alta</option>
+                  <option value="medium">Média</option>
+                  <option value="low">Baixa</option>
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                  Cliente
+                </label>
+                <select
+                  className="h-9 w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-xs text-[var(--text-primary)]"
+                  value={customerFilter}
+                  onChange={event => setCustomerFilter(event.target.value)}
+                >
+                  <option value="all">Todos os clientes</option>
+                  {customers.map(customer => (
+                    <option key={String(customer.id)} value={String(customer.id)}>
+                      {String(customer.name ?? "Cliente")}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          }
+          activeFilterChips={[
+            ...(windowFilter === "next7"
+              ? [
+                  {
+                    key: "window-next7",
+                    label: "Janela: Próximos 7 dias",
+                    onRemove: () => setWindowFilter("all"),
+                  },
+                ]
+              : []),
+            ...(priorityFilter !== "all"
+              ? [
+                  {
+                    key: "priority",
+                    label: `Prioridade: ${
+                      priorityFilter === "high"
+                        ? "Alta"
+                        : priorityFilter === "medium"
+                          ? "Média"
+                          : "Baixa"
+                    }`,
+                    onRemove: () => setPriorityFilter("all"),
+                  },
+                ]
+              : []),
+            ...(customerFilter !== "all"
+              ? [
+                  {
+                    key: "customer",
+                    label: `Cliente: ${selectedCustomerName}`,
+                    onRemove: () => setCustomerFilter("all"),
+                  },
+                ]
+              : []),
+          ]}
+          onClearAllFilters={() => {
+            setWindowFilter("all");
+            setPriorityFilter("all");
+            setCustomerFilter("all");
+          }}
         />
 
         <div className="space-y-4">
