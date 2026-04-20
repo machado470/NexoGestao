@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
+import { Input } from "@/components/ui/input";
 import { trpc } from "@/lib/trpc";
 import { normalizeArrayPayload } from "@/lib/query-helpers";
 import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
@@ -8,274 +9,796 @@ import { AppRowActionsDropdown } from "@/components/app-system";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedbackButton";
-import { getAppointmentSeverity, getOperationalSeverityLabel } from "@/lib/operations/operational-intelligence";
+import {
+  getAppointmentSeverity,
+  getOperationalSeverityLabel,
+} from "@/lib/operations/operational-intelligence";
 import {
   AppDataTable,
+  AppFiltersBar,
   AppKpiRow,
   AppListBlock,
   AppPageEmptyState,
   AppPageErrorState,
+  AppPageHeader,
   AppPageLoadingState,
+  appSelectionPillClasses,
   AppSecondaryTabs,
   AppSectionBlock,
   AppPriorityBadge,
   AppStatusBadge,
 } from "@/components/internal-page-system";
-import { formatDelta, getDayWindow, getWindow, inRange, percentDelta, safeDate, trendFromDelta } from "@/lib/operational/kpi";
+import {
+  formatDelta,
+  getDayWindow,
+  getWindow,
+  inRange,
+  percentDelta,
+  safeDate,
+  trendFromDelta,
+} from "@/lib/operational/kpi";
+
+type TabKey = "agenda" | "confirmed" | "pending" | "conflicts" | "history";
+type WindowFilter = "all" | "today" | "next7" | "overdue";
+
+type AppointmentLike = {
+  id?: string;
+  customerId?: string;
+  customer?: { id?: string; name?: string };
+  assignedToPersonId?: string | null;
+  personId?: string | null;
+  title?: string | null;
+  status?: string | null;
+  startsAt?: string | Date | null;
+  endsAt?: string | Date | null;
+};
+
+function mapOperationalState(item: AppointmentLike, hasConflict: boolean) {
+  const severity = getAppointmentSeverity(item);
+  const status = String(item?.status ?? "").toUpperCase();
+
+  if (status === "DONE") return "Concluído";
+  if (status === "CANCELED") return "Cancelado";
+  if (status === "NO_SHOW") return "Não compareceu";
+  if (status === "CONFIRMED") return hasConflict ? "Em risco" : "Confirmado";
+  if (hasConflict || severity === "critical") return "Em risco";
+  return status === "SCHEDULED"
+    ? "Pendente"
+    : getOperationalSeverityLabel(severity);
+}
+
+function getNextAction(item: AppointmentLike) {
+  const status = String(item?.status ?? "").toUpperCase();
+  if (status === "SCHEDULED") return "Confirmar";
+  if (status === "CONFIRMED") return "Criar O.S.";
+  if (status === "DONE") return "Revisar execução";
+  return "Contato no WhatsApp";
+}
 
 export default function AppointmentsPage() {
   const [, navigate] = useLocation();
   const [openCreate, setOpenCreate] = useState(false);
-  const [activeTab, setActiveTab] = useState<"agenda" | "confirmed" | "pending" | "conflicts" | "history">("agenda");
+  const [activeTab, setActiveTab] = useState<TabKey>("agenda");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [windowFilter, setWindowFilter] = useState<WindowFilter>("today");
+  const [customerFilter, setCustomerFilter] = useState("all");
+  const [focusedAppointmentId, setFocusedAppointmentId] = useState<string>("");
 
-  const customersQuery = trpc.nexo.customers.list.useQuery(undefined, { retry: false });
-  const appointmentsQuery = trpc.nexo.appointments.list.useQuery(undefined, { retry: false });
+  const customersQuery = trpc.nexo.customers.list.useQuery(undefined, {
+    retry: false,
+  });
+  const appointmentsQuery = trpc.nexo.appointments.list.useQuery(undefined, {
+    retry: false,
+  });
 
-  const customers = useMemo(() => normalizeArrayPayload<any>(customersQuery.data), [customersQuery.data]);
-  const appointments = useMemo(() => normalizeArrayPayload<any>(appointmentsQuery.data), [appointmentsQuery.data]);
+  const customers = useMemo(
+    () => normalizeArrayPayload<any>(customersQuery.data),
+    [customersQuery.data]
+  );
+  const appointments = useMemo(
+    () => normalizeArrayPayload<AppointmentLike>(appointmentsQuery.data),
+    [appointmentsQuery.data]
+  );
   const hasData = appointments.length > 0;
   const showInitialLoading = appointmentsQuery.isLoading && !hasData;
   const showErrorState = appointmentsQuery.error && !hasData;
+
   usePageDiagnostics({
     page: "appointments",
     isLoading: showInitialLoading,
     hasError: Boolean(showErrorState),
-    isEmpty: !showInitialLoading && !showErrorState && appointments.length === 0,
+    isEmpty:
+      !showInitialLoading && !showErrorState && appointments.length === 0,
     dataCount: appointments.length,
   });
 
-  const scheduled = appointments.filter((item) => String(item?.status ?? "").toUpperCase() === "SCHEDULED").length;
-  const confirmed = appointments.filter((item) => String(item?.status ?? "").toUpperCase() === "CONFIRMED").length;
+  const scheduled = appointments.filter(
+    item => String(item?.status ?? "").toUpperCase() === "SCHEDULED"
+  ).length;
+  const confirmed = appointments.filter(
+    item => String(item?.status ?? "").toUpperCase() === "CONFIRMED"
+  ).length;
   const todayWindow = getDayWindow(0);
   const yesterdayWindow = getDayWindow(1);
-  const todayTotal = appointments.filter(item => inRange(safeDate(item?.startsAt), todayWindow.start, todayWindow.end)).length;
-  const yesterdayTotal = appointments.filter(item => inRange(safeDate(item?.startsAt), yesterdayWindow.start, yesterdayWindow.end)).length;
+  const todayTotal = appointments.filter(item =>
+    inRange(safeDate(item?.startsAt), todayWindow.start, todayWindow.end)
+  ).length;
+  const yesterdayTotal = appointments.filter(item =>
+    inRange(
+      safeDate(item?.startsAt),
+      yesterdayWindow.start,
+      yesterdayWindow.end
+    )
+  ).length;
+
   const current7 = getWindow(7, 0);
   const previous7 = getWindow(7, 1);
-  const current7Appointments = appointments.filter(item => inRange(safeDate(item?.startsAt), current7.start, current7.end));
-  const previous7Appointments = appointments.filter(item => inRange(safeDate(item?.startsAt), previous7.start, previous7.end));
-  const confirmationRateCurrent = current7Appointments.length === 0 ? 0 : (current7Appointments.filter(item => String(item?.status ?? "").toUpperCase() === "CONFIRMED").length / current7Appointments.length) * 100;
-  const confirmationRatePrevious = previous7Appointments.length === 0 ? 0 : (previous7Appointments.filter(item => String(item?.status ?? "").toUpperCase() === "CONFIRMED").length / previous7Appointments.length) * 100;
-  const appointmentsBySlot = appointments.reduce<Record<string, number>>((acc, item) => {
-    const slot = safeDate(item?.startsAt)?.toISOString().slice(0, 16) ?? "";
-    if (!slot) return acc;
-    acc[slot] = (acc[slot] ?? 0) + 1;
-    return acc;
-  }, {});
+  const current7Appointments = appointments.filter(item =>
+    inRange(safeDate(item?.startsAt), current7.start, current7.end)
+  );
+  const previous7Appointments = appointments.filter(item =>
+    inRange(safeDate(item?.startsAt), previous7.start, previous7.end)
+  );
+  const confirmationRateCurrent =
+    current7Appointments.length === 0
+      ? 0
+      : (current7Appointments.filter(
+          item => String(item?.status ?? "").toUpperCase() === "CONFIRMED"
+        ).length /
+          current7Appointments.length) *
+        100;
+  const confirmationRatePrevious =
+    previous7Appointments.length === 0
+      ? 0
+      : (previous7Appointments.filter(
+          item => String(item?.status ?? "").toUpperCase() === "CONFIRMED"
+        ).length /
+          previous7Appointments.length) *
+        100;
+
+  const appointmentsBySlot = useMemo(
+    () =>
+      appointments.reduce<Record<string, number>>((acc, item) => {
+        const slot = safeDate(item?.startsAt)?.toISOString().slice(0, 16) ?? "";
+        if (!slot) return acc;
+        acc[slot] = (acc[slot] ?? 0) + 1;
+        return acc;
+      }, {}),
+    [appointments]
+  );
+
   const now = new Date();
   const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const dayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
-  const agendaDoDia = appointments
-    .filter((item) => inRange(safeDate(item?.startsAt), dayStart, dayEnd))
-    .sort((a, b) => (safeDate(a?.startsAt)?.getTime() ?? 0) - (safeDate(b?.startsAt)?.getTime() ?? 0))
+  const dayEnd = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+    23,
+    59,
+    59,
+    999
+  );
+  const next7End = new Date(dayEnd);
+  next7End.setDate(next7End.getDate() + 7);
+
+  const appointmentWithContext = useMemo(() => {
+    return appointments.map(item => {
+      const slot = safeDate(item?.startsAt)?.toISOString().slice(0, 16) ?? "";
+      const hasConflict = Boolean(slot && (appointmentsBySlot[slot] ?? 0) > 1);
+      const status = String(item?.status ?? "").toUpperCase();
+      const start = safeDate(item?.startsAt);
+      const isDelayed = Boolean(
+        start && start < now && ["SCHEDULED", "CONFIRMED"].includes(status)
+      );
+      const operationalState = mapOperationalState(
+        item,
+        hasConflict || isDelayed
+      );
+      return {
+        item,
+        hasConflict,
+        isDelayed,
+        operationalState,
+        nextAction: getNextAction(item),
+      };
+    });
+  }, [appointments, appointmentsBySlot, now]);
+
+  const agendaDoDia = appointmentWithContext
+    .filter(({ item }) => inRange(safeDate(item?.startsAt), dayStart, dayEnd))
+    .sort(
+      (a, b) =>
+        (safeDate(a.item?.startsAt)?.getTime() ?? 0) -
+        (safeDate(b.item?.startsAt)?.getTime() ?? 0)
+    )
     .slice(0, 6);
-  const atrasados = appointments.filter((item) => {
-    const start = safeDate(item?.startsAt);
-    const status = String(item?.status ?? "").toUpperCase();
-    return Boolean(start && start < now && ["SCHEDULED", "CONFIRMED"].includes(status));
-  });
-  const semResponsavel = appointments.filter((item) => !item?.personId && !item?.assignedToPersonId);
-  const gargalosAgenda = [
-    ...atrasados.slice(0, 3).map((item) => ({
-      title: `${String(item?.customer?.name ?? "Cliente")} atrasado`,
-      subtitle: `Início ${safeDate(item?.startsAt)?.toLocaleString("pt-BR") ?? "sem horário"} · ${String(item?.status ?? "").toUpperCase()}`,
-      action: <button className="nexo-cta-secondary" onClick={() => navigate(`/whatsapp?customerId=${item?.customerId}`)}>Avisar</button>,
-    })),
-    ...semResponsavel.slice(0, 3).map((item) => ({
-      title: `${String(item?.customer?.name ?? "Cliente")} sem responsável`,
-      subtitle: `Agendamento ${safeDate(item?.startsAt)?.toLocaleString("pt-BR") ?? "sem horário"}`,
-      action: <button className="nexo-cta-secondary" onClick={() => setOpenCreate(true)}>Reatribuir</button>,
-    })),
-  ].slice(0, 6);
+
+  const atRiskList = appointmentWithContext
+    .filter(
+      ({ hasConflict, isDelayed, operationalState }) =>
+        hasConflict || isDelayed || operationalState === "Em risco"
+    )
+    .sort(
+      (a, b) =>
+        (safeDate(a.item?.startsAt)?.getTime() ?? 0) -
+        (safeDate(b.item?.startsAt)?.getTime() ?? 0)
+    );
+
+  const requiresExecution = appointmentWithContext.filter(
+    ({ item }) => String(item?.status ?? "").toUpperCase() === "CONFIRMED"
+  ).length;
+  const mostLoadedSlot = Object.entries(appointmentsBySlot).sort(
+    (a, b) => b[1] - a[1]
+  )[0];
+
   const filteredAppointments = useMemo(() => {
-    if (activeTab === "agenda") return appointments;
+    let base = appointmentWithContext;
+
     if (activeTab === "confirmed") {
-      return appointments.filter((item) => String(item?.status ?? "").toUpperCase() === "CONFIRMED");
+      base = base.filter(
+        ({ item }) => String(item?.status ?? "").toUpperCase() === "CONFIRMED"
+      );
+    } else if (activeTab === "pending") {
+      base = base.filter(
+        ({ item }) => String(item?.status ?? "").toUpperCase() === "SCHEDULED"
+      );
+    } else if (activeTab === "conflicts") {
+      base = base.filter(({ hasConflict }) => hasConflict);
+    } else if (activeTab === "history") {
+      base = [...base].sort(
+        (a, b) =>
+          (safeDate(b.item?.startsAt)?.getTime() ?? 0) -
+          (safeDate(a.item?.startsAt)?.getTime() ?? 0)
+      );
     }
-    if (activeTab === "pending") {
-      return appointments.filter((item) => String(item?.status ?? "").toUpperCase() === "SCHEDULED");
+
+    if (statusFilter !== "all") {
+      base = base.filter(
+        ({ item }) => String(item?.status ?? "").toUpperCase() === statusFilter
+      );
     }
-    if (activeTab === "conflicts") {
-      return appointments.filter((item) => {
-        const slot = safeDate(item?.startsAt)?.toISOString().slice(0, 16) ?? "";
-        return Boolean(slot && (appointmentsBySlot[slot] ?? 0) > 1);
+
+    if (windowFilter === "today") {
+      base = base.filter(({ item }) =>
+        inRange(safeDate(item?.startsAt), dayStart, dayEnd)
+      );
+    } else if (windowFilter === "next7") {
+      base = base.filter(({ item }) =>
+        inRange(safeDate(item?.startsAt), dayStart, next7End)
+      );
+    } else if (windowFilter === "overdue") {
+      base = base.filter(({ isDelayed }) => isDelayed);
+    }
+
+    if (customerFilter !== "all") {
+      base = base.filter(
+        ({ item }) => String(item?.customerId ?? "") === customerFilter
+      );
+    }
+
+    if (searchTerm.trim()) {
+      const term = searchTerm.trim().toLowerCase();
+      base = base.filter(({ item }) => {
+        const name = String(item?.customer?.name ?? "").toLowerCase();
+        const title = String(item?.title ?? "").toLowerCase();
+        const id = String(item?.id ?? "");
+        return name.includes(term) || title.includes(term) || id.includes(term);
       });
     }
-    return [...appointments].sort(
-      (a, b) => (safeDate(b?.startsAt)?.getTime() ?? 0) - (safeDate(a?.startsAt)?.getTime() ?? 0)
+
+    return base;
+  }, [
+    activeTab,
+    appointmentWithContext,
+    customerFilter,
+    dayEnd,
+    dayStart,
+    next7End,
+    searchTerm,
+    statusFilter,
+    windowFilter,
+  ]);
+
+  useEffect(() => {
+    if (filteredAppointments.length === 0) {
+      setFocusedAppointmentId("");
+      return;
+    }
+    const hasFocused = filteredAppointments.some(
+      ({ item }) => String(item?.id ?? "") === focusedAppointmentId
     );
-  }, [activeTab, appointments, appointmentsBySlot]);
+    if (!hasFocused) {
+      setFocusedAppointmentId(String(filteredAppointments[0]?.item?.id ?? ""));
+    }
+  }, [filteredAppointments, focusedAppointmentId]);
+
+  const focused =
+    filteredAppointments.find(
+      ({ item }) => String(item?.id ?? "") === focusedAppointmentId
+    ) ?? filteredAppointments[0];
 
   return (
-    <PageWrapper title="Agendamentos" subtitle="Agenda diária com prioridade clara e próximos passos de execução.">
-      <OperationalTopCard
-        contextLabel="Direção de agenda"
-        title="Fila de agendamentos"
-        description="Agendamentos reais com atualização automática após cada criação."
-        primaryAction={(
-          <ActionFeedbackButton state="idle" idleLabel="Criar agendamento agora" onClick={() => setOpenCreate(true)} />
-        )}
-      />
-
-      <AppKpiRow
-        gridClassName="grid-cols-1 md:grid-cols-2 xl:grid-cols-4"
-        items={[
-          {
-            title: "Agendamentos hoje",
-            value: String(todayTotal),
-            delta: formatDelta(percentDelta(todayTotal, yesterdayTotal)),
-            trend: trendFromDelta(percentDelta(todayTotal, yesterdayTotal)),
-            hint: "comparativo com ontem",
-          },
-          { title: "Confirmados", value: String(confirmed), hint: "prontos para executar" },
-          { title: "Pendentes", value: String(scheduled), hint: "aguardando confirmação" },
-          {
-            title: "Taxa de confirmação",
-            value: `${confirmationRateCurrent.toFixed(1).replace(".", ",")}%`,
-            delta: formatDelta(percentDelta(confirmationRateCurrent, confirmationRatePrevious)),
-            trend: trendFromDelta(percentDelta(confirmationRateCurrent, confirmationRatePrevious)),
-            hint: "últimos 7 dias",
-          },
-        ]}
-      />
-      <AppSecondaryTabs
-        items={[
-          { value: "agenda", label: "Agenda" },
-          { value: "confirmed", label: "Confirmados" },
-          { value: "pending", label: "Pendentes" },
-          { value: "conflicts", label: "Conflitos" },
-          { value: "history", label: "Histórico" },
-        ]}
-        value={activeTab}
-        onChange={setActiveTab}
-      />
-
-      {(activeTab === "agenda" || activeTab === "pending" || activeTab === "conflicts") ? (
-      <div className="grid gap-4 xl:grid-cols-12">
-      <AppSectionBlock
-        title="Agenda do dia"
-        subtitle="Bloco principal: lista direta com ação imediata para executar sem dispersão"
-        className="xl:col-span-8"
-      >
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs text-[var(--text-muted)]">Comece por aqui: confirme, execute ou reagende e mantenha o dia fluindo.</p>
-          <ActionFeedbackButton state="idle" idleLabel="Executar agenda agora" onClick={() => navigate("/service-orders")} />
-        </div>
-        <AppListBlock
-          className="col-span-full"
-          compact
-          showPlaceholders={false}
-          items={agendaDoDia.length > 0
-            ? agendaDoDia.map((item) => ({
-                title: `${safeDate(item?.startsAt)?.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) ?? "--:--"} · ${String(item?.customer?.name ?? "Cliente")}`,
-                subtitle: `Status ${String(item?.status ?? "").toUpperCase()} · ${String(item?.title ?? "atendimento")}`,
-                action: <button className="nexo-cta-secondary" onClick={() => navigate(`/whatsapp?customerId=${item?.customerId}`)}>Executar agora</button>,
-              }))
-            : [{ title: "Sem agenda hoje", subtitle: "Crie novos horários para preencher a operação.", action: <button className="nexo-cta-secondary" onClick={() => setOpenCreate(true)}>Criar</button> }]}
+    <PageWrapper
+      title="Agenda operacional"
+      subtitle="Agendamentos conectados à execução, cliente e comunicação sem quebrar o fluxo atual."
+    >
+      <div className="space-y-4">
+        <AppPageHeader
+          title="Agenda operacional de agendamentos"
+          description="Visual único para confirmação, risco, execução e próximo passo por cliente."
+          secondaryActions={
+            <ActionFeedbackButton
+              state="idle"
+              idleLabel="Abrir O.S. pendentes"
+              onClick={() => navigate("/service-orders")}
+            />
+          }
+          cta={
+            <ActionFeedbackButton
+              state="idle"
+              idleLabel="Novo agendamento"
+              onClick={() => setOpenCreate(true)}
+            />
+          }
         />
-      </AppSectionBlock>
 
-      <AppSectionBlock title="Conflitos e próximas ações" subtitle="Lateral operacional para destravar o dia" className="xl:col-span-4" compact>
-        <AppListBlock
-          className="col-span-full"
-          compact
-          showPlaceholders={false}
-          items={gargalosAgenda.length > 0
-            ? gargalosAgenda
-            : [{ title: "Sem gargalos críticos agora", subtitle: "Mantenha a rotina e monitore novos conflitos.", action: <button className="nexo-cta-secondary" onClick={() => navigate("/service-orders")}>Próxima etapa</button> }]}
+        <OperationalTopCard
+          contextLabel="Direção de agenda"
+          title="Painel de execução dos agendamentos"
+          description="Priorize confirmação, risco e conversão em O.S. sem sair do fluxo atual."
+          primaryAction={
+            <ActionFeedbackButton
+              state="idle"
+              idleLabel="Criar agendamento"
+              onClick={() => setOpenCreate(true)}
+            />
+          }
         />
-      </AppSectionBlock>
-      </div>
-      ) : null}
 
-      <AppSectionBlock
-        title={activeTab === "history" ? "Histórico de agendamentos" : "Fila de agendamentos"}
-        subtitle="Sincronizada em tempo real com backend"
-      >
-        {showInitialLoading ? (
-          <AppPageLoadingState description="Carregando agendamentos..." />
-        ) : showErrorState ? (
-          <AppPageErrorState
-            description={appointmentsQuery.error?.message ?? "Falha ao carregar agendamentos."}
-            actionLabel="Tentar novamente"
-            onAction={() => void appointmentsQuery.refetch()}
-          />
-        ) : filteredAppointments.length === 0 ? (
-          <AppPageEmptyState title="Nenhum dado disponível ainda" description="Ação recomendada: criar agendamento" />
-        ) : (
-          <div className="max-h-[520px] overflow-y-auto">
-          <AppDataTable>
-            <table className="w-full text-sm">
-              <thead className="bg-[var(--surface-elevated)] text-xs text-[var(--text-muted)]">
-                <tr>
-                  <th className="p-3">Início</th>
-                  <th>Cliente</th>
-                  <th>Status</th>
-                  <th>Fim</th>
-                  <th className="w-[112px] p-3 text-right">Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredAppointments.map((appointment) => {
-                  const severity = getAppointmentSeverity(appointment);
-                  const status = String(appointment?.status ?? "").toUpperCase();
-                  const slot = safeDate(appointment?.startsAt)?.toISOString().slice(0, 16) ?? "";
-                  const hasConflict = Boolean(slot && (appointmentsBySlot[slot] ?? 0) > 1);
-                  const operationalState =
-                    status === "DONE" ? "Concluído" :
-                    status === "CONFIRMED" ? "Confirmado" :
-                    hasConflict || severity === "critical" ? "Em risco" : "Pendente";
-                  const nextAction = status === "SCHEDULED"
-                    ? "Confirmar"
-                    : status === "CONFIRMED"
-                      ? "Criar O.S."
-                      : "Enviar WhatsApp";
-                  const priorityLabel = hasConflict || status === "SCHEDULED" ? "HIGH" : "MEDIUM";
-                  const handlePrimaryAction = () => {
-                    if (nextAction === "Criar O.S.") {
-                      navigate(`/service-orders?customerId=${appointment.customerId}&appointmentId=${appointment.id}`);
-                      return;
+        <AppKpiRow
+          gridClassName="grid-cols-1 md:grid-cols-2 xl:grid-cols-4"
+          items={[
+            {
+              title: "Agendamentos do dia",
+              value: String(todayTotal),
+              delta: formatDelta(percentDelta(todayTotal, yesterdayTotal)),
+              trend: trendFromDelta(percentDelta(todayTotal, yesterdayTotal)),
+              hint: "comparativo com ontem",
+            },
+            {
+              title: "Confirmados",
+              value: String(confirmed),
+              hint: `${requiresExecution} prontos para virar O.S.`,
+              tone: confirmed > 0 ? "important" : "default",
+            },
+            {
+              title: "Exigem atenção",
+              value: String(atRiskList.length),
+              hint: "atrasos, conflitos ou risco operacional",
+              tone: atRiskList.length > 0 ? "critical" : "default",
+            },
+            {
+              title: "Taxa de confirmação",
+              value: `${confirmationRateCurrent.toFixed(1).replace(".", ",")}%`,
+              delta: formatDelta(
+                percentDelta(confirmationRateCurrent, confirmationRatePrevious)
+              ),
+              trend: trendFromDelta(
+                percentDelta(confirmationRateCurrent, confirmationRatePrevious)
+              ),
+              hint: "últimos 7 dias",
+            },
+          ]}
+        />
+
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+          <AppSectionBlock
+            title="Leitura operacional da agenda"
+            subtitle="Onde a janela está carregada, o que está em risco e qual ação destrava a operação agora."
+            className="xl:col-span-8"
+          >
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+              <article className="rounded-lg border border-[var(--dashboard-danger)]/30 bg-[var(--surface-subtle)] p-3.5">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                    Janela crítica
+                  </p>
+                  <AppStatusBadge
+                    label={atRiskList.length > 0 ? "Em risco" : "Estável"}
+                  />
+                </div>
+                <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
+                  {atRiskList.length > 0
+                    ? `${atRiskList.length} agendamento(s) exigem reação imediata.`
+                    : "Sem atraso crítico no momento."}
+                </p>
+                <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                  Priorize conflitos, atrasos e confirmação pendente para manter
+                  SLA do dia.
+                </p>
+              </article>
+
+              <article className="rounded-lg border border-[var(--dashboard-warning)]/30 bg-[var(--surface-subtle)] p-3.5">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                    Concentração operacional
+                  </p>
+                  <AppStatusBadge
+                    label={
+                      mostLoadedSlot?.[1] && mostLoadedSlot[1] > 1
+                        ? "Atenção"
+                        : "Distribuída"
                     }
-                    navigate(`/whatsapp?customerId=${appointment.customerId}`);
-                  };
-                  return (
-                  <tr key={String(appointment?.id)} className="border-t border-[var(--border-subtle)]">
-                    <td className="p-3">
-                      {new Date(String(appointment?.startsAt)).toLocaleString("pt-BR")}
-                      {hasConflict ? <p className="text-xs text-[var(--dashboard-danger)]">Conflito de horário detectado</p> : null}
-                    </td>
-                    <td>
-                      <p>{String(appointment?.customer?.name ?? "Cliente")}</p>
-                      <p className="text-xs text-[var(--text-muted)]">#{String(appointment?.customerId ?? "—")}</p>
-                    </td>
-                    <td><AppStatusBadge label={operationalState || getOperationalSeverityLabel(severity)} /></td>
-                    <td>{appointment?.endsAt ? new Date(String(appointment.endsAt)).toLocaleString("pt-BR") : "—"}</td>
-                    <td className="p-3 align-middle">
-                      <div className="flex items-center justify-end gap-2">
-                        <AppPriorityBadge label={priorityLabel} />
-                        <AppRowActionsDropdown
-                          triggerLabel="Mais ações"
-                          contentClassName="min-w-[232px]"
-                          items={[
-                            { label: `${nextAction} · prioritário`, onSelect: handlePrimaryAction },
-                            ...(nextAction !== "Confirmar"
-                              ? [{ label: "Confirmar", onSelect: () => navigate(`/whatsapp?customerId=${appointment.customerId}`) }]
-                              : []),
-                            { label: "Criar O.S.", onSelect: () => navigate(`/service-orders?customerId=${appointment.customerId}&appointmentId=${appointment.id}`) },
-                            { label: "Enviar WhatsApp", onSelect: () => navigate(`/whatsapp?customerId=${appointment.customerId}`) },
-                            { label: "Reagendar", onSelect: () => setOpenCreate(true) },
-                          ]}
-                        />
-                      </div>
-                    </td>
-                  </tr>
-                )})}
-              </tbody>
-            </table>
-          </AppDataTable>
-          </div>
-        )}
-      </AppSectionBlock>
+                  />
+                </div>
+                <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
+                  {mostLoadedSlot
+                    ? `${new Date(mostLoadedSlot[0]).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })} com ${mostLoadedSlot[1]} item(ns).`
+                    : "Sem concentração relevante."}
+                </p>
+                <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                  Use este pico para redistribuir responsável e reduzir choque
+                  de agenda.
+                </p>
+              </article>
+
+              <article className="rounded-lg border border-[var(--dashboard-info)]/30 bg-[var(--surface-subtle)] p-3.5">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                    Próxima ação recomendada
+                  </p>
+                  <AppStatusBadge label="Executar" />
+                </div>
+                <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
+                  {requiresExecution > 0
+                    ? `Converter ${requiresExecution} confirmado(s) em execução/O.S.`
+                    : "Focar em confirmação e limpeza de pendências."}
+                </p>
+                <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                  Agendamento confirmado sem execução aberta reduz
+                  previsibilidade operacional.
+                </p>
+              </article>
+            </div>
+          </AppSectionBlock>
+
+          <AppSectionBlock
+            title="Fila acionável"
+            subtitle="Itens com maior impacto operacional imediato."
+            className="xl:col-span-4"
+            compact
+          >
+            <AppListBlock
+              className="col-span-full"
+              compact
+              showPlaceholders={false}
+              items={
+                atRiskList.length > 0
+                  ? atRiskList.slice(0, 4).map(({ item, nextAction }) => ({
+                      title: `${String(item?.customer?.name ?? "Cliente")} · ${mapOperationalState(item, true)}`,
+                      subtitle: `${safeDate(item?.startsAt)?.toLocaleString("pt-BR") ?? "sem horário"} · Próxima ${nextAction}`,
+                      action: (
+                        <button
+                          className="nexo-cta-secondary"
+                          onClick={() =>
+                            navigate(`/whatsapp?customerId=${item?.customerId}`)
+                          }
+                        >
+                          Atuar
+                        </button>
+                      ),
+                    }))
+                  : [
+                      {
+                        title: "Sem gargalos críticos no momento",
+                        subtitle:
+                          "Acompanhe os confirmados e inicie execução preventiva.",
+                        action: (
+                          <button
+                            className="nexo-cta-secondary"
+                            onClick={() => navigate("/service-orders")}
+                          >
+                            Abrir execução
+                          </button>
+                        ),
+                      },
+                    ]
+              }
+            />
+          </AppSectionBlock>
+        </div>
+
+        <AppSecondaryTabs
+          items={[
+            { value: "agenda", label: "Agenda" },
+            { value: "confirmed", label: "Confirmados" },
+            { value: "pending", label: "Pendentes" },
+            { value: "conflicts", label: "Conflitos" },
+            { value: "history", label: "Histórico" },
+          ]}
+          value={activeTab}
+          onChange={setActiveTab}
+        />
+
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+          <AppSectionBlock
+            title={
+              activeTab === "history"
+                ? "Histórico de agendamentos"
+                : "Agenda operacional"
+            }
+            subtitle="Lista principal com filtros por estado, janela e cliente para ação rápida."
+            className="xl:col-span-8"
+          >
+            <AppFiltersBar className="mb-3 gap-3">
+              <div className="min-w-[220px] flex-1">
+                <Input
+                  value={searchTerm}
+                  onChange={event => setSearchTerm(event.target.value)}
+                  placeholder="Buscar por cliente, título ou ID"
+                  className="h-9"
+                />
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {[
+                  { key: "today", label: "Hoje" },
+                  { key: "next7", label: "Próximos 7 dias" },
+                  { key: "overdue", label: "Atrasados" },
+                  { key: "all", label: "Tudo" },
+                ].map(item => (
+                  <button
+                    key={item.key}
+                    type="button"
+                    className={appSelectionPillClasses(
+                      windowFilter === item.key
+                    )}
+                    onClick={() => setWindowFilter(item.key as WindowFilter)}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+
+              <select
+                className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-xs text-[var(--text-primary)]"
+                value={statusFilter}
+                onChange={event => setStatusFilter(event.target.value)}
+              >
+                <option value="all">Todos os status</option>
+                <option value="SCHEDULED">Agendado</option>
+                <option value="CONFIRMED">Confirmado</option>
+                <option value="DONE">Concluído</option>
+                <option value="CANCELED">Cancelado</option>
+                <option value="NO_SHOW">Não compareceu</option>
+              </select>
+
+              <select
+                className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-xs text-[var(--text-primary)]"
+                value={customerFilter}
+                onChange={event => setCustomerFilter(event.target.value)}
+              >
+                <option value="all">Todos os clientes</option>
+                {customers.map(customer => (
+                  <option key={String(customer.id)} value={String(customer.id)}>
+                    {String(customer.name ?? "Cliente")}
+                  </option>
+                ))}
+              </select>
+            </AppFiltersBar>
+
+            {showInitialLoading ? (
+              <AppPageLoadingState description="Carregando agendamentos..." />
+            ) : showErrorState ? (
+              <AppPageErrorState
+                description={
+                  appointmentsQuery.error?.message ??
+                  "Falha ao carregar agendamentos."
+                }
+                actionLabel="Tentar novamente"
+                onAction={() => void appointmentsQuery.refetch()}
+              />
+            ) : filteredAppointments.length === 0 ? (
+              <AppPageEmptyState
+                title="Nenhum dado disponível ainda"
+                description="Ação recomendada: criar agendamento"
+              />
+            ) : (
+              <div className="max-h-[540px] overflow-y-auto">
+                <AppDataTable>
+                  <table className="w-full text-sm">
+                    <thead className="bg-[var(--surface-elevated)] text-xs text-[var(--text-muted)]">
+                      <tr>
+                        <th className="p-3 text-left">Início</th>
+                        <th className="text-left">Cliente</th>
+                        <th className="text-left">Estado operacional</th>
+                        <th className="text-left">Prioridade</th>
+                        <th className="text-left">Próxima ação</th>
+                        <th className="w-[112px] p-3 text-right">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredAppointments.map(
+                        ({
+                          item,
+                          hasConflict,
+                          operationalState,
+                          nextAction,
+                        }) => {
+                          const status = String(
+                            item?.status ?? ""
+                          ).toUpperCase();
+                          const priorityLabel =
+                            hasConflict || status === "SCHEDULED"
+                              ? "HIGH"
+                              : status === "CONFIRMED"
+                                ? "MEDIUM"
+                                : "LOW";
+                          const handlePrimaryAction = () => {
+                            if (nextAction === "Criar O.S.") {
+                              navigate(
+                                `/service-orders?customerId=${item.customerId}&appointmentId=${item.id}`
+                              );
+                              return;
+                            }
+                            navigate(`/whatsapp?customerId=${item.customerId}`);
+                          };
+
+                          return (
+                            <tr
+                              key={String(item?.id)}
+                              className="cursor-pointer border-t border-[var(--border-subtle)] transition-colors hover:bg-[var(--surface-subtle)]/60"
+                              onClick={() =>
+                                setFocusedAppointmentId(String(item?.id ?? ""))
+                              }
+                            >
+                              <td className="p-3 align-top">
+                                {safeDate(item?.startsAt)?.toLocaleString(
+                                  "pt-BR"
+                                ) ?? "—"}
+                                {hasConflict ? (
+                                  <p className="text-xs text-[var(--dashboard-danger)]">
+                                    Conflito de horário detectado
+                                  </p>
+                                ) : null}
+                              </td>
+                              <td className="align-top">
+                                <p className="font-medium text-[var(--text-primary)]">
+                                  {String(item?.customer?.name ?? "Cliente")}
+                                </p>
+                                <p className="text-xs text-[var(--text-muted)]">
+                                  #{String(item?.customerId ?? "—")}
+                                </p>
+                              </td>
+                              <td className="align-top">
+                                <AppStatusBadge label={operationalState} />
+                              </td>
+                              <td className="align-top">
+                                <AppPriorityBadge label={priorityLabel} />
+                              </td>
+                              <td className="align-top text-xs text-[var(--text-secondary)]">
+                                {nextAction}
+                              </td>
+                              <td className="p-3 align-top">
+                                <div className="flex items-center justify-end gap-2">
+                                  <AppRowActionsDropdown
+                                    triggerLabel="Mais ações"
+                                    contentClassName="min-w-[232px]"
+                                    items={[
+                                      {
+                                        label: `${nextAction} · prioritário`,
+                                        onSelect: handlePrimaryAction,
+                                      },
+                                      {
+                                        label: "Criar O.S.",
+                                        onSelect: () =>
+                                          navigate(
+                                            `/service-orders?customerId=${item.customerId}&appointmentId=${item.id}`
+                                          ),
+                                      },
+                                      {
+                                        label: "Enviar WhatsApp",
+                                        onSelect: () =>
+                                          navigate(
+                                            `/whatsapp?customerId=${item.customerId}`
+                                          ),
+                                      },
+                                      {
+                                        label: "Reagendar",
+                                        onSelect: () => setOpenCreate(true),
+                                      },
+                                    ]}
+                                  />
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        }
+                      )}
+                    </tbody>
+                  </table>
+                </AppDataTable>
+              </div>
+            )}
+          </AppSectionBlock>
+
+          <AppSectionBlock
+            title="Workspace do agendamento"
+            subtitle="Contexto do item em foco conectado com cliente, execução e comunicação."
+            className="xl:col-span-4"
+            compact
+          >
+            {focused ? (
+              <div className="space-y-3">
+                <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-semibold text-[var(--text-primary)]">
+                      {String(focused.item?.customer?.name ?? "Cliente")}
+                    </p>
+                    <AppStatusBadge label={focused.operationalState} />
+                  </div>
+                  <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                    Início:{" "}
+                    {safeDate(focused.item?.startsAt)?.toLocaleString(
+                      "pt-BR"
+                    ) ?? "—"}
+                  </p>
+                  <p className="text-xs text-[var(--text-secondary)]">
+                    Fim:{" "}
+                    {safeDate(focused.item?.endsAt)?.toLocaleString("pt-BR") ??
+                      "Não definido"}
+                  </p>
+                  <p className="mt-2 text-xs text-[var(--text-muted)]">
+                    Próxima ação recomendada: {focused.nextAction}.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 gap-2">
+                  <button
+                    type="button"
+                    className="nexo-cta-primary"
+                    onClick={() =>
+                      navigate(
+                        `/service-orders?customerId=${focused.item?.customerId}&appointmentId=${focused.item?.id}`
+                      )
+                    }
+                  >
+                    Converter em O.S.
+                  </button>
+                  <button
+                    type="button"
+                    className="nexo-cta-secondary"
+                    onClick={() =>
+                      navigate(
+                        `/customers?customerId=${focused.item?.customerId}`
+                      )
+                    }
+                  >
+                    Abrir cliente
+                  </button>
+                  <button
+                    type="button"
+                    className="nexo-cta-secondary"
+                    onClick={() =>
+                      navigate(
+                        `/whatsapp?customerId=${focused.item?.customerId}`
+                      )
+                    }
+                  >
+                    Abrir WhatsApp
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-[var(--text-muted)]">
+                Selecione um agendamento para ver o contexto operacional e
+                executar o próximo passo.
+              </p>
+            )}
+          </AppSectionBlock>
+        </div>
+      </div>
 
       <CreateAppointmentModal
         isOpen={openCreate}
@@ -283,7 +806,10 @@ export default function AppointmentsPage() {
         onSuccess={() => {
           void appointmentsQuery.refetch();
         }}
-        customers={customers.map((item) => ({ id: String(item.id), name: String(item.name ?? "Cliente") }))}
+        customers={customers.map(item => ({
+          id: String(item.id),
+          name: String(item.name ?? "Cliente"),
+        }))}
       />
     </PageWrapper>
   );
