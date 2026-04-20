@@ -356,13 +356,6 @@ export default function ServiceOrdersPage() {
         <AppPageHeader
           title="Painel operacional de ordens de serviço"
           description="Visual de execução para enxergar gargalos, risco, próxima ação e fechamento financeiro sem quebrar os fluxos atuais."
-          secondaryActions={
-            <ActionFeedbackButton
-              state="idle"
-              idleLabel="Abrir cobranças pendentes"
-              onClick={() => navigate("/finances")}
-            />
-          }
           cta={
             <ActionFeedbackButton
               state="idle"
@@ -370,6 +363,18 @@ export default function ServiceOrdersPage() {
               onClick={() => setOpenCreate(true)}
             />
           }
+        />
+
+        <AppSecondaryTabs
+          items={[
+            { value: "pipeline", label: "Pipeline" },
+            { value: "execution", label: "Em execução" },
+            { value: "attention", label: "Atenção" },
+            { value: "done", label: "Concluídas" },
+            { value: "history", label: "Histórico" },
+          ]}
+          value={activeTab}
+          onChange={setActiveTab}
         />
 
         <OperationalTopCard
@@ -420,21 +425,15 @@ export default function ServiceOrdersPage() {
           }
         />
 
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-          <AppSectionBlock
-            title="Leitura operacional"
-            subtitle="Onde está o gargalo agora, quais ordens estão em risco e qual ação acelera execução + caixa."
-            className="xl:col-span-8"
-          >
-            <AppListBlock items={topActions} />
-          </AppSectionBlock>
-
-          <AppSectionBlock
-            title="Fila crítica"
-            subtitle="Ordens com risco imediato de atraso ou bloqueio."
-            className="xl:col-span-4"
-            compact
-          >
+        <AppSectionBlock
+          title="Leitura operacional"
+          subtitle="Onde está o gargalo agora, quais ordens estão em risco e qual ação acelera execução + caixa."
+        >
+          <AppListBlock items={topActions} />
+          <div className="mt-3">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">
+              Fila crítica
+            </p>
             <AppListBlock
               compact
               showPlaceholders={false}
@@ -465,22 +464,10 @@ export default function ServiceOrdersPage() {
                     ]
               }
             />
-          </AppSectionBlock>
-        </div>
+          </div>
+        </AppSectionBlock>
 
-        <AppSecondaryTabs
-          items={[
-            { value: "pipeline", label: "Pipeline" },
-            { value: "execution", label: "Em execução" },
-            { value: "attention", label: "Atenção" },
-            { value: "done", label: "Concluídas" },
-            { value: "history", label: "Histórico" },
-          ]}
-          value={activeTab}
-          onChange={setActiveTab}
-        />
-
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+        <div className="space-y-4">
           <AppSectionBlock
             title={
               activeTab === "history"
@@ -488,7 +475,6 @@ export default function ServiceOrdersPage() {
                 : "Execução das ordens de serviço"
             }
             subtitle="Lista principal com filtros de estado, prioridade, cliente e janela para decisão rápida."
-            className="xl:col-span-8"
           >
             <AppFiltersBar className="mb-3 gap-3">
               <div className="min-w-[220px] flex-1">
@@ -706,7 +692,6 @@ export default function ServiceOrdersPage() {
           <AppSectionBlock
             title="Workspace da O.S. em foco"
             subtitle="Resumo da execução conectado com cliente, agenda, cobrança e comunicação."
-            className="xl:col-span-4"
             compact
           >
             {focusedOrder ? (
@@ -756,17 +741,6 @@ export default function ServiceOrdersPage() {
                     }
                   >
                     Abrir cliente
-                  </button>
-                  <button
-                    type="button"
-                    className="nexo-cta-secondary"
-                    onClick={() =>
-                      navigate(
-                        `/whatsapp?customerId=${focusedOrder.customerId}`
-                      )
-                    }
-                  >
-                    Comunicar via WhatsApp
                   </button>
                 </div>
 

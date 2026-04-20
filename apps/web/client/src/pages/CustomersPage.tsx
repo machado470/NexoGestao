@@ -472,15 +472,6 @@ export default function CustomersPage() {
         <AppPageHeader
           title="Centro operacional de clientes"
           description="Cliente como núcleo da operação: relacionamento, agenda, O.S., cobrança e comunicação em uma leitura única."
-          secondaryActions={
-            <SecondaryButton
-              type="button"
-              className="h-10 px-4"
-              onClick={() => navigate("/whatsapp?source=customers_hub")}
-            >
-              Comunicação da carteira
-            </SecondaryButton>
-          }
           cta={
             <Button
               type="button"
@@ -492,6 +483,23 @@ export default function CustomersPage() {
           }
         />
 
+        <AppSecondaryTabs
+          items={[
+            { value: "overview", label: "Visão geral" },
+            { value: "agenda", label: "Agenda" },
+            { value: "service_orders", label: "O.S." },
+            { value: "financial", label: "Financeiro" },
+            { value: "history", label: "Histórico" },
+          ]}
+          value={activeTab}
+          onChange={value => {
+            setActiveTab(value);
+            if (value === "financial") setActiveFilter("billing");
+            else if (value === "agenda") setActiveFilter("no_schedule");
+            else if (value === "overview") setActiveFilter("all");
+          }}
+        />
+
         <ActionBarWrapper
           className="border border-[var(--border-subtle)] bg-[var(--surface-base)] p-0"
           searchValue={searchTerm}
@@ -499,68 +507,82 @@ export default function CustomersPage() {
           searchPlaceholder="Buscar por nome, telefone, email ou ID"
         />
 
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-          <AppSectionBlock
-            className="xl:col-span-8"
-            title="Leitura operacional da carteira"
-            subtitle="Quem pede ação agora, onde está o risco e qual próximo passo reduz impacto."
-          >
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-              <article className="rounded-lg border border-[var(--dashboard-danger)]/30 bg-[var(--surface-subtle)] p-3.5">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
-                    Risco de receita
-                  </p>
-                  <AppStatusBadge label="Em risco" />
-                </div>
-                <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
-                  {overdueCustomers} cliente(s) com cobrança vencida.
+        <AppSectionBlock
+          title={
+            activeTab === "agenda"
+              ? "Leitura operacional da agenda da carteira"
+              : activeTab === "service_orders"
+                ? "Leitura operacional das O.S. por cliente"
+                : activeTab === "financial"
+                  ? "Leitura operacional de cobrança da carteira"
+                  : activeTab === "history"
+                    ? "Leitura do histórico operacional"
+                    : "Leitura operacional da carteira"
+          }
+          subtitle={
+            activeTab === "agenda"
+              ? "Foco em clientes sem agenda futura e risco de descontinuidade."
+              : activeTab === "service_orders"
+                ? "Quem exige avanço de execução e abertura de workspace agora."
+                : activeTab === "financial"
+                  ? "Quem concentra impacto no caixa e precisa de ação de cobrança."
+                  : activeTab === "history"
+                    ? "Evolução de interação e recorrências para corrigir padrão."
+                    : "Quem pede ação agora, onde está o risco e qual próximo passo reduz impacto."
+          }
+        >
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <article className="rounded-lg border border-[var(--dashboard-danger)]/30 bg-[var(--surface-subtle)] p-3.5">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                  Risco de receita
                 </p>
-                <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                  Priorize cobrança e contato para evitar atraso recorrente no
-                  caixa.
-                </p>
-              </article>
+                <AppStatusBadge label="Em risco" />
+              </div>
+              <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
+                {overdueCustomers} cliente(s) com cobrança vencida.
+              </p>
+              <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                Priorize cobrança e contato para evitar atraso recorrente no
+                caixa.
+              </p>
+            </article>
 
-              <article className="rounded-lg border border-[var(--dashboard-warning)]/30 bg-[var(--surface-subtle)] p-3.5">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
-                    Continuidade operacional
-                  </p>
-                  <AppStatusBadge label="Atenção" />
-                </div>
-                <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
-                  {withoutFutureSchedule} cliente(s) sem agendamento futuro.
+            <article className="rounded-lg border border-[var(--dashboard-warning)]/30 bg-[var(--surface-subtle)] p-3.5">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                  Continuidade operacional
                 </p>
-                <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                  Sem agenda confirmada, a carteira perde previsibilidade de
-                  execução.
-                </p>
-              </article>
+                <AppStatusBadge label="Atenção" />
+              </div>
+              <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
+                {withoutFutureSchedule} cliente(s) sem agendamento futuro.
+              </p>
+              <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                Sem agenda confirmada, a carteira perde previsibilidade de
+                execução.
+              </p>
+            </article>
 
-              <article className="rounded-lg border border-[var(--dashboard-info)]/30 bg-[var(--surface-subtle)] p-3.5">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
-                    Próxima ação
-                  </p>
-                  <AppStatusBadge label="Executar" />
-                </div>
-                <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
-                  Abrir top prioridades e disparar ação por contexto.
+            <article className="rounded-lg border border-[var(--dashboard-info)]/30 bg-[var(--surface-subtle)] p-3.5">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                  Próxima ação
                 </p>
-                <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                  Financeiro, agenda e WhatsApp já conectados por cliente.
-                </p>
-              </article>
-            </div>
-          </AppSectionBlock>
-
-          <AppSectionBlock
-            className="xl:col-span-4"
-            title="Fila prioritária da carteira"
-            subtitle="Top 3 clientes com maior urgência combinando cobrança, contato e agenda."
-            compact
-          >
+                <AppStatusBadge label="Executar" />
+              </div>
+              <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
+                Abrir top prioridades e disparar ação por contexto.
+              </p>
+              <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                Financeiro, agenda e WhatsApp já conectados por cliente.
+              </p>
+            </article>
+          </div>
+          <div className="mt-3 space-y-2.5">
+            <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">
+              Fila prioritária da carteira
+            </p>
             <div className="space-y-2.5">
               {topPriorityCustomers.length > 0 ? (
                 topPriorityCustomers.map(snapshot => {
@@ -609,29 +631,11 @@ export default function CustomersPage() {
                 </p>
               )}
             </div>
-          </AppSectionBlock>
-        </div>
+          </div>
+        </AppSectionBlock>
 
-        <AppSecondaryTabs
-          items={[
-            { value: "overview", label: "Visão geral" },
-            { value: "agenda", label: "Agenda" },
-            { value: "service_orders", label: "O.S." },
-            { value: "financial", label: "Financeiro" },
-            { value: "history", label: "Histórico" },
-          ]}
-          value={activeTab}
-          onChange={value => {
-            setActiveTab(value);
-            if (value === "financial") setActiveFilter("billing");
-            else if (value === "agenda") setActiveFilter("no_schedule");
-            else if (value === "overview") setActiveFilter("all");
-          }}
-        />
-
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+        <div className="space-y-4">
           <AppSectionBlock
-            className="xl:col-span-8"
             title={
               activeTab === "history"
                 ? "Histórico operacional da carteira"
@@ -697,33 +701,11 @@ export default function CustomersPage() {
                     className="h-8 px-3 text-xs"
                     onClick={() =>
                       navigate(
-                        `/whatsapp?customerIds=${selectedCustomerIds.join(",")}`
-                      )
-                    }
-                  >
-                    Enviar WhatsApp
-                  </SecondaryButton>
-                  <SecondaryButton
-                    type="button"
-                    className="h-8 px-3 text-xs"
-                    onClick={() =>
-                      navigate(
                         `/finances?customerIds=${selectedCustomerIds.join(",")}&filter=overdue`
                       )
                     }
                   >
                     Cobrar agora
-                  </SecondaryButton>
-                  <SecondaryButton
-                    type="button"
-                    className="h-8 px-3 text-xs"
-                    onClick={() =>
-                      navigate(
-                        `/appointments?customerIds=${selectedCustomerIds.join(",")}`
-                      )
-                    }
-                  >
-                    Criar agendamento
                   </SecondaryButton>
                 </div>
               </div>
@@ -957,20 +939,6 @@ export default function CustomersPage() {
                                           `/service-orders?customerId=${customerId}`
                                         ),
                                     },
-                                    {
-                                      label: "Enviar WhatsApp",
-                                      onSelect: () =>
-                                        navigate(
-                                          `/whatsapp?customerId=${customerId}`
-                                        ),
-                                    },
-                                    {
-                                      label: "Criar agendamento",
-                                      onSelect: () =>
-                                        navigate(
-                                          `/appointments?customerId=${customerId}`
-                                        ),
-                                    },
                                   ]}
                                 />
                               </div>
@@ -985,7 +953,6 @@ export default function CustomersPage() {
             )}
           </AppSectionBlock>
           <AppSectionBlock
-            className="xl:col-span-4"
             title="Workspace e contexto"
             subtitle={
               selectedCustomer
@@ -1066,17 +1033,6 @@ export default function CustomersPage() {
                   disabled={!selectedCustomer}
                 >
                   Ir para cobrança
-                </SecondaryButton>
-                <SecondaryButton
-                  type="button"
-                  className="h-8 px-3 text-xs"
-                  onClick={() =>
-                    selectedCustomer &&
-                    navigate(`/whatsapp?customerId=${selectedCustomer.id}`)
-                  }
-                  disabled={!selectedCustomer}
-                >
-                  Falar no WhatsApp
                 </SecondaryButton>
               </div>
             </div>

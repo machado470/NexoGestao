@@ -267,13 +267,6 @@ export default function AppointmentsPage() {
         <AppPageHeader
           title="Agenda operacional de agendamentos"
           description="Visual único para confirmação, risco, execução e próximo passo por cliente."
-          secondaryActions={
-            <ActionFeedbackButton
-              state="idle"
-              idleLabel="Abrir O.S. pendentes"
-              onClick={() => navigate("/service-orders")}
-            />
-          }
           cta={
             <ActionFeedbackButton
               state="idle"
@@ -283,24 +276,25 @@ export default function AppointmentsPage() {
           }
         />
 
-        <OperationalTopCard
-          contextLabel="Direção de agenda"
-          title="Painel de execução dos agendamentos"
-          description="Priorize confirmação, risco e conversão em O.S. sem sair do fluxo atual."
-          primaryAction={
-            <ActionFeedbackButton
-              state="idle"
-              idleLabel="Criar agendamento"
-              onClick={() => setOpenCreate(true)}
-            />
-          }
+        <AppSecondaryTabs
+          items={[
+            { value: "agenda", label: "Agenda" },
+            { value: "confirmed", label: "Confirmados" },
+            { value: "pending", label: "Pendentes" },
+            { value: "conflicts", label: "Conflitos" },
+            { value: "history", label: "Histórico" },
+          ]}
+          value={activeTab}
+          onChange={setActiveTab}
         />
 
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+        <AppSectionBlock
+          title="Leitura operacional da agenda"
+          subtitle="Onde a janela está carregada, o que está em risco e qual ação destrava a operação agora."
+        >
           <AppSectionBlock
-            title="Leitura operacional da agenda"
-            subtitle="Onde a janela está carregada, o que está em risco e qual ação destrava a operação agora."
-            className="xl:col-span-8"
+            title="Painel de execução"
+            subtitle="Priorize confirmação, risco e conversão em O.S. sem sair do fluxo atual."
           >
             <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
               <article className="rounded-lg border border-[var(--dashboard-danger)]/30 bg-[var(--surface-subtle)] p-3.5">
@@ -366,13 +360,10 @@ export default function AppointmentsPage() {
               </article>
             </div>
           </AppSectionBlock>
-
-          <AppSectionBlock
-            title="Fila acionável"
-            subtitle="Itens com maior impacto operacional imediato."
-            className="xl:col-span-4"
-            compact
-          >
+          <div className="mt-3">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">
+              Fila acionável
+            </p>
             <AppListBlock
               className="col-span-full"
               compact
@@ -410,20 +401,8 @@ export default function AppointmentsPage() {
                     ]
               }
             />
-          </AppSectionBlock>
-        </div>
-
-        <AppSecondaryTabs
-          items={[
-            { value: "agenda", label: "Agenda" },
-            { value: "confirmed", label: "Confirmados" },
-            { value: "pending", label: "Pendentes" },
-            { value: "conflicts", label: "Conflitos" },
-            { value: "history", label: "Histórico" },
-          ]}
-          value={activeTab}
-          onChange={setActiveTab}
-        />
+          </div>
+        </AppSectionBlock>
 
         <OperationalTopCard
           contextLabel="Modo ativo da agenda"
@@ -473,7 +452,7 @@ export default function AppointmentsPage() {
           }
         />
 
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+        <div className="space-y-4">
           <AppSectionBlock
             title={
               activeTab === "history"
@@ -481,7 +460,6 @@ export default function AppointmentsPage() {
                 : "Agenda operacional"
             }
             subtitle="Lista principal com filtros por estado, janela e cliente para ação rápida."
-            className="xl:col-span-8"
           >
             <AppFiltersBar className="mb-3 gap-3">
               <div className="min-w-[220px] flex-1">
@@ -656,10 +634,6 @@ export default function AppointmentsPage() {
                                             `/whatsapp?customerId=${item.customerId}`
                                           ),
                                       },
-                                      {
-                                        label: "Reagendar",
-                                        onSelect: () => setOpenCreate(true),
-                                      },
                                     ]}
                                   />
                                 </div>
@@ -678,7 +652,6 @@ export default function AppointmentsPage() {
           <AppSectionBlock
             title="Workspace do agendamento"
             subtitle="Contexto do item em foco conectado com cliente, execução e comunicação."
-            className="xl:col-span-4"
             compact
           >
             {focused ? (
@@ -728,17 +701,6 @@ export default function AppointmentsPage() {
                     }
                   >
                     Abrir cliente
-                  </button>
-                  <button
-                    type="button"
-                    className="nexo-cta-secondary"
-                    onClick={() =>
-                      navigate(
-                        `/whatsapp?customerId=${focused.item?.customerId}`
-                      )
-                    }
-                  >
-                    Abrir WhatsApp
                   </button>
                 </div>
               </div>
