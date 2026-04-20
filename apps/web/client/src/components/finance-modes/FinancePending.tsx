@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import {
   AppDataTable,
   AppPageEmptyState,
@@ -89,18 +89,18 @@ export function FinancePending({
         subtitle="Acompanhamento preventivo para reduzir virada para vencidas."
       >
         <div className="grid gap-3 xl:grid-cols-[1.4fr_1fr]">
-          <div className="grid gap-3 md:grid-cols-3">
-            <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/45 p-4">
+          <div className="grid min-w-0 gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="min-w-0 overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/45 p-4">
               <p className="text-xs text-[var(--text-muted)]">Total pendente</p>
-              <p className="mt-1 text-2xl font-semibold text-[var(--text-primary)]">{formatCurrency(pendingTotal)}</p>
+              <p className="mt-1 truncate text-xl font-semibold leading-tight text-[var(--text-primary)] md:text-2xl">{formatCurrency(pendingTotal)}</p>
             </div>
-            <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/45 p-4">
+            <div className="min-w-0 overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/45 p-4">
               <p className="text-xs text-[var(--text-muted)]">Cobranças abertas</p>
-              <p className="mt-1 text-2xl font-semibold text-[var(--text-primary)]">{charges.length}</p>
+              <p className="mt-1 truncate text-xl font-semibold leading-tight text-[var(--text-primary)] md:text-2xl">{charges.length}</p>
             </div>
-            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
-              <p className="text-xs text-amber-100/80">Vencendo em breve</p>
-              <p className="mt-1 text-2xl font-semibold text-amber-100">{dueSoon}</p>
+            <div className="min-w-0 overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/45 p-4">
+              <p className="text-xs text-[var(--text-muted)]">Vencendo em breve</p>
+              <p className="mt-1 truncate text-xl font-semibold leading-tight text-[var(--text-primary)] md:text-2xl">{dueSoon}</p>
             </div>
           </div>
 
@@ -140,37 +140,35 @@ export function FinancePending({
 
         <AppSectionBlock
           title="Pendente por cliente"
-          subtitle="Quem concentra maior valor pendente agora."
+          subtitle="Clientes com maior concentração de valor pendente."
           compact
         >
-          <ChartContainer className="h-[220px] w-full" config={{ value: { label: "Valor" } }}>
-            <PieChart>
-              <Pie
-                data={distributionByCustomer}
-                dataKey="value"
-                nameKey="label"
-                cx="50%"
-                cy="50%"
-                innerRadius={45}
-                outerRadius={78}
-                paddingAngle={3}
-              >
-                {distributionByCustomer.map((_, index) => (
-                  <Cell
-                    key={`cliente-${index}`}
-                    fill={["#5b8cff", "#42b8a8", "#9a7bff", "#ff9d5c", "#ff6f9f"][index % 5]}
-                  />
-                ))}
-              </Pie>
-              <ChartTooltip
-                content={
-                  <ChartTooltipContent
-                    formatter={value => [formatCurrency(Number(value)), "Valor pendente"]}
-                  />
-                }
-              />
-            </PieChart>
-          </ChartContainer>
+          <div className="space-y-2">
+            {distributionByCustomer.map(item => {
+              const ratio = pendingTotal > 0 ? (item.value / pendingTotal) * 100 : 0;
+              return (
+                <div
+                  key={item.label}
+                  className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/35 p-3"
+                >
+                  <div className="flex min-w-0 items-center justify-between gap-2">
+                    <p className="truncate text-sm font-medium text-[var(--text-primary)]">{item.label}</p>
+                    <p className="shrink-0 text-xs font-semibold text-[var(--text-primary)]">
+                      {formatCurrency(item.value)}
+                    </p>
+                  </div>
+                  <div className="mt-2 h-1.5 rounded-full bg-[var(--surface-elevated)]">
+                    <div className="h-1.5 rounded-full bg-[var(--accent-primary)]/80" style={{ width: `${Math.max(ratio, 8)}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+            {distributionByCustomer.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-[var(--border-subtle)] p-4 text-xs text-[var(--text-muted)]">
+                Sem concentração relevante por cliente.
+              </div>
+            ) : null}
+          </div>
         </AppSectionBlock>
       </div>
 

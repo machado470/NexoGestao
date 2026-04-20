@@ -128,7 +128,7 @@ export function FinanceReports({
         </div>
       </AppSectionBlock>
 
-      <div className="grid gap-3 md:grid-cols-4">
+      <div className="grid min-w-0 gap-3 grid-cols-2 xl:grid-cols-4">
         {[
           { label: "Receita do mês", value: formatCurrency(revenue) },
           { label: "Despesas do mês", value: formatCurrency(monthExpenses) },
@@ -137,10 +137,10 @@ export function FinanceReports({
         ].map(kpi => (
           <div
             key={kpi.label}
-            className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/35 p-3"
+            className="min-w-0 overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/35 p-3"
           >
-            <p className="text-xs text-[var(--text-muted)]">{kpi.label}</p>
-            <p className="mt-1 text-lg font-semibold">{kpi.value}</p>
+            <p className="truncate text-xs text-[var(--text-muted)]">{kpi.label}</p>
+            <p className="mt-1 truncate text-lg font-semibold leading-tight">{kpi.value}</p>
           </div>
         ))}
       </div>

@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import {
   AppDataTable,
   AppPageEmptyState,
@@ -71,22 +71,22 @@ export function FinancePaid({ charges, formatCurrency }: FinancePaidProps) {
         subtitle="Leitura de eficiência com histórico consolidado."
         className="border-emerald-500/25 bg-emerald-500/8"
       >
-        <div className="grid gap-3 md:grid-cols-4">
-          <div className="rounded-xl border border-emerald-400/25 bg-emerald-500/10 p-4">
-            <p className="text-xs text-emerald-100/80">Total recebido</p>
-            <p className="mt-1 text-2xl font-semibold text-emerald-100">{formatCurrency(receivedTotal)}</p>
+        <div className="grid min-w-0 gap-3 grid-cols-2 xl:grid-cols-4">
+          <div className="min-w-0 overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/45 p-4">
+            <p className="text-xs text-[var(--text-muted)]">Total recebido</p>
+            <p className="mt-1 truncate text-xl font-semibold leading-tight text-[var(--text-primary)] md:text-2xl">{formatCurrency(receivedTotal)}</p>
           </div>
-          <div className="rounded-xl border border-emerald-400/25 bg-emerald-500/10 p-4">
-            <p className="text-xs text-emerald-100/80">Quantidade paga</p>
-            <p className="mt-1 text-2xl font-semibold text-emerald-100">{sorted.length}</p>
+          <div className="min-w-0 overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/45 p-4">
+            <p className="text-xs text-[var(--text-muted)]">Quantidade paga</p>
+            <p className="mt-1 truncate text-xl font-semibold leading-tight text-[var(--text-primary)] md:text-2xl">{sorted.length}</p>
           </div>
-          <div className="rounded-xl border border-emerald-400/25 bg-emerald-500/10 p-4">
-            <p className="text-xs text-emerald-100/80">Média de atraso</p>
-            <p className="mt-1 text-2xl font-semibold text-emerald-100">{avgDaysToPay} dia(s)</p>
+          <div className="min-w-0 overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/45 p-4">
+            <p className="text-xs text-[var(--text-muted)]">Média de atraso</p>
+            <p className="mt-1 truncate text-xl font-semibold leading-tight text-[var(--text-primary)] md:text-2xl">{avgDaysToPay} dia(s)</p>
           </div>
-          <div className="rounded-xl border border-emerald-400/25 bg-emerald-500/10 p-4">
-            <p className="text-xs text-emerald-100/80">Métodos de pagamento</p>
-            <p className="mt-1 text-sm font-semibold text-emerald-100">
+          <div className="min-w-0 overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/45 p-4">
+            <p className="text-xs text-[var(--text-muted)]">Métodos de pagamento</p>
+            <p className="mt-1 line-clamp-2 text-sm font-semibold leading-tight text-[var(--text-primary)]">
               {methodData.length > 0 ? methodData.map(item => item.label).slice(0, 3).join(", ") : "Sem dados"}
             </p>
           </div>
@@ -110,17 +110,34 @@ export function FinancePaid({ charges, formatCurrency }: FinancePaidProps) {
           </ChartContainer>
         </AppSectionBlock>
 
-        <AppSectionBlock title="Distribuição por método" subtitle="Como os clientes estão pagando." compact>
-          <ChartContainer className="h-[220px] w-full" config={{ value: { label: "Quantidade" } }}>
-            <PieChart>
-              <Pie data={methodData} dataKey="value" nameKey="label" innerRadius={45} outerRadius={78} paddingAngle={3}>
-                {methodData.map((_, index) => (
-                  <Cell key={`metodo-${index}`} fill={["#34d399", "#38bdf8", "#a78bfa", "#fbbf24"][index % 4]} />
-                ))}
-              </Pie>
-              <ChartTooltip content={<ChartTooltipContent />} />
-            </PieChart>
-          </ChartContainer>
+        <AppSectionBlock title="Distribuição por método" subtitle="Métodos com maior recorrência de recebimento." compact>
+          <div className="space-y-2">
+            {methodData
+              .sort((a, b) => b.value - a.value)
+              .slice(0, 5)
+              .map(item => {
+                const ratio = sorted.length > 0 ? (item.value / sorted.length) * 100 : 0;
+                return (
+                  <div
+                    key={item.label}
+                    className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/35 p-3"
+                  >
+                    <div className="flex min-w-0 items-center justify-between gap-2">
+                      <p className="truncate text-sm font-medium text-[var(--text-primary)]">{item.label}</p>
+                      <p className="shrink-0 text-xs text-[var(--text-secondary)]">{item.value} pagamento(s)</p>
+                    </div>
+                    <div className="mt-2 h-1.5 rounded-full bg-[var(--surface-elevated)]">
+                      <div className="h-1.5 rounded-full bg-emerald-400/80" style={{ width: `${Math.max(ratio, 8)}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            {methodData.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-[var(--border-subtle)] p-4 text-xs text-[var(--text-muted)]">
+                Sem dados de método para exibir.
+              </div>
+            ) : null}
+          </div>
         </AppSectionBlock>
       </div>
 
