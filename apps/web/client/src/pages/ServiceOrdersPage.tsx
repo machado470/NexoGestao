@@ -1,42 +1,132 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { normalizeArrayPayload } from "@/lib/query-helpers";
 import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
 import CreateServiceOrderModal from "@/components/CreateServiceOrderModal";
+import ServiceOrderDetailsPanel from "@/components/service-orders/ServiceOrderDetailsPanel";
+import type { ServiceOrder } from "@/components/service-orders/service-order.types";
 import { AppRowActionsDropdown } from "@/components/app-system";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedbackButton";
-import { getOperationalSeverityLabel, getServiceOrderSeverity } from "@/lib/operations/operational-intelligence";
 import {
   AppDataTable,
+  AppFiltersBar,
   AppKpiRow,
   AppListBlock,
   AppPageEmptyState,
   AppPageErrorState,
+  AppPageHeader,
   AppPageLoadingState,
   AppPriorityBadge,
+  appSelectionPillClasses,
   AppSecondaryTabs,
   AppSectionBlock,
   AppStatusBadge,
 } from "@/components/internal-page-system";
-import { formatDelta, getWindow, inRange, percentDelta, safeDate, trendFromDelta } from "@/lib/operational/kpi";
+import {
+  formatDelta,
+  getDayWindow,
+  getWindow,
+  inRange,
+  percentDelta,
+  safeDate,
+  trendFromDelta,
+} from "@/lib/operational/kpi";
+import { Input } from "@/components/ui/input";
+import {
+  getOperationalSeverityLabel,
+  getServiceOrderSeverity,
+} from "@/lib/operations/operational-intelligence";
+
+type ServiceOrderTab =
+  | "pipeline"
+  | "execution"
+  | "attention"
+  | "done"
+  | "history";
+type WindowFilter = "all" | "today" | "next7" | "overdue";
+type PriorityFilter = "all" | "high" | "medium" | "low";
+
+function normalizeStatus(value: unknown) {
+  return String(value ?? "")
+    .trim()
+    .toUpperCase();
+}
+
+function getStatusLabel(status: string) {
+  if (status === "OPEN") return "Criada";
+  if (status === "ASSIGNED") return "Atribuída";
+  if (status === "IN_PROGRESS") return "Em andamento";
+  if (status === "DONE") return "Concluída";
+  if (status === "WAITING_CUSTOMER") return "Aguardando cliente";
+  if (status === "BLOCKED") return "Bloqueada";
+  if (status === "ON_HOLD") return "Em espera";
+  if (status === "PAUSED") return "Pausada";
+  if (status === "CANCELED") return "Cancelada";
+  return status || "Sem status";
+}
+
+function getPriorityLabel(priority: number) {
+  if (priority >= 4) return "HIGH" as const;
+  if (priority === 3) return "MEDIUM" as const;
+  return "LOW" as const;
+}
+
+function getNextAction(order: any) {
+  const status = normalizeStatus(order?.status);
+  const hasCharge = Boolean(order?.financialSummary?.hasCharge);
+
+  if (["BLOCKED", "ON_HOLD", "PAUSED"].includes(status)) {
+    return "Destravar execução";
+  }
+  if (status === "WAITING_CUSTOMER") return "Cobrar retorno";
+  if (["OPEN", "ASSIGNED"].includes(status) && !order?.assignedToPersonId) {
+    return "Atribuir técnico";
+  }
+  if (["OPEN", "ASSIGNED"].includes(status)) return "Iniciar execução";
+  if (status === "IN_PROGRESS") return "Acompanhar execução";
+  if (status === "DONE" && !hasCharge) return "Gerar cobrança";
+  if (status === "DONE" && hasCharge) return "Notificar cliente";
+  return "Revisar histórico";
+}
 
 export default function ServiceOrdersPage() {
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
   const [openCreate, setOpenCreate] = useState(false);
-  const [activeTab, setActiveTab] = useState<"pipeline" | "execution" | "done" | "blocked" | "history">("pipeline");
-  const customersQuery = trpc.nexo.customers.list.useQuery(undefined, { retry: false });
-  const peopleQuery = trpc.people.list.useQuery(undefined, { retry: false });
-  const serviceOrdersQuery = trpc.nexo.serviceOrders.list.useQuery({ page: 1, limit: 100 }, { retry: false });
+  const [activeTab, setActiveTab] = useState<ServiceOrderTab>("pipeline");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [windowFilter, setWindowFilter] = useState<WindowFilter>("all");
+  const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>("all");
+  const [customerFilter, setCustomerFilter] = useState("all");
+  const [focusedOrderId, setFocusedOrderId] = useState("");
 
-  const customers = useMemo(() => normalizeArrayPayload<any>(customersQuery.data), [customersQuery.data]);
-  const people = useMemo(() => normalizeArrayPayload<any>(peopleQuery.data), [peopleQuery.data]);
-  const orders = useMemo(() => normalizeArrayPayload<any>(serviceOrdersQuery.data), [serviceOrdersQuery.data]);
+  const customersQuery = trpc.nexo.customers.list.useQuery(undefined, {
+    retry: false,
+  });
+  const peopleQuery = trpc.people.list.useQuery(undefined, { retry: false });
+  const serviceOrdersQuery = trpc.nexo.serviceOrders.list.useQuery(
+    { page: 1, limit: 100 },
+    { retry: false }
+  );
+
+  const customers = useMemo(
+    () => normalizeArrayPayload<any>(customersQuery.data),
+    [customersQuery.data]
+  );
+  const people = useMemo(
+    () => normalizeArrayPayload<any>(peopleQuery.data),
+    [peopleQuery.data]
+  );
+  const orders = useMemo(
+    () => normalizeArrayPayload<any>(serviceOrdersQuery.data),
+    [serviceOrdersQuery.data]
+  );
   const hasData = orders.length > 0;
   const showInitialLoading = serviceOrdersQuery.isLoading && !hasData;
   const showErrorState = serviceOrdersQuery.error && !hasData;
+
   usePageDiagnostics({
     page: "service-orders",
     isLoading: showInitialLoading,
@@ -45,255 +135,694 @@ export default function ServiceOrdersPage() {
     dataCount: orders.length,
   });
 
-  const inProgress = orders.filter((item) => String(item?.status ?? "").toUpperCase() === "IN_PROGRESS").length;
-  const done = orders.filter((item) => String(item?.status ?? "").toUpperCase() === "DONE").length;
+  const now = new Date();
+  const todayWindow = getDayWindow(0);
+  const yesterdayWindow = getDayWindow(1);
+  const next7End = new Date(todayWindow.end);
+  next7End.setDate(next7End.getDate() + 7);
+
+  const openedToday = orders.filter(item =>
+    inRange(safeDate(item?.createdAt), todayWindow.start, todayWindow.end)
+  ).length;
+  const openedYesterday = orders.filter(item =>
+    inRange(
+      safeDate(item?.createdAt),
+      yesterdayWindow.start,
+      yesterdayWindow.end
+    )
+  ).length;
+
   const current7 = getWindow(7, 0);
   const previous7 = getWindow(7, 1);
-  const openedCurrent = orders.filter(item => inRange(safeDate(item?.createdAt), current7.start, current7.end)).length;
-  const openedPrevious = orders.filter(item => inRange(safeDate(item?.createdAt), previous7.start, previous7.end)).length;
-  const pipeline = {
-    aberta: orders.filter(item => ["OPEN", "ASSIGNED"].includes(String(item?.status ?? "").toUpperCase())).length,
-    execucao: orders.filter(item => String(item?.status ?? "").toUpperCase() === "IN_PROGRESS").length,
-    concluida: orders.filter(item => String(item?.status ?? "").toUpperCase() === "DONE").length,
-    prontaCobranca: orders.filter(item => String(item?.status ?? "").toUpperCase() === "DONE" && !item?.financialSummary?.hasCharge).length,
-  };
-  const travadas = orders.filter(item => ["BLOCKED", "ON_HOLD", "PAUSED"].includes(String(item?.status ?? "").toUpperCase())).length;
-  const semResponsavel = orders.filter(item => !item?.assignedToPersonId).length;
-  const aguardandoCliente = orders.filter(item => String(item?.status ?? "").toUpperCase() === "WAITING_CUSTOMER").length;
-  const semAvanco = orders.filter((item) => {
-    const status = String(item?.status ?? "").toUpperCase();
-    return status === "OPEN" || status === "ASSIGNED";
+  const finishedCurrent = orders.filter(
+    item =>
+      normalizeStatus(item?.status) === "DONE" &&
+      inRange(safeDate(item?.updatedAt), current7.start, current7.end)
+  ).length;
+  const finishedPrevious = orders.filter(
+    item =>
+      normalizeStatus(item?.status) === "DONE" &&
+      inRange(safeDate(item?.updatedAt), previous7.start, previous7.end)
+  ).length;
+
+  const pipelineOpen = orders.filter(item =>
+    ["OPEN", "ASSIGNED"].includes(normalizeStatus(item?.status))
+  ).length;
+  const inExecution = orders.filter(
+    item => normalizeStatus(item?.status) === "IN_PROGRESS"
+  ).length;
+  const blocked = orders.filter(item =>
+    ["BLOCKED", "ON_HOLD", "PAUSED", "WAITING_CUSTOMER"].includes(
+      normalizeStatus(item?.status)
+    )
+  ).length;
+  const readyToCharge = orders.filter(
+    item =>
+      normalizeStatus(item?.status) === "DONE" &&
+      !item?.financialSummary?.hasCharge
+  ).length;
+
+  const unassigned = orders.filter(item => !item?.assignedToPersonId).length;
+  const stalePipeline = orders.filter(item => {
+    const status = normalizeStatus(item?.status);
+    const updatedAt = safeDate(item?.updatedAt);
+    if (!["OPEN", "ASSIGNED", "IN_PROGRESS"].includes(status)) return false;
+    if (!updatedAt) return true;
+    const diff = now.getTime() - updatedAt.getTime();
+    return diff >= 1000 * 60 * 60 * 24 * 2;
   }).length;
-  const topOS = [...orders]
-    .sort((a, b) => {
-      const priorityDiff = Number(b?.priority ?? 0) - Number(a?.priority ?? 0);
-      if (priorityDiff !== 0) return priorityDiff;
-      return (safeDate(b?.updatedAt)?.getTime() ?? 0) - (safeDate(a?.updatedAt)?.getTime() ?? 0);
-    })
-    .slice(0, 6);
-  const travadasDetalhadas = [
-    ...orders
-      .filter(item => ["BLOCKED", "ON_HOLD", "PAUSED"].includes(String(item?.status ?? "").toUpperCase()))
-      .slice(0, 3)
-      .map((item) => ({
-        title: String(item?.title ?? "O.S. sem título"),
-        subtitle: `Status ${String(item?.status ?? "").toUpperCase()} · cliente ${String(item?.customer?.name ?? "não identificado")}`,
-        action: <button className="nexo-cta-secondary" onClick={() => navigate(`/service-orders?serviceOrderId=${item?.id}`)}>Destravar</button>,
-      })),
-    ...orders
-      .filter(item => !item?.assignedToPersonId)
-      .slice(0, 2)
-      .map((item) => ({
-        title: `${String(item?.title ?? "O.S.")} sem responsável`,
-        subtitle: "Sem técnico alocado para execução.",
-        action: <button className="nexo-cta-secondary" onClick={() => setOpenCreate(true)}>Atribuir</button>,
-      })),
-    ...orders
-      .filter(item => String(item?.status ?? "").toUpperCase() === "WAITING_CUSTOMER")
-      .slice(0, 2)
-      .map((item) => ({
-        title: `${String(item?.title ?? "O.S.")} sem resposta do cliente`,
-        subtitle: `Cliente ${String(item?.customer?.name ?? "não identificado")} aguardando retorno.`,
-        action: <button className="nexo-cta-secondary" onClick={() => navigate(`/whatsapp?customerId=${item?.customerId}`)}>Cobrar retorno</button>,
-      })),
-  ].slice(0, 7);
-  const visibleOrders = useMemo(() => {
-    if (activeTab === "pipeline") return orders;
-    if (activeTab === "execution") return orders.filter(item => String(item?.status ?? "").toUpperCase() === "IN_PROGRESS");
-    if (activeTab === "done") return orders.filter(item => String(item?.status ?? "").toUpperCase() === "DONE");
-    if (activeTab === "blocked") return orders.filter(item => ["BLOCKED", "ON_HOLD", "PAUSED"].includes(String(item?.status ?? "").toUpperCase()));
-    return [...orders].sort((a, b) => (safeDate(b?.updatedAt)?.getTime() ?? 0) - (safeDate(a?.updatedAt)?.getTime() ?? 0));
-  }, [activeTab, orders]);
+
+  const riskList = useMemo(() => {
+    return orders
+      .filter(item => {
+        const status = normalizeStatus(item?.status);
+        const updatedAt = safeDate(item?.updatedAt);
+        const delayed =
+          Boolean(updatedAt) &&
+          now.getTime() - (updatedAt?.getTime() ?? 0) >=
+            1000 * 60 * 60 * 24 * 3;
+        return (
+          ["BLOCKED", "ON_HOLD", "PAUSED", "WAITING_CUSTOMER"].includes(
+            status
+          ) || delayed
+        );
+      })
+      .sort(
+        (a, b) =>
+          Number(b?.priority ?? 0) - Number(a?.priority ?? 0) ||
+          (safeDate(a?.updatedAt)?.getTime() ?? 0) -
+            (safeDate(b?.updatedAt)?.getTime() ?? 0)
+      )
+      .slice(0, 5);
+  }, [now, orders]);
+
+  const statusParam = useMemo(() => {
+    const queryString = location.split("?")[1] ?? "";
+    return new URLSearchParams(queryString).get("status");
+  }, [location]);
+
+  useEffect(() => {
+    if (statusParam === "blocked") {
+      setActiveTab("attention");
+    }
+  }, [statusParam]);
+
+  const filteredOrders = useMemo(() => {
+    let base = orders;
+
+    if (activeTab === "execution") {
+      base = base.filter(
+        item => normalizeStatus(item?.status) === "IN_PROGRESS"
+      );
+    } else if (activeTab === "attention") {
+      base = base.filter(item =>
+        ["BLOCKED", "ON_HOLD", "PAUSED", "WAITING_CUSTOMER"].includes(
+          normalizeStatus(item?.status)
+        )
+      );
+    } else if (activeTab === "done") {
+      base = base.filter(item => normalizeStatus(item?.status) === "DONE");
+    } else if (activeTab === "history") {
+      base = [...base].sort(
+        (a, b) =>
+          (safeDate(b?.updatedAt)?.getTime() ?? 0) -
+          (safeDate(a?.updatedAt)?.getTime() ?? 0)
+      );
+    }
+
+    if (windowFilter === "today") {
+      base = base.filter(item =>
+        inRange(
+          safeDate(item?.scheduledFor ?? item?.createdAt),
+          todayWindow.start,
+          todayWindow.end
+        )
+      );
+    } else if (windowFilter === "next7") {
+      base = base.filter(item =>
+        inRange(
+          safeDate(item?.scheduledFor ?? item?.createdAt),
+          todayWindow.start,
+          next7End
+        )
+      );
+    } else if (windowFilter === "overdue") {
+      base = base.filter(item => {
+        const status = normalizeStatus(item?.status);
+        const scheduled = safeDate(item?.scheduledFor);
+        return (
+          Boolean(scheduled && scheduled < now) &&
+          ["OPEN", "ASSIGNED", "IN_PROGRESS"].includes(status)
+        );
+      });
+    }
+
+    if (priorityFilter !== "all") {
+      base = base.filter(item => {
+        const tier = getPriorityLabel(Number(item?.priority ?? 2));
+        return tier.toLowerCase() === priorityFilter;
+      });
+    }
+
+    if (customerFilter !== "all") {
+      base = base.filter(
+        item => String(item?.customerId ?? "") === customerFilter
+      );
+    }
+
+    if (searchTerm.trim()) {
+      const term = searchTerm.trim().toLowerCase();
+      base = base.filter(item => {
+        const title = String(item?.title ?? "").toLowerCase();
+        const customerName = String(item?.customer?.name ?? "").toLowerCase();
+        const id = String(item?.id ?? "");
+        return (
+          title.includes(term) ||
+          customerName.includes(term) ||
+          id.includes(term)
+        );
+      });
+    }
+
+    return base;
+  }, [
+    activeTab,
+    customerFilter,
+    next7End,
+    now,
+    orders,
+    priorityFilter,
+    searchTerm,
+    todayWindow.end,
+    todayWindow.start,
+    windowFilter,
+  ]);
+
+  useEffect(() => {
+    if (filteredOrders.length === 0) {
+      setFocusedOrderId("");
+      return;
+    }
+
+    const hasFocused = filteredOrders.some(
+      item => String(item?.id ?? "") === focusedOrderId
+    );
+    if (!hasFocused) {
+      setFocusedOrderId(String(filteredOrders[0]?.id ?? ""));
+    }
+  }, [filteredOrders, focusedOrderId]);
+
+  const focusedOrder =
+    filteredOrders.find(item => String(item?.id ?? "") === focusedOrderId) ??
+    filteredOrders[0] ??
+    null;
+
+  const topActions = [
+    {
+      title:
+        blocked > 0
+          ? `${blocked} O.S. com risco direto de travar o dia.`
+          : "Sem travas críticas neste momento.",
+      subtitle:
+        blocked > 0
+          ? "Ataque bloqueios e esperas de cliente para restaurar fluxo de execução."
+          : "Mantenha cadência com revisão das O.S. em execução e prontas para cobrança.",
+      action: (
+        <button
+          className="nexo-cta-secondary"
+          onClick={() => {
+            setActiveTab("attention");
+          }}
+        >
+          Abrir fila de atenção
+        </button>
+      ),
+    },
+    {
+      title: `${readyToCharge} concluída(s) aguardando cobrança`,
+      subtitle:
+        readyToCharge > 0
+          ? "Converta execução em receita: gerar cobrança e confirmar envio ao cliente."
+          : "Sem pendência financeira imediata de O.S. concluída.",
+      action: (
+        <button
+          className="nexo-cta-secondary"
+          onClick={() => navigate("/finances")}
+        >
+          Ir para Financeiro
+        </button>
+      ),
+    },
+    {
+      title: `${unassigned} sem responsável · ${stalePipeline} sem avanço recente`,
+      subtitle:
+        "Distribua execução e remova ordens paradas há mais de 48h para proteger SLA.",
+      action: (
+        <button
+          className="nexo-cta-secondary"
+          onClick={() => setOpenCreate(true)}
+        >
+          Criar/Atribuir O.S.
+        </button>
+      ),
+    },
+  ];
 
   return (
-    <PageWrapper title="Ordens de Serviço" subtitle="Centro da operação: execução, cobrança e próxima ação sem ruído.">
-      <OperationalTopCard
-        contextLabel="Direção de execução"
-        title="Pipeline de ordens de serviço"
-        description="Leitura direta da rotina de campo: o que está aberto, em execução, travado e pronto para cobrança."
-        primaryAction={(
-          <ActionFeedbackButton state="idle" idleLabel="Criar nova O.S. agora" onClick={() => setOpenCreate(true)} />
-        )}
-      />
-
-      <AppKpiRow
-        gridClassName="grid-cols-1 md:grid-cols-2 xl:grid-cols-4"
-        items={[
-          {
-            title: "O.S. abertas",
-            value: String(openedCurrent),
-            delta: formatDelta(percentDelta(openedCurrent, openedPrevious)),
-            trend: trendFromDelta(percentDelta(openedCurrent, openedPrevious)),
-            hint: "últimos 7 dias",
-          },
-          { title: "Em execução", value: String(inProgress), hint: "equipes com atendimento em campo" },
-          { title: "Concluídas", value: String(done), hint: "serviços finalizados" },
-          { title: "Prontas p/ cobrança", value: String(pipeline.prontaCobranca), hint: "concluídas e sem cobrança ativa" },
-        ]}
-      />
-      <AppSecondaryTabs
-        items={[
-          { value: "pipeline", label: "Pipeline" },
-          { value: "execution", label: "Em execução" },
-          { value: "done", label: "Concluídas" },
-          { value: "blocked", label: "Travadas" },
-          { value: "history", label: "Histórico" },
-        ]}
-        value={activeTab}
-        onChange={setActiveTab}
-      />
-
-      {(activeTab === "pipeline" || activeTab === "blocked") ? (
-        <section className="grid gap-4 xl:grid-cols-12">
-        <AppSectionBlock
-        title="Travadas"
-        subtitle="Bloco principal: ordens que mais pressionam SLA e precisam de ação direta agora"
-        className="xl:col-span-8"
-      >
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm text-[var(--text-secondary)]">{semResponsavel} sem responsável · {semAvanco} sem avanço · {aguardandoCliente} aguardando cliente.</p>
-          <ActionFeedbackButton state="idle" idleLabel="Destravar ordens agora" onClick={() => navigate("/service-orders?status=blocked")} />
-        </div>
-        <AppListBlock
-          items={travadasDetalhadas.length > 0
-            ? travadasDetalhadas
-            : [{ title: "Sem travas críticas", subtitle: "Pipeline fluindo no momento.", action: <button className="nexo-cta-secondary" onClick={() => navigate("/finances")}>Seguir para cobrança</button> }]}
+    <PageWrapper
+      title="Ordens de Serviço"
+      subtitle="Centro operacional de execução, bloqueios, conclusão e conversão financeira."
+    >
+      <div className="space-y-4">
+        <AppPageHeader
+          title="Painel operacional de ordens de serviço"
+          description="Visual de execução para enxergar gargalos, risco, próxima ação e fechamento financeiro sem quebrar os fluxos atuais."
+          secondaryActions={
+            <ActionFeedbackButton
+              state="idle"
+              idleLabel="Abrir cobranças pendentes"
+              onClick={() => navigate("/finances")}
+            />
+          }
+          cta={
+            <ActionFeedbackButton
+              state="idle"
+              idleLabel="Criar nova O.S."
+              onClick={() => setOpenCreate(true)}
+            />
+          }
         />
-      </AppSectionBlock>
-      <AppSectionBlock title="Destravamento e cobrança" subtitle="Prioridades executivas da lateral" className="xl:col-span-4" compact>
-        <AppListBlock
-          compact
-          showPlaceholders={false}
+
+        <OperationalTopCard
+          contextLabel="Direção da execução"
+          title="Operação em tempo real das O.S."
+          description="Mostra o que está parado, em andamento, travado e pronto para virar cobrança ou comunicação."
+          primaryAction={
+            <ActionFeedbackButton
+              state="idle"
+              idleLabel="Priorizar travadas"
+              onClick={() => setActiveTab("attention")}
+            />
+          }
+        />
+
+        <AppKpiRow
+          gridClassName="grid-cols-1 md:grid-cols-2 xl:grid-cols-4"
           items={[
-            { title: `Travadas agora: ${travadas}`, subtitle: "Ataque o topo da fila para reduzir pressão de SLA.", action: <button className="nexo-cta-secondary" onClick={() => navigate("/service-orders?status=blocked")}>Destravar</button> },
-            { title: `Sem responsável: ${semResponsavel}`, subtitle: "Distribua técnico para remover gargalo de execução.", action: <button className="nexo-cta-secondary" onClick={() => setOpenCreate(true)}>Atribuir</button> },
-            { title: `Aguardando cliente: ${aguardandoCliente}`, subtitle: "Cobrança ativa de retorno evita tempo morto.", action: <button className="nexo-cta-secondary" onClick={() => navigate("/whatsapp")}>Cobrar retorno</button> },
+            {
+              title: "Abertas no dia",
+              value: String(openedToday),
+              delta: formatDelta(percentDelta(openedToday, openedYesterday)),
+              trend: trendFromDelta(percentDelta(openedToday, openedYesterday)),
+              hint: "comparativo com ontem",
+            },
+            {
+              title: "Em execução",
+              value: String(inExecution),
+              hint: `${pipelineOpen} ainda na fila inicial`,
+              tone: inExecution > 0 ? "important" : "default",
+            },
+            {
+              title: "Exigem atenção",
+              value: String(blocked),
+              hint: "bloqueadas, pausadas ou aguardando cliente",
+              tone: blocked > 0 ? "critical" : "default",
+            },
+            {
+              title: "Prontas para cobrança",
+              value: String(readyToCharge),
+              delta: formatDelta(
+                percentDelta(finishedCurrent, finishedPrevious)
+              ),
+              trend: trendFromDelta(
+                percentDelta(finishedCurrent, finishedPrevious)
+              ),
+              hint: "concluídas sem cobrança ativa",
+            },
           ]}
         />
-      </AppSectionBlock>
-      </section>
-      ) : null}
 
-      {(activeTab === "pipeline" || activeTab === "execution") ? (
-      <section className="grid gap-4 xl:grid-cols-12">
-        <AppSectionBlock title="Top O.S. para executar agora" subtitle="Prioridade alta com ação operacional direta" className="xl:col-span-8">
-          <AppListBlock
-            items={topOS.length > 0
-              ? topOS.map((item) => ({
-                  title: `${String(item?.title ?? "O.S. sem título")} · P${String(item?.priority ?? 2)}`,
-                  subtitle: `${String(item?.customer?.name ?? "Cliente")} · ${String(item?.status ?? "").toUpperCase()}`,
-                  action: <button className="nexo-cta-secondary" onClick={() => navigate(`/service-orders?serviceOrderId=${item?.id}`)}>Executar</button>,
-                }))
-              : [{ title: "Sem O.S. abertas", subtitle: "Crie uma ordem para iniciar execução.", action: <button className="nexo-cta-secondary" onClick={() => setOpenCreate(true)}>Criar O.S.</button> }]}
-          />
-        </AppSectionBlock>
-        <AppSectionBlock title="Resumo de bloqueio" subtitle="Indicadores com CTA para destrave imediato" className="xl:col-span-4" compact>
-          <AppListBlock
-            showPlaceholders={false}
-            items={[
-              { title: `Travadas agora: ${travadas}`, subtitle: "Ataque o topo da fila para reduzir pressão de SLA.", action: <button className="nexo-cta-secondary" onClick={() => navigate("/service-orders?status=blocked")}>Destravar</button> },
-              { title: `Sem responsável: ${semResponsavel}`, subtitle: "Distribua técnico para remover gargalo de execução.", action: <button className="nexo-cta-secondary" onClick={() => setOpenCreate(true)}>Atribuir</button> },
-              { title: `Aguardando cliente: ${aguardandoCliente}`, subtitle: "Cobrança ativa de retorno evita tempo morto.", action: <button className="nexo-cta-secondary" onClick={() => navigate("/whatsapp")}>Cobrar retorno</button> },
-            ]}
-          />
-        </AppSectionBlock>
-      </section>
-      ) : null}
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+          <AppSectionBlock
+            title="Leitura operacional"
+            subtitle="Onde está o gargalo agora, quais ordens estão em risco e qual ação acelera execução + caixa."
+            className="xl:col-span-8"
+          >
+            <AppListBlock items={topActions} />
+          </AppSectionBlock>
 
-      <AppSectionBlock
-        title={activeTab === "history" ? "Histórico de ordens de serviço" : "Pipeline operacional"}
-        subtitle="Cada O.S. com ação real"
-      >
-        {showInitialLoading ? (
-          <AppPageLoadingState description="Carregando ordens de serviço..." />
-        ) : showErrorState ? (
-          <AppPageErrorState
-            description={serviceOrdersQuery.error?.message ?? "Falha ao carregar ordens de serviço."}
-            actionLabel="Tentar novamente"
-            onAction={() => void serviceOrdersQuery.refetch()}
-          />
-        ) : visibleOrders.length === 0 ? (
-          <AppPageEmptyState title="Nenhum dado disponível ainda" description="Ação recomendada: criar ordem de serviço" />
-        ) : (
-          <div className="max-h-[560px] overflow-y-auto">
-          <AppDataTable>
-            <table className="w-full text-sm">
-              <thead className="bg-[var(--surface-elevated)] text-xs text-[var(--text-muted)]">
-                <tr>
-                  <th className="p-3">Título</th>
-                  <th>Cliente</th>
-                  <th>Status</th>
-                  <th className="w-[168px] p-3 text-right">Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleOrders.map((order) => {
-                  const status = String(order?.status ?? "").toUpperCase();
-                  const hasCharge = Boolean(order?.financialSummary?.hasCharge);
-                  const isPending = ["PENDENTE", "SCHEDULED", "OPEN", "ASSIGNED"].includes(status);
-                  const isConfirmed = ["CONFIRMADO", "CONFIRMED", "IN_PROGRESS"].includes(status);
-                  const isDoneWithoutCharge = status === "DONE" && !hasCharge;
-                  const priorityLabel = isDoneWithoutCharge || isPending ? "HIGH" : isConfirmed ? "MEDIUM" : "LOW";
-                  const nextAction = isPending
-                    ? "Confirmar"
-                    : isConfirmed
-                      ? "Criar O.S."
-                      : isDoneWithoutCharge
-                        ? "Gerar cobrança"
-                        : hasCharge
-                          ? "Enviar WhatsApp"
-                          : "Criar O.S.";
-                  const handlePrimaryAction = () => {
-                    if (nextAction === "Confirmar") {
-                      navigate(`/whatsapp?customerId=${order.customerId}`);
-                      return;
+          <AppSectionBlock
+            title="Fila crítica"
+            subtitle="Ordens com risco imediato de atraso ou bloqueio."
+            className="xl:col-span-4"
+            compact
+          >
+            <AppListBlock
+              compact
+              showPlaceholders={false}
+              items={
+                riskList.length > 0
+                  ? riskList.map(item => ({
+                      title: String(item?.title ?? "O.S. sem título"),
+                      subtitle: `${String(item?.customer?.name ?? "Cliente")} · ${getStatusLabel(
+                        normalizeStatus(item?.status)
+                      )}`,
+                      action: (
+                        <button
+                          className="nexo-cta-secondary"
+                          onClick={() =>
+                            setFocusedOrderId(String(item?.id ?? ""))
+                          }
+                        >
+                          Abrir O.S.
+                        </button>
+                      ),
+                    }))
+                  : [
+                      {
+                        title: "Sem ordens críticas",
+                        subtitle:
+                          "A fila de risco está controlada neste momento.",
+                      },
+                    ]
+              }
+            />
+          </AppSectionBlock>
+        </div>
+
+        <AppSecondaryTabs
+          items={[
+            { value: "pipeline", label: "Pipeline" },
+            { value: "execution", label: "Em execução" },
+            { value: "attention", label: "Atenção" },
+            { value: "done", label: "Concluídas" },
+            { value: "history", label: "Histórico" },
+          ]}
+          value={activeTab}
+          onChange={setActiveTab}
+        />
+
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+          <AppSectionBlock
+            title={
+              activeTab === "history"
+                ? "Histórico operacional de O.S."
+                : "Execução das ordens de serviço"
+            }
+            subtitle="Lista principal com filtros de estado, prioridade, cliente e janela para decisão rápida."
+            className="xl:col-span-8"
+          >
+            <AppFiltersBar className="mb-3 gap-3">
+              <div className="min-w-[220px] flex-1">
+                <Input
+                  value={searchTerm}
+                  onChange={event => setSearchTerm(event.target.value)}
+                  placeholder="Buscar por título, cliente ou ID"
+                  className="h-9"
+                />
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {[
+                  { key: "all", label: "Tudo" },
+                  { key: "today", label: "Hoje" },
+                  { key: "next7", label: "Próximos 7 dias" },
+                  { key: "overdue", label: "Atrasadas" },
+                ].map(item => (
+                  <button
+                    key={item.key}
+                    type="button"
+                    className={appSelectionPillClasses(
+                      windowFilter === item.key
+                    )}
+                    onClick={() => setWindowFilter(item.key as WindowFilter)}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+
+              <select
+                className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-xs text-[var(--text-primary)]"
+                value={priorityFilter}
+                onChange={event =>
+                  setPriorityFilter(event.target.value as PriorityFilter)
+                }
+              >
+                <option value="all">Toda prioridade</option>
+                <option value="high">Alta</option>
+                <option value="medium">Média</option>
+                <option value="low">Baixa</option>
+              </select>
+
+              <select
+                className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-xs text-[var(--text-primary)]"
+                value={customerFilter}
+                onChange={event => setCustomerFilter(event.target.value)}
+              >
+                <option value="all">Todos os clientes</option>
+                {customers.map(customer => (
+                  <option key={String(customer.id)} value={String(customer.id)}>
+                    {String(customer.name ?? "Cliente")}
+                  </option>
+                ))}
+              </select>
+            </AppFiltersBar>
+
+            {showInitialLoading ? (
+              <AppPageLoadingState description="Carregando ordens de serviço..." />
+            ) : showErrorState ? (
+              <AppPageErrorState
+                description={
+                  serviceOrdersQuery.error?.message ??
+                  "Falha ao carregar ordens de serviço."
+                }
+                actionLabel="Tentar novamente"
+                onAction={() => void serviceOrdersQuery.refetch()}
+              />
+            ) : filteredOrders.length === 0 ? (
+              <AppPageEmptyState
+                title="Nenhuma O.S. encontrada"
+                description="Ajuste os filtros ou crie uma nova ordem para manter o fluxo operacional."
+              />
+            ) : (
+              <div className="max-h-[560px] overflow-y-auto">
+                <AppDataTable>
+                  <table className="w-full text-sm">
+                    <thead className="bg-[var(--surface-elevated)] text-xs text-[var(--text-muted)]">
+                      <tr>
+                        <th className="p-3 text-left">Ordem</th>
+                        <th className="text-left">Cliente</th>
+                        <th className="text-left">Status</th>
+                        <th className="text-left">Prioridade</th>
+                        <th className="text-left">Próxima ação</th>
+                        <th className="w-[120px] p-3 text-right">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredOrders.map(order => {
+                        const status = normalizeStatus(order?.status);
+                        const hasCharge = Boolean(
+                          order?.financialSummary?.hasCharge
+                        );
+                        const nextAction = getNextAction(order);
+                        const priorityLabel = getPriorityLabel(
+                          Number(order?.priority ?? 2)
+                        );
+
+                        const handlePrimaryAction = () => {
+                          if (nextAction === "Gerar cobrança") {
+                            navigate(`/finances?serviceOrderId=${order.id}`);
+                            return;
+                          }
+                          if (
+                            nextAction === "Cobrar retorno" ||
+                            nextAction === "Notificar cliente"
+                          ) {
+                            navigate(
+                              `/whatsapp?customerId=${order.customerId}`
+                            );
+                            return;
+                          }
+                          setFocusedOrderId(String(order?.id ?? ""));
+                        };
+
+                        return (
+                          <tr
+                            key={String(order?.id)}
+                            className="cursor-pointer border-t border-[var(--border-subtle)] transition-colors hover:bg-[var(--surface-subtle)]/60"
+                            onClick={() =>
+                              setFocusedOrderId(String(order?.id ?? ""))
+                            }
+                          >
+                            <td className="p-3 align-top">
+                              <p className="font-medium text-[var(--text-primary)]">
+                                {String(order?.title ?? "Sem título")}
+                              </p>
+                              <p className="text-xs text-[var(--text-muted)]">
+                                #{String(order?.id ?? "—")}
+                              </p>
+                            </td>
+                            <td className="align-top">
+                              <p className="text-[var(--text-primary)]">
+                                {String(order?.customer?.name ?? "Cliente")}
+                              </p>
+                              <p className="text-xs text-[var(--text-muted)]">
+                                {order?.scheduledFor
+                                  ? `Agendada: ${safeDate(order?.scheduledFor)?.toLocaleDateString("pt-BR")}`
+                                  : "Sem data definida"}
+                              </p>
+                            </td>
+                            <td className="align-top">
+                              <AppStatusBadge
+                                label={`${getStatusLabel(status)} · ${getOperationalSeverityLabel(getServiceOrderSeverity(order))}`}
+                              />
+                              {status === "DONE" && !hasCharge ? (
+                                <p className="mt-1 text-xs text-[var(--dashboard-danger)]">
+                                  Concluída sem cobrança ativa
+                                </p>
+                              ) : null}
+                            </td>
+                            <td className="align-top">
+                              <AppPriorityBadge label={priorityLabel} />
+                            </td>
+                            <td className="align-top text-xs text-[var(--text-secondary)]">
+                              {nextAction}
+                            </td>
+                            <td className="p-3 align-top">
+                              <div className="flex items-center justify-end gap-2">
+                                <AppRowActionsDropdown
+                                  triggerLabel="Mais ações"
+                                  contentClassName="min-w-[240px]"
+                                  items={[
+                                    {
+                                      label: `${nextAction} · prioritário`,
+                                      onSelect: handlePrimaryAction,
+                                    },
+                                    {
+                                      label: "Abrir cliente",
+                                      onSelect: () =>
+                                        navigate(
+                                          `/customers?customerId=${order.customerId}`
+                                        ),
+                                    },
+                                    {
+                                      label: "Abrir agendamentos",
+                                      onSelect: () =>
+                                        navigate(
+                                          `/appointments?customerId=${order.customerId}${
+                                            order?.appointmentId
+                                              ? `&appointmentId=${order.appointmentId}`
+                                              : ""
+                                          }`
+                                        ),
+                                    },
+                                    {
+                                      label: "Gerar cobrança",
+                                      onSelect: () =>
+                                        navigate(
+                                          `/finances?serviceOrderId=${order.id}`
+                                        ),
+                                    },
+                                    {
+                                      label: "Enviar WhatsApp",
+                                      onSelect: () =>
+                                        navigate(
+                                          `/whatsapp?customerId=${order.customerId}`
+                                        ),
+                                    },
+                                  ]}
+                                />
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </AppDataTable>
+              </div>
+            )}
+          </AppSectionBlock>
+
+          <AppSectionBlock
+            title="Workspace da O.S. em foco"
+            subtitle="Resumo da execução conectado com cliente, agenda, cobrança e comunicação."
+            className="xl:col-span-4"
+            compact
+          >
+            {focusedOrder ? (
+              <div className="space-y-3">
+                <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-semibold text-[var(--text-primary)]">
+                      {String(focusedOrder?.title ?? "O.S. sem título")}
+                    </p>
+                    <AppStatusBadge
+                      label={getStatusLabel(
+                        normalizeStatus(focusedOrder?.status)
+                      )}
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                    Cliente: {String(focusedOrder?.customer?.name ?? "Cliente")}
+                  </p>
+                  <p className="text-xs text-[var(--text-secondary)]">
+                    Próxima ação: {getNextAction(focusedOrder)}
+                  </p>
+                  {normalizeStatus(focusedOrder?.status) === "DONE" &&
+                  !focusedOrder?.financialSummary?.hasCharge ? (
+                    <p className="mt-1 text-xs font-medium text-[var(--dashboard-danger)]">
+                      Esta O.S. concluída ainda não gerou cobrança.
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className="grid grid-cols-1 gap-2">
+                  <button
+                    type="button"
+                    className="nexo-cta-primary"
+                    onClick={() =>
+                      navigate(`/finances?serviceOrderId=${focusedOrder.id}`)
                     }
-                    if (nextAction === "Criar O.S.") {
-                      navigate(`/service-orders?serviceOrderId=${order.id}`);
-                      return;
+                  >
+                    Ir para cobrança
+                  </button>
+                  <button
+                    type="button"
+                    className="nexo-cta-secondary"
+                    onClick={() =>
+                      navigate(
+                        `/customers?customerId=${focusedOrder.customerId}`
+                      )
                     }
-                    if (nextAction === "Gerar cobrança") {
-                      navigate(`/finances?serviceOrderId=${order.id}`);
-                      return;
+                  >
+                    Abrir cliente
+                  </button>
+                  <button
+                    type="button"
+                    className="nexo-cta-secondary"
+                    onClick={() =>
+                      navigate(
+                        `/whatsapp?customerId=${focusedOrder.customerId}`
+                      )
                     }
-                    navigate(`/whatsapp?customerId=${order.customerId}`);
-                  };
-                  return (
-                    <tr key={String(order?.id)} className="border-t border-[var(--border-subtle)]">
-                      <td className="p-3">{String(order?.title ?? "Sem título")}</td>
-                      <td>{String(order?.customer?.name ?? "—")}</td>
-                      <td><AppStatusBadge label={getOperationalSeverityLabel(getServiceOrderSeverity(order))} /></td>
-                      <td className="p-3 align-middle">
-                        <div className="flex items-center justify-end gap-2">
-                          <AppPriorityBadge label={priorityLabel} />
-                          <AppRowActionsDropdown
-                            triggerLabel="Mais ações"
-                            contentClassName="min-w-[220px]"
-                            items={[
-                              { label: `${nextAction} · prioritário`, onSelect: handlePrimaryAction },
-                              ...(nextAction !== "Criar O.S."
-                                ? [{ label: "Criar O.S.", onSelect: () => navigate(`/service-orders?serviceOrderId=${order.id}`) }]
-                                : []),
-                              ...(nextAction !== "Gerar cobrança"
-                                ? [{ label: "Gerar cobrança", onSelect: () => navigate(`/finances?serviceOrderId=${order.id}`) }]
-                                : []),
-                              ...(nextAction !== "Enviar WhatsApp"
-                                ? [{ label: "Enviar WhatsApp", onSelect: () => navigate(`/whatsapp?customerId=${order.customerId}`) }]
-                                : []),
-                              { label: "Reagendar", onSelect: () => navigate(`/appointments`) },
-                            ]}
-                          />
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </AppDataTable>
-          </div>
-        )}
-      </AppSectionBlock>
+                  >
+                    Comunicar via WhatsApp
+                  </button>
+                </div>
+
+                <ServiceOrderDetailsPanel os={focusedOrder as ServiceOrder} />
+              </div>
+            ) : (
+              <p className="text-xs text-[var(--text-muted)]">
+                Selecione uma ordem para abrir o workspace operacional completo
+                e executar o próximo passo.
+              </p>
+            )}
+          </AppSectionBlock>
+        </div>
+      </div>
 
       <CreateServiceOrderModal
         open={openCreate}
@@ -301,8 +830,14 @@ export default function ServiceOrdersPage() {
         onSuccess={() => {
           void serviceOrdersQuery.refetch();
         }}
-        customers={customers.map((item) => ({ id: String(item.id), name: String(item.name ?? "Cliente") }))}
-        people={people.map((item) => ({ id: String(item.id), name: String(item.name ?? "Pessoa") }))}
+        customers={customers.map(item => ({
+          id: String(item.id),
+          name: String(item.name ?? "Cliente"),
+        }))}
+        people={people.map(item => ({
+          id: String(item.id),
+          name: String(item.name ?? "Pessoa"),
+        }))}
       />
     </PageWrapper>
   );
