@@ -11,6 +11,13 @@ import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedbackButton";
 import { AppOperationalModal } from "@/components/operating-system/AppOperationalModal";
 import {
+  EmptyActionState,
+  OperationalFlowState,
+  OperationalInlineFeedback,
+  OperationalNextAction,
+  OperationalRelationSummary,
+} from "@/components/operating-system/OperationalRefinementBlocks";
+import {
   AppOperationalBar,
   AppDataTable,
   AppPageEmptyState,
@@ -66,19 +73,29 @@ function getPriorityLabel(priority: number) {
 function getNextAction(order: any) {
   const status = normalizeStatus(order?.status);
   const hasCharge = Boolean(order?.financialSummary?.hasCharge);
+  const overdueDays = (() => {
+    const scheduled = safeDate(order?.scheduledFor);
+    if (!scheduled) return 0;
+    const now = Date.now();
+    if (scheduled.getTime() >= now) return 0;
+    return Math.max(1, Math.floor((now - scheduled.getTime()) / (1000 * 60 * 60 * 24)));
+  })();
 
   if (["BLOCKED", "ON_HOLD", "PAUSED"].includes(status)) {
-    return "Destravar execução";
+    return "Destravar agora — O.S. bloqueada";
   }
-  if (status === "WAITING_CUSTOMER") return "Cobrar retorno";
+  if (status === "WAITING_CUSTOMER") return "Cobrar retorno — aguardando cliente";
   if (["OPEN", "ASSIGNED"].includes(status) && !order?.assignedToPersonId) {
-    return "Atribuir técnico";
+    return "Atribuir técnico — ordem sem responsável";
   }
-  if (["OPEN", "ASSIGNED"].includes(status)) return "Iniciar execução";
-  if (status === "IN_PROGRESS") return "Acompanhar execução";
-  if (status === "DONE" && !hasCharge) return "Gerar cobrança";
-  if (status === "DONE" && hasCharge) return "Notificar cliente";
-  return "Revisar histórico";
+  if (["OPEN", "ASSIGNED"].includes(status))
+    return overdueDays > 0
+      ? `Iniciar hoje — agendada e atrasada há ${overdueDays} dia(s)`
+      : "Iniciar execução — pronta para avanço";
+  if (status === "IN_PROGRESS") return "Acompanhar execução — evitar atraso";
+  if (status === "DONE" && !hasCharge) return "Cobrar agora — O.S. concluída sem cobrança";
+  if (status === "DONE" && hasCharge) return "Notificar cliente — cobrança emitida";
+  return "Revisar histórico operacional";
 }
 
 export default function ServiceOrdersPage() {
@@ -92,6 +109,9 @@ export default function ServiceOrdersPage() {
   const [focusedOrderId, setFocusedOrderId] = useState("");
   const [openOperationalModal, setOpenOperationalModal] = useState(false);
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
+  const [actionFeedbackTone, setActionFeedbackTone] = useState<
+    "neutral" | "success" | "error"
+  >("neutral");
 
   const customersQuery = trpc.nexo.customers.list.useQuery(undefined, {
     retry: false,
@@ -132,50 +152,6 @@ export default function ServiceOrdersPage() {
   const todayWindow = getDayWindow(0);
   const next7End = new Date(todayWindow.end);
   next7End.setDate(next7End.getDate() + 7);
-
-  const unassigned = orders.filter(item => !item?.assignedToPersonId).length;
-  const stalePipeline = orders.filter(item => {
-    const status = normalizeStatus(item?.status);
-    const updatedAt = safeDate(item?.updatedAt);
-    if (!["OPEN", "ASSIGNED", "IN_PROGRESS"].includes(status)) return false;
-    if (!updatedAt) return true;
-    const diff = now.getTime() - updatedAt.getTime();
-    return diff >= 1000 * 60 * 60 * 24 * 2;
-  }).length;
-  const blocked = orders.filter(item =>
-    ["BLOCKED", "ON_HOLD", "PAUSED", "WAITING_CUSTOMER"].includes(
-      normalizeStatus(item?.status)
-    )
-  ).length;
-  const readyToCharge = orders.filter(
-    item =>
-      normalizeStatus(item?.status) === "DONE" &&
-      !item?.financialSummary?.hasCharge
-  ).length;
-
-  const riskList = useMemo(() => {
-    return orders
-      .filter(item => {
-        const status = normalizeStatus(item?.status);
-        const updatedAt = safeDate(item?.updatedAt);
-        const delayed =
-          Boolean(updatedAt) &&
-          now.getTime() - (updatedAt?.getTime() ?? 0) >=
-            1000 * 60 * 60 * 24 * 3;
-        return (
-          ["BLOCKED", "ON_HOLD", "PAUSED", "WAITING_CUSTOMER"].includes(
-            status
-          ) || delayed
-        );
-      })
-      .sort(
-        (a, b) =>
-          Number(b?.priority ?? 0) - Number(a?.priority ?? 0) ||
-          (safeDate(a?.updatedAt)?.getTime() ?? 0) -
-            (safeDate(b?.updatedAt)?.getTime() ?? 0)
-      )
-      .slice(0, 5);
-  }, [now, orders]);
 
   const statusParam = useMemo(() => {
     const queryString = location.split("?")[1] ?? "";
@@ -303,70 +279,22 @@ export default function ServiceOrdersPage() {
   ) => {
     if (!focusedOrder?.id) return;
     try {
+      setActionFeedbackTone("neutral");
       setActionFeedback("Atualizando ordem de serviço...");
       await updateServiceOrder.mutateAsync({
         id: String(focusedOrder.id),
         status,
       } as any);
       setActionFeedback(`Status atualizado para ${getStatusLabel(status)}.`);
+      setActionFeedbackTone("success");
       await serviceOrdersQuery.refetch();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Falha na atualização.";
+      setActionFeedbackTone("error");
       setActionFeedback(message);
       toast.error(message);
     }
   };
-
-  const topActions = [
-    {
-      title:
-        blocked > 0
-          ? `${blocked} O.S. com risco direto de travar o dia.`
-          : "Sem travas críticas neste momento.",
-      subtitle:
-        blocked > 0
-          ? "Ataque bloqueios e esperas de cliente para restaurar fluxo de execução."
-          : "Mantenha cadência com revisão das O.S. em execução e prontas para cobrança.",
-      action: (
-        <button
-          className="nexo-cta-secondary"
-          onClick={() => {
-            setActiveTab("attention");
-          }}
-        >
-          Abrir fila de atenção
-        </button>
-      ),
-    },
-    {
-      title: `${readyToCharge} concluída(s) aguardando cobrança`,
-      subtitle:
-        readyToCharge > 0
-          ? "Converta execução em receita: gerar cobrança e confirmar envio ao cliente."
-          : "Sem pendência financeira imediata de O.S. concluída.",
-      action: (
-        <button
-          className="nexo-cta-secondary"
-          onClick={() => navigate("/finances")}
-        >
-          Ir para Financeiro
-        </button>
-      ),
-    },
-    {
-      title: `${unassigned} sem responsável · ${stalePipeline} sem avanço recente`,
-      subtitle:
-        "Distribua execução e remova ordens paradas há mais de 48h para proteger SLA.",
-      action: (
-        <button
-          className="nexo-cta-secondary"
-          onClick={() => setOpenCreate(true)}
-        >
-          Criar/Atribuir O.S.
-        </button>
-      ),
-    },
-  ];
 
   const headerCta = (() => {
     if (activeTab === "execution") {
@@ -406,7 +334,7 @@ export default function ServiceOrdersPage() {
   return (
     <PageWrapper
       title="Ordens de Serviço"
-      subtitle="Centro operacional de execução, bloqueios, conclusão e conversão financeira."
+      subtitle="Execute, destrave e converta O.S. em cobrança no mesmo fluxo."
     >
       <div className="space-y-4">
         <AppPageHeader
@@ -627,19 +555,6 @@ export default function ServiceOrdersPage() {
                         );
 
                         const handlePrimaryAction = () => {
-                          if (nextAction === "Gerar cobrança") {
-                            setFocusedOrderId(String(order?.id ?? ""));
-                            setOpenOperationalModal(true);
-                            return;
-                          }
-                          if (
-                            nextAction === "Cobrar retorno" ||
-                            nextAction === "Notificar cliente"
-                          ) {
-                            setFocusedOrderId(String(order?.id ?? ""));
-                            setOpenOperationalModal(true);
-                            return;
-                          }
                           setFocusedOrderId(String(order?.id ?? ""));
                           setOpenOperationalModal(true);
                         };
@@ -768,7 +683,13 @@ export default function ServiceOrdersPage() {
 
       <AppOperationalModal
         open={openOperationalModal && Boolean(focusedOrder)}
-        onOpenChange={setOpenOperationalModal}
+        onOpenChange={open => {
+          setOpenOperationalModal(open);
+          if (!open) {
+            setActionFeedback(null);
+            setActionFeedbackTone("neutral");
+          }
+        }}
         title={String(focusedOrder?.title ?? "O.S. sem título")}
         subtitle={`Cliente: ${String(focusedOrder?.customer?.name ?? "Cliente")}`}
         status={getStatusLabel(normalizeStatus(focusedOrder?.status))}
@@ -806,11 +727,14 @@ export default function ServiceOrdersPage() {
               !focusedOrder?.financialSummary?.hasCharge
             ) {
               try {
+                setActionFeedbackTone("neutral");
                 setActionFeedback("Gerando cobrança...");
                 await generateCharge.mutateAsync({ id: String(focusedOrder.id) } as any);
                 setActionFeedback("Cobrança gerada com sucesso.");
+                setActionFeedbackTone("success");
                 await serviceOrdersQuery.refetch();
               } catch (error) {
+                setActionFeedbackTone("error");
                 setActionFeedback("Falha ao gerar cobrança.");
               }
               return;
@@ -818,6 +742,7 @@ export default function ServiceOrdersPage() {
             await executeOrderStatus("IN_PROGRESS");
           },
           disabled: updateServiceOrder.isPending || generateCharge.isPending,
+          processing: updateServiceOrder.isPending || generateCharge.isPending,
         }}
         secondaryAction={{
           label: "Concluir O.S.",
@@ -846,8 +771,43 @@ export default function ServiceOrdersPage() {
           },
         ]}
         feedback={actionFeedback}
+        feedbackTone={actionFeedbackTone}
       >
         <div className="space-y-4">
+          {focusedOrder ? (
+            <OperationalNextAction
+              title={getNextAction(focusedOrder)}
+              reason="Recomendação baseada no status da O.S., avanço do fluxo e vínculo financeiro."
+              urgency={
+                ["BLOCKED", "ON_HOLD", "PAUSED"].includes(
+                  normalizeStatus(focusedOrder?.status)
+                ) || !focusedOrder?.financialSummary?.hasCharge
+                  ? "Urgente"
+                  : "Prioridade operacional"
+              }
+              impact={
+                normalizeStatus(focusedOrder?.status) === "DONE" &&
+                !focusedOrder?.financialSummary?.hasCharge
+                  ? "Evitar perda de receita"
+                  : "Manter SLA de execução"
+              }
+            />
+          ) : null}
+          <OperationalFlowState
+            steps={[
+              { label: "Cliente", state: "done" },
+              { label: "Agendamento", state: focusedOrder?.appointmentId ? "done" : "pending" },
+              { label: "O.S.", state: "current" },
+              {
+                label: "Cobrança",
+                state: focusedOrder?.financialSummary?.hasCharge ? "done" : "pending",
+              },
+              {
+                label: "Pagamento",
+                state: focusedOrder?.financialSummary?.hasCharge ? "current" : "pending",
+              },
+            ]}
+          />
           <section className="space-y-1.5">
             <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
               Próxima melhor ação
@@ -864,11 +824,36 @@ export default function ServiceOrdersPage() {
               </p>
             ) : null}
           </section>
+          <OperationalRelationSummary
+            title="Entidades conectadas"
+            items={[
+              `Esta O.S. pertence ao cliente ${String(focusedOrder?.customer?.name ?? "não identificado")}.`,
+              focusedOrder?.appointmentId
+                ? `A execução veio do agendamento #${String(focusedOrder.appointmentId)}.`
+                : "Sem agendamento de origem registrado.",
+              focusedOrder?.financialSummary?.hasCharge
+                ? "Já existe cobrança associada a esta O.S."
+                : "Ainda não existe cobrança associada a esta O.S.",
+            ]}
+          />
+          {!focusedOrder?.financialSummary?.hasCharge ? (
+            <EmptyActionState
+              title="Nenhuma cobrança gerada ainda"
+              description="A O.S. já está no fluxo operacional, mas sem conexão com o financeiro."
+              ctaLabel="Gerar cobrança"
+              onCta={() => focusedOrder?.id && navigate(`/finances?serviceOrderId=${focusedOrder.id}`)}
+            />
+          ) : null}
           <section className="border-t border-[var(--border-subtle)] pt-4">
             {focusedOrder ? (
               <ServiceOrderDetailsPanel os={focusedOrder as ServiceOrder} />
             ) : null}
           </section>
+          {actionFeedback ? (
+            <OperationalInlineFeedback tone={actionFeedbackTone}>
+              {actionFeedback}
+            </OperationalInlineFeedback>
+          ) : null}
         </div>
       </AppOperationalModal>
       <CreateServiceOrderModal

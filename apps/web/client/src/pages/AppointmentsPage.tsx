@@ -10,6 +10,13 @@ import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedbackButton";
 import { AppOperationalModal } from "@/components/operating-system/AppOperationalModal";
 import {
+  EmptyActionState,
+  OperationalFlowState,
+  OperationalInlineFeedback,
+  OperationalNextAction,
+  OperationalRelationSummary,
+} from "@/components/operating-system/OperationalRefinementBlocks";
+import {
   getAppointmentSeverity,
   getOperationalSeverityLabel,
 } from "@/lib/operations/operational-intelligence";
@@ -25,7 +32,7 @@ import {
   AppPriorityBadge,
   AppStatusBadge,
 } from "@/components/internal-page-system";
-import { getDayWindow, inRange, safeDate } from "@/lib/operational/kpi";
+import { inRange, safeDate } from "@/lib/operational/kpi";
 import { toast } from "sonner";
 
 type TabKey = "agenda" | "confirmed" | "pending" | "conflicts" | "history";
@@ -59,10 +66,19 @@ function mapOperationalState(item: AppointmentLike, hasConflict: boolean) {
 
 function getNextAction(item: AppointmentLike) {
   const status = String(item?.status ?? "").toUpperCase();
-  if (status === "SCHEDULED") return "Confirmar";
-  if (status === "CONFIRMED") return "Criar O.S.";
-  if (status === "DONE") return "Revisar execução";
-  return "Contato no WhatsApp";
+  const start = safeDate(item?.startsAt);
+  const now = new Date();
+  const overdueDays =
+    start && start < now
+      ? Math.max(1, Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)))
+      : 0;
+  if (status === "SCHEDULED")
+    return overdueDays > 0
+      ? `Confirmar agora — agendamento atrasado há ${overdueDays} dia(s)`
+      : "Confirmar agora — agendamento ainda pendente";
+  if (status === "CONFIRMED") return "Criar O.S. — atendimento confirmado";
+  if (status === "DONE") return "Revisar execução — atendimento concluído";
+  return "Contatar no WhatsApp — alinhar próximo passo";
 }
 
 export default function AppointmentsPage() {
@@ -77,6 +93,9 @@ export default function AppointmentsPage() {
   const [openOperationalModal, setOpenOperationalModal] = useState(false);
   const [openServiceOrderCreate, setOpenServiceOrderCreate] = useState(false);
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
+  const [actionFeedbackTone, setActionFeedbackTone] = useState<
+    "neutral" | "success" | "error"
+  >("neutral");
 
   const customersQuery = trpc.nexo.customers.list.useQuery(undefined, {
     retry: false,
@@ -111,8 +130,6 @@ export default function AppointmentsPage() {
       !showInitialLoading && !showErrorState && appointments.length === 0,
     dataCount: appointments.length,
   });
-
-  const todayWindow = getDayWindow(0);
 
   const appointmentsBySlot = useMemo(
     () =>
@@ -161,24 +178,6 @@ export default function AppointmentsPage() {
       };
     });
   }, [appointments, appointmentsBySlot, now]);
-
-  const atRiskList = appointmentWithContext
-    .filter(
-      ({ hasConflict, isDelayed, operationalState }) =>
-        hasConflict || isDelayed || operationalState === "Em risco"
-    )
-    .sort(
-      (a, b) =>
-        (safeDate(a.item?.startsAt)?.getTime() ?? 0) -
-        (safeDate(b.item?.startsAt)?.getTime() ?? 0)
-    );
-
-  const requiresExecution = appointmentWithContext.filter(
-    ({ item }) => String(item?.status ?? "").toUpperCase() === "CONFIRMED"
-  ).length;
-  const mostLoadedSlot = Object.entries(appointmentsBySlot).sort(
-    (a, b) => b[1] - a[1]
-  )[0];
 
   const filteredAppointments = useMemo(() => {
     let base = appointmentWithContext;
@@ -269,6 +268,7 @@ export default function AppointmentsPage() {
   const executeStatusUpdate = async (status: "CONFIRMED" | "CANCELED") => {
     if (!focused?.item?.id) return;
     try {
+      setActionFeedbackTone("neutral");
       setActionFeedback("Processando ação...");
       await updateAppointment.mutateAsync({
         id: String(focused.item.id),
@@ -279,10 +279,12 @@ export default function AppointmentsPage() {
           ? "Agendamento confirmado com sucesso."
           : "Agendamento cancelado com sucesso."
       );
+      setActionFeedbackTone("success");
       await appointmentsQuery.refetch();
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Falha ao atualizar agendamento.";
+      setActionFeedbackTone("error");
       setActionFeedback(message);
       toast.error(message);
     }
@@ -326,7 +328,7 @@ export default function AppointmentsPage() {
   return (
     <PageWrapper
       title="Agenda operacional"
-      subtitle="Agendamentos conectados à execução, cliente e comunicação sem quebrar o fluxo atual."
+      subtitle="Confirme, execute e avance para O.S. sem sair da agenda."
     >
       <div className="space-y-4">
         <AppPageHeader
@@ -656,7 +658,13 @@ export default function AppointmentsPage() {
 
       <AppOperationalModal
         open={openOperationalModal && Boolean(focused)}
-        onOpenChange={setOpenOperationalModal}
+        onOpenChange={open => {
+          setOpenOperationalModal(open);
+          if (!open) {
+            setActionFeedback(null);
+            setActionFeedbackTone("neutral");
+          }
+        }}
         title={String(focused?.item?.title ?? focused?.item?.customer?.name ?? "Agendamento")}
         subtitle={String(focused?.item?.customer?.name ?? "Cliente não identificado")}
         status={focused?.operationalState}
@@ -681,20 +689,21 @@ export default function AppointmentsPage() {
           { label: "Próxima ação", value: focused?.nextAction ?? "—" },
         ]}
         primaryAction={{
-          label: focused?.nextAction ?? "Executar ação",
+          label: focused?.nextAction?.split("—")[0]?.trim() ?? "Executar ação",
           onClick: () => {
             if (!focused) return;
-            if (focused.nextAction === "Confirmar") {
+            if (focused.nextAction.startsWith("Confirmar agora")) {
               void executeStatusUpdate("CONFIRMED");
               return;
             }
-            if (focused.nextAction === "Criar O.S.") {
+            if (focused.nextAction.startsWith("Criar O.S.")) {
               setOpenServiceOrderCreate(true);
               return;
             }
             navigate(`/whatsapp?customerId=${focused.item?.customerId}`);
           },
           disabled: updateAppointment.isPending,
+          processing: updateAppointment.isPending,
         }}
         secondaryAction={{
           label: "Cancelar",
@@ -712,6 +721,7 @@ export default function AppointmentsPage() {
               start.setDate(start.getDate() + 1);
               if (end) end.setDate(end.getDate() + 1);
               try {
+                setActionFeedbackTone("neutral");
                 setActionFeedback("Remarcando agendamento...");
                 await updateAppointment.mutateAsync({
                   id: String(focused.item.id),
@@ -719,8 +729,10 @@ export default function AppointmentsPage() {
                   endsAt: end?.toISOString(),
                 } as any);
                 setActionFeedback("Agendamento remarcado para o próximo dia.");
+                setActionFeedbackTone("success");
                 await appointmentsQuery.refetch();
               } catch (error) {
+                setActionFeedbackTone("error");
                 setActionFeedback("Falha ao remarcar.");
               }
             },
@@ -740,8 +752,39 @@ export default function AppointmentsPage() {
           },
         ]}
         feedback={actionFeedback}
+        feedbackTone={actionFeedbackTone}
       >
         <div className="space-y-4">
+          {focused ? (
+            <OperationalNextAction
+              title={focused.nextAction}
+              reason={
+                focused.hasConflict
+                  ? "Há conflito de agenda e risco de perda de atendimento."
+                  : focused.isDelayed
+                    ? "A janela prevista já passou e exige reação imediata."
+                    : "Esta ação mantém o fluxo entre agenda e execução."
+              }
+              urgency={
+                focused.hasConflict || focused.isDelayed
+                  ? "Urgente"
+                  : "Prioridade operacional"
+              }
+              impact={focused.isDelayed ? "Reduz no-show e atraso" : "Mantém sequência de atendimento"}
+            />
+          ) : null}
+          <OperationalFlowState
+            steps={[
+              { label: "Cliente", state: "done" },
+              { label: "Agendamento", state: "current" },
+              {
+                label: "O.S.",
+                state: String(focused?.item?.status ?? "").toUpperCase() === "CONFIRMED" ? "pending" : "done",
+              },
+              { label: "Cobrança", state: "pending" },
+              { label: "Pagamento", state: "pending" },
+            ]}
+          />
           <section className="space-y-1.5">
             <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
               Contexto operacional
@@ -754,6 +797,22 @@ export default function AppointmentsPage() {
                   : "Fluxo dentro do planejado para execução."}
             </p>
           </section>
+          <OperationalRelationSummary
+            title="Entidades conectadas"
+            items={[
+              `Este agendamento está vinculado ao cliente ${String(focused?.item?.customer?.name ?? "não identificado")}.`,
+              `Status atual: ${String(focused?.item?.status ?? "não informado")} com próxima ação "${focused?.nextAction ?? "—"}".`,
+              "Ao confirmar, o próximo passo recomendado é gerar O.S. e avançar para cobrança.",
+            ]}
+          />
+          {String(focused?.item?.status ?? "").toUpperCase() === "CONFIRMED" ? (
+            <EmptyActionState
+              title="Atendimento confirmado e pronto para execução"
+              description="Ainda não há garantia de execução operacional. Crie uma O.S. para continuar o fluxo."
+              ctaLabel="Criar O.S."
+              onCta={() => setOpenServiceOrderCreate(true)}
+            />
+          ) : null}
           <section className="space-y-1.5 border-t border-[var(--border-subtle)] pt-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
               Timeline curta
@@ -764,6 +823,11 @@ export default function AppointmentsPage() {
               <li>Próxima melhor ação: {focused?.nextAction ?? "—"}.</li>
             </ul>
           </section>
+          {actionFeedback ? (
+            <OperationalInlineFeedback tone={actionFeedbackTone}>
+              {actionFeedback}
+            </OperationalInlineFeedback>
+          ) : null}
         </div>
       </AppOperationalModal>
       <CreateAppointmentModal
@@ -781,6 +845,7 @@ export default function AppointmentsPage() {
         open={openServiceOrderCreate}
         onClose={() => setOpenServiceOrderCreate(false)}
         onSuccess={() => {
+          setActionFeedbackTone("success");
           setActionFeedback("O.S. criada com vínculo ao agendamento.");
         }}
         customers={customers.map(item => ({

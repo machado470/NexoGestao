@@ -12,6 +12,13 @@ import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
 import { Button, SecondaryButton } from "@/components/design-system";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { AppOperationalModal } from "@/components/operating-system/AppOperationalModal";
+import {
+  EmptyActionState,
+  OperationalFlowState,
+  OperationalInlineFeedback,
+  OperationalNextAction,
+  OperationalRelationSummary,
+} from "@/components/operating-system/OperationalRefinementBlocks";
 import { AppRowActionsDropdown, AppCheckbox } from "@/components/app-system";
 import {
   AppOperationalBar,
@@ -20,7 +27,6 @@ import {
   AppPageErrorState,
   AppPageHeader,
   AppPageLoadingState,
-  AppPriorityBadge,
   AppSectionBlock,
   AppStatusBadge,
   appSelectionPillClasses,
@@ -39,12 +45,6 @@ type OperationalFilter =
   | "no_schedule"
   | "healthy";
 type OperationalSort = "priority" | "financial" | "last_interaction" | "name";
-type NextAction =
-  | "Cobrar agora"
-  | "Criar agendamento"
-  | "Enviar WhatsApp"
-  | "Abrir workspace";
-
 type CustomerOperationalSnapshot = {
   customerId: string;
   status: OperationalStatus;
@@ -57,7 +57,10 @@ type CustomerOperationalSnapshot = {
   overdueCharges: number;
   pendingCharges: number;
   reactivationPotential: boolean;
-  primaryActionLabel: NextAction;
+  primaryActionLabel: string;
+  primaryActionReason: string;
+  primaryActionUrgency?: string;
+  primaryActionImpact?: string;
   financialPendingCents: number;
   financialPotentialCents: number;
   latestChargeCents: number;
@@ -117,6 +120,10 @@ export default function CustomersPage() {
   const [openAppointmentCreate, setOpenAppointmentCreate] = useState(false);
   const [openServiceOrderCreate, setOpenServiceOrderCreate] = useState(false);
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
+  const [actionFeedbackTone, setActionFeedbackTone] = useState<
+    "neutral" | "success" | "error"
+  >("neutral");
+  const [isProcessingPrimaryAction, setIsProcessingPrimaryAction] = useState(false);
   const [activeTab, setActiveTab] = useState<
     "overview" | "agenda" | "service_orders" | "financial" | "history"
   >("overview");
@@ -249,27 +256,47 @@ export default function CustomersPage() {
 
       let status: OperationalStatus = "Seguro";
       let contextLabel = "Fluxo operacional seguro";
-      let primaryActionLabel: NextAction = "Abrir workspace";
+      let primaryActionLabel = "Abrir detalhe operacional";
+      let primaryActionReason = "Cliente em situação estável com fluxo contínuo.";
+      let primaryActionUrgency: string | undefined;
+      let primaryActionImpact = "Manter previsibilidade operacional";
       let nextActionReason = "Manter ritmo com revisão rápida do histórico";
 
       if (overdueCharges > 0) {
         status = "Em risco";
         contextLabel = "Cobrança vencida";
-        primaryActionLabel = "Cobrar agora";
+        primaryActionLabel = `Cobrar hoje — ${overdueCharges} vencida(s)`;
+        primaryActionReason =
+          "O cliente já concluiu etapas e ainda possui cobrança vencida.";
+        primaryActionUrgency = `Urgente · atraso de ${contactDays} dias`;
+        primaryActionImpact = formatMoney(financialPendingCents);
         nextActionReason = "Cobrança vencida com impacto direto no caixa";
       } else if (!hasFutureSchedule) {
         status = "Atenção";
         contextLabel = "Sem agendamento futuro";
-        primaryActionLabel = "Criar agendamento";
+        primaryActionLabel = "Criar agendamento — sem agenda futura";
+        primaryActionReason =
+          "Sem próxima visita agendada, com risco de perder continuidade.";
+        primaryActionUrgency = "Ação hoje para proteger recorrência";
+        primaryActionImpact = "Reduz risco de inatividade";
         nextActionReason = "Sem agenda futura e risco de quebra do fluxo";
       } else if (contactState !== "responded") {
         status = "Atenção";
         contextLabel = `Sem resposta há ${contactDays} dias`;
-        primaryActionLabel = "Enviar WhatsApp";
+        primaryActionLabel = `Confirmar agora — sem resposta há ${contactDays} dias`;
+        primaryActionReason =
+          "Agendamento futuro existe, mas sem confirmação recente do cliente.";
+        primaryActionUrgency =
+          contactDays >= 5 ? "Urgente · risco de no-show" : "Atenção";
+        primaryActionImpact = "Evita falta e retrabalho";
         nextActionReason = "Reengajar comunicação para manter continuidade";
       } else if (!hasAnyCharge) {
         status = "Sem cobrança";
         contextLabel = "Sem cobrança ativa";
+        primaryActionLabel = "Gerar cobrança — fluxo financeiro incompleto";
+        primaryActionReason =
+          "Operação está ativa, porém sem camada financeira vinculada.";
+        primaryActionImpact = "Transformar execução em receita";
         nextActionReason = "Fluxo sem camada financeira ativa";
       }
 
@@ -296,6 +323,9 @@ export default function CustomersPage() {
         pendingCharges,
         reactivationPotential,
         primaryActionLabel,
+        primaryActionReason,
+        primaryActionUrgency,
+        primaryActionImpact,
         financialPendingCents,
         financialPotentialCents,
         latestChargeCents,
@@ -330,8 +360,8 @@ export default function CustomersPage() {
       if (activeTab === "agenda" && snapshot.hasFutureSchedule) return false;
       if (
         activeTab === "service_orders" &&
-        snapshot.primaryActionLabel !== "Abrir workspace" &&
-        snapshot.primaryActionLabel !== "Enviar WhatsApp"
+        !snapshot.primaryActionLabel.includes("detalhe") &&
+        !snapshot.primaryActionLabel.includes("Confirmar")
       ) {
         return false;
       }
@@ -442,39 +472,43 @@ export default function CustomersPage() {
   const latestMessage = workspaceMessages[0];
   const selectedSnapshot = snapshotByCustomerId.get(selectedCustomer?.id ?? "");
 
-  const explainConditions = selectedSnapshot
-    ? ([
-        selectedSnapshot.overdueCharges > 0
-          ? `Cobrança vencida há ${selectedSnapshot.contactDays} dias`
-          : null,
-        selectedSnapshot.contactState !== "responded"
-          ? `Cliente sem resposta (${selectedSnapshot.contactLabel.toLowerCase()})`
-          : null,
-        !selectedSnapshot.hasFutureSchedule
-          ? "Sem agendamento futuro confirmado"
-          : null,
-        `Comportamento detectado: ${selectedSnapshot.behaviorLabel.toLowerCase()}`,
-      ].filter(Boolean) as string[])
-    : [];
-
   const runCustomerPrimaryAction = () => {
     if (!selectedCustomer?.id || !selectedSnapshot) return;
-    if (selectedSnapshot.primaryActionLabel === "Cobrar agora") {
+    setIsProcessingPrimaryAction(true);
+    if (selectedSnapshot.primaryActionLabel.startsWith("Cobrar")) {
+      setActionFeedbackTone("success");
       setActionFeedback("Abrindo cobrança do cliente...");
       navigate(`/finances?customerId=${selectedCustomer.id}&filter=overdue`);
+      setIsProcessingPrimaryAction(false);
       return;
     }
-    if (selectedSnapshot.primaryActionLabel === "Criar agendamento") {
+    if (selectedSnapshot.primaryActionLabel.startsWith("Criar agendamento")) {
+      setActionFeedbackTone("success");
       setActionFeedback("Abrindo criação de agendamento...");
       setOpenAppointmentCreate(true);
+      setIsProcessingPrimaryAction(false);
       return;
     }
-    if (selectedSnapshot.primaryActionLabel === "Enviar WhatsApp") {
+    if (
+      selectedSnapshot.primaryActionLabel.startsWith("Confirmar agora") ||
+      selectedSnapshot.primaryActionLabel.startsWith("Enviar WhatsApp")
+    ) {
+      setActionFeedbackTone("success");
       setActionFeedback("Abrindo canal de comunicação...");
       navigate(`/whatsapp?customerId=${selectedCustomer.id}`);
+      setIsProcessingPrimaryAction(false);
       return;
     }
+    if (selectedSnapshot.primaryActionLabel.startsWith("Gerar cobrança")) {
+      setActionFeedbackTone("success");
+      setActionFeedback("Abrindo financeiro para gerar cobrança...");
+      navigate(`/finances?customerId=${selectedCustomer.id}`);
+      setIsProcessingPrimaryAction(false);
+      return;
+    }
+    setActionFeedbackTone("neutral");
     setActionFeedback("Contexto do cliente carregado.");
+    setIsProcessingPrimaryAction(false);
   };
 
   const filterItems: Array<{ key: OperationalFilter; label: string }> = [
@@ -497,10 +531,6 @@ export default function CustomersPage() {
     last_interaction: "Última interação",
     name: "Nome",
   };
-
-  const topPriorityCustomers = [...operationalSnapshots]
-    .sort((left, right) => right.priorityScore - left.priorityScore)
-    .slice(0, 3);
 
   const tabMeta = {
     overview: {
@@ -565,7 +595,7 @@ export default function CustomersPage() {
   return (
     <PageWrapper
       title="Centro operacional de clientes"
-      subtitle="Cliente como núcleo da operação: relacionamento, agenda, O.S., cobrança e comunicação em uma leitura única."
+      subtitle="Relacione cliente, agenda, O.S. e cobrança em uma única decisão operacional."
     >
       <div className="space-y-4">
         <AppPageHeader
@@ -769,37 +799,33 @@ export default function CustomersPage() {
                         if (!snapshot) return null;
 
                         const primaryAction = (() => {
-                          if (snapshot.primaryActionLabel === "Cobrar agora") {
+                          if (snapshot.primaryActionLabel.startsWith("Cobrar")) {
                             return {
-                              label: "Cobrar agora · prioritário",
+                              label: `${snapshot.primaryActionLabel} · prioritário`,
                               onSelect: () =>
                                 navigate(
                                   `/finances?customerId=${customerId}&filter=overdue`
                                 ),
                             };
                           }
-                          if (
-                            snapshot.primaryActionLabel === "Criar agendamento"
-                          ) {
+                          if (snapshot.primaryActionLabel.startsWith("Criar agendamento")) {
                             return {
-                              label: "Criar agendamento · prioritário",
+                              label: `${snapshot.primaryActionLabel} · prioritário`,
                               onSelect: () =>
                                 navigate(
                                   `/appointments?customerId=${customerId}`
                                 ),
                             };
                           }
-                          if (
-                            snapshot.primaryActionLabel === "Enviar WhatsApp"
-                          ) {
+                          if (snapshot.primaryActionLabel.startsWith("Confirmar")) {
                             return {
-                              label: "Enviar WhatsApp · prioritário",
+                              label: `${snapshot.primaryActionLabel} · prioritário`,
                               onSelect: () =>
                                 navigate(`/whatsapp?customerId=${customerId}`),
                             };
                           }
                           return {
-                            label: "Abrir workspace · prioritário",
+                            label: `${snapshot.primaryActionLabel} · prioritário`,
                             onSelect: () => {
                               setTimelineExpanded(false);
                               setSelectedCustomer({
@@ -878,7 +904,7 @@ export default function CustomersPage() {
                                 {snapshot.nextActionReason}
                               </p>
                               <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
-                                Próxima: {snapshot.primaryActionLabel}
+                                {snapshot.primaryActionLabel}
                               </p>
                               {snapshot.financialPendingCents > 0 ? (
                                 <p className="mt-1 text-xs text-[var(--text-muted)]">
@@ -913,7 +939,7 @@ export default function CustomersPage() {
                                       onSelect: primaryAction.onSelect,
                                     },
                                     {
-                                      label: "Abrir workspace",
+                                      label: "Abrir detalhe operacional",
                                       onSelect: () => {
                                         setTimelineExpanded(false);
                                         setSelectedCustomer({
@@ -958,88 +984,6 @@ export default function CustomersPage() {
               </div>
             )}
           </AppSectionBlock>
-          <AppSectionBlock
-            title="Ação contextual contínua"
-            subtitle={
-              selectedCustomer
-                ? "Detalhe operacional aberto em modal para executar sem trocar de tela."
-                : "Selecione um cliente para abrir a central operacional."
-            }
-            compact
-          >
-            <div className="space-y-3">
-              <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">
-                  Cliente em foco
-                </p>
-                <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
-                  {selectedCustomer?.name ?? "Nenhum cliente selecionado"}
-                </p>
-                <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                  {selectedSnapshot
-                    ? `${selectedSnapshot.contextLabel} · ${selectedSnapshot.contactLabel}`
-                    : "Clique em um cliente na tabela para abrir a central operacional completa."}
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-2.5">
-                  <p className="text-[11px] uppercase tracking-[0.1em] text-[var(--text-muted)]">
-                    Financeiro
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
-                    {selectedCustomer ? workspaceCharges.length : 0}
-                  </p>
-                </div>
-                <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-2.5">
-                  <p className="text-[11px] uppercase tracking-[0.1em] text-[var(--text-muted)]">
-                    Agenda
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
-                    {selectedCustomer ? workspaceAppointments.length : 0}
-                  </p>
-                </div>
-                <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-2.5">
-                  <p className="text-[11px] uppercase tracking-[0.1em] text-[var(--text-muted)]">
-                    O.S.
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
-                    {selectedCustomer ? workspaceServiceOrders.length : 0}
-                  </p>
-                </div>
-                <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-2.5">
-                  <p className="text-[11px] uppercase tracking-[0.1em] text-[var(--text-muted)]">
-                    WhatsApp
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
-                    {selectedCustomer ? workspaceMessages.length : 0}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  className="h-8 px-3 text-xs"
-                  onClick={() => selectedCustomer && runCustomerPrimaryAction()}
-                  disabled={!selectedCustomer}
-                >
-                  {selectedSnapshot?.primaryActionLabel ?? "Abrir detalhe"}
-                </Button>
-                <SecondaryButton
-                  type="button"
-                  className="h-8 px-3 text-xs"
-                  onClick={() =>
-                    selectedCustomer &&
-                    setSelectedCustomer({ ...selectedCustomer })
-                  }
-                  disabled={!selectedCustomer}
-                >
-                  Abrir detalhe operacional
-                </SecondaryButton>
-              </div>
-            </div>
-          </AppSectionBlock>
         </div>
 
         <CreateCustomerModal
@@ -1064,6 +1008,7 @@ export default function CustomersPage() {
               setSelectedCustomer(null);
               setTimelineExpanded(false);
               setActionFeedback(null);
+              setActionFeedbackTone("neutral");
             }
           }}
           title={selectedCustomer?.name ?? "Cliente"}
@@ -1094,6 +1039,7 @@ export default function CustomersPage() {
             label: selectedSnapshot?.primaryActionLabel ?? "Abrir detalhe",
             onClick: runCustomerPrimaryAction,
             disabled: !selectedCustomer?.id,
+            processing: isProcessingPrimaryAction,
           }}
           secondaryAction={{
             label: "Criar O.S.",
@@ -1104,24 +1050,25 @@ export default function CustomersPage() {
             {
               label: "Criar agendamento",
               onClick: () => setOpenAppointmentCreate(true),
-              disabled: !selectedCustomer?.id,
+              disabled: !selectedCustomer?.id || isProcessingPrimaryAction,
             },
             {
               label: "Cobrança",
               onClick: () =>
                 selectedCustomer?.id &&
                 navigate(`/finances?customerId=${selectedCustomer.id}&filter=overdue`),
-              disabled: !selectedCustomer?.id,
+              disabled: !selectedCustomer?.id || isProcessingPrimaryAction,
             },
             {
               label: "WhatsApp",
               onClick: () =>
                 selectedCustomer?.id &&
                 navigate(`/whatsapp?customerId=${selectedCustomer.id}`),
-              disabled: !selectedCustomer?.id,
+              disabled: !selectedCustomer?.id || isProcessingPrimaryAction,
             },
           ]}
           feedback={actionFeedback}
+          feedbackTone={actionFeedbackTone}
         >
           <div className="space-y-4">
             {workspaceQuery.isLoading ? (
@@ -1150,21 +1097,55 @@ export default function CustomersPage() {
                     </p>
                   ) : null}
                 </section>
-                <section className="space-y-1.5 border-t border-[var(--border-subtle)] pt-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
-                    Próxima melhor ação
-                  </p>
-                  <p className="text-sm text-[var(--text-primary)]">
-                    {selectedSnapshot?.nextActionReason ?? "Sem recomendação no momento."}
-                  </p>
-                  {selectedSnapshot ? (
-                    <ul className="mt-1 list-disc space-y-1 pl-4 text-xs text-[var(--text-secondary)]">
-                      {explainConditions.map(condition => (
-                        <li key={condition}>{condition}</li>
-                      ))}
-                    </ul>
-                  ) : null}
-                </section>
+                {selectedSnapshot ? (
+                  <OperationalNextAction
+                    title={selectedSnapshot.primaryActionLabel}
+                    reason={selectedSnapshot.primaryActionReason}
+                    urgency={selectedSnapshot.primaryActionUrgency}
+                    impact={selectedSnapshot.primaryActionImpact}
+                  />
+                ) : null}
+                <OperationalFlowState
+                  steps={[
+                    { label: "Cliente", state: "done" },
+                    {
+                      label: "Agendamento",
+                      state: selectedSnapshot?.hasFutureSchedule ? "done" : "pending",
+                    },
+                    {
+                      label: "O.S.",
+                      state: workspaceServiceOrders.length > 0 ? "done" : "pending",
+                    },
+                    {
+                      label: "Cobrança",
+                      state:
+                        selectedSnapshot &&
+                        (selectedSnapshot.pendingCharges > 0 ||
+                          selectedSnapshot.overdueCharges > 0)
+                          ? "current"
+                          : workspaceCharges.length > 0
+                            ? "done"
+                            : "pending",
+                    },
+                    {
+                      label: "Pagamento",
+                      state:
+                        selectedSnapshot?.overdueCharges
+                          ? "pending"
+                          : workspaceCharges.length > 0
+                            ? "current"
+                            : "pending",
+                    },
+                  ]}
+                />
+                <OperationalRelationSummary
+                  title="Entidades conectadas"
+                  items={[
+                    `Este cliente possui ${workspaceAppointments.length} agendamento(s) e ${workspaceServiceOrders.length} O.S. vinculada(s).`,
+                    `Financeiro atual: ${workspaceCharges.length} cobrança(s), com ${selectedSnapshot?.overdueCharges ?? 0} vencida(s).`,
+                    `Canal ativo: ${workspaceMessages.length} interação(ões) de WhatsApp registradas.`,
+                  ]}
+                />
                 <section className="space-y-1.5 border-t border-[var(--border-subtle)] pt-4">
                   <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
                     Financeiro e cobrança
@@ -1186,6 +1167,25 @@ export default function CustomersPage() {
                         : "—"}
                   </p>
                 </section>
+                {workspaceServiceOrders.length === 0 ? (
+                  <EmptyActionState
+                    title="Nenhuma O.S. vinculada ainda"
+                    description="Ainda não existe ordem de serviço para este cliente. Abra uma O.S. para dar continuidade ao fluxo operacional."
+                    ctaLabel="Criar O.S."
+                    onCta={() => setOpenServiceOrderCreate(true)}
+                  />
+                ) : null}
+                {workspaceCharges.length === 0 ? (
+                  <EmptyActionState
+                    title="Nenhuma cobrança gerada ainda"
+                    description="Sem cobrança ativa para este cliente. Gere cobrança para conectar execução ao financeiro."
+                    ctaLabel="Gerar cobrança"
+                    onCta={() =>
+                      selectedCustomer?.id &&
+                      navigate(`/finances?customerId=${selectedCustomer.id}`)
+                    }
+                  />
+                ) : null}
                 <section className="space-y-1.5 border-t border-[var(--border-subtle)] pt-4">
                   <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
                     Agenda, O.S. e comunicação
@@ -1205,6 +1205,11 @@ export default function CustomersPage() {
                     )}
                   </p>
                 </section>
+                {actionFeedback ? (
+                  <OperationalInlineFeedback tone={actionFeedbackTone}>
+                    {actionFeedback}
+                  </OperationalInlineFeedback>
+                ) : null}
                 {workspaceTimeline.length > 3 ? (
                   <button
                     type="button"
@@ -1224,6 +1229,7 @@ export default function CustomersPage() {
           isOpen={openAppointmentCreate}
           onClose={() => setOpenAppointmentCreate(false)}
           onSuccess={() => {
+            setActionFeedbackTone("success");
             setActionFeedback("Agendamento criado com sucesso.");
             void workspaceQuery.refetch();
           }}
@@ -1236,6 +1242,7 @@ export default function CustomersPage() {
           open={openServiceOrderCreate}
           onClose={() => setOpenServiceOrderCreate(false)}
           onSuccess={() => {
+            setActionFeedbackTone("success");
             setActionFeedback("O.S. criada e conectada ao cliente.");
             void workspaceQuery.refetch();
           }}
