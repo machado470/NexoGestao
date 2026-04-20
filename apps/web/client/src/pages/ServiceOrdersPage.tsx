@@ -9,6 +9,7 @@ import type { ServiceOrder } from "@/components/service-orders/service-order.typ
 import { AppRowActionsDropdown } from "@/components/app-system";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedbackButton";
+import { AppOperationalModal } from "@/components/operating-system/AppOperationalModal";
 import {
   AppOperationalBar,
   AppDataTable,
@@ -26,6 +27,7 @@ import {
   getOperationalSeverityLabel,
   getServiceOrderSeverity,
 } from "@/lib/operations/operational-intelligence";
+import { toast } from "sonner";
 
 type ServiceOrderTab =
   | "pipeline"
@@ -88,6 +90,8 @@ export default function ServiceOrdersPage() {
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>("all");
   const [customerFilter, setCustomerFilter] = useState("all");
   const [focusedOrderId, setFocusedOrderId] = useState("");
+  const [openOperationalModal, setOpenOperationalModal] = useState(false);
+  const [actionFeedback, setActionFeedback] = useState<string | null>(null);
 
   const customersQuery = trpc.nexo.customers.list.useQuery(undefined, {
     retry: false,
@@ -97,6 +101,8 @@ export default function ServiceOrdersPage() {
     { page: 1, limit: 100 },
     { retry: false }
   );
+  const updateServiceOrder = trpc.nexo.serviceOrders.update.useMutation();
+  const generateCharge = trpc.nexo.serviceOrders.generateCharge.useMutation();
 
   const customers = useMemo(
     () => normalizeArrayPayload<any>(customersQuery.data),
@@ -291,6 +297,25 @@ export default function ServiceOrdersPage() {
     filteredOrders.find(item => String(item?.id ?? "") === focusedOrderId) ??
     filteredOrders[0] ??
     null;
+
+  const executeOrderStatus = async (
+    status: "IN_PROGRESS" | "DONE" | "CANCELED"
+  ) => {
+    if (!focusedOrder?.id) return;
+    try {
+      setActionFeedback("Atualizando ordem de serviço...");
+      await updateServiceOrder.mutateAsync({
+        id: String(focusedOrder.id),
+        status,
+      } as any);
+      setActionFeedback(`Status atualizado para ${getStatusLabel(status)}.`);
+      await serviceOrdersQuery.refetch();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Falha na atualização.";
+      setActionFeedback(message);
+      toast.error(message);
+    }
+  };
 
   const topActions = [
     {
@@ -603,28 +628,30 @@ export default function ServiceOrdersPage() {
 
                         const handlePrimaryAction = () => {
                           if (nextAction === "Gerar cobrança") {
-                            navigate(`/finances?serviceOrderId=${order.id}`);
+                            setFocusedOrderId(String(order?.id ?? ""));
+                            setOpenOperationalModal(true);
                             return;
                           }
                           if (
                             nextAction === "Cobrar retorno" ||
                             nextAction === "Notificar cliente"
                           ) {
-                            navigate(
-                              `/whatsapp?customerId=${order.customerId}`
-                            );
+                            setFocusedOrderId(String(order?.id ?? ""));
+                            setOpenOperationalModal(true);
                             return;
                           }
                           setFocusedOrderId(String(order?.id ?? ""));
+                          setOpenOperationalModal(true);
                         };
 
                         return (
                           <tr
                             key={String(order?.id)}
                             className="cursor-pointer border-t border-[var(--border-subtle)] transition-colors hover:bg-[var(--surface-subtle)]/60"
-                            onClick={() =>
-                              setFocusedOrderId(String(order?.id ?? ""))
-                            }
+                            onClick={() => {
+                              setFocusedOrderId(String(order?.id ?? ""));
+                              setOpenOperationalModal(true);
+                            }}
                           >
                             <td className="p-3 align-top">
                               <p className="font-medium text-[var(--text-primary)]">
@@ -658,7 +685,16 @@ export default function ServiceOrdersPage() {
                               <AppPriorityBadge label={priorityLabel} />
                             </td>
                             <td className="align-top text-xs text-[var(--text-secondary)]">
-                              {nextAction}
+                              <button
+                                type="button"
+                                className="font-medium text-[var(--accent-primary)] hover:underline"
+                                onClick={event => {
+                                  event.stopPropagation();
+                                  handlePrimaryAction();
+                                }}
+                              >
+                                {nextAction}
+                              </button>
                             </td>
                             <td className="p-3 align-top">
                               <div className="flex items-center justify-end gap-2">
@@ -717,72 +753,124 @@ export default function ServiceOrdersPage() {
           </AppSectionBlock>
 
           <AppSectionBlock
-            title="Workspace da O.S. em foco"
-            subtitle="Resumo da execução conectado com cliente, agenda, cobrança e comunicação."
+            title="Detalhe operacional de O.S."
+            subtitle="Abra o modal operacional para resolver execução, cobrança e comunicação no mesmo contexto."
             compact
           >
-            {focusedOrder ? (
-              <div className="space-y-3">
-                <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-semibold text-[var(--text-primary)]">
-                      {String(focusedOrder?.title ?? "O.S. sem título")}
-                    </p>
-                    <AppStatusBadge
-                      label={getStatusLabel(
-                        normalizeStatus(focusedOrder?.status)
-                      )}
-                    />
-                  </div>
-                  <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                    Cliente: {String(focusedOrder?.customer?.name ?? "Cliente")}
-                  </p>
-                  <p className="text-xs text-[var(--text-secondary)]">
-                    Próxima ação: {getNextAction(focusedOrder)}
-                  </p>
-                  {normalizeStatus(focusedOrder?.status) === "DONE" &&
-                  !focusedOrder?.financialSummary?.hasCharge ? (
-                    <p className="mt-1 text-xs font-medium text-[var(--dashboard-danger)]">
-                      Esta O.S. concluída ainda não gerou cobrança.
-                    </p>
-                  ) : null}
-                </div>
-
-                <div className="grid grid-cols-1 gap-2">
-                  <button
-                    type="button"
-                    className="nexo-cta-primary"
-                    onClick={() =>
-                      navigate(`/finances?serviceOrderId=${focusedOrder.id}`)
-                    }
-                  >
-                    Ir para cobrança
-                  </button>
-                  <button
-                    type="button"
-                    className="nexo-cta-secondary"
-                    onClick={() =>
-                      navigate(
-                        `/customers?customerId=${focusedOrder.customerId}`
-                      )
-                    }
-                  >
-                    Abrir cliente
-                  </button>
-                </div>
-
-                <ServiceOrderDetailsPanel os={focusedOrder as ServiceOrder} />
-              </div>
-            ) : (
-              <p className="text-xs text-[var(--text-muted)]">
-                Selecione uma ordem para abrir o workspace operacional completo
-                e executar o próximo passo.
-              </p>
-            )}
+            <p className="text-xs text-[var(--text-muted)]">
+              {focusedOrder
+                ? `Em foco: ${String(focusedOrder?.title ?? "O.S. sem título")} · ${getNextAction(focusedOrder)}`
+                : "Selecione uma ordem para abrir a central operacional."}
+            </p>
           </AppSectionBlock>
         </div>
       </div>
 
+      <AppOperationalModal
+        open={openOperationalModal && Boolean(focusedOrder)}
+        onOpenChange={setOpenOperationalModal}
+        title={String(focusedOrder?.title ?? "O.S. sem título")}
+        subtitle={`Cliente: ${String(focusedOrder?.customer?.name ?? "Cliente")}`}
+        status={getStatusLabel(normalizeStatus(focusedOrder?.status))}
+        priority={`Prioridade ${getPriorityLabel(Number(focusedOrder?.priority ?? 2))}`}
+        summary={[
+          {
+            label: "Status",
+            value: getStatusLabel(normalizeStatus(focusedOrder?.status)),
+          },
+          {
+            label: "Próxima ação",
+            value: focusedOrder ? getNextAction(focusedOrder) : "—",
+          },
+          {
+            label: "Cobrança",
+            value: focusedOrder?.financialSummary?.hasCharge ? "Gerada" : "Pendente",
+          },
+          {
+            label: "Agendamento",
+            value: focusedOrder?.scheduledFor
+              ? safeDate(focusedOrder?.scheduledFor)?.toLocaleDateString("pt-BR") ?? "—"
+              : "Sem data",
+          },
+        ]}
+        primaryAction={{
+          label:
+            normalizeStatus(focusedOrder?.status) === "DONE" &&
+            !focusedOrder?.financialSummary?.hasCharge
+              ? "Gerar cobrança"
+              : "Marcar em andamento",
+          onClick: async () => {
+            if (!focusedOrder?.id) return;
+            if (
+              normalizeStatus(focusedOrder?.status) === "DONE" &&
+              !focusedOrder?.financialSummary?.hasCharge
+            ) {
+              try {
+                setActionFeedback("Gerando cobrança...");
+                await generateCharge.mutateAsync({ id: String(focusedOrder.id) } as any);
+                setActionFeedback("Cobrança gerada com sucesso.");
+                await serviceOrdersQuery.refetch();
+              } catch (error) {
+                setActionFeedback("Falha ao gerar cobrança.");
+              }
+              return;
+            }
+            await executeOrderStatus("IN_PROGRESS");
+          },
+          disabled: updateServiceOrder.isPending || generateCharge.isPending,
+        }}
+        secondaryAction={{
+          label: "Concluir O.S.",
+          onClick: () => void executeOrderStatus("DONE"),
+          disabled: updateServiceOrder.isPending || !focusedOrder,
+        }}
+        quickActions={[
+          {
+            label: "Acionar cobrança",
+            onClick: () =>
+              focusedOrder?.id &&
+              navigate(`/finances?serviceOrderId=${focusedOrder.id}`),
+            disabled: !focusedOrder,
+          },
+          {
+            label: "WhatsApp",
+            onClick: () =>
+              focusedOrder?.customerId &&
+              navigate(`/whatsapp?customerId=${focusedOrder.customerId}`),
+            disabled: !focusedOrder?.customerId,
+          },
+          {
+            label: "Cancelar",
+            onClick: () => void executeOrderStatus("CANCELED"),
+            disabled: updateServiceOrder.isPending || !focusedOrder,
+          },
+        ]}
+        feedback={actionFeedback}
+      >
+        <div className="space-y-4">
+          <section className="space-y-1.5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+              Próxima melhor ação
+            </p>
+            <p className="text-sm text-[var(--text-primary)]">
+              {focusedOrder
+                ? getNextAction(focusedOrder)
+                : "Sem ordem selecionada."}
+            </p>
+            {normalizeStatus(focusedOrder?.status) === "DONE" &&
+            !focusedOrder?.financialSummary?.hasCharge ? (
+              <p className="text-xs font-medium text-[var(--dashboard-danger)]">
+                O.S. concluída sem cobrança ativa: risco de perda de receita.
+              </p>
+            ) : null}
+          </section>
+          <section className="border-t border-[var(--border-subtle)] pt-4">
+            {focusedOrder ? (
+              <ServiceOrderDetailsPanel os={focusedOrder as ServiceOrder} />
+            ) : null}
+          </section>
+        </div>
+      </AppOperationalModal>
       <CreateServiceOrderModal
         open={openCreate}
         onClose={() => setOpenCreate(false)}
