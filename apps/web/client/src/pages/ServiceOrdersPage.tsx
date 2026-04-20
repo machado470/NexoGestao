@@ -13,7 +13,6 @@ import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedba
 import {
   AppDataTable,
   AppFiltersBar,
-  AppKpiRow,
   AppListBlock,
   AppPageEmptyState,
   AppPageErrorState,
@@ -25,15 +24,7 @@ import {
   AppSectionBlock,
   AppStatusBadge,
 } from "@/components/internal-page-system";
-import {
-  formatDelta,
-  getDayWindow,
-  getWindow,
-  inRange,
-  percentDelta,
-  safeDate,
-  trendFromDelta,
-} from "@/lib/operational/kpi";
+import { getDayWindow, inRange, safeDate } from "@/lib/operational/kpi";
 import { Input } from "@/components/ui/input";
 import {
   getOperationalSeverityLabel,
@@ -137,50 +128,8 @@ export default function ServiceOrdersPage() {
 
   const now = new Date();
   const todayWindow = getDayWindow(0);
-  const yesterdayWindow = getDayWindow(1);
   const next7End = new Date(todayWindow.end);
   next7End.setDate(next7End.getDate() + 7);
-
-  const openedToday = orders.filter(item =>
-    inRange(safeDate(item?.createdAt), todayWindow.start, todayWindow.end)
-  ).length;
-  const openedYesterday = orders.filter(item =>
-    inRange(
-      safeDate(item?.createdAt),
-      yesterdayWindow.start,
-      yesterdayWindow.end
-    )
-  ).length;
-
-  const current7 = getWindow(7, 0);
-  const previous7 = getWindow(7, 1);
-  const finishedCurrent = orders.filter(
-    item =>
-      normalizeStatus(item?.status) === "DONE" &&
-      inRange(safeDate(item?.updatedAt), current7.start, current7.end)
-  ).length;
-  const finishedPrevious = orders.filter(
-    item =>
-      normalizeStatus(item?.status) === "DONE" &&
-      inRange(safeDate(item?.updatedAt), previous7.start, previous7.end)
-  ).length;
-
-  const pipelineOpen = orders.filter(item =>
-    ["OPEN", "ASSIGNED"].includes(normalizeStatus(item?.status))
-  ).length;
-  const inExecution = orders.filter(
-    item => normalizeStatus(item?.status) === "IN_PROGRESS"
-  ).length;
-  const blocked = orders.filter(item =>
-    ["BLOCKED", "ON_HOLD", "PAUSED", "WAITING_CUSTOMER"].includes(
-      normalizeStatus(item?.status)
-    )
-  ).length;
-  const readyToCharge = orders.filter(
-    item =>
-      normalizeStatus(item?.status) === "DONE" &&
-      !item?.financialSummary?.hasCharge
-  ).length;
 
   const unassigned = orders.filter(item => !item?.assignedToPersonId).length;
   const stalePipeline = orders.filter(item => {
@@ -191,6 +140,16 @@ export default function ServiceOrdersPage() {
     const diff = now.getTime() - updatedAt.getTime();
     return diff >= 1000 * 60 * 60 * 24 * 2;
   }).length;
+  const blocked = orders.filter(item =>
+    ["BLOCKED", "ON_HOLD", "PAUSED", "WAITING_CUSTOMER"].includes(
+      normalizeStatus(item?.status)
+    )
+  ).length;
+  const readyToCharge = orders.filter(
+    item =>
+      normalizeStatus(item?.status) === "DONE" &&
+      !item?.financialSummary?.hasCharge
+  ).length;
 
   const riskList = useMemo(() => {
     return orders
@@ -415,51 +374,50 @@ export default function ServiceOrdersPage() {
 
         <OperationalTopCard
           contextLabel="Direção da execução"
-          title="Operação em tempo real das O.S."
-          description="Mostra o que está parado, em andamento, travado e pronto para virar cobrança ou comunicação."
+          title={
+            activeTab === "pipeline"
+              ? "Organizar pipeline e evitar fila parada"
+              : activeTab === "execution"
+                ? "Acelerar ordens em execução"
+                : activeTab === "attention"
+                  ? "Destravar ordens críticas agora"
+                  : activeTab === "done"
+                    ? "Converter concluídas em cobrança"
+                    : "Auditar histórico de execução"
+          }
+          description={
+            activeTab === "pipeline"
+              ? "Foco em atribuição, distribuição da carga e avanço contínuo das ordens abertas."
+              : activeTab === "execution"
+                ? "Acompanhe ordens ativas para reduzir bloqueio e manter previsibilidade do turno."
+                : activeTab === "attention"
+                  ? "Concentre a operação em bloqueios, esperas de cliente e itens sem avanço."
+                  : activeTab === "done"
+                    ? "Valide fechamento, cobrança gerada e comunicação para capturar receita."
+                    : "Use histórico para detectar padrões de atraso e corrigir recorrências."
+          }
           primaryAction={
             <ActionFeedbackButton
               state="idle"
-              idleLabel="Priorizar travadas"
-              onClick={() => setActiveTab("attention")}
+              idleLabel={
+                activeTab === "execution"
+                  ? "Revisar ordens ativas"
+                  : activeTab === "attention"
+                    ? "Priorizar travadas"
+                    : activeTab === "done"
+                      ? "Abrir prontas p/ cobrança"
+                      : activeTab === "history"
+                        ? "Voltar ao pipeline"
+                        : "Distribuir pipeline"
+              }
+              onClick={() => {
+                if (activeTab === "done") navigate("/finances");
+                else if (activeTab === "history") setActiveTab("pipeline");
+                else if (activeTab === "pipeline") setActiveTab("execution");
+                else setActiveTab("attention");
+              }}
             />
           }
-        />
-
-        <AppKpiRow
-          gridClassName="grid-cols-1 md:grid-cols-2 xl:grid-cols-4"
-          items={[
-            {
-              title: "Abertas no dia",
-              value: String(openedToday),
-              delta: formatDelta(percentDelta(openedToday, openedYesterday)),
-              trend: trendFromDelta(percentDelta(openedToday, openedYesterday)),
-              hint: "comparativo com ontem",
-            },
-            {
-              title: "Em execução",
-              value: String(inExecution),
-              hint: `${pipelineOpen} ainda na fila inicial`,
-              tone: inExecution > 0 ? "important" : "default",
-            },
-            {
-              title: "Exigem atenção",
-              value: String(blocked),
-              hint: "bloqueadas, pausadas ou aguardando cliente",
-              tone: blocked > 0 ? "critical" : "default",
-            },
-            {
-              title: "Prontas para cobrança",
-              value: String(readyToCharge),
-              delta: formatDelta(
-                percentDelta(finishedCurrent, finishedPrevious)
-              ),
-              trend: trendFromDelta(
-                percentDelta(finishedCurrent, finishedPrevious)
-              ),
-              hint: "concluídas sem cobrança ativa",
-            },
-          ]}
         />
 
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">

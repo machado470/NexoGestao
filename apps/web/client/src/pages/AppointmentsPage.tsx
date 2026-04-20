@@ -16,7 +16,6 @@ import {
 import {
   AppDataTable,
   AppFiltersBar,
-  AppKpiRow,
   AppListBlock,
   AppPageEmptyState,
   AppPageErrorState,
@@ -28,15 +27,7 @@ import {
   AppPriorityBadge,
   AppStatusBadge,
 } from "@/components/internal-page-system";
-import {
-  formatDelta,
-  getDayWindow,
-  getWindow,
-  inRange,
-  percentDelta,
-  safeDate,
-  trendFromDelta,
-} from "@/lib/operational/kpi";
+import { getDayWindow, inRange, safeDate } from "@/lib/operational/kpi";
 
 type TabKey = "agenda" | "confirmed" | "pending" | "conflicts" | "history";
 type WindowFilter = "all" | "today" | "next7" | "overdue";
@@ -113,49 +104,7 @@ export default function AppointmentsPage() {
     dataCount: appointments.length,
   });
 
-  const scheduled = appointments.filter(
-    item => String(item?.status ?? "").toUpperCase() === "SCHEDULED"
-  ).length;
-  const confirmed = appointments.filter(
-    item => String(item?.status ?? "").toUpperCase() === "CONFIRMED"
-  ).length;
   const todayWindow = getDayWindow(0);
-  const yesterdayWindow = getDayWindow(1);
-  const todayTotal = appointments.filter(item =>
-    inRange(safeDate(item?.startsAt), todayWindow.start, todayWindow.end)
-  ).length;
-  const yesterdayTotal = appointments.filter(item =>
-    inRange(
-      safeDate(item?.startsAt),
-      yesterdayWindow.start,
-      yesterdayWindow.end
-    )
-  ).length;
-
-  const current7 = getWindow(7, 0);
-  const previous7 = getWindow(7, 1);
-  const current7Appointments = appointments.filter(item =>
-    inRange(safeDate(item?.startsAt), current7.start, current7.end)
-  );
-  const previous7Appointments = appointments.filter(item =>
-    inRange(safeDate(item?.startsAt), previous7.start, previous7.end)
-  );
-  const confirmationRateCurrent =
-    current7Appointments.length === 0
-      ? 0
-      : (current7Appointments.filter(
-          item => String(item?.status ?? "").toUpperCase() === "CONFIRMED"
-        ).length /
-          current7Appointments.length) *
-        100;
-  const confirmationRatePrevious =
-    previous7Appointments.length === 0
-      ? 0
-      : (previous7Appointments.filter(
-          item => String(item?.status ?? "").toUpperCase() === "CONFIRMED"
-        ).length /
-          previous7Appointments.length) *
-        100;
 
   const appointmentsBySlot = useMemo(
     () =>
@@ -204,15 +153,6 @@ export default function AppointmentsPage() {
       };
     });
   }, [appointments, appointmentsBySlot, now]);
-
-  const agendaDoDia = appointmentWithContext
-    .filter(({ item }) => inRange(safeDate(item?.startsAt), dayStart, dayEnd))
-    .sort(
-      (a, b) =>
-        (safeDate(a.item?.startsAt)?.getTime() ?? 0) -
-        (safeDate(b.item?.startsAt)?.getTime() ?? 0)
-    )
-    .slice(0, 6);
 
   const atRiskList = appointmentWithContext
     .filter(
@@ -356,42 +296,6 @@ export default function AppointmentsPage() {
           }
         />
 
-        <AppKpiRow
-          gridClassName="grid-cols-1 md:grid-cols-2 xl:grid-cols-4"
-          items={[
-            {
-              title: "Agendamentos do dia",
-              value: String(todayTotal),
-              delta: formatDelta(percentDelta(todayTotal, yesterdayTotal)),
-              trend: trendFromDelta(percentDelta(todayTotal, yesterdayTotal)),
-              hint: "comparativo com ontem",
-            },
-            {
-              title: "Confirmados",
-              value: String(confirmed),
-              hint: `${requiresExecution} prontos para virar O.S.`,
-              tone: confirmed > 0 ? "important" : "default",
-            },
-            {
-              title: "Exigem atenção",
-              value: String(atRiskList.length),
-              hint: "atrasos, conflitos ou risco operacional",
-              tone: atRiskList.length > 0 ? "critical" : "default",
-            },
-            {
-              title: "Taxa de confirmação",
-              value: `${confirmationRateCurrent.toFixed(1).replace(".", ",")}%`,
-              delta: formatDelta(
-                percentDelta(confirmationRateCurrent, confirmationRatePrevious)
-              ),
-              trend: trendFromDelta(
-                percentDelta(confirmationRateCurrent, confirmationRatePrevious)
-              ),
-              hint: "últimos 7 dias",
-            },
-          ]}
-        />
-
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
           <AppSectionBlock
             title="Leitura operacional da agenda"
@@ -519,6 +423,54 @@ export default function AppointmentsPage() {
           ]}
           value={activeTab}
           onChange={setActiveTab}
+        />
+
+        <OperationalTopCard
+          contextLabel="Modo ativo da agenda"
+          title={
+            activeTab === "agenda"
+              ? "Orquestrar agenda do turno atual"
+              : activeTab === "confirmed"
+                ? "Converter confirmados em execução"
+                : activeTab === "pending"
+                  ? "Fechar confirmações pendentes"
+                  : activeTab === "conflicts"
+                    ? "Resolver conflitos de horário"
+                    : "Auditar histórico e reincidências"
+          }
+          description={
+            activeTab === "agenda"
+              ? "Visão geral do dia com foco em sequência operacional e prevenção de atrasos."
+              : activeTab === "confirmed"
+                ? "Priorize os confirmados para abrir O.S. e não perder janela de atendimento."
+                : activeTab === "pending"
+                  ? "Concentre esforços em confirmação e lembretes para manter previsibilidade."
+                  : activeTab === "conflicts"
+                    ? "Isole sobreposição e atrasos para destravar capacidade do time."
+                    : "Use histórico para corrigir padrões e reduzir recorrência de falhas."
+          }
+          primaryAction={
+            <ActionFeedbackButton
+              state="idle"
+              idleLabel={
+                activeTab === "confirmed"
+                  ? "Criar O.S. dos confirmados"
+                  : activeTab === "pending"
+                    ? "Executar confirmações"
+                    : activeTab === "conflicts"
+                      ? "Atuar nos conflitos"
+                      : activeTab === "history"
+                        ? "Revisar reincidências"
+                        : "Organizar turno atual"
+              }
+              onClick={() => {
+                if (activeTab === "confirmed") navigate("/service-orders");
+                else if (activeTab === "history") setActiveTab("agenda");
+                else if (activeTab === "pending") setWindowFilter("today");
+                else setActiveTab("conflicts");
+              }}
+            />
+          }
         />
 
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
