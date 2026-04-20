@@ -48,6 +48,7 @@ type ServiceOrderTab =
   | "history";
 type WindowFilter = "all" | "today" | "next7" | "overdue";
 type PriorityFilter = "all" | "high" | "medium" | "low";
+const SERVICE_ORDERS_PER_PAGE = 8;
 
 function normalizeStatus(value: unknown) {
   return String(value ?? "")
@@ -102,6 +103,36 @@ function getNextAction(order: any) {
   return "Revisar histórico operacional";
 }
 
+function getPrimaryActionLabel(order: any, nextAction: string) {
+  const status = normalizeStatus(order?.status);
+  if (nextAction.toLowerCase().includes("cobrar")) return "Cobrar";
+  if (nextAction.toLowerCase().includes("iniciar")) return "Iniciar";
+  if (nextAction.toLowerCase().includes("confirmar")) return "Confirmar";
+  if (nextAction.toLowerCase().includes("notificar")) return "Notificar";
+  if (status === "DONE" && !order?.financialSummary?.hasCharge) return "Cobrar";
+  if (["OPEN", "ASSIGNED"].includes(status)) return "Iniciar";
+  if (status === "WAITING_CUSTOMER") return "Notificar";
+  return "Agir";
+}
+
+function getPaginationSlots(totalPages: number, currentPage: number) {
+  const pages = new Set<number>([1, totalPages, currentPage]);
+  [currentPage - 1, currentPage + 1, currentPage - 2, currentPage + 2].forEach(
+    page => {
+      if (page >= 1 && page <= totalPages) pages.add(page);
+    }
+  );
+  const sorted = [...pages].sort((a, b) => a - b);
+  const slots: Array<number | "ellipsis"> = [];
+  sorted.forEach((page, index) => {
+    if (index > 0 && page - sorted[index - 1] > 1) {
+      slots.push("ellipsis");
+    }
+    slots.push(page);
+  });
+  return slots;
+}
+
 export default function ServiceOrdersPage() {
   const [location, navigate] = useLocation();
   const [openCreate, setOpenCreate] = useState(false);
@@ -131,6 +162,7 @@ export default function ServiceOrdersPage() {
   const [actionFeedbackTone, setActionFeedbackTone] = useState<
     "neutral" | "success" | "error"
   >("neutral");
+  const [currentPage, setCurrentPage] = useState(1);
 
   const customersQuery = trpc.nexo.customers.list.useQuery(undefined, {
     retry: false,
@@ -292,6 +324,23 @@ export default function ServiceOrdersPage() {
     filteredOrders.find(item => String(item?.id ?? "") === focusedOrderId) ??
     filteredOrders[0] ??
     null;
+
+  const totalOrders = filteredOrders.length;
+  const totalPages = Math.max(1, Math.ceil(totalOrders / SERVICE_ORDERS_PER_PAGE));
+  const pageStart = totalOrders === 0 ? 0 : (currentPage - 1) * SERVICE_ORDERS_PER_PAGE;
+  const pageEnd = Math.min(pageStart + SERVICE_ORDERS_PER_PAGE, totalOrders);
+  const paginatedOrders = filteredOrders.slice(pageStart, pageEnd);
+  const paginationSlots = getPaginationSlots(totalPages, currentPage);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, customerFilter, priorityFilter, searchTerm, windowFilter]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   const executeOrderStatus = async (
     status: "IN_PROGRESS" | "DONE" | "CANCELED"
@@ -557,26 +606,30 @@ export default function ServiceOrdersPage() {
                 description="Ajuste os filtros ou crie uma nova ordem para manter o fluxo operacional."
               />
             ) : (
-              <div className="max-h-[560px] overflow-y-auto">
+              <div className="space-y-3">
                 <AppDataTable>
                   <table className="w-full text-sm">
                     <thead className="bg-[var(--surface-elevated)] text-xs text-[var(--text-muted)]">
                       <tr>
-                        <th className="p-3 text-left">Ordem</th>
-                        <th className="text-left">Cliente</th>
-                        <th className="text-left">Status</th>
-                        <th className="text-left">Prioridade</th>
-                        <th className="text-left">Próxima ação</th>
-                        <th className="w-[120px] p-3 text-right">Ações</th>
+                        <th className="w-[24%] px-4 py-3 text-left">Ordem</th>
+                        <th className="w-[21%] px-4 py-3 text-left">Cliente</th>
+                        <th className="w-[19%] px-4 py-3 text-left">Status</th>
+                        <th className="w-[12%] px-4 py-3 text-left">Prioridade</th>
+                        <th className="w-[16%] px-4 py-3 text-left">Próxima ação</th>
+                        <th className="w-[128px] px-4 py-3 text-right">Ações</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredOrders.map(order => {
+                      {paginatedOrders.map(order => {
                         const status = normalizeStatus(order?.status);
                         const hasCharge = Boolean(
                           order?.financialSummary?.hasCharge
                         );
                         const nextAction = getNextAction(order);
+                        const primaryActionLabel = getPrimaryActionLabel(
+                          order,
+                          nextAction
+                        );
                         const priorityLabel = getPriorityLabel(
                           Number(order?.priority ?? 2)
                         );
@@ -595,25 +648,28 @@ export default function ServiceOrdersPage() {
                               setOpenOperationalModal(true);
                             }}
                           >
-                            <td className="p-3 align-top">
-                              <p className="font-medium text-[var(--text-primary)]">
+                            <td className="px-4 py-3.5 align-top">
+                              <p className="truncate text-[13px] font-semibold text-[var(--text-primary)]">
                                 {String(order?.title ?? "Sem título")}
                               </p>
-                              <p className="text-xs text-[var(--text-muted)]">
+                              <p className="mt-1 text-xs text-[var(--text-muted)]">
                                 #{String(order?.id ?? "—")}
                               </p>
                             </td>
-                            <td className="align-top">
-                              <p className="text-[var(--text-primary)]">
+                            <td className="px-4 py-3.5 align-top">
+                              <p
+                                className="truncate text-sm text-[var(--text-primary)]"
+                                title={String(order?.customer?.name ?? "Cliente")}
+                              >
                                 {String(order?.customer?.name ?? "Cliente")}
                               </p>
-                              <p className="text-xs text-[var(--text-muted)]">
+                              <p className="mt-1 text-xs text-[var(--text-muted)]">
                                 {order?.scheduledFor
                                   ? `Agendada: ${safeDate(order?.scheduledFor)?.toLocaleDateString("pt-BR")}`
                                   : "Sem data definida"}
                               </p>
                             </td>
-                            <td className="align-top">
+                            <td className="px-4 py-3.5 align-top">
                               <AppStatusBadge
                                 label={`${getStatusLabel(status)} · ${getOperationalSeverityLabel(getServiceOrderSeverity(order))}`}
                               />
@@ -623,13 +679,14 @@ export default function ServiceOrdersPage() {
                                 </p>
                               ) : null}
                             </td>
-                            <td className="align-top">
+                            <td className="px-4 py-3.5 align-top">
                               <AppPriorityBadge label={priorityLabel} />
                             </td>
-                            <td className="align-top text-xs text-[var(--text-secondary)]">
+                            <td className="px-4 py-3.5 align-top text-xs text-[var(--text-secondary)]">
                               <button
                                 type="button"
-                                className="font-medium text-[var(--accent-primary)] hover:underline"
+                                className="line-clamp-2 text-left font-medium text-[var(--accent-primary)] hover:underline"
+                                title={nextAction}
                                 onClick={event => {
                                   event.stopPropagation();
                                   handlePrimaryAction();
@@ -638,17 +695,17 @@ export default function ServiceOrdersPage() {
                                 {nextAction}
                               </button>
                             </td>
-                            <td className="p-3 align-top">
+                            <td className="px-4 py-3.5 align-top">
                               <div className="flex items-center justify-end gap-2">
                                 <SecondaryButton
                                   type="button"
-                                  className="h-8 px-2.5 text-xs"
+                                  className="h-8 min-w-[74px] px-2.5 text-xs"
                                   onClick={event => {
                                     event.stopPropagation();
                                     handlePrimaryAction();
                                   }}
                                 >
-                                  Agir
+                                  {primaryActionLabel}
                                 </SecondaryButton>
                                 <AppRowActionsDropdown
                                   triggerLabel="Mais ações"
@@ -700,6 +757,55 @@ export default function ServiceOrdersPage() {
                     </tbody>
                   </table>
                 </AppDataTable>
+                <div className="flex flex-col gap-3 border-t border-[var(--border-subtle)]/70 pt-2 md:flex-row md:items-center md:justify-between">
+                  <p className="text-xs text-[var(--text-muted)]">
+                    Mostrando {totalOrders === 0 ? 0 : pageStart + 1}–{pageEnd} de{" "}
+                    {totalOrders}
+                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      className="rounded-md border border-[var(--border-subtle)] px-2.5 py-1.5 text-xs text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-subtle)] disabled:cursor-not-allowed disabled:opacity-50"
+                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      anterior
+                    </button>
+                    {paginationSlots.map((slot, index) =>
+                      slot === "ellipsis" ? (
+                        <span
+                          key={`ellipsis-${index}`}
+                          className="px-1 text-xs text-[var(--text-muted)]"
+                        >
+                          …
+                        </span>
+                      ) : (
+                        <button
+                          key={`page-${slot}`}
+                          type="button"
+                          className={`min-w-8 rounded-md border px-2 py-1.5 text-xs font-medium transition-colors ${
+                            slot === currentPage
+                              ? "border-[var(--accent-primary)] bg-[var(--accent-soft)] text-[var(--accent-primary)]"
+                              : "border-[var(--border-subtle)] text-[var(--text-secondary)] hover:bg-[var(--surface-subtle)]"
+                          }`}
+                          onClick={() => setCurrentPage(slot)}
+                        >
+                          {slot}
+                        </button>
+                      )
+                    )}
+                    <button
+                      type="button"
+                      className="rounded-md border border-[var(--border-subtle)] px-2.5 py-1.5 text-xs text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-subtle)] disabled:cursor-not-allowed disabled:opacity-50"
+                      onClick={() =>
+                        setCurrentPage(prev => Math.min(totalPages, prev + 1))
+                      }
+                      disabled={currentPage === totalPages}
+                    >
+                      próximo
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
           </AppSectionBlock>
