@@ -18,7 +18,6 @@ import {
 } from "@/components/internal-page-system";
 import { KpiErrorBoundary } from "@/components/KpiErrorBoundary";
 import { ExecutiveTrendChart } from "@/components/dashboard/ExecutiveTrendChart";
-import { WhatsAppOverviewCard } from "@/components/dashboard/WhatsAppOverviewCard";
 
 const clientesSemRetorno = 4;
 const agendaSemConfirmacao = 3;
@@ -85,7 +84,7 @@ export default function ExecutiveDashboard() {
 
       <KpiErrorBoundary context="executive-dashboard:kpi">
         <AppKpiRow
-          gridClassName="grid-cols-1 sm:grid-cols-2 xl:grid-cols-2"
+          gridClassName="grid-cols-1 sm:grid-cols-2 xl:grid-cols-4"
           items={[
             {
               label: "Receita",
@@ -290,7 +289,7 @@ export default function ExecutiveDashboard() {
         <AppSectionBlock
           title="Central de alertas"
           subtitle="Filas que exigem ação no turno atual"
-          className="xl:col-span-5"
+          className="xl:col-span-6"
           ctaLabel="Abrir operação"
           onCtaClick={() => navigate("/dashboard/operations?filter=critical")}
         >
@@ -334,7 +333,7 @@ export default function ExecutiveDashboard() {
         <AppSectionBlock
           title="Agenda operacional"
           subtitle="Compromissos e checkpoints do dia"
-          className="xl:col-span-4"
+          className="xl:col-span-6"
           ctaLabel="Abrir agenda"
           onCtaClick={() => navigate("/appointments")}
         >
@@ -378,11 +377,6 @@ export default function ExecutiveDashboard() {
             ))}
           </ul>
         </AppSectionBlock>
-
-        <WhatsAppOverviewCard
-          className="xl:col-span-3"
-          onOpenWhatsApp={() => navigate("/whatsapp")}
-        />
       </div>
     </AppPageShell>
   );
