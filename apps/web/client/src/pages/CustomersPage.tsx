@@ -8,6 +8,10 @@ import {
   normalizeArrayPayload,
   normalizeObjectPayload,
 } from "@/lib/query-helpers";
+import {
+  resolveOperationalActionLabel,
+  toSingleLineAction,
+} from "@/lib/operations/operational-list";
 import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
 import { useOperationalMemoryState } from "@/hooks/useOperationalMemory";
 import { Button, SecondaryButton } from "@/components/design-system";
@@ -777,8 +781,7 @@ export default function CustomersPage() {
                 description="Ajuste filtros, busca ou crie clientes para ativar o fluxo operacional."
               />
             ) : (
-              <div className="max-h-[540px] overflow-y-auto">
-                <AppDataTable>
+              <AppDataTable>
                   <table className="w-full text-sm">
                     <thead className="bg-[var(--surface-elevated)] text-left text-xs text-[var(--text-muted)]">
                       <tr>
@@ -801,9 +804,9 @@ export default function CustomersPage() {
                         </th>
                         <th className="w-[22%] p-3">Cliente</th>
                         <th className="w-[20%] p-3">Contato</th>
-                        <th className="w-[31%] p-3">Contexto</th>
-                        <th className="w-[21%] p-3">Status</th>
-                        <th className="w-[74px] p-3 text-right">Ações</th>
+                        <th className="w-[18%] p-3">Status</th>
+                        <th className="w-[30%] p-3">Próxima ação</th>
+                        <th className="w-[124px] p-3 text-right">Ações</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -815,7 +818,7 @@ export default function CustomersPage() {
                         const primaryAction = (() => {
                           if (snapshot.primaryActionLabel.startsWith("Cobrar")) {
                             return {
-                              label: `${snapshot.primaryActionLabel} · prioritário`,
+                              label: "Cobrar",
                               onSelect: () =>
                                 navigate(
                                   `/finances?customerId=${customerId}&filter=overdue`
@@ -824,7 +827,7 @@ export default function CustomersPage() {
                           }
                           if (snapshot.primaryActionLabel.startsWith("Criar agendamento")) {
                             return {
-                              label: `${snapshot.primaryActionLabel} · prioritário`,
+                              label: "Criar agenda",
                               onSelect: () =>
                                 navigate(
                                   `/appointments?customerId=${customerId}`
@@ -833,13 +836,16 @@ export default function CustomersPage() {
                           }
                           if (snapshot.primaryActionLabel.startsWith("Confirmar")) {
                             return {
-                              label: `${snapshot.primaryActionLabel} · prioritário`,
+                              label: "Confirmar",
                               onSelect: () =>
                                 navigate(`/whatsapp?customerId=${customerId}`),
                             };
                           }
                           return {
-                            label: `${snapshot.primaryActionLabel} · prioritário`,
+                            label: resolveOperationalActionLabel(
+                              snapshot.primaryActionLabel,
+                              "Abrir"
+                            ),
                             onSelect: () => {
                               setTimelineExpanded(false);
                               setSelectedCustomer({
@@ -895,12 +901,9 @@ export default function CustomersPage() {
                                 <p className="text-[15px] font-semibold leading-5 text-[var(--text-primary)]">
                                   {String(customer?.name ?? "Sem nome")}
                                 </p>
-                                <div className="mt-1 flex flex-wrap items-center gap-2">
-                                  <span className="text-xs text-[var(--text-muted)]">
-                                    ID {customerId.slice(0, 8)}
-                                  </span>
-                                  <AppStatusBadge label={snapshot.status} />
-                                </div>
+                                <span className="mt-1 block text-xs text-[var(--text-muted)]">
+                                  ID {customerId.slice(0, 8)}
+                                </span>
                               </button>
                             </td>
                             <td className="p-3 align-top">
@@ -912,21 +915,6 @@ export default function CustomersPage() {
                                   {String(customer?.email ?? "—")}
                                 </p>
                               </div>
-                            </td>
-                            <td className="p-3 align-top">
-                              <p className="font-medium text-[var(--text-primary)]">
-                                {snapshot.nextActionReason}
-                              </p>
-                              <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
-                                {snapshot.primaryActionLabel}
-                              </p>
-                              {snapshot.financialPendingCents > 0 ? (
-                                <p className="mt-1 text-xs text-[var(--text-muted)]">
-                                  Impacto:{" "}
-                                  {formatMoney(snapshot.financialPendingCents)}{" "}
-                                  pendente
-                                </p>
-                              ) : null}
                             </td>
                             <td className="p-3 align-top">
                               <AppStatusBadge
@@ -943,23 +931,34 @@ export default function CustomersPage() {
                               />
                             </td>
                             <td className="p-3 align-top">
+                              <p
+                                className="truncate text-sm font-medium text-[var(--text-primary)]"
+                                title={snapshot.nextActionReason}
+                              >
+                                {toSingleLineAction(snapshot.nextActionReason)}
+                              </p>
+                              <p className="mt-1 text-xs text-[var(--text-muted)]">
+                                {snapshot.contextLabel}
+                              </p>
+                            </td>
+                            <td className="p-3 align-top">
                               <div className="flex items-center justify-end gap-2">
                                 <SecondaryButton
                                   type="button"
-                                  className="h-8 px-2.5 text-xs"
+                                  className="h-8 min-w-[92px] px-2.5 text-xs"
                                   onClick={event => {
                                     event.stopPropagation();
                                     primaryAction.onSelect();
                                   }}
                                 >
-                                  Agir
+                                  {primaryAction.label}
                                 </SecondaryButton>
                                 <AppRowActionsDropdown
                                   triggerLabel="Mais ações"
                                   contentClassName="min-w-[248px]"
                                   items={[
                                     {
-                                      label: primaryAction.label,
+                                      label: `${snapshot.primaryActionLabel} · prioritário`,
                                       onSelect: primaryAction.onSelect,
                                     },
                                     {
@@ -1004,8 +1003,7 @@ export default function CustomersPage() {
                       })}
                     </tbody>
                   </table>
-                </AppDataTable>
-              </div>
+              </AppDataTable>
             )}
           </AppSectionBlock>
         </div>

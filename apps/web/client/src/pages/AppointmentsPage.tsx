@@ -24,6 +24,10 @@ import {
   getOperationalSeverityLabel,
 } from "@/lib/operations/operational-intelligence";
 import {
+  resolveOperationalActionLabel,
+  toSingleLineAction,
+} from "@/lib/operations/operational-list";
+import {
   AppOperationalBar,
   AppDataTable,
   AppPageEmptyState,
@@ -78,11 +82,11 @@ function getNextAction(item: AppointmentLike) {
       : 0;
   if (status === "SCHEDULED")
     return overdueDays > 0
-      ? `Confirmar agora — agendamento atrasado há ${overdueDays} dia(s)`
-      : "Confirmar agora — agendamento ainda pendente";
-  if (status === "CONFIRMED") return "Criar O.S. — atendimento confirmado";
-  if (status === "DONE") return "Revisar execução — atendimento concluído";
-  return "Contatar no WhatsApp — alinhar próximo passo";
+      ? "Confirmar cliente"
+      : "Confirmar atendimento";
+  if (status === "CONFIRMED") return "Criar O.S.";
+  if (status === "DONE") return "Revisar execução";
+  return "Contatar cliente";
 }
 
 export default function AppointmentsPage() {
@@ -548,8 +552,7 @@ export default function AppointmentsPage() {
                 description="Ação recomendada: criar agendamento"
               />
             ) : (
-              <div className="max-h-[540px] overflow-y-auto">
-                <AppDataTable>
+              <AppDataTable>
                   <table className="w-full text-sm">
                     <thead className="bg-[var(--surface-elevated)] text-xs text-[var(--text-muted)]">
                       <tr>
@@ -566,6 +569,7 @@ export default function AppointmentsPage() {
                         ({
                           item,
                           hasConflict,
+                          isDelayed,
                           operationalState,
                           nextAction,
                         }) => {
@@ -598,12 +602,22 @@ export default function AppointmentsPage() {
                             }}
                           >
                               <td className="p-3 align-top">
-                                {safeDate(item?.startsAt)?.toLocaleString(
-                                  "pt-BR"
-                                ) ?? "—"}
+                                <p className="text-sm font-semibold text-[var(--text-primary)]">
+                                  {safeDate(item?.startsAt)?.toLocaleTimeString("pt-BR", {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  }) ?? "—"}
+                                </p>
+                                <p className="text-xs text-[var(--text-muted)]">
+                                  {safeDate(item?.startsAt)?.toLocaleDateString("pt-BR") ?? "—"}
+                                </p>
                                 {hasConflict ? (
                                   <p className="text-xs text-[var(--dashboard-danger)]">
-                                    Conflito de horário detectado
+                                    Conflito de horário
+                                  </p>
+                                ) : isDelayed ? (
+                                  <p className="text-xs text-[var(--dashboard-danger)]">
+                                    Atendimento atrasado
                                   </p>
                                 ) : null}
                               </td>
@@ -624,26 +638,27 @@ export default function AppointmentsPage() {
                               <td className="align-top text-xs text-[var(--text-secondary)]">
                                 <button
                                   type="button"
-                                  className="font-medium text-[var(--accent-primary)] hover:underline"
+                                  className="w-full truncate text-left text-sm font-medium text-[var(--accent-primary)] hover:underline"
                                   onClick={event => {
                                     event.stopPropagation();
                                     handlePrimaryAction();
                                   }}
+                                  title={nextAction}
                                 >
-                                  {nextAction}
+                                  {toSingleLineAction(nextAction)}
                                 </button>
                               </td>
                               <td className="p-3 align-top">
                                 <div className="flex items-center justify-end gap-2">
                                   <SecondaryButton
                                     type="button"
-                                    className="h-8 px-2.5 text-xs"
+                                    className="h-8 min-w-[96px] px-2.5 text-xs"
                                     onClick={event => {
                                       event.stopPropagation();
                                       handlePrimaryAction();
                                     }}
                                   >
-                                    Agir
+                                    {resolveOperationalActionLabel(nextAction)}
                                   </SecondaryButton>
                                   <AppRowActionsDropdown
                                     triggerLabel="Mais ações"
@@ -677,8 +692,7 @@ export default function AppointmentsPage() {
                       )}
                     </tbody>
                   </table>
-                </AppDataTable>
-              </div>
+              </AppDataTable>
             )}
           </AppSectionBlock>
 
