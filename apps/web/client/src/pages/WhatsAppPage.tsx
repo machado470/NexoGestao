@@ -22,6 +22,7 @@ import { buildIdempotencyKey } from "@/lib/idempotency";
 import { invalidateOperationalGraph } from "@/lib/operationalConsistency";
 import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
 import { cn } from "@/lib/utils";
+import { useOperationalMemoryState } from "@/hooks/useOperationalMemory";
 import { Button } from "@/components/design-system";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -204,10 +205,10 @@ export default function WhatsAppPage() {
   const charges = useMemo(() => normalizeArrayPayload<any>(chargesQuery.data), [chargesQuery.data]);
   const serviceOrders = useMemo(() => normalizeArrayPayload<any>(serviceOrdersQuery.data), [serviceOrdersQuery.data]);
 
-  const [selectedCustomerId, setSelectedCustomerId] = useState(queryCustomerId || "");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [activeFilter, setActiveFilter] = useState<ConversationFilter>("all");
-  const [content, setContent] = useState("");
+  const [selectedCustomerId, setSelectedCustomerId] = useOperationalMemoryState("nexo.whatsapp.selected-customer.v1", queryCustomerId || "");
+  const [searchTerm, setSearchTerm] = useOperationalMemoryState("nexo.whatsapp.search.v1", "");
+  const [activeFilter, setActiveFilter] = useOperationalMemoryState<ConversationFilter>("nexo.whatsapp.filter.v1", "all");
+  const [content, setContent] = useOperationalMemoryState("nexo.whatsapp.composer.v1", "");
 
   const selectedCustomer = customers.find(item => String(item?.id) === selectedCustomerId);
 
