@@ -9,7 +9,6 @@ import {
   normalizeObjectPayload,
 } from "@/lib/query-helpers";
 import {
-  OPERATIONAL_NEXT_ACTION_CLASS,
   OPERATIONAL_PRIMARY_CTA_CLASS,
   resolveOperationalActionLabel,
   toSingleLineAction,
@@ -17,7 +16,7 @@ import {
 import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
 import { useOperationalMemoryState } from "@/hooks/useOperationalMemory";
 import { Button, SecondaryButton } from "@/components/design-system";
-import { PageWrapper } from "@/components/operating-system/Wrappers";
+import { ActionBarWrapper, PageWrapper } from "@/components/operating-system/Wrappers";
 import { WorkspaceScaffold } from "@/components/operating-system/WorkspaceScaffold";
 import {
   EmptyActionState,
@@ -77,6 +76,14 @@ type CustomerOperationalSnapshot = {
   behaviorLabel: "Responde rápido" | "Responde lento" | "Baixa interação";
   segmentTag: "Carteira ativa" | "Cobrança crítica" | "Reativação";
   priorityScore: number;
+  hasOpenServiceOrder: boolean;
+  lastServiceLabel: string;
+  nextAppointmentLabel: string;
+  ownerLabel: string;
+  isFrequent: boolean;
+  isNew: boolean;
+  riskLabel: "Baixo" | "Médio" | "Alto";
+  totalSpentCents: number;
 };
 
 function hashSeed(value: string) {
@@ -114,6 +121,10 @@ function getContactUrgencyLabel(days: number, state: ContactState) {
   return "Pendente";
 }
 
+function formatDateLabel(date: Date) {
+  return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+}
+
 export default function CustomersPage() {
   const [, navigate] = useLocation();
   const [createOpen, setCreateOpen] = useState(false);
@@ -128,6 +139,24 @@ export default function CustomersPage() {
     "nexo.customers.sort.v1",
     "priority"
   );
+  const [withPendingOnly, setWithPendingOnly] = useOperationalMemoryState(
+    "nexo.customers.filter.pending.v1",
+    false
+  );
+  const [withOpenOsOnly, setWithOpenOsOnly] = useOperationalMemoryState(
+    "nexo.customers.filter.open-os.v1",
+    false
+  );
+  const [withoutRecentReplyOnly, setWithoutRecentReplyOnly] = useOperationalMemoryState(
+    "nexo.customers.filter.no-reply.v1",
+    false
+  );
+  const [periodFilter, setPeriodFilter] = useOperationalMemoryState<
+    "all" | "7d" | "15d" | "30d"
+  >("nexo.customers.filter.period.v1", "all");
+  const [minPendingAmountBand, setMinPendingAmountBand] = useOperationalMemoryState<
+    "all" | "10k" | "50k" | "100k"
+  >("nexo.customers.filter.value.v1", "all");
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
   const [timelineExpanded, setTimelineExpanded] = useOperationalMemoryState(
     "nexo.customers.timeline-expanded.v1",
@@ -260,6 +289,27 @@ export default function CustomersPage() {
         financialPendingCents + Math.max((seed % 10) * 40000, 16000);
       const latestChargeCents =
         chargeStats.latestChargeCents || Math.max((seed % 6) * 20000, 12000);
+      const hasOpenServiceOrder = seed % 4 !== 0;
+      const isFrequent = seed % 3 === 0;
+      const isNew = seed % 11 === 0;
+      const ownerLabel =
+        people.length > 0
+          ? String(people[seed % people.length]?.name ?? "Equipe")
+          : "Equipe";
+      const lastServiceDate = new Date();
+      lastServiceDate.setDate(lastServiceDate.getDate() - (2 + (seed % 18)));
+      const nextAppointmentDate = new Date();
+      nextAppointmentDate.setDate(
+        nextAppointmentDate.getDate() + (hasFutureSchedule ? 1 + (seed % 14) : -(seed % 5))
+      );
+      const lastServiceLabel = `Serviço ${formatDateLabel(lastServiceDate)}`;
+      const nextAppointmentLabel = hasFutureSchedule
+        ? formatDateLabel(nextAppointmentDate)
+        : "Sem agenda";
+      const totalSpentCents = Math.max(
+        latestChargeCents * (3 + (seed % 5)),
+        financialPendingCents + 120000
+      );
 
       const behaviorLabel =
         ((): CustomerOperationalSnapshot["behaviorLabel"] => {
@@ -353,9 +403,17 @@ export default function CustomersPage() {
         behaviorLabel,
         segmentTag,
         priorityScore,
+        hasOpenServiceOrder,
+        lastServiceLabel,
+        nextAppointmentLabel,
+        ownerLabel,
+        isFrequent,
+        isNew,
+        riskLabel: status === "Em risco" ? "Alto" : status === "Atenção" ? "Médio" : "Baixo",
+        totalSpentCents,
       };
     });
-  }, [chargeByCustomerId, customers]);
+  }, [chargeByCustomerId, customers, people]);
 
   const snapshotByCustomerId = useMemo(
     () => new Map(operationalSnapshots.map(item => [item.customerId, item])),
@@ -410,6 +468,26 @@ export default function CustomersPage() {
         return false;
       if (activeFilter === "healthy" && snapshot.status !== "Seguro")
         return false;
+      if (withPendingOnly && !(snapshot.overdueCharges > 0 || snapshot.pendingCharges > 0))
+        return false;
+      if (withOpenOsOnly && !snapshot.hasOpenServiceOrder) return false;
+      if (withoutRecentReplyOnly && snapshot.contactState === "responded") return false;
+
+      if (periodFilter !== "all") {
+        const threshold =
+          periodFilter === "7d" ? 7 : periodFilter === "15d" ? 15 : 30;
+        if (snapshot.lastInteractionDays > threshold) return false;
+      }
+
+      if (minPendingAmountBand !== "all") {
+        const thresholdCents =
+          minPendingAmountBand === "10k"
+            ? 1000_00
+            : minPendingAmountBand === "50k"
+              ? 5000_00
+              : 10000_00;
+        if (snapshot.financialPendingCents < thresholdCents) return false;
+      }
 
       if (!normalizedSearch) return true;
 
@@ -451,8 +529,13 @@ export default function CustomersPage() {
     activeSort,
     activeTab,
     customers,
+    minPendingAmountBand,
     searchTerm,
     snapshotByCustomerId,
+    periodFilter,
+    withOpenOsOnly,
+    withPendingOnly,
+    withoutRecentReplyOnly,
   ]);
 
   const allDisplayedSelected =
@@ -502,9 +585,14 @@ export default function CustomersPage() {
   );
   const workspaceCharges = listFrom(workspace.charges ?? workspace.finance);
   const workspaceTimeline = listFrom(workspace.timeline ?? workspace.events);
+  const sortedTimeline = [...workspaceTimeline].sort((a, b) => {
+    const aDate = new Date(String(a?.occurredAt ?? a?.createdAt ?? 0)).getTime();
+    const bDate = new Date(String(b?.occurredAt ?? b?.createdAt ?? 0)).getTime();
+    return bDate - aDate;
+  });
   const visibleTimeline = timelineExpanded
-    ? workspaceTimeline.slice(0, 8)
-    : workspaceTimeline.slice(0, 3);
+    ? sortedTimeline.slice(0, 8)
+    : sortedTimeline.slice(0, 4);
   const workspaceMessages = listFrom(
     workspace.messages ?? workspace.whatsappMessages
   );
@@ -643,7 +731,16 @@ export default function CustomersPage() {
       <div className="space-y-4">
         <AppPageHeader
           title={activeMeta.title}
-          description={activeMeta.description}
+          description={
+            <span>
+              {activeMeta.description}
+              <span className="ml-2 inline-flex">
+                <AppStatusBadge
+                  label={`${customers.length} clientes · ${overdueCustomers} em risco · ${withoutFutureSchedule} sem agenda`}
+                />
+              </span>
+            </span>
+          }
           cta={
             <Button
               type="button"
@@ -652,6 +749,33 @@ export default function CustomersPage() {
             >
               {activeMeta.ctaLabel}
             </Button>
+          }
+        />
+        <ActionBarWrapper
+          secondaryActions={
+            <div className="flex flex-wrap items-center gap-2">
+              <SecondaryButton
+                type="button"
+                className="h-8 px-3 text-xs"
+                onClick={() => navigate("/service-orders")}
+              >
+                Nova O.S.
+              </SecondaryButton>
+              <SecondaryButton
+                type="button"
+                className="h-8 px-3 text-xs"
+                onClick={() => navigate("/appointments")}
+              >
+                Novo agendamento
+              </SecondaryButton>
+              <SecondaryButton
+                type="button"
+                className="h-8 px-3 text-xs"
+                onClick={() => navigate("/finances?filter=overdue")}
+              >
+                Cobranças críticas
+              </SecondaryButton>
+            </div>
           }
         />
 
@@ -728,6 +852,55 @@ export default function CustomersPage() {
                   <option value="name">Nome</option>
                 </select>
               </div>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <button
+                  type="button"
+                  className={appSelectionPillClasses(withPendingOnly)}
+                  onClick={() => setWithPendingOnly(prev => !prev)}
+                >
+                  Com cobrança pendente
+                </button>
+                <button
+                  type="button"
+                  className={appSelectionPillClasses(withOpenOsOnly)}
+                  onClick={() => setWithOpenOsOnly(prev => !prev)}
+                >
+                  Com O.S. aberta
+                </button>
+                <button
+                  type="button"
+                  className={appSelectionPillClasses(withoutRecentReplyOnly)}
+                  onClick={() => setWithoutRecentReplyOnly(prev => !prev)}
+                >
+                  Sem resposta recente
+                </button>
+                <select
+                  className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-xs text-[var(--text-primary)]"
+                  value={periodFilter}
+                  onChange={event =>
+                    setPeriodFilter(event.target.value as "all" | "7d" | "15d" | "30d")
+                  }
+                >
+                  <option value="all">Período: todos</option>
+                  <option value="7d">Período: até 7 dias</option>
+                  <option value="15d">Período: até 15 dias</option>
+                  <option value="30d">Período: até 30 dias</option>
+                </select>
+                <select
+                  className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-xs text-[var(--text-primary)] sm:col-span-2"
+                  value={minPendingAmountBand}
+                  onChange={event =>
+                    setMinPendingAmountBand(
+                      event.target.value as "all" | "10k" | "50k" | "100k"
+                    )
+                  }
+                >
+                  <option value="all">Valor pendente: qualquer faixa</option>
+                  <option value="10k">Valor pendente: acima de R$ 1.000</option>
+                  <option value="50k">Valor pendente: acima de R$ 5.000</option>
+                  <option value="100k">Valor pendente: acima de R$ 10.000</option>
+                </select>
+              </div>
             </>
           }
           activeFilterChips={[
@@ -752,10 +925,30 @@ export default function CustomersPage() {
                   },
                 ]
               : []),
+            ...(withPendingOnly
+              ? [{ key: "pending-only", label: "Com cobrança pendente", onRemove: () => setWithPendingOnly(false) }]
+              : []),
+            ...(withOpenOsOnly
+              ? [{ key: "open-os-only", label: "Com O.S. aberta", onRemove: () => setWithOpenOsOnly(false) }]
+              : []),
+            ...(withoutRecentReplyOnly
+              ? [{ key: "no-reply-only", label: "Sem resposta recente", onRemove: () => setWithoutRecentReplyOnly(false) }]
+              : []),
+            ...(periodFilter !== "all"
+              ? [{ key: "period", label: `Período ${periodFilter}`, onRemove: () => setPeriodFilter("all") }]
+              : []),
+            ...(minPendingAmountBand !== "all"
+              ? [{ key: "value", label: `Faixa ${minPendingAmountBand}`, onRemove: () => setMinPendingAmountBand("all") }]
+              : []),
           ]}
           onClearAllFilters={() => {
             setActiveFilter("all");
             setActiveSort("priority");
+            setWithPendingOnly(false);
+            setWithOpenOsOnly(false);
+            setWithoutRecentReplyOnly(false);
+            setPeriodFilter("all");
+            setMinPendingAmountBand("all");
           }}
         />
 
@@ -827,10 +1020,11 @@ export default function CustomersPage() {
                             aria-label="Selecionar todos"
                           />
                         </th>
-                        <th className="w-[26%] px-4 py-2.5 align-middle">Cliente</th>
-                        <th className="w-[22%] px-4 py-2.5 align-middle">Contato</th>
-                        <th className="w-[18%] px-4 py-2.5 align-middle">Status</th>
-                        <th className="w-[20%] px-4 py-2.5 align-middle">Próxima ação</th>
+                        <th className="w-[22%] px-4 py-2.5 align-middle">Cliente</th>
+                        <th className="w-[24%] px-4 py-2.5 align-middle">Contato e contexto</th>
+                        <th className="w-[20%] px-4 py-2.5 align-middle">Serviço e agenda</th>
+                        <th className="w-[16%] px-4 py-2.5 align-middle">Financeiro e risco</th>
+                        <th className="w-[10%] px-4 py-2.5 align-middle">Responsável</th>
                         <th className="w-[156px] px-4 py-2.5 text-right align-middle">Ações</th>
                       </tr>
                     </thead>
@@ -879,19 +1073,12 @@ export default function CustomersPage() {
                             },
                           };
                         })();
-                        const billingActionLabel =
-                          snapshot.overdueCharges > 0
-                            ? "Cobrar agora"
-                            : snapshot.pendingCharges > 0
-                              ? "Ver cobrança pendente"
-                              : "Ver cobranças";
-
                         return (
                           <tr
                             key={customerId}
                             className={`border-t border-[var(--border-subtle)] transition-colors hover:bg-[var(--surface-subtle)]/60 focus-within:bg-[var(--surface-subtle)]/70 ${
                               activeCustomerId === customerId
-                                ? "bg-[var(--accent-soft)]/65 ring-1 ring-inset ring-[var(--accent-primary)]/35"
+                                ? "bg-[var(--accent-soft)]/65"
                                 : selectedCustomerIds.includes(customerId)
                                   ? "bg-[var(--accent-soft)]/35"
                                 : ""
@@ -940,6 +1127,18 @@ export default function CustomersPage() {
                                 <span className="mt-1 block truncate text-[11px] text-[var(--text-muted)]">
                                   ID {customerId.slice(0, 8)}
                                 </span>
+                                <div className="mt-1.5 flex flex-wrap gap-1">
+                                  {snapshot.isNew ? (
+                                    <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-2 py-0.5 text-[10px] text-[var(--text-muted)]">
+                                      Cliente novo
+                                    </span>
+                                  ) : null}
+                                  {snapshot.isFrequent ? (
+                                    <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-500">
+                                      Cliente frequente
+                                    </span>
+                                  ) : null}
+                                </div>
                               </button>
                             </td>
                             <td className="px-4 py-3.5 align-top">
@@ -967,6 +1166,19 @@ export default function CustomersPage() {
                               </div>
                             </td>
                             <td className="px-4 py-3.5 align-top">
+                              <p className="text-xs text-[var(--text-secondary)]">
+                                Último serviço: {snapshot.lastServiceLabel}
+                              </p>
+                              <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                                Próximo agendamento: {snapshot.nextAppointmentLabel}
+                              </p>
+                              <p className="mt-1 text-[11px] text-[var(--text-muted)]">
+                                {snapshot.hasOpenServiceOrder
+                                  ? "Com O.S. aberta"
+                                  : "Sem O.S. aberta"}
+                              </p>
+                            </td>
+                            <td className="px-4 py-3.5 align-top">
                               <AppStatusBadge
                                 label={
                                   snapshot.overdueCharges > 0
@@ -979,14 +1191,19 @@ export default function CustomersPage() {
                                         )
                                 }
                               />
+                              <p className="mt-1.5 text-xs text-[var(--text-secondary)]">
+                                Pendente: {formatMoney(snapshot.financialPendingCents)}
+                              </p>
+                              <p className="mt-1 text-[11px] text-[var(--text-muted)]">
+                                Total gasto: {formatMoney(snapshot.totalSpentCents)}
+                              </p>
+                              <p className="mt-1 text-[11px] text-[var(--text-muted)]">
+                                Ação: {toSingleLineAction(snapshot.nextActionReason)}
+                              </p>
                             </td>
                             <td className="px-4 py-3.5 align-top">
-                              <p
-                                className={OPERATIONAL_NEXT_ACTION_CLASS}
-                                title={snapshot.nextActionReason}
-                              >
-                                {toSingleLineAction(snapshot.nextActionReason)}
-                              </p>
+                              <p className="text-xs text-[var(--text-secondary)]">{snapshot.ownerLabel}</p>
+                              <p className="mt-1 text-[11px] text-[var(--text-muted)]">Risco {snapshot.riskLabel}</p>
                             </td>
                             <td className="px-4 py-3.5 align-top">
                               <div className="flex items-center justify-end gap-2">
@@ -1005,7 +1222,7 @@ export default function CustomersPage() {
                                   contentClassName="min-w-[248px]"
                                   items={[
                                     {
-                                      label: "Abrir detalhe operacional",
+                                      label: "Ver cliente",
                                       onSelect: () => {
                                         setTimelineExpanded(false);
                                         setActionFeedback(null);
@@ -1014,25 +1231,29 @@ export default function CustomersPage() {
                                       },
                                     },
                                     {
-                                      label: billingActionLabel,
+                                      label: "Cobrar",
                                       onSelect: () =>
                                         navigate(
-                                          `/finances?customerId=${customerId}`
+                                          `/finances?customerId=${customerId}&filter=overdue`
                                         ),
                                     },
                                     {
-                                      label: "Ver agendamentos",
+                                      label: "Agendar",
                                       onSelect: () =>
                                         navigate(
                                           `/appointments?customerId=${customerId}`
                                         ),
                                     },
                                     {
-                                      label: "Criar O.S.",
+                                      label: "Abrir O.S.",
                                       onSelect: () =>
                                         navigate(
                                           `/service-orders?customerId=${customerId}`
                                         ),
+                                    },
+                                    {
+                                      label: "Enviar mensagem",
+                                      onSelect: () => navigate(`/whatsapp?customerId=${customerId}`),
                                     },
                                   ]}
                                 />
@@ -1198,20 +1419,33 @@ export default function CustomersPage() {
               timeline={
                 <section className="rounded-xl border border-[var(--border-subtle)]/80 p-3.5">
                   <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
-                    Timeline recente
+                    Timeline do cliente
                   </p>
-                  <ul className="mt-2 space-y-1.5 text-xs text-[var(--text-secondary)]">
+                  <ul className="mt-2 space-y-2 text-xs text-[var(--text-secondary)]">
                     {visibleTimeline.length === 0 ? (
                       <li>Sem eventos recentes.</li>
                     ) : (
                       visibleTimeline.map((event, index) => (
-                        <li key={`${String(event?.id ?? "event")}-${index}`}>
-                          • {String(event?.description ?? event?.title ?? event?.type ?? "Evento operacional")}
+                        <li
+                          key={`${String(event?.id ?? "event")}-${index}`}
+                          className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)]/45 p-2"
+                        >
+                          <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
+                            {String(event?.type ?? event?.entityType ?? "evento")}
+                          </p>
+                          <p className="mt-0.5 text-xs text-[var(--text-primary)]">
+                            {String(event?.description ?? event?.title ?? "Evento operacional")}
+                          </p>
+                          <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">
+                            {event?.occurredAt || event?.createdAt
+                              ? new Date(String(event?.occurredAt ?? event?.createdAt)).toLocaleString("pt-BR")
+                              : "Data não informada"}
+                          </p>
                         </li>
                       ))
                     )}
                   </ul>
-                  {workspaceTimeline.length > 3 ? (
+                  {sortedTimeline.length > 4 ? (
                     <button
                       type="button"
                       className="mt-2 text-left text-xs font-medium text-[var(--accent-primary)]"
@@ -1238,6 +1472,14 @@ export default function CustomersPage() {
                   <p className="mt-1 text-xs text-[var(--text-muted)]">
                     Situação: {selectedSnapshot?.status === "Em risco" ? "Atraso impactando caixa." : "Fluxo financeiro monitorado."}
                   </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="mt-3 h-8 px-3 text-xs"
+                    onClick={() => navigate(`/finances?customerId=${activeCustomerId}`)}
+                  >
+                    Cobrar cliente
+                  </Button>
                 </section>
               }
             >
@@ -1288,6 +1530,96 @@ export default function CustomersPage() {
                     `Canal ativo: ${workspaceMessages.length} interação(ões) de WhatsApp registradas.`,
                   ]}
                 />
+                <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                  <section className="rounded-xl border border-[var(--border-subtle)]/80 p-3.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                        Ordens de serviço
+                      </p>
+                      <SecondaryButton
+                        type="button"
+                        className="h-7 px-2 text-[11px]"
+                        onClick={() => navigate(`/service-orders?customerId=${activeCustomerId}`)}
+                      >
+                        Nova O.S.
+                      </SecondaryButton>
+                    </div>
+                    <ul className="mt-2 space-y-1.5 text-xs text-[var(--text-secondary)]">
+                      {workspaceServiceOrders.slice(0, 4).map((order, index) => (
+                        <li key={`${String(order?.id ?? "order")}-${index}`} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)]/40 p-2">
+                          {String(order?.title ?? order?.id ?? "O.S.")} · {String(order?.status ?? "aberta")} ·{" "}
+                          {order?.amountCents ? formatMoney(Number(order.amountCents)) : "sem valor"} ·{" "}
+                          {String(order?.assignedToName ?? order?.assigneeName ?? selectedSnapshot?.ownerLabel ?? "Equipe")}
+                        </li>
+                      ))}
+                      {workspaceServiceOrders.length === 0 ? <li>Sem O.S. registrada.</li> : null}
+                    </ul>
+                  </section>
+                  <section className="rounded-xl border border-[var(--border-subtle)]/80 p-3.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                        Agendamentos
+                      </p>
+                      <SecondaryButton
+                        type="button"
+                        className="h-7 px-2 text-[11px]"
+                        onClick={() => setOpenAppointmentCreate(true)}
+                      >
+                        Novo agendamento
+                      </SecondaryButton>
+                    </div>
+                    <ul className="mt-2 space-y-1.5 text-xs text-[var(--text-secondary)]">
+                      {workspaceAppointments.slice(0, 4).map((appointment, index) => (
+                        <li key={`${String(appointment?.id ?? "appointment")}-${index}`} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)]/40 p-2">
+                          {appointment?.startsAt
+                            ? new Date(String(appointment.startsAt)).toLocaleString("pt-BR")
+                            : "Data não informada"}{" "}
+                          · {String(appointment?.status ?? "pendente")} ·{" "}
+                          {String(appointment?.notes ?? appointment?.description ?? "Sem observação")}
+                        </li>
+                      ))}
+                      {workspaceAppointments.length === 0 ? <li>Sem agendamento registrado.</li> : null}
+                    </ul>
+                  </section>
+                  <section className="rounded-xl border border-[var(--border-subtle)]/80 p-3.5">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                      Comunicação
+                    </p>
+                    <ul className="mt-2 space-y-1.5 text-xs text-[var(--text-secondary)]">
+                      {workspaceMessages.slice(0, 4).map((message, index) => (
+                        <li key={`${String(message?.id ?? "msg")}-${index}`} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)]/40 p-2">
+                          {String(message?.status ?? "enviado")} ·{" "}
+                          {String(message?.body ?? message?.text ?? "Mensagem registrada")} ·{" "}
+                          {message?.createdAt ? new Date(String(message.createdAt)).toLocaleString("pt-BR") : "sem data"}
+                        </li>
+                      ))}
+                      {workspaceMessages.length === 0 ? <li>Sem mensagens registradas.</li> : null}
+                    </ul>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="mt-2 h-8 px-3 text-xs"
+                      onClick={() => navigate(`/whatsapp?customerId=${activeCustomerId}`)}
+                    >
+                      Enviar WhatsApp contextualizado
+                    </Button>
+                  </section>
+                  <section className="rounded-xl border border-[var(--border-subtle)]/80 p-3.5">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                      Risco e próxima melhor ação
+                    </p>
+                    <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                      Risco {selectedSnapshot?.riskLabel ?? "Médio"} · atraso {selectedSnapshot?.contactDays ?? 0} dia(s) ·{" "}
+                      {selectedSnapshot?.overdueCharges ?? 0} cobrança(s) vencida(s).
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--text-muted)]">
+                      Próxima melhor ação: {selectedSnapshot?.nextActionReason ?? "Abrir detalhe"}.
+                    </p>
+                    <Button type="button" className="mt-2 h-8 px-3 text-xs" onClick={runCustomerPrimaryAction}>
+                      {resolveOperationalActionLabel(selectedSnapshot?.primaryActionLabel ?? "", "Executar ação")}
+                    </Button>
+                  </section>
+                </div>
                 {workspaceServiceOrders.length === 0 ? (
                   <EmptyActionState
                     title="Nenhuma O.S. vinculada ainda"
