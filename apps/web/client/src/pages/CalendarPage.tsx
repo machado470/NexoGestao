@@ -17,9 +17,11 @@ import {
   AppPageShell,
   AppSectionBlock,
   AppStatusBadge,
+  AppPriorityBadge,
 } from "@/components/internal-page-system";
 import { trpc } from "@/lib/trpc";
 import { normalizeArrayPayload } from "@/lib/query-helpers";
+import { useOperationalMemoryState } from "@/hooks/useOperationalMemory";
 
 type ViewMode = "timeGridDay" | "timeGridWeek" | "dayGridMonth";
 
@@ -61,14 +63,14 @@ function normalizeEventStatus(status: string) {
 
 export default function CalendarPage() {
   const [, navigate] = useLocation();
-  const [viewMode, setViewMode] = useState<ViewMode>("timeGridWeek");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useOperationalMemoryState<ViewMode>("nexo.calendar.view.v1", "timeGridWeek");
+  const [selectedId, setSelectedId] = useOperationalMemoryState<string | null>("nexo.calendar.selected-id.v1", null);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
-  const [teamFilter, setTeamFilter] = useState("all");
-  const [serviceFilter, setServiceFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [customerFilter, setCustomerFilter] = useState("all");
+  const [teamFilter, setTeamFilter] = useOperationalMemoryState("nexo.calendar.team-filter.v1", "all");
+  const [serviceFilter, setServiceFilter] = useOperationalMemoryState("nexo.calendar.service-filter.v1", "all");
+  const [statusFilter, setStatusFilter] = useOperationalMemoryState("nexo.calendar.status-filter.v1", "all");
+  const [customerFilter, setCustomerFilter] = useOperationalMemoryState("nexo.calendar.customer-filter.v1", "all");
 
   const appointmentsQuery = trpc.nexo.appointments.list.useQuery(undefined, { retry: false });
   const customersQuery = trpc.nexo.customers.list.useQuery(undefined, { retry: false });
@@ -237,13 +239,14 @@ export default function CalendarPage() {
                         <p className="mt-2 text-xs text-[var(--text-secondary)]">{new Date(selected.startsAt).toLocaleString("pt-BR")}</p>
                         <div className="mt-2 flex flex-wrap gap-2">
                           <AppStatusBadge label={STATUS_LABEL[selected.status]} />
+                          <AppPriorityBadge label={new Date(selected.startsAt).getTime() - Date.now() < 45 * 60 * 1000 ? "Alta" : "Média"} />
                           <AppStatusBadge label={new Date(selected.startsAt).getTime() - Date.now() < 45 * 60 * 1000 ? "Próximo do horário" : "Programado"} />
                         </div>
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        <Button size="sm" variant="outline" onClick={() => navigate(`/appointments?id=${selected.id}`)}>Abrir agendamento</Button>
+                        <Button size="sm" variant="outline" onClick={() => navigate(`/appointments?id=${selected.id}&source=calendar&mode=operational_list`)}>Abrir agendamento</Button>
                         <Button size="sm" variant="outline" onClick={() => navigate(`/service-orders?appointmentId=${selected.id}`)}>Abrir O.S.</Button>
-                        <Button size="sm" variant="outline" onClick={() => selected.customerId && navigate(`/customers?id=${selected.customerId}`)}>Abrir cliente</Button>
+                        <Button size="sm" variant="outline" onClick={() => selected.customerId && navigate(`/customers?id=${selected.customerId}&source=calendar`)}>Abrir cliente</Button>
                       </div>
                       <AppTimeline>
                         <AppTimelineItem>

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/design-system";
-import { AppTimeline, AppTimelineItem, AppToolbar } from "@/components/app-system";
+import { AppRowActionsDropdown, AppTimeline, AppTimelineItem, AppToolbar } from "@/components/app-system";
 import {
   AppPageEmptyState,
   AppPageErrorState,
@@ -10,9 +10,11 @@ import {
   AppPageShell,
   AppSectionBlock,
   AppStatusBadge,
+  AppPriorityBadge,
 } from "@/components/internal-page-system";
 import { trpc } from "@/lib/trpc";
 import { normalizeArrayPayload, normalizeObjectPayload } from "@/lib/query-helpers";
+import { useOperationalMemoryState } from "@/hooks/useOperationalMemory";
 
 function currencyBRL(value: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value / 100);
@@ -28,7 +30,7 @@ function statusLabel(value: string) {
 
 export default function ProfilePage() {
   const [, navigate] = useLocation();
-  const [availability, setAvailability] = useState("Disponível");
+  const [availability, setAvailability] = useOperationalMemoryState("nexo.profile.availability.v1", "Disponível");
 
   const meQuery = trpc.nexo.me.useQuery(undefined, { retry: false });
   const appointmentsQuery = trpc.nexo.appointments.list.useQuery(undefined, { retry: false });
@@ -103,6 +105,7 @@ export default function ProfilePage() {
           <AppStatusBadge label={me?.active === false ? "Inativo" : "Ativo"} />
           <AppStatusBadge label={`Função ${String(me?.role ?? "USER")}`} />
           <AppStatusBadge label={`${myPending.length} pendências`} />
+          <AppPriorityBadge label={myDelayed.length > 0 ? "Alta" : myPending.length > 2 ? "Média" : "Baixa"} />
           <select className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm" value={availability} onChange={event => setAvailability(event.target.value)}>
             <option>Disponível</option>
             <option>Em execução</option>
@@ -137,11 +140,17 @@ export default function ProfilePage() {
                     <p>Meus agendamentos: <strong className="text-[var(--text-primary)]">{myAppointments.length}</strong></p>
                     <p>Minhas tarefas pendentes: <strong className="text-[var(--text-primary)]">{myPending.length}</strong></p>
                   </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <Button size="sm" variant="outline" onClick={() => navigate("/service-orders?scope=mine")}>Ver minhas tarefas</Button>
-                    <Button size="sm" variant="outline" onClick={() => navigate("/appointments?scope=mine")}>Abrir meus agendamentos</Button>
-                    <Button size="sm" variant="outline" onClick={() => navigate("/service-orders?filter=pending")}>Assumir tarefa</Button>
-                    <Button size="sm" variant="outline" onClick={() => navigate("/service-orders?filter=in_progress")}>Marcar concluída</Button>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <Button size="sm" onClick={() => navigate("/service-orders?scope=mine&source=profile")}>Ver minhas tarefas</Button>
+                    <AppRowActionsDropdown
+                      triggerLabel="Ações rápidas do perfil"
+                      items={[
+                        { label: "Abrir meus agendamentos", onSelect: () => navigate("/appointments?scope=mine&source=profile") },
+                        { label: "Assumir tarefa", onSelect: () => navigate("/service-orders?filter=pending&source=profile") },
+                        { label: "Marcar conclusão", onSelect: () => navigate("/service-orders?filter=in_progress&source=profile") },
+                        { label: "Ajustar disponibilidade", onSelect: () => navigate("/settings?section=sistema&source=profile") },
+                      ]}
+                    />
                   </div>
                 </AppSectionBlock>
 

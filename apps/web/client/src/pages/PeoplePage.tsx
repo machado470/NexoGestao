@@ -6,7 +6,7 @@ import CreatePersonModal from "@/components/CreatePersonModal";
 import EditPersonModal from "@/components/EditPersonModal";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
-import { AppStatCard, AppTimeline, AppTimelineItem, AppToolbar } from "@/components/app-system";
+import { AppRowActionsDropdown, AppStatCard, AppTimeline, AppTimelineItem, AppToolbar } from "@/components/app-system";
 import {
   AppDataTable,
   AppPageEmptyState,
@@ -20,6 +20,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { trpc } from "@/lib/trpc";
 import { normalizeArrayPayload, normalizeObjectPayload } from "@/lib/query-helpers";
+import { useOperationalMemoryState } from "@/hooks/useOperationalMemory";
 
 type PersonItem = {
   id: string;
@@ -94,15 +95,15 @@ export default function PeoplePage() {
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingPersonId, setEditingPersonId] = useState<string | null>(null);
-  const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
+  const [selectedPersonId, setSelectedPersonId] = useOperationalMemoryState<string | null>("nexo.people.selected-person.v1", null);
 
-  const [periodFilter, setPeriodFilter] = useState<"today" | "7d" | "30d">("7d");
-  const [statusFilter, setStatusFilter] = useState<"all" | "ativo" | "atencao" | "inativo">("all");
-  const [roleFilter, setRoleFilter] = useState<"all" | "admin" | "operador" | "financeiro">("all");
-  const [loadFilter, setLoadFilter] = useState<"all" | "alta" | "media" | "baixa">("all");
-  const [delayFilter, setDelayFilter] = useState<"all" | "com-atraso">("all");
-  const [riskFilter, setRiskFilter] = useState<"all" | "alto-risco">("all");
-  const [searchValue, setSearchValue] = useState("");
+  const [periodFilter, setPeriodFilter] = useOperationalMemoryState<"today" | "7d" | "30d">("nexo.people.period-filter.v1", "7d");
+  const [statusFilter, setStatusFilter] = useOperationalMemoryState<"all" | "ativo" | "atencao" | "inativo">("nexo.people.status-filter.v1", "all");
+  const [roleFilter, setRoleFilter] = useOperationalMemoryState<"all" | "admin" | "operador" | "financeiro">("nexo.people.role-filter.v1", "all");
+  const [loadFilter, setLoadFilter] = useOperationalMemoryState<"all" | "alta" | "media" | "baixa">("nexo.people.load-filter.v1", "all");
+  const [delayFilter, setDelayFilter] = useOperationalMemoryState<"all" | "com-atraso">("nexo.people.delay-filter.v1", "all");
+  const [riskFilter, setRiskFilter] = useOperationalMemoryState<"all" | "alto-risco">("nexo.people.risk-filter.v1", "all");
+  const [searchValue, setSearchValue] = useOperationalMemoryState("nexo.people.search-filter.v1", "");
 
   const canLoadPeople = isAuthenticated;
 
@@ -571,7 +572,7 @@ export default function PeoplePage() {
                           <th className="px-3 py-2">Atraso / risco</th>
                           <th className="px-3 py-2">Última atividade</th>
                           <th className="px-3 py-2">Responsabilidade</th>
-                          <th className="px-3 py-2">Ações inline</th>
+                          <th className="px-3 py-2">Ação</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -596,12 +597,17 @@ export default function PeoplePage() {
                             <td className="px-3 py-2 text-xs text-[var(--text-secondary)]">{row.lastActivityLabel}</td>
                             <td className="px-3 py-2 text-xs text-[var(--text-secondary)]">{row.governanceSummary}</td>
                             <td className="px-3 py-2">
-                              <div className="flex flex-wrap gap-1.5">
+                              <div className="flex items-center gap-2">
                                 <Button type="button" size="sm" variant="outline" onClick={() => setSelectedPersonId(row.id)}>Ver detalhe</Button>
-                                <Button type="button" size="sm" variant="outline" onClick={() => navigate(`/service-orders?assignTo=${row.id}`)}>Atribuir</Button>
-                                <Button type="button" size="sm" variant="outline" onClick={() => setEditingPersonId(row.id)}>Status</Button>
-                                <Button type="button" size="sm" variant="outline" onClick={() => navigate(`/governance?personId=${row.id}`)}>Permissão</Button>
-                                <Button type="button" size="sm" variant="outline" onClick={() => navigate(`/timeline?personId=${row.id}`)}>Itens</Button>
+                                <AppRowActionsDropdown
+                                  triggerLabel={`Ações para ${row.name}`}
+                                  items={[
+                                    { label: "Atribuir tarefa", onSelect: () => navigate(`/service-orders?assignTo=${row.id}&source=people`) },
+                                    { label: "Alterar status", onSelect: () => setEditingPersonId(row.id) },
+                                    { label: "Ajustar permissão", onSelect: () => navigate(`/governance?personId=${row.id}&source=people`) },
+                                    { label: "Ver timeline", onSelect: () => navigate(`/timeline?personId=${row.id}&source=people`) },
+                                  ]}
+                                />
                               </div>
                             </td>
                           </tr>
