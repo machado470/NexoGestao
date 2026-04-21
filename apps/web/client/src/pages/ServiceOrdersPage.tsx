@@ -41,6 +41,11 @@ import {
   resolveOperationalActionLabel,
   toSingleLineAction,
 } from "@/lib/operations/operational-list";
+import {
+  buildCompactOperationalTimeline,
+  getOperationalSignalToneClasses,
+  type OperationalSignal,
+} from "@/lib/operations/operational-workspace";
 import { toast } from "sonner";
 
 type ServiceOrderTab =
@@ -52,6 +57,25 @@ type ServiceOrderTab =
 type WindowFilter = "all" | "today" | "next7" | "overdue";
 type PriorityFilter = "all" | "high" | "medium" | "low";
 const SERVICE_ORDERS_PER_PAGE = 8;
+
+type ServiceOrderActionIntent =
+  | "start"
+  | "progress"
+  | "complete"
+  | "charge"
+  | "finance"
+  | "whatsapp"
+  | "modal";
+
+type ServiceOrderSecondaryIntent = "finance" | "whatsapp" | "appointment";
+
+type ServiceOrderNextAction = {
+  title: string;
+  reason: string;
+  ctaLabel: string;
+  ctaIntent: ServiceOrderActionIntent;
+  secondary: Array<{ label: string; intent: ServiceOrderSecondaryIntent }>;
+};
 
 function normalizeStatus(value: unknown) {
   return String(value ?? "")
@@ -196,25 +220,6 @@ function normalizeChargeStatus(value: unknown) {
   return String(value ?? "")
     .trim()
     .toUpperCase();
-}
-
-type OperationalSignal = {
-  key: string;
-  label: string;
-  tone: "critical" | "warning" | "info" | "healthy";
-};
-
-function getSignalToneClasses(tone: OperationalSignal["tone"]) {
-  if (tone === "critical") {
-    return "border-[var(--dashboard-danger)]/35 bg-[var(--dashboard-danger)]/10 text-[var(--dashboard-danger)]";
-  }
-  if (tone === "warning") {
-    return "border-amber-500/35 bg-amber-500/10 text-amber-600 dark:text-amber-300";
-  }
-  if (tone === "info") {
-    return "border-sky-500/35 bg-sky-500/10 text-sky-600 dark:text-sky-300";
-  }
-  return "border-emerald-500/35 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300";
 }
 
 function getOperationalSignals(order: any, timeline: any[]) {
@@ -550,7 +555,21 @@ export default function ServiceOrdersPage() {
         : [],
     [focusedHasCharge, focusedOrder, focusedOrderStatus]
   );
-  const timelineToRender = focusedTimeline.length > 0 ? focusedTimeline : fallbackTimeline;
+  const compactTimeline = useMemo(
+    () =>
+      buildCompactOperationalTimeline({
+        events: focusedTimeline,
+        fallbackEvents: fallbackTimeline,
+        mapEvent: event => ({
+          id: String(event?.id ?? `${event?.action}-${event?.createdAt}`),
+          occurredAt: event?.createdAt,
+          label: formatTimelineEventLabel(event),
+          summary: formatTimelineSummary(event),
+        }),
+        maxItems: 6,
+      }),
+    [fallbackTimeline, focusedTimeline]
+  );
   const lastExecution = focusedExecutions[0] ?? null;
 
   const totalOrders = filteredOrders.length;
@@ -624,14 +643,14 @@ export default function ServiceOrdersPage() {
     }
   };
 
-  const dominantAction = useMemo(() => {
+  const dominantAction = useMemo<ServiceOrderNextAction>(() => {
     if (!focusedOrder) {
       return {
         title: "Selecione uma O.S.",
         reason: "Escolha uma linha para receber recomendação contextual.",
         ctaLabel: "Abrir detalhe",
         ctaIntent: "modal" as const,
-        secondary: [] as Array<{ label: string; intent: "finance" | "whatsapp" | "appointment" }>,
+        secondary: [],
       };
     }
     if (focusedOrderStatus === "OPEN" || focusedOrderStatus === "ASSIGNED") {
@@ -1051,7 +1070,7 @@ export default function ServiceOrdersPage() {
                                 {rowSignals.slice(0, 2).map(signal => (
                                   <span
                                     key={signal.key}
-                                    className={`rounded-full border px-1.5 py-0.5 text-[10px] font-semibold ${getSignalToneClasses(signal.tone)}`}
+                                    className={`rounded-full border px-1.5 py-0.5 text-[10px] font-semibold ${getOperationalSignalToneClasses(signal.tone, "outlined")}`}
                                   >
                                     {signal.label}
                                   </span>
@@ -1251,7 +1270,7 @@ export default function ServiceOrdersPage() {
                         {focusedSignals.map(signal => (
                           <span
                             key={signal.key}
-                            className={`rounded-full border px-2 py-1 text-[10px] font-semibold ${getSignalToneClasses(signal.tone)}`}
+                            className={`rounded-full border px-2 py-1 text-[10px] font-semibold ${getOperationalSignalToneClasses(signal.tone, "outlined")}`}
                           >
                             {signal.label}
                           </span>
@@ -1420,16 +1439,16 @@ export default function ServiceOrdersPage() {
                       <p className="mt-2 text-xs text-[var(--text-muted)]">Carregando eventos...</p>
                     ) : (
                       <ul className="mt-2 space-y-2">
-                        {timelineToRender.slice(0, 6).map(event => (
-                          <li key={String(event?.id ?? `${event?.action}-${event?.createdAt}`)} className="rounded-md border border-[var(--border-subtle)]/70 px-2.5 py-2 text-xs">
+                        {compactTimeline.map(event => (
+                          <li key={event.id} className="rounded-md border border-[var(--border-subtle)]/70 px-2.5 py-2 text-xs">
                             <p className="font-semibold text-[var(--text-primary)]">
-                              {formatTimelineEventLabel(event)}
+                              {event.label}
                             </p>
                             <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">
-                              {formatDateLabel(event?.createdAt, "Sem data registrada")}
+                              {formatDateLabel(event.occurredAt, "Sem data registrada")}
                             </p>
                             <p className="mt-1 text-[11px] text-[var(--text-secondary)]">
-                              {formatTimelineSummary(event)}
+                              {event.summary}
                             </p>
                           </li>
                         ))}

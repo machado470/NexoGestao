@@ -39,6 +39,12 @@ import {
 } from "@/components/internal-page-system";
 import { SecondaryButton } from "@/components/design-system";
 import { inRange, safeDate } from "@/lib/operational/kpi";
+import {
+  buildCompactOperationalTimeline,
+  getOperationalSignalToneClasses,
+  type OperationalNextActionDecision,
+  type OperationalSignal,
+} from "@/lib/operations/operational-workspace";
 import { toast } from "sonner";
 
 type TabKey = "agenda" | "confirmed" | "pending" | "conflicts" | "history";
@@ -60,12 +66,6 @@ type AppointmentLike = {
   updatedAt?: string | Date | null;
 };
 
-type OperationalSignal = {
-  key: string;
-  label: string;
-  tone: "danger" | "warning" | "info" | "healthy";
-};
-
 type NextActionIntent =
   | "confirm"
   | "status"
@@ -74,15 +74,7 @@ type NextActionIntent =
   | "reschedule"
   | "none";
 
-type NextActionDecision = {
-  title: string;
-  reason: string;
-  impact: string;
-  urgency: string;
-  intent: NextActionIntent;
-  healthy?: boolean;
-  secondary: NextActionIntent[];
-};
+type NextActionDecision = OperationalNextActionDecision<NextActionIntent>;
 
 function mapOperationalState(item: AppointmentLike, hasConflict: boolean) {
   const severity = getAppointmentSeverity(item);
@@ -94,13 +86,6 @@ function mapOperationalState(item: AppointmentLike, hasConflict: boolean) {
   if (status === "CONFIRMED") return hasConflict ? "Em risco" : "Confirmado";
   if (hasConflict || severity === "critical") return "Em risco";
   return status === "SCHEDULED" ? "Pendente" : getOperationalSeverityLabel(severity);
-}
-
-function getSignalToneClasses(tone: OperationalSignal["tone"]) {
-  if (tone === "danger") return "bg-[var(--dashboard-danger)]/15 text-[var(--dashboard-danger)]";
-  if (tone === "warning") return "bg-amber-500/15 text-amber-600 dark:text-amber-300";
-  if (tone === "info") return "bg-sky-500/15 text-sky-700 dark:text-sky-300";
-  return "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300";
 }
 
 export default function AppointmentsPage() {
@@ -191,14 +176,14 @@ export default function AppointmentsPage() {
 
       const signals: OperationalSignal[] = [];
       if (startsSoon) signals.push({ key: "starts_soon", label: "Agendamento próximo", tone: "warning" });
-      if (isDelayed) signals.push({ key: "delayed", label: "Atrasado sem avanço", tone: "danger" });
+      if (isDelayed) signals.push({ key: "delayed", label: "Atrasado sem avanço", tone: "critical" });
       if (status === "SCHEDULED") signals.push({ key: "not_confirmed", label: "Não confirmado", tone: "warning" });
       if (requiresCommunication) signals.push({ key: "pending_contact", label: "Comunicação pendente", tone: "info" });
       if (!item?.customerId) signals.push({ key: "customer_dependency", label: "Dependente de cliente", tone: "warning" });
       if (status === "CONFIRMED" && !hasServiceOrder) {
         signals.push({ key: "service_order_dependency", label: "Dependente de O.S.", tone: "info" });
       }
-      if (status === "CANCELED") signals.push({ key: "canceled", label: "Cancelado", tone: "danger" });
+      if (status === "CANCELED") signals.push({ key: "canceled", label: "Cancelado", tone: "critical" });
       if (Number(item?.priority ?? 0) >= 3 || hasConflict) {
         signals.push({ key: "priority_high", label: "Prioridade elevada", tone: "warning" });
       }
@@ -379,6 +364,21 @@ export default function AppointmentsPage() {
     }
     return entries;
   }, [focused]);
+
+  const compactTimeline = useMemo(
+    () =>
+      buildCompactOperationalTimeline({
+        events: timelineFallback,
+        mapEvent: event => ({
+          id: String(event.id),
+          occurredAt: event.at,
+          label: "Evento",
+          summary: String(event.text),
+        }),
+        maxItems: 6,
+      }),
+    [timelineFallback]
+  );
 
   const executeStatusUpdate = async (status: "CONFIRMED" | "CANCELED" | "DONE" | "NO_SHOW") => {
     if (!focused?.item?.id) return;
@@ -662,7 +662,7 @@ export default function AppointmentsPage() {
                             <p className="whitespace-nowrap text-[11px] text-[var(--text-muted)]">
                               {safeDate(item?.startsAt)?.toLocaleDateString("pt-BR") ?? "—"}
                             </p>
-                            <p className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${getSignalToneClasses(signalPreview.tone)}`}>
+                            <p className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${getOperationalSignalToneClasses(signalPreview.tone, "soft")}`}>
                               {signalPreview.label}
                             </p>
                           </td>
@@ -767,7 +767,7 @@ export default function AppointmentsPage() {
                     {focused.signals.slice(0, 5).map(signal => (
                       <span
                         key={signal.key}
-                        className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${getSignalToneClasses(signal.tone)}`}
+                        className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${getOperationalSignalToneClasses(signal.tone, "soft")}`}
                       >
                         {signal.label}
                       </span>
@@ -874,10 +874,10 @@ export default function AppointmentsPage() {
                 <section className="space-y-1.5 border-t border-[var(--border-subtle)] pt-4">
                   <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Timeline curta</p>
                   <ul className="list-disc space-y-1 pl-4 text-xs text-[var(--text-secondary)]">
-                    {timelineFallback.length > 0 ? (
-                      timelineFallback.slice(0, 6).map(event => (
+                    {compactTimeline.length > 0 ? (
+                      compactTimeline.map(event => (
                         <li key={event.id}>
-                          {safeDate(event.at)?.toLocaleString("pt-BR") ?? "—"} · {event.text}
+                          {safeDate(event.occurredAt)?.toLocaleString("pt-BR") ?? "—"} · {event.summary}
                         </li>
                       ))
                     ) : (
