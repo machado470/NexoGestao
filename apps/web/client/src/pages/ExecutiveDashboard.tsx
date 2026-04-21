@@ -1,11 +1,11 @@
 import { useEffect, useMemo } from "react";
 import { useLocation } from "wouter";
-import { AlertTriangle, ArrowRight, Clock3, MessageSquareWarning, ShieldAlert } from "lucide-react";
+import { ArrowRight, Clock3, MessageSquareWarning, ShieldAlert, TrendingDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { AppStatCard, AppToolbar } from "@/components/app-system";
 import { useRunAction } from "@/hooks/useRunAction";
 import { useRenderWatchdog } from "@/hooks/useRenderWatchdog";
 import {
-  AppKpiRow,
   AppPageEmptyState,
   AppPageErrorState,
   AppPageHeader,
@@ -24,14 +24,12 @@ const severityWeight: Record<Severity, number> = {
   medium: 1,
 };
 
-const operationalPeriodLabel = "Hoje · Turno 08:00–18:00";
-
 const immediateAttentionItems = [
   {
     severity: "critical" as const,
     title: "Cobranças vencidas em lote crítico",
-    context: "6 cobranças vencidas há +48h no fechamento do caixa do dia.",
-    impact: "Risco direto de estrangulamento de caixa e atraso de repasses.",
+    context: "6 cobranças vencidas há +48h no fechamento do caixa.",
+    impact: "Risco de estrangulamento de caixa e atraso de repasses.",
     owner: "Financeiro · Ana",
     primaryCtaLabel: "Cobrar agora",
     primaryPath: "/finances?view=charges&status=overdue",
@@ -41,8 +39,8 @@ const immediateAttentionItems = [
   {
     severity: "critical" as const,
     title: "O.S. atrasadas em rota ativa",
-    context: "2 O.S. estão paradas há mais de 2h após início previsto.",
-    impact: "Propaga atraso para agenda do dia e degrada SLA.",
+    context: "2 O.S. paradas há mais de 2h após início previsto.",
+    impact: "Degrada SLA e empurra atraso para os próximos slots.",
     owner: "Operações · Bruno",
     primaryCtaLabel: "Destravar O.S.",
     primaryPath: "/service-orders?status=attention",
@@ -52,7 +50,7 @@ const immediateAttentionItems = [
   {
     severity: "high" as const,
     title: "Agendamentos sem confirmação",
-    context: "4 clientes ainda sem confirmação para a próxima janela de execução.",
+    context: "4 clientes sem confirmação para a janela 10:00–12:00.",
     impact: "Risco de ociosidade operacional e quebra de previsibilidade.",
     owner: "Agenda · Camila",
     primaryCtaLabel: "Confirmar agenda",
@@ -62,9 +60,9 @@ const immediateAttentionItems = [
   },
   {
     severity: "high" as const,
-    title: "Falha de comunicação WhatsApp",
-    context: "5 mensagens de confirmação falharam na última hora.",
-    impact: "Sem notificação, aumenta ausência em agendamento e retrabalho.",
+    title: "Falhas em mensagens de confirmação",
+    context: "5 mensagens de WhatsApp falharam na última hora.",
+    impact: "Aumenta ausência em agendamento e retrabalho.",
     owner: "Comunicação · Júlia",
     primaryCtaLabel: "Resolver falhas",
     primaryPath: "/timeline?type=whatsapp-failure",
@@ -74,8 +72,8 @@ const immediateAttentionItems = [
   {
     severity: "medium" as const,
     title: "Clientes sem resposta pós-serviço",
-    context: "3 clientes sem retorno após execução concluída nas últimas 24h.",
-    impact: "Queda de recompra e menor taxa de confirmação futura.",
+    context: "3 clientes sem retorno após execução nas últimas 24h.",
+    impact: "Reduz recompra e confirmação futura.",
     owner: "Relacionamento · Time CS",
     primaryCtaLabel: "Responder cliente",
     primaryPath: "/customers?segment=inactive",
@@ -88,40 +86,45 @@ const operationalFlow = [
   {
     stage: "Cliente",
     volume: 138,
-    status: "Atenção",
+    conversion: "→ Agendamento 30,4%",
     bottleneck: "3 sem retorno",
+    status: "Atenção",
     action: "Ativar follow-up",
     path: "/customers?segment=inactive",
   },
   {
     stage: "Agendamento",
     volume: 42,
-    status: "Atenção",
+    conversion: "→ O.S. 66,7%",
     bottleneck: "4 sem confirmação",
+    status: "Atenção",
     action: "Confirmar agenda",
     path: "/appointments?status=pending-confirmation",
   },
   {
     stage: "O.S.",
     volume: 28,
-    status: "Em risco",
+    conversion: "→ Cobrança 75%",
     bottleneck: "2 atrasadas",
+    status: "Em risco",
     action: "Destravar execução",
     path: "/service-orders?status=attention",
   },
   {
     stage: "Cobrança",
     volume: 21,
-    status: "Em risco",
+    conversion: "→ Pagamento 71,4%",
     bottleneck: "6 vencidas",
+    status: "Crítico",
     action: "Cobrar carteira",
     path: "/finances?view=charges&status=overdue",
   },
   {
     stage: "Pagamento",
     volume: 15,
-    status: "Seguro",
-    bottleneck: "Conversão estável",
+    conversion: "Meta 80%",
+    bottleneck: "Conversão abaixo da meta",
+    status: "Atenção",
     action: "Ver recebimentos",
     path: "/finances?view=paid",
   },
@@ -129,34 +132,7 @@ const operationalFlow = [
 
 const operationalQueue = [
   {
-    type: "O.S. para iniciar",
-    entity: "OS-7841 · Cliente Acácia",
-    status: "Pendente",
-    deadline: "09:30",
-    owner: "Equipe Campo 2",
-    actionLabel: "Iniciar O.S.",
-    path: "/service-orders?status=pending",
-  },
-  {
-    type: "Agendamento",
-    entity: "AG-1992 · Clínica Viva",
-    status: "Atenção",
-    deadline: "10:00",
-    owner: "Agenda",
-    actionLabel: "Confirmar",
-    path: "/appointments?status=pending-confirmation",
-  },
-  {
-    type: "Cliente aguardando resposta",
-    entity: "Marina Costa",
-    status: "Em risco",
-    deadline: "10:15",
-    owner: "Relacionamento",
-    actionLabel: "Responder",
-    path: "/customers?segment=needs-contact",
-  },
-  {
-    type: "Cobrança a cobrar",
+    type: "Cobrança",
     entity: "COB-9021 · R$ 4.280",
     status: "Urgente",
     deadline: "11:00",
@@ -165,7 +141,34 @@ const operationalQueue = [
     path: "/finances?view=charges&status=overdue",
   },
   {
-    type: "Pendência do dia",
+    type: "O.S.",
+    entity: "OS-7841 · Cliente Acácia",
+    status: "Atenção",
+    deadline: "09:30",
+    owner: "Equipe Campo 2",
+    actionLabel: "Iniciar O.S.",
+    path: "/service-orders?status=pending",
+  },
+  {
+    type: "Agendamento",
+    entity: "AG-1992 · Clínica Viva",
+    status: "Pendente",
+    deadline: "10:00",
+    owner: "Agenda",
+    actionLabel: "Confirmar",
+    path: "/appointments?status=pending-confirmation",
+  },
+  {
+    type: "Atendimento",
+    entity: "Marina Costa · sem retorno",
+    status: "Em risco",
+    deadline: "10:15",
+    owner: "Relacionamento",
+    actionLabel: "Responder",
+    path: "/customers?segment=needs-contact",
+  },
+  {
+    type: "Comunicação",
     entity: "Falha WhatsApp · lote 14",
     status: "Atenção",
     deadline: "11:30",
@@ -176,12 +179,13 @@ const operationalQueue = [
 ];
 
 const contextualQuickActions = [
-  { label: "Cobrar cliente", path: "/finances?view=charges&status=overdue" },
-  { label: "Abrir O.S.", path: "/service-orders/new" },
-  { label: "Ajustar agenda", path: "/appointments?view=calendar" },
-  { label: "Responder cliente", path: "/customers?segment=needs-contact" },
-  { label: "Ver detalhe da timeline", path: "/timeline" },
-  { label: "Resolver falha de comunicação", path: "/timeline?type=whatsapp-failure" },
+  { label: "Clientes", path: "/customers" },
+  { label: "Agendamentos", path: "/appointments" },
+  { label: "O.S.", path: "/service-orders" },
+  { label: "Financeiro", path: "/finances" },
+  { label: "WhatsApp", path: "/timeline?type=whatsapp-failure" },
+  { label: "Timeline", path: "/timeline" },
+  { label: "Governança", path: "/governance" },
 ];
 
 function resolveOperationalState(alertCount: number, criticalCount: number): DashboardState {
@@ -233,10 +237,12 @@ export default function ExecutiveDashboard() {
               ? "Falha de leitura operacional"
               : "Carregando operação";
 
+  const operationalPeriodLabel = "Hoje · 21 de abril de 2026 · Turno 08:00–18:00";
+
   const nextBestAction = {
-    action: "Confirmar imediatamente 4 agendamentos da faixa 10:00–12:00",
-    reason: "É o ponto de maior impacto imediato para proteger SLA e evitar ociosidade da equipe de campo.",
-    impact: "Evita até 2 horas de capacidade ociosa e reduz risco de efeito cascata em O.S. e cobrança.",
+    action: "Confirmar agora os 4 agendamentos pendentes da janela 10:00–12:00",
+    reason: "Esse ponto evita ociosidade de equipe e reduz o efeito cascata de atraso em O.S. e cobrança.",
+    impact: "Protege até 2h de capacidade de campo e melhora a conversão de agenda para execução ainda no turno.",
     ctaLabel: "Executar confirmação",
     ctaPath: "/appointments?status=pending-confirmation",
     detailPath: "/dashboard/operations?filter=critical",
@@ -244,24 +250,15 @@ export default function ExecutiveDashboard() {
 
   useEffect(() => {
     // eslint-disable-next-line no-console
-    console.info("[RENDER PAGE] executive-dashboard-refactor-v1");
+    console.info("[RENDER PAGE] executive-dashboard-v2-operational-center");
   }, []);
 
   return (
     <AppPageShell>
       <AppPageHeader
-        title="Dashboard Operacional · NexoGestão"
-        description={
-          <span>
-            Central de decisão do fluxo Cliente → Agendamento → O.S. → Cobrança → Pagamento → Timeline → Risco → Governança.
-            <span className="ml-2 inline-flex">
-              <AppStatusBadge label={operationStateLabel} />
-            </span>
-          </span>
-        }
-        secondaryActions={
-          <Button variant="outline" onClick={() => navigate("/governance")}>Ver governança</Button>
-        }
+        title="Centro de decisão operacional"
+        description="Resumo de prioridade para decidir em segundos: o que acontece agora, o que está errado e qual ação vem primeiro."
+        secondaryActions={<Button variant="outline" onClick={() => navigate("/governance")}>Ver governança</Button>}
         cta={
           <Button onClick={() => void runAction(async () => navigate("/dashboard/operations?filter=critical"))}>
             Abrir fila prioritária
@@ -269,10 +266,10 @@ export default function ExecutiveDashboard() {
         }
       />
 
-      <div className="mb-4 flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
+      <AppToolbar className="mb-4 gap-2.5 px-3 py-2.5 text-xs text-[var(--text-muted)]">
         <span className="rounded-md border border-[var(--border-subtle)] px-2 py-1">{operationalPeriodLabel}</span>
         <span className="rounded-md border border-[var(--border-subtle)] px-2 py-1">Estado geral: {operationStateLabel}</span>
-      </div>
+      </AppToolbar>
 
       {dashboardState === "loading" ? <AppPageLoadingState /> : null}
       {dashboardState === "error" ? (
@@ -285,7 +282,7 @@ export default function ExecutiveDashboard() {
       {dashboardState === "empty" ? (
         <AppPageEmptyState
           title="Operação sem dados suficientes"
-          description="Comece por: cadastrar cliente, criar agendamento, abrir O.S. e registrar cobrança para ativar a leitura operacional."
+          description="Comece por cadastrar cliente, criar agendamento, abrir O.S. e registrar cobrança para ativar o centro de decisão."
         />
       ) : null}
 
@@ -293,12 +290,12 @@ export default function ExecutiveDashboard() {
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
           <AppSectionBlock
             title="Atenção imediata"
-            subtitle="Problemas urgentes ordenados por severidade e impacto operacional."
+            subtitle="Problemas urgentes ordenados por severidade. Cada alerta já traz contexto, impacto e ação principal."
             className="xl:col-span-12"
           >
             <div className="space-y-2.5">
               {immediateAttention.map(item => (
-                <div
+                <article
                   key={item.title}
                   className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3"
                 >
@@ -310,95 +307,103 @@ export default function ExecutiveDashboard() {
                   </div>
                   <p className="mt-1 text-xs text-[var(--text-secondary)]">{item.context}</p>
                   <p className="mt-1 text-xs text-[var(--text-secondary)]">Impacto: {item.impact}</p>
-                  <p className="mt-1 text-[11px] uppercase tracking-[0.08em] text-[var(--text-muted)]">Área responsável: {item.owner}</p>
+                  <p className="mt-1 text-[11px] uppercase tracking-[0.08em] text-[var(--text-muted)]">Responsável: {item.owner}</p>
                   <div className="mt-2 flex flex-wrap gap-2">
                     <Button size="sm" onClick={() => navigate(item.primaryPath)}>{item.primaryCtaLabel}</Button>
-                    {item.secondaryCtaLabel ? (
-                      <Button size="sm" variant="outline" onClick={() => navigate(item.secondaryPath)}>
-                        {item.secondaryCtaLabel}
-                      </Button>
-                    ) : null}
+                    <Button size="sm" variant="outline" onClick={() => navigate(item.secondaryPath)}>
+                      {item.secondaryCtaLabel}
+                    </Button>
                   </div>
-                </div>
+                </article>
               ))}
             </div>
           </AppSectionBlock>
 
           <AppSectionBlock
             title="Próxima melhor ação"
-            subtitle="Se só houver uma ação agora, execute esta para proteger o fluxo operacional."
-            className="xl:col-span-6"
+            subtitle="Se só uma ação puder ser feita agora, execute esta recomendação."
+            className="xl:col-span-5"
           >
-            <div className="rounded-lg border border-[var(--dashboard-danger)]/30 bg-[var(--surface-subtle)] p-3">
+            <article className="rounded-lg border border-[var(--dashboard-danger)]/30 bg-[var(--surface-subtle)] p-3.5">
               <p className="text-sm font-semibold text-[var(--text-primary)]">{nextBestAction.action}</p>
               <p className="mt-1 text-xs text-[var(--text-secondary)]">Motivo: {nextBestAction.reason}</p>
               <p className="mt-1 text-xs text-[var(--text-secondary)]">Impacto esperado: {nextBestAction.impact}</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <Button size="sm" onClick={() => navigate(nextBestAction.ctaPath)}>{nextBestAction.ctaLabel}</Button>
                 <Button size="sm" variant="outline" onClick={() => navigate(nextBestAction.detailPath)}>
-                  Ver detalhe operacional
+                  Ver detalhe
                 </Button>
               </div>
-            </div>
+            </article>
           </AppSectionBlock>
 
           <AppSectionBlock
             title="KPIs operacionais"
-            subtitle="Indicadores de decisão com contexto e ação direta."
-            className="xl:col-span-6"
+            subtitle="Poucos indicadores, cada um com consequência operacional e ação direta."
+            className="xl:col-span-7"
           >
-            <AppKpiRow
-              gridClassName="grid-cols-1 sm:grid-cols-2"
-              items={[
-                { title: "Receita do período", value: "R$ 187,4k", delta: "+15,6%", trend: "up", hint: "Ainda com pressão de inadimplência.", ctaLabel: "Ver receita", onClick: () => navigate("/finances?view=revenue") },
-                { title: "Ordens em aberto", value: "18", delta: "+2", trend: "up", hint: "2 atrasadas com risco de SLA.", ctaLabel: "Ver O.S.", onClick: () => navigate("/service-orders?status=open") },
-                { title: "Agendamentos do dia", value: "42", delta: "-4", trend: "down", hint: "4 pendentes de confirmação.", ctaLabel: "Ver agenda", onClick: () => navigate("/appointments") },
-                { title: "SLA / atraso médio", value: "92,8% · 38min", delta: "-1,4%", trend: "down", hint: "Atraso concentrado em 2 rotas.", ctaLabel: "Proteger SLA", onClick: () => navigate("/service-orders?status=attention") },
-                { title: "Ticket médio", value: "R$ 1.511", delta: "+4,4%", trend: "up", hint: "Manter conversão pós-serviço.", ctaLabel: "Detalhar ticket", onClick: () => navigate("/finances?metric=average_ticket") },
-                { title: "Cobranças pendentes", value: "21", delta: "+6", trend: "up", hint: "6 vencidas acima de 48h.", ctaLabel: "Cobrar carteira", onClick: () => navigate("/finances?view=charges") },
-                { title: "Pagamentos recebidos", value: "15", delta: "+3", trend: "up", hint: "Conversão estabilizando no período.", ctaLabel: "Ver recebimentos", onClick: () => navigate("/finances?view=paid") },
-                { title: "Taxa de confirmação", value: "90,5%", delta: "-2,3%", trend: "down", hint: "Queda puxada por WhatsApp falho.", ctaLabel: "Ajustar comunicação", onClick: () => navigate("/timeline?type=whatsapp-failure") },
-              ]}
-            />
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
+              <AppStatCard
+                label="Receita do período"
+                value="R$ 187,4k"
+                helper="Ainda pressionada por inadimplência."
+                delta={<Button size="sm" variant="ghost" onClick={() => navigate("/finances?view=revenue")}>Ver receita</Button>}
+              />
+              <AppStatCard
+                label="Ordens em aberto"
+                value="18"
+                helper="2 atrasadas com risco de SLA."
+                delta={<Button size="sm" variant="ghost" onClick={() => navigate("/service-orders?status=open")}>Abrir O.S.</Button>}
+              />
+              <AppStatCard
+                label="Agendamentos do dia"
+                value="42"
+                helper="4 pendentes de confirmação."
+                delta={<Button size="sm" variant="ghost" onClick={() => navigate("/appointments")}>Ver agenda</Button>}
+              />
+              <AppStatCard
+                label="SLA / atraso médio"
+                value="92,8% · 38min"
+                helper="Atraso concentrado em 2 rotas."
+                delta={<Button size="sm" variant="ghost" onClick={() => navigate("/service-orders?status=attention")}>Proteger SLA</Button>}
+              />
+            </div>
           </AppSectionBlock>
 
           <AppSectionBlock
             title="Fluxo operacional"
-            subtitle="Cliente → Agendamento → O.S. → Cobrança → Pagamento com volume, gargalo e ação sugerida."
+            subtitle="Cliente → Agendamento → O.S. → Cobrança → Pagamento com volume, passagem e gargalo principal."
             className="xl:col-span-12"
           >
-            <ul className="grid grid-cols-1 gap-2.5 md:grid-cols-5">
+            <div className="grid grid-cols-1 gap-2.5 md:grid-cols-5">
               {operationalFlow.map(step => (
-                <li key={step.stage} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
+                <article key={step.stage} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">{step.stage}</p>
                   <p className="mt-1 text-lg font-semibold text-[var(--text-primary)]">{step.volume}</p>
+                  <p className="mt-1 text-xs text-[var(--text-secondary)]">{step.conversion}</p>
                   <p className="mt-1 text-xs text-[var(--text-secondary)]">Gargalo: {step.bottleneck}</p>
                   <div className="mt-2 flex items-center justify-between gap-2">
                     <AppStatusBadge label={step.status} />
-                    <button
-                      type="button"
-                      onClick={() => navigate(step.path)}
-                      className="text-xs font-medium text-[var(--text-secondary)] underline-offset-2 hover:text-[var(--text-primary)] hover:underline"
-                    >
+                    <Button size="sm" variant="ghost" onClick={() => navigate(step.path)}>
                       {step.action}
-                    </button>
+                    </Button>
                   </div>
-                </li>
+                </article>
               ))}
-            </ul>
+            </div>
             <p className="mt-3 text-xs text-[var(--text-secondary)]">
-              Gargalo principal: Cobrança vencida e O.S. atrasada. Etapa crítica atual: O.S. com atraso em rota ativa. Ação sugerida: confirmar agenda crítica e destravar execução antes de abrir nova carga.
+              Gargalo principal: Cobrança → Pagamento. Etapa crítica atual: Cobrança vencida acima de 48h. Próxima ação sugerida: cobrança ativa antes de abrir novos serviços.
             </p>
           </AppSectionBlock>
 
           <AppSectionBlock
             title="Fila operacional"
-            subtitle="Execução imediata ordenada por urgência, sem tabela gigante."
+            subtitle="Itens priorizados para execução imediata, sem virar tabela gigante."
             className="xl:col-span-7"
           >
             <div className="space-y-2.5">
               {operationalQueue.map(item => (
-                <div key={`${item.type}-${item.entity}`} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
+                <article key={`${item.type}-${item.entity}`} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-sm font-semibold text-[var(--text-primary)]">{item.type}</p>
                     <AppStatusBadge label={item.status} />
@@ -408,59 +413,46 @@ export default function ExecutiveDashboard() {
                   <Button className="mt-2" size="sm" variant="outline" onClick={() => navigate(item.path)}>
                     {item.actionLabel}
                   </Button>
-                </div>
+                </article>
               ))}
             </div>
           </AppSectionBlock>
 
           <AppSectionBlock
             title="Pulso da operação"
-            subtitle="Leitura interpretativa do que mudou e o que isso significa agora."
+            subtitle="Leitura interpretativa em linguagem humana para orientar decisão rápida."
             className="xl:col-span-5"
           >
             <div className="space-y-2.5">
               <div className="flex items-start gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
                 <Clock3 className="mt-0.5 h-4 w-4 text-[var(--dashboard-warning)]" />
-                <p className="text-xs text-[var(--text-secondary)]">
-                  Aumento de atrasos em O.S. significa risco de efeito cascata no SLA da manhã.
-                </p>
+                <p className="text-xs text-[var(--text-secondary)]">Atrasos em O.S. subiram e já pressionam a janela da manhã. Priorize destravar execução.</p>
               </div>
               <div className="flex items-start gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
-                <ArrowRight className="mt-0.5 h-4 w-4 text-[var(--dashboard-info)]" />
-                <p className="text-xs text-[var(--text-secondary)]">
-                  Queda na conversão para pagamento indica necessidade de atuar em cobrança no mesmo dia da execução.
-                </p>
+                <TrendingDown className="mt-0.5 h-4 w-4 text-[var(--dashboard-danger)]" />
+                <p className="text-xs text-[var(--text-secondary)]">A conversão de cobrança para pagamento caiu para 71,4%, abaixo da meta de 80%.</p>
               </div>
               <div className="flex items-start gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
                 <MessageSquareWarning className="mt-0.5 h-4 w-4 text-[var(--dashboard-danger)]" />
-                <p className="text-xs text-[var(--text-secondary)]">
-                  Falhas em mensagens pioram tempo de resposta e aumentam clientes inativos.
-                </p>
+                <p className="text-xs text-[var(--text-secondary)]">Falhas de mensagem aumentam no-show e pioram o tempo de resposta ao cliente.</p>
               </div>
               <div className="flex items-start gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
                 <ShieldAlert className="mt-0.5 h-4 w-4 text-[var(--dashboard-info)]" />
-                <p className="text-xs text-[var(--text-secondary)]">
-                  Risco operacional alto no financeiro e na agenda. Governança deve acompanhar com prioridade neste turno.
-                </p>
-              </div>
-              <div className="flex items-start gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
-                <AlertTriangle className="mt-0.5 h-4 w-4 text-[var(--dashboard-warning)]" />
-                <p className="text-xs text-[var(--text-secondary)]">
-                  Timeline aponta aumento de eventos críticos; tratar causa-raiz evita retrabalho ao fim do dia.
-                </p>
+                <p className="text-xs text-[var(--text-secondary)]">Risco operacional concentra em agenda e financeiro; governança deve acompanhar este turno.</p>
               </div>
             </div>
           </AppSectionBlock>
 
           <AppSectionBlock
             title="Acessos rápidos contextuais"
-            subtitle="Atalhos acionáveis alinhados ao momento operacional atual."
+            subtitle="Atalhos enxutos para navegar por decisão, sem duplicar menu global."
             className="xl:col-span-12"
           >
             <div className="flex flex-wrap gap-2">
               {contextualQuickActions.map(action => (
                 <Button key={action.label} size="sm" variant="outline" onClick={() => navigate(action.path)}>
                   {action.label}
+                  <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
                 </Button>
               ))}
             </div>
