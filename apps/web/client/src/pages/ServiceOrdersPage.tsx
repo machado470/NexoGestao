@@ -161,6 +161,120 @@ function formatDateLabel(value: unknown, fallback = "Sem data definida") {
   return parsed.toLocaleString("pt-BR");
 }
 
+function formatTimelineEventLabel(event: any) {
+  const action = String(event?.action ?? event?.type ?? "")
+    .trim()
+    .toUpperCase();
+  if (action === "SERVICE_ORDER_CREATED") return "O.S. criada";
+  if (action === "SERVICE_ORDER_UPDATED" || action === "SERVICE_ORDER_STATUS_CHANGED") {
+    return "Status atualizado";
+  }
+  if (action === "EXECUTION_STARTED") return "Execução iniciada";
+  if (action === "EXECUTION_COMPLETED" || action === "EXECUTION_DONE") {
+    return "Execução concluída";
+  }
+  if (action === "CHARGE_CREATED") return "Cobrança gerada";
+  if (action === "PAYMENT_RECEIVED" || action === "CHARGE_PAID") return "Pagamento recebido";
+  if (action === "WHATSAPP_SENT" || action === "MESSAGE_SENT") return "Comunicação enviada";
+  if (action === "APPOINTMENT_LINKED") return "Agendamento vinculado";
+  if (action === "CUSTOMER_LINKED") return "Cliente vinculado";
+  return String(event?.description ?? event?.action ?? event?.type ?? "Evento operacional");
+}
+
+function formatTimelineSummary(event: any) {
+  const description = String(event?.description ?? "").trim();
+  if (description) return description;
+  const metadataStatus = String(event?.metadata?.status ?? "").trim();
+  if (metadataStatus) return `Status ${metadataStatus}.`;
+  if (event?.metadata?.amountCents) {
+    return `Valor ${formatMoney(Number(event.metadata.amountCents))}.`;
+  }
+  return "Evento registrado na trilha operacional.";
+}
+
+function normalizeChargeStatus(value: unknown) {
+  return String(value ?? "")
+    .trim()
+    .toUpperCase();
+}
+
+type OperationalSignal = {
+  key: string;
+  label: string;
+  tone: "critical" | "warning" | "info" | "healthy";
+};
+
+function getSignalToneClasses(tone: OperationalSignal["tone"]) {
+  if (tone === "critical") {
+    return "border-[var(--dashboard-danger)]/35 bg-[var(--dashboard-danger)]/10 text-[var(--dashboard-danger)]";
+  }
+  if (tone === "warning") {
+    return "border-amber-500/35 bg-amber-500/10 text-amber-600 dark:text-amber-300";
+  }
+  if (tone === "info") {
+    return "border-sky-500/35 bg-sky-500/10 text-sky-600 dark:text-sky-300";
+  }
+  return "border-emerald-500/35 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300";
+}
+
+function getOperationalSignals(order: any, timeline: any[]) {
+  const status = normalizeStatus(order?.status);
+  const chargeStatus = normalizeChargeStatus(order?.financialSummary?.chargeStatus);
+  const scheduled = safeDate(order?.scheduledFor);
+  const overdue =
+    Boolean(scheduled && scheduled < new Date()) &&
+    ["OPEN", "ASSIGNED", "IN_PROGRESS"].includes(status);
+  const blocked = ["BLOCKED", "ON_HOLD", "PAUSED"].includes(status);
+  const noCharge = !order?.financialSummary?.hasCharge;
+  const doneWithoutFinancial = status === "DONE" && noCharge;
+  const communicationPending =
+    status === "WAITING_CUSTOMER" ||
+    (status === "DONE" &&
+      chargeStatus === "PENDING" &&
+      !timeline.some(event =>
+        String(event?.action ?? event?.type ?? "")
+          .toUpperCase()
+          .includes("WHATSAPP")
+      ));
+  const dependentAppointment =
+    !order?.appointmentId && ["OPEN", "ASSIGNED"].includes(status);
+  const priorityHigh = Number(order?.priority ?? 0) >= 4;
+
+  const signals: OperationalSignal[] = [];
+  if (overdue) signals.push({ key: "overdue", label: "O.S. atrasada", tone: "critical" });
+  if (blocked) signals.push({ key: "blocked", label: "Bloqueio operacional", tone: "critical" });
+  if (doneWithoutFinancial) {
+    signals.push({
+      key: "done_no_finance",
+      label: "Concluída sem ação financeira",
+      tone: "critical",
+    });
+  } else if (noCharge) {
+    signals.push({ key: "no_charge", label: "Sem cobrança", tone: "warning" });
+  }
+  if (communicationPending) {
+    signals.push({
+      key: "communication_pending",
+      label: "Comunicação pendente",
+      tone: "warning",
+    });
+  }
+  if (dependentAppointment) {
+    signals.push({
+      key: "appointment_dependency",
+      label: "Dependente de agendamento",
+      tone: "info",
+    });
+  }
+  if (priorityHigh) {
+    signals.push({ key: "priority_high", label: "Prioridade elevada", tone: "info" });
+  }
+  if (signals.length === 0) {
+    signals.push({ key: "healthy", label: "Fluxo saudável", tone: "healthy" });
+  }
+  return signals;
+}
+
 export default function ServiceOrdersPage() {
   const [location, navigate] = useLocation();
   const [openCreate, setOpenCreate] = useState(false);
@@ -201,6 +315,14 @@ export default function ServiceOrdersPage() {
   const serviceOrdersQuery = trpc.nexo.serviceOrders.list.useQuery(
     { page: 1, limit: 100 },
     { retry: false }
+  );
+  const focusedTimelineQuery = trpc.nexo.timeline.listByServiceOrder.useQuery(
+    { serviceOrderId: String(focusedOrderId ?? ""), limit: 20 },
+    { retry: false, enabled: Boolean(focusedOrderId) }
+  );
+  const focusedExecutionQuery = trpc.nexo.executions.listByServiceOrder.useQuery(
+    { serviceOrderId: String(focusedOrderId ?? ""), limit: 10 },
+    { retry: false, enabled: Boolean(focusedOrderId) }
   );
   const updateServiceOrder = trpc.nexo.serviceOrders.update.useMutation();
   const generateCharge = trpc.nexo.serviceOrders.generateCharge.useMutation();
@@ -376,6 +498,60 @@ export default function ServiceOrdersPage() {
     : focusedOrderStatus === "DONE"
       ? "Cobrança vinculada"
       : "Cobrança em preparação";
+  const focusedChargeStatusRaw = normalizeChargeStatus(
+    focusedOrder?.financialSummary?.chargeStatus
+  );
+  const focusedTimeline = useMemo(
+    () => normalizeArrayPayload<any>(focusedTimelineQuery.data),
+    [focusedTimelineQuery.data]
+  );
+  const focusedExecutions = useMemo(
+    () => normalizeArrayPayload<any>(focusedExecutionQuery.data),
+    [focusedExecutionQuery.data]
+  );
+  const focusedSignals = useMemo(
+    () => getOperationalSignals(focusedOrder, focusedTimeline),
+    [focusedOrder, focusedTimeline]
+  );
+  const lastCommunicationEvent = useMemo(
+    () =>
+      focusedTimeline.find(event =>
+        ["WHATSAPP_SENT", "MESSAGE_SENT", "CUSTOMER_NOTIFIED"].includes(
+          String(event?.action ?? event?.type ?? "").toUpperCase()
+        )
+      ) ?? null,
+    [focusedTimeline]
+  );
+  const fallbackTimeline = useMemo(
+    () =>
+      focusedOrder
+        ? [
+            {
+              id: `created-${focusedOrder.id}`,
+              action: "SERVICE_ORDER_CREATED",
+              createdAt: focusedOrder.createdAt,
+              description: "Ordem criada no pipeline operacional.",
+            },
+            {
+              id: `updated-${focusedOrder.id}`,
+              action: "SERVICE_ORDER_UPDATED",
+              createdAt: focusedOrder.updatedAt,
+              description: `Status atual: ${getStatusLabel(focusedOrderStatus)}.`,
+            },
+            {
+              id: `charge-${focusedOrder.id}`,
+              action: focusedHasCharge ? "CHARGE_CREATED" : "CHARGE_PENDING",
+              createdAt: focusedOrder.updatedAt ?? focusedOrder.createdAt,
+              description: focusedHasCharge
+                ? "Cobrança vinculada ao fluxo."
+                : "Cobrança ainda não gerada.",
+            },
+          ]
+        : [],
+    [focusedHasCharge, focusedOrder, focusedOrderStatus]
+  );
+  const timelineToRender = focusedTimeline.length > 0 ? focusedTimeline : fallbackTimeline;
+  const lastExecution = focusedExecutions[0] ?? null;
 
   const totalOrders = filteredOrders.length;
   const totalPages = Math.max(1, Math.ceil(totalOrders / SERVICE_ORDERS_PER_PAGE));
@@ -422,6 +598,135 @@ export default function ServiceOrdersPage() {
       setActionFeedback(message);
       toast.error(message);
     }
+  };
+
+  const executeGenerateCharge = async () => {
+    if (!focusedOrder?.id) return;
+    try {
+      setActionFeedbackTone("neutral");
+      setActionFeedback("Gerando cobrança...");
+      await generateCharge.mutateAsync({ id: String(focusedOrder.id) } as any);
+      setActionFeedback("Cobrança gerada com sucesso.");
+      setActionFeedbackTone("success");
+      await Promise.all([
+        serviceOrdersQuery.refetch(),
+        focusedTimelineQuery.refetch(),
+      ]);
+    } catch (error) {
+      const message = explainOperationalError({
+        fallback: error instanceof Error ? error.message : "Falha ao gerar cobrança.",
+        cause: "Não foi possível concluir a geração da cobrança da O.S.",
+        suggestion: "Valide se a O.S. está concluída e tente novamente.",
+      });
+      setActionFeedbackTone("error");
+      setActionFeedback(message);
+      toast.error(message);
+    }
+  };
+
+  const dominantAction = useMemo(() => {
+    if (!focusedOrder) {
+      return {
+        title: "Selecione uma O.S.",
+        reason: "Escolha uma linha para receber recomendação contextual.",
+        ctaLabel: "Abrir detalhe",
+        ctaIntent: "modal" as const,
+        secondary: [] as Array<{ label: string; intent: "finance" | "whatsapp" | "appointment" }>,
+      };
+    }
+    if (focusedOrderStatus === "OPEN" || focusedOrderStatus === "ASSIGNED") {
+      return {
+        title: "Iniciar execução",
+        reason: "A O.S. está criada e pronta para iniciar o atendimento.",
+        ctaLabel: "Iniciar execução",
+        ctaIntent: "start" as const,
+        secondary: [{ label: "Abrir agendamento", intent: "appointment" as const }],
+      };
+    }
+    if (focusedOrderStatus === "IN_PROGRESS" && focusedIsOverdue) {
+      return {
+        title: "Atualizar andamento",
+        reason: "A janela operacional venceu e o status precisa de atualização imediata.",
+        ctaLabel: "Marcar andamento",
+        ctaIntent: "progress" as const,
+        secondary: [{ label: "Enviar atualização", intent: "whatsapp" as const }],
+      };
+    }
+    if (focusedOrderStatus === "IN_PROGRESS") {
+      return {
+        title: "Concluir execução",
+        reason: "Execução em curso sem pendência crítica detectada.",
+        ctaLabel: "Concluir execução",
+        ctaIntent: "complete" as const,
+        secondary: [{ label: "Atualizar cliente", intent: "whatsapp" as const }],
+      };
+    }
+    if (focusedOrderStatus === "DONE" && !focusedHasCharge) {
+      return {
+        title: "Gerar cobrança",
+        reason: "Serviço concluído sem vínculo financeiro ativo.",
+        ctaLabel: "Gerar cobrança",
+        ctaIntent: "charge" as const,
+        secondary: [{ label: "Ir para financeiro", intent: "finance" as const }],
+      };
+    }
+    if (focusedChargeStatusRaw === "OVERDUE" || focusedChargeStatusRaw === "PENDING") {
+      return {
+        title: "Atuar no financeiro",
+        reason: "Existe cobrança pendente/vencida exigindo continuidade no recebimento.",
+        ctaLabel: "Ir para financeiro",
+        ctaIntent: "finance" as const,
+        secondary: [{ label: "Cobrar no WhatsApp", intent: "whatsapp" as const }],
+      };
+    }
+    if (focusedNeedsNotification) {
+      return {
+        title: "Enviar atualização ao cliente",
+        reason: "Há indicação de pendência de retorno para o cliente.",
+        ctaLabel: "Abrir WhatsApp",
+        ctaIntent: "whatsapp" as const,
+        secondary: [{ label: "Abrir detalhe", intent: "appointment" as const }],
+      };
+    }
+    return {
+      title: "Fluxo operacional saudável",
+      reason: "Execução, financeiro e comunicação estão consistentes neste momento.",
+      ctaLabel: "Revisar detalhes",
+      ctaIntent: "modal" as const,
+      secondary: [{ label: "Abrir financeiro", intent: "finance" as const }],
+    };
+  }, [
+    focusedChargeStatusRaw,
+    focusedHasCharge,
+    focusedIsOverdue,
+    focusedNeedsNotification,
+    focusedOrder,
+    focusedOrderStatus,
+  ]);
+
+  const handleDominantAction = async () => {
+    if (!focusedOrder) return;
+    if (dominantAction.ctaIntent === "start" || dominantAction.ctaIntent === "progress") {
+      await executeOrderStatus("IN_PROGRESS");
+      return;
+    }
+    if (dominantAction.ctaIntent === "complete") {
+      await executeOrderStatus("DONE");
+      return;
+    }
+    if (dominantAction.ctaIntent === "charge") {
+      await executeGenerateCharge();
+      return;
+    }
+    if (dominantAction.ctaIntent === "finance") {
+      navigate(`/finances?serviceOrderId=${focusedOrder.id}`);
+      return;
+    }
+    if (dominantAction.ctaIntent === "whatsapp") {
+      navigate(`/whatsapp?customerId=${focusedOrder.customerId}&serviceOrderId=${focusedOrder.id}`);
+      return;
+    }
+    setOpenOperationalModal(true);
   };
 
   const headerCta = (() => {
@@ -685,6 +990,7 @@ export default function ServiceOrdersPage() {
                         const priorityLabel = getPriorityLabel(
                           Number(order?.priority ?? 2)
                         );
+                        const rowSignals = getOperationalSignals(order, []);
 
                         const handlePrimaryAction = () => {
                           setFocusedOrderId(String(order?.id ?? ""));
@@ -741,28 +1047,16 @@ export default function ServiceOrdersPage() {
                               <AppStatusBadge
                                 label={getStatusLabel(status)}
                               />
-                              {status === "DONE" && !hasCharge ? (
-                                <p className="mt-1 truncate text-xs text-[var(--dashboard-danger)]">
-                                  Sem cobrança ativa
-                                </p>
-                              ) : null}
-                              {status !== "DONE" &&
-                              scheduledDate &&
-                              scheduledDate < new Date() ? (
-                                <p className="mt-1 truncate text-xs text-amber-500">
-                                  Atrasada para execução
-                                </p>
-                              ) : null}
-                              {status === "WAITING_CUSTOMER" ? (
-                                <p className="mt-1 truncate text-xs text-sky-500">
-                                  Precisa notificar cliente
-                                </p>
-                              ) : null}
-                              {["BLOCKED", "ON_HOLD", "PAUSED"].includes(status) ? (
-                                <p className="mt-1 truncate text-xs text-[var(--dashboard-danger)]">
-                                  Bloqueio operacional
-                                </p>
-                              ) : null}
+                              <div className="mt-1.5 flex flex-wrap gap-1">
+                                {rowSignals.slice(0, 2).map(signal => (
+                                  <span
+                                    key={signal.key}
+                                    className={`rounded-full border px-1.5 py-0.5 text-[10px] font-semibold ${getSignalToneClasses(signal.tone)}`}
+                                  >
+                                    {signal.label}
+                                  </span>
+                                ))}
+                              </div>
                             </td>
                             <td className="px-4 py-3.5 align-top">
                               <AppPriorityBadge label={priorityLabel} />
@@ -896,11 +1190,8 @@ export default function ServiceOrdersPage() {
                 title={`Workspace · ${String(focusedOrder?.title ?? "O.S. sem título")}`}
                 subtitle={`Cliente: ${String(focusedOrder?.customer?.name ?? "Cliente")} · Status ${getStatusLabel(focusedOrderStatus)}`}
                 primaryAction={{
-                  label: resolveOperationalActionLabel(
-                    focusedNextAction,
-                    getPrimaryActionLabel(focusedOrder, focusedNextAction)
-                  ),
-                  onClick: () => setOpenOperationalModal(true),
+                  label: dominantAction.ctaLabel,
+                  onClick: () => void handleDominantAction(),
                 }}
                 context={
                   <div className="space-y-4">
@@ -933,21 +1224,40 @@ export default function ServiceOrdersPage() {
                     </section>
 
                     <OperationalNextAction
-                      title={focusedNextAction}
-                      reason="Ação sugerida com base no status atual, sinais de execução e vínculo financeiro."
+                      title={dominantAction.title}
+                      reason={dominantAction.reason}
                       urgency={
                         focusedIsBlocked || focusedIsOverdue
                           ? "Urgente"
                           : focusedNeedsNotification
                             ? "Atenção"
-                            : "Prioridade operacional"
+                            : focusedSignals[0]?.tone === "healthy"
+                              ? "Saudável"
+                              : "Prioridade operacional"
                       }
                       impact={
                         !focusedHasCharge && focusedOrderStatus === "DONE"
                           ? "Evitar perda de receita"
-                          : "Proteger continuidade da execução"
+                          : focusedSignals[0]?.tone === "healthy"
+                            ? "Manter estabilidade operacional"
+                            : "Proteger continuidade da execução"
                       }
                     />
+                    <section className="space-y-1.5 border-t border-[var(--border-subtle)] pt-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                        Sinais operacionais
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {focusedSignals.map(signal => (
+                          <span
+                            key={signal.key}
+                            className={`rounded-full border px-2 py-1 text-[10px] font-semibold ${getSignalToneClasses(signal.tone)}`}
+                          >
+                            {signal.label}
+                          </span>
+                        ))}
+                      </div>
+                    </section>
 
                     <section className="space-y-1.5 border-t border-[var(--border-subtle)] pt-3">
                       <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
@@ -962,6 +1272,42 @@ export default function ServiceOrdersPage() {
                       <p className="text-xs text-[var(--text-muted)]">
                         Última atualização: {formatDateLabel(focusedOrder?.updatedAt, "Sem atualização registrada")}.
                       </p>
+                      {lastExecution ? (
+                        <p className="text-xs text-[var(--text-muted)]">
+                          Registro de execução:{" "}
+                          {String(lastExecution?.status ?? "status não informado")} em{" "}
+                          {formatDateLabel(lastExecution?.updatedAt ?? lastExecution?.createdAt, "data não registrada")}.
+                        </p>
+                      ) : null}
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {dominantAction.secondary.slice(0, 2).map(secondary => (
+                          <SecondaryButton
+                            key={secondary.label}
+                            type="button"
+                            className="h-7 px-2.5 text-[11px]"
+                            onClick={() => {
+                              if (!focusedOrder) return;
+                              if (secondary.intent === "finance") {
+                                navigate(`/finances?serviceOrderId=${focusedOrder.id}`);
+                                return;
+                              }
+                              if (secondary.intent === "whatsapp") {
+                                navigate(`/whatsapp?customerId=${focusedOrder.customerId}&serviceOrderId=${focusedOrder.id}`);
+                                return;
+                              }
+                              navigate(
+                                `/appointments?customerId=${focusedOrder.customerId}${
+                                  focusedOrder?.appointmentId
+                                    ? `&appointmentId=${focusedOrder.appointmentId}`
+                                    : ""
+                                }`
+                              );
+                            }}
+                          >
+                            {secondary.label}
+                          </SecondaryButton>
+                        ))}
+                      </div>
                     </section>
 
                     <section className="space-y-1.5 border-t border-[var(--border-subtle)] pt-3">
@@ -990,17 +1336,40 @@ export default function ServiceOrdersPage() {
                       Situação: {focusedChargeStatus}.
                     </p>
                     <p className="mt-1 text-xs text-[var(--text-muted)]">
+                      Status financeiro:{" "}
+                      {focusedChargeStatusRaw === "PAID"
+                        ? "Pagamento recebido"
+                        : focusedChargeStatusRaw === "OVERDUE"
+                          ? "Cobrança vencida"
+                          : focusedChargeStatusRaw === "PENDING"
+                            ? "Cobrança pendente"
+                            : "Sem fluxo financeiro ativo"}
+                      .
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--text-muted)]">
                       Valor:{" "}
-                      {focusedOrder?.financialSummary?.amountCents
-                        ? formatMoney(Number(focusedOrder.financialSummary.amountCents))
+                      {focusedOrder?.financialSummary?.chargeAmountCents
+                        ? formatMoney(Number(focusedOrder.financialSummary.chargeAmountCents))
                         : "sem valor consolidado"}.
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--text-muted)]">
+                      Vencimento:{" "}
+                      {formatDateLabel(
+                        focusedOrder?.financialSummary?.chargeDueDate,
+                        "não definido"
+                      )}
+                      .
                     </p>
                     <SecondaryButton
                       type="button"
                       className="mt-3 h-8 px-3 text-xs"
-                      onClick={() => navigate(`/finances?serviceOrderId=${focusedOrder?.id}`)}
+                      onClick={() =>
+                        !focusedHasCharge
+                          ? void executeGenerateCharge()
+                          : navigate(`/finances?serviceOrderId=${focusedOrder?.id}`)
+                      }
                     >
-                      Abrir financeiro
+                      {!focusedHasCharge ? "Gerar cobrança" : "Abrir financeiro"}
                     </SecondaryButton>
                   </section>
                 }
@@ -1014,31 +1383,58 @@ export default function ServiceOrdersPage() {
                         ? "Cliente aguardando retorno no WhatsApp."
                         : "Sem pendência crítica de contato."}
                     </p>
+                    <p className="mt-1 text-xs text-[var(--text-muted)]">
+                      Última interação:{" "}
+                      {lastCommunicationEvent
+                        ? formatDateLabel(lastCommunicationEvent?.createdAt, "sem horário")
+                        : "nenhuma registrada"}
+                      .
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--text-muted)]">
+                      Sugestão:{" "}
+                      {focusedOrderStatus === "DONE" && focusedChargeStatusRaw === "PENDING"
+                        ? "Cobrar confirmação de pagamento."
+                        : focusedOrderStatus === "IN_PROGRESS"
+                          ? "Enviar atualização de andamento."
+                          : "Manter cliente informado sobre a execução."}
+                    </p>
                     <Button
                       type="button"
                       className="mt-3 h-8 px-3 text-xs"
                       onClick={() =>
-                        navigate(`/whatsapp?customerId=${focusedOrder?.customerId}`)
+                        navigate(
+                          `/whatsapp?customerId=${focusedOrder?.customerId}&serviceOrderId=${focusedOrder?.id}`
+                        )
                       }
                     >
-                      Abrir WhatsApp
+                      Enviar atualização
                     </Button>
                   </section>
                 }
                 timeline={
                   <section className="rounded-xl border border-[var(--border-subtle)]/80 p-3.5">
                     <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
-                      Timeline curta
+                      Histórico operacional
                     </p>
-                    <ul className="mt-2 space-y-1.5 text-xs text-[var(--text-secondary)]">
-                      <li>• O.S. criada em {formatDateLabel(focusedOrder?.createdAt, "data não registrada")}.</li>
-                      <li>
-                        • Status atual: {getStatusLabel(focusedOrderStatus)}{focusedIsBlocked ? " (requer destravar)." : "."}
-                      </li>
-                      <li>
-                        • Cobrança: {focusedHasCharge ? "vinculada ao fluxo." : "ainda não gerada."}
-                      </li>
-                    </ul>
+                    {focusedTimelineQuery.isLoading ? (
+                      <p className="mt-2 text-xs text-[var(--text-muted)]">Carregando eventos...</p>
+                    ) : (
+                      <ul className="mt-2 space-y-2">
+                        {timelineToRender.slice(0, 6).map(event => (
+                          <li key={String(event?.id ?? `${event?.action}-${event?.createdAt}`)} className="rounded-md border border-[var(--border-subtle)]/70 px-2.5 py-2 text-xs">
+                            <p className="font-semibold text-[var(--text-primary)]">
+                              {formatTimelineEventLabel(event)}
+                            </p>
+                            <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">
+                              {formatDateLabel(event?.createdAt, "Sem data registrada")}
+                            </p>
+                            <p className="mt-1 text-[11px] text-[var(--text-secondary)]">
+                              {formatTimelineSummary(event)}
+                            </p>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </section>
                 }
               >
@@ -1057,7 +1453,12 @@ export default function ServiceOrdersPage() {
                       },
                       {
                         label: "Pagamento",
-                        state: focusedHasCharge ? "current" : "pending",
+                        state:
+                          focusedChargeStatusRaw === "PAID"
+                            ? "done"
+                            : focusedHasCharge
+                              ? "current"
+                              : "pending",
                       },
                     ]}
                   />
@@ -1069,8 +1470,13 @@ export default function ServiceOrdersPage() {
                         ? `Origem no agendamento #${String(focusedOrder?.appointmentId)}.`
                         : "Sem agendamento de origem.",
                       focusedHasCharge
-                        ? "Cobrança conectada ao fluxo financeiro."
+                        ? focusedChargeStatusRaw === "PAID"
+                          ? "Cobrança já quitada e registrada no financeiro."
+                          : "Cobrança conectada ao fluxo financeiro."
                         : "Fluxo financeiro ainda pendente para esta O.S.",
+                      lastCommunicationEvent
+                        ? `Última comunicação registrada em ${formatDateLabel(lastCommunicationEvent.createdAt, "horário não disponível")}.`
+                        : "Sem comunicação registrada nesta O.S.",
                     ]}
                   />
                   {!focusedHasCharge ? (
