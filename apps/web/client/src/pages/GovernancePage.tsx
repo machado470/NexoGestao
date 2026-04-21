@@ -4,9 +4,8 @@ import { ArrowUpRight, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
+import { AppStatCard, AppTimeline, AppTimelineItem, AppToolbar } from "@/components/app-system";
 import {
-  AppNextActionCard,
-  AppOperationalBar,
   AppPageEmptyState,
   AppPageErrorState,
   AppPageHeader,
@@ -22,9 +21,11 @@ import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
 import { useRenderWatchdog } from "@/hooks/useRenderWatchdog";
 import { setBootPhase } from "@/lib/bootPhase";
 
-type GovernanceView = "visao" | "problemas" | "acoes" | "historico";
 type PriorityLevel = "critical" | "high" | "medium";
 type OperationalState = "healthy" | "attention" | "critical" | "empty" | "loading" | "error";
+type GovernanceStateTone = "NORMAL" | "WARNING" | "RESTRICTED" | "SUSPENDED";
+type ActionType = "charge" | "message" | "assignment" | "schedule";
+type ActionContext = Record<string, unknown>;
 
 type GovernanceProblem = {
   id: string;
@@ -43,8 +44,44 @@ type GovernanceProblem = {
   expectedImpact: string;
 };
 
-type ActionType = "charge" | "message" | "assignment" | "schedule";
-type ActionContext = Record<string, unknown>;
+type GovernanceActionItem = {
+  id: string;
+  type: "alert" | "suggestion" | "restriction" | "state-change" | "prioritization" | "correction";
+  title: string;
+  reason: string;
+  impact: string;
+  when: string;
+  ctaLabel: string;
+  ctaPath: string;
+  timelinePath: string;
+  priority: PriorityLevel;
+};
+
+type GovernanceExecutionItem = {
+  id: string;
+  event: "GOVERNANCE_RUN_STARTED" | "GOVERNANCE_RUN_COMPLETED" | "OPERATIONAL_STATE_CHANGED";
+  title: string;
+  summary: string;
+  occurredAt: string;
+  riskScore: number;
+  stateLabel: GovernanceStateTone;
+  timelinePath: string;
+};
+
+type GovernanceDetail = {
+  id: string;
+  title: string;
+  state: GovernanceStateTone;
+  reason: string;
+  changed: string;
+  possibleNext: string;
+  signals: string[];
+  impactedEntities: Array<{ label: string; path: string }>;
+  relatedEvents: string[];
+  executedActions: string[];
+  crossLinks: Array<{ label: string; path: string }>;
+};
+
 type Action = {
   id: string;
   type: ActionType;
@@ -75,6 +112,13 @@ function operationStateFromRisk(riskScore: number, hasCritical: boolean, hasAnyP
   return "healthy";
 }
 
+function operationalToneFromState(state: OperationalState): GovernanceStateTone {
+  if (state === "critical") return "SUSPENDED";
+  if (state === "attention") return "WARNING";
+  if (state === "healthy") return "NORMAL";
+  return "RESTRICTED";
+}
+
 function operationStateLabel(state: OperationalState) {
   if (state === "critical") return "Crítico";
   if (state === "attention") return "Atenção";
@@ -86,19 +130,26 @@ function operationStateLabel(state: OperationalState) {
 
 function operationSummaryCopy(state: OperationalState, problemCount: number) {
   if (state === "critical") {
-    return `Operação sob risco alto com ${problemCount} problema(s) prioritário(s) exigindo execução imediata.`;
+    return `Operação em risco alto com ${problemCount} sinal(is) exigindo intervenção imediata.`;
   }
   if (state === "attention") {
-    return `Operação em atenção com ${problemCount} problema(s) que podem escalar ainda hoje.`;
+    return `Operação em atenção com ${problemCount} sinal(is) que podem escalar nas próximas horas.`;
   }
   if (state === "healthy") {
-    return "Operação saudável no momento. Governança deve manter monitoramento ativo.";
+    return "Operação saudável no momento. Governança segue em supervisão contínua.";
   }
   if (state === "empty") {
-    return "Sem desvios detectados. Este estado vazio indica operação saudável nesta janela.";
+    return "Sem desvios detectados nesta janela. Governança mantém monitoramento ativo.";
   }
-  if (state === "loading") return "Lendo sinais operacionais para decisão automática.";
+  if (state === "loading") return "Lendo sinais operacionais para consolidar estado e reação.";
   return "Não foi possível consolidar o estado operacional agora.";
+}
+
+function toneDescription(state: GovernanceStateTone) {
+  if (state === "SUSPENDED") return "Restrições fortes em curso para conter risco operacional.";
+  if (state === "RESTRICTED") return "Operação parcialmente limitada enquanto ações corretivas executam.";
+  if (state === "WARNING") return "Risco crescente pede ação rápida para evitar escalada.";
+  return "Operação controlada, sem restrições no momento.";
 }
 
 export default function GovernancePage() {
@@ -119,9 +170,10 @@ export default function GovernancePage() {
   );
   const executeGovernanceAction = trpc.governance.executeAction.useMutation();
 
-  const [activeView, setActiveView] = useState<GovernanceView>("visao");
   const [searchValue, setSearchValue] = useState("");
   const [priorityFilter, setPriorityFilter] = useState<"all" | PriorityLevel>("all");
+  const [periodFilter, setPeriodFilter] = useState<"24h" | "7d" | "30d">("7d");
+  const [selectedDetailId, setSelectedDetailId] = useState<string | null>(null);
   const [actionStatus, setActionStatus] = useState<Record<string, { state: "idle" | "loading" | "success" | "error"; message?: string }>>({});
 
   const summary = useMemo(
@@ -138,6 +190,7 @@ export default function GovernancePage() {
     const payload = normalizeObjectPayload<any>(serviceOrdersQuery.data) ?? {};
     return normalizeArrayPayload<any>(payload.data ?? payload.items ?? serviceOrdersQuery.data ?? []);
   }, [serviceOrdersQuery.data]);
+
   const hasSummaryData = Boolean(summaryQuery.data);
   const hasRunsData = runs.length > 0;
 
@@ -153,10 +206,7 @@ export default function GovernancePage() {
   const overloadedWorkload = metric(summary, "overloadedTeams", "workloadPressure", "teamOverload", "overloadCount");
 
   const latestRisk = Number(
-    runs[0]?.riskScore ??
-      runs[0]?.score ??
-      runs[0]?.overallRisk ??
-      metric(summary, "riskScore", "overallRisk", "operationalRisk")
+    runs[0]?.riskScore ?? runs[0]?.score ?? runs[0]?.overallRisk ?? metric(summary, "riskScore", "overallRisk", "operationalRisk")
   );
 
   const detectedProblems = useMemo<GovernanceProblem[]>(() => {
@@ -257,7 +307,7 @@ export default function GovernancePage() {
       });
     }
 
-    entitiesAtRisk.slice(0, 2).forEach((entity, index) => {
+    entitiesAtRisk.slice(0, 3).forEach((entity, index) => {
       const entityName = String(entity?.name ?? entity?.entityName ?? "Entidade em risco");
       const entityLevel = String(entity?.level ?? entity?.riskLevel ?? "WARNING").toUpperCase();
       problems.push({
@@ -283,14 +333,7 @@ export default function GovernancePage() {
       if (bySeverity !== 0) return bySeverity;
       return b.count - a.count;
     });
-  }, [
-    communicationFailures,
-    entitiesAtRisk,
-    overdueCharges,
-    overdueServiceOrders,
-    overloadedWorkload,
-    unansweredCustomers,
-  ]);
+  }, [communicationFailures, entitiesAtRisk, overdueCharges, overdueServiceOrders, overloadedWorkload, unansweredCustomers]);
 
   const filteredProblems = useMemo(() => {
     const query = searchValue.trim().toLowerCase();
@@ -307,18 +350,87 @@ export default function GovernancePage() {
     });
   }, [detectedProblems, priorityFilter, searchValue]);
 
-  const governanceActions = useMemo(
-    () => filteredProblems.map(problem => ({
-      id: `action-${problem.id}`,
+  const hasCritical = detectedProblems.some(problem => problem.priority === "critical");
+  const effectiveState = operationStateFromRisk(latestRisk, hasCritical, detectedProblems.length > 0);
+  const governanceTone = operationalToneFromState(effectiveState);
+
+  const actionItems = useMemo<GovernanceActionItem[]>(() => {
+    const base: GovernanceActionItem[] = filteredProblems.map(problem => ({
+      id: `system-action-${problem.id}`,
+      type: (problem.priority === "critical" ? "restriction" : "suggestion") as GovernanceActionItem["type"],
       title: problem.actionLabel,
-      description: `${problem.reason} Impacto esperado: ${problem.expectedImpact}`,
-      severity: (problem.priority === "critical" ? "critical" : problem.priority === "high" ? "high" : "medium") as "critical" | "high" | "medium",
-      path: problem.actionPath,
+      reason: problem.reason,
+      impact: problem.expectedImpact,
+      when: "Agora",
+      ctaLabel: "Executar investigação",
+      ctaPath: problem.actionPath,
       timelinePath: problem.timelinePath,
-      module: problem.module,
-    })),
-    [filteredProblems]
-  );
+      priority: problem.priority,
+    }));
+
+    if (effectiveState === "critical") {
+      base.unshift({
+        id: "system-action-state-change",
+        type: "state-change",
+        title: "Mudança de estado operacional aplicada",
+        reason: "Risco consolidado acima do limiar crítico com sinais simultâneos em O.S. e Financeiro.",
+        impact: "Bloqueia propagação do risco e força priorização de backlog crítico.",
+        when: "Última execução",
+        ctaLabel: "Abrir Timeline da mudança",
+        ctaPath: "/timeline?module=governance&event=OPERATIONAL_STATE_CHANGED",
+        timelinePath: "/timeline?module=governance",
+        priority: "critical",
+      });
+    }
+
+    return base.slice(0, 8);
+  }, [effectiveState, filteredProblems]);
+
+  const executions = useMemo<GovernanceExecutionItem[]>(() => {
+    if (runs.length === 0) return [];
+
+    const items = runs.slice(0, 8).flatMap((run, index) => {
+      const runId = String(run?.id ?? `run-${index}`);
+      const runRisk = Number(run?.riskScore ?? run?.score ?? run?.overallRisk ?? 0);
+      const createdAt = run?.createdAt ? new Date(String(run.createdAt)).toLocaleString("pt-BR") : "Sem data";
+      const tone: GovernanceStateTone = runRisk >= 75 ? "SUSPENDED" : runRisk >= 50 ? "RESTRICTED" : runRisk >= 30 ? "WARNING" : "NORMAL";
+
+      return [
+        {
+          id: `${runId}-start`,
+          event: "GOVERNANCE_RUN_STARTED" as const,
+          title: "Governance run iniciado",
+          summary: "Motor começou a consolidar sinais de timeline, risco e operação.",
+          occurredAt: createdAt,
+          riskScore: runRisk,
+          stateLabel: tone,
+          timelinePath: "/timeline?module=governance",
+        },
+        {
+          id: `${runId}-completed`,
+          event: "GOVERNANCE_RUN_COMPLETED" as const,
+          title: "Governance run concluído",
+          summary: `Leitura consolidada com risco ${runRisk}/100 e decisões emitidas para ação.`,
+          occurredAt: createdAt,
+          riskScore: runRisk,
+          stateLabel: tone,
+          timelinePath: "/timeline?module=governance",
+        },
+        {
+          id: `${runId}-state-changed`,
+          event: "OPERATIONAL_STATE_CHANGED" as const,
+          title: "Estado operacional reavaliado",
+          summary: `Operação classificada como ${tone}.`,
+          occurredAt: createdAt,
+          riskScore: runRisk,
+          stateLabel: tone,
+          timelinePath: "/timeline?module=governance&event=OPERATIONAL_STATE_CHANGED",
+        },
+      ];
+    });
+
+    return items.slice(0, 9);
+  }, [runs]);
 
   const assignablePeople = useMemo(() => people.filter(person => person?.active !== false), [people]);
   const firstOverdueCharge = overdueChargesList[0] ?? null;
@@ -333,7 +445,7 @@ export default function GovernancePage() {
       label: "Cobrar agora",
       description: "Envia lembrete de cobrança via WhatsApp sem sair da Governança.",
       requiresConfirmation: true,
-      execute: async (context) => {
+      execute: async context => {
         await executeGovernanceAction.mutateAsync({
           id: "charge.send_whatsapp",
           type: "charge",
@@ -349,7 +461,7 @@ export default function GovernancePage() {
       type: "assignment",
       label: "Atribuir responsável",
       description: "Atribui automaticamente a próxima O.S. sem responsável.",
-      execute: async (context) => {
+      execute: async context => {
         await executeGovernanceAction.mutateAsync({
           id: "assignment.assign_owner",
           type: "assignment",
@@ -371,12 +483,7 @@ export default function GovernancePage() {
     try {
       await action.execute(context);
       setActionStatus(current => ({ ...current, [action.id]: { state: "success", message: "Ação executada e registrada na timeline." } }));
-      void Promise.all([
-        summaryQuery.refetch(),
-        runsQuery.refetch(),
-        overdueChargesQuery.refetch(),
-        serviceOrdersQuery.refetch(),
-      ]);
+      void Promise.all([summaryQuery.refetch(), runsQuery.refetch(), overdueChargesQuery.refetch(), serviceOrdersQuery.refetch()]);
     } catch (error: any) {
       setActionStatus(current => ({
         ...current,
@@ -385,15 +492,99 @@ export default function GovernancePage() {
     }
   }
 
-  const hasCritical = detectedProblems.some(problem => problem.priority === "critical");
-  const effectiveState = operationStateFromRisk(latestRisk, hasCritical, detectedProblems.length > 0);
-
   const pageState: OperationalState =
     summaryQuery.isLoading && !hasSummaryData
       ? "loading"
       : summaryQuery.error && !hasSummaryData
         ? "error"
         : effectiveState;
+
+  const alertPriorities = useMemo(() => {
+    const alerts = [
+      {
+        id: "risk-growth",
+        label: "Risco crescente",
+        description: latestRisk >= 40 ? `Score ${latestRisk}/100 com tendência de escalada se não houver ação.` : "Risco estável no momento.",
+        action: "/timeline?module=governance",
+        active: latestRisk >= 40,
+      },
+      {
+        id: "state-change",
+        label: "Mudança de estado",
+        description: `Estado operacional atual: ${governanceTone}. ${toneDescription(governanceTone)}`,
+        action: "/timeline?module=governance&event=OPERATIONAL_STATE_CHANGED",
+        active: governanceTone !== "NORMAL",
+      },
+      {
+        id: "auto-action",
+        label: "Ações automáticas",
+        description: `${actionItems.length} ação(ões) em fila de intervenção com consequência operacional visível.`,
+        action: "/timeline?module=governance",
+        active: actionItems.length > 0,
+      },
+      {
+        id: "prioritized-entities",
+        label: "Entidades priorizadas",
+        description: `${entitiesAtRisk.length} entidade(s) sob observação ativa para evitar bloqueio sistêmico.`,
+        action: "/customers?segment=needs-contact",
+        active: entitiesAtRisk.length > 0,
+      },
+    ];
+
+    return alerts;
+  }, [actionItems.length, entitiesAtRisk.length, governanceTone, latestRisk]);
+
+  const details = useMemo<GovernanceDetail[]>(() => {
+    const problemDetails: GovernanceDetail[] = filteredProblems.map(problem => ({
+      id: `detail-${problem.id}`,
+      title: problem.title,
+      state: (problem.priority === "critical" ? "SUSPENDED" : problem.priority === "high" ? "RESTRICTED" : "WARNING") as GovernanceStateTone,
+      reason: problem.reason,
+      changed: `Governança priorizou ${problem.owner} para conter impacto em ${problem.module}.`,
+      possibleNext: `Se persistir, a operação pode evoluir para ${problem.priority === "critical" ? "SUSPENDED" : "RESTRICTED"}.`,
+      signals: [problem.context, problem.impact, problem.origin],
+      impactedEntities: [{ label: problem.owner, path: problem.actionPath }],
+      relatedEvents: ["Timeline registrou evento de risco", "Risk Engine consolidou criticidade"],
+      executedActions: [problem.actionLabel],
+      crossLinks: [
+        { label: "Cliente", path: "/customers" },
+        { label: "O.S.", path: "/service-orders" },
+        { label: "Financeiro", path: "/finances" },
+        { label: "WhatsApp", path: "/whatsapp" },
+        { label: "Timeline", path: problem.timelinePath },
+      ],
+    }));
+
+    const executionDetails: GovernanceDetail[] = executions.slice(0, 3).map(item => ({
+      id: `detail-${item.id}`,
+      title: item.title,
+      state: item.stateLabel,
+      reason: item.summary,
+      changed: `Execução ${item.event} reavaliou prioridade operacional.`,
+      possibleNext: "Próxima execução pode elevar ou reduzir restrições conforme sinais da Timeline.",
+      signals: [
+        `Evento: ${item.event}`,
+        `Risco consolidado: ${item.riskScore}/100`,
+        `Ocorrência: ${item.occurredAt}`,
+      ],
+      impactedEntities: [{ label: "Operação", path: "/dashboard" }],
+      relatedEvents: ["Timeline recebeu rastreabilidade da execução", "Governança emitiu recomendações"],
+      executedActions: ["Leitura executiva atualizada", "Priorização operacional aplicada"],
+      crossLinks: [
+        { label: "Timeline", path: item.timelinePath },
+        { label: "Financeiro", path: "/finances" },
+        { label: "Agendamentos", path: "/appointments" },
+      ],
+    }));
+
+    return [...problemDetails, ...executionDetails];
+  }, [executions, filteredProblems]);
+
+  const selectedDetail = useMemo(() => {
+    if (details.length === 0) return null;
+    if (!selectedDetailId) return details[0];
+    return details.find(item => item.id === selectedDetailId) ?? details[0];
+  }, [details, selectedDetailId]);
 
   usePageDiagnostics({
     page: "governance",
@@ -405,16 +596,32 @@ export default function GovernancePage() {
 
   useEffect(() => {
     // eslint-disable-next-line no-console
-    console.info("[RENDER PAGE] governance-refactor-v1");
+    console.info("[RENDER PAGE] governance-refactor-v2-supervision");
   }, []);
 
   return (
-    <PageWrapper title="Governança · Centro de decisão" subtitle="Governança interpreta a Timeline e decide a reação operacional com execução assistida.">
+    <PageWrapper
+      title="Governança · supervisão e intervenção"
+      subtitle="Camada visível de supervisão contínua entre Timeline, Risk Engine e ação corretiva."
+    >
       <OperationalTopCard
         contextLabel="Direção de governança"
-        title="Leitura de risco e reação imediata"
-        description="Estado, prioridade e execução no mesmo fluxo para agir agora."
-        primaryAction={(
+        title="Operação sob supervisão ativa"
+        description="Estado operacional, interpretação de risco, execução e rastreabilidade no mesmo fluxo."
+      />
+    <AppPageShell className="space-y-4">
+      <AppPageHeader
+        title="Governança"
+        description={
+          <span>
+            Supervisão contínua da operação: interpretação de risco, decisão e intervenção rastreável.
+            <span className="ml-2 inline-flex">
+              <AppStatusBadge label={`${governanceTone} · ${operationStateLabel(pageState)}`} />
+            </span>
+          </span>
+        }
+        secondaryActions={<Button variant="outline" onClick={() => navigate("/timeline?module=governance")}>Abrir Timeline</Button>}
+        actions={
           <Button
             type="button"
             onClick={() => {
@@ -424,47 +631,24 @@ export default function GovernancePage() {
             <RefreshCw className="mr-2 h-4 w-4" />
             Atualizar leitura
           </Button>
-        )}
-      />
-      <AppPageShell>
-      <AppPageHeader
-        title="Governança · Centro de decisão"
-        description={(
-          <span>
-            {operationSummaryCopy(pageState, detectedProblems.length)}
-            <span className="ml-2 inline-flex">
-              <AppStatusBadge label={operationStateLabel(pageState)} />
-            </span>
-          </span>
-        )}
-        secondaryActions={
-          <Button variant="outline" onClick={() => navigate("/timeline?module=governance")}>Ver timeline</Button>
         }
       />
 
-      <AppOperationalBar
-        tabs={[
-          { value: "visao", label: "Estado geral" },
-          { value: "problemas", label: "Problemas" },
-          { value: "acoes", label: "Ações" },
-          { value: "historico", label: "Histórico" },
-        ]}
-        activeTab={activeView}
-        onTabChange={setActiveView}
-        searchValue={searchValue}
-        onSearchChange={setSearchValue}
-        searchPlaceholder="Buscar problema, contexto ou responsável"
-        quickFilters={(
-          <>
-            <Button size="sm" variant={priorityFilter === "all" ? "default" : "outline"} onClick={() => setPriorityFilter("all")}>Todas</Button>
-            <Button size="sm" variant={priorityFilter === "critical" ? "default" : "outline"} onClick={() => setPriorityFilter("critical")}>Críticas</Button>
-            <Button size="sm" variant={priorityFilter === "high" ? "default" : "outline"} onClick={() => setPriorityFilter("high")}>Altas</Button>
-            <Button size="sm" variant={priorityFilter === "medium" ? "default" : "outline"} onClick={() => setPriorityFilter("medium")}>Médias</Button>
-          </>
-        )}
-      />
+      <AppToolbar className="gap-2 px-3 py-2.5">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
+          <span className="rounded-full border border-[var(--border-subtle)] px-2 py-1">Período: {periodFilter}</span>
+          <span className="rounded-full border border-[var(--border-subtle)] px-2 py-1">Estado: {governanceTone}</span>
+          <span className="rounded-full border border-[var(--border-subtle)] px-2 py-1">Risco: {latestRisk}/100</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" variant={periodFilter === "24h" ? "default" : "outline"} onClick={() => setPeriodFilter("24h")}>24h</Button>
+          <Button size="sm" variant={periodFilter === "7d" ? "default" : "outline"} onClick={() => setPeriodFilter("7d")}>7 dias</Button>
+          <Button size="sm" variant={periodFilter === "30d" ? "default" : "outline"} onClick={() => setPeriodFilter("30d")}>30 dias</Button>
+          <Button size="sm" variant="outline" onClick={() => navigate("/finances?view=charges&status=overdue")}>Investigar financeiro</Button>
+        </div>
+      </AppToolbar>
 
-      {pageState === "loading" ? <AppPageLoadingState description="Carregando leitura de risco, problemas e ações de governança..." /> : null}
+      {pageState === "loading" ? <AppPageLoadingState description="Carregando estado atual, ações e contexto de governança..." /> : null}
       {pageState === "error" ? (
         <AppPageErrorState
           description={summaryQuery.error?.message ?? "Falha ao carregar dados de governança."}
@@ -477,276 +661,243 @@ export default function GovernancePage() {
 
       {pageState !== "loading" && pageState !== "error" ? (
         <>
-          {(activeView === "visao" || activeView === "problemas") ? (
-            <AppSectionBlock
-              title="Estado geral da operação"
-              subtitle="Leitura instantânea de atrasos, inadimplência, comunicação e carga de trabalho"
-              className="mt-3"
-            >
-              <div className="space-y-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <AppStatusBadge label={operationStateLabel(pageState)} />
-                  <span className="text-sm text-[var(--text-secondary)]">Score de risco atual: {latestRisk}/100</span>
+          <AppSectionBlock title="1) Estado atual · leitura executiva" subtitle="Saúde operacional em segundos: estado, causa, sinais e próxima ação.">
+            <div className="grid gap-3 xl:grid-cols-4">
+              <AppStatCard
+                label="Estado operacional"
+                value={governanceTone}
+                helper={toneDescription(governanceTone)}
+              />
+              <AppStatCard
+                label="Por que está assim"
+                value={filteredProblems[0]?.title ?? "Sem desvio crítico"}
+                helper={filteredProblems[0]?.reason ?? "Sem gatilho crítico no período."}
+              />
+              <AppStatCard
+                label="Sinais detectados"
+                value={`${filteredProblems.length} sinal(is)`}
+                helper="Consolidação entre Timeline, risco e módulos operacionais."
+              />
+              <AppStatCard
+                label="Próxima ação"
+                value={actionItems[0]?.title ?? "Monitoramento ativo"}
+                helper={actionItems[0]?.impact ?? "Sem intervenção pendente no momento."}
+              />
+            </div>
+            <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+              {alertPriorities.map(alert => (
+                <button
+                  type="button"
+                  key={alert.id}
+                  onClick={() => navigate(alert.action)}
+                  className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3 text-left transition hover:border-[var(--border-emphasis)]"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-semibold text-[var(--text-primary)]">{alert.label}</p>
+                    <AppStatusBadge label={alert.active ? "Ativo" : "Estável"} />
+                  </div>
+                  <p className="mt-1 text-xs text-[var(--text-secondary)]">{alert.description}</p>
+                </button>
+              ))}
+            </div>
+          </AppSectionBlock>
+
+          <AppSectionBlock title="2) Ações do sistema · histórico de execução" subtitle="Governança interpreta, decide e executa. Nada de alerta passivo.">
+            <div className="grid gap-3 xl:grid-cols-12">
+              <div className="space-y-2 xl:col-span-5">
+                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Ações do sistema</p>
+                <div className="grid gap-2">
+                  {actionItems.length === 0 ? (
+                    <AppPageEmptyState title="Sem ações pendentes" description="Quando houver risco com consequência operacional, as ações aparecerão aqui." />
+                  ) : (
+                    actionItems.map(item => (
+                      <button
+                        type="button"
+                        key={item.id}
+                        onClick={() => setSelectedDetailId(`detail-${item.id.replace("system-action-", "")}`)}
+                        className="rounded-lg border border-[var(--border-subtle)] p-3 text-left"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-semibold text-[var(--text-primary)]">{item.title}</p>
+                          <AppPriorityBadge label={item.priority} />
+                        </div>
+                        <p className="mt-1 text-xs text-[var(--text-secondary)]">{item.reason}</p>
+                        <p className="text-xs text-[var(--text-muted)]">Impacto: {item.impact}</p>
+                        <div className="mt-2 flex gap-2">
+                          <Button size="sm" onClick={() => navigate(item.ctaPath)}>{item.ctaLabel}</Button>
+                          <Button size="sm" variant="outline" onClick={() => navigate(item.timelinePath)}>Rastrear</Button>
+                        </div>
+                      </button>
+                    ))
+                  )}
                 </div>
-                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-                  <div className="rounded-lg border border-[var(--border-subtle)] p-3">
-                    <p className="text-xs text-[var(--text-muted)]">Atrasos de O.S.</p>
-                    <p className="text-lg font-semibold text-[var(--text-primary)]">{overdueServiceOrders}</p>
-                  </div>
-                  <div className="rounded-lg border border-[var(--border-subtle)] p-3">
-                    <p className="text-xs text-[var(--text-muted)]">Cobranças vencidas</p>
-                    <p className="text-lg font-semibold text-[var(--text-primary)]">{overdueCharges}</p>
-                  </div>
-                  <div className="rounded-lg border border-[var(--border-subtle)] p-3">
-                    <p className="text-xs text-[var(--text-muted)]">Clientes sem resposta</p>
-                    <p className="text-lg font-semibold text-[var(--text-primary)]">{unansweredCustomers}</p>
-                  </div>
-                  <div className="rounded-lg border border-[var(--border-subtle)] p-3">
-                    <p className="text-xs text-[var(--text-muted)]">Falhas de comunicação</p>
-                    <p className="text-lg font-semibold text-[var(--text-primary)]">{communicationFailures}</p>
+
+                <div className="rounded-lg border border-[var(--border-subtle)] p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Execução direta</p>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    <Button
+                      disabled={!firstOverdueCharge || actionStatus["charge.send_whatsapp"]?.state === "loading"}
+                      onClick={() =>
+                        runAction(engineActions[0], {
+                          chargeId: String(firstOverdueCharge?.id ?? ""),
+                          customerId: String(firstOverdueCharge?.customerId ?? ""),
+                        })
+                      }
+                    >
+                      {actionStatus["charge.send_whatsapp"]?.state === "loading" ? "Cobrando..." : "Cobrar agora"}
+                    </Button>
+                    <Button
+                      disabled={!firstUnassignedServiceOrder || assignablePeople.length === 0 || actionStatus["assignment.assign_owner"]?.state === "loading"}
+                      onClick={() =>
+                        runAction(engineActions[1], {
+                          serviceOrderId: String(firstUnassignedServiceOrder?.id ?? ""),
+                          assignedToPersonId: String(assignablePeople[0]?.id ?? ""),
+                          expectedUpdatedAt: String(firstUnassignedServiceOrder?.updatedAt ?? ""),
+                        })
+                      }
+                    >
+                      {actionStatus["assignment.assign_owner"]?.state === "loading" ? "Atribuindo..." : "Atribuir responsável"}
+                    </Button>
                   </div>
                 </div>
               </div>
-            </AppSectionBlock>
-          ) : null}
 
-          {(activeView === "visao" || activeView === "problemas") ? (
-            <AppSectionBlock
-              title="Problemas detectados"
-              subtitle="Lista priorizada do que está errado agora"
-              className="mt-3"
-            >
-              {filteredProblems.length === 0 ? (
-                <AppPageEmptyState
-                  title="Operação saudável"
-                  description="Sem problemas detectados. Estado vazio indica que não há reação urgente neste momento."
-                />
-              ) : (
-                <ul className="space-y-2">
-                  {filteredProblems.map(problem => (
-                    <li key={problem.id} className="rounded-lg border border-[var(--border-subtle)] p-3">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-sm font-semibold text-[var(--text-primary)]">{problem.title}</p>
-                        <AppPriorityBadge label={problem.priority} />
-                      </div>
-                      <p className="mt-1 text-sm text-[var(--text-secondary)]">{problem.context}</p>
-                      <p className="text-xs text-[var(--text-muted)]">Impacto: {problem.impact}</p>
-                      <p className="text-xs text-[var(--text-muted)]">Origem: {problem.origin}</p>
-                      <p className="text-xs text-[var(--text-muted)]">Responsável: {problem.owner}</p>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        <Button size="sm" variant="outline" onClick={() => navigate(problem.timelinePath)}>
-                          Ver origem na Timeline
-                        </Button>
-                        <Button size="sm" onClick={() => navigate(problem.actionPath)}>
-                          {problem.actionLabel}
-                        </Button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </AppSectionBlock>
-          ) : null}
-
-          {(activeView === "visao" || activeView === "acoes") ? (
-            <div className="mt-3 grid gap-3 xl:grid-cols-2">
-              <AppSectionBlock
-                title="Ações sugeridas"
-                subtitle="Decisão automatizada com motivo, impacto e execução imediata"
-              >
-                {governanceActions.length === 0 ? (
-                  <AppPageEmptyState title="Sem ações pendentes" description="Quando surgir risco, a governança sugerirá ações executáveis aqui." />
-                ) : (
-                  <div className="space-y-2">
-                    {governanceActions.slice(0, 6).map(action => (
-                      <AppNextActionCard
-                        key={action.id}
-                        title={action.title}
-                        description={action.description}
-                        severity={action.severity}
-                        metadata={action.module}
-                        action={{ label: "Executar agora", onClick: () => navigate(action.path) }}
-                      />
-                    ))}
-                  </div>
-                )}
-              </AppSectionBlock>
-
-              <AppSectionBlock
-                title="Execução direta"
-                subtitle="Ações assistidas sem sair do fluxo de governança"
-              >
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <Button
-                    disabled={!firstOverdueCharge || actionStatus["charge.send_whatsapp"]?.state === "loading"}
-                    onClick={() =>
-                      runAction(engineActions[0], {
-                        chargeId: String(firstOverdueCharge?.id ?? ""),
-                        customerId: String(firstOverdueCharge?.customerId ?? ""),
-                      })
-                    }
-                  >
-                    {actionStatus["charge.send_whatsapp"]?.state === "loading" ? "Cobrando..." : "Cobrar agora"}
-                  </Button>
-                  <Button
-                    disabled={!firstUnassignedServiceOrder || assignablePeople.length === 0 || actionStatus["assignment.assign_owner"]?.state === "loading"}
-                    onClick={() =>
-                      runAction(engineActions[1], {
-                        serviceOrderId: String(firstUnassignedServiceOrder?.id ?? ""),
-                        assignedToPersonId: String(assignablePeople[0]?.id ?? ""),
-                        expectedUpdatedAt: String(firstUnassignedServiceOrder?.updatedAt ?? ""),
-                      })
-                    }
-                  >
-                    {actionStatus["assignment.assign_owner"]?.state === "loading" ? "Atribuindo..." : "Atribuir responsável"}
-                  </Button>
-                  <Button variant="outline" onClick={() => navigate(firstUnassignedServiceOrder ? `/service-orders?id=${String(firstUnassignedServiceOrder.id)}` : "/service-orders")}>
-                    Abrir O.S.
-                  </Button>
-                  <Button variant="outline" onClick={() => navigate(firstOverdueCharge ? `/whatsapp?customerId=${String(firstOverdueCharge.customerId ?? "")}` : "/whatsapp")}>
-                    Enviar mensagem padrão
-                  </Button>
-                  <Button variant="outline" onClick={() => navigate("/calendar")}>
-                    Remarcar agenda
-                  </Button>
-                  <Button onClick={() => navigate("/timeline?module=governance")} variant="outline">Abrir Timeline</Button>
-                </div>
-                <div className="mt-3 space-y-1 text-xs">
-                  {engineActions.map(action => {
-                    const status = actionStatus[action.id];
-                    if (!status || status.state === "idle") return null;
-                    const color =
-                      status.state === "success"
-                        ? "text-emerald-400"
-                        : status.state === "error"
-                          ? "text-rose-400"
-                          : "text-amber-300";
-                    return (
-                      <p key={`${action.id}-status`} className={color}>
-                        {action.label}: {status.message}
-                      </p>
-                    );
-                  })}
-                  {!firstOverdueCharge ? <p className="text-[var(--text-muted)]">Sem cobrança vencida com contexto completo para execução direta.</p> : null}
-                  {!firstUnassignedServiceOrder ? <p className="text-[var(--text-muted)]">Sem O.S. aberta sem responsável para atribuição automática.</p> : null}
-                </div>
-              </AppSectionBlock>
-            </div>
-          ) : null}
-
-          {(activeView === "visao" || activeView === "historico") ? (
-            <div className="mt-3 grid gap-3 xl:grid-cols-12">
-              <AppSectionBlock
-                title="Histórico de governança"
-                subtitle="Decisões e execuções recentes conectadas com a Timeline"
-                className="xl:col-span-8"
-              >
+              <div className="space-y-2 xl:col-span-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Histórico de execuções</p>
                 {runsQuery.isLoading && !hasRunsData ? (
-                  <AppPageLoadingState description="Carregando execuções de governança..." />
+                  <AppPageLoadingState description="Carregando histórico de governança..." />
                 ) : runsQuery.error && !hasRunsData ? (
                   <AppPageErrorState
-                    description={runsQuery.error?.message ?? "Falha ao carregar execuções de governança."}
+                    description={runsQuery.error?.message ?? "Falha ao carregar histórico de governança."}
                     actionLabel="Tentar novamente"
                     onAction={() => void runsQuery.refetch()}
                   />
-                ) : runs.length === 0 ? (
-                  <AppPageEmptyState title="Sem execuções registradas" description="Assim que a governança rodar, as decisões aparecerão aqui." />
+                ) : executions.length === 0 ? (
+                  <AppPageEmptyState title="Sem execuções registradas" description="A primeira execução vai aparecer com rastreabilidade completa aqui." />
                 ) : (
-                  <ul className="space-y-2">
-                    {runs.slice(0, 8).map((run, index) => {
-                      const runRisk = Number(run?.riskScore ?? run?.score ?? run?.overallRisk ?? 0);
-                      const runDate = run?.createdAt ? new Date(String(run.createdAt)).toLocaleString("pt-BR") : "Sem data";
-                      return (
-                        <li key={String(run?.id ?? `run-${index}`)} className="rounded-lg border border-[var(--border-subtle)] p-3">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-sm font-semibold text-[var(--text-primary)]">Execução {index + 1}</p>
-                            <AppStatusBadge label={runRisk >= 70 ? "Crítico" : runRisk >= 40 ? "Atenção" : "Saudável"} />
-                          </div>
-                          <p className="text-xs text-[var(--text-muted)]">Risco calculado: {runRisk}/100 · {runDate}</p>
-                          <Button size="sm" variant="outline" className="mt-2" onClick={() => navigate("/timeline?module=governance")}>Ver decisão na Timeline</Button>
-                        </li>
-                      );
-                    })}
-                  </ul>
+                  <AppTimeline className="space-y-2">
+                    {executions.map(item => (
+                      <AppTimelineItem
+                        key={item.id}
+                        className="cursor-pointer p-2.5"
+                        onClick={() => setSelectedDetailId(`detail-${item.id}`)}
+                      >
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-xs font-semibold text-[var(--text-primary)]">{item.event}</p>
+                          <AppStatusBadge label={item.stateLabel} />
+                        </div>
+                        <p className="text-sm text-[var(--text-secondary)]">{item.summary}</p>
+                        <p className="text-xs text-[var(--text-muted)]">{item.occurredAt}</p>
+                      </AppTimelineItem>
+                    ))}
+                  </AppTimeline>
                 )}
-              </AppSectionBlock>
+              </div>
 
-              <AppSectionBlock
-                title="Regras de governança"
-                subtitle="Condição → ação em linguagem simples"
-                className="xl:col-span-4"
-              >
+              <div className="space-y-2 xl:col-span-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Políticas / regras ativas</p>
                 {institutionalPolicies.length === 0 ? (
                   <AppPageEmptyState
-                    title="Sem regras configuradas"
-                    description="Quando houver políticas publicadas, elas aparecerão como condição e ação nesta seção."
+                    title="Estrutura pronta para políticas"
+                    description="Sem inventar backend: esta área já está pronta para publicar regras configuráveis na evolução da V2."
                   />
                 ) : (
                   <ul className="space-y-2">
                     {institutionalPolicies.slice(0, 6).map((policy, index) => (
                       <li key={String(policy?.id ?? `policy-${index}`)} className="rounded-lg border border-[var(--border-subtle)] p-3">
-                        <p className="text-sm font-medium text-[var(--text-primary)]">{String(policy?.title ?? policy?.name ?? "Regra")}</p>
+                        <p className="text-sm font-medium text-[var(--text-primary)]">{String(policy?.title ?? policy?.name ?? "Política")}</p>
                         <p className="text-xs text-[var(--text-muted)]">{String(policy?.condition ?? policy?.trigger ?? "Condição não especificada")}</p>
-                        <p className="text-xs text-[var(--text-secondary)]">
-                          → {String(policy?.action ?? policy?.resolution ?? policy?.status ?? "Ação não especificada")}
-                        </p>
+                        <p className="text-xs text-[var(--text-secondary)]">→ {String(policy?.action ?? policy?.resolution ?? "Ação não especificada")}</p>
                       </li>
                     ))}
                   </ul>
                 )}
-              </AppSectionBlock>
+              </div>
             </div>
-          ) : null}
+          </AppSectionBlock>
 
-          {(activeView === "visao" || activeView === "acoes") && recommendations.length > 0 ? (
-            <AppSectionBlock
-              title="Sugestões automáticas do motor"
-              subtitle="Ações complementares trazidas pelo backend de governança"
-              className="mt-3"
-            >
-              <ul className="space-y-2">
-                {recommendations.slice(0, 5).map((item, index) => (
+          <AppSectionBlock title="3) Detalhe · contexto de governança" subtitle="O que aconteceu, por que importou, o que mudou e o que pode acontecer em seguida.">
+            {!selectedDetail ? (
+              <AppPageEmptyState
+                title="Sem detalhe disponível"
+                description="Sem contexto selecionado. Assim que houver sinal ou execução, o detalhe de governança ficará visível aqui."
+              />
+            ) : (
+              <div className="grid gap-3 xl:grid-cols-12">
+                <div className="space-y-2 xl:col-span-7">
+                  <div className="rounded-lg border border-[var(--border-subtle)] p-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-semibold text-[var(--text-primary)]">{selectedDetail.title}</p>
+                      <AppStatusBadge label={selectedDetail.state} />
+                    </div>
+                    <p className="mt-1 text-sm text-[var(--text-secondary)]">{selectedDetail.reason}</p>
+                    <p className="mt-1 text-xs text-[var(--text-muted)]">Mudança: {selectedDetail.changed}</p>
+                    <p className="text-xs text-[var(--text-muted)]">Próximo possível: {selectedDetail.possibleNext}</p>
+                  </div>
+
+                  <div className="rounded-lg border border-[var(--border-subtle)] p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Cadeia de decisão</p>
+                    <p className="mt-1 text-xs text-[var(--text-secondary)]">Evento acontece → Timeline registra → Risk Engine interpreta → Governança age.</p>
+                    <ul className="mt-2 space-y-1 text-xs text-[var(--text-secondary)]">
+                      {selectedDetail.relatedEvents.map(event => (
+                        <li key={event}>• {event}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="space-y-2 xl:col-span-5">
+                  <div className="rounded-lg border border-[var(--border-subtle)] p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Sinais e ações executadas</p>
+                    <ul className="mt-2 space-y-1 text-xs text-[var(--text-secondary)]">
+                      {selectedDetail.signals.map(signal => (
+                        <li key={signal}>• {signal}</li>
+                      ))}
+                    </ul>
+                    <p className="mt-2 text-xs font-semibold text-[var(--text-muted)]">Ações</p>
+                    <ul className="space-y-1 text-xs text-[var(--text-secondary)]">
+                      {selectedDetail.executedActions.map(action => (
+                        <li key={action}>• {action}</li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div className="rounded-lg border border-[var(--border-subtle)] p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Entidades impactadas e links cruzados</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {selectedDetail.impactedEntities.map(entity => (
+                        <Button key={entity.label} size="sm" variant="outline" onClick={() => navigate(entity.path)}>{entity.label}</Button>
+                      ))}
+                    </div>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                      {selectedDetail.crossLinks.map(link => (
+                        <Button key={link.label} size="sm" variant="outline" onClick={() => navigate(link.path)}>
+                          {link.label}
+                          <ArrowUpRight className="ml-2 h-4 w-4" />
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </AppSectionBlock>
+
+          {recommendations.length > 0 ? (
+            <AppSectionBlock title="Recomendações do motor" subtitle="Leitura complementar para intervenção assistida.">
+              <ul className="grid gap-2 sm:grid-cols-2">
+                {recommendations.slice(0, 4).map((item, index) => (
                   <li key={String(item?.id ?? `recommendation-${index}`)} className="rounded-lg border border-[var(--border-subtle)] p-3">
                     <p className="text-sm font-medium text-[var(--text-primary)]">{String(item?.title ?? item?.action ?? "Ação recomendada")}</p>
                     <p className="text-xs text-[var(--text-muted)]">{String(item?.description ?? item?.impact ?? "Sem descrição detalhada")}</p>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="mt-2"
-                      onClick={() => navigate("/timeline?module=governance")}
-                    >
-                      Rastrear na Timeline
-                      <ArrowUpRight className="ml-2 h-4 w-4" />
-                    </Button>
                   </li>
                 ))}
               </ul>
             </AppSectionBlock>
           ) : null}
 
-          {(activeView === "visao" || activeView === "acoes") ? (
-            <AppSectionBlock
-              title="Próximas ações do Action Engine"
-              subtitle="Backlog planejado para ampliar execução automática ou semi-automática"
-              className="mt-3"
-            >
-              <ul className="grid gap-2 sm:grid-cols-2">
-                <li className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Reenviar cobrança automaticamente por regra de atraso.</li>
-                <li className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Registrar follow-up comercial com SLA por cliente.</li>
-                <li className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Enviar mensagem padrão contextual por canal.</li>
-                <li className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Abrir O.S. automática a partir de falha crítica detectada.</li>
-                <li className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Marcar prioridade operacional por risco e capacidade.</li>
-                <li className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Sugerir/remarcar horário com base em capacidade da agenda.</li>
-              </ul>
-            </AppSectionBlock>
-          ) : null}
-
-          {failures.length > 0 && (activeView === "visao" || activeView === "problemas") ? (
-            <AppSectionBlock
-              title="Falhas abertas de execução"
-              subtitle="Desvios operacionais ainda sem resolução"
-              className="mt-3"
-            >
+          {failures.length > 0 ? (
+            <AppSectionBlock title="Falhas abertas de execução" subtitle="Pontos que ainda exigem intervenção para fechamento de ciclo.">
               <ul className="space-y-2">
                 {failures.slice(0, 6).map((failure, index) => (
                   <li key={String(failure?.id ?? `failure-${index}`)} className="rounded-lg border border-rose-500/30 bg-rose-500/10 p-3">
@@ -758,9 +909,21 @@ export default function GovernancePage() {
               </ul>
             </AppSectionBlock>
           ) : null}
+
+          {pageState === "empty" ? (
+            <div className="space-y-2">
+              <AppPageEmptyState
+                title="Sem eventos críticos no período"
+                description="Operação saudável nesta janela. Use os atalhos da barra de contexto para auditar Timeline e módulos-chave."
+              />
+              <div className="flex justify-center">
+                <Button onClick={() => navigate("/timeline?module=governance")}>Auditar Timeline</Button>
+              </div>
+            </div>
+          ) : null}
         </>
       ) : null}
-      </AppPageShell>
+    </AppPageShell>
     </PageWrapper>
   );
 }
