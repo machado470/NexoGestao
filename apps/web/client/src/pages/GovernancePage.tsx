@@ -43,6 +43,17 @@ type GovernanceProblem = {
   expectedImpact: string;
 };
 
+type ActionType = "charge" | "message" | "assignment" | "schedule";
+type ActionContext = Record<string, unknown>;
+type Action = {
+  id: string;
+  type: ActionType;
+  label: string;
+  description: string;
+  execute: (context: ActionContext) => Promise<void>;
+  requiresConfirmation?: boolean;
+};
+
 function metric(summary: Record<string, any>, ...keys: string[]) {
   for (const key of keys) {
     const value = Number(summary?.[key]);
@@ -97,16 +108,36 @@ export default function GovernancePage() {
   const [, navigate] = useLocation();
   const summaryQuery = trpc.governance.summary.useQuery(undefined, { retry: false });
   const runsQuery = trpc.governance.runs.useQuery({ limit: 12 }, { retry: false });
+  const peopleQuery = trpc.people.list.useQuery(undefined, { retry: false });
+  const overdueChargesQuery = trpc.finance.charges.list.useQuery(
+    { page: 1, limit: 10, status: "OVERDUE" },
+    { retry: false }
+  );
+  const serviceOrdersQuery = trpc.nexo.serviceOrders.list.useQuery(
+    { page: 1, limit: 20, status: "OPEN" },
+    { retry: false }
+  );
+  const executeGovernanceAction = trpc.governance.executeAction.useMutation();
 
   const [activeView, setActiveView] = useState<GovernanceView>("visao");
   const [searchValue, setSearchValue] = useState("");
   const [priorityFilter, setPriorityFilter] = useState<"all" | PriorityLevel>("all");
+  const [actionStatus, setActionStatus] = useState<Record<string, { state: "idle" | "loading" | "success" | "error"; message?: string }>>({});
 
   const summary = useMemo(
     () => (normalizeObjectPayload<any>(summaryQuery.data) ?? {}) as Record<string, any>,
     [summaryQuery.data]
   );
   const runs = useMemo(() => normalizeArrayPayload<any>(runsQuery.data), [runsQuery.data]);
+  const people = useMemo(() => normalizeArrayPayload<any>(peopleQuery.data), [peopleQuery.data]);
+  const overdueChargesList = useMemo(
+    () => normalizeArrayPayload<any>((overdueChargesQuery.data as any)?.data ?? overdueChargesQuery.data ?? []),
+    [overdueChargesQuery.data]
+  );
+  const serviceOrders = useMemo(() => {
+    const payload = normalizeObjectPayload<any>(serviceOrdersQuery.data) ?? {};
+    return normalizeArrayPayload<any>(payload.data ?? payload.items ?? serviceOrdersQuery.data ?? []);
+  }, [serviceOrdersQuery.data]);
   const hasSummaryData = Boolean(summaryQuery.data);
   const hasRunsData = runs.length > 0;
 
@@ -288,6 +319,71 @@ export default function GovernancePage() {
     })),
     [filteredProblems]
   );
+
+  const assignablePeople = useMemo(() => people.filter(person => person?.active !== false), [people]);
+  const firstOverdueCharge = overdueChargesList[0] ?? null;
+  const firstUnassignedServiceOrder = serviceOrders.find(
+    order => !order?.assignedToPersonId && ["OPEN", "ASSIGNED"].includes(String(order?.status ?? ""))
+  );
+
+  const engineActions = useMemo<Action[]>(() => [
+    {
+      id: "charge.send_whatsapp",
+      type: "charge",
+      label: "Cobrar agora",
+      description: "Envia lembrete de cobrança via WhatsApp sem sair da Governança.",
+      requiresConfirmation: true,
+      execute: async (context) => {
+        await executeGovernanceAction.mutateAsync({
+          id: "charge.send_whatsapp",
+          type: "charge",
+          label: "Cobrar agora",
+          description: "Cobrança enviada via Action Engine",
+          requiresConfirmation: true,
+          context,
+        });
+      },
+    },
+    {
+      id: "assignment.assign_owner",
+      type: "assignment",
+      label: "Atribuir responsável",
+      description: "Atribui automaticamente a próxima O.S. sem responsável.",
+      execute: async (context) => {
+        await executeGovernanceAction.mutateAsync({
+          id: "assignment.assign_owner",
+          type: "assignment",
+          label: "Atribuir responsável",
+          description: "Atribuição automática de responsável pela Governança",
+          context,
+        });
+      },
+    },
+  ], [executeGovernanceAction]);
+
+  async function runAction(action: Action, context: ActionContext) {
+    if (action.requiresConfirmation) {
+      const confirmed = window.confirm(`Confirmar execução da ação crítica: ${action.label}?`);
+      if (!confirmed) return;
+    }
+
+    setActionStatus(current => ({ ...current, [action.id]: { state: "loading", message: "Executando..." } }));
+    try {
+      await action.execute(context);
+      setActionStatus(current => ({ ...current, [action.id]: { state: "success", message: "Ação executada e registrada na timeline." } }));
+      void Promise.all([
+        summaryQuery.refetch(),
+        runsQuery.refetch(),
+        overdueChargesQuery.refetch(),
+        serviceOrdersQuery.refetch(),
+      ]);
+    } catch (error: any) {
+      setActionStatus(current => ({
+        ...current,
+        [action.id]: { state: "error", message: error?.message ?? "Falha ao executar ação." },
+      }));
+    }
+  }
 
   const hasCritical = detectedProblems.some(problem => problem.priority === "critical");
   const effectiveState = operationStateFromRisk(latestRisk, hasCritical, detectedProblems.length > 0);
@@ -481,12 +577,52 @@ export default function GovernancePage() {
                 subtitle="Ações assistidas sem sair do fluxo de governança"
               >
                 <div className="grid gap-2 sm:grid-cols-2">
-                  <Button onClick={() => navigate("/finances?view=charges&status=overdue")}>Cobrar</Button>
-                  <Button onClick={() => navigate("/service-orders?status=attention")}>Reatribuir O.S.</Button>
-                  <Button onClick={() => navigate("/service-orders/new")} variant="outline">Abrir O.S.</Button>
-                  <Button onClick={() => navigate("/customers?segment=needs-contact")} variant="outline">Enviar mensagem</Button>
-                  <Button onClick={() => navigate("/appointments?view=calendar")} variant="outline">Ajustar agenda</Button>
+                  <Button
+                    disabled={!firstOverdueCharge || actionStatus["charge.send_whatsapp"]?.state === "loading"}
+                    onClick={() =>
+                      runAction(engineActions[0], {
+                        chargeId: String(firstOverdueCharge?.id ?? ""),
+                        customerId: String(firstOverdueCharge?.customerId ?? ""),
+                      })
+                    }
+                  >
+                    {actionStatus["charge.send_whatsapp"]?.state === "loading" ? "Cobrando..." : "Cobrar agora"}
+                  </Button>
+                  <Button
+                    disabled={!firstUnassignedServiceOrder || assignablePeople.length === 0 || actionStatus["assignment.assign_owner"]?.state === "loading"}
+                    onClick={() =>
+                      runAction(engineActions[1], {
+                        serviceOrderId: String(firstUnassignedServiceOrder?.id ?? ""),
+                        assignedToPersonId: String(assignablePeople[0]?.id ?? ""),
+                        expectedUpdatedAt: String(firstUnassignedServiceOrder?.updatedAt ?? ""),
+                      })
+                    }
+                  >
+                    {actionStatus["assignment.assign_owner"]?.state === "loading" ? "Atribuindo..." : "Atribuir responsável"}
+                  </Button>
+                  <Button variant="outline" disabled>Abrir O.S. (em breve)</Button>
+                  <Button variant="outline" disabled>Enviar mensagem padrão (em breve)</Button>
+                  <Button variant="outline" disabled>Remarcar agenda (em breve)</Button>
                   <Button onClick={() => navigate("/timeline?module=governance")} variant="outline">Abrir Timeline</Button>
+                </div>
+                <div className="mt-3 space-y-1 text-xs">
+                  {engineActions.map(action => {
+                    const status = actionStatus[action.id];
+                    if (!status || status.state === "idle") return null;
+                    const color =
+                      status.state === "success"
+                        ? "text-emerald-400"
+                        : status.state === "error"
+                          ? "text-rose-400"
+                          : "text-amber-300";
+                    return (
+                      <p key={`${action.id}-status`} className={color}>
+                        {action.label}: {status.message}
+                      </p>
+                    );
+                  })}
+                  {!firstOverdueCharge ? <p className="text-[var(--text-muted)]">Sem cobrança vencida com contexto completo para execução direta.</p> : null}
+                  {!firstUnassignedServiceOrder ? <p className="text-[var(--text-muted)]">Sem O.S. aberta sem responsável para atribuição automática.</p> : null}
                 </div>
               </AppSectionBlock>
             </div>
@@ -578,6 +714,23 @@ export default function GovernancePage() {
                     </Button>
                   </li>
                 ))}
+              </ul>
+            </AppSectionBlock>
+          ) : null}
+
+          {(activeView === "visao" || activeView === "acoes") ? (
+            <AppSectionBlock
+              title="Próximas ações do Action Engine"
+              subtitle="Backlog planejado para ampliar execução automática ou semi-automática"
+              className="mt-3"
+            >
+              <ul className="grid gap-2 sm:grid-cols-2">
+                <li className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Reenviar cobrança automaticamente por regra de atraso.</li>
+                <li className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Registrar follow-up comercial com SLA por cliente.</li>
+                <li className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Enviar mensagem padrão contextual por canal.</li>
+                <li className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Abrir O.S. automática a partir de falha crítica detectada.</li>
+                <li className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Marcar prioridade operacional por risco e capacidade.</li>
+                <li className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">Sugerir/remarcar horário com base em capacidade da agenda.</li>
               </ul>
             </AppSectionBlock>
           ) : null}
