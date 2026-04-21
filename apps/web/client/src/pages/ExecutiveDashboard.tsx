@@ -14,6 +14,7 @@ import {
   AppSectionBlock,
   AppStatusBadge,
 } from "@/components/internal-page-system";
+import { normalizeOperationalState } from "@/lib/operations";
 
 type DashboardState = "healthy" | "alert" | "critical" | "empty" | "error" | "loading";
 type Severity = "critical" | "high" | "medium";
@@ -225,17 +226,13 @@ export default function ExecutiveDashboard() {
   const dashboardState: DashboardState = forcedState ?? computedState;
 
   const operationStateLabel =
-    dashboardState === "critical"
-      ? "Operação crítica"
-      : dashboardState === "alert"
-        ? "Operação em alerta"
-        : dashboardState === "healthy"
-          ? "Operação saudável"
-          : dashboardState === "empty"
-            ? "Operação sem dados"
-            : dashboardState === "error"
-              ? "Falha de leitura operacional"
-              : "Carregando operação";
+    dashboardState === "empty"
+      ? "Operação sem dados"
+      : dashboardState === "error"
+        ? "Falha de leitura operacional"
+        : dashboardState === "loading"
+          ? "Carregando operação"
+          : normalizeOperationalState(dashboardState);
 
   const operationalPeriodLabel = "Hoje · 21 de abril de 2026 · Turno 08:00–18:00";
 
