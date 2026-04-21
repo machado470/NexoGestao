@@ -600,9 +600,15 @@ export default function GovernancePage() {
                   >
                     {actionStatus["assignment.assign_owner"]?.state === "loading" ? "Atribuindo..." : "Atribuir responsável"}
                   </Button>
-                  <Button variant="outline" disabled>Abrir O.S. (em breve)</Button>
-                  <Button variant="outline" disabled>Enviar mensagem padrão (em breve)</Button>
-                  <Button variant="outline" disabled>Remarcar agenda (em breve)</Button>
+                  <Button variant="outline" onClick={() => navigate(firstUnassignedServiceOrder ? `/service-orders?id=${String(firstUnassignedServiceOrder.id)}` : "/service-orders")}>
+                    Abrir O.S.
+                  </Button>
+                  <Button variant="outline" onClick={() => navigate(firstOverdueCharge ? `/whatsapp?customerId=${String(firstOverdueCharge.customerId ?? "")}` : "/whatsapp")}>
+                    Enviar mensagem padrão
+                  </Button>
+                  <Button variant="outline" onClick={() => navigate("/calendar")}>
+                    Remarcar agenda
+                  </Button>
                   <Button onClick={() => navigate("/timeline?module=governance")} variant="outline">Abrir Timeline</Button>
                 </div>
                 <div className="mt-3 space-y-1 text-xs">
