@@ -483,13 +483,14 @@ export function MainLayout({ children }: MainLayoutProps) {
           </NexoSidebar>
 
           <div
+            data-sidebar-collapsed={!isMobile && sidebarCollapsed ? "true" : "false"}
             className="flex min-w-0 flex-1 flex-col transition-[margin-left] duration-200 ease-out"
             style={!isMobile ? { marginLeft: `${desktopSidebarWidth}px` } : undefined}
           >
             <NexoTopbar className="z-20 nexo-state-transition">
               <div className="nexo-topbar-grid">
-                <div className="grid grid-cols-1 items-center gap-2 md:grid-cols-[auto_minmax(0,1fr)_auto] md:gap-3">
-                  <div className="flex min-w-0 items-center gap-2.5 md:gap-3">
+                <div className="nexo-topbar-content-grid">
+                  <div className="flex min-w-0 items-center gap-2 md:gap-2.5">
                     {isMobile ? (
                       <button
                         type="button"
@@ -500,7 +501,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                       </button>
                     ) : null}
                     <div className="nexo-topbar-meta min-w-0">
-                      <p className="truncate text-base font-semibold tracking-tight text-[var(--text-primary)] md:text-lg">
+                      <p className="truncate text-[15px] font-semibold tracking-tight text-[var(--text-primary)] md:text-base">
                         {currentMeta.title}
                       </p>
                       {currentMeta.subtitle ? (
@@ -511,7 +512,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                     </div>
                   </div>
 
-                  <div className="min-w-0 md:px-1">
+                  <div className="nexo-topbar-search-slot min-w-0">
                     <GlobalSearch />
                   </div>
 
@@ -588,7 +589,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                       <DropdownMenuTrigger asChild>
                         <button
                           type="button"
-                          className="nexo-topbar-control h-9 px-2"
+                          className="nexo-topbar-control h-[34px] px-2"
                         >
                           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--surface-elevated)] text-[var(--text-primary)]">
                             <User className="h-4 w-4" />

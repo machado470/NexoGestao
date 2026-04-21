@@ -2896,3 +2896,63 @@ html {
     animation: none !important;
   }
 }
+
+@layer components {
+  .app-root .nexo-topbar {
+    min-height: 64px;
+  }
+
+  .app-root .nexo-topbar-grid {
+    min-height: 64px;
+    padding: 0.625rem 0.875rem;
+    gap: 0.625rem;
+  }
+
+  .app-root [data-sidebar-collapsed="true"] .nexo-topbar-grid {
+    padding-inline: 0.75rem;
+  }
+
+  .app-root .nexo-topbar-content-grid {
+    width: 100%;
+    display: grid;
+    align-items: center;
+    gap: 0.5rem;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .app-root .nexo-topbar-meta {
+    padding: 0.4rem 0.6rem;
+    border-radius: 10px;
+  }
+
+  .app-root .nexo-topbar-search-slot {
+    width: 100%;
+    max-width: 460px;
+    justify-self: start;
+  }
+
+  .app-root [data-sidebar-collapsed="true"] .nexo-topbar-search-slot {
+    max-width: 420px;
+  }
+
+  .app-root .nexo-topbar-control {
+    min-height: 34px;
+    padding-inline: 0.55rem;
+    border-radius: 10px;
+  }
+
+  .app-root .nexo-search-input {
+    padding-inline: 0.625rem;
+  }
+
+  @media (min-width: 768px) {
+    .app-root .nexo-topbar-content-grid {
+      grid-template-columns: minmax(180px, 0.9fr) minmax(280px, 460px) auto;
+      gap: 0.625rem;
+    }
+
+    .app-root [data-sidebar-collapsed="true"] .nexo-topbar-content-grid {
+      grid-template-columns: minmax(180px, 0.8fr) minmax(260px, 420px) auto;
+    }
+  }
+}

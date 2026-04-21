@@ -64,7 +64,7 @@ export function NexoMainContainer({
     <main
       data-scrollbar="nexo"
       className={cn(
-        "nexo-app-content nexo-section-reveal m-3 mt-2 min-h-0 flex-1 overflow-auto pr-2 md:m-4 md:mt-3 md:pr-3",
+        "nexo-app-content nexo-section-reveal m-3 mt-1.5 min-h-0 flex-1 overflow-auto pr-2 md:m-4 md:mt-2 md:pr-3",
         className
       )}
       {...props}
