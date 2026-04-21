@@ -16,7 +16,7 @@ export const OPERATIONAL_PRIMARY_CTA_CLASS =
   "h-8 min-w-[104px] whitespace-nowrap px-3 text-xs font-semibold";
 
 export const OPERATIONAL_NEXT_ACTION_CLASS =
-  "block w-full truncate whitespace-nowrap text-left text-sm font-medium leading-5";
+  "block w-full truncate whitespace-nowrap text-left text-sm font-normal leading-5 text-[var(--text-secondary)]";
 
 export function resolveOperationalActionLabel(
   text: string,

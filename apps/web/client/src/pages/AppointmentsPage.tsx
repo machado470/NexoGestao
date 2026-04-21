@@ -641,18 +641,13 @@ export default function AppointmentsPage() {
                               <td className="px-4 py-3.5 align-top">
                                 <AppPriorityBadge label={priorityLabel} />
                               </td>
-                              <td className="px-4 py-3.5 align-top text-xs text-[var(--text-secondary)]">
-                                <button
-                                  type="button"
-                                  className={`${OPERATIONAL_NEXT_ACTION_CLASS} text-[var(--accent-primary)] hover:underline`}
-                                  onClick={event => {
-                                    event.stopPropagation();
-                                    handlePrimaryAction();
-                                  }}
+                              <td className="px-4 py-3.5 align-top">
+                                <p
+                                  className={OPERATIONAL_NEXT_ACTION_CLASS}
                                   title={nextAction}
                                 >
                                   {toSingleLineAction(nextAction)}
-                                </button>
+                                </p>
                               </td>
                               <td className="px-4 py-3.5 align-top">
                                 <div className="flex items-center justify-end gap-2">

@@ -705,18 +705,13 @@ export default function ServiceOrdersPage() {
                             <td className="px-4 py-3.5 align-top">
                               <AppPriorityBadge label={priorityLabel} />
                             </td>
-                            <td className="px-4 py-3.5 align-top text-xs text-[var(--text-secondary)]">
-                              <button
-                                type="button"
-                                className={`${OPERATIONAL_NEXT_ACTION_CLASS} text-[var(--accent-primary)] underline-offset-2 hover:underline`}
+                            <td className="px-4 py-3.5 align-top">
+                              <p
+                                className={OPERATIONAL_NEXT_ACTION_CLASS}
                                 title={shouldShowNextActionTitle ? nextAction : undefined}
-                                onClick={event => {
-                                  event.stopPropagation();
-                                  handlePrimaryAction();
-                                }}
                               >
                                 {toSingleLineAction(nextAction)}
-                              </button>
+                              </p>
                             </td>
                             <td className="px-4 py-3.5 align-top">
                               <div className="flex items-center justify-end gap-2">
