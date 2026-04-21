@@ -28,11 +28,15 @@ export const NexoAppShell = AppShell;
 export function SidebarNav({
   children,
   className,
-}: {
+  ...props
+}: ComponentProps<"aside"> & {
   children: ReactNode;
-  className?: string;
 }) {
-  return <aside className={cn("nexo-sidebar", className)}>{children}</aside>;
+  return (
+    <aside className={cn("nexo-sidebar", className)} {...props}>
+      {children}
+    </aside>
+  );
 }
 
 export const NexoSidebar = SidebarNav;

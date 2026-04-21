@@ -41,6 +41,7 @@ import {
 } from "@/components/design-system";
 import { BrandSignature } from "@/components/BrandSignature";
 import { AppShell } from "@/components/AppShell";
+import { useOperationalMemoryState } from "@/hooks/useOperationalMemory";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -143,6 +144,10 @@ interface MainLayoutProps {
   children: React.ReactNode;
 }
 
+const SIDEBAR_COLLAPSED_STORAGE_KEY = "nexo:app-shell:sidebar-collapsed";
+const SIDEBAR_EXPANDED_WIDTH = 286;
+const SIDEBAR_COLLAPSED_WIDTH = 88;
+
 export function MainLayout({ children }: MainLayoutProps) {
   // KPI/top-metrics são definidos por página (dashboard forte, módulos contextuais).
   // O layout principal não deve injetar cards globais para evitar regressão estrutural.
@@ -154,7 +159,10 @@ export function MainLayout({ children }: MainLayoutProps) {
   const removeNotification = useNotificationStore(state => state.remove);
 
   const isMobile = useIsMobile();
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useOperationalMemoryState<boolean>(
+    SIDEBAR_COLLAPSED_STORAGE_KEY,
+    true
+  );
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useAutomationRunner({ navigate, enabled: isAuthenticated });
@@ -310,12 +318,13 @@ export function MainLayout({ children }: MainLayoutProps) {
   );
 
   const currentMeta = useMemo(() => getPageMeta(location), [location]);
+  const desktopSidebarWidth = sidebarCollapsed
+    ? SIDEBAR_COLLAPSED_WIDTH
+    : SIDEBAR_EXPANDED_WIDTH;
 
   useEffect(() => {
-    if (isMobile) {
-      setSidebarCollapsed(false);
-      setMobileMenuOpen(false);
-    }
+    if (!isMobile) return;
+    setMobileMenuOpen(false);
   }, [isMobile, location]);
 
   const handleNavigate = (route: string) => {
@@ -361,11 +370,12 @@ export function MainLayout({ children }: MainLayoutProps) {
         <div className="flex min-h-screen w-full">
           <NexoSidebar
             data-scrollbar="nexo"
-            className={`nexo-sidebar z-40 flex shrink-0 flex-col overflow-hidden nexo-state-transition ${
+            className={`nexo-sidebar z-40 flex shrink-0 flex-col overflow-hidden transition-[width,transform] duration-200 ease-out ${
               isMobile
                 ? `fixed inset-y-0 left-0 w-[304px] ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full"}`
-                : `fixed inset-y-0 left-0 ${sidebarCollapsed ? "w-[92px]" : "w-[286px]"}`
+                : "fixed inset-y-0 left-0"
             }`}
+            style={!isMobile ? { width: `${desktopSidebarWidth}px` } : undefined}
           >
             <div className="nexo-sidebar-header border-b border-[var(--border)] px-4">
               <div className="flex items-center justify-between gap-3">
@@ -381,6 +391,8 @@ export function MainLayout({ children }: MainLayoutProps) {
                   <button
                     type="button"
                     onClick={() => setSidebarCollapsed(prev => !prev)}
+                    aria-label={sidebarCollapsed ? "Expandir menu lateral" : "Recolher menu lateral"}
+                    title={sidebarCollapsed ? "Expandir menu lateral" : "Recolher menu lateral"}
                     className="rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-muted)] transition hover:bg-[var(--accent-soft)] hover:text-[var(--text-primary)]"
                   >
                     {sidebarCollapsed ? (
@@ -420,10 +432,12 @@ export function MainLayout({ children }: MainLayoutProps) {
                             key={item.id}
                             type="button"
                             title={item.label}
+                            aria-label={item.label}
+                            aria-current={active ? "page" : undefined}
                             onClick={() => handleNavigate(item.route)}
                             className={`nexo-sidebar-item group nexo-state-transition ${active ? "nexo-sidebar-item-active" : ""} ${
                               sidebarCollapsed && !isMobile
-                                ? "justify-center px-2"
+                                ? "h-11 justify-center px-0"
                                 : ""
                             }`}
                           >
@@ -452,7 +466,9 @@ export function MainLayout({ children }: MainLayoutProps) {
               <button
                 type="button"
                 onClick={toggleTheme}
-                className={`nexo-sidebar-item w-full ${sidebarCollapsed && !isMobile ? "justify-center px-2" : ""}`}
+                title={theme === "dark" ? "Ativar tema claro" : "Ativar tema escuro"}
+                aria-label={theme === "dark" ? "Ativar tema claro" : "Ativar tema escuro"}
+                className={`nexo-sidebar-item w-full ${sidebarCollapsed && !isMobile ? "h-11 justify-center px-0" : ""}`}
               >
                 {theme === "dark" ? (
                   <Sun className="h-4 w-4" />
@@ -467,7 +483,8 @@ export function MainLayout({ children }: MainLayoutProps) {
           </NexoSidebar>
 
           <div
-            className={`flex min-w-0 flex-1 flex-col ${!isMobile ? (sidebarCollapsed ? "md:ml-[92px]" : "md:ml-[286px]") : ""}`}
+            className="flex min-w-0 flex-1 flex-col transition-[margin-left] duration-200 ease-out"
+            style={!isMobile ? { marginLeft: `${desktopSidebarWidth}px` } : undefined}
           >
             <NexoTopbar className="z-20 nexo-state-transition">
               <div className="nexo-topbar-grid">
