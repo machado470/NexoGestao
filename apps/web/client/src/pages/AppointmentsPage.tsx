@@ -20,7 +20,6 @@ import {
   getOperationalSeverityLabel,
 } from "@/lib/operations/operational-intelligence";
 import {
-  OPERATIONAL_NEXT_ACTION_CLASS,
   OPERATIONAL_PRIMARY_CTA_CLASS,
   resolveOperationalActionLabel,
   toSingleLineAction,
@@ -38,6 +37,7 @@ import {
   AppStatusBadge,
 } from "@/components/internal-page-system";
 import { SecondaryButton } from "@/components/design-system";
+import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import { inRange, safeDate } from "@/lib/operational/kpi";
 import {
   buildCompactOperationalTimeline,
@@ -48,7 +48,8 @@ import {
 import { toast } from "sonner";
 
 type TabKey = "agenda" | "confirmed" | "pending" | "conflicts" | "history";
-type WindowFilter = "all" | "today" | "next7" | "overdue";
+type WindowFilter = "all" | "today" | "tomorrow" | "week" | "overdue";
+type ViewMode = "operational_list" | "calendar_macro" | "timeline_day";
 
 type AppointmentLike = {
   id?: string;
@@ -76,12 +77,22 @@ type NextActionIntent =
 
 type NextActionDecision = OperationalNextActionDecision<NextActionIntent>;
 
+function formatDuration(start: Date | null, end: Date | null) {
+  if (!start || !end || end.getTime() <= start.getTime()) return "—";
+  const minutes = Math.round((end.getTime() - start.getTime()) / (1000 * 60));
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const remaining = minutes % 60;
+  return remaining === 0 ? `${hours}h` : `${hours}h ${remaining}min`;
+}
+
 function mapOperationalState(item: AppointmentLike, hasConflict: boolean) {
   const severity = getAppointmentSeverity(item);
   const status = String(item?.status ?? "").toUpperCase();
 
   if (status === "DONE") return "Concluído";
   if (status === "CANCELED") return "Cancelado";
+  if (status === "IN_PROGRESS") return "Em andamento";
   if (status === "NO_SHOW") return "Não compareceu";
   if (status === "CONFIRMED") return hasConflict ? "Em risco" : "Confirmado";
   if (hasConflict || severity === "critical") return "Em risco";
@@ -101,10 +112,18 @@ export default function AppointmentsPage() {
     "nexo.appointments.window-filter.v1",
     "today"
   );
+  const [viewMode, setViewMode] = useOperationalMemoryState<ViewMode>(
+    "nexo.appointments.view-mode.v1",
+    "operational_list"
+  );
   const [customerFilter, setCustomerFilter] = useOperationalMemoryState(
     "nexo.appointments.customer-filter.v1",
     "all"
   );
+  const [ownerFilter, setOwnerFilter] = useOperationalMemoryState("nexo.appointments.owner-filter.v1", "all");
+  const [serviceFilter, setServiceFilter] = useOperationalMemoryState("nexo.appointments.service-filter.v1", "all");
+  const [onlyConflict, setOnlyConflict] = useOperationalMemoryState("nexo.appointments.conflict-filter.v1", false);
+  const [onlyUnconfirmed, setOnlyUnconfirmed] = useOperationalMemoryState("nexo.appointments.unconfirmed-filter.v1", false);
   const [focusedAppointmentId, setFocusedAppointmentId] = useOperationalMemoryState<string | null>(
     "nexo.appointments.active-id.v1",
     null
@@ -152,8 +171,12 @@ export default function AppointmentsPage() {
   const now = new Date();
   const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const dayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
-  const next7End = new Date(dayEnd);
-  next7End.setDate(next7End.getDate() + 7);
+  const tomorrowStart = new Date(dayStart);
+  tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+  const tomorrowEnd = new Date(dayEnd);
+  tomorrowEnd.setDate(tomorrowEnd.getDate() + 1);
+  const weekEnd = new Date(dayEnd);
+  weekEnd.setDate(weekEnd.getDate() + 7);
 
   const appointmentWithContext = useMemo(() => {
     return appointments.map(item => {
@@ -173,6 +196,11 @@ export default function AppointmentsPage() {
       const hasServiceOrder = Boolean(serviceOrder?.id);
       const requiresCommunication = status === "SCHEDULED" || startsSoon || isDelayed;
       const operationalState = mapOperationalState(item, hasConflict || isDelayed);
+      const ownerName =
+        people.find(person => String(person?.id ?? "") === String(item?.assignedToPersonId ?? item?.personId ?? ""))?.name ??
+        "Equipe não definida";
+      const serviceName = String(item?.title ?? "Atendimento geral");
+      const durationLabel = formatDuration(start, safeDate(item?.endsAt));
 
       const signals: OperationalSignal[] = [];
       if (startsSoon) signals.push({ key: "starts_soon", label: "Agendamento próximo", tone: "warning" });
@@ -249,13 +277,16 @@ export default function AppointmentsPage() {
         requiresCommunication,
         hasServiceOrder,
         serviceOrder,
+        ownerName: String(ownerName),
+        serviceName,
+        durationLabel,
         operationalState,
         nextAction: decision.title,
         decision,
         signals,
       };
     });
-  }, [appointments, appointmentsBySlot, now, serviceOrders]);
+  }, [appointments, appointmentsBySlot, now, people, serviceOrders]);
 
   const filteredAppointments = useMemo(() => {
     let base = appointmentWithContext;
@@ -278,14 +309,32 @@ export default function AppointmentsPage() {
 
     if (windowFilter === "today") {
       base = base.filter(({ item }) => inRange(safeDate(item?.startsAt), dayStart, dayEnd));
-    } else if (windowFilter === "next7") {
-      base = base.filter(({ item }) => inRange(safeDate(item?.startsAt), dayStart, next7End));
+    } else if (windowFilter === "tomorrow") {
+      base = base.filter(({ item }) => inRange(safeDate(item?.startsAt), tomorrowStart, tomorrowEnd));
+    } else if (windowFilter === "week") {
+      base = base.filter(({ item }) => inRange(safeDate(item?.startsAt), dayStart, weekEnd));
     } else if (windowFilter === "overdue") {
       base = base.filter(({ isDelayed }) => isDelayed);
     }
 
     if (customerFilter !== "all") {
       base = base.filter(({ item }) => String(item?.customerId ?? "") === customerFilter);
+    }
+
+    if (ownerFilter !== "all") {
+      base = base.filter(({ item }) => String(item?.assignedToPersonId ?? item?.personId ?? "") === ownerFilter);
+    }
+
+    if (serviceFilter !== "all") {
+      base = base.filter(({ serviceName }) => serviceName === serviceFilter);
+    }
+
+    if (onlyConflict) {
+      base = base.filter(({ hasConflict }) => hasConflict);
+    }
+
+    if (onlyUnconfirmed) {
+      base = base.filter(({ item }) => String(item?.status ?? "").toUpperCase() === "SCHEDULED");
     }
 
     if (searchTerm.trim()) {
@@ -299,10 +348,94 @@ export default function AppointmentsPage() {
     }
 
     return base;
-  }, [activeTab, appointmentWithContext, customerFilter, dayEnd, dayStart, next7End, searchTerm, statusFilter, windowFilter]);
+  }, [
+    activeTab,
+    appointmentWithContext,
+    customerFilter,
+    dayEnd,
+    dayStart,
+    onlyConflict,
+    onlyUnconfirmed,
+    ownerFilter,
+    searchTerm,
+    serviceFilter,
+    statusFilter,
+    tomorrowEnd,
+    tomorrowStart,
+    weekEnd,
+    windowFilter,
+  ]);
 
   const delayedCount = filteredAppointments.filter(({ isDelayed }) => isDelayed).length;
   const conflictCount = filteredAppointments.filter(({ hasConflict }) => hasConflict).length;
+  const unconfirmedCount = filteredAppointments.filter(
+    ({ item }) => String(item?.status ?? "").toUpperCase() === "SCHEDULED"
+  ).length;
+  const todayCount = appointmentWithContext.filter(({ item }) => inRange(safeDate(item?.startsAt), dayStart, dayEnd)).length;
+  const weekCount = appointmentWithContext.filter(({ item }) => inRange(safeDate(item?.startsAt), dayStart, weekEnd)).length;
+  const responseRiskCount = filteredAppointments.filter(({ requiresCommunication }) => requiresCommunication).length;
+  const criticalWindowEmpty = todayCount === 0;
+  const overloadCount = appointmentWithContext.filter(
+    ({ item }) => inRange(safeDate(item?.startsAt), dayStart, dayEnd)
+  ).length > 12;
+  const agendaHealth: "Saudável" | "Atenção" | "Crítica" | "Vazia" =
+    criticalWindowEmpty
+      ? "Vazia"
+      : delayedCount > 0 || conflictCount > 0
+        ? "Crítica"
+        : unconfirmedCount > 0 || overloadCount
+          ? "Atenção"
+          : "Saudável";
+
+  const availableSlots = Math.max(0, 10 - todayCount);
+  const alertItems = [
+    {
+      key: "unconfirmed",
+      title: "Agendamentos sem confirmação",
+      detail: `${unconfirmedCount} pendente(s) de confirmação.`,
+      severity: unconfirmedCount > 3 ? "critical" : unconfirmedCount > 0 ? "warning" : "healthy",
+      action: () => {
+        setOnlyUnconfirmed(true);
+        setActiveTab("pending");
+      },
+      actionLabel: "Confirmar agora",
+    },
+    {
+      key: "conflicts",
+      title: "Conflitos de horário",
+      detail: `${conflictCount} choque(s) de slot detectado(s).`,
+      severity: conflictCount > 0 ? "critical" : "healthy",
+      action: () => {
+        setOnlyConflict(true);
+        setActiveTab("conflicts");
+      },
+      actionLabel: "Resolver conflito",
+    },
+    {
+      key: "delays",
+      title: "Atrasos operacionais",
+      detail: `${delayedCount} atendimento(s) com horário estourado.`,
+      severity: delayedCount > 0 ? "critical" : "healthy",
+      action: () => setWindowFilter("overdue"),
+      actionLabel: "Atualizar status",
+    },
+    {
+      key: "no_response",
+      title: "Clientes sem resposta",
+      detail: `${responseRiskCount} item(ns) com comunicação pendente.`,
+      severity: responseRiskCount > 4 ? "warning" : "healthy",
+      action: () => navigate("/whatsapp"),
+      actionLabel: "Abrir WhatsApp",
+    },
+    {
+      key: "critical_window",
+      title: "Janela crítica vazia",
+      detail: criticalWindowEmpty ? "Sem agenda para hoje no período operacional." : "Cobertura mínima do dia ativa.",
+      severity: criticalWindowEmpty ? "warning" : "healthy",
+      action: () => setOpenCreate(true),
+      actionLabel: "Criar agendamento",
+    },
+  ];
 
   useEffect(() => {
     if (filteredAppointments.length === 0) {
@@ -469,30 +602,64 @@ export default function AppointmentsPage() {
     <PageWrapper title="Agenda operacional" subtitle="Confirme, execute e avance para O.S. sem sair da agenda.">
       <div className="space-y-4">
         <AppPageHeader
-          title={
-            activeTab === "confirmed"
-              ? "Agendamentos confirmados"
-              : activeTab === "pending"
-                ? "Pendências de confirmação"
-                : activeTab === "conflicts"
-                  ? "Conflitos de agenda"
-                  : activeTab === "history"
-                    ? "Histórico de agendamentos"
-                    : "Agenda operacional de agendamentos"
-          }
-          description={
-            activeTab === "confirmed"
-              ? "Foco em confirmados para converter em execução/O.S."
-              : activeTab === "pending"
-                ? "Fila acionável para confirmação e contato por cliente."
-                : activeTab === "conflicts"
-                  ? "Choques de agenda, atrasos e risco operacional."
-                  : activeTab === "history"
-                    ? "Concluídos, cancelados e eventos passados para leitura histórica."
-                    : "Visual do turno/dia para sequência operacional e prevenção de atraso."
-          }
+          title="Agendamentos · controle do tempo operacional"
+          description={`Hoje: ${todayCount} compromissos · Semana: ${weekCount} · Saúde da agenda: ${agendaHealth}. O foco aqui é decidir rápido o que acontece agora, com quem e o que preparar.`}
           cta={<ActionFeedbackButton state="idle" idleLabel={headerCta.label} onClick={headerCta.onClick} />}
         />
+
+        <OperationalTopCard
+          contextLabel="Entrada da execução"
+          title="Cliente, agenda, O.S., comunicação e timeline em uma única decisão operacional."
+          description="Use a lista para puxar ação imediata, o workspace para decidir e os alertas para prevenir gargalo."
+        />
+
+        <AppSectionBlock
+          title="Alertas operacionais da agenda"
+          subtitle="Leitura objetiva de risco com ação direta sem sair da tela."
+          compact
+        >
+          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
+            {alertItems.map(alert => (
+              <button
+                key={alert.key}
+                type="button"
+                onClick={alert.action}
+                className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3 text-left transition hover:border-[var(--border-strong)]"
+              >
+                <p
+                  className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${getOperationalSignalToneClasses(
+                    alert.severity as OperationalSignal["tone"],
+                    "soft"
+                  )}`}
+                >
+                  {alert.severity === "critical" ? "Crítico" : alert.severity === "warning" ? "Atenção" : "Saudável"}
+                </p>
+                <p className="mt-1 text-xs font-semibold text-[var(--text-primary)]">{alert.title}</p>
+                <p className="mt-1 text-[11px] text-[var(--text-secondary)]">{alert.detail}</p>
+                <p className="mt-2 text-[11px] font-medium text-[var(--text-primary)]">{alert.actionLabel} →</p>
+              </button>
+            ))}
+          </div>
+        </AppSectionBlock>
+
+        <AppSectionBlock title="Modos de visualização" subtitle="Lista operacional é padrão. Calendário e timeline apoiam leitura macro." compact>
+          <div className="flex flex-wrap gap-2">
+            {[
+              { value: "operational_list", label: "Lista operacional" },
+              { value: "calendar_macro", label: "Calendário macro" },
+              { value: "timeline_day", label: "Timeline do dia" },
+            ].map(mode => (
+              <button
+                key={mode.value}
+                type="button"
+                className={appSelectionPillClasses(viewMode === mode.value)}
+                onClick={() => setViewMode(mode.value as ViewMode)}
+              >
+                {mode.label}
+              </button>
+            ))}
+          </div>
+        </AppSectionBlock>
 
         <AppOperationalBar
           tabs={[
@@ -511,7 +678,8 @@ export default function AppointmentsPage() {
             <div className="flex flex-wrap items-center gap-2">
               {[
                 { key: "today", label: "Hoje" },
-                { key: "next7", label: "Próx. 7 dias" },
+                { key: "tomorrow", label: "Amanhã" },
+                { key: "week", label: "Semana" },
                 { key: "overdue", label: "Atrasados" },
               ].map(item => (
                 <button
@@ -536,7 +704,8 @@ export default function AppointmentsPage() {
                   onChange={event => setWindowFilter(event.target.value as WindowFilter)}
                 >
                   <option value="today">Hoje</option>
-                  <option value="next7">Próximos 7 dias</option>
+                  <option value="tomorrow">Amanhã</option>
+                  <option value="week">Semana</option>
                   <option value="overdue">Atrasados</option>
                   <option value="all">Tudo</option>
                 </select>
@@ -551,6 +720,7 @@ export default function AppointmentsPage() {
                   <option value="all">Todos os status</option>
                   <option value="SCHEDULED">Agendado</option>
                   <option value="CONFIRMED">Confirmado</option>
+                  <option value="IN_PROGRESS">Em andamento</option>
                   <option value="DONE">Concluído</option>
                   <option value="CANCELED">Cancelado</option>
                   <option value="NO_SHOW">Não compareceu</option>
@@ -571,6 +741,48 @@ export default function AppointmentsPage() {
                   ))}
                 </select>
               </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Responsável</label>
+                <select
+                  className="h-9 w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-xs text-[var(--text-primary)]"
+                  value={ownerFilter}
+                  onChange={event => setOwnerFilter(event.target.value)}
+                >
+                  <option value="all">Todos responsáveis</option>
+                  {people.map(person => (
+                    <option key={String(person.id)} value={String(person.id)}>
+                      {String(person.name ?? "Responsável")}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Serviço</label>
+                <select
+                  className="h-9 w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-xs text-[var(--text-primary)]"
+                  value={serviceFilter}
+                  onChange={event => setServiceFilter(event.target.value)}
+                >
+                  <option value="all">Todos os serviços</option>
+                  {Array.from(new Set(appointmentWithContext.map(entry => entry.serviceName))).map(service => (
+                    <option key={service} value={service}>
+                      {service}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+                <input type="checkbox" checked={onlyConflict} onChange={event => setOnlyConflict(event.target.checked)} />
+                Apenas com conflito
+              </label>
+              <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+                <input
+                  type="checkbox"
+                  checked={onlyUnconfirmed}
+                  onChange={event => setOnlyUnconfirmed(event.target.checked)}
+                />
+                Apenas não confirmados
+              </label>
             </div>
           }
           activeFilterChips={[
@@ -583,15 +795,56 @@ export default function AppointmentsPage() {
             ...(customerFilter !== "all"
               ? [{ key: "customer", label: `Cliente: ${selectedCustomerName}`, onRemove: () => setCustomerFilter("all") }]
               : []),
+            ...(ownerFilter !== "all" ? [{ key: "owner", label: "Responsável filtrado", onRemove: () => setOwnerFilter("all") }] : []),
+            ...(serviceFilter !== "all"
+              ? [{ key: "service", label: `Serviço: ${serviceFilter}`, onRemove: () => setServiceFilter("all") }]
+              : []),
+            ...(onlyConflict ? [{ key: "conflict", label: "Somente conflitos", onRemove: () => setOnlyConflict(false) }] : []),
+            ...(onlyUnconfirmed
+              ? [{ key: "unconfirmed", label: "Somente não confirmados", onRemove: () => setOnlyUnconfirmed(false) }]
+              : []),
           ]}
           onClearAllFilters={() => {
             setWindowFilter("today");
             setStatusFilter("all");
             setCustomerFilter("all");
+            setOwnerFilter("all");
+            setServiceFilter("all");
+            setOnlyConflict(false);
+            setOnlyUnconfirmed(false);
           }}
         />
 
         <div className="space-y-4">
+          <AppSectionBlock
+            title="Leitura de carga e tempo operacional"
+            subtitle="Sem BI pesado: visão direta de volume, horários livres e risco de atraso."
+            compact
+          >
+            <div className="grid gap-2 md:grid-cols-5">
+              <div className="rounded-lg border border-[var(--border-subtle)] p-3">
+                <p className="text-[11px] text-[var(--text-muted)]">Carga do dia</p>
+                <p className="text-lg font-semibold text-[var(--text-primary)]">{todayCount}</p>
+              </div>
+              <div className="rounded-lg border border-[var(--border-subtle)] p-3">
+                <p className="text-[11px] text-[var(--text-muted)]">Horários livres</p>
+                <p className="text-lg font-semibold text-[var(--text-primary)]">{availableSlots}</p>
+              </div>
+              <div className="rounded-lg border border-[var(--border-subtle)] p-3">
+                <p className="text-[11px] text-[var(--text-muted)]">Conflitos</p>
+                <p className="text-lg font-semibold text-[var(--text-primary)]">{conflictCount}</p>
+              </div>
+              <div className="rounded-lg border border-[var(--border-subtle)] p-3">
+                <p className="text-[11px] text-[var(--text-muted)]">Concentração excessiva</p>
+                <p className="text-lg font-semibold text-[var(--text-primary)]">{overloadCount ? "Sim" : "Não"}</p>
+              </div>
+              <div className="rounded-lg border border-[var(--border-subtle)] p-3">
+                <p className="text-[11px] text-[var(--text-muted)]">Risco de atraso</p>
+                <p className="text-lg font-semibold text-[var(--text-primary)]">{delayedCount > 0 ? "Alto" : "Baixo"}</p>
+              </div>
+            </div>
+          </AppSectionBlock>
+
           <AppSectionBlock
             title={
               activeTab === "agenda"
@@ -616,22 +869,75 @@ export default function AppointmentsPage() {
               />
             ) : filteredAppointments.length === 0 ? (
               <AppPageEmptyState title="Nenhum dado disponível ainda" description="Ação recomendada: criar agendamento" />
+            ) : viewMode === "calendar_macro" ? (
+              <div className="space-y-3">
+                <p className="text-xs text-[var(--text-secondary)]">
+                  Calendário como leitura macro. Para produtividade, mantenha a lista operacional como modo padrão.
+                </p>
+                <div className="grid gap-2 md:grid-cols-2">
+                  {filteredAppointments.slice(0, 8).map(({ item, serviceName, ownerName, isDelayed }) => (
+                    <button
+                      key={String(item?.id)}
+                      type="button"
+                      className="rounded-lg border border-[var(--border-subtle)] p-3 text-left hover:border-[var(--border-strong)]"
+                      onClick={() => setFocusedAppointmentId(String(item?.id ?? ""))}
+                    >
+                      <p className="text-sm font-semibold text-[var(--text-primary)]">
+                        {safeDate(item?.startsAt)?.toLocaleString("pt-BR") ?? "Sem horário"}
+                      </p>
+                      <p className="text-xs text-[var(--text-secondary)]">{String(item?.customer?.name ?? "Cliente")}</p>
+                      <p className="text-[11px] text-[var(--text-muted)]">{serviceName} · {ownerName}</p>
+                      <p className={`mt-1 text-[11px] ${isDelayed ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"}`}>
+                        {isDelayed ? "Em atraso" : "Dentro da janela"}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+                <SecondaryButton type="button" onClick={() => navigate("/calendar")}>
+                  Abrir visão completa de calendário
+                </SecondaryButton>
+              </div>
+            ) : viewMode === "timeline_day" ? (
+              <div className="space-y-2">
+                {filteredAppointments
+                  .slice()
+                  .sort((a, b) => (safeDate(a.item?.startsAt)?.getTime() ?? 0) - (safeDate(b.item?.startsAt)?.getTime() ?? 0))
+                  .slice(0, 12)
+                  .map(({ item, operationalState, decision }) => (
+                    <button
+                      key={String(item?.id)}
+                      type="button"
+                      className="w-full rounded-lg border border-[var(--border-subtle)] p-3 text-left hover:border-[var(--border-strong)]"
+                      onClick={() => setFocusedAppointmentId(String(item?.id ?? ""))}
+                    >
+                      <p className="text-xs font-semibold text-[var(--text-primary)]">
+                        {safeDate(item?.startsAt)?.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) ?? "—"} ·{" "}
+                        {String(item?.customer?.name ?? "Cliente")}
+                      </p>
+                      <p className="text-[11px] text-[var(--text-secondary)]">
+                        {operationalState} · Próxima melhor ação: {decision.title}
+                      </p>
+                    </button>
+                  ))}
+              </div>
             ) : (
               <AppDataTable>
                 <table className="w-full table-fixed text-sm">
                   <thead className="bg-[var(--surface-elevated)] text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
                     <tr>
-                      <th className="w-[18%] px-4 py-2.5 text-left align-middle">Início</th>
-                      <th className="w-[24%] px-4 py-2.5 text-left align-middle">Cliente</th>
-                      <th className="w-[18%] px-4 py-2.5 text-left align-middle">Status</th>
-                      <th className="w-[12%] px-4 py-2.5 text-left align-middle">Prioridade</th>
-                      <th className="w-[22%] px-4 py-2.5 text-left align-middle">Próxima ação</th>
+                      <th className="w-[13%] px-4 py-2.5 text-left align-middle">Horário</th>
+                      <th className="w-[18%] px-4 py-2.5 text-left align-middle">Cliente</th>
+                      <th className="w-[16%] px-4 py-2.5 text-left align-middle">Serviço / tipo</th>
+                      <th className="w-[11%] px-4 py-2.5 text-left align-middle">Status</th>
+                      <th className="w-[12%] px-4 py-2.5 text-left align-middle">Responsável</th>
+                      <th className="w-[10%] px-4 py-2.5 text-left align-middle">Duração</th>
+                      <th className="w-[20%] px-4 py-2.5 text-left align-middle">Observação e risco</th>
                       <th className="w-[156px] px-4 py-2.5 text-right align-middle">Ações</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredAppointments.map(entry => {
-                      const { item, hasConflict, isDelayed, operationalState, decision, signals } = entry;
+                      const { item, hasConflict, isDelayed, operationalState, decision, signals, ownerName, serviceName, durationLabel } = entry;
                       const status = String(item?.status ?? "").toUpperCase();
                       const priorityLabel =
                         hasConflict || Number(item?.priority ?? 0) >= 3 || status === "SCHEDULED"
@@ -652,7 +958,7 @@ export default function AppointmentsPage() {
                           }`}
                           onClick={() => setFocusedAppointmentId(String(item?.id ?? ""))}
                         >
-                          <td className="px-4 py-3.5 align-top">
+                          <td className="px-4 py-3 align-top">
                             <p className="whitespace-nowrap text-sm font-semibold leading-5 text-[var(--text-primary)]">
                               {safeDate(item?.startsAt)?.toLocaleTimeString("pt-BR", {
                                 hour: "2-digit",
@@ -666,24 +972,35 @@ export default function AppointmentsPage() {
                               {signalPreview.label}
                             </p>
                           </td>
-                          <td className="px-4 py-3.5 align-top">
+                          <td className="px-4 py-3 align-top">
                             <p className="truncate text-sm font-medium leading-5 text-[var(--text-primary)]">
                               {String(item?.customer?.name ?? "Cliente")}
                             </p>
                             <p className="mt-1 truncate text-[11px] text-[var(--text-muted)]">#{String(item?.customerId ?? "—")}</p>
                           </td>
-                          <td className="px-4 py-3.5 align-top">
+                          <td className="px-4 py-3 align-top">
+                            <p className="truncate text-xs font-medium text-[var(--text-primary)]">{serviceName}</p>
+                            <p className="mt-1 text-[11px] text-[var(--text-muted)]">{toSingleLineAction(decision.title)}</p>
+                          </td>
+                          <td className="px-4 py-3 align-top">
                             <AppStatusBadge label={operationalState} />
                           </td>
-                          <td className="px-4 py-3.5 align-top">
+                          <td className="px-4 py-3 align-top">
+                            <p className="text-xs text-[var(--text-primary)]">{ownerName}</p>
                             <AppPriorityBadge label={priorityLabel} />
                           </td>
-                          <td className="px-4 py-3.5 align-top">
-                            <p className={OPERATIONAL_NEXT_ACTION_CLASS} title={decision.title}>
-                              {toSingleLineAction(decision.title)}
+                          <td className="px-4 py-3 align-top">
+                            <p className="text-xs text-[var(--text-primary)]">{durationLabel}</p>
+                          </td>
+                          <td className="px-4 py-3 align-top">
+                            <p className="line-clamp-2 text-[11px] text-[var(--text-secondary)]">
+                              {String(item?.notes ?? "Sem observação operacional.")}
+                            </p>
+                            <p className={`mt-1 text-[11px] ${isDelayed ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"}`}>
+                              {signalPreview.label}
                             </p>
                           </td>
-                          <td className="px-4 py-3.5 align-top">
+                          <td className="px-4 py-3 align-top">
                             <div className="flex items-center justify-end gap-2">
                               <SecondaryButton
                                 type="button"
@@ -700,10 +1017,17 @@ export default function AppointmentsPage() {
                                 triggerLabel="Mais ações"
                                 contentClassName="min-w-[232px]"
                                 items={[
+                                  {
+                                    label: "Iniciar atendimento",
+                                    onSelect: () => {
+                                      setFocusedAppointmentId(String(item?.id ?? ""));
+                                      void executeStatusUpdate("DONE");
+                                    },
+                                  },
                                   ...(primaryIntent !== "service_order"
                                     ? [
                                         {
-                                          label: "Criar O.S.",
+                                          label: "Abrir O.S.",
                                           onSelect: () =>
                                             navigate(`/service-orders?customerId=${item.customerId}&appointmentId=${item.id}`),
                                         },
@@ -728,6 +1052,20 @@ export default function AppointmentsPage() {
                                         },
                                       ]
                                     : []),
+                                  {
+                                    label: "Remarcar +1 dia",
+                                    onSelect: () => {
+                                      setFocusedAppointmentId(String(item?.id ?? ""));
+                                      void runInlineAction("reschedule");
+                                    },
+                                  },
+                                  {
+                                    label: "Cancelar agendamento",
+                                    onSelect: () => {
+                                      setFocusedAppointmentId(String(item?.id ?? ""));
+                                      void executeStatusUpdate("CANCELED");
+                                    },
+                                  },
                                 ]}
                               />
                             </div>
