@@ -30,8 +30,10 @@ type AppointmentStatus =
 const INITIAL_FORM = {
   customerId: "",
   assignedToPersonId: "",
-  startsAt: "",
-  endsAt: "",
+  date: "",
+  time: "",
+  durationMinutes: "60",
+  serviceType: "",
   status: "SCHEDULED" as AppointmentStatus,
   notes: "",
 };
@@ -67,8 +69,21 @@ export function CreateAppointmentModal({
 
     setFormData({
       ...INITIAL_FORM,
-      startsAt: initialStartsAt ?? "",
-      endsAt: initialEndsAt ?? "",
+      date: initialStartsAt ? initialStartsAt.slice(0, 10) : "",
+      time: initialStartsAt ? initialStartsAt.slice(11, 16) : "",
+      durationMinutes:
+        initialStartsAt && initialEndsAt
+          ? String(
+              Math.max(
+                15,
+                Math.round(
+                  (new Date(initialEndsAt).getTime() -
+                    new Date(initialStartsAt).getTime()) /
+                    60000
+                )
+              )
+            )
+          : "60",
     });
   }, [initialEndsAt, initialStartsAt, isOpen]);
 
@@ -84,19 +99,18 @@ export function CreateAppointmentModal({
     e.preventDefault();
     if (createAppointment.isPending) return;
 
-    if (!formData.customerId || !formData.startsAt) {
+    if (!formData.customerId || !formData.date || !formData.time) {
       toast.error("Cliente e data/hora de início são obrigatórios");
       return;
     }
 
-    if (
-      formData.endsAt &&
-      new Date(formData.endsAt).getTime() <=
-        new Date(formData.startsAt).getTime()
-    ) {
-      toast.error("Data/hora final deve ser maior que a inicial");
+    const startsAt = new Date(`${formData.date}T${formData.time}`);
+    if (Number.isNaN(startsAt.getTime())) {
+      toast.error("Data e hora inválidas");
       return;
     }
+    const durationMinutes = Math.max(15, Number(formData.durationMinutes) || 60);
+    const endsAt = new Date(startsAt.getTime() + durationMinutes * 60000);
 
     if (
       formData.assignedToPersonId &&
@@ -111,8 +125,9 @@ export function CreateAppointmentModal({
     const payload = {
       customerId: formData.customerId,
       assignedToPersonId: formData.assignedToPersonId || undefined,
-      startsAt: formData.startsAt,
-      endsAt: formData.endsAt || undefined,
+      startsAt: startsAt.toISOString(),
+      endsAt: endsAt.toISOString(),
+      title: formData.serviceType.trim() || undefined,
       status: formData.status,
       notes: formData.notes.trim() || undefined,
     };
@@ -184,7 +199,7 @@ export function CreateAppointmentModal({
       open={isOpen}
       onOpenChange={nextOpen => (!nextOpen ? handleClose() : undefined)}
       title="Novo Agendamento"
-      description="Crie agendamentos com o mesmo padrão visual operacional do app interno."
+      description="Crie em segundos: cliente, data, hora e contexto mínimo para executar."
       closeBlocked={createAppointment.isPending}
       footer={
         <>
@@ -252,37 +267,45 @@ export function CreateAppointmentModal({
           </div>
         </AppField>
 
-        <AppField label="Data/Hora Início *">
+        <div className="grid gap-3 md:grid-cols-3">
+          <AppField label="Data *">
+            <Input
+              type="date"
+              value={formData.date}
+              onChange={e => setFormData({ ...formData, date: e.target.value })}
+            />
+          </AppField>
+          <AppField label="Hora *">
+            <Input
+              type="time"
+              value={formData.time}
+              onChange={e => setFormData({ ...formData, time: e.target.value })}
+            />
+          </AppField>
+          <AppField label="Duração">
+            <AppSelect
+              value={formData.durationMinutes}
+              onValueChange={durationMinutes =>
+                setFormData({ ...formData, durationMinutes })
+              }
+              options={[
+                { value: "30", label: "30 min" },
+                { value: "45", label: "45 min" },
+                { value: "60", label: "1h" },
+                { value: "90", label: "1h30" },
+                { value: "120", label: "2h" },
+              ]}
+            />
+          </AppField>
+        </div>
+
+        <AppField label="Serviço (opcional)">
           <Input
-            type="datetime-local"
-            value={formData.startsAt}
+            value={formData.serviceType}
             onChange={e =>
-              setFormData({ ...formData, startsAt: e.target.value })
+              setFormData({ ...formData, serviceType: e.target.value })
             }
-          />
-        </AppField>
-
-        <AppField label="Data/Hora Fim">
-          <Input
-            type="datetime-local"
-            value={formData.endsAt}
-            onChange={e => setFormData({ ...formData, endsAt: e.target.value })}
-          />
-        </AppField>
-
-        <AppField label="Status">
-          <AppSelect
-            value={formData.status}
-            onValueChange={status =>
-              setFormData({ ...formData, status: status as AppointmentStatus })
-            }
-            options={[
-              { value: "SCHEDULED", label: "Agendado" },
-              { value: "CONFIRMED", label: "Confirmado" },
-              { value: "DONE", label: "Concluído" },
-              { value: "CANCELED", label: "Cancelado" },
-              { value: "NO_SHOW", label: "Não compareceu" },
-            ]}
+            placeholder="Ex.: Instalação, Manutenção, Revisão"
           />
         </AppField>
 
@@ -290,10 +313,13 @@ export function CreateAppointmentModal({
           <Textarea
             value={formData.notes}
             onChange={e => setFormData({ ...formData, notes: e.target.value })}
-            placeholder="Observações"
+            placeholder="Observação curta para execução"
             rows={3}
           />
         </AppField>
+        <p className="text-xs text-[var(--text-muted)]">
+          Dica operacional: a página sinaliza conflitos e próximos horários após criar.
+        </p>
       </AppForm>
     </FormModal>
   );
