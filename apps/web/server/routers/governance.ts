@@ -79,4 +79,24 @@ export const governanceRouter = router({
         ...input,
       };
     }),
+
+  executeAction: protectedProcedure
+    .input(
+      z.object({
+        id: z.string().min(1),
+        type: z.enum(['charge', 'message', 'assignment', 'schedule']),
+        label: z.string().min(1),
+        description: z.string().min(1),
+        requiresConfirmation: z.boolean().optional(),
+        context: z.record(z.unknown()),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const raw = await nexoFetch<any>(ctx.req, `/governance/actions/execute`, {
+        method: 'POST',
+        body: JSON.stringify(input),
+      })
+
+      return raw?.data ?? raw
+    }),
 });

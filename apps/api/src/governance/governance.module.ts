@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common'
 import { PrismaModule } from '../prisma/prisma.module'
 import { TimelineModule } from '../timeline/timeline.module'
+import { FinanceModule } from '../finance/finance.module'
+import { ServiceOrdersModule } from '../service-orders/service-orders.module'
 
 import { GovernanceRunService } from './governance-run.service'
 import { GovernanceRunJob } from './governance-run.job'
@@ -13,15 +15,20 @@ import { EnforcementController } from './enforcement.controller'
 // Leitura de dados de governança — controller e service existiam mas não estavam registrados
 import { GovernanceReadController } from './governance-read.controller'
 import { GovernanceReadService } from './governance-read.service'
+import { GovernanceActionController } from './governance-action.controller'
+import { GovernanceActionService } from './governance-action.service'
 
 @Module({
   imports: [
     PrismaModule,
     TimelineModule,
+    FinanceModule,
+    ServiceOrdersModule,
   ],
   controllers: [
     EnforcementController,
     GovernanceReadController,
+    GovernanceActionController,
   ],
   providers: [
     GovernanceRunService,
@@ -32,6 +39,7 @@ import { GovernanceReadService } from './governance-read.service'
     EnforcementJob,
 
     GovernanceReadService,
+    GovernanceActionService,
   ],
   exports: [
     GovernanceRunService,
@@ -42,6 +50,7 @@ import { GovernanceReadService } from './governance-read.service'
     EnforcementJob,
 
     GovernanceReadService,
+    GovernanceActionService,
   ],
 })
 export class GovernanceModule {}
