@@ -52,6 +52,7 @@ export default function PeoplePage() {
   const [, navigate] = useLocation();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingPersonId, setEditingPersonId] = useState<string | null>(null);
+  const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
   const { isAuthenticated, isInitializing } = useAuth();
   const canLoadPeople = isAuthenticated;
 
@@ -108,6 +109,8 @@ export default function PeoplePage() {
         </Button>
       ),
     }));
+
+  const selectedPerson = tableRows.find((item) => item.id === selectedPersonId) ?? tableRows[0] ?? null;
 
   const hasRenderableData =
     listPeople.data !== undefined ||
@@ -171,8 +174,8 @@ export default function PeoplePage() {
     >
       <OperationalTopCard
         contextLabel="Direção da equipe"
-        title={unassignedOrders > 0 ? "Distribuir ordens sem responsável" : "Equipe operacional estável"}
-        description={`${unassignedOrders} O.S. sem responsável e ${overloadedPeople} pessoas com possível sobrecarga.`}
+        title={unassignedOrders > 0 ? "Distribuir responsabilidades da operação" : "Equipe operacional estável"}
+        description={`${unassignedOrders} O.S. sem responsável, ${overloadedPeople} pessoas com risco de sobrecarga e foco em execução visível.`}
         chips={
           <>
             <AppStatusBadge label={`${linkedStats?.count ?? 0} pessoas vinculadas`} />
@@ -230,6 +233,9 @@ export default function PeoplePage() {
                       <td className="px-3 py-2">{row.workload} O.S.</td>
                       <td className="px-3 py-2">
                         <div className="flex flex-wrap gap-2">
+                          <Button type="button" size="sm" variant="outline" onClick={() => setSelectedPersonId(row.id)}>
+                            Ver detalhe
+                          </Button>
                           <Button type="button" size="sm" variant="outline" onClick={() => navigate(`/appointments?personId=${row.id}`)}>
                             Agenda
                           </Button>
@@ -256,6 +262,32 @@ export default function PeoplePage() {
           />
         </AppSectionBlock>
       </div>
+
+      <AppSectionBlock title="Workspace da pessoa" subtitle="Resumo, execução e permissões">
+        {selectedPerson ? (
+          <div className="grid gap-3 lg:grid-cols-2">
+            <AppListBlock
+              compact
+              items={[
+                { title: selectedPerson.name, subtitle: `${selectedPerson.role ?? "Função não informada"} · ${selectedPerson.email ?? "Sem e-mail"}`, right: <AppStatusBadge label={selectedPerson.statusLabel} /> },
+                { title: "O.S. atribuídas", subtitle: `${selectedPerson.workload} ordens em andamento.` },
+                { title: "Agendamentos", subtitle: "Acompanhe agenda operacional vinculada.", action: <Button size="sm" variant="outline" onClick={() => navigate(`/appointments?personId=${selectedPerson.id}`)}>Abrir agenda</Button> },
+              ]}
+            />
+            <AppListBlock
+              compact
+              items={[
+                { title: "Desempenho", subtitle: selectedPerson.workload >= 5 ? "Carga alta: revisar redistribuição." : "Carga em faixa controlada." },
+                { title: "Timeline da pessoa", subtitle: "Histórico operacional e decisões recentes.", action: <Button size="sm" variant="outline" onClick={() => navigate(`/timeline?personId=${selectedPerson.id}`)}>Ver timeline</Button> },
+                { title: "Permissões e acesso", subtitle: "Ajuste papel e estado operacional quando necessário.", action: <Button size="sm" variant="outline" onClick={() => setEditingPersonId(selectedPerson.id)}>Ajustar permissão</Button> },
+                { title: "Atribuir tarefa", subtitle: "Direcione novas O.S. para esta pessoa.", action: <Button size="sm" variant="outline" onClick={() => navigate(`/service-orders?assignTo=${selectedPerson.id}`)}>Atribuir</Button> },
+              ]}
+            />
+          </div>
+        ) : (
+          <p className="text-sm text-[var(--text-muted)]">Selecione uma pessoa para abrir o workspace operacional.</p>
+        )}
+      </AppSectionBlock>
 
       <CreatePersonModal
         open={isCreateOpen}

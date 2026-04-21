@@ -41,7 +41,7 @@ const routeBreadcrumbs: Record<string, Breadcrumb[]> = {
   ],
 
   "/settings": [{ label: "Configurações" }],
-  "/billing": [{ label: "Billing" }],
+  "/billing": [{ label: "Planos" }],
   "/onboarding": [{ label: "Jornada de Demonstração" }],
 };
 
