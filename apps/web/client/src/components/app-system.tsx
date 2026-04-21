@@ -32,6 +32,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   NexoStatusBadge,
   NexoStatCard,
   DataTable,
@@ -46,7 +51,7 @@ export function AppPageShell({
 }: ComponentProps<"section">) {
   return (
     <section
-      className={cn("nexo-page-shell min-w-0 space-y-4", className)}
+      className={cn("nexo-page-shell min-w-0", className)}
       {...props}
     />
   );
@@ -80,7 +85,7 @@ export function AppToolbar({ className, ...props }: ComponentProps<"div">) {
   return (
     <div
       className={cn(
-        "nexo-card-informative flex flex-wrap items-center justify-between gap-2.5 rounded-xl p-3.5",
+        "nexo-app-toolbar nexo-card-informative flex flex-wrap items-center justify-between rounded-xl",
         className
       )}
       {...props}
@@ -312,7 +317,13 @@ export function AppFormActions({ className, ...props }: ComponentProps<"div">) {
 }
 
 export const AppDropdown = DropdownMenu;
-export const AppPopover = DropdownMenu;
+export const AppDropdownTrigger = DropdownMenuTrigger;
+export const AppDropdownContent = DropdownMenuContent;
+export const AppDropdownItem = DropdownMenuItem;
+
+export const AppPopover = Popover;
+export const AppPopoverTrigger = PopoverTrigger;
+export const AppPopoverContent = PopoverContent;
 
 const toastTone = cva("rounded-xl border p-3", {
   variants: {

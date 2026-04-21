@@ -294,6 +294,13 @@
   --nexo-shadow-elev-2: 0 16px 40px rgba(15, 23, 42, 0.11);
   --nexo-title-font: "DM Sans", "Inter", system-ui, sans-serif;
   --nexo-body-font: "DM Sans", "Inter", system-ui, sans-serif;
+  --nexo-space-page-padding-x: 1.5rem;
+  --nexo-space-page-padding-y: 1.5rem;
+  --nexo-space-section-gap: 1.25rem;
+  --nexo-space-card-padding: 1rem;
+  --nexo-space-toolbar-gap: 0.625rem;
+  --nexo-control-height-md: 2.5rem;
+  --nexo-table-row-height: 2.85rem;
 }
 
 .dark {
@@ -890,7 +897,11 @@
   }
 
   .nexo-page-shell {
-    @apply mx-auto w-full max-w-[1420px] space-y-6 p-4 pb-28 md:space-y-8 md:p-6 md:pb-12;
+    @apply mx-auto w-full max-w-[1420px] pb-28 md:pb-12;
+    padding: var(--nexo-space-page-padding-y) var(--nexo-space-page-padding-x);
+    gap: var(--nexo-space-section-gap);
+    display: flex;
+    flex-direction: column;
   }
 
   .nexo-page-header {
@@ -908,6 +919,16 @@
 
   .nexo-page-header-description {
     @apply mt-2 max-w-3xl text-sm leading-6 text-[var(--text-secondary)] dark:text-[var(--text-muted)];
+  }
+
+  .nexo-app-toolbar {
+    gap: var(--nexo-space-toolbar-gap);
+    padding: var(--nexo-space-card-padding);
+    min-height: var(--nexo-control-height-md);
+  }
+
+  .nexo-data-table tbody tr {
+    min-height: var(--nexo-table-row-height);
   }
 
   .nexo-surface-operational {
