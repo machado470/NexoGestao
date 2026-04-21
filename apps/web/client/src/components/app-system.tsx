@@ -95,7 +95,13 @@ export function AppSectionCard({
   ...props
 }: ComponentProps<"section">) {
   return (
-    <section className={cn("nexo-card-kpi p-4 md:p-5", className)} {...props} />
+    <section
+      className={cn(
+        "nexo-card-kpi rounded-2xl border border-[var(--border-subtle)]/85 p-4 md:p-5",
+        className
+      )}
+      {...props}
+    />
   );
 }
 
@@ -157,7 +163,7 @@ export function AppRowActionsDropdown({
           type="button"
           variant="outline"
           size="icon"
-          className="h-8 w-8 border-[var(--border-subtle)] bg-[var(--surface-base)] text-[var(--text-secondary)] hover:bg-[var(--accent-soft)] hover:text-[var(--text-primary)]"
+          className="h-8 w-8 border-[var(--border-subtle)] bg-[var(--surface-base)] text-[var(--text-secondary)] shadow-none hover:bg-[var(--accent-soft)] hover:text-[var(--text-primary)] focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-0"
           aria-label={triggerLabel}
         >
           <MoreHorizontal className="h-4 w-4" />

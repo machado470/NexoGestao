@@ -18,6 +18,8 @@ const modalSizeMap = {
   full: "sm:max-w-[96vw]",
 } as const;
 
+export type ModalIntent = "create" | "edit" | "confirm" | "detail-legacy";
+
 export function BaseModal({
   open,
   onOpenChange,
@@ -30,6 +32,7 @@ export function BaseModal({
   fixedHeader = true,
   fixedFooter = true,
   initialFocusRef,
+  intent = "edit",
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -42,7 +45,15 @@ export function BaseModal({
   fixedHeader?: boolean;
   fixedFooter?: boolean;
   initialFocusRef?: RefObject<HTMLElement | null>;
+  intent?: ModalIntent;
 }) {
+  if (import.meta.env.DEV && intent === "detail-legacy") {
+    // eslint-disable-next-line no-console
+    console.warn(
+      "[modal] detail-legacy detectado. Priorizar migração gradual para workspace contextual."
+    );
+  }
+
   return (
     <Dialog
       open={open}
@@ -64,7 +75,7 @@ export function BaseModal({
           initialFocusRef.current.focus();
         }}
         className={cn(
-          "flex max-h-[90vh] min-h-[220px] flex-col overflow-hidden p-0",
+          "flex max-h-[90vh] min-h-[220px] flex-col overflow-hidden rounded-2xl border-[var(--border-subtle)]/90 p-0 shadow-[var(--app-overlay-shadow)]",
           modalSizeMap[size]
         )}
       >
@@ -147,9 +158,12 @@ export function ModalFooter({
 }
 
 export function BaseOperationalModal(
-  props: Omit<Parameters<typeof BaseModal>[0], "fixedHeader" | "fixedFooter">
+  props: Omit<
+    Parameters<typeof BaseModal>[0],
+    "fixedHeader" | "fixedFooter" | "intent"
+  >
 ) {
-  return <BaseModal {...props} fixedHeader fixedFooter />;
+  return <BaseModal {...props} fixedHeader fixedFooter intent="edit" />;
 }
 
 export function ConfirmModal({
@@ -176,6 +190,7 @@ export function ConfirmModal({
       open={open}
       onOpenChange={onOpenChange}
       size="sm"
+      intent="confirm"
       title={title}
       description={description}
       closeBlocked={isPending}
@@ -227,6 +242,7 @@ export function QuickActionModal({
     <BaseModal
       open={open}
       onOpenChange={onOpenChange}
+      intent="edit"
       title={title}
       description={description}
       size={size}
@@ -264,6 +280,7 @@ export function FormModal({
     <BaseModal
       open={open}
       onOpenChange={onOpenChange}
+      intent="edit"
       title={title}
       description={description}
       size={size}
