@@ -659,8 +659,9 @@ export default function ServiceOrdersPage() {
                         const customerName = String(
                           order?.customer?.name ?? "Cliente"
                         );
+                        const scheduledDate = safeDate(order?.scheduledFor);
                         const scheduledLabel = order?.scheduledFor
-                          ? `Agendada: ${safeDate(order?.scheduledFor)?.toLocaleDateString("pt-BR")}`
+                          ? `Agendada: ${scheduledDate?.toLocaleDateString("pt-BR")}`
                           : "Sem data definida";
                         const shouldShowNextActionTitle = nextAction.length > 30;
 
@@ -701,6 +702,18 @@ export default function ServiceOrdersPage() {
                                   Sem cobrança ativa
                                 </p>
                               ) : null}
+                              {status !== "DONE" &&
+                              scheduledDate &&
+                              scheduledDate < new Date() ? (
+                                <p className="mt-1 truncate text-xs text-amber-500">
+                                  Atrasada para execução
+                                </p>
+                              ) : null}
+                              {status === "WAITING_CUSTOMER" ? (
+                                <p className="mt-1 truncate text-xs text-sky-500">
+                                  Precisa notificar cliente
+                                </p>
+                              ) : null}
                             </td>
                             <td className="px-4 py-3.5 align-top">
                               <AppPriorityBadge label={priorityLabel} />
@@ -729,10 +742,6 @@ export default function ServiceOrdersPage() {
                                   triggerLabel="Mais ações"
                                   contentClassName="min-w-[240px]"
                                   items={[
-                                    {
-                                      label: `${nextAction} · prioritário`,
-                                      onSelect: handlePrimaryAction,
-                                    },
                                     {
                                       label: "Abrir cliente",
                                       onSelect: () =>

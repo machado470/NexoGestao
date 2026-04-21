@@ -18,6 +18,7 @@ import {
 } from "@/components/internal-page-system";
 import { KpiErrorBoundary } from "@/components/KpiErrorBoundary";
 import { ExecutiveTrendChart } from "@/components/dashboard/ExecutiveTrendChart";
+import { WorkspaceScaffold } from "@/components/operating-system/WorkspaceScaffold";
 
 const clientesSemRetorno = 4;
 const agendaSemConfirmacao = 3;
@@ -377,6 +378,50 @@ export default function ExecutiveDashboard() {
             ))}
           </ul>
         </AppSectionBlock>
+
+        <div className="xl:col-span-12">
+          <WorkspaceScaffold
+            title="Preparação para workspace operacional"
+            subtitle="Estrutura já alinhada para contexto principal + timeline + comunicação + financeiro sem modal gigante."
+            primaryAction={{
+              label: "Abrir operação crítica",
+              onClick: () => navigate("/dashboard/operations?filter=critical"),
+            }}
+            context={
+              <AppSectionBlock
+                title="Contexto principal"
+                subtitle="Resumo mínimo para iniciar ação sem trocar de rota."
+                compact
+              >
+                <p className="text-xs text-[var(--text-secondary)]">
+                  {agendaSemConfirmacao} agendamentos críticos, {ordensComBloqueio} O.S. bloqueada e{" "}
+                  {clientesSemRetorno} clientes sem retorno no ciclo atual.
+                </p>
+              </AppSectionBlock>
+            }
+            timeline={
+              <AppSectionBlock title="Timeline" subtitle="Evidências recentes da operação." compact>
+                <p className="text-xs text-[var(--text-secondary)]">
+                  Últimos eventos críticos disponíveis em Timeline e Governança para auditoria.
+                </p>
+              </AppSectionBlock>
+            }
+            communication={
+              <AppSectionBlock title="Comunicação" subtitle="Ação contextual por WhatsApp." compact>
+                <p className="text-xs text-[var(--text-secondary)]">
+                  Dispare confirmação, cobrança ou notificação sem perder o vínculo com cliente, agenda e O.S.
+                </p>
+              </AppSectionBlock>
+            }
+            finance={
+              <AppSectionBlock title="Financeiro" subtitle="Conversão de execução em caixa." compact>
+                <p className="text-xs text-[var(--text-secondary)]">
+                  Priorizar vencidas e abrir cobrança vinculada ao serviço concluído sem retrabalho.
+                </p>
+              </AppSectionBlock>
+            }
+          />
+        </div>
       </div>
     </AppPageShell>
   );

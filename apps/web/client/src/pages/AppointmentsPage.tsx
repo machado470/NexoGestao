@@ -271,6 +271,8 @@ export default function AppointmentsPage() {
     statusFilter,
     windowFilter,
   ]);
+  const delayedCount = filteredAppointments.filter(({ isDelayed }) => isDelayed).length;
+  const conflictCount = filteredAppointments.filter(({ hasConflict }) => hasConflict).length;
 
   useEffect(() => {
     if (filteredAppointments.length === 0) {
@@ -666,10 +668,6 @@ export default function AppointmentsPage() {
                                     contentClassName="min-w-[232px]"
                                     items={[
                                       {
-                                        label: `${nextAction} · prioritário`,
-                                        onSelect: handlePrimaryAction,
-                                      },
-                                      {
                                         label: "Criar O.S.",
                                         onSelect: () =>
                                           navigate(
@@ -699,14 +697,21 @@ export default function AppointmentsPage() {
 
           <AppSectionBlock
             title="Central operacional do agendamento"
-            subtitle="Clique em um item para abrir detalhe completo sem sair da página."
+            subtitle="Ponte de comando para resolver conflitos, atrasos e próximos passos sem quebrar o fluxo."
             compact
           >
-            <p className="text-xs text-[var(--text-muted)]">
-              {focused
-                ? `Em foco: ${String(focused.item?.customer?.name ?? "Cliente")} · ${focused.nextAction}`
-                : "Selecione um agendamento para abrir o detalhe operacional."}
-            </p>
+            <div className="space-y-2.5 text-xs text-[var(--text-muted)]">
+              <p>
+                {focused
+                  ? `Em foco: ${String(focused.item?.customer?.name ?? "Cliente")} · ${focused.nextAction}`
+                  : "Selecione um agendamento para abrir o detalhe operacional."}
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                <AppStatusBadge label={`${conflictCount} com conflito`} />
+                <AppStatusBadge label={`${delayedCount} atrasado(s)`} />
+                <AppStatusBadge label={`${filteredAppointments.length} na fila`} />
+              </div>
+            </div>
           </AppSectionBlock>
         </div>
       </div>

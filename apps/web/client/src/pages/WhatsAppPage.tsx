@@ -709,6 +709,9 @@ function ConversationsView({
                       {conversation.suggestionsCount > 0 ? <Badge>{conversation.suggestionsCount} sugestão(ões)</Badge> : null}
                     </div>
                     <p className="text-xs text-[var(--text-muted)]">{conversation.phone}</p>
+                    <p className="text-[11px] text-[var(--text-muted)]">
+                      Contexto: {conversation.contextBadge}
+                    </p>
                   </div>
                   <div className="text-right">
                     <span className="text-xs text-[var(--text-muted)]">{fmtTime(conversation.lastInteraction)}</span>
