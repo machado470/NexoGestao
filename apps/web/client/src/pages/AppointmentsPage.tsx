@@ -24,6 +24,8 @@ import {
   getOperationalSeverityLabel,
 } from "@/lib/operations/operational-intelligence";
 import {
+  OPERATIONAL_NEXT_ACTION_CLASS,
+  OPERATIONAL_PRIMARY_CTA_CLASS,
   resolveOperationalActionLabel,
   toSingleLineAction,
 } from "@/lib/operations/operational-list";
@@ -553,14 +555,14 @@ export default function AppointmentsPage() {
               />
             ) : (
               <AppDataTable>
-                  <table className="w-full text-sm">
+                  <table className="w-full table-fixed text-sm">
                     <thead className="bg-[var(--surface-elevated)] text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
                       <tr>
-                        <th className="w-[19%] px-4 py-2.5 text-left align-middle">Início</th>
-                        <th className="w-[20%] px-4 py-2.5 text-left align-middle">Cliente</th>
-                        <th className="w-[19%] px-4 py-2.5 text-left align-middle">Estado operacional</th>
-                        <th className="w-[13%] px-4 py-2.5 text-left align-middle">Prioridade</th>
-                        <th className="w-[25%] px-4 py-2.5 text-left align-middle">Próxima ação</th>
+                        <th className="w-[18%] px-4 py-2.5 text-left align-middle">Início</th>
+                        <th className="w-[24%] px-4 py-2.5 text-left align-middle">Cliente</th>
+                        <th className="w-[18%] px-4 py-2.5 text-left align-middle">Status</th>
+                        <th className="w-[12%] px-4 py-2.5 text-left align-middle">Prioridade</th>
+                        <th className="w-[22%] px-4 py-2.5 text-left align-middle">Próxima ação</th>
                         <th className="w-[156px] px-4 py-2.5 text-right align-middle">Ações</th>
                       </tr>
                     </thead>
@@ -642,7 +644,7 @@ export default function AppointmentsPage() {
                               <td className="px-4 py-3.5 align-top text-xs text-[var(--text-secondary)]">
                                 <button
                                   type="button"
-                                  className="w-full truncate whitespace-nowrap text-left text-sm font-medium leading-5 text-[var(--accent-primary)] hover:underline"
+                                  className={`${OPERATIONAL_NEXT_ACTION_CLASS} text-[var(--accent-primary)] hover:underline`}
                                   onClick={event => {
                                     event.stopPropagation();
                                     handlePrimaryAction();
@@ -656,7 +658,7 @@ export default function AppointmentsPage() {
                                 <div className="flex items-center justify-end gap-2">
                                   <SecondaryButton
                                     type="button"
-                                    className="h-8 min-w-[104px] whitespace-nowrap px-3 text-xs font-semibold"
+                                    className={OPERATIONAL_PRIMARY_CTA_CLASS}
                                     onClick={event => {
                                       event.stopPropagation();
                                       handlePrimaryAction();

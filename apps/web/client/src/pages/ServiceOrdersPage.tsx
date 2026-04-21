@@ -35,6 +35,8 @@ import {
 import { SecondaryButton } from "@/components/design-system";
 import { getDayWindow, inRange, safeDate } from "@/lib/operational/kpi";
 import {
+  OPERATIONAL_NEXT_ACTION_CLASS,
+  OPERATIONAL_PRIMARY_CTA_CLASS,
   resolveOperationalActionLabel,
   toSingleLineAction,
 } from "@/lib/operations/operational-list";
@@ -112,7 +114,7 @@ function getPrimaryActionLabel(order: any, nextAction: string) {
   if (status === "DONE" && !order?.financialSummary?.hasCharge) return "Cobrar";
   if (["OPEN", "ASSIGNED"].includes(status)) return "Iniciar";
   if (status === "WAITING_CUSTOMER") return "Notificar";
-  return "Agir";
+  return "Abrir";
 }
 
 function getPaginationSlots(totalPages: number, currentPage: number) {
@@ -620,14 +622,14 @@ export default function ServiceOrdersPage() {
             ) : (
               <div className="space-y-3">
                 <AppDataTable>
-                  <table className="w-full text-sm">
+                  <table className="w-full table-fixed text-sm">
                     <thead className="bg-[var(--surface-elevated)] text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
                       <tr>
-                        <th className="w-[23%] px-4 py-2.5 text-left align-middle">Ordem</th>
-                        <th className="w-[20%] px-4 py-2.5 text-left align-middle">Cliente</th>
-                        <th className="w-[19%] px-4 py-2.5 text-left align-middle">Status</th>
-                        <th className="w-[13%] px-4 py-2.5 text-left align-middle">Prioridade</th>
-                        <th className="w-[25%] px-4 py-2.5 text-left align-middle">Próxima ação</th>
+                        <th className="w-[24%] px-4 py-2.5 text-left align-middle">Ordem</th>
+                        <th className="w-[22%] px-4 py-2.5 text-left align-middle">Cliente</th>
+                        <th className="w-[18%] px-4 py-2.5 text-left align-middle">Status</th>
+                        <th className="w-[12%] px-4 py-2.5 text-left align-middle">Prioridade</th>
+                        <th className="w-[18%] px-4 py-2.5 text-left align-middle">Próxima ação</th>
                         <th className="w-[156px] px-4 py-2.5 text-right align-middle">Ações</th>
                       </tr>
                     </thead>
@@ -706,7 +708,7 @@ export default function ServiceOrdersPage() {
                             <td className="px-4 py-3.5 align-top text-xs text-[var(--text-secondary)]">
                               <button
                                 type="button"
-                                className="w-full truncate whitespace-nowrap text-left text-sm font-medium leading-5 text-[var(--accent-primary)] underline-offset-2 hover:underline"
+                                className={`${OPERATIONAL_NEXT_ACTION_CLASS} text-[var(--accent-primary)] underline-offset-2 hover:underline`}
                                 title={shouldShowNextActionTitle ? nextAction : undefined}
                                 onClick={event => {
                                   event.stopPropagation();
@@ -720,7 +722,7 @@ export default function ServiceOrdersPage() {
                               <div className="flex items-center justify-end gap-2">
                                 <SecondaryButton
                                   type="button"
-                                  className="h-8 min-w-[104px] whitespace-nowrap px-3 text-xs font-semibold tracking-[0.01em]"
+                                  className={`${OPERATIONAL_PRIMARY_CTA_CLASS} tracking-[0.01em]`}
                                   onClick={event => {
                                     event.stopPropagation();
                                     handlePrimaryAction();

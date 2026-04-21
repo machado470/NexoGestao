@@ -9,6 +9,8 @@ import {
   normalizeObjectPayload,
 } from "@/lib/query-helpers";
 import {
+  OPERATIONAL_NEXT_ACTION_CLASS,
+  OPERATIONAL_PRIMARY_CTA_CLASS,
   resolveOperationalActionLabel,
   toSingleLineAction,
 } from "@/lib/operations/operational-list";
@@ -278,7 +280,7 @@ export default function CustomersPage() {
       let primaryActionReason = "Cliente em situação estável com fluxo contínuo.";
       let primaryActionUrgency: string | undefined;
       let primaryActionImpact = "Manter previsibilidade operacional";
-      let nextActionReason = "Manter ritmo com revisão rápida do histórico";
+      let nextActionReason = "Abrir detalhe";
 
       if (overdueCharges > 0) {
         status = "Em risco";
@@ -288,7 +290,7 @@ export default function CustomersPage() {
           "O cliente já concluiu etapas e ainda possui cobrança vencida.";
         primaryActionUrgency = `Urgente · atraso de ${contactDays} dias`;
         primaryActionImpact = formatMoney(financialPendingCents);
-        nextActionReason = "Cobrança vencida com impacto direto no caixa";
+        nextActionReason = "Cobrar hoje";
       } else if (!hasFutureSchedule) {
         status = "Atenção";
         contextLabel = "Sem agendamento futuro";
@@ -297,7 +299,7 @@ export default function CustomersPage() {
           "Sem próxima visita agendada, com risco de perder continuidade.";
         primaryActionUrgency = "Ação hoje para proteger recorrência";
         primaryActionImpact = "Reduz risco de inatividade";
-        nextActionReason = "Sem agenda futura e risco de quebra do fluxo";
+        nextActionReason = "Criar agenda";
       } else if (contactState !== "responded") {
         status = "Atenção";
         contextLabel = `Sem resposta há ${contactDays} dias`;
@@ -307,7 +309,7 @@ export default function CustomersPage() {
         primaryActionUrgency =
           contactDays >= 5 ? "Urgente · risco de no-show" : "Atenção";
         primaryActionImpact = "Evita falta e retrabalho";
-        nextActionReason = "Reengajar comunicação para manter continuidade";
+        nextActionReason = "Confirmar cliente";
       } else if (!hasAnyCharge) {
         status = "Sem cobrança";
         contextLabel = "Sem cobrança ativa";
@@ -315,7 +317,7 @@ export default function CustomersPage() {
         primaryActionReason =
           "Operação está ativa, porém sem camada financeira vinculada.";
         primaryActionImpact = "Transformar execução em receita";
-        nextActionReason = "Fluxo sem camada financeira ativa";
+        nextActionReason = "Registrar cobrança";
       }
 
       const priorityScore =
@@ -782,7 +784,7 @@ export default function CustomersPage() {
               />
             ) : (
               <AppDataTable>
-                  <table className="w-full text-sm">
+                  <table className="w-full table-fixed text-sm">
                     <thead className="bg-[var(--surface-elevated)] text-left text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
                       <tr>
                         <th className="w-10 px-4 py-2.5 align-middle">
@@ -802,10 +804,10 @@ export default function CustomersPage() {
                             aria-label="Selecionar todos"
                           />
                         </th>
-                        <th className="w-[23%] px-4 py-2.5 align-middle">Cliente</th>
-                        <th className="w-[20%] px-4 py-2.5 align-middle">Contato</th>
+                        <th className="w-[26%] px-4 py-2.5 align-middle">Cliente</th>
+                        <th className="w-[22%] px-4 py-2.5 align-middle">Contato</th>
                         <th className="w-[18%] px-4 py-2.5 align-middle">Status</th>
-                        <th className="w-[25%] px-4 py-2.5 align-middle">Próxima ação</th>
+                        <th className="w-[20%] px-4 py-2.5 align-middle">Próxima ação</th>
                         <th className="w-[156px] px-4 py-2.5 text-right align-middle">Ações</th>
                       </tr>
                     </thead>
@@ -911,14 +913,9 @@ export default function CustomersPage() {
                               </button>
                             </td>
                             <td className="px-4 py-3.5 align-top">
-                              <div className="space-y-1">
-                                <p className="truncate text-xs text-[var(--text-secondary)]">
-                                  {String(customer?.phone ?? "—")}
-                                </p>
-                                <p className="truncate text-[11px] text-[var(--text-muted)]">
-                                  {String(customer?.email ?? "—")}
-                                </p>
-                              </div>
+                              <p className="truncate text-xs text-[var(--text-secondary)]">
+                                {String(customer?.phone || customer?.email || "—")}
+                              </p>
                             </td>
                             <td className="px-4 py-3.5 align-top">
                               <AppStatusBadge
@@ -936,20 +933,17 @@ export default function CustomersPage() {
                             </td>
                             <td className="px-4 py-3.5 align-top">
                               <p
-                                className="truncate whitespace-nowrap text-sm font-medium leading-5 text-[var(--text-primary)]"
+                                className={OPERATIONAL_NEXT_ACTION_CLASS}
                                 title={snapshot.nextActionReason}
                               >
                                 {toSingleLineAction(snapshot.nextActionReason)}
-                              </p>
-                              <p className="mt-1 truncate text-[11px] text-[var(--text-muted)]">
-                                {snapshot.contextLabel}
                               </p>
                             </td>
                             <td className="px-4 py-3.5 align-top">
                               <div className="flex items-center justify-end gap-2">
                                 <SecondaryButton
                                   type="button"
-                                  className="h-8 min-w-[104px] whitespace-nowrap px-3 text-xs font-semibold"
+                                  className={OPERATIONAL_PRIMARY_CTA_CLASS}
                                   onClick={event => {
                                     event.stopPropagation();
                                     primaryAction.onSelect();
