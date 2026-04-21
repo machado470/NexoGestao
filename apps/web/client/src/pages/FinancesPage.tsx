@@ -8,8 +8,11 @@ import {
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedbackButton";
 import {
+  AppDataTable,
+  AppOperationalBar,
   AppFiltersBar,
   AppKpiRow,
+  AppPageEmptyState,
   AppPageErrorState,
   AppPageHeader,
   AppPageLoadingState,
@@ -18,6 +21,7 @@ import {
   AppSecondaryTabs,
   AppStatusBadge,
 } from "@/components/internal-page-system";
+import { AppRowActionsDropdown } from "@/components/app-system";
 import { toast } from "sonner";
 import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
 import { useRenderWatchdog } from "@/hooks/useRenderWatchdog";
@@ -117,6 +121,19 @@ export default function FinancesPage() {
     "overview" | "pending" | "overdue" | "paid" | "reports"
   >("overview");
   const [period, setPeriod] = useState<FinanceTrendPeriod>("30d");
+  const [activeStatusTab, setActiveStatusTab] = useState<
+    "all" | "pending" | "overdue" | "paid" | "cancelled"
+  >("all");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterCustomer, setFilterCustomer] = useState<string>("all");
+  const [filterPeriod, setFilterPeriod] = useState<"all" | "7d" | "15d" | "30d">(
+    "all"
+  );
+  const [filterValue, setFilterValue] = useState<"all" | "5k" | "20k" | "50k">(
+    "all"
+  );
+  const [filterOrigin, setFilterOrigin] = useState<string>("all");
+  const [selectedChargeId, setSelectedChargeId] = useState<string | null>(null);
   const [focusedCustomerId, setFocusedCustomerId] = useState<string | null>(
     null
   );
@@ -458,6 +475,55 @@ export default function FinancesPage() {
     ]
   );
 
+  const financialAlerts = useMemo(() => {
+    const base = [
+      {
+        key: "overdue",
+        severity: "critical",
+        title: "Cobranças vencidas",
+        detail: `${overdueCharges.length} cobrança(s) vencida(s), somando ${formatCurrency(overdueTotal)}.`,
+      },
+      {
+        key: "in_default",
+        severity: overdueCharges.length >= 3 ? "critical" : "attention",
+        title: "Clientes com inadimplência recorrente",
+        detail:
+          overdueCharges.length >= 3
+            ? "Concentração alta de atraso em clientes recorrentes."
+            : "Monitorar recorrência de atraso para evitar escalada.",
+      },
+      {
+        key: "pending_due",
+        severity: dueToday > 0 ? "attention" : "healthy",
+        title: "Cobranças sem registro de pagamento",
+        detail: `${dueToday} vencem hoje e ${dueSoon} vencem em até 7 dias.`,
+      },
+      {
+        key: "reminder_fail",
+        severity: reminderStats.failed > 0 ? "attention" : "healthy",
+        title: "Falhas de cobrança",
+        detail:
+          reminderStats.failed > 0
+            ? `${reminderStats.failed} lembrete(s) com falha na última execução.`
+            : "Fluxo de lembretes sem falhas relevantes.",
+      },
+      {
+        key: "cash_pressure",
+        severity: overdueTotal > receivedCurrent ? "critical" : "attention",
+        title: "Pressão de caixa",
+        detail:
+          overdueTotal > receivedCurrent
+            ? "Valor vencido já supera recebimento recente."
+            : "Risco presente, mas ainda controlável com ação imediata.",
+      },
+    ] as const;
+
+    const severityRank = { critical: 3, attention: 2, healthy: 1 };
+    return [...base]
+      .sort((a, b) => severityRank[b.severity] - severityRank[a.severity])
+      .slice(0, 4);
+  }, [dueSoon, dueToday, overdueCharges.length, overdueTotal, receivedCurrent, reminderStats.failed]);
+
   const handleCharge = (charge?: any) => {
     const customerId = String(charge?.customerId ?? charge?.customer?.id ?? "");
     if (customerId) setFocusedCustomerId(customerId);
@@ -652,12 +718,147 @@ export default function FinancesPage() {
     );
   }, [filteredOverdueCharges, filteredPendingCharges]);
 
+  const originOptions = useMemo(() => {
+    return Array.from(
+      new Set(
+        charges
+          .map(item => String(item?.source ?? item?.serviceOrderId ?? "Sem origem"))
+          .filter(Boolean)
+      )
+    ).slice(0, 8);
+  }, [charges]);
+
+  const customerOptions = useMemo(() => {
+    return Array.from(
+      new Set(
+        charges
+          .map(item => String(item?.customer?.name ?? "Sem cliente"))
+          .filter(Boolean)
+      )
+    ).slice(0, 8);
+  }, [charges]);
+
+  const operationalRows = useMemo(() => {
+    return charges
+      .map(charge => {
+        const status = String(charge?.status ?? "PENDING").toLowerCase();
+        const dueDate = safeDate(charge?.dueDate);
+        const dayDelta = dueDate
+          ? Math.floor((Date.now() - dueDate.getTime()) / (1000 * 60 * 60 * 24))
+          : 0;
+        const daysUntilDue = dueDate
+          ? Math.ceil((dueDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+          : null;
+        const statusLabel =
+          status === "overdue"
+            ? "overdue"
+            : status === "paid"
+              ? "paid"
+              : status === "cancelled"
+                ? "cancelled"
+                : "pending";
+        const riskState =
+          statusLabel === "overdue"
+            ? "crítico"
+            : statusLabel === "pending" && (daysUntilDue ?? 99) <= 2
+              ? "atenção"
+              : "saudável";
+        return {
+          id: String(charge?.id ?? ""),
+          customer: String(charge?.customer?.name ?? "Sem cliente"),
+          customerId: String(charge?.customerId ?? charge?.customer?.id ?? ""),
+          amountCents: Number(charge?.amountCents ?? 0),
+          status: statusLabel,
+          dueDateLabel: dueDate?.toLocaleDateString("pt-BR") ?? "Sem data",
+          dueDateRaw: dueDate,
+          delayLabel:
+            statusLabel === "overdue"
+              ? `${Math.max(dayDelta, 0)} dia(s) de atraso`
+              : statusLabel === "pending" && daysUntilDue !== null
+                ? daysUntilDue <= 0
+                  ? "vence hoje"
+                  : `${daysUntilDue} dia(s) para vencer`
+                : "sem atraso",
+          source: String(
+            charge?.source ??
+              (charge?.serviceOrderId ? `O.S. ${charge?.serviceOrderId}` : "Sem origem")
+          ),
+          context: String(
+            charge?.description ??
+              (statusLabel === "overdue"
+                ? "Ação de cobrança imediata recomendada."
+                : "Acompanhar no fluxo de cobrança.")
+          ),
+          riskState,
+          raw: charge,
+        };
+      })
+      .sort((a, b) => {
+        const score = (row: { status: string }) => {
+          if (row.status === "overdue") return 4;
+          if (row.status === "pending") return 3;
+          if (row.status === "paid") return 2;
+          return 1;
+        };
+        return score(b) - score(a);
+      });
+  }, [charges]);
+
+  const filteredOperationalRows = useMemo(() => {
+    return operationalRows.filter(row => {
+      if (activeStatusTab !== "all" && row.status !== activeStatusTab) return false;
+      if (filterCustomer !== "all" && row.customer !== filterCustomer) return false;
+      if (filterOrigin !== "all" && row.source !== filterOrigin) return false;
+      if (searchTerm.trim()) {
+        const needle = searchTerm.trim().toLowerCase();
+        if (
+          ![
+            row.customer,
+            row.source,
+            row.context,
+            row.id,
+            row.status,
+          ]
+            .join(" ")
+            .toLowerCase()
+            .includes(needle)
+        ) {
+          return false;
+        }
+      }
+      if (filterPeriod !== "all") {
+        const limitDays =
+          filterPeriod === "7d" ? 7 : filterPeriod === "15d" ? 15 : 30;
+        if (!row.dueDateRaw) return false;
+        const diff = Math.abs(
+          (Date.now() - row.dueDateRaw.getTime()) / (1000 * 60 * 60 * 24)
+        );
+        if (diff > limitDays) return false;
+      }
+      if (filterValue !== "all") {
+        const minValue =
+          filterValue === "5k"
+            ? 500000
+            : filterValue === "20k"
+              ? 2000000
+              : 5000000;
+        if (row.amountCents < minValue) return false;
+      }
+      return true;
+    });
+  }, [activeStatusTab, filterCustomer, filterOrigin, filterPeriod, filterValue, operationalRows, searchTerm]);
+
   const workspaceCharge = useMemo(() => {
-    if (!priorityCharge) return null;
-    const status = String(priorityCharge?.status ?? "").toUpperCase();
-    const amount = Number(priorityCharge?.amountCents ?? 0);
-    const dueDate = safeDate(priorityCharge?.dueDate);
-    const paidAt = safeDate(priorityCharge?.paidAt ?? priorityCharge?.updatedAt);
+    const selectedRaw =
+      selectedChargeId
+        ? operationalRows.find(item => item.id === selectedChargeId)?.raw
+        : null;
+    const selected = selectedRaw ?? priorityCharge;
+    if (!selected) return null;
+    const status = String(selected?.status ?? "").toUpperCase();
+    const amount = Number(selected?.amountCents ?? 0);
+    const dueDate = safeDate(selected?.dueDate);
+    const paidAt = safeDate(selected?.paidAt ?? selected?.updatedAt);
     const dayDelta = dueDate
       ? Math.floor((Date.now() - dueDate.getTime()) / (1000 * 60 * 60 * 24))
       : 0;
@@ -674,8 +875,8 @@ export default function FinancesPage() {
           ? "Pagamento confirmado aguardando baixa e conciliação."
           : "Cobrança em carteira ativa com janela preventiva.";
     return {
-      id: String(priorityCharge?.id ?? "sem-id"),
-      customerName: String(priorityCharge?.customer?.name ?? "Cliente"),
+      id: String(selected?.id ?? "sem-id"),
+      customerName: String(selected?.customer?.name ?? "Cliente"),
       statusLabel,
       priorityLabel,
       summary,
@@ -689,14 +890,14 @@ export default function FinancesPage() {
           : status === "PAID"
             ? `Pago em ${paidAt?.toLocaleDateString("pt-BR") ?? "data não informada"}`
             : `Vence ${dueDate?.toLocaleDateString("pt-BR") ?? "sem data"}`,
-      sourceLabel: String(priorityCharge?.source ?? "Fluxo operacional"),
-      billingMethod: String(priorityCharge?.paymentMethod ?? "Método não informado"),
-      customerId: String(priorityCharge?.customerId ?? priorityCharge?.customer?.id ?? "—"),
-      operationalLink: String(priorityCharge?.serviceOrderId ?? priorityCharge?.appointmentId ?? "Sem vínculo direto"),
-      openedAt: formatDate(priorityCharge?.createdAt),
-      lastEventAt: formatDate(priorityCharge?.updatedAt ?? priorityCharge?.paidAt ?? priorityCharge?.dueDate),
+      sourceLabel: String(selected?.source ?? "Fluxo operacional"),
+      billingMethod: String(selected?.paymentMethod ?? "Método não informado"),
+      customerId: String(selected?.customerId ?? selected?.customer?.id ?? "—"),
+      operationalLink: String(selected?.serviceOrderId ?? selected?.appointmentId ?? "Sem vínculo direto"),
+      openedAt: formatDate(selected?.createdAt),
+      lastEventAt: formatDate(selected?.updatedAt ?? selected?.paidAt ?? selected?.dueDate),
     };
-  }, [priorityCharge]);
+  }, [operationalRows, priorityCharge, selectedChargeId]);
 
   const decisionCenter = useMemo(() => {
     if (mode === "overdue") {
@@ -847,6 +1048,20 @@ export default function FinancesPage() {
       : overdueCurrent > 0
         ? 100
         : 0;
+  const financialPulse = useMemo(() => {
+    const revenueDirection =
+      receivedDelta > 5 ? "subindo" : receivedDelta < -5 ? "caindo" : "estável";
+    const delayDirection =
+      overdueDelta > 5 ? "aumentando" : overdueDelta < -5 ? "reduzindo" : "estável";
+    return {
+      revenueDirection,
+      delayDirection,
+      interpretation:
+        overdueCharges.length > 0
+          ? "Cobrança está travando antes da conversão em pagamento."
+          : "Fluxo de cobrança está convertendo sem bloqueios críticos.",
+    };
+  }, [overdueCharges.length, overdueDelta, receivedDelta]);
 
   return (
     <PageWrapper
@@ -1037,6 +1252,66 @@ export default function FinancesPage() {
             </div>
           </AppSectionBlock>
         </div>
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+          <AppSectionBlock
+            title="Alertas financeiros"
+            subtitle="Curto, direto e ordenado por severidade."
+            className="xl:col-span-7"
+            compact
+          >
+            <div className="space-y-2.5">
+              {financialAlerts.map(alert => (
+                <div
+                  key={alert.key}
+                  className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/35 p-3"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-semibold text-[var(--text-primary)]">
+                      {alert.title}
+                    </p>
+                    <AppStatusBadge
+                      label={
+                        alert.severity === "critical"
+                          ? "Crítico"
+                          : alert.severity === "attention"
+                            ? "Atenção"
+                            : "Saudável"
+                      }
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                    {alert.detail}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </AppSectionBlock>
+          <AppSectionBlock
+            title="Pulso financeiro"
+            subtitle="Interpretação humana da tendência para agir."
+            className="xl:col-span-5"
+            compact
+          >
+            <div className="space-y-2.5 text-xs text-[var(--text-secondary)]">
+              <p>
+                Receita está <strong>{financialPulse.revenueDirection}</strong>.
+              </p>
+              <p>
+                Atraso está <strong>{financialPulse.delayDirection}</strong>.
+              </p>
+              <p>{financialPulse.interpretation}</p>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="mt-1"
+                onClick={() => setMode("reports")}
+              >
+                Abrir leitura completa
+              </Button>
+            </div>
+          </AppSectionBlock>
+        </div>
 
         <AppSecondaryTabs
           items={[
@@ -1089,6 +1364,193 @@ export default function FinancesPage() {
             Limpar contexto
           </Button>
         </AppFiltersBar>
+        <AppSectionBlock
+          title="Lista operacional de cobranças e pagamentos"
+          subtitle="Aqui o time resolve o trabalho sem sair do Financeiro."
+        >
+          <AppOperationalBar
+            tabs={[
+              { value: "all", label: "Todas" },
+              { value: "pending", label: "Pendentes" },
+              { value: "overdue", label: "Vencidas" },
+              { value: "paid", label: "Pagas" },
+              { value: "cancelled", label: "Canceladas" },
+            ]}
+            activeTab={activeStatusTab}
+            onTabChange={setActiveStatusTab}
+            searchValue={searchTerm}
+            onSearchChange={setSearchTerm}
+            searchPlaceholder="Buscar por cliente, O.S., contexto ou status"
+            quickFilters={
+              <>
+                <button
+                  type="button"
+                  className="rounded-lg border border-[var(--border-subtle)] px-2.5 py-1 text-xs text-[var(--text-secondary)]"
+                  onClick={() => setFilterPeriod(filterPeriod === "7d" ? "all" : "7d")}
+                >
+                  {filterPeriod === "7d" ? "Período: 7 dias ✓" : "Período: 7 dias"}
+                </button>
+                <button
+                  type="button"
+                  className="rounded-lg border border-[var(--border-subtle)] px-2.5 py-1 text-xs text-[var(--text-secondary)]"
+                  onClick={() => setFilterValue(filterValue === "20k" ? "all" : "20k")}
+                >
+                  {filterValue === "20k" ? "Valor ≥ R$20k ✓" : "Valor ≥ R$20k"}
+                </button>
+              </>
+            }
+            advancedFiltersLabel="Filtros operacionais"
+            activeFilterChips={[
+              ...(filterCustomer !== "all"
+                ? [{ key: "customer", label: `Cliente: ${filterCustomer}`, onRemove: () => setFilterCustomer("all") }]
+                : []),
+              ...(filterOrigin !== "all"
+                ? [{ key: "origin", label: `Origem: ${filterOrigin}`, onRemove: () => setFilterOrigin("all") }]
+                : []),
+              ...(filterPeriod !== "all"
+                ? [{ key: "period", label: `Período: ${filterPeriod}`, onRemove: () => setFilterPeriod("all") }]
+                : []),
+              ...(filterValue !== "all"
+                ? [{ key: "value", label: `Faixa: ${filterValue}`, onRemove: () => setFilterValue("all") }]
+                : []),
+            ]}
+            onClearAllFilters={() => {
+              setFilterCustomer("all");
+              setFilterOrigin("all");
+              setFilterPeriod("all");
+              setFilterValue("all");
+            }}
+            advancedFiltersContent={
+              <div className="space-y-2.5 text-xs">
+                <label className="grid gap-1">
+                  <span className="text-[var(--text-muted)]">Cliente</span>
+                  <select
+                    className="h-9 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-2"
+                    value={filterCustomer}
+                    onChange={event => setFilterCustomer(event.target.value)}
+                  >
+                    <option value="all">Todos</option>
+                    {customerOptions.map(customer => (
+                      <option key={customer} value={customer}>
+                        {customer}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="grid gap-1">
+                  <span className="text-[var(--text-muted)]">Período</span>
+                  <select
+                    className="h-9 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-2"
+                    value={filterPeriod}
+                    onChange={event => setFilterPeriod(event.target.value as typeof filterPeriod)}
+                  >
+                    <option value="all">Todos</option>
+                    <option value="7d">7 dias</option>
+                    <option value="15d">15 dias</option>
+                    <option value="30d">30 dias</option>
+                  </select>
+                </label>
+                <label className="grid gap-1">
+                  <span className="text-[var(--text-muted)]">Faixa de valor</span>
+                  <select
+                    className="h-9 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-2"
+                    value={filterValue}
+                    onChange={event => setFilterValue(event.target.value as typeof filterValue)}
+                  >
+                    <option value="all">Todas</option>
+                    <option value="5k">Acima de R$ 5 mil</option>
+                    <option value="20k">Acima de R$ 20 mil</option>
+                    <option value="50k">Acima de R$ 50 mil</option>
+                  </select>
+                </label>
+                <label className="grid gap-1">
+                  <span className="text-[var(--text-muted)]">Origem / O.S.</span>
+                  <select
+                    className="h-9 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-2"
+                    value={filterOrigin}
+                    onChange={event => setFilterOrigin(event.target.value)}
+                  >
+                    <option value="all">Todas</option>
+                    {originOptions.map(origin => (
+                      <option key={origin} value={origin}>
+                        {origin}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            }
+          />
+          {filteredOperationalRows.length === 0 ? (
+            <div className="mt-3">
+              <AppPageEmptyState
+                title="Nenhuma cobrança no recorte"
+                description="Crie cobrança, conclua O.S. ou registre o primeiro pagamento para ativar a operação financeira."
+              />
+            </div>
+          ) : (
+            <div className="mt-3">
+              <AppDataTable>
+                <table className="w-full text-sm">
+                  <thead className="bg-[var(--surface-elevated)] text-xs text-[var(--text-muted)]">
+                    <tr>
+                      <th className="p-2.5 text-left">Cliente</th>
+                      <th className="text-left">Valor</th>
+                      <th className="text-left">Status</th>
+                      <th className="text-left">Vencimento</th>
+                      <th className="text-left">Atraso</th>
+                      <th className="text-left">Origem</th>
+                      <th className="text-left">Contexto</th>
+                      <th className="p-2.5 text-left">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredOperationalRows.slice(0, 30).map(row => (
+                      <tr
+                        key={row.id}
+                        className="cursor-pointer border-t border-[var(--border-subtle)]"
+                        onClick={() => setSelectedChargeId(row.id)}
+                      >
+                        <td className="p-2.5">{row.customer}</td>
+                        <td>{formatCurrency(row.amountCents)}</td>
+                        <td>
+                          <AppStatusBadge
+                            label={
+                              row.status === "overdue"
+                                ? "Vencida"
+                                : row.status === "paid"
+                                  ? "Paga"
+                                  : row.status === "cancelled"
+                                    ? "Cancelada"
+                                    : "Pendente"
+                            }
+                          />
+                        </td>
+                        <td>{row.dueDateLabel}</td>
+                        <td className="text-xs text-[var(--text-secondary)]">{row.delayLabel}</td>
+                        <td className="text-xs">{row.source}</td>
+                        <td className="max-w-[220px] truncate text-xs text-[var(--text-secondary)]">
+                          {row.context}
+                        </td>
+                        <td className="p-2.5">
+                          <AppRowActionsDropdown
+                            items={[
+                              { label: "Cobrar agora", onSelect: () => handleCharge(row.raw) },
+                              { label: "Enviar link de cobrança", onSelect: () => handleRemind(row.raw) },
+                              { label: "Marcar como pago", onSelect: () => setMode("paid") },
+                              { label: "Ver detalhe", onSelect: () => setSelectedChargeId(row.id) },
+                              { label: "Cancelar cobrança", onSelect: () => toast.message("Fluxo de cancelamento pronto para integração.") },
+                            ]}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </AppDataTable>
+            </div>
+          )}
+        </AppSectionBlock>
         <OperationalTopCard
           contextLabel="Centro de decisão financeiro"
           title={decisionCenter.title}
@@ -1228,11 +1690,22 @@ export default function FinancesPage() {
               subtitle="Ponte com WhatsApp e follow-up de cobrança."
               compact
             >
-              <p className="text-xs text-[var(--text-secondary)]">
-                {workspaceCharge
-                  ? `Mensagem contextual para ${workspaceCharge.customerName}, alinhando cobrança e vínculo operacional.`
-                  : "Selecione uma cobrança para habilitar mensagem contextual sem sair da página."}
-              </p>
+              <div className="space-y-2">
+                <p className="text-xs text-[var(--text-secondary)]">
+                  {workspaceCharge
+                    ? `Mensagem contextual para ${workspaceCharge.customerName}, alinhando cobrança e vínculo operacional.`
+                    : "Selecione uma cobrança para habilitar mensagem contextual sem sair da página."}
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 w-full justify-start text-xs"
+                  onClick={() => toast.success("Fluxo de WhatsApp contextual iniciado.")}
+                >
+                  Abrir WhatsApp da cobrança
+                </Button>
+              </div>
             </AppSectionBlock>
           }
         >
@@ -1254,6 +1727,26 @@ export default function FinancesPage() {
                 <span className="text-[var(--text-muted)]">Método:</span>{" "}
                 {workspaceCharge?.billingMethod ?? "—"}
               </p>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <AppStatusBadge
+                label={
+                  pageSeverity === "critical"
+                    ? "Risco crítico"
+                    : pageSeverity === "pending"
+                      ? "Risco em atenção"
+                      : "Risco saudável"
+                }
+              />
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-7 text-xs"
+                onClick={() => toast.message("Evento financeiro registrado na timeline operacional.")}
+              >
+                Registrar evento na timeline
+              </Button>
             </div>
           </AppSectionBlock>
         </WorkspaceScaffold>
