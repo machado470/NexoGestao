@@ -3,19 +3,16 @@ import { useLocation } from "wouter";
 import { toast } from "sonner";
 import {
   AlertTriangle,
-  Bot,
   Check,
   CheckCheck,
-  ChevronRight,
   Clock3,
-  History,
-  Info,
+  MessageCircleWarning,
   Search,
   Send,
-  Sparkles,
+  Siren,
   UserRound,
-  WandSparkles,
   Workflow,
+  XCircle,
 } from "lucide-react";
 
 import { trpc } from "@/lib/trpc";
@@ -24,65 +21,67 @@ import { buildIdempotencyKey } from "@/lib/idempotency";
 import { invalidateOperationalGraph } from "@/lib/operationalConsistency";
 import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
 import { cn } from "@/lib/utils";
-import { Button, Badge } from "@/components/design-system";
-import { Input } from "@/components/ui/input";
+import { Button } from "@/components/design-system";
 import { Textarea } from "@/components/ui/textarea";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
-import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import {
   AppEmptyState,
-  AppLoadingState,
-  AppSecondaryTabs,
+  AppOperationalBar,
+  AppPageEmptyState,
+  AppPageErrorState,
+  AppPageHeader,
+  AppPageLoadingState,
+  AppPriorityBadge,
+  AppSectionBlock,
   AppStatusBadge,
-  appSelectionPillClasses,
 } from "@/components/internal-page-system";
 
-type ConversationFilter = "all" | "no_reply" | "billing" | "appointment" | "service_order" | "failures" | "suggestions";
+type ConversationFilter =
+  | "all"
+  | "no_reply"
+  | "billing"
+  | "appointment"
+  | "service_order"
+  | "failures";
 type MessageSendStatus = "queued" | "sent" | "delivered" | "failed" | "unknown";
 type MessageKind = "incoming" | "outgoing" | "automation" | "event";
-type WorkspaceView = "conversations" | "chat" | "context" | "automations" | "history";
+type Severity = "healthy" | "attention" | "critical";
 
 const QUICK_ACTIONS = [
   {
     key: "confirm_appointment",
     label: "Confirmar agendamento",
-    content: "Olá! Confirmando seu agendamento para hoje. Qualquer ajuste, me avise por aqui.",
+    content: "Olá! Confirmando seu agendamento. Está tudo certo para seguirmos no horário?",
   },
   {
     key: "send_charge",
     label: "Enviar cobrança",
-    content: "Olá! Segue o lembrete da cobrança pendente. Posso te enviar novamente o link de pagamento?",
+    content: "Olá! Identificamos uma pendência em aberto. Posso reenviar o link de pagamento por aqui?",
   },
   {
-    key: "request_reply",
-    label: "Cobrar retorno",
-    content: "Passando para confirmar se conseguiu ver nossa última mensagem. Posso te ajudar com algo agora?",
+    key: "payment_link",
+    label: "Reenviar link",
+    content: "Segue novamente o link de pagamento para facilitar sua regularização.",
   },
   {
-    key: "delay_notice",
-    label: "Avisar atraso",
-    content: "Atualizando seu atendimento: tivemos um atraso na operação, mas seu caso já está priorizado.",
+    key: "service_update",
+    label: "Atualização de O.S.",
+    content: "Atualizando sua O.S.: seguimos em execução e retorno confirmado no próximo bloco operacional.",
   },
   {
-    key: "confirm_completion",
-    label: "Confirmar conclusão",
-    content: "Concluímos a execução da sua solicitação. Se precisar de ajuste final, responda por aqui.",
-  },
-  {
-    key: "free_message",
-    label: "Mensagem livre",
-    content: "",
+    key: "follow_up",
+    label: "Fazer follow-up",
+    content: "Passando para confirmar se conseguiu ver nossa última atualização.",
   },
 ] as const;
 
-const FILTERS: Array<{ key: ConversationFilter; label: string }> = [
-  { key: "all", label: "Todas" },
-  { key: "no_reply", label: "Sem resposta" },
-  { key: "billing", label: "Cobrança" },
-  { key: "appointment", label: "Agendamento" },
-  { key: "service_order", label: "O.S." },
-  { key: "failures", label: "Falhas" },
-  { key: "suggestions", label: "Sugestões" },
+const FILTERS: Array<{ value: ConversationFilter; label: string }> = [
+  { value: "all", label: "Todas" },
+  { value: "no_reply", label: "Não respondidos" },
+  { value: "billing", label: "Cobranças" },
+  { value: "appointment", label: "Agendamentos" },
+  { value: "service_order", label: "O.S." },
+  { value: "failures", label: "Falhas" },
 ];
 
 function safeDate(value: unknown) {
@@ -104,8 +103,7 @@ function fmtTime(value: unknown) {
 function sinceDays(value: unknown) {
   const parsed = safeDate(value);
   if (!parsed) return null;
-  const diff = Date.now() - parsed.getTime();
-  return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
+  return Math.max(0, Math.floor((Date.now() - parsed.getTime()) / (1000 * 60 * 60 * 24)));
 }
 
 function normalizeMessageStatus(status: unknown): MessageSendStatus {
@@ -129,60 +127,55 @@ function detectMessageKind(message: any): MessageKind {
 }
 
 function statusLabel(status: MessageSendStatus) {
-  switch (status) {
-    case "queued":
-      return "Na fila";
-    case "sent":
-      return "Enviada";
-    case "delivered":
-      return "Entregue";
-    case "failed":
-      return "Falhou";
-    default:
-      return "Sem status";
-  }
+  if (status === "queued") return "Na fila";
+  if (status === "sent") return "Enviada";
+  if (status === "delivered") return "Entregue";
+  if (status === "failed") return "Falhou";
+  return "Sem status";
 }
 
-function statusTone(status: MessageSendStatus) {
-  switch (status) {
-    case "failed":
-      return "text-rose-500";
-    case "delivered":
-      return "text-emerald-500";
-    case "queued":
-      return "text-amber-500";
-    default:
-      return "text-[var(--text-muted)]";
-  }
+function severityFromScore(score: number): Severity {
+  if (score >= 9) return "critical";
+  if (score >= 5) return "attention";
+  return "healthy";
 }
 
-function statusIcon(status: MessageSendStatus) {
-  switch (status) {
-    case "queued":
-      return <Clock3 className="size-3.5" />;
-    case "sent":
-      return <Check className="size-3.5" />;
-    case "delivered":
-      return <CheckCheck className="size-3.5" />;
-    case "failed":
-      return <span className="text-[10px] font-bold leading-none">!</span>;
-    default:
-      return null;
-  }
+function riskLabel(severity: Severity) {
+  if (severity === "critical") return "Crítico";
+  if (severity === "attention") return "Atenção";
+  return "Saudável";
 }
 
-function stateTone(state: string) {
-  if (state === "Falha") return "text-rose-500";
-  if (state === "Cobrança") return "text-amber-500";
-  if (state === "Sem resposta") return "text-sky-500";
-  return "text-[var(--text-secondary)]";
+function nextBestAction(snapshot: {
+  hasFailed: boolean;
+  hasOverdueCharge: boolean;
+  isAwaitingReply: boolean;
+  hasServiceOrderRisk: boolean;
+  hasScheduled: boolean;
+}) {
+  if (snapshot.hasFailed) {
+    return { title: "Reenviar mensagem falhada", description: "Último envio falhou. Reenvie agora para evitar quebra de fluxo.", cta: "Reenviar mensagem" };
+  }
+  if (snapshot.hasOverdueCharge) {
+    return { title: "Cobrar pendência vencida", description: "Existe cobrança vencida ligada à conversa. Priorize regularização.", cta: "Enviar cobrança" };
+  }
+  if (snapshot.hasScheduled) {
+    return { title: "Confirmar agendamento", description: "Conversa vinculada a agenda. Confirme presença para reduzir no-show.", cta: "Confirmar agenda" };
+  }
+  if (snapshot.hasServiceOrderRisk) {
+    return { title: "Atualizar status da O.S.", description: "Cliente precisa atualização de execução para reduzir risco operacional.", cta: "Atualizar cliente" };
+  }
+  if (snapshot.isAwaitingReply) {
+    return { title: "Executar follow-up", description: "Cliente sem retorno recente. Faça follow-up objetivo agora.", cta: "Enviar follow-up" };
+  }
+  return { title: "Conversa saudável", description: "Sem bloqueios críticos agora. Mantenha acompanhamento com contexto.", cta: "Enviar atualização" };
 }
 
 export default function WhatsAppPage() {
   const [location] = useLocation();
   const utils = trpc.useUtils();
-  const search = new URLSearchParams(location.split("?")[1] ?? "");
-  const queryCustomerId = search.get("customerId") ?? "";
+  const searchParams = new URLSearchParams(location.split("?")[1] ?? "");
+  const queryCustomerId = searchParams.get("customerId") ?? "";
 
   const customersQuery = trpc.nexo.customers.list.useQuery(undefined, { retry: false });
   const chargesQuery = trpc.finance.charges.list.useQuery({ page: 1, limit: 100 }, { retry: false });
@@ -192,13 +185,12 @@ export default function WhatsAppPage() {
   const charges = useMemo(() => normalizeArrayPayload<any>(chargesQuery.data), [chargesQuery.data]);
   const serviceOrders = useMemo(() => normalizeArrayPayload<any>(serviceOrdersQuery.data), [serviceOrdersQuery.data]);
 
-  const [selectedCustomerId, setSelectedCustomerId] = useState(queryCustomerId || String(customers[0]?.id ?? ""));
-  const [content, setContent] = useState("");
+  const [selectedCustomerId, setSelectedCustomerId] = useState(queryCustomerId || "");
   const [searchTerm, setSearchTerm] = useState("");
   const [activeFilter, setActiveFilter] = useState<ConversationFilter>("all");
-  const [activeWorkspaceView, setActiveWorkspaceView] = useState<WorkspaceView>(queryCustomerId ? "chat" : "conversations");
+  const [content, setContent] = useState("");
 
-  const selectedCustomer = customers.find((item) => String(item?.id) === selectedCustomerId);
+  const selectedCustomer = customers.find(item => String(item?.id) === selectedCustomerId);
 
   const messagesQuery = trpc.nexo.whatsapp.messages.useQuery(
     { customerId: selectedCustomerId },
@@ -207,941 +199,521 @@ export default function WhatsAppPage() {
   const sendMutation = trpc.nexo.whatsapp.send.useMutation();
 
   const selectedMessages = useMemo(() => normalizeArrayPayload<any>(messagesQuery.data), [messagesQuery.data]);
+  const sortedMessages = useMemo(
+    () =>
+      [...selectedMessages]
+        .sort((a, b) => (safeDate(a?.createdAt)?.getTime() ?? 0) - (safeDate(b?.createdAt)?.getTime() ?? 0))
+        .map(message => ({
+          ...message,
+          _kind: detectMessageKind(message),
+          _deliveryStatus: normalizeMessageStatus(message?.status),
+        })),
+    [selectedMessages]
+  );
 
-  const failed = selectedMessages.filter((item) => normalizeMessageStatus(item?.status) === "failed").length;
-  const delivered = selectedMessages.filter((item) => normalizeMessageStatus(item?.status) === "delivered").length;
-
-  usePageDiagnostics({
-    page: "whatsapp",
-    isLoading: messagesQuery.isLoading,
-    hasError: Boolean(messagesQuery.error),
-    isEmpty: !messagesQuery.isLoading && !messagesQuery.error && selectedMessages.length === 0,
-    dataCount: selectedMessages.length,
-  });
-
-  const automationSuggestions = useMemo(() => {
-    const now = Date.now();
-    const items: Array<{
-      id: string;
-      customerId: string;
-      title: string;
-      reason: string;
-      impact: string;
-      urgency: "Alta" | "Média";
-      preview: string;
-      origin: string;
-    }> = [];
-
-    for (const charge of charges) {
-      if (String(charge?.status ?? "").toUpperCase() !== "OVERDUE") continue;
-      const customerId = String(charge?.customerId ?? "");
-      const customer = customers.find((item) => String(item?.id) === customerId);
-      if (!customerId || !customer?.phone) continue;
-      const value = Number(charge?.amountCents ?? 0) / 100;
-      items.push({
-        id: `overdue-${String(charge?.id ?? customerId)}`,
-        customerId,
-        title: `Cobrança vencida · ${String(customer?.name ?? "Cliente")}`,
-        reason: "Cobrança vencida detectada",
-        impact: value > 0 ? `Impacto financeiro: R$ ${value.toFixed(2).replace(".", ",")}` : "Impacto financeiro imediato",
-        urgency: "Alta",
-        preview: "Olá, identificamos cobrança em aberto. Podemos regularizar hoje para evitar bloqueios?",
-        origin: "Financeiro",
-      });
-    }
-
-    for (const serviceOrder of serviceOrders) {
-      const status = String(serviceOrder?.status ?? "").toUpperCase();
-      if (status !== "OVERDUE" && status !== "AT_RISK") continue;
-      const customerId = String(serviceOrder?.customerId ?? "");
-      const customer = customers.find((item) => String(item?.id) === customerId);
-      if (!customerId || !customer?.phone) continue;
-      items.push({
-        id: `so-delay-${String(serviceOrder?.id ?? customerId)}`,
-        customerId,
-        title: `Atraso de O.S. · ${String(customer?.name ?? "Cliente")}`,
-        reason: "Ordem em atraso operacional",
-        impact: "Impacto em SLA e retenção",
-        urgency: "Alta",
-        preview: "Atualização rápida: sua O.S. está em prioridade máxima e enviamos novo horário estimado.",
-        origin: "Service Desk",
-      });
-    }
-
-    for (const customer of customers) {
-      const customerId = String(customer?.id ?? "");
-      if (!customerId || !customer?.phone) continue;
-      const lastContact = safeDate(customer?.lastContactAt);
-      if (lastContact && now - lastContact.getTime() < 1000 * 60 * 60 * 24 * 14) continue;
-      items.push({
-        id: `no-contact-${customerId}`,
-        customerId,
-        title: `Cliente sem contato · ${String(customer?.name ?? "Cliente")}`,
-        reason: "Sem interação recente",
-        impact: "Oportunidade de reativação",
-        urgency: "Média",
-        preview: "Passando para confirmar se está tudo bem e se você precisa de algum suporte nesta semana.",
-        origin: "Relacionamento",
-      });
-    }
-
-    return items.slice(0, 8);
-  }, [charges, customers, serviceOrders]);
+  const currentCustomerFailed = sortedMessages.filter(m => m._deliveryStatus === "failed").length;
 
   const conversations = useMemo(() => {
-    return customers.map((customer) => {
-      const cid = String(customer?.id ?? "");
-      const relatedCharge = charges.find((charge) => String(charge?.customerId ?? "") === cid && String(charge?.status ?? "").toUpperCase() === "OVERDUE");
-      const relatedServiceOrder = serviceOrders.find((serviceOrder) => {
-        const status = String(serviceOrder?.status ?? "").toUpperCase();
-        return String(serviceOrder?.customerId ?? "") === cid && (status === "OVERDUE" || status === "AT_RISK");
-      });
-      const suggestionsForConversation = automationSuggestions.filter((item) => item.customerId === cid);
-      const hasFailure = cid === selectedCustomerId && failed > 0;
-      const lastContact = safeDate(customer?.lastContactAt);
-      const noReplyDays = lastContact ? Math.floor((Date.now() - lastContact.getTime()) / (1000 * 60 * 60 * 24)) : 99;
-      const isNoReply = !lastContact || noReplyDays > 3;
+    return customers
+      .map(customer => {
+        const customerId = String(customer?.id ?? "");
+        const customerMessages = customerId === selectedCustomerId ? sortedMessages : [];
+        const lastMessage = customerMessages[customerMessages.length - 1];
+        const lastContact = safeDate(lastMessage?.createdAt ?? customer?.lastContactAt);
+        const noReplyDays = sinceDays(lastContact) ?? 99;
+        const hasOverdueCharge = charges.some(
+          charge => String(charge?.customerId ?? "") === customerId && String(charge?.status ?? "").toUpperCase() === "OVERDUE"
+        );
+        const serviceOrder = serviceOrders.find(item => String(item?.customerId ?? "") === customerId);
+        const serviceStatus = String(serviceOrder?.status ?? "").toUpperCase();
+        const hasServiceOrderRisk = serviceStatus === "AT_RISK" || serviceStatus === "OVERDUE";
+        const hasScheduled = serviceStatus === "SCHEDULED";
+        const hasFailed = customerId === selectedCustomerId && currentCustomerFailed > 0;
+        const isAwaitingReply = noReplyDays >= 3;
 
-      const state = hasFailure
-        ? "Falha"
-        : relatedCharge
-          ? "Cobrança"
-          : relatedServiceOrder
-            ? "O.S."
-            : isNoReply
-              ? "Sem resposta"
-              : "Seguro";
+        const priorityScore =
+          Number(hasFailed) * 6 +
+          Number(hasOverdueCharge) * 5 +
+          Number(hasServiceOrderRisk) * 4 +
+          Number(hasScheduled) * 2 +
+          Number(isAwaitingReply) * 3;
 
-      const contextBadge = relatedServiceOrder
-        ? "Agendamento"
-        : suggestionsForConversation.length > 0
-          ? "Automação sugerida"
-          : null;
+        const severity = severityFromScore(priorityScore);
+        const contextType = hasOverdueCharge
+          ? "cobrança"
+          : hasScheduled
+            ? "agendamento"
+            : hasServiceOrderRisk
+              ? "O.S."
+              : "relacionamento";
 
-      const suggestedSnippet = relatedCharge
-        ? "Cobrança vencida precisa de retorno."
-        : relatedServiceOrder
-          ? "O.S. com risco operacional."
-          : isNoReply
-            ? `Sem interação há ${noReplyDays} dia${noReplyDays === 1 ? "" : "s"}.`
-            : "Conversa em andamento.";
+        const bestAction = nextBestAction({
+          hasFailed,
+          hasOverdueCharge,
+          isAwaitingReply,
+          hasServiceOrderRisk,
+          hasScheduled,
+        });
 
-      const urgencyScore = Number(Boolean(relatedCharge)) * 4 + Number(Boolean(relatedServiceOrder)) * 3 + Number(hasFailure) * 5 + Number(isNoReply) * 2;
+        return {
+          id: customerId,
+          name: String(customer?.name ?? "Cliente"),
+          phone: String(customer?.phone ?? "—"),
+          snippet: String(lastMessage?.content ?? bestAction.description),
+          lastMessageAt: lastMessage?.createdAt ?? customer?.lastContactAt,
+          lastStatus: lastMessage?._deliveryStatus ?? "unknown",
+          contextType,
+          severity,
+          priorityScore,
+          isAwaitingReply,
+          noReplyDays,
+          hasOverdueCharge,
+          hasServiceOrderRisk,
+          hasScheduled,
+          hasFailed,
+          bestAction,
+          serviceOrder,
+        };
+      })
+      .sort((a, b) => b.priorityScore - a.priorityScore);
+  }, [charges, currentCustomerFailed, customers, selectedCustomerId, serviceOrders, sortedMessages]);
 
-      return {
-        id: cid,
-        name: String(customer?.name ?? "Cliente"),
-        phone: String(customer?.phone ?? "—"),
-        lastInteraction: lastContact,
-        snippet: suggestedSnippet,
-        state,
-        contextBadge,
-        suggestionsCount: suggestionsForConversation.length,
-        hasCharge: Boolean(relatedCharge),
-        hasServiceOrder: Boolean(relatedServiceOrder),
-        isNoReply,
-        noReplyDays,
-        urgencyScore,
-      };
-    }).sort((a, b) => b.urgencyScore - a.urgencyScore);
-  }, [automationSuggestions, charges, customers, failed, selectedCustomerId, serviceOrders]);
+  const selectedConversation = conversations.find(item => item.id === selectedCustomerId);
 
   const filteredConversations = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
-    return conversations.filter((conversation) => {
+    return conversations.filter(conversation => {
       const filterMatch = (() => {
         if (activeFilter === "all") return true;
-        if (activeFilter === "no_reply") return conversation.state === "Sem resposta";
-        if (activeFilter === "billing") return conversation.state === "Cobrança";
-        if (activeFilter === "appointment") return conversation.contextBadge === "Agendamento";
-        if (activeFilter === "service_order") return conversation.state === "O.S.";
-        if (activeFilter === "failures") return conversation.state === "Falha";
-        if (activeFilter === "suggestions") return conversation.suggestionsCount > 0;
+        if (activeFilter === "no_reply") return conversation.isAwaitingReply;
+        if (activeFilter === "billing") return conversation.hasOverdueCharge;
+        if (activeFilter === "appointment") return conversation.hasScheduled;
+        if (activeFilter === "service_order") return conversation.hasServiceOrderRisk;
+        if (activeFilter === "failures") return conversation.hasFailed;
         return true;
       })();
 
-      const searchMatch = !normalizedSearch
-        || conversation.name.toLowerCase().includes(normalizedSearch)
-        || conversation.phone.replace(/\D/g, "").includes(normalizedSearch.replace(/\D/g, ""));
+      const searchMatch =
+        !normalizedSearch ||
+        conversation.name.toLowerCase().includes(normalizedSearch) ||
+        conversation.phone.replace(/\D/g, "").includes(normalizedSearch.replace(/\D/g, ""));
 
       return filterMatch && searchMatch;
     });
   }, [activeFilter, conversations, searchTerm]);
 
-  const conversationSuggestions = useMemo(
-    () => automationSuggestions.filter((item) => item.customerId === selectedCustomerId),
-    [automationSuggestions, selectedCustomerId]
-  );
+  const communicationAlerts = useMemo(() => {
+    const noReply = conversations.filter(item => item.isAwaitingReply).length;
+    const failures = conversations.filter(item => item.hasFailed).length;
+    const billing = conversations.filter(item => item.hasOverdueCharge).length;
+    const appointments = conversations.filter(item => item.hasScheduled).length;
+    const critical = conversations.filter(item => item.severity === "critical").length;
 
-  const chargePendingForSelected = charges.some(
-    (charge) => String(charge?.customerId ?? "") === selectedCustomerId && String(charge?.status ?? "").toUpperCase() === "OVERDUE"
-  );
-  const futureAppointmentForSelected = serviceOrders.some((item) => {
-    if (String(item?.customerId ?? "") !== selectedCustomerId) return false;
-    const status = String(item?.status ?? "").toUpperCase();
-    return status === "SCHEDULED" || status === "AT_RISK";
+    const alerts = [
+      {
+        id: "waiting",
+        title: `${noReply} cliente(s) aguardando resposta`,
+        description: "Follow-up pendente pode virar perda de contexto operacional.",
+        severity: noReply > 0 ? "attention" : "healthy",
+        cta: "Ver não respondidos",
+        action: () => setActiveFilter("no_reply"),
+      },
+      {
+        id: "failures",
+        title: `${failures} falha(s) de envio`,
+        description: "Mensagens não entregues pedem reenvio imediato.",
+        severity: failures > 0 ? "critical" : "healthy",
+        cta: "Abrir falhas",
+        action: () => setActiveFilter("failures"),
+      },
+      {
+        id: "billing",
+        title: `${billing} cobrança(s) ignorada(s)`,
+        description: "Conversa com financeiro crítico exige ação agora.",
+        severity: billing > 0 ? "critical" : "healthy",
+        cta: "Abrir cobranças",
+        action: () => setActiveFilter("billing"),
+      },
+      {
+        id: "appointments",
+        title: `${appointments} agendamento(s) sem confirmação`,
+        description: "Reduza no-show com confirmação em 1 clique.",
+        severity: appointments > 0 ? "attention" : "healthy",
+        cta: "Ver agendamentos",
+        action: () => setActiveFilter("appointment"),
+      },
+      {
+        id: "critical",
+        title: `${critical} conversa(s) crítica(s)`,
+        description: "Risco consolidado de relacionamento, entrega e caixa.",
+        severity: critical > 0 ? "critical" : "healthy",
+        cta: "Prioridade máxima",
+        action: () => setActiveFilter("all"),
+      },
+    ] as const;
+
+    return alerts;
+  }, [conversations]);
+
+  usePageDiagnostics({
+    page: "whatsapp",
+    isLoading: customersQuery.isLoading,
+    hasError: Boolean(customersQuery.error),
+    isEmpty: !customersQuery.isLoading && !customersQuery.error && customers.length === 0,
+    dataCount: customers.length,
   });
-  const recentServiceOrder = serviceOrders.find((item) => String(item?.customerId ?? "") === selectedCustomerId);
 
-  const sortedMessages = useMemo(() => {
-    return [...selectedMessages]
-      .sort((a, b) => {
-        const left = safeDate(a?.createdAt)?.getTime() ?? 0;
-        const right = safeDate(b?.createdAt)?.getTime() ?? 0;
-        return left - right;
-      })
-      .map((message) => ({
-        ...message,
-        _kind: detectMessageKind(message),
-        _deliveryStatus: normalizeMessageStatus(message?.status),
-      }));
-  }, [selectedMessages]);
-
-  const lastMessage = sortedMessages[sortedMessages.length - 1];
-  const noReplyDays = sinceDays(lastMessage?.createdAt ?? selectedCustomer?.lastContactAt);
-
-  const intelligenceSignals = useMemo(() => {
-    const items: Array<{ id: string; label: string; tone: "danger" | "attention" | "neutral" }> = [];
-    if (chargePendingForSelected) items.push({ id: "charge", label: "Cobrança vencida", tone: "danger" });
-    if (futureAppointmentForSelected) items.push({ id: "so", label: "Operação em risco", tone: "attention" });
-    if ((noReplyDays ?? 0) >= 3) items.push({ id: "no-reply", label: `Sem resposta há ${noReplyDays}d`, tone: "attention" });
-    if (conversationSuggestions.length > 0) items.push({ id: "suggestion", label: `${conversationSuggestions.length} ação sugerida`, tone: "neutral" });
-    if (failed > 0) items.push({ id: "failed", label: `${failed} falha de envio`, tone: "danger" });
-    return items;
-  }, [chargePendingForSelected, futureAppointmentForSelected, noReplyDays, conversationSuggestions.length, failed]);
-
-  const historyEvents = useMemo(() => {
-    const events: Array<{ id: string; label: string; detail: string; at: string; type: "billing" | "warning" | "automation" | "normal" }> = [];
-
-    if (chargePendingForSelected) {
-      events.push({
-        id: "charge-overdue",
-        label: "Cobrança pendente",
-        detail: "Existe cobrança vencida que pode disparar contato automático.",
-        at: fmtDateTime(new Date()),
-        type: "billing",
-      });
-    }
-
-    if (futureAppointmentForSelected) {
-      events.push({
-        id: "schedule",
-        label: "Agendamento operacional",
-        detail: "Atendimento com status de acompanhamento ativo.",
-        at: fmtDateTime(recentServiceOrder?.updatedAt ?? recentServiceOrder?.createdAt),
-        type: "warning",
-      });
-    }
-
-    const failedMessage = [...sortedMessages].reverse().find((message) => message._deliveryStatus === "failed");
-    if (failedMessage) {
-      events.push({
-        id: "failed-send",
-        label: "Falha de entrega",
-        detail: "Última tentativa de envio retornou falha e requer ação.",
-        at: fmtDateTime(failedMessage?.createdAt),
-        type: "warning",
-      });
-    }
-
-    if (conversationSuggestions.length > 0) {
-      events.push({
-        id: "suggested-action",
-        label: "Próxima ação recomendada",
-        detail: "O sistema detectou oportunidade de automação para acelerar a conversa.",
-        at: fmtDateTime(new Date()),
-        type: "automation",
-      });
-    }
-
-    if (events.length === 0 && sortedMessages.length > 0) {
-      events.push({
-        id: "recent-message",
-        label: "Conversa ativa",
-        detail: "Últimas mensagens sem bloqueios operacionais críticos.",
-        at: fmtDateTime(lastMessage?.createdAt),
-        type: "normal",
-      });
-    }
-
-    return events;
-  }, [chargePendingForSelected, futureAppointmentForSelected, lastMessage?.createdAt, recentServiceOrder?.createdAt, recentServiceOrder?.updatedAt, sortedMessages, conversationSuggestions.length]);
-
-  async function sendMessage() {
-    if (!selectedCustomerId || content.trim().length < 2) {
-      toast.error("Selecione o cliente e escreva uma mensagem válida para enviar.");
+  async function sendMessage(predefinedContent?: string) {
+    const finalContent = predefinedContent ?? content;
+    if (!selectedConversation?.id || finalContent.trim().length < 2) {
+      toast.error("Selecione uma conversa e escreva uma mensagem válida.");
       return;
     }
-    const phone = String(selectedCustomer?.phone ?? "").replace(/\D/g, "");
+    const phone = selectedConversation.phone.replace(/\D/g, "");
     if (phone.length < 10) {
-      toast.error("Cliente sem número válido para WhatsApp.");
+      toast.error("Cliente sem telefone válido para WhatsApp.");
       return;
     }
 
     try {
       await sendMutation.mutateAsync({
-        customerId: selectedCustomerId,
-        content: content.trim(),
-        idempotencyKey: buildIdempotencyKey("whatsapp.manual_send", selectedCustomerId),
+        customerId: selectedConversation.id,
+        content: finalContent.trim(),
+        idempotencyKey: buildIdempotencyKey("whatsapp.operational_send", selectedConversation.id),
       });
       setContent("");
-      toast.success("Mensagem enviada com sucesso.");
-      await Promise.all([
-        messagesQuery.refetch(),
-        invalidateOperationalGraph(utils, selectedCustomerId),
-      ]);
+      toast.success("Mensagem operacional enviada.");
+      await Promise.all([messagesQuery.refetch(), invalidateOperationalGraph(utils, selectedConversation.id)]);
     } catch (error: any) {
       toast.error(error?.message || "Falha ao enviar mensagem.");
     }
   }
 
-  async function executeSuggestedMessage(customerIdToSend: string, preview: string) {
-    setSelectedCustomerId(customerIdToSend);
-    setContent(preview);
-    await sendMutation.mutateAsync({
-      customerId: customerIdToSend,
-      content: preview,
-      idempotencyKey: buildIdempotencyKey("whatsapp.automation_send", customerIdToSend),
-    });
-    toast.success("Automação executada com 1 clique.");
-    await Promise.all([messagesQuery.refetch(), invalidateOperationalGraph(utils, customerIdToSend)]);
+  if (customersQuery.isLoading && customers.length === 0) {
+    return (
+      <PageWrapper title="WhatsApp Operacional" subtitle="">
+        <AppPageLoadingState title="Carregando comunicação operacional" />
+      </PageWrapper>
+    );
+  }
+
+  if (customersQuery.error && customers.length === 0) {
+    return (
+      <PageWrapper title="WhatsApp Operacional" subtitle="">
+        <AppPageErrorState
+          description="Não foi possível carregar as conversas operacionais do WhatsApp."
+          actionLabel="Tentar novamente"
+          onAction={() => void customersQuery.refetch()}
+        />
+      </PageWrapper>
+    );
+  }
+
+  if (customers.length === 0) {
+    return (
+      <PageWrapper title="WhatsApp Operacional" subtitle="">
+        <AppPageEmptyState
+          title="Sem base operacional para iniciar comunicação"
+          description="Cadastre cliente, crie agendamento ou O.S. e retorne para iniciar conversa com contexto."
+        />
+      </PageWrapper>
+    );
   }
 
   return (
     <PageWrapper title="WhatsApp Operacional" subtitle="">
       <section className="space-y-4">
-        <OperationalTopCard
-          contextLabel="Central de execução"
-          title="Conversa, decisão e ação no mesmo fluxo operacional"
-          description="WhatsApp conectado a cliente, cobrança, agendamento e ordem de serviço sem sair do contexto."
-          chips={
-            selectedCustomer ? (
-              <div className="inline-flex items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)] px-3 py-2">
-                <p className="text-sm font-medium text-[var(--text-primary)]">
-                  {String(selectedCustomer.name ?? "Cliente")}
-                </p>
-                <AppStatusBadge
-                  label={failed > 0 ? "Falhou" : delivered > 0 ? "Seguro" : "Pendente"}
-                />
-              </div>
-            ) : null
+        <AppPageHeader
+          title="WhatsApp · Execução operacional"
+          description="Quem falou com quem, sobre o quê e qual ação precisa acontecer agora, sem sair do contexto do Nexo."
+          cta={
+            <Button type="button" onClick={() => setContent("Olá! Iniciando atendimento operacional contextual pelo Nexo.")}>
+              Nova mensagem contextual
+            </Button>
           }
         />
 
-        <WorkspaceModeTabs activeView={activeWorkspaceView} onChange={setActiveWorkspaceView} />
-
-        <main className="min-h-[74vh] rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-base)]">
-          {activeWorkspaceView === "conversations" ? (
-            <ConversationsView
-              filteredConversations={filteredConversations}
-              selectedCustomerId={selectedCustomerId}
-              searchTerm={searchTerm}
-              onSearchChange={setSearchTerm}
-              activeFilter={activeFilter}
-              onFilterChange={setActiveFilter}
-              onSelectConversation={(conversationId) => {
-                setSelectedCustomerId(conversationId);
-                setActiveWorkspaceView("chat");
-              }}
-            />
-          ) : null}
-
-          {activeWorkspaceView === "chat" ? (
-            <ChatView
-              selectedCustomer={selectedCustomer}
-              messages={sortedMessages}
-              isLoading={messagesQuery.isLoading}
-              content={content}
-              onContentChange={setContent}
-              onSend={() => void sendMessage()}
-              isSending={sendMutation.isPending}
-              quickActions={QUICK_ACTIONS}
-              onQuickAction={setContent}
-              onOpenConversations={() => setActiveWorkspaceView("conversations")}
-              signals={intelligenceSignals}
-              noReplyDays={noReplyDays}
-            />
-          ) : null}
-
-          {activeWorkspaceView === "context" ? (
-            <ContextWorkspaceView
-              selectedCustomer={selectedCustomer}
-              selectedMessages={sortedMessages}
-              chargePendingForSelected={chargePendingForSelected}
-              futureAppointmentForSelected={futureAppointmentForSelected}
-              recentServiceOrder={recentServiceOrder}
-              noReplyDays={noReplyDays}
-            />
-          ) : null}
-
-          {activeWorkspaceView === "automations" ? (
-            <AutomationsWorkspaceView
-              selectedCustomer={selectedCustomer}
-              conversationSuggestions={conversationSuggestions}
-              onApplySuggestion={(preview) => {
-                setContent(preview);
-                setActiveWorkspaceView("chat");
-              }}
-              onExecuteSuggestion={(item) => {
-                void executeSuggestedMessage(item.customerId, item.preview);
-                setActiveWorkspaceView("chat");
-              }}
-            />
-          ) : null}
-
-          {activeWorkspaceView === "history" ? (
-            <HistoryWorkspaceView selectedCustomer={selectedCustomer} historyEvents={historyEvents} />
-          ) : null}
-        </main>
-      </section>
-    </PageWrapper>
-  );
-}
-
-function WorkspaceModeTabs({ activeView, onChange }: { activeView: WorkspaceView; onChange: (value: WorkspaceView) => void }) {
-  const tabItems: Array<{ value: WorkspaceView; label: string }> = [
-    { value: "conversations", label: "Conversas" },
-    { value: "chat", label: "Conversar" },
-    { value: "context", label: "Contexto" },
-    { value: "automations", label: "Executar" },
-    { value: "history", label: "Histórico" },
-  ];
-  return (
-    <AppSecondaryTabs items={tabItems} value={activeView} onChange={onChange} />
-  );
-}
-
-function ConversationsView({
-  filteredConversations,
-  selectedCustomerId,
-  searchTerm,
-  onSearchChange,
-  activeFilter,
-  onFilterChange,
-  onSelectConversation,
-}: {
-  filteredConversations: Array<{
-    id: string;
-    name: string;
-    phone: string;
-    lastInteraction: Date | null;
-    snippet: string;
-    state: string;
-    contextBadge: string | null;
-    hasCharge: boolean;
-    hasServiceOrder: boolean;
-    isNoReply: boolean;
-    noReplyDays: number;
-    suggestionsCount: number;
-    urgencyScore: number;
-  }>;
-  selectedCustomerId: string;
-  searchTerm: string;
-  onSearchChange: (value: string) => void;
-  activeFilter: ConversationFilter;
-  onFilterChange: (value: ConversationFilter) => void;
-  onSelectConversation: (id: string) => void;
-}) {
-  return (
-    <div className="flex h-full min-h-[74vh] flex-col">
-      <div className="border-b border-[var(--border-subtle)] px-6 py-5">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <p className="text-base font-semibold text-[var(--text-primary)]">Radar de conversas</p>
-            <p className="mt-1 text-sm text-[var(--text-secondary)]">Priorize cobranças, riscos operacionais e clientes sem retorno com leitura instantânea.</p>
-          </div>
-          <Badge>{filteredConversations.length} em foco</Badge>
-        </div>
-
-        <div className="relative mt-4 max-w-xl">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--text-muted)]" />
-          <Input
-            value={searchTerm}
-            onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="Buscar cliente ou telefone"
-            className="h-11 pl-9"
-          />
-        </div>
-
-        <div className="mt-4 flex gap-1 overflow-x-auto rounded-[999px] border border-[var(--border-subtle)] bg-[var(--surface-elevated)]/35 p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {FILTERS.map((filter) => (
-            <button
-              key={filter.key}
-              type="button"
-              onClick={() => onFilterChange(filter.key)}
-              className={cn(
-                "h-7 shrink-0 whitespace-nowrap px-2.5 text-[12px]",
-                appSelectionPillClasses(activeFilter === filter.key)
-              )}
-            >
-              {filter.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-6">
-        {filteredConversations.length === 0 ? (
-          <AppEmptyState
-            title="Nenhuma conversa encontrada"
-            description="Ajuste o filtro ou a busca para localizar uma conversa operacional."
-          />
-        ) : (
-          <div className="divide-y divide-[var(--border-subtle)] rounded-2xl border border-[var(--border-subtle)]/70">
-            {filteredConversations.map((conversation) => (
-              <button
-                key={conversation.id}
-                type="button"
-                onClick={() => onSelectConversation(conversation.id)}
+        <AppSectionBlock
+          title="Alertas de comunicação"
+          subtitle="Priorize risco, falha e follow-up pendente com CTA direto."
+          compact
+        >
+          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
+            {communicationAlerts.map(alert => (
+              <article
+                key={alert.id}
                 className={cn(
-                  "group relative w-full px-4 py-4 text-left transition-all md:px-5",
-                  selectedCustomerId === conversation.id
-                    ? "bg-[color-mix(in_srgb,var(--surface-elevated)_76%,var(--surface-primary))]"
-                    : "hover:bg-[var(--surface-elevated)]/35"
+                  "rounded-xl border p-3",
+                  alert.severity === "critical"
+                    ? "border-rose-500/30 bg-rose-500/10"
+                    : alert.severity === "attention"
+                      ? "border-amber-500/30 bg-amber-500/10"
+                      : "border-[var(--border-subtle)] bg-[var(--surface-elevated)]/35"
                 )}
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="space-y-1.5">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-semibold text-[var(--text-primary)]">{conversation.name}</p>
-                      {conversation.hasCharge ? <Badge>Cobrança</Badge> : null}
-                      {conversation.hasServiceOrder ? <Badge>O.S.</Badge> : null}
-                      {conversation.suggestionsCount > 0 ? <Badge>{conversation.suggestionsCount} sugestão(ões)</Badge> : null}
-                    </div>
-                    <p className="text-xs text-[var(--text-muted)]">{conversation.phone}</p>
-                    <p className="text-[11px] text-[var(--text-muted)]">
-                      Contexto: {conversation.contextBadge}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-xs text-[var(--text-muted)]">{fmtTime(conversation.lastInteraction)}</span>
-                    <p className={cn("mt-1 text-xs font-medium", stateTone(conversation.state))}>{conversation.state}</p>
-                  </div>
-                </div>
-
-                <div className="mt-3 flex items-start justify-between gap-4">
-                  <p className="text-sm text-[var(--text-secondary)]">{conversation.snippet}</p>
-                  <span className="inline-flex items-center gap-1 text-xs text-[var(--text-muted)]">
-                    Abrir
-                    <ChevronRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
-                  </span>
-                </div>
-
-                {conversation.isNoReply ? (
-                  <p className="mt-2 text-xs text-amber-500">Sem retorno há {conversation.noReplyDays} dia{conversation.noReplyDays === 1 ? "" : "s"}.</p>
-                ) : null}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function ChatView({
-  selectedCustomer,
-  messages,
-  isLoading,
-  content,
-  onContentChange,
-  onSend,
-  isSending,
-  quickActions,
-  onQuickAction,
-  onOpenConversations,
-  signals,
-  noReplyDays,
-}: {
-  selectedCustomer: any;
-  messages: Array<any>;
-  isLoading: boolean;
-  content: string;
-  onContentChange: (value: string) => void;
-  onSend: () => void;
-  isSending: boolean;
-  quickActions: ReadonlyArray<{ key: string; label: string; content: string }>;
-  onQuickAction: (value: string) => void;
-  onOpenConversations: () => void;
-  signals: Array<{ id: string; label: string; tone: "danger" | "attention" | "neutral" }>;
-  noReplyDays: number | null;
-}) {
-  if (!selectedCustomer) {
-    return (
-      <div className="flex min-h-[74vh] items-center justify-center p-8">
-        <div className="space-y-4 text-center">
-          <AppEmptyState
-            title="Nenhuma conversa selecionada"
-            description="Abra o modo Conversas para escolher um cliente e iniciar o atendimento operacional."
-          />
-          <Button type="button" variant="outline" onClick={onOpenConversations}>
-            Ir para Conversas
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="grid min-h-[74vh] grid-rows-[auto_minmax(0,1fr)_auto]">
-      <header className="border-b border-[var(--border-subtle)] px-5 py-4 md:px-6">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-base font-semibold text-[var(--text-primary)]">{String(selectedCustomer.name ?? "Cliente")}</p>
-            <p className="mt-0.5 text-xs text-[var(--text-secondary)]">{String(selectedCustomer.phone ?? "Telefone não informado")}</p>
-            <p className="mt-2 text-xs text-[var(--text-muted)]">{noReplyDays !== null ? `Último retorno há ${noReplyDays} dia(s)` : "Sem histórico de resposta"}</p>
-          </div>
-          <div className="flex max-w-xl flex-wrap justify-end gap-2">
-            {signals.map((signal) => (
-              <span
-                key={signal.id}
-                className={cn(
-                  "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs",
-                  signal.tone === "danger"
-                    ? "border-rose-500/35 bg-rose-500/10 text-rose-500"
-                    : signal.tone === "attention"
-                      ? "border-amber-500/35 bg-amber-500/10 text-amber-500"
-                      : "border-[var(--border-subtle)] bg-[var(--surface-elevated)]/65 text-[var(--text-secondary)]"
-                )}
-              >
-                {signal.tone === "danger" ? <AlertTriangle className="size-3.5" /> : <Sparkles className="size-3.5" />}
-                {signal.label}
-              </span>
-            ))}
-          </div>
-        </div>
-      </header>
-
-      <div className="min-h-0 overflow-y-auto bg-[linear-gradient(to_bottom,color-mix(in_srgb,var(--surface-elevated)_28%,transparent),transparent_140px)] px-4 py-5 md:px-7">
-        {isLoading ? (
-          <AppLoadingState rows={7} />
-        ) : messages.length === 0 ? (
-          <div className="mx-auto flex h-full w-full max-w-4xl flex-col justify-end">
-            <div className="mx-auto mb-4 inline-flex items-center gap-2 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-elevated)]/50 px-3 py-1 text-xs text-[var(--text-secondary)]">
-              <Bot className="size-3.5" />
-              Sem mensagens ainda — a conversa está pronta para começar.
-            </div>
-          </div>
-        ) : (
-          <div className="mx-auto w-full max-w-4xl space-y-4">
-            {messages.map((message) => {
-              if (message._kind === "event") {
-                return (
-                  <div key={String(message?.id)} className="mx-auto flex w-full items-center gap-3 py-1">
-                    <span className="h-px flex-1 bg-[var(--border-subtle)]" />
-                    <p className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-primary)] px-3 py-1 text-[11px] text-[var(--text-secondary)]">
-                      <Workflow className="size-3.5" />
-                      {String(message?.content ?? "Evento operacional")}
-                    </p>
-                    <span className="text-[11px] text-[var(--text-muted)]">{fmtTime(message?.createdAt)}</span>
-                    <span className="h-px flex-1 bg-[var(--border-subtle)]" />
-                  </div>
-                );
-              }
-
-              const fromClient = message._kind === "incoming";
-              return (
-                <div key={String(message?.id)} className={cn("flex", fromClient ? "justify-start" : "justify-end")}>
-                  <div
-                    className={cn(
-                      "max-w-[82%] rounded-2xl px-4 py-3",
-                      fromClient
-                        ? "rounded-tl-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)]/75"
-                        : "rounded-tr-md border border-[var(--border-emphasis)] bg-[color-mix(in_srgb,var(--surface-elevated)_82%,var(--bg-surface))]"
-                    )}
-                  >
-                    <div className="mb-1 flex items-center gap-1 text-[11px] text-[var(--text-muted)]">
-                      {fromClient ? <UserRound className="size-3" /> : message._kind === "automation" ? <Bot className="size-3" /> : <Send className="size-3" />}
-                      <span>{fromClient ? "Cliente" : message._kind === "automation" ? "Automação" : "Operação"}</span>
-                    </div>
-                    <p className="text-sm leading-relaxed text-[var(--text-primary)]">{String(message?.content ?? "")}</p>
-                    <div className="mt-2 flex items-center justify-end gap-1 text-[11px] text-[var(--text-muted)]">
-                      <span>{fmtTime(message?.createdAt)}</span>
-                      {!fromClient ? (
-                        <span className={cn("inline-flex items-center gap-1", statusTone(message._deliveryStatus))}>
-                          {statusIcon(message._deliveryStatus)}
-                          {statusLabel(message._deliveryStatus)}
-                        </span>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      <footer className="border-t border-[var(--border-subtle)] bg-[var(--surface-primary)] px-4 py-4 md:px-6">
-        <div className="mx-auto w-full max-w-4xl space-y-3">
-          <div className="flex flex-wrap gap-2">
-            {quickActions.map((action) => (
-              <button
-                key={action.key}
-                type="button"
-                onClick={() => onQuickAction(action.content)}
-                className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-elevated)]/40 px-3 py-1.5 text-xs text-[var(--text-secondary)] transition-all hover:border-[var(--border-emphasis)]/40 hover:text-[var(--text-primary)]"
-              >
-                {action.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex items-end gap-2 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)]/45 px-3 py-3">
-            <Textarea
-              value={content}
-              onChange={(event) => onContentChange(event.target.value)}
-              placeholder="Escreva a mensagem, ajuste uma sugestão ou acione uma resposta rápida..."
-              className="min-h-[64px] flex-1 resize-none border-0 bg-transparent p-0 shadow-none focus-visible:ring-0"
-            />
-            <Button type="button" onClick={onSend} disabled={isSending || content.trim().length < 2} className="h-10 rounded-xl px-4">
-              <Send className="mr-1 size-4" />
-              Enviar
-            </Button>
-          </div>
-        </div>
-      </footer>
-    </div>
-  );
-}
-
-function ContextWorkspaceView({
-  selectedCustomer,
-  selectedMessages,
-  chargePendingForSelected,
-  futureAppointmentForSelected,
-  recentServiceOrder,
-  noReplyDays,
-}: {
-  selectedCustomer: any;
-  selectedMessages: Array<any>;
-  chargePendingForSelected: boolean;
-  futureAppointmentForSelected: boolean;
-  recentServiceOrder: any;
-  noReplyDays: number | null;
-}) {
-  if (!selectedCustomer) {
-    return (
-      <div className="flex min-h-[74vh] items-center justify-center p-8">
-        <AppEmptyState
-          title="Contexto indisponível"
-          description="Selecione uma conversa para acompanhar os dados operacionais do cliente."
-        />
-      </div>
-    );
-  }
-
-  const contextRows = [
-    { label: "Cliente", value: String(selectedCustomer?.name ?? "—") },
-    { label: "Telefone", value: String(selectedCustomer?.phone ?? "—") },
-    { label: "Última interação", value: fmtDateTime(selectedMessages[selectedMessages.length - 1]?.createdAt ?? selectedCustomer?.lastContactAt) },
-    { label: "Mensagens no histórico", value: String(selectedMessages.length) },
-    { label: "O.S. recente", value: recentServiceOrder ? String(recentServiceOrder?.status ?? "Registrada") : "Sem O.S. recente" },
-    { label: "Responsável interno", value: String(selectedCustomer?.ownerName ?? "Operação Nexo") },
-    { label: "Observações", value: String(selectedCustomer?.notes ?? "Sem observações registradas") },
-  ];
-
-  return (
-    <div className="min-h-[74vh] px-6 py-6 md:px-8">
-      <div className="max-w-5xl space-y-4">
-        <div className="space-y-1">
-          <p className="text-base font-semibold text-[var(--text-primary)]">Contexto para decisão</p>
-          <p className="text-sm text-[var(--text-secondary)]">Priorize o que impacta resposta, cobrança e execução antes de responder no chat.</p>
-        </div>
-
-        <div className="grid gap-3 md:grid-cols-3">
-          <section className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3">
-            <p className="text-[11px] uppercase tracking-wide text-rose-500">Criticidade</p>
-            <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">{chargePendingForSelected ? "Cobrança pendente" : "Sem cobrança crítica"}</p>
-          </section>
-          <section className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
-            <p className="text-[11px] uppercase tracking-wide text-amber-500">Operação</p>
-            <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">{futureAppointmentForSelected ? "Agendamento em acompanhamento" : "Sem risco imediato"}</p>
-          </section>
-          <section className="rounded-xl border border-sky-500/30 bg-sky-500/10 p-3">
-            <p className="text-[11px] uppercase tracking-wide text-sky-500">Relacionamento</p>
-            <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">{(noReplyDays ?? 0) >= 3 ? `Sem resposta há ${noReplyDays} dias` : "Contato recente"}</p>
-          </section>
-        </div>
-      </div>
-
-      <div className="mt-6 divide-y divide-[var(--border-subtle)] rounded-2xl border border-[var(--border-subtle)]/80">
-        {contextRows.map((row) => (
-          <div key={row.label} className="grid gap-2 px-4 py-4 md:grid-cols-[220px_minmax(0,1fr)] md:items-start md:px-6">
-            <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">{row.label}</p>
-            <p className="text-sm text-[var(--text-primary)]">{row.value}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function AutomationsWorkspaceView({
-  selectedCustomer,
-  conversationSuggestions,
-  onApplySuggestion,
-  onExecuteSuggestion,
-}: {
-  selectedCustomer: any;
-  conversationSuggestions: Array<{ id: string; customerId: string; title: string; reason: string; urgency: "Alta" | "Média"; origin: string; impact: string; preview: string }>;
-  onApplySuggestion: (preview: string) => void;
-  onExecuteSuggestion: (item: { customerId: string; preview: string }) => void;
-}) {
-  if (!selectedCustomer) {
-    return (
-      <div className="flex min-h-[74vh] items-center justify-center p-8">
-        <AppEmptyState
-          title="Automações indisponíveis"
-          description="Selecione uma conversa para exibir sugestões acionáveis desta operação."
-        />
-      </div>
-    );
-  }
-
-  if (conversationSuggestions.length === 0) {
-    return (
-      <div className="flex min-h-[74vh] items-center justify-center p-8">
-        <AppEmptyState
-          title="Nenhuma automação disponível"
-          description="Quando houver gatilho de cobrança, atraso ou reativação, ele aparecerá aqui para execução rápida."
-        />
-      </div>
-    );
-  }
-
-  const [primarySuggestion, ...secondarySuggestions] = conversationSuggestions;
-
-  return (
-    <div className="min-h-[74vh] space-y-6 px-6 py-6 md:px-8">
-      <section
-        tabIndex={0}
-        className="rounded-2xl border border-[var(--accent-primary)]/30 bg-[color-mix(in_srgb,var(--surface-elevated)_60%,var(--surface-primary))] p-6 shadow-sm transition-colors duration-200 hover:border-[var(--accent-primary)]/45 active:border-[var(--accent-primary)]/70 focus-visible:border-[var(--accent-primary)]/70"
-      >
-        <p className="inline-flex items-center gap-1 border-l-[3px] border-[var(--accent-primary)] pl-2 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
-          <Sparkles className="size-3.5" />
-          melhor próxima ação
-        </p>
-        <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
-          <div className="max-w-3xl">
-            <p className="text-lg font-semibold text-[var(--text-primary)]">{primarySuggestion.title}</p>
-            <p className="mt-1 text-sm text-[var(--text-secondary)]">{primarySuggestion.reason}</p>
-            <p className="mt-1 text-sm text-[var(--text-secondary)]">{primarySuggestion.impact}</p>
-          </div>
-          <Badge>{primarySuggestion.urgency}</Badge>
-        </div>
-
-        <div className="mt-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)]/85 p-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">Mensagem sugerida</p>
-          <p className="mt-2 text-sm text-[var(--text-primary)]">{primarySuggestion.preview}</p>
-        </div>
-
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-          <span className="inline-flex items-center gap-1 text-xs text-[var(--text-muted)]">
-            <Workflow className="size-4" />
-            Origem: {primarySuggestion.origin}
-          </span>
-          <div className="flex gap-2">
-            <Button type="button" variant="outline" onClick={() => onApplySuggestion(primarySuggestion.preview)}>
-              Revisar no chat
-            </Button>
-            <Button type="button" onClick={() => onExecuteSuggestion(primarySuggestion)}>
-              Executar agora
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      {secondarySuggestions.length > 0 ? (
-        <section className="space-y-2">
-          <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">Opções secundárias</p>
-          <div className="divide-y divide-[var(--border-subtle)] rounded-xl border border-[var(--border-subtle)]/70">
-            {secondarySuggestions.map((item) => (
-              <article key={item.id} className="px-4 py-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold text-[var(--text-primary)]">{item.title}</p>
-                    <p className="mt-1 text-xs text-[var(--text-secondary)]">{item.reason}</p>
-                  </div>
-                  <Badge>{item.urgency}</Badge>
-                </div>
-                <p className="mt-2 text-sm text-[var(--text-secondary)]">{item.preview}</p>
-                <div className="mt-3 flex items-center justify-between gap-2">
-                  <span className="text-xs text-[var(--text-muted)]">Origem: {item.origin}</span>
-                  <Button type="button" variant="outline" size="sm" onClick={() => onApplySuggestion(item.preview)}>
-                    Levar ao chat
-                  </Button>
-                </div>
+                <p className="text-sm font-semibold text-[var(--text-primary)]">{alert.title}</p>
+                <p className="mt-1 text-xs text-[var(--text-secondary)]">{alert.description}</p>
+                <Button className="mt-3 h-8" type="button" variant="outline" size="sm" onClick={alert.action}>
+                  {alert.cta}
+                </Button>
               </article>
             ))}
           </div>
-        </section>
-      ) : null}
-    </div>
-  );
-}
+        </AppSectionBlock>
 
-function HistoryWorkspaceView({
-  selectedCustomer,
-  historyEvents,
-}: {
-  selectedCustomer: any;
-  historyEvents: Array<{ id: string; label: string; detail: string; at: string; type: "billing" | "warning" | "automation" | "normal" }>;
-}) {
-  if (!selectedCustomer) {
-    return (
-      <div className="flex min-h-[74vh] items-center justify-center p-8">
-        <AppEmptyState
-          title="Histórico indisponível"
-          description="Selecione uma conversa para visualizar a timeline operacional auditável."
-        />
-      </div>
-    );
-  }
+        <div className="grid min-h-[72vh] gap-4 xl:grid-cols-[340px_minmax(0,1fr)_320px]">
+          <AppSectionBlock title="Inbox prioritária" subtitle="Ordenada por prioridade operacional, não cronologia burra." className="h-full">
+            <AppOperationalBar
+              tabs={FILTERS}
+              activeTab={activeFilter}
+              onTabChange={setActiveFilter}
+              searchValue={searchTerm}
+              onSearchChange={setSearchTerm}
+              searchPlaceholder="Buscar cliente ou telefone"
+            />
 
-  if (historyEvents.length === 0) {
-    return (
-      <div className="flex min-h-[74vh] items-center justify-center p-8">
-        <AppEmptyState
-          title="Sem histórico recente"
-          description="Os eventos operacionais desta conversa aparecerão aqui conforme a execução avança."
-        />
-      </div>
-    );
-  }
+            <div className="mt-3 max-h-[56vh] space-y-2 overflow-y-auto pr-1">
+              {filteredConversations.length === 0 ? (
+                <AppEmptyState
+                  title="Nenhuma conversa nesse filtro"
+                  description="Ajuste filtro ou busca para continuar a execução operacional."
+                />
+              ) : (
+                filteredConversations.map(conversation => (
+                  <button
+                    key={conversation.id}
+                    type="button"
+                    onClick={() => setSelectedCustomerId(conversation.id)}
+                    className={cn(
+                      "w-full rounded-xl border p-3 text-left",
+                      selectedConversation?.id === conversation.id
+                        ? "border-[var(--border-emphasis)] bg-[var(--surface-elevated)]/55"
+                        : "border-[var(--border-subtle)] bg-[var(--surface-primary)]/70 hover:bg-[var(--surface-elevated)]/45"
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-semibold text-[var(--text-primary)]">{conversation.name}</p>
+                        <p className="text-xs text-[var(--text-muted)]">{conversation.phone}</p>
+                      </div>
+                      <div className="text-right">
+                        <AppPriorityBadge label={riskLabel(conversation.severity)} />
+                        <p className="mt-1 text-[11px] text-[var(--text-muted)]">{fmtTime(conversation.lastMessageAt)}</p>
+                      </div>
+                    </div>
 
-  return (
-    <div className="min-h-[74vh] px-6 py-6 md:px-8">
-      <div className="max-w-4xl">
-        <p className="mb-4 text-base font-semibold text-[var(--text-primary)]">Linha do tempo operacional</p>
-        <div className="space-y-1">
-          {historyEvents.map((event, index) => (
-            <article key={event.id} className="relative grid gap-1 rounded-lg px-4 py-3 pl-11 hover:bg-[var(--surface-elevated)]/35">
-              {index < historyEvents.length - 1 ? (
-                <span className="absolute -bottom-5 left-[21px] top-8 w-px bg-[var(--border-subtle)]" aria-hidden />
-              ) : null}
-              <span
-                className={cn(
-                  "absolute left-3 top-3.5 inline-flex size-5 items-center justify-center rounded-full border",
-                  event.type === "billing"
-                    ? "border-rose-500/40 bg-rose-500/15 text-rose-500"
-                    : event.type === "warning"
-                      ? "border-amber-500/40 bg-amber-500/15 text-amber-500"
-                      : event.type === "automation"
-                        ? "border-violet-500/40 bg-violet-500/15 text-violet-500"
-                        : "border-[var(--border-subtle)] bg-[var(--surface-primary)] text-[var(--text-muted)]"
-                )}
-                aria-hidden
-              >
-                {event.type === "automation" ? <Bot className="size-3" /> : <Clock3 className="size-3" />}
-              </span>
-              <p className="text-sm font-semibold text-[var(--text-primary)]">{event.label}</p>
-              <p className="text-sm text-[var(--text-secondary)]">{event.detail}</p>
-              <p className="text-xs text-[var(--text-muted)]">{event.at}</p>
-            </article>
-          ))}
+                    <div className="mt-2 flex items-center gap-2">
+                      <AppStatusBadge label={conversation.contextType} />
+                      <AppStatusBadge label={conversation.hasFailed ? "Falhou" : conversation.isAwaitingReply ? "Atenção" : "Seguro"} />
+                    </div>
+                    <p className="mt-2 line-clamp-2 text-xs text-[var(--text-secondary)]">{conversation.snippet}</p>
+                    <p className="mt-2 text-[11px] text-[var(--text-muted)]">Próxima ação: {conversation.bestAction.title}</p>
+                  </button>
+                ))
+              )}
+            </div>
+          </AppSectionBlock>
+
+          <AppSectionBlock
+            title="Conversa orientada à ação"
+            subtitle="Execução rápida com contexto, status de envio e templates operacionais."
+            className="h-full"
+          >
+            {!selectedConversation ? (
+              <AppEmptyState
+                title="Selecione uma conversa"
+                description="Escolha um cliente na inbox para iniciar execução operacional."
+              />
+            ) : (
+              <div className="grid h-full grid-rows-[auto_minmax(0,1fr)_auto] gap-3">
+                <header className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)]/70 p-3">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-semibold text-[var(--text-primary)]">{selectedConversation.name}</p>
+                      <p className="text-xs text-[var(--text-muted)]">{selectedConversation.phone}</p>
+                    </div>
+                    <div className="flex flex-wrap justify-end gap-2">
+                      <AppStatusBadge label={selectedConversation.contextType} />
+                      <AppStatusBadge label={riskLabel(selectedConversation.severity)} />
+                    </div>
+                  </div>
+                  <div className="mt-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)]/35 px-3 py-2">
+                    <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Próxima melhor ação</p>
+                    <p className="text-sm font-medium text-[var(--text-primary)]">{selectedConversation.bestAction.title}</p>
+                    <p className="text-xs text-[var(--text-secondary)]">{selectedConversation.bestAction.description}</p>
+                  </div>
+                </header>
+
+                <div className="max-h-[44vh] space-y-3 overflow-y-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/60 p-3">
+                  {messagesQuery.isLoading ? (
+                    <AppPageLoadingState title="Carregando histórico" description="Buscando mensagens e eventos desta conversa." />
+                  ) : sortedMessages.length === 0 ? (
+                    <AppEmptyState
+                      title="Conversa sem mensagens"
+                      description="Use um template contextual para iniciar contato com objetivo operacional."
+                    />
+                  ) : (
+                    sortedMessages.map(message => {
+                      if (message._kind === "event") {
+                        return (
+                          <div key={String(message?.id)} className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
+                            <Workflow className="size-3.5" />
+                            <span>{String(message?.content ?? "Evento de timeline")}</span>
+                            <span className="ml-auto">{fmtTime(message?.createdAt)}</span>
+                          </div>
+                        );
+                      }
+
+                      const incoming = message._kind === "incoming";
+                      const status = message._deliveryStatus as MessageSendStatus;
+
+                      return (
+                        <div key={String(message?.id)} className={cn("flex", incoming ? "justify-start" : "justify-end")}>
+                          <div
+                            className={cn(
+                              "max-w-[80%] rounded-xl border px-3 py-2",
+                              incoming
+                                ? "border-[var(--border-subtle)] bg-[var(--surface-primary)]"
+                                : "border-[var(--border-emphasis)] bg-[var(--surface-elevated)]/45"
+                            )}
+                          >
+                            <div className="mb-1 flex items-center gap-1 text-[11px] text-[var(--text-muted)]">
+                              <UserRound className="size-3" />
+                              <span>{incoming ? "Cliente" : message._kind === "automation" ? "Template" : "Operação"}</span>
+                            </div>
+                            <p className="text-sm text-[var(--text-primary)]">{String(message?.content ?? "")}</p>
+                            <div className="mt-1 flex items-center justify-end gap-2 text-[11px] text-[var(--text-muted)]">
+                              <span>{fmtTime(message?.createdAt)}</span>
+                              {!incoming ? (
+                                <span className={cn("inline-flex items-center gap-1", status === "failed" ? "text-rose-500" : "text-[var(--text-muted)]")}>
+                                  {status === "queued" ? <Clock3 className="size-3.5" /> : null}
+                                  {status === "sent" ? <Check className="size-3.5" /> : null}
+                                  {status === "delivered" ? <CheckCheck className="size-3.5" /> : null}
+                                  {status === "failed" ? <XCircle className="size-3.5" /> : null}
+                                  {statusLabel(status)}
+                                </span>
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                <footer className="space-y-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)]/80 p-3">
+                  <div className="flex flex-wrap gap-2">
+                    {QUICK_ACTIONS.map(action => (
+                      <Button key={action.key} type="button" size="sm" variant="outline" onClick={() => setContent(action.content)}>
+                        {action.label}
+                      </Button>
+                    ))}
+                  </div>
+                  <div className="flex items-end gap-2">
+                    <Textarea
+                      value={content}
+                      onChange={event => setContent(event.target.value)}
+                      placeholder="Escreva mensagem com contexto operacional..."
+                      className="min-h-[64px] resize-none"
+                    />
+                    <Button type="button" className="h-10" disabled={sendMutation.isPending || content.trim().length < 2} onClick={() => void sendMessage()}>
+                      <Send className="mr-1 size-4" />
+                      Enviar
+                    </Button>
+                  </div>
+                </footer>
+              </div>
+            )}
+          </AppSectionBlock>
+
+          <AppSectionBlock
+            title="Contexto operacional"
+            subtitle="Cliente, agenda, O.S., financeiro, timeline e risco na mesma visão."
+            className="h-full"
+          >
+            {!selectedConversation ? (
+              <AppEmptyState
+                title="Sem contexto ativo"
+                description="Selecione uma conversa para abrir o painel contextual lateral."
+              />
+            ) : (
+              <div className="space-y-3 text-sm">
+                <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)]/70 p-3">
+                  <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Cliente</p>
+                  <p className="text-sm font-semibold text-[var(--text-primary)]">{selectedConversation.name}</p>
+                  <p className="text-xs text-[var(--text-secondary)]">{selectedConversation.phone}</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <AppStatusBadge label={riskLabel(selectedConversation.severity)} />
+                    <AppStatusBadge label={selectedConversation.isAwaitingReply ? "Sem resposta" : "Ativo"} />
+                  </div>
+                </section>
+
+                <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)]/70 p-3">
+                  <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Agendamento</p>
+                  <p className="text-sm text-[var(--text-primary)]">
+                    {selectedConversation.hasScheduled
+                      ? `Próximo atendimento vinculado · ${String(selectedConversation.serviceOrder?.status ?? "SCHEDULED")}`
+                      : "Sem agendamento ativo"}
+                  </p>
+                  <Button size="sm" variant="outline" className="mt-2">Confirmar/Reagendar</Button>
+                </section>
+
+                <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)]/70 p-3">
+                  <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">O.S.</p>
+                  <p className="text-sm text-[var(--text-primary)]">
+                    {selectedConversation.serviceOrder
+                      ? `Status atual: ${String(selectedConversation.serviceOrder?.status ?? "OPEN")}`
+                      : "Sem ordem em andamento"}
+                  </p>
+                  <Button size="sm" variant="outline" className="mt-2">Abrir O.S.</Button>
+                </section>
+
+                <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)]/70 p-3">
+                  <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Financeiro</p>
+                  <p className="text-sm text-[var(--text-primary)]">
+                    {selectedConversation.hasOverdueCharge
+                      ? "Cobrança pendente detectada. Priorize envio de cobrança/link."
+                      : "Sem cobrança crítica vinculada"}
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="mt-2"
+                    onClick={() => void sendMessage("Olá! Reforçando a pendência em aberto. Posso te apoiar com o pagamento agora?")}
+                    disabled={!selectedConversation.hasOverdueCharge || sendMutation.isPending}
+                  >
+                    Cobrar / reenviar link
+                  </Button>
+                </section>
+
+                <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)]/70 p-3">
+                  <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Timeline e risco</p>
+                  <ul className="mt-1 space-y-1 text-xs text-[var(--text-secondary)]">
+                    <li>• Último evento em {fmtDateTime(sortedMessages[sortedMessages.length - 1]?.createdAt ?? selectedCustomer?.lastContactAt)}</li>
+                    <li>• Leitura de risco: {riskLabel(selectedConversation.severity)}</li>
+                    <li>• Follow-up: {selectedConversation.noReplyDays >= 3 ? `pendente há ${selectedConversation.noReplyDays} dia(s)` : "em dia"}</li>
+                  </ul>
+                </section>
+              </div>
+            )}
+          </AppSectionBlock>
         </div>
-      </div>
-    </div>
+
+        <div className="grid gap-3 md:grid-cols-4">
+          <Button type="button" variant="outline" onClick={() => setActiveFilter("all")} className="justify-start">
+            <Search className="mr-2 size-4" /> Ver inbox completa
+          </Button>
+          <Button type="button" variant="outline" onClick={() => setActiveFilter("billing")} className="justify-start">
+            <Siren className="mr-2 size-4" /> Abrir cobranças críticas
+          </Button>
+          <Button type="button" variant="outline" onClick={() => setActiveFilter("no_reply")} className="justify-start">
+            <MessageCircleWarning className="mr-2 size-4" /> Ver não respondidos
+          </Button>
+          <Button type="button" variant="outline" onClick={() => setActiveFilter("failures")} className="justify-start">
+            <AlertTriangle className="mr-2 size-4" /> Ver falhas de entrega
+          </Button>
+        </div>
+      </section>
+    </PageWrapper>
   );
 }
