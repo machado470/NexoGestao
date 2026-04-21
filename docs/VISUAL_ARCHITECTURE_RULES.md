@@ -45,3 +45,14 @@ Garantir isolamento visual estrutural entre páginas públicas, autenticação e
 - Consultar `docs/LAYOUT_GLOBAL_PROTECTION.md` antes de alterar wrappers raiz.
 - Efeitos visuais (`transform`, `filter`, `backdrop-filter`) devem ficar em componentes isolados.
 - Não usar `overflow: hidden` global no root do app.
+
+## Regra de arquitetura visual V2 (2026-04-21)
+
+1. Toda página interna deve abrir com `AppPageShell` e `AppPageHeader`.
+2. Toda área de conteúdo operacional deve usar `AppSectionCard`/`AppSectionBlock`.
+3. Toda tabela operacional deve usar `AppDataTable`.
+4. Todo modal interno deve usar `BaseModal`, `FormModal` ou `ConfirmModal`.
+5. Toda badge de estado deve usar `AppStatusBadge`.
+6. Toolbars/filtros devem usar `AppToolbar`/`AppFiltersBar`.
+7. Não criar variação local de layout (header, toolbar, card, table, modal) quando já existir componente oficial.
+8. Novos componentes internos devem usar tokens (`--nexo-*`, `--surface-*`, `--text-*`, `--border-*`) e evitar hardcode visual.

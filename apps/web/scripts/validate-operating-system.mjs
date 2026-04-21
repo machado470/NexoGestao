@@ -34,6 +34,19 @@ const styleScopeFiles = [
   "client/src/components/CreateAppointmentModal.tsx",
   "client/src/components/CreateServiceOrderModal.tsx",
 ];
+const designSystemScope = [
+  "client/src/components/app-system.tsx",
+  "client/src/components/app-modal-system.tsx",
+  "client/src/components/internal-page-system.tsx",
+  "client/src/components/CreateCustomerModal.tsx",
+  "client/src/components/CreateAppointmentModal.tsx",
+  "client/src/components/CreateServiceOrderModal.tsx",
+  "client/src/components/CreateExpenseModal.tsx",
+  "client/src/components/CreateLaunchModal.tsx",
+  "client/src/components/CreateChargeModal.tsx",
+  "client/src/components/ConfirmDialog.tsx",
+  "client/src/components/ConfirmDeleteModal.tsx",
+];
 const statusScopePages = [
   "client/src/pages/AppointmentsPage.tsx",
   "client/src/pages/ServiceOrdersPage.tsx",
@@ -126,6 +139,17 @@ for (const file of styleScopeFiles) {
           `${file}: padrão visual proibido detectado (${pattern}) para elementos operacionais.`
         );
       }
+    }
+  }
+}
+
+for (const file of designSystemScope) {
+  const source = readFileSync(join(root, file), "utf8");
+  for (const forbidden of forbiddenClasses) {
+    if (source.includes(forbidden)) {
+      errors.push(
+        `${file}: hardcode escuro proibido detectado no design system (${forbidden}).`
+      );
     }
   }
 }
