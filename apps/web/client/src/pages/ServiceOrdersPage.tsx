@@ -34,6 +34,7 @@ import {
   AppSectionBlock,
   AppStatusBadge,
 } from "@/components/internal-page-system";
+import { AppPageShell, AppSectionCard, AppTimeline, AppTimelineItem, AppToolbar } from "@/components/app-system";
 import { Button, SecondaryButton } from "@/components/design-system";
 import { getDayWindow, inRange, safeDate } from "@/lib/operational/kpi";
 import {
@@ -102,6 +103,16 @@ function getStatusLabel(status: string) {
   if (status === "PAUSED") return "Pausada";
   if (status === "CANCELED") return "Cancelada";
   return status || "Sem status";
+}
+
+function getStatusVisual(status: string, isOverdue: boolean, riskState: string) {
+  if (isOverdue) return { label: "Atrasada", tone: "danger" as const };
+  if (riskState === "Crítico") return { label: "Em risco", tone: "warning" as const };
+  if (status === "IN_PROGRESS") return { label: "Em execução", tone: "info" as const };
+  if (status === "OPEN" || status === "ASSIGNED") return { label: "Criada", tone: "neutral" as const };
+  if (status === "DONE") return { label: "Concluída", tone: "success" as const };
+  if (status === "CANCELED") return { label: "Cancelada", tone: "danger" as const };
+  return { label: getStatusLabel(status), tone: "accent" as const };
 }
 
 function getPriorityLabel(priority: number) {
@@ -684,7 +695,7 @@ export default function ServiceOrdersPage() {
   }, [currentPage, totalPages]);
 
   const executeOrderStatus = async (
-    status: "IN_PROGRESS" | "DONE" | "CANCELED"
+    status: "IN_PROGRESS" | "DONE" | "CANCELED" | "PAUSED"
   ) => {
     if (!focusedOrder?.id) return;
     try {
@@ -908,10 +919,11 @@ export default function ServiceOrdersPage() {
   }, [globalAlerts]);
 
   return (
-    <PageWrapper
-      title="Ordens de Serviço"
-      subtitle="Execute, destrave e converta O.S. em cobrança no mesmo fluxo."
-    >
+    <AppPageShell>
+      <PageWrapper
+        title="Ordens de Serviço"
+        subtitle="Execute, destrave e converta O.S. em cobrança no mesmo fluxo."
+      >
       <div className="space-y-4">
         <AppPageHeader
           title={
@@ -964,6 +976,20 @@ export default function ServiceOrdersPage() {
             </SecondaryButton>
           }
         />
+        <AppToolbar className="gap-2 px-3 py-2.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <AppStatusBadge label="Fluxo: Cliente → Agendamento → O.S. → Cobrança → Pagamento" />
+            <AppStatusBadge label={`Período: ${windowFilter === "next7" ? "próximos 7 dias" : windowFilter === "today" ? "hoje" : windowFilter === "overdue" ? "atrasadas" : "operação completa"}`} />
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <SecondaryButton type="button" className="h-8 px-3 text-xs" onClick={() => navigate("/finances")}>
+              Financeiro
+            </SecondaryButton>
+            <SecondaryButton type="button" className="h-8 px-3 text-xs" onClick={() => navigate("/whatsapp")}>
+              WhatsApp
+            </SecondaryButton>
+          </div>
+        </AppToolbar>
 
         <AppOperationalBar
           tabs={[
@@ -1310,9 +1336,10 @@ export default function ServiceOrdersPage() {
                               </p>
                             </td>
                             <td className="px-4 py-3.5 align-top">
-                              <AppStatusBadge
-                                label={getStatusLabel(status)}
-                              />
+                              {(() => {
+                                const statusVisual = getStatusVisual(status, Boolean(scheduledDate && scheduledDate < now && ["OPEN", "ASSIGNED", "IN_PROGRESS"].includes(status)), riskState);
+                                return <AppStatusBadge label={statusVisual.label} />;
+                              })()}
                               <div className="mt-1.5 flex flex-wrap gap-1">
                                 {rowSignals.slice(0, 2).map(signal => (
                                   <span
@@ -1354,16 +1381,31 @@ export default function ServiceOrdersPage() {
                               </p>
                             </td>
                             <td className="px-4 py-3.5 align-top">
-                              <div className="flex items-center justify-end gap-2">
+                              <div className="flex flex-wrap items-center justify-end gap-1.5">
+                                <SecondaryButton type="button" className="h-7 px-2 text-[10px]" onClick={event => { event.stopPropagation(); setFocusedOrderId(String(order?.id ?? "")); void executeOrderStatus("IN_PROGRESS"); }}>
+                                  Iniciar
+                                </SecondaryButton>
+                                <SecondaryButton type="button" className="h-7 px-2 text-[10px]" onClick={event => { event.stopPropagation(); setFocusedOrderId(String(order?.id ?? "")); void executeOrderStatus("PAUSED"); }}>
+                                  Pausar
+                                </SecondaryButton>
+                                <SecondaryButton type="button" className="h-7 px-2 text-[10px]" onClick={event => { event.stopPropagation(); setFocusedOrderId(String(order?.id ?? "")); void executeOrderStatus("DONE"); }}>
+                                  Concluir
+                                </SecondaryButton>
                                 <SecondaryButton
                                   type="button"
-                                  className={`${OPERATIONAL_PRIMARY_CTA_CLASS} tracking-[0.01em]`}
+                                  className={`${OPERATIONAL_PRIMARY_CTA_CLASS} h-7 px-2 text-[10px] tracking-[0.01em]`}
                                   onClick={event => {
                                     event.stopPropagation();
                                     handlePrimaryAction();
                                   }}
                                 >
                                   {resolveOperationalActionLabel(nextAction, primaryActionLabel)}
+                                </SecondaryButton>
+                                <SecondaryButton type="button" className="h-7 px-2 text-[10px]" onClick={event => { event.stopPropagation(); navigate(`/whatsapp?customerId=${order.customerId}&serviceOrderId=${order.id}`); }}>
+                                  WhatsApp
+                                </SecondaryButton>
+                                <SecondaryButton type="button" className="h-7 px-2 text-[10px]" onClick={event => { event.stopPropagation(); navigate(`/finances?serviceOrderId=${order.id}`); }}>
+                                  Cobrança
                                 </SecondaryButton>
                                 <AppRowActionsDropdown
                                   triggerLabel="Mais ações"
@@ -1562,7 +1604,7 @@ export default function ServiceOrdersPage() {
                         <SecondaryButton type="button" className="h-8 px-3 text-xs" onClick={() => void executeOrderStatus("IN_PROGRESS")}>
                           Iniciar atendimento
                         </SecondaryButton>
-                        <SecondaryButton type="button" className="h-8 px-3 text-xs" onClick={() => void executeOrderStatus("CANCELED")}>
+                        <SecondaryButton type="button" className="h-8 px-3 text-xs" onClick={() => void executeOrderStatus("PAUSED")}>
                           Pausar
                         </SecondaryButton>
                         <Button type="button" className="h-8 px-3 text-xs" onClick={() => void executeOrderStatus("DONE")}>
@@ -1621,6 +1663,23 @@ export default function ServiceOrdersPage() {
                         ))}
                       </div>
                     </section>
+
+                    <AppSectionCard className="space-y-1.5 border-t border-[var(--border-subtle)] pt-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                        Registros e evidências
+                      </p>
+                      <p className="text-xs text-[var(--text-muted)]">
+                        Estrutura pronta para anexos/fotos e observações operacionais sem bloquear a execução atual.
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        <SecondaryButton type="button" className="h-7 px-2.5 text-[11px]" onClick={() => setOpenOperationalModal(true)}>
+                          Ver alterações
+                        </SecondaryButton>
+                        <SecondaryButton type="button" className="h-7 px-2.5 text-[11px]" onClick={() => navigate(`/timeline?serviceOrderId=${focusedOrder?.id}`)}>
+                          Abrir timeline completa
+                        </SecondaryButton>
+                      </div>
+                    </AppSectionCard>
 
                     <section className="space-y-1.5 border-t border-[var(--border-subtle)] pt-3">
                       <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
@@ -1751,9 +1810,9 @@ export default function ServiceOrdersPage() {
                     {focusedTimelineQuery.isLoading ? (
                       <p className="mt-2 text-xs text-[var(--text-muted)]">Carregando eventos...</p>
                     ) : (
-                      <ul className="mt-2 space-y-2">
+                      <AppTimeline className="mt-2">
                         {compactTimeline.map(event => (
-                          <li key={event.id} className="rounded-md border border-[var(--border-subtle)]/70 px-2.5 py-2 text-xs">
+                          <AppTimelineItem key={event.id} className="rounded-md border border-[var(--border-subtle)]/70 px-2.5 py-2 text-xs">
                             <p className="font-semibold text-[var(--text-primary)]">
                               {event.label}
                             </p>
@@ -1763,9 +1822,9 @@ export default function ServiceOrdersPage() {
                             <p className="mt-1 text-[11px] text-[var(--text-secondary)]">
                               {event.summary}
                             </p>
-                          </li>
+                          </AppTimelineItem>
                         ))}
-                      </ul>
+                      </AppTimeline>
                     )}
                   </section>
                 }
@@ -2056,7 +2115,10 @@ export default function ServiceOrdersPage() {
           id: String(item.id),
           name: String(item.name ?? "Pessoa"),
         }))}
+        appointmentId={String(focusedOrder?.appointmentId ?? "") || undefined}
+        initialCustomerId={String(focusedOrder?.customerId ?? "") || undefined}
       />
-    </PageWrapper>
+      </PageWrapper>
+    </AppPageShell>
   );
 }

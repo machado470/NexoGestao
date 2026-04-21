@@ -435,23 +435,7 @@ export default function CreateServiceOrderModal({
           </AppField>
 
           <AppFieldGroup>
-            <AppField label="Prioridade">
-              <AppSelect
-                value={formData.priority}
-                onValueChange={(priority) =>
-                  setFormData((state) => ({ ...state, priority }))
-                }
-                options={[
-                  { value: "1", label: "Bem baixa" },
-                  { value: "2", label: "Baixa" },
-                  { value: "3", label: "Normal" },
-                  { value: "4", label: "Alta" },
-                  { value: "5", label: "Urgente hoje" },
-                ]}
-              />
-            </AppField>
-
-            <AppField label="Agendada para">
+            <AppField label="Data prevista (opcional)">
               <AppInput
                 type="datetime-local"
                 value={formData.scheduledFor}
@@ -460,10 +444,12 @@ export default function CreateServiceOrderModal({
                 }
                 disabled={createMutation.isPending}
               />
+              {appointmentId ? (
+                <AppInlineHint>
+                  Sugestão: esta O.S. pode herdar contexto do agendamento #{appointmentId}.
+                </AppInlineHint>
+              ) : null}
             </AppField>
-          </AppFieldGroup>
-
-          <AppFieldGroup>
             <AppField label="Valor (R$)">
               <AppInput
                 inputMode="decimal"
@@ -477,17 +463,6 @@ export default function CreateServiceOrderModal({
               <AppInlineHint>
                 Valor atual: {formatCurrencyFromInput(formData.amount)}
               </AppInlineHint>
-            </AppField>
-
-            <AppField label="Vencimento">
-              <AppInput
-                type="datetime-local"
-                value={formData.dueDate}
-                onChange={(e) =>
-                  setFormData((state) => ({ ...state, dueDate: e.target.value }))
-                }
-                disabled={createMutation.isPending}
-              />
             </AppField>
           </AppFieldGroup>
 
