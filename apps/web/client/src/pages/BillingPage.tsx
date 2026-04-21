@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { CreditCard } from "lucide-react";
+import { CheckCircle2, CreditCard } from "lucide-react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 import { Button } from "@/components/design-system";
@@ -28,15 +28,35 @@ const PLAN_PRICE_ID: Record<PlanName, string | null> = {
   SCALE: "price_scale",
 };
 
-const PRICE_CENTS: Record<PlanName, number> = {
-  FREE: 0,
-  STARTER: 19900,
-  PRO: 49900,
-  SCALE: 99900,
+const PLAN_META: Record<PlanName, { title: string; priceCents: number; description: string; benefits: string[] }> = {
+  FREE: {
+    title: "Essencial",
+    priceCents: 0,
+    description: "Base para iniciar operação auditável sem perder rastreabilidade.",
+    benefits: ["1 usuário", "Clientes e agenda", "Timeline básica", "Suporte padrão"],
+  },
+  STARTER: {
+    title: "Starter",
+    priceCents: 19900,
+    description: "Para times em estruturação com foco em execução previsível.",
+    benefits: ["Até 5 usuários", "Fluxo Cliente → O.S.", "Financeiro operacional", "WhatsApp contextual"],
+  },
+  PRO: {
+    title: "Pro",
+    priceCents: 49900,
+    description: "Escala com governança e leitura por exceção no dia a dia.",
+    benefits: ["Até 20 usuários", "Risco e governança", "Automação de cobrança", "Relatórios executivos", "Suporte prioritário"],
+  },
+  SCALE: {
+    title: "Scale",
+    priceCents: 99900,
+    description: "Operação multi-equipe com controle fino, contexto e performance.",
+    benefits: ["Usuários ilimitados", "SLA avançado", "Integrações ampliadas", "Playbooks operacionais", "Acompanhamento dedicado"],
+  },
 };
 
-function brl(value: number) {
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value / 100);
+function brl(valueCents: number) {
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(valueCents / 100);
 }
 
 function statusText(status: string) {
@@ -45,6 +65,11 @@ function statusText(status: string) {
   if (status === "PAST_DUE") return "Em atraso";
   if (status === "CANCELED") return "Cancelado";
   return status;
+}
+
+function safePlanName(value: unknown): PlanName {
+  const candidate = String(value ?? "FREE").toUpperCase();
+  return ["FREE", "STARTER", "PRO", "SCALE"].includes(candidate) ? (candidate as PlanName) : "FREE";
 }
 
 export default function BillingPage() {
@@ -56,7 +81,7 @@ export default function BillingPage() {
   const utils = trpc.useUtils();
 
   const plans = useMemo(() => normalizeArrayPayload<any>(plansQuery.data), [plansQuery.data]);
-  const currentPlan = String(statusQuery.data?.plan ?? limitsQuery.data?.plan ?? "FREE").toUpperCase() as PlanName;
+  const currentPlan = safePlanName(statusQuery.data?.plan ?? limitsQuery.data?.plan);
   const currentStatus = String(statusQuery.data?.status ?? "ACTIVE").toUpperCase();
   const stripeConfigured = readinessQuery.data?.integrations?.stripe === "configured";
 
@@ -104,65 +129,122 @@ export default function BillingPage() {
   };
 
   return (
-    <PageWrapper title="Billing" subtitle="Assinatura da sua empresa no Nexo: plano, recorrência, cobrança e acesso.">
+    <PageWrapper title="Planos" subtitle="Assinatura da sua empresa no Nexo: plano, recorrência, cobrança e acesso.">
       <AppPageShell>
-      <AppPageHeader title="Billing" description="Assinatura da sua empresa no Nexo: plano, recorrência, cobrança e acesso." />
-      <OperationalTopCard
-        contextLabel="Gestão da assinatura"
-        title="Cobrança da plataforma Nexo"
-        description="Esta área é exclusiva para plano, recorrência e acesso da sua empresa ao Nexo."
-        chips={
-          <>
-            <AppStatusBadge label={`Plano ${currentPlan}`} />
-            <AppStatusBadge label={`Assinatura ${statusText(currentStatus)}`} />
-          </>
-        }
-        primaryAction={
-          <Button onClick={() => upgrade(currentPlan === "STARTER" ? "PRO" : "STARTER")} disabled={checkoutMutation.isPending || !stripeConfigured}>
-            <CreditCard className="mr-1.5 h-4 w-4" /> Trocar plano
-          </Button>
-        }
-      />
+        <AppPageHeader title="Planos" description="Gerencie assinatura, limites e acesso da plataforma sem misturar com o financeiro operacional." />
+        <OperationalTopCard
+          contextLabel="Gestão de assinatura"
+          title="Planos da plataforma Nexo"
+          description="Aqui você decide capacidade, limites e evolução da sua operação no produto."
+          chips={
+            <>
+              <AppStatusBadge label={`Plano ${PLAN_META[currentPlan].title}`} />
+              <AppStatusBadge label={`Assinatura ${statusText(currentStatus)}`} />
+            </>
+          }
+          primaryAction={
+            <Button onClick={() => upgrade(currentPlan === "STARTER" ? "PRO" : "STARTER")} disabled={checkoutMutation.isPending || !stripeConfigured}>
+              <CreditCard className="mr-1.5 h-4 w-4" /> Trocar plano
+            </Button>
+          }
+        />
 
-      <AppToolbar>
-        <div className="flex flex-wrap items-center gap-2">
-          <AppStatusBadge label={`Plano ${currentPlan}`} />
-          <AppStatusBadge label={`Assinatura ${statusText(currentStatus)}`} />
-          <AppStatusBadge label={stripeConfigured ? "Pagamento automático ativo" : "Pagamento automático pendente"} />
-        </div>
-        <Button onClick={() => upgrade(currentPlan === "STARTER" ? "PRO" : "STARTER")} disabled={checkoutMutation.isPending || !stripeConfigured}>
-          <CreditCard className="mr-1.5 h-4 w-4" /> Trocar plano
-        </Button>
-      </AppToolbar>
-
-      {isLoading ? <AppPageLoadingState description="Montando visão de assinatura e recorrência..." /> : null}
-      {hasError ? <AppPageErrorState description="Não foi possível carregar billing neste momento." onAction={refetchAll} /> : null}
-
-      {!isLoading && !hasError ? (
-        <>
-          {plans.length === 0 ? <AppPageEmptyState title="Sem catálogo de planos" description="Nenhum plano disponível para este ambiente. Verifique configuração de billing." /> : null}
-
-          <div className="grid gap-4 xl:grid-cols-2">
-            <AppSectionBlock title="1) Plano atual" subtitle="Quanto está pagando, por que e quais limites principais estão incluídos.">
-              <div className="space-y-2 text-sm text-[var(--text-secondary)]">
-                <p>Plano atual: <strong className="text-[var(--text-primary)]">{currentPlan}</strong></p>
-                <p>Valor base: <strong className="text-[var(--text-primary)]">{brl(PRICE_CENTS[currentPlan])}/mês</strong></p>
-                <p>Benefício-chave: previsibilidade de capacidade e acesso do time.</p>
-              </div>
-              <div className="mt-3"><Button size="sm" variant="outline" onClick={() => upgrade("PRO")}>Trocar plano</Button></div>
-            </AppSectionBlock>
-
-            <AppSectionBlock title="2) Assinatura" subtitle="Estado atual, renovação e consequência de status.">
-              <div className="space-y-2 text-sm text-[var(--text-secondary)]">
-                <p>Status: <AppStatusBadge label={statusText(currentStatus)} /></p>
-                <p>Renovação: <strong className="text-[var(--text-primary)]">{limitsQuery.data?.trial?.endsAt ? new Date(limitsQuery.data.trial.endsAt).toLocaleDateString("pt-BR") : "Ciclo não informado"}</strong></p>
-                <p>Se houver falha de pagamento, o acesso pode entrar em restrição até regularização.</p>
-              </div>
-            </AppSectionBlock>
+        <AppToolbar>
+          <div className="flex flex-wrap items-center gap-2">
+            <AppStatusBadge label={`Plano atual: ${PLAN_META[currentPlan].title}`} />
+            <AppStatusBadge label={`Status: ${statusText(currentStatus)}`} />
+            <AppStatusBadge label={stripeConfigured ? "Pagamento automático ativo" : "Pagamento automático pendente"} />
           </div>
+          <Button variant="outline" onClick={() => navigate("/settings?section=integracoes")}>Gerenciar pagamento</Button>
+        </AppToolbar>
 
-          <div className="grid gap-4 xl:grid-cols-3">
-            <AppSectionBlock title="3) Cobrança recorrente / histórico" subtitle="Faturas por período com status claro." className="xl:col-span-2">
+        {isLoading ? <AppPageLoadingState description="Montando visão de planos, assinatura e recorrência..." /> : null}
+        {hasError ? <AppPageErrorState description="Não foi possível carregar Planos neste momento." onAction={refetchAll} /> : null}
+
+        {!isLoading && !hasError ? (
+          <>
+            {plans.length === 0 ? <AppPageEmptyState title="Sem catálogo de planos" description="Nenhum plano disponível para este ambiente. Verifique a configuração de cobrança." /> : null}
+
+            <div className="grid gap-4 xl:grid-cols-3">
+              <AppSectionBlock title="Plano atual" subtitle="Valor, status e impacto imediato no acesso da operação." className="xl:col-span-2">
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3 text-sm text-[var(--text-secondary)]">
+                    <p>
+                      Plano ativo: <strong className="text-[var(--text-primary)]">{PLAN_META[currentPlan].title}</strong>
+                    </p>
+                    <p className="mt-1">
+                      Valor base: <strong className="text-[var(--text-primary)]">{brl(PLAN_META[currentPlan].priceCents)}/mês</strong>
+                    </p>
+                    <p className="mt-1">Descrição: {PLAN_META[currentPlan].description}</p>
+                  </div>
+                  <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3 text-sm text-[var(--text-secondary)]">
+                    <p>
+                      Status da assinatura: <AppStatusBadge label={statusText(currentStatus)} />
+                    </p>
+                    <p className="mt-1">
+                      Renovação: <strong className="text-[var(--text-primary)]">{limitsQuery.data?.trial?.endsAt ? new Date(limitsQuery.data.trial.endsAt).toLocaleDateString("pt-BR") : "Ciclo não informado"}</strong>
+                    </p>
+                    <p className="mt-1">Impacto: atrasos de pagamento podem restringir acesso operacional.</p>
+                  </div>
+                </div>
+              </AppSectionBlock>
+
+              <AppSectionBlock title="Ações da assinatura" subtitle="Operações críticas para manter acesso e previsibilidade.">
+                <div className="space-y-2">
+                  <Button size="sm" className="w-full" onClick={() => upgrade("PRO")} disabled={!stripeConfigured || checkoutMutation.isPending}>Trocar para Pro</Button>
+                  <Button size="sm" variant="outline" className="w-full" onClick={() => navigate("/settings?section=integracoes")}>Atualizar método de pagamento</Button>
+                  <Button size="sm" variant="outline" className="w-full" onClick={() => navigate("/billing")}>Ver histórico</Button>
+                  <Button size="sm" variant="outline" className="w-full" disabled={cancelMutation.isPending || currentPlan === "FREE"} onClick={() => cancelMutation.mutate()}>
+                    {cancelMutation.isPending ? "Cancelando..." : "Cancelar assinatura"}
+                  </Button>
+                </div>
+              </AppSectionBlock>
+            </div>
+
+            <AppSectionBlock title="Planos disponíveis" subtitle="Comparativo claro para upgrade/downgrade com posicionamento premium.">
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                {(plans.length > 0 ? plans : Object.keys(PLAN_META).map(name => ({ name }))).map((plan: any) => {
+                  const name = safePlanName(plan?.name);
+                  const meta = PLAN_META[name];
+                  const isCurrent = name === currentPlan;
+                  const badge = isCurrent ? "Plano atual" : name === "PRO" ? "Mais escolhido" : name === "SCALE" ? "Recomendado" : "Disponível";
+                  return (
+                    <article key={name} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="text-base font-semibold text-[var(--text-primary)]">{meta.title}</p>
+                          <p className="text-xs text-[var(--text-muted)]">{meta.description}</p>
+                        </div>
+                        <AppStatusBadge label={badge} />
+                      </div>
+                      <p className="mt-3 text-2xl font-semibold text-[var(--text-primary)]">{brl(meta.priceCents)}</p>
+                      <p className="text-xs text-[var(--text-muted)]">por mês</p>
+
+                      <ul className="mt-3 space-y-1.5 text-xs text-[var(--text-secondary)]">
+                        {meta.benefits.slice(0, 6).map(item => (
+                          <li key={item} className="flex items-start gap-1.5">
+                            <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 text-emerald-500" />
+                            <span>{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+
+                      <Button
+                        size="sm"
+                        className="mt-4 w-full"
+                        variant={isCurrent ? "outline" : "default"}
+                        disabled={isCurrent || name === "FREE"}
+                        onClick={() => upgrade(name)}
+                      >
+                        {isCurrent ? "Plano ativo" : "Escolher plano"}
+                      </Button>
+                    </article>
+                  );
+                })}
+              </div>
+            </AppSectionBlock>
+
+            <AppSectionBlock title="Histórico de cobrança da plataforma" subtitle="Faturas e eventos da assinatura com status rastreável.">
               <AppDataTable>
                 <table className="w-full min-w-[720px] text-sm">
                   <thead>
@@ -189,41 +271,8 @@ export default function BillingPage() {
                 </table>
               </AppDataTable>
             </AppSectionBlock>
-
-            <AppSectionBlock title="4) Método de pagamento e ações" subtitle="Tudo que precisa para manter a conta ativa e sem surpresa.">
-              <div className="space-y-2 text-sm text-[var(--text-secondary)]">
-                <p>Método atual: <strong className="text-[var(--text-primary)]">{stripeConfigured ? "Cartão via Stripe" : "Não configurado"}</strong></p>
-                <p>Estado da conta: <AppStatusBadge label={statusText(currentStatus)} /></p>
-              </div>
-              <div className="mt-3 space-y-2">
-                <Button size="sm" className="w-full" onClick={() => upgrade("PRO")} disabled={!stripeConfigured || checkoutMutation.isPending}>Trocar plano</Button>
-                <Button size="sm" variant="outline" className="w-full" onClick={() => navigate("/settings?section=integracoes")}>Atualizar pagamento</Button>
-                <Button size="sm" variant="outline" className="w-full" onClick={() => navigate("/billing")}>Ver histórico</Button>
-                <Button size="sm" variant="outline" className="w-full" disabled={cancelMutation.isPending || currentPlan === "FREE"} onClick={() => cancelMutation.mutate()}>{cancelMutation.isPending ? "Cancelando..." : "Cancelar assinatura"}</Button>
-              </div>
-            </AppSectionBlock>
-          </div>
-
-          <AppSectionBlock title="5) Planos disponíveis" subtitle="Upgrade/downgrade com clareza de valor e impacto.">
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              {plans.map((plan: any) => {
-                const name = String(plan?.name ?? "FREE").toUpperCase() as PlanName;
-                const isCurrent = name === currentPlan;
-                return (
-                  <div key={name} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3">
-                    <p className="text-sm font-semibold text-[var(--text-primary)]">{name}</p>
-                    <p className="text-xs text-[var(--text-secondary)]">{brl(PRICE_CENTS[name])}/mês</p>
-                    <p className="mt-2"><AppStatusBadge label={isCurrent ? "Plano atual" : "Disponível"} /></p>
-                    <div className="mt-2">
-                      <Button size="sm" variant="outline" disabled={isCurrent || name === "FREE"} onClick={() => upgrade(name)}>Escolher</Button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </AppSectionBlock>
-        </>
-      ) : null}
+          </>
+        ) : null}
       </AppPageShell>
     </PageWrapper>
   );

@@ -31,6 +31,7 @@ import {
   AppTrendIndicator,
 } from "@/components/app";
 import { NexoStatusBadge } from "@/components/design-system";
+import { normalizePriorityLabel } from "@/lib/operations";
 
 export function AppPageHeader({
   title,
@@ -798,21 +799,7 @@ export function AppStatusBadge({ label }: { label: string }) {
 }
 
 export function AppPriorityBadge({ label }: { label: string }) {
-  const normalized = String(label ?? "").trim().toLowerCase();
-  const mapped =
-    normalized === "critical" || normalized === "urgent" || normalized === "p0"
-      ? "Urgente"
-      : normalized === "high" || normalized === "alta" || normalized === "p1"
-        ? "Alta"
-        : normalized === "medium" ||
-            normalized === "média" ||
-            normalized === "p2"
-          ? "Médio"
-          : normalized === "low" || normalized === "baixa" || normalized === "p3"
-            ? "Baixo"
-            : label;
-
-  return <AppStatusBadge label={mapped} />;
+  return <AppStatusBadge label={normalizePriorityLabel(label)} />;
 }
 
 type AppNextActionSeverity = "low" | "medium" | "high" | "critical";

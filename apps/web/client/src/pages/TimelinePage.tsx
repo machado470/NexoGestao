@@ -52,7 +52,7 @@ type ModuleFilter =
 type SeverityFilter = "all" | "critical" | "high" | "medium" | "low";
 type ModeFilter = "global" | "customer" | "entity" | "module";
 
-const PAGE_SIZE = 30;
+const PAGE_SIZE = 12;
 
 const MODULE_OPTIONS: Array<{ value: ModuleFilter; label: string }> = [
   { value: "all", label: "Todos os módulos" },

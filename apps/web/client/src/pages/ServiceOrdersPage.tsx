@@ -1382,15 +1382,6 @@ export default function ServiceOrdersPage() {
                             </td>
                             <td className="px-4 py-3.5 align-top">
                               <div className="flex flex-wrap items-center justify-end gap-1.5">
-                                <SecondaryButton type="button" className="h-7 px-2 text-[10px]" onClick={event => { event.stopPropagation(); setFocusedOrderId(String(order?.id ?? "")); void executeOrderStatus("IN_PROGRESS"); }}>
-                                  Iniciar
-                                </SecondaryButton>
-                                <SecondaryButton type="button" className="h-7 px-2 text-[10px]" onClick={event => { event.stopPropagation(); setFocusedOrderId(String(order?.id ?? "")); void executeOrderStatus("PAUSED"); }}>
-                                  Pausar
-                                </SecondaryButton>
-                                <SecondaryButton type="button" className="h-7 px-2 text-[10px]" onClick={event => { event.stopPropagation(); setFocusedOrderId(String(order?.id ?? "")); void executeOrderStatus("DONE"); }}>
-                                  Concluir
-                                </SecondaryButton>
                                 <SecondaryButton
                                   type="button"
                                   className={`${OPERATIONAL_PRIMARY_CTA_CLASS} h-7 px-2 text-[10px] tracking-[0.01em]`}
@@ -1400,12 +1391,6 @@ export default function ServiceOrdersPage() {
                                   }}
                                 >
                                   {resolveOperationalActionLabel(nextAction, primaryActionLabel)}
-                                </SecondaryButton>
-                                <SecondaryButton type="button" className="h-7 px-2 text-[10px]" onClick={event => { event.stopPropagation(); navigate(`/whatsapp?customerId=${order.customerId}&serviceOrderId=${order.id}`); }}>
-                                  WhatsApp
-                                </SecondaryButton>
-                                <SecondaryButton type="button" className="h-7 px-2 text-[10px]" onClick={event => { event.stopPropagation(); navigate(`/finances?serviceOrderId=${order.id}`); }}>
-                                  Cobrança
                                 </SecondaryButton>
                                 <AppRowActionsDropdown
                                   triggerLabel="Mais ações"
@@ -1423,6 +1408,13 @@ export default function ServiceOrdersPage() {
                                       onSelect: () => {
                                         setFocusedOrderId(String(order?.id ?? ""));
                                         void executeOrderStatus("DONE");
+                                      },
+                                    },
+                                    {
+                                      label: "Pausar",
+                                      onSelect: () => {
+                                        setFocusedOrderId(String(order?.id ?? ""));
+                                        void executeOrderStatus("PAUSED");
                                       },
                                     },
                                     {

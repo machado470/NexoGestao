@@ -403,7 +403,7 @@ export function AppTimelineItem({ className, ...props }: ComponentProps<"li">) {
 
 export const AppActivityFeed = AppTimeline;
 
-type AppOperationalState = "NORMAL" | "WARNING" | "RESTRICTED" | "SUSPENDED";
+type AppOperationalState = "NORMAL" | "ATENÇÃO" | "CRÍTICO" | "WARNING" | "RESTRICTED" | "SUSPENDED";
 
 const operationalStateTone: Record<
   AppOperationalState,
@@ -413,6 +413,8 @@ const operationalStateTone: Record<
   }
 > = {
   NORMAL: { badgeTone: "success", borderClass: "border-[var(--success)]/30" },
+  ATENÇÃO: { badgeTone: "warning", borderClass: "border-[var(--warning)]/30" },
+  CRÍTICO: { badgeTone: "danger", borderClass: "border-[var(--danger)]/35" },
   WARNING: { badgeTone: "warning", borderClass: "border-[var(--warning)]/30" },
   RESTRICTED: { badgeTone: "accent", borderClass: "border-[var(--accent)]/35" },
   SUSPENDED: { badgeTone: "danger", borderClass: "border-[var(--danger)]/35" },
