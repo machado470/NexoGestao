@@ -298,7 +298,7 @@ export default function TimelinePage() {
             ]}
           />
         ) : (
-          <div className="max-h-[620px] space-y-3 overflow-y-auto pr-1">
+          <div className="space-y-3">
             <AppSectionBlock title="Eventos acionáveis" subtitle="Sem espaço vazio: tudo aqui tem próximo passo operacional.">
               <AppListBlock
                 className="col-span-full"
@@ -322,10 +322,16 @@ export default function TimelinePage() {
                       <p className="text-sm font-medium text-[var(--text-primary)]">
                         {toLabel(event?.title ?? event?.action ?? event?.type, "Evento operacional")}
                       </p>
-                      <p className="mt-1 text-xs text-[var(--text-muted)]">
-                        {toLabel(event?.entityType, "Entidade")} #{toLabel(event?.entityId, "—")} · {toLabel(event?.actorName, "Sistema")} · {event?.createdAt ? new Date(String(event.createdAt)).toLocaleString("pt-BR") : "sem data"}
+                      <div className="mt-1 grid gap-1 text-xs text-[var(--text-muted)] md:grid-cols-2">
+                        <p>Tipo: {toLabel(event?.type ?? event?.action, "Evento")}</p>
+                        <p>Entidade: {toLabel(event?.entityType, "Entidade")} #{toLabel(event?.entityId, "—")}</p>
+                        <p>Data: {event?.createdAt ? new Date(String(event.createdAt)).toLocaleString("pt-BR") : "sem data"}</p>
+                        <p>Ator: {toLabel(event?.actorName, "Sistema")}</p>
+                      </div>
+                      <p className="mt-2 text-xs text-[var(--text-secondary)]">
+                        {toLabel(event?.description ?? event?.title ?? event?.action, "Sem resumo adicional.")}
                       </p>
-                      <div className="mt-2">
+                      <div className="mt-2.5">
                         <AppStatusBadge label={String(event?.status ?? event?.executionMode ?? "manual").toLowerCase().includes("fail")
                           ? "Falha"
                           : String(event?.status ?? event?.executionMode ?? "").toLowerCase().includes("block")

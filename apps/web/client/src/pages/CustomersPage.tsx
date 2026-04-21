@@ -916,6 +916,20 @@ export default function CustomersPage() {
                               <p className="truncate text-xs text-[var(--text-secondary)]">
                                 {String(customer?.phone || customer?.email || "—")}
                               </p>
+                              <div className="mt-1.5 flex flex-wrap gap-1">
+                                {snapshot.overdueCharges > 0 ? (
+                                  <span className="rounded-full bg-rose-500/10 px-2 py-0.5 text-[10px] font-semibold text-rose-500">
+                                    Cobrança vencida
+                                  </span>
+                                ) : snapshot.pendingCharges > 0 ? (
+                                  <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-500">
+                                    Cobrança pendente
+                                  </span>
+                                ) : null}
+                                <span className="rounded-full bg-[var(--surface-subtle)] px-2 py-0.5 text-[10px] text-[var(--text-muted)]">
+                                  Última interação: {snapshot.lastInteractionDays}d
+                                </span>
+                              </div>
                             </td>
                             <td className="px-4 py-3.5 align-top">
                               <AppStatusBadge
@@ -955,10 +969,6 @@ export default function CustomersPage() {
                                   triggerLabel="Mais ações"
                                   contentClassName="min-w-[248px]"
                                   items={[
-                                    {
-                                      label: `${snapshot.primaryActionLabel} · prioritário`,
-                                      onSelect: primaryAction.onSelect,
-                                    },
                                     {
                                       label: "Abrir detalhe operacional",
                                       onSelect: () => {

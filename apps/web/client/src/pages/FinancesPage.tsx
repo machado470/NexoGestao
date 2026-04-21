@@ -829,17 +829,17 @@ export default function FinancesPage() {
                     : modeContext.onCta
                 }
               />
-              <ActionFeedbackButton
-                state="idle"
-                idleLabel={
-                  mode === "reports" ? "Nova cobrança" : "Nova despesa"
-                }
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() =>
                   mode === "reports"
                     ? setOpenCreate(true)
                     : setOpenCreateExpense(true)
                 }
-              />
+              >
+                {mode === "reports" ? "Nova cobrança" : "Nova despesa"}
+              </Button>
             </div>
           }
         />
