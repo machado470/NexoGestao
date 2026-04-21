@@ -321,6 +321,7 @@ export function MainLayout({ children }: MainLayoutProps) {
   const desktopSidebarWidth = sidebarCollapsed
     ? SIDEBAR_COLLAPSED_WIDTH
     : SIDEBAR_EXPANDED_WIDTH;
+  const isDesktopCollapsedSidebar = sidebarCollapsed && !isMobile;
 
   useEffect(() => {
     if (!isMobile) return;
@@ -377,14 +378,26 @@ export function MainLayout({ children }: MainLayoutProps) {
             }`}
             style={!isMobile ? { width: `${desktopSidebarWidth}px` } : undefined}
           >
-            <div className="nexo-sidebar-header border-b border-[var(--border)] px-3.5 py-2">
-              <div className="flex items-center justify-between gap-2">
+            <div
+              className={`nexo-sidebar-header border-b border-[var(--border)] py-2 ${
+                isDesktopCollapsedSidebar ? "px-2" : "px-3.5"
+              }`}
+            >
+              <div
+                className={`flex items-center gap-2 ${
+                  isDesktopCollapsedSidebar
+                    ? "relative min-h-10 justify-start pl-1 pr-11"
+                    : "justify-between"
+                }`}
+              >
                 <button
                   type="button"
                   onClick={() => handleNavigate("/executive-dashboard")}
-                  className={`flex min-w-0 items-center ${sidebarCollapsed && !isMobile ? "justify-center" : ""}`}
+                  className={`flex min-w-0 items-center ${
+                    isDesktopCollapsedSidebar ? "justify-start" : ""
+                  }`}
                 >
-                  <BrandSignature compact={sidebarCollapsed && !isMobile} />
+                  <BrandSignature compact={isDesktopCollapsedSidebar} />
                 </button>
 
                 {!isMobile ? (
@@ -393,7 +406,11 @@ export function MainLayout({ children }: MainLayoutProps) {
                     onClick={() => setSidebarCollapsed(prev => !prev)}
                     aria-label={sidebarCollapsed ? "Expandir menu lateral" : "Recolher menu lateral"}
                     title={sidebarCollapsed ? "Expandir menu lateral" : "Recolher menu lateral"}
-                    className="rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-muted)] transition hover:bg-[var(--accent-soft)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/35"
+                    className={`rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-muted)] transition hover:bg-[var(--accent-soft)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/35 ${
+                      isDesktopCollapsedSidebar
+                        ? "absolute right-1.5 top-1/2 -translate-y-1/2"
+                        : ""
+                    }`}
                   >
                     {sidebarCollapsed ? (
                       <ChevronRight className="h-4 w-4" />
