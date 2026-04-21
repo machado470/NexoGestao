@@ -19,6 +19,12 @@ import { Button, SecondaryButton } from "@/components/design-system";
 import { ActionBarWrapper, PageWrapper } from "@/components/operating-system/Wrappers";
 import { WorkspaceScaffold } from "@/components/operating-system/WorkspaceScaffold";
 import {
+  AppSectionCard,
+  AppTimeline,
+  AppTimelineItem,
+  AppToolbar,
+} from "@/components/app-system";
+import {
   EmptyActionState,
   OperationalAutomationNote,
   OperationalFlowState,
@@ -34,9 +40,9 @@ import {
   AppPageErrorState,
   AppPageHeader,
   AppPageLoadingState,
-  AppPriorityBadge,
   AppSectionBlock,
   AppStatusBadge,
+  AppPriorityBadge,
   appSelectionPillClasses,
 } from "@/components/internal-page-system";
 
@@ -725,15 +731,15 @@ export default function CustomersPage() {
 
   return (
     <PageWrapper
-      title="Centro operacional de clientes"
-      subtitle="Relacione cliente, agenda, O.S. e cobrança em uma única decisão operacional."
+      title="Clientes"
+      subtitle="Centro operacional, financeiro e comunicação por cliente."
     >
       <div className="space-y-4">
         <AppPageHeader
-          title={activeMeta.title}
+          title="Clientes"
           description={
             <span>
-              {activeMeta.description}
+              Memória viva da operação para decidir e agir sem trocar de tela.
               <span className="ml-2 inline-flex">
                 <AppStatusBadge
                   label={`${customers.length} clientes · ${overdueCustomers} em risco · ${withoutFutureSchedule} sem agenda`}
@@ -744,38 +750,48 @@ export default function CustomersPage() {
           cta={
             <Button
               type="button"
-              onClick={activeMeta.onCta}
+              onClick={() => setCreateOpen(true)}
               className="h-10 whitespace-nowrap px-4"
             >
-              {activeMeta.ctaLabel}
+              Novo cliente
             </Button>
+          }
+          secondaryActions={
+            <p className="max-w-2xl text-xs text-[var(--text-muted)]">
+              {activeMeta.description}
+            </p>
           }
         />
         <ActionBarWrapper
           secondaryActions={
-            <div className="flex flex-wrap items-center gap-2">
-              <SecondaryButton
-                type="button"
-                className="h-8 px-3 text-xs"
-                onClick={() => navigate("/service-orders")}
-              >
-                Nova O.S.
-              </SecondaryButton>
-              <SecondaryButton
-                type="button"
-                className="h-8 px-3 text-xs"
-                onClick={() => navigate("/appointments")}
-              >
-                Novo agendamento
-              </SecondaryButton>
-              <SecondaryButton
-                type="button"
-                className="h-8 px-3 text-xs"
-                onClick={() => navigate("/finances?filter=overdue")}
-              >
-                Cobranças críticas
-              </SecondaryButton>
-            </div>
+            <AppToolbar className="w-full border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2">
+              <p className="text-xs font-medium text-[var(--text-secondary)]">
+                Centro operacional, financeiro e comunicação por cliente.
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <SecondaryButton
+                  type="button"
+                  className="h-8 px-3 text-xs"
+                  onClick={() => navigate("/service-orders")}
+                >
+                  Nova O.S.
+                </SecondaryButton>
+                <SecondaryButton
+                  type="button"
+                  className="h-8 px-3 text-xs"
+                  onClick={() => navigate("/appointments")}
+                >
+                  Novo agendamento
+                </SecondaryButton>
+                <SecondaryButton
+                  type="button"
+                  className="h-8 px-3 text-xs"
+                  onClick={() => navigate("/finances?filter=overdue")}
+                >
+                  Cobranças críticas
+                </SecondaryButton>
+              </div>
+            </AppToolbar>
           }
         />
 
@@ -952,7 +968,8 @@ export default function CustomersPage() {
           }}
         />
 
-        <div className="space-y-4">
+        <div className="grid gap-4 2xl:grid-cols-[1.2fr_0.8fr]">
+          <div className="space-y-4">
           <AppSectionBlock
             title={
               activeTab === "history"
@@ -1267,25 +1284,11 @@ export default function CustomersPage() {
               </AppDataTable>
             )}
           </AppSectionBlock>
-        </div>
-
-        <CreateCustomerModal
-          open={createOpen}
-          onOpenChange={setCreateOpen}
-          onCreated={async created => {
-            setCreateOpen(false);
-            await customersQuery.refetch();
-            if (created?.id) {
-              setTimelineExpanded(false);
-              setActionFeedback(null);
-              setActionFeedbackTone("neutral");
-              setActiveCustomerId(created.id);
-            }
-          }}
-        />
+          </div>
+          <div className="space-y-4 2xl:sticky 2xl:top-4 2xl:self-start">
         <AppSectionBlock
-          title="Workspace operacional do cliente"
-          subtitle="Contexto vivo para decidir e agir sem sair da lista."
+          title="Detalhe operacional do cliente"
+          subtitle="Estrutura pronta para evoluir para side panel/workspace sem reescrever a página."
         >
           {!activeCustomerId || !activeCustomer ? (
             <AppPageEmptyState
@@ -1308,7 +1311,7 @@ export default function CustomersPage() {
               }}
               context={
                 <div className="space-y-4">
-                  <section className="rounded-xl border border-[var(--border-subtle)]/80 bg-[var(--surface-subtle)]/35 p-3.5">
+                  <AppSectionCard className="rounded-xl border-[var(--border-subtle)]/80 bg-[var(--surface-subtle)]/35 p-3.5">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <h4 className="text-sm font-semibold text-[var(--text-primary)]">
                         {String(activeCustomer?.name ?? "Cliente")}
@@ -1334,7 +1337,7 @@ export default function CustomersPage() {
                       {String(workspaceCustomer?.phone ?? "Sem telefone")} ·{" "}
                       {String(workspaceCustomer?.email ?? "Sem e-mail")}
                     </p>
-                  </section>
+                  </AppSectionCard>
                   {selectedSnapshot ? (
                     <OperationalNextAction
                       title={selectedSnapshot.primaryActionLabel}
@@ -1421,14 +1424,21 @@ export default function CustomersPage() {
                   <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
                     Timeline do cliente
                   </p>
-                  <ul className="mt-2 space-y-2 text-xs text-[var(--text-secondary)]">
+                  <AppTimeline className="mt-2 text-xs text-[var(--text-secondary)]">
                     {visibleTimeline.length === 0 ? (
-                      <li>Sem eventos recentes.</li>
+                      <AppTimelineItem>Sem eventos recentes.</AppTimelineItem>
                     ) : (
                       visibleTimeline.map((event, index) => (
-                        <li
+                        <AppTimelineItem
                           key={`${String(event?.id ?? "event")}-${index}`}
-                          className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)]/45 p-2"
+                          className="cursor-pointer border border-[var(--border-subtle)]/85 bg-[var(--surface-subtle)]/45 transition-colors hover:border-[var(--border-emphasis)]"
+                          onClick={() =>
+                            navigate(
+                              `/timeline?customerId=${activeCustomerId}&type=${String(
+                                event?.type ?? event?.entityType ?? "evento"
+                              )}`
+                            )
+                          }
                         >
                           <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
                             {String(event?.type ?? event?.entityType ?? "evento")}
@@ -1441,10 +1451,10 @@ export default function CustomersPage() {
                               ? new Date(String(event?.occurredAt ?? event?.createdAt)).toLocaleString("pt-BR")
                               : "Data não informada"}
                           </p>
-                        </li>
+                        </AppTimelineItem>
                       ))
                     )}
-                  </ul>
+                  </AppTimeline>
                   {sortedTimeline.length > 4 ? (
                     <button
                       type="button"
@@ -1652,6 +1662,22 @@ export default function CustomersPage() {
             </WorkspaceScaffold>
           )}
         </AppSectionBlock>
+          </div>
+        </div>
+        <CreateCustomerModal
+          open={createOpen}
+          onOpenChange={setCreateOpen}
+          onCreated={async created => {
+            setCreateOpen(false);
+            await customersQuery.refetch();
+            if (created?.id) {
+              setTimelineExpanded(false);
+              setActionFeedback(null);
+              setActionFeedbackTone("neutral");
+              setActiveCustomerId(created.id);
+            }
+          }}
+        />
         <CreateAppointmentModal
           isOpen={openAppointmentCreate}
           onClose={() => setOpenAppointmentCreate(false)}
