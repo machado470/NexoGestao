@@ -1,23 +1,25 @@
 import { useMemo } from "react";
-import { AlertTriangle, CreditCard, Loader2 } from "lucide-react";
+import { CreditCard } from "lucide-react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
-import { trpc } from "@/lib/trpc";
-import { useProductAnalytics } from "@/hooks/useProductAnalytics";
-import { EmptyState } from "@/components/EmptyState";
 import { Button } from "@/components/design-system";
-import { getQueryUiState, normalizeArrayPayload } from "@/lib/query-helpers";
+import { AppToolbar } from "@/components/app-system";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import {
   AppDataTable,
-  AppKpiRow,
-  AppListBlock,
+  AppPageEmptyState,
+  AppPageErrorState,
+  AppPageHeader,
+  AppPageLoadingState,
+  AppPageShell,
   AppSectionBlock,
   AppStatusBadge,
 } from "@/components/internal-page-system";
+import { trpc } from "@/lib/trpc";
+import { normalizeArrayPayload } from "@/lib/query-helpers";
 
-type PlanName = "STARTER" | "PRO" | "SCALE" | "FREE";
+type PlanName = "FREE" | "STARTER" | "PRO" | "SCALE";
 
 const PLAN_PRICE_ID: Record<PlanName, string | null> = {
   FREE: null,
@@ -26,153 +28,75 @@ const PLAN_PRICE_ID: Record<PlanName, string | null> = {
   SCALE: "price_scale",
 };
 
-const PLAN_BASE_PRICE_CENTS: Record<PlanName, number> = {
+const PRICE_CENTS: Record<PlanName, number> = {
   FREE: 0,
   STARTER: 19900,
   PRO: 49900,
   SCALE: 99900,
 };
 
-const PLAN_GAIN: Record<PlanName, string> = {
-  FREE: "Para começar a testar o fluxo.",
-  STARTER: "Estrutura inicial para operar sem perder cobranças.",
-  PRO: "Escala comercial com mais capacidade e previsibilidade.",
-  SCALE: "Máxima escala para operação com múltiplos times.",
-};
+function brl(value: number) {
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value / 100);
+}
 
-function formatCurrency(cents: number) {
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  }).format((cents ?? 0) / 100);
+function statusText(status: string) {
+  if (status === "ACTIVE") return "Ativo";
+  if (status === "TRIALING") return "Trial";
+  if (status === "PAST_DUE") return "Em atraso";
+  if (status === "CANCELED") return "Cancelado";
+  return status;
 }
 
 export default function BillingPage() {
   const [, navigate] = useLocation();
-  const { track } = useProductAnalytics();
-  const plansQuery = trpc.billing.plans.useQuery(undefined, {
-    retry: 1,
-    staleTime: 60_000,
-    refetchOnWindowFocus: false,
-  });
-  const statusQuery = trpc.billing.status.useQuery(undefined, {
-    retry: 1,
-    staleTime: 45_000,
-    refetchOnWindowFocus: false,
-  });
-  const limitsQuery = trpc.billing.limits.useQuery(undefined, {
-    retry: 1,
-    staleTime: 45_000,
-    refetchOnWindowFocus: false,
-  });
-  const readinessQuery = trpc.integrations.readiness.useQuery(undefined, {
-    retry: 1,
-    staleTime: 45_000,
-    refetchOnWindowFocus: false,
-  });
+  const plansQuery = trpc.billing.plans.useQuery(undefined, { retry: false });
+  const statusQuery = trpc.billing.status.useQuery(undefined, { retry: false });
+  const limitsQuery = trpc.billing.limits.useQuery(undefined, { retry: false });
+  const readinessQuery = trpc.integrations.readiness.useQuery(undefined, { retry: false });
   const utils = trpc.useUtils();
 
+  const plans = useMemo(() => normalizeArrayPayload<any>(plansQuery.data), [plansQuery.data]);
+  const currentPlan = String(statusQuery.data?.plan ?? limitsQuery.data?.plan ?? "FREE").toUpperCase() as PlanName;
+  const currentStatus = String(statusQuery.data?.status ?? "ACTIVE").toUpperCase();
+  const stripeConfigured = readinessQuery.data?.integrations?.stripe === "configured";
+
   const checkoutMutation = trpc.billing.checkout.useMutation({
-    onSuccess: (payload) => {
+    onSuccess: payload => {
       const checkoutUrl = payload?.url ?? payload?.checkoutUrl;
-      track("checkout_completed", {
-        screen: "billing",
-        hasRedirect: Boolean(checkoutUrl),
-      });
       if (checkoutUrl) {
         window.location.assign(checkoutUrl);
         return;
       }
-      toast.success("Plano atualizado com sucesso.");
-      void Promise.all([
-        utils.billing.status.invalidate(),
-        utils.billing.limits.invalidate(),
-      ]);
+      toast.success("Plano atualizado.");
+      void Promise.all([utils.billing.status.invalidate(), utils.billing.limits.invalidate()]);
     },
-    onError: (error) => {
-      const message = (error.message || "").toLowerCase();
-      if (
-        message.includes("integração stripe não configurada") ||
-        message.includes("integration_not_configured")
-      ) {
-        toast.error(
-          "Checkout indisponível: integração Stripe ainda não foi configurada neste ambiente."
-        );
-        return;
-      }
-      toast.error(error.message || "Falha ao iniciar checkout.");
-    },
+    onError: error => toast.error(error.message || "Falha ao iniciar checkout."),
   });
 
   const cancelMutation = trpc.billing.cancel.useMutation({
     onSuccess: async () => {
-      toast.success("Assinatura cancelada. Acesso permanece até o fim do ciclo.");
-      await Promise.all([
-        utils.billing.status.invalidate(),
-        utils.billing.limits.invalidate(),
-      ]);
+      toast.success("Assinatura cancelada para o próximo ciclo.");
+      await Promise.all([utils.billing.status.invalidate(), utils.billing.limits.invalidate()]);
     },
-    onError: (error) => {
-      toast.error(error.message || "Não foi possível cancelar agora.");
-    },
+    onError: error => toast.error(error.message || "Não foi possível cancelar."),
   });
 
-  const status = statusQuery.data;
-  const limits = limitsQuery.data;
-  const plans = useMemo(
-    () => normalizeArrayPayload<any>(plansQuery.data),
-    [plansQuery.data]
-  );
+  const invoices = Array.isArray(statusQuery.data?.events) ? statusQuery.data?.events : [];
+  const isLoading = [plansQuery, statusQuery, limitsQuery, readinessQuery].some(query => query.isLoading);
+  const hasError = [plansQuery, statusQuery, limitsQuery, readinessQuery].some(query => query.isError);
 
-  const hasAnyData = plans.length > 0 || Boolean(status) || Boolean(limits);
-  const queryState = getQueryUiState(
-    [plansQuery, statusQuery, limitsQuery],
-    hasAnyData
-  );
+  const refetchAll = () => {
+    void Promise.all([plansQuery.refetch(), statusQuery.refetch(), limitsQuery.refetch(), readinessQuery.refetch()]);
+  };
 
-  const usageItems = [
-    { label: "Clientes", usage: limits?.usage?.customers },
-    { label: "Agendamentos", usage: limits?.usage?.appointments },
-    { label: "Mensagens", usage: limits?.usage?.messages },
-    { label: "Ordens de serviço", usage: limits?.usage?.serviceOrders },
-    { label: "Usuários", usage: limits?.usage?.users },
-  ];
-
-  const currentPlan = String(status?.plan ?? limits?.plan ?? "FREE").toUpperCase();
-  const subscriptionStatus = String(status?.status ?? "ACTIVE").toUpperCase();
-  const subscriptionStatusLabel =
-    subscriptionStatus === "ACTIVE"
-      ? "Ativo"
-      : subscriptionStatus === "TRIALING"
-        ? "Trial"
-        : subscriptionStatus === "PAST_DUE"
-          ? "Em atraso"
-          : subscriptionStatus === "CANCELED"
-            ? "Cancelado"
-            : subscriptionStatus;
-  const stripeConfigured = readinessQuery.data?.integrations?.stripe === "configured";
-  const isTrial = Boolean(limits?.trial?.isTrial);
-  const blockedItems = usageItems.filter((item) => {
-    const used = Number(item.usage?.used ?? 0);
-    const limit = Number(item.usage?.limit ?? 0);
-    if (item.usage?.unlimited) return false;
-    if (!Number.isFinite(used) || !Number.isFinite(limit) || limit <= 0) return false;
-    return used >= limit;
-  });
-
-  const handleUpgrade = async (planName: PlanName) => {
-    const priceId = PLAN_PRICE_ID[planName];
-    if (!priceId) return;
+  const upgrade = (plan: PlanName) => {
     if (!stripeConfigured) {
-      toast.error("Stripe indisponível neste ambiente. Use cobrança manual em Finanças.");
+      toast.error("Checkout indisponível sem Stripe configurado.");
       return;
     }
-    track("checkout_started", {
-      screen: "billing",
-      entryPoint: "plan_card",
-      targetPlan: planName,
-    });
-    await checkoutMutation.mutateAsync({
+    const priceId = PLAN_PRICE_ID[plan];
+    if (!priceId) return;
+    checkoutMutation.mutate({
       priceId,
       successUrl: `${window.location.origin}/billing`,
       cancelUrl: `${window.location.origin}/billing`,
@@ -180,255 +104,127 @@ export default function BillingPage() {
   };
 
   return (
-    <PageWrapper
-      title="Planos"
-      subtitle="Como sua empresa paga para usar o Nexo, com visão simples e previsível."
-    >
+    <PageWrapper title="Billing" subtitle="Assinatura da sua empresa no Nexo: plano, recorrência, cobrança e acesso.">
+      <AppPageShell>
+      <AppPageHeader title="Billing" description="Assinatura da sua empresa no Nexo: plano, recorrência, cobrança e acesso." />
       <OperationalTopCard
-        contextLabel="Direção de assinatura"
-        title="Planos e cobrança do Nexo"
-        description="Esta área controla a assinatura da sua empresa no Nexo (não confundir com o Financeiro dos seus clientes)."
-        chips={(
+        contextLabel="Gestão da assinatura"
+        title="Cobrança da plataforma Nexo"
+        description="Esta área é exclusiva para plano, recorrência e acesso da sua empresa ao Nexo."
+        chips={
           <>
             <AppStatusBadge label={`Plano ${currentPlan}`} />
-            <AppStatusBadge label={`Assinatura ${subscriptionStatusLabel}`} />
-            <AppStatusBadge label={`Integrações prontas ${stripeConfigured ? "1/1" : "0/1"}`} />
+            <AppStatusBadge label={`Assinatura ${statusText(currentStatus)}`} />
           </>
-        )}
+        }
         primaryAction={
-          <Button
-            type="button"
-            disabled={checkoutMutation.isPending || !stripeConfigured}
-            onClick={() => void handleUpgrade(blockedItems.length > 0 ? "PRO" : "STARTER")}
-          >
-            {checkoutMutation.isPending ? "Processando..." : "Alterar plano"}
+          <Button onClick={() => upgrade(currentPlan === "STARTER" ? "PRO" : "STARTER")} disabled={checkoutMutation.isPending || !stripeConfigured}>
+            <CreditCard className="mr-1.5 h-4 w-4" /> Trocar plano
           </Button>
         }
       />
 
-      <AppKpiRow
-        items={[
-          { title: "Plano atual", value: currentPlan, hint: "uso do Nexo" },
-          {
-            title: "Valor",
-            value: `${formatCurrency(PLAN_BASE_PRICE_CENTS[currentPlan as PlanName] ?? 0)}/mês`,
-            hint: "referência do plano",
-          },
-          { title: "Status", value: subscriptionStatusLabel, hint: "estado da assinatura" },
-          {
-            title: "Próxima cobrança",
-            value: limits?.trial?.endsAt
-              ? new Date(limits.trial.endsAt).toLocaleDateString("pt-BR")
-              : "Não informada",
-            hint: "próximo marco de assinatura",
-          },
-        ]}
-        gridClassName="grid-cols-1 md:grid-cols-2 xl:grid-cols-4"
-      />
+      <AppToolbar>
+        <div className="flex flex-wrap items-center gap-2">
+          <AppStatusBadge label={`Plano ${currentPlan}`} />
+          <AppStatusBadge label={`Assinatura ${statusText(currentStatus)}`} />
+          <AppStatusBadge label={stripeConfigured ? "Pagamento automático ativo" : "Pagamento automático pendente"} />
+        </div>
+        <Button onClick={() => upgrade(currentPlan === "STARTER" ? "PRO" : "STARTER")} disabled={checkoutMutation.isPending || !stripeConfigured}>
+          <CreditCard className="mr-1.5 h-4 w-4" /> Trocar plano
+        </Button>
+      </AppToolbar>
 
-      {!stripeConfigured ? (
-        <AppSectionBlock title="Atenção" subtitle="Checkout online indisponível no ambiente" compact>
-          <p className="text-sm text-[var(--text-secondary)]">
-            Stripe não configurado. Alternativa segura: registrar cobranças e pagamentos no Financeiro.
-          </p>
-        </AppSectionBlock>
-      ) : null}
+      {isLoading ? <AppPageLoadingState description="Montando visão de assinatura e recorrência..." /> : null}
+      {hasError ? <AppPageErrorState description="Não foi possível carregar billing neste momento." onAction={refetchAll} /> : null}
 
-      <div className="grid gap-4 xl:grid-cols-3">
-        <AppSectionBlock title="Plano atual e limites" subtitle="Capacidade operacional disponível" className="xl:col-span-2">
-          <AppDataTable>
-            <table className="w-full min-w-[680px] text-sm">
-              <thead>
-                <tr className="border-b border-[var(--border-subtle)] text-left text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">
-                  <th className="px-3 py-2">Recurso</th>
-                  <th className="px-3 py-2">Uso</th>
-                  <th className="px-3 py-2">Limite</th>
-                  <th className="px-3 py-2">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {usageItems.map((item) => {
-                  const used = Number(item.usage?.used ?? 0);
-                  const limit = Number(item.usage?.limit ?? 0);
-                  const unlimited = Boolean(item.usage?.unlimited);
-                  const atLimit = !unlimited && Number.isFinite(limit) && limit > 0 && used >= limit;
-                  return (
-                    <tr key={item.label} className="border-b border-[var(--border-subtle)]/60">
-                      <td className="px-3 py-2 text-[var(--text-primary)]">{item.label}</td>
-                      <td className="px-3 py-2">{item.usage?.used ?? "—"}</td>
-                      <td className="px-3 py-2">{unlimited ? "∞" : item.usage?.limit ?? "—"}</td>
-                      <td className="px-3 py-2"><AppStatusBadge label={atLimit ? "No limite" : "Disponível"} /></td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </AppDataTable>
-        </AppSectionBlock>
+      {!isLoading && !hasError ? (
+        <>
+          {plans.length === 0 ? <AppPageEmptyState title="Sem catálogo de planos" description="Nenhum plano disponível para este ambiente. Verifique configuração de billing." /> : null}
 
-        <AppSectionBlock title="Forma de pagamento e ações" subtitle="Gestão direta da assinatura" compact>
-          <AppListBlock
-            compact
-            minItems={4}
-            items={[
-              {
-                title: "Forma de pagamento",
-                subtitle: stripeConfigured ? "Cartão via Stripe conectado." : "Checkout indisponível neste ambiente.",
-              },
-              {
-                title: "Trocar plano",
-                subtitle: "Ajuste capacidade sem interromper a operação.",
-                action: <Button type="button" variant="outline" onClick={() => void handleUpgrade("PRO")}>Trocar</Button>,
-              },
-              {
-                title: "Atualizar pagamento",
-                subtitle: stripeConfigured ? "Método ativo no Stripe." : "Checkout indisponível sem Stripe.",
-                action: (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={!stripeConfigured}
-                    onClick={() => navigate("/settings?section=integracoes")}
-                  >
-                    Atualizar
-                  </Button>
-                ),
-              },
-              {
-                title: "Ver histórico",
-                subtitle: "Consulte faturas e rastreie status de cobrança.",
-                action: (
-                  <Button type="button" variant="outline" onClick={() => navigate("/finances?view=history")}>
-                    Histórico
-                  </Button>
-                ),
-              },
-              {
-                title: "Cancelar assinatura",
-                subtitle: "Acesso mantém até o fim do ciclo atual.",
-                action: (
-                  <Button type="button" variant="outline" disabled={currentPlan === "FREE" || cancelMutation.isPending} onClick={() => cancelMutation.mutate()}>
-                    {cancelMutation.isPending ? "Cancelando..." : "Cancelar"}
-                  </Button>
-                ),
-              },
-            ]}
-          />
-        </AppSectionBlock>
-      </div>
+          <div className="grid gap-4 xl:grid-cols-2">
+            <AppSectionBlock title="1) Plano atual" subtitle="Quanto está pagando, por que e quais limites principais estão incluídos.">
+              <div className="space-y-2 text-sm text-[var(--text-secondary)]">
+                <p>Plano atual: <strong className="text-[var(--text-primary)]">{currentPlan}</strong></p>
+                <p>Valor base: <strong className="text-[var(--text-primary)]">{brl(PRICE_CENTS[currentPlan])}/mês</strong></p>
+                <p>Benefício-chave: previsibilidade de capacidade e acesso do time.</p>
+              </div>
+              <div className="mt-3"><Button size="sm" variant="outline" onClick={() => upgrade("PRO")}>Trocar plano</Button></div>
+            </AppSectionBlock>
 
-      <AppSectionBlock title="Histórico de cobranças e faturas" subtitle="Registro para conferência rápida" compact>
-        <AppDataTable>
-          <table className="w-full min-w-[760px] text-sm">
-            <thead>
-              <tr className="border-b border-[var(--border-subtle)] text-left text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">
-                <th className="px-3 py-2">Data</th>
-                <th className="px-3 py-2">Descrição</th>
-                <th className="px-3 py-2">Valor</th>
-                <th className="px-3 py-2">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(Array.isArray(status?.events) ? status.events : []).slice(0, 6).map((event: any, index: number) => (
-                <tr key={`${event?.id ?? event?.createdAt ?? index}`} className="border-b border-[var(--border-subtle)]/60">
-                  <td className="px-3 py-2">{event?.createdAt ? new Date(event.createdAt).toLocaleDateString("pt-BR") : "—"}</td>
-                  <td className="px-3 py-2 text-[var(--text-primary)]">{String(event?.description ?? event?.type ?? "Cobrança de assinatura")}</td>
-                  <td className="px-3 py-2">{event?.amountCents ? formatCurrency(Number(event.amountCents)) : "—"}</td>
-                  <td className="px-3 py-2"><AppStatusBadge label={String(event?.status ?? "Registrado")} /></td>
-                </tr>
-              ))}
-              {!Array.isArray(status?.events) || status.events.length === 0 ? (
-                <tr>
-                  <td className="px-3 py-3 text-[var(--text-muted)]" colSpan={4}>Ainda não há histórico disponível neste ambiente.</td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
-        </AppDataTable>
-      </AppSectionBlock>
-
-      <AppSectionBlock title="Planos disponíveis" subtitle="Comparação para evolução da assinatura" compact>
-        {queryState.shouldBlockForError ? (
-          <EmptyState
-            icon={<AlertTriangle className="h-7 w-7" />}
-            title="Falha ao carregar billing"
-            description="Não foi possível carregar planos e status agora."
-            action={{
-              label: "Tentar novamente",
-              onClick: () => {
-                void Promise.all([
-                  plansQuery.refetch(),
-                  statusQuery.refetch(),
-                  limitsQuery.refetch(),
-                ]);
-              },
-            }}
-          />
-        ) : queryState.isInitialLoading ? (
-          <div className="p-2 text-sm text-[var(--text-muted)]">
-            <Loader2 className="mr-2 inline h-4 w-4 animate-spin" /> Carregando status de assinatura...
+            <AppSectionBlock title="2) Assinatura" subtitle="Estado atual, renovação e consequência de status.">
+              <div className="space-y-2 text-sm text-[var(--text-secondary)]">
+                <p>Status: <AppStatusBadge label={statusText(currentStatus)} /></p>
+                <p>Renovação: <strong className="text-[var(--text-primary)]">{limitsQuery.data?.trial?.endsAt ? new Date(limitsQuery.data.trial.endsAt).toLocaleDateString("pt-BR") : "Ciclo não informado"}</strong></p>
+                <p>Se houver falha de pagamento, o acesso pode entrar em restrição até regularização.</p>
+              </div>
+            </AppSectionBlock>
           </div>
-        ) : (
-          <AppDataTable>
-            <table className="w-full min-w-[760px] text-sm">
-              <thead>
-                <tr className="border-b border-[var(--border-subtle)] text-left text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">
-                  <th className="px-3 py-2">Plano</th>
-                  <th className="px-3 py-2">Valor</th>
-                  <th className="px-3 py-2">Ganho operacional</th>
-                  <th className="px-3 py-2">Status</th>
-                  <th className="px-3 py-2">Ação</th>
-                </tr>
-              </thead>
-              <tbody>
-                {plans.map((plan: any) => {
-                  const name = String(plan.name ?? "FREE").toUpperCase() as PlanName;
-                  const isCurrent = name === currentPlan;
-                  return (
-                    <tr key={name} className="border-b border-[var(--border-subtle)]/60">
-                      <td className="px-3 py-2 font-medium text-[var(--text-primary)]">{name}</td>
-                      <td className="px-3 py-2">{formatCurrency(PLAN_BASE_PRICE_CENTS[name] ?? 0)}/mês</td>
-                      <td className="px-3 py-2 text-[var(--text-secondary)]">{PLAN_GAIN[name]}</td>
-                      <td className="px-3 py-2"><AppStatusBadge label={isCurrent ? "Em uso" : "Disponível"} /></td>
-                      <td className="px-3 py-2">
-                        {isCurrent ? (
-                          <span className="text-xs text-[var(--text-muted)]">Plano atual</span>
-                        ) : (
-                          <Button
-                            type="button"
-                            size="sm"
-                            className="gap-1"
-                            disabled={checkoutMutation.isPending || !stripeConfigured || name === "FREE"}
-                            onClick={() => void handleUpgrade(name)}
-                          >
-                            <CreditCard className="h-3.5 w-3.5" /> Escolher
-                          </Button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </AppDataTable>
-        )}
-      </AppSectionBlock>
 
-      {(isTrial || blockedItems.length > 0) ? (
-        <AppSectionBlock title="Risco comercial" subtitle="Pontos que podem bloquear expansão" compact>
-          <div className="space-y-2 text-sm text-[var(--text-secondary)]">
-            {isTrial ? (
-              <p className="inline-flex items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
-                <AlertTriangle className="h-4 w-4" />
-                Trial ativo até {new Date(limits?.trial?.endsAt).toLocaleDateString("pt-BR")}.
-              </p>
-            ) : null}
-            {blockedItems.length > 0 ? (
-              <p>Limites atingidos em: {blockedItems.map((item) => item.label).join(", ")}.</p>
-            ) : null}
+          <div className="grid gap-4 xl:grid-cols-3">
+            <AppSectionBlock title="3) Cobrança recorrente / histórico" subtitle="Faturas por período com status claro." className="xl:col-span-2">
+              <AppDataTable>
+                <table className="w-full min-w-[720px] text-sm">
+                  <thead>
+                    <tr className="border-b border-[var(--border-subtle)] text-left text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                      <th className="px-3 py-2">Período/Data</th>
+                      <th className="px-3 py-2">Descrição</th>
+                      <th className="px-3 py-2">Valor</th>
+                      <th className="px-3 py-2">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {invoices.slice(0, 8).map((event: any, index: number) => (
+                      <tr key={`${String(event?.id ?? "invoice")}-${index}`} className="border-b border-[var(--border-subtle)]/60">
+                        <td className="px-3 py-2">{event?.createdAt ? new Date(event.createdAt).toLocaleDateString("pt-BR") : "—"}</td>
+                        <td className="px-3 py-2 text-[var(--text-primary)]">{String(event?.description ?? event?.type ?? "Cobrança da plataforma")}</td>
+                        <td className="px-3 py-2">{event?.amountCents ? brl(Number(event.amountCents)) : "—"}</td>
+                        <td className="px-3 py-2"><AppStatusBadge label={String(event?.status ?? "Registrado")} /></td>
+                      </tr>
+                    ))}
+                    {invoices.length === 0 ? (
+                      <tr><td className="px-3 py-3 text-[var(--text-muted)]" colSpan={4}>Sem histórico de faturas para este ambiente.</td></tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              </AppDataTable>
+            </AppSectionBlock>
+
+            <AppSectionBlock title="4) Método de pagamento e ações" subtitle="Tudo que precisa para manter a conta ativa e sem surpresa.">
+              <div className="space-y-2 text-sm text-[var(--text-secondary)]">
+                <p>Método atual: <strong className="text-[var(--text-primary)]">{stripeConfigured ? "Cartão via Stripe" : "Não configurado"}</strong></p>
+                <p>Estado da conta: <AppStatusBadge label={statusText(currentStatus)} /></p>
+              </div>
+              <div className="mt-3 space-y-2">
+                <Button size="sm" className="w-full" onClick={() => upgrade("PRO")} disabled={!stripeConfigured || checkoutMutation.isPending}>Trocar plano</Button>
+                <Button size="sm" variant="outline" className="w-full" onClick={() => navigate("/settings?section=integracoes")}>Atualizar pagamento</Button>
+                <Button size="sm" variant="outline" className="w-full" onClick={() => navigate("/billing")}>Ver histórico</Button>
+                <Button size="sm" variant="outline" className="w-full" disabled={cancelMutation.isPending || currentPlan === "FREE"} onClick={() => cancelMutation.mutate()}>{cancelMutation.isPending ? "Cancelando..." : "Cancelar assinatura"}</Button>
+              </div>
+            </AppSectionBlock>
           </div>
-        </AppSectionBlock>
+
+          <AppSectionBlock title="5) Planos disponíveis" subtitle="Upgrade/downgrade com clareza de valor e impacto.">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {plans.map((plan: any) => {
+                const name = String(plan?.name ?? "FREE").toUpperCase() as PlanName;
+                const isCurrent = name === currentPlan;
+                return (
+                  <div key={name} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3">
+                    <p className="text-sm font-semibold text-[var(--text-primary)]">{name}</p>
+                    <p className="text-xs text-[var(--text-secondary)]">{brl(PRICE_CENTS[name])}/mês</p>
+                    <p className="mt-2"><AppStatusBadge label={isCurrent ? "Plano atual" : "Disponível"} /></p>
+                    <div className="mt-2">
+                      <Button size="sm" variant="outline" disabled={isCurrent || name === "FREE"} onClick={() => upgrade(name)}>Escolher</Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </AppSectionBlock>
+        </>
       ) : null}
+      </AppPageShell>
     </PageWrapper>
   );
 }
