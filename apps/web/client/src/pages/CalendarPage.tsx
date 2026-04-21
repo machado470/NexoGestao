@@ -1,632 +1,278 @@
-import { useMemo, useRef, useState, useCallback } from "react";
-import FullCalendar from "@fullcalendar/react";
+import { useMemo, useState } from "react";
+import type { EventClickArg, EventInput } from "@fullcalendar/core";
 import dayGridPlugin from "@fullcalendar/daygrid";
+import interactionPlugin from "@fullcalendar/interaction";
+import FullCalendar from "@fullcalendar/react";
 import timeGridPlugin from "@fullcalendar/timegrid";
-import interactionPlugin, {
-  type DateClickArg,
-} from "@fullcalendar/interaction";
-import type {
-  EventClickArg,
-  EventDropArg,
-  EventInput,
-} from "@fullcalendar/core";
+import { Plus } from "lucide-react";
 import { useLocation } from "wouter";
-import { trpc } from "@/lib/trpc";
-import { toast } from "sonner";
 import { Button } from "@/components/design-system";
-import {
-  Plus,
-  UserRound,
-  Briefcase,
-  CalendarCheck2,
-} from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
-import { PageWrapper } from "@/components/operating-system/Wrappers";
-import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
+import { AppToolbar, AppTimeline, AppTimelineItem } from "@/components/app-system";
 import { CreateAppointmentModal } from "@/components/CreateAppointmentModal";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  getConcurrencyErrorMessage,
-  isConcurrentConflictError,
-} from "@/lib/concurrency";
-import { AppKpiRow, AppListBlock, AppSectionBlock, AppStatusBadge } from "@/components/internal-page-system";
-type CalendarViewMode = "timeGridDay" | "timeGridWeek" | "dayGridMonth";
+  AppPageEmptyState,
+  AppPageErrorState,
+  AppPageHeader,
+  AppPageLoadingState,
+  AppPageShell,
+  AppSectionBlock,
+  AppStatusBadge,
+} from "@/components/internal-page-system";
+import { trpc } from "@/lib/trpc";
+import { normalizeArrayPayload } from "@/lib/query-helpers";
 
-const STATUS_COLORS: Record<string, string> = {
-  SCHEDULED: "#f97316",
+type ViewMode = "timeGridDay" | "timeGridWeek" | "dayGridMonth";
+
+type Appointment = {
+  id: string;
+  customerId: string;
+  assignedToPersonId?: string | null;
+  customer?: { id: string; name: string } | null;
+  startsAt: string;
+  endsAt?: string | null;
+  status: "SCHEDULED" | "CONFIRMED" | "DONE" | "CANCELED" | "NO_SHOW";
+  title?: string | null;
+  notes?: string | null;
+};
+
+const STATUS_COLOR: Record<Appointment["status"], string> = {
+  SCHEDULED: "#f59e0b",
   CONFIRMED: "#22c55e",
   DONE: "#10b981",
   CANCELED: "#ef4444",
-  NO_SHOW: "#6b7280",
+  NO_SHOW: "#71717a",
 };
 
-type CustomerRef = {
-  id: string;
-  name: string;
-  phone?: string | null;
+const STATUS_LABEL: Record<Appointment["status"], string> = {
+  SCHEDULED: "Agendado",
+  CONFIRMED: "Confirmado",
+  DONE: "Concluído",
+  CANCELED: "Cancelado",
+  NO_SHOW: "Não compareceu",
 };
 
-type AppointmentEvent = {
-  id: string;
-  customerId: string;
-  customer?: CustomerRef | null;
-  startsAt: string;
-  endsAt: string | null;
-  status: "SCHEDULED" | "CONFIRMED" | "DONE" | "CANCELED" | "NO_SHOW";
-  notes?: string | null;
-  updatedAt?: string | null;
-};
-
-interface CreateModalState {
-  open: boolean;
-  startStr: string;
-  endStr: string;
-}
-
-interface DetailModalState {
-  open: boolean;
-  event: AppointmentEvent | null;
-}
-
-function formatDateTimeLocalInput(date: Date) {
-  const pad = (value: number) => String(value).padStart(2, "0");
-
-  const year = date.getFullYear();
-  const month = pad(date.getMonth() + 1);
-  const day = pad(date.getDate());
-  const hours = pad(date.getHours());
-  const minutes = pad(date.getMinutes());
-
-  return `${year}-${month}-${day}T${hours}:${minutes}`;
-}
-
-function getStatusLabel(status: AppointmentEvent["status"]) {
-  const labels: Record<AppointmentEvent["status"], string> = {
-    SCHEDULED: "Agendado",
-    CONFIRMED: "Confirmado",
-    DONE: "Concluído",
-    CANCELED: "Cancelado",
-    NO_SHOW: "Não compareceu",
-  };
-
-  return labels[status];
-}
-
-function CalendarSkeleton() {
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <Skeleton className="h-8 w-48" />
-        <div className="flex gap-2">
-          <Skeleton className="h-8 w-20" />
-          <Skeleton className="h-8 w-20" />
-          <Skeleton className="h-8 w-20" />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-7 gap-1">
-        {Array.from({ length: 7 }).map((_, i) => (
-          <Skeleton key={i} className="h-8" />
-        ))}
-      </div>
-
-      {Array.from({ length: 5 }).map((_, row) => (
-        <div key={row} className="grid grid-cols-7 gap-1">
-          {Array.from({ length: 7 }).map((_, col) => (
-            <Skeleton key={col} className="h-24" />
-          ))}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function EventDetailModal({
-  state,
-  onClose,
-  onUpdate,
-  onOpenAppointment,
-  onOpenServiceOrder,
-  onOpenCustomer,
-}: {
-  state: DetailModalState;
-  onClose: () => void;
-  onUpdate: () => void;
-  onOpenAppointment: (appointmentId: string) => void;
-  onOpenServiceOrder: (appointmentId: string) => void;
-  onOpenCustomer: (customerId: string) => void;
-}) {
-  const updateMutation = trpc.nexo.appointments.update.useMutation({
-    onSuccess: () => {
-      toast.success("Agendamento atualizado!");
-      onUpdate();
-      onClose();
-    },
-    onError: err => {
-      if (isConcurrentConflictError(err)) {
-        toast.error(getConcurrencyErrorMessage("agendamento"), {
-          action: { label: "Recarregar", onClick: onUpdate },
-        });
-        return;
-      }
-      toast.error("Erro ao atualizar: " + err.message);
-    },
-  });
-
-  if (!state.event) return null;
-
-  const event = state.event;
-
-  const handleStatusChange = (newStatus: AppointmentEvent["status"]) => {
-    updateMutation.mutate({
-      id: event.id,
-      status: newStatus,
-      expectedUpdatedAt: event.updatedAt ?? undefined,
-    });
-  };
-
-  return (
-    <Dialog open={state.open} onOpenChange={(open) => (!open ? onClose() : undefined)}>
-      <DialogContent className="max-w-sm border-[var(--border-subtle)] bg-[var(--card-bg)] p-0 text-[var(--text-primary)] shadow-2xl backdrop-blur">
-        <DialogHeader className="border-b border-[var(--border-subtle)] px-6 py-5">
-          <DialogTitle className="pr-2 text-lg font-semibold">
-            Detalhes do Agendamento
-          </DialogTitle>
-          <DialogDescription className="text-[var(--text-muted)]">
-            Atualize o status e abra rapidamente agendamento, O.S. ou cliente.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-3 px-6 py-5">
-          <div>
-            <span className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
-              Cliente
-            </span>
-            <p className="mt-0.5 text-sm text-[var(--text-primary)]">
-              {event.customer?.name ?? "Cliente não identificado"}
-            </p>
-          </div>
-
-          <div>
-            <span className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
-              Início
-            </span>
-            <p className="mt-0.5 text-sm text-[var(--text-primary)]">
-              {new Date(event.startsAt).toLocaleString("pt-BR")}
-            </p>
-          </div>
-
-          <div>
-            <span className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
-              Fim
-            </span>
-            <p className="mt-0.5 text-sm text-[var(--text-primary)]">
-              {event.endsAt
-                ? new Date(event.endsAt).toLocaleString("pt-BR")
-                : "—"}
-            </p>
-          </div>
-
-          <div>
-            <span className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
-              Status
-            </span>
-            <div className="mt-1.5">
-              <Select
-                value={event.status}
-                onValueChange={(value) => handleStatusChange(value as AppointmentEvent["status"])}
-              >
-                <SelectTrigger disabled={updateMutation.isPending}>
-                  <SelectValue placeholder="Selecione o status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="SCHEDULED">Agendado</SelectItem>
-                  <SelectItem value="CONFIRMED">Confirmado</SelectItem>
-                  <SelectItem value="DONE">Concluído</SelectItem>
-                  <SelectItem value="CANCELED">Cancelado</SelectItem>
-                  <SelectItem value="NO_SHOW">Não compareceu</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div>
-            <span className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
-              Observações
-            </span>
-            <p className="mt-0.5 text-sm text-[var(--text-primary)]">
-              {event.notes?.trim() ? event.notes : "—"}
-            </p>
-          </div>
-        </div>
-
-        <DialogFooter className="space-y-2 border-t border-[var(--border-subtle)] px-6 py-4 sm:flex-col sm:space-x-0">
-          <Button
-            type="button"
-            className="w-full"
-            disabled={updateMutation.isPending}
-            onClick={() => onOpenAppointment(event.id)}
-          >
-            <CalendarCheck2 className="mr-2 h-4 w-4" />
-            Abrir agendamento
-          </Button>
-
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full"
-            disabled={updateMutation.isPending}
-            onClick={() => onOpenServiceOrder(event.id)}
-          >
-            <Briefcase className="mr-2 h-4 w-4" />
-            Abrir O.S.
-          </Button>
-
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full"
-            disabled={updateMutation.isPending}
-            onClick={() => onOpenCustomer(event.customerId)}
-          >
-            <UserRound className="mr-2 h-4 w-4" />
-            Ver cliente
-          </Button>
-
-          <Button
-            variant="outline"
-            onClick={onClose}
-            disabled={updateMutation.isPending}
-            className="w-full"
-          >
-            Fechar
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
+function normalizeEventStatus(status: string) {
+  if (status === "CANCELED") return "Cancelado";
+  if (status === "CONFIRMED") return "Confirmado";
+  if (status === "DONE") return "Concluído";
+  if (status === "NO_SHOW") return "Não compareceu";
+  return "Agendado";
 }
 
 export default function CalendarPage() {
-  const calendarRef = useRef<FullCalendar>(null);
   const [, navigate] = useLocation();
-  const [viewMode, setViewMode] = useState<CalendarViewMode>("timeGridWeek");
-  const [createModal, setCreateModal] = useState<CreateModalState>({
-    open: false,
-    startStr: "",
-    endStr: "",
-  });
-  const [detailModal, setDetailModal] = useState<DetailModalState>({
-    open: false,
-    event: null,
-  });
+  const [viewMode, setViewMode] = useState<ViewMode>("timeGridWeek");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
-  const appointmentsQuery = trpc.nexo.appointments.list.useQuery(undefined, {
-    retry: false,
-    refetchOnWindowFocus: false,
-  });
+  const [teamFilter, setTeamFilter] = useState("all");
+  const [serviceFilter, setServiceFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [customerFilter, setCustomerFilter] = useState("all");
 
-  const customersQuery = trpc.nexo.customers.list.useQuery(undefined, {
-    retry: false,
-    refetchOnWindowFocus: false,
-  });
+  const appointmentsQuery = trpc.nexo.appointments.list.useQuery(undefined, { retry: false });
+  const customersQuery = trpc.nexo.customers.list.useQuery(undefined, { retry: false });
+  const peopleQuery = trpc.people.list.useQuery(undefined, { retry: false });
 
-  const updateMutation = trpc.nexo.appointments.update.useMutation({
-    onSuccess: () => {
-      toast.success("Agendamento atualizado!");
-      void appointmentsQuery.refetch();
-    },
-    onError: err => {
-      if (isConcurrentConflictError(err)) {
-        toast.error(getConcurrencyErrorMessage("agendamento"));
-        void appointmentsQuery.refetch();
-        return;
-      }
-      toast.error("Erro ao atualizar: " + err.message);
-      void appointmentsQuery.refetch();
-    },
-  });
+  const appointments = useMemo(
+    () => normalizeArrayPayload<Appointment>(appointmentsQuery.data),
+    [appointmentsQuery.data]
+  );
+  const customers = useMemo(
+    () => normalizeArrayPayload<{ id: string; name: string }>(customersQuery.data),
+    [customersQuery.data]
+  );
+  const people = useMemo(() => normalizeArrayPayload<any>(peopleQuery.data), [peopleQuery.data]);
 
-  const rawAppointments = useMemo(() => {
-    const payload = appointmentsQuery.data;
-    const rows = Array.isArray(payload?.data)
-      ? payload.data
-      : Array.isArray(payload)
-        ? payload
-        : [];
-
-    return rows as AppointmentEvent[];
-  }, [appointmentsQuery.data]);
-
-  const events: EventInput[] = useMemo(() => {
-    return rawAppointments.map(appointment => ({
-      id: String(appointment.id),
-      title: `${appointment.customer?.name ?? "Agendamento"} • ${getStatusLabel(
-        appointment.status
-      )}`,
-      start: appointment.startsAt,
-      end: appointment.endsAt ?? undefined,
-      backgroundColor: STATUS_COLORS[appointment.status] ?? "#6b7280",
-      borderColor: STATUS_COLORS[appointment.status] ?? "#6b7280",
-      extendedProps: appointment,
+  const events = useMemo<EventInput[]>(() => {
+    return appointments.map(item => ({
+      id: item.id,
+      title: `${item.customer?.name ?? "Cliente"} · ${item.title ?? "Serviço"}`,
+      start: item.startsAt,
+      end: item.endsAt ?? undefined,
+      backgroundColor: STATUS_COLOR[item.status],
+      borderColor: STATUS_COLOR[item.status],
+      extendedProps: {
+        status: item.status,
+        customerName: item.customer?.name ?? "Cliente",
+        serviceName: item.title ?? "Serviço",
+      },
     }));
-  }, [rawAppointments]);
-  const scheduledCount = rawAppointments.filter((item) => item.status === "SCHEDULED").length;
-  const confirmedCount = rawAppointments.filter((item) => item.status === "CONFIRMED").length;
-  const noShowCount = rawAppointments.filter((item) => item.status === "NO_SHOW").length;
-  const canceledCount = rawAppointments.filter((item) => item.status === "CANCELED").length;
-  const overloadCount = rawAppointments.filter((item) => {
-    const date = new Date(item.startsAt).toDateString();
-    const sameDay = rawAppointments.filter((candidate) => new Date(candidate.startsAt).toDateString() === date);
-    return sameDay.length >= 6;
-  }).length;
+  }, [appointments]);
 
-  const customers = useMemo(() => {
-    const payload = customersQuery.data;
-    const rows = Array.isArray(payload?.data)
-      ? payload.data
-      : Array.isArray(payload)
-        ? payload
-        : [];
-
-    return rows.map((customer: any) => ({
-      id: String(customer.id),
-      name: String(customer.name),
-    }));
-  }, [customersQuery.data]);
-
-  const handleDateClick = useCallback((arg: DateClickArg) => {
-    const startDate = arg.date;
-    const endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
-
-    setCreateModal({
-      open: true,
-      startStr: formatDateTimeLocalInput(startDate),
-      endStr: formatDateTimeLocalInput(endDate),
+  const filteredAppointments = useMemo(() => {
+    return appointments.filter(item => {
+      const teamOk = teamFilter === "all" || String(item.assignedToPersonId ?? "") === teamFilter;
+      const serviceOk = serviceFilter === "all" || String(item.title ?? "").toLowerCase().includes(serviceFilter.toLowerCase());
+      const statusOk = statusFilter === "all" || item.status === statusFilter;
+      const customerOk = customerFilter === "all" || item.customerId === customerFilter;
+      return teamOk && serviceOk && statusOk && customerOk;
     });
-  }, []);
+  }, [appointments, customerFilter, serviceFilter, statusFilter, teamFilter]);
 
-  const handleEventClick = useCallback((arg: EventClickArg) => {
-    const appointment = arg.event.extendedProps as AppointmentEvent;
-    setDetailModal({ open: true, event: appointment });
-  }, []);
+  const selected = filteredAppointments.find(item => item.id === selectedId) ?? null;
 
-  const handleEventDrop = useCallback(
-    (arg: EventDropArg) => {
-      const id = arg.event.id;
-      const newStart = arg.event.start;
-      const newEnd = arg.event.end;
+  const executiveRead = useMemo(() => {
+    const now = Date.now();
+    const oneHour = 60 * 60 * 1000;
+    const conflictByPerson = new Map<string, number>();
+    const sorted = [...filteredAppointments].sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
 
-      if (!newStart) {
-        arg.revert();
-        return;
+    for (let i = 1; i < sorted.length; i++) {
+      const current = sorted[i];
+      const previous = sorted[i - 1];
+      const sameAssignee = String(current.assignedToPersonId ?? "") && current.assignedToPersonId === previous.assignedToPersonId;
+      if (!sameAssignee) continue;
+      const currentStart = new Date(current.startsAt).getTime();
+      const previousEnd = new Date(previous.endsAt ?? previous.startsAt).getTime();
+      if (currentStart < previousEnd) {
+        const key = String(current.assignedToPersonId);
+        conflictByPerson.set(key, (conflictByPerson.get(key) ?? 0) + 1);
       }
+    }
 
-      updateMutation.mutate({
-        id,
-        startsAt: newStart.toISOString(),
-        endsAt: newEnd ? newEnd.toISOString() : undefined,
-        expectedUpdatedAt:
-          (arg.event.extendedProps as AppointmentEvent | undefined)?.updatedAt ?? undefined,
-      });
-    },
-    [updateMutation]
-  );
+    const conflicts = [...conflictByPerson.values()].reduce((acc, value) => acc + value, 0);
+    const overload = filteredAppointments.filter(item => {
+      const start = new Date(item.startsAt).getTime();
+      return start - now <= oneHour && start - now > 0;
+    }).length;
+    const canceled = filteredAppointments.filter(item => item.status === "CANCELED").length;
+    const possibleFits = Math.max(0, 12 - filteredAppointments.length);
 
-  const handleCreateSuccess = useCallback(() => {
-    void appointmentsQuery.refetch();
-  }, [appointmentsQuery]);
+    return { conflicts, overload, canceled, possibleFits };
+  }, [filteredAppointments]);
 
-  const handleOpenAppointment = useCallback(
-    (appointmentId: string) => {
-      navigate(`/appointments?id=${appointmentId}`);
-      setDetailModal({ open: false, event: null });
-    },
-    [navigate]
-  );
+  const isLoading = appointmentsQuery.isLoading || customersQuery.isLoading || peopleQuery.isLoading;
+  const hasError = appointmentsQuery.isError || customersQuery.isError || peopleQuery.isError;
 
-  const handleOpenServiceOrder = useCallback(
-    (appointmentId: string) => {
-      navigate(`/service-orders?appointmentId=${appointmentId}`);
-      setDetailModal({ open: false, event: null });
-    },
-    [navigate]
-  );
-
-  const handleOpenCustomer = useCallback(
-    (customerId: string) => {
-      navigate(`/customers?customerId=${customerId}`);
-      setDetailModal({ open: false, event: null });
-    },
-    [navigate]
-  );
-
-  const todayItems = rawAppointments
-    .filter((item) => {
-      const start = new Date(item.startsAt);
-      const now = new Date();
-      return start.toDateString() === now.toDateString();
-    })
-    .slice(0, 5)
-    .map((item) => ({
-      title: `${item.customer?.name ?? "Cliente"} · ${new Date(item.startsAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`,
-      subtitle: getStatusLabel(item.status),
-      right: <AppStatusBadge label={getStatusLabel(item.status)} />,
-      action: <Button type="button" size="sm" variant="outline" onClick={() => navigate(`/appointments?id=${item.id}`)}>Abrir</Button>,
-    }));
-
-  const conflictItems = rawAppointments
-    .filter((item) => item.status === "NO_SHOW" || item.status === "CANCELED")
-    .slice(0, 5)
-    .map((item) => ({
-      title: item.customer?.name ?? "Cliente",
-      subtitle: `${new Date(item.startsAt).toLocaleString("pt-BR")} · ${getStatusLabel(item.status)}`,
-      right: <AppStatusBadge label={item.status === "NO_SHOW" ? "Conflito" : "Cancelado"} />,
-      action: (
-        <Button type="button" size="sm" variant="outline" onClick={() => setDetailModal({ open: true, event: item })}>
-          Analisar
-        </Button>
-      ),
-    }));
-
-  const idleDays = useMemo(() => {
-    const daysWithItems = new Set(rawAppointments.map((item) => new Date(item.startsAt).toDateString()));
-    return Array.from({ length: 7 }).map((_, offset) => {
-      const day = new Date();
-      day.setDate(day.getDate() + offset);
-      return day;
-    }).filter((day) => !daysWithItems.has(day.toDateString()));
-  }, [rawAppointments]);
-
-  const handleChangeView = (nextView: CalendarViewMode) => {
-    setViewMode(nextView);
-    calendarRef.current?.getApi().changeView(nextView);
+  const refetchAll = () => {
+    void Promise.all([appointmentsQuery.refetch(), customersQuery.refetch(), peopleQuery.refetch()]);
   };
 
   return (
-    <PageWrapper title="Calendário" subtitle="Leitura visual da agenda operacional conectada à execução.">
-      <OperationalTopCard
-        contextLabel="Direção do tempo operacional"
-        title="Calendário operacional"
-        description="Visão macro da semana para identificar conflitos, sobrecarga e vazios na operação."
-        primaryAction={
-          <Button
-            onClick={() => {
-              const now = new Date();
-              const end = new Date(now.getTime() + 60 * 60 * 1000);
-              setCreateModal({ open: true, startStr: formatDateTimeLocalInput(now), endStr: formatDateTimeLocalInput(end) });
-            }}
-            className="gap-2"
-          >
-            <Plus className="h-4 w-4" /> Novo agendamento
+    <AppPageShell>
+      <AppPageHeader
+        title="Calendário"
+        description="Visão estratégica de distribuição do tempo, conflitos, vazios e sobrecarga operacional."
+        cta={
+          <Button type="button" onClick={() => setShowCreateModal(true)}>
+            <Plus className="mr-1.5 h-4 w-4" /> Novo agendamento
           </Button>
         }
       />
 
-      <AppKpiRow
-        items={[
-          { title: "Agendados", value: String(scheduledCount), hint: "aguardando confirmação" },
-          { title: "Confirmados", value: String(confirmedCount), hint: "prontos para atendimento" },
-          { title: "Conflitos", value: String(noShowCount + canceledCount), hint: "no-show e cancelamentos" },
-          { title: "Sobrecarga", value: String(overloadCount), hint: "itens em dias muito concentrados" },
-        ]}
-        gridClassName="grid-cols-1 md:grid-cols-2 xl:grid-cols-4"
-      />
+      <AppToolbar>
+        <div className="flex flex-wrap items-center gap-2">
+          <select className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm" value={viewMode} onChange={event => setViewMode(event.target.value as ViewMode)}>
+            <option value="timeGridDay">Dia</option>
+            <option value="timeGridWeek">Semana</option>
+            <option value="dayGridMonth">Mês</option>
+          </select>
+          <select className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm" value={teamFilter} onChange={event => setTeamFilter(event.target.value)}>
+            <option value="all">Equipe: todas</option>
+            {people.map((person: any) => <option key={String(person.id)} value={String(person.id)}>{String(person.name ?? "Colaborador")}</option>)}
+          </select>
+          <select className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm" value={serviceFilter} onChange={event => setServiceFilter(event.target.value)}>
+            <option value="all">Serviço: todos</option>
+            <option value="instalação">Instalação</option>
+            <option value="manutenção">Manutenção</option>
+            <option value="vistoria">Vistoria</option>
+          </select>
+          <select className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm" value={statusFilter} onChange={event => setStatusFilter(event.target.value)}>
+            <option value="all">Status: todos</option>
+            <option value="SCHEDULED">Agendado</option>
+            <option value="CONFIRMED">Confirmado</option>
+            <option value="DONE">Concluído</option>
+            <option value="CANCELED">Cancelado</option>
+          </select>
+          <select className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm" value={customerFilter} onChange={event => setCustomerFilter(event.target.value)}>
+            <option value="all">Cliente: todos</option>
+            {customers.map(customer => <option key={customer.id} value={customer.id}>{customer.name}</option>)}
+          </select>
+        </div>
+        <Button variant="outline" size="sm" onClick={refetchAll}>Atualizar leitura</Button>
+      </AppToolbar>
 
-      <div className="grid gap-4 xl:grid-cols-3">
-        <AppSectionBlock title="Calendário da operação" subtitle="Semana como visão principal, com dia e mês para apoio" className="xl:col-span-2">
-          <div className="mb-3 flex flex-wrap gap-2">
-            <Button type="button" size="sm" variant={viewMode === "timeGridDay" ? "default" : "outline"} onClick={() => handleChangeView("timeGridDay")}>Dia</Button>
-            <Button type="button" size="sm" variant={viewMode === "timeGridWeek" ? "default" : "outline"} onClick={() => handleChangeView("timeGridWeek")}>Semana</Button>
-            <Button type="button" size="sm" variant={viewMode === "dayGridMonth" ? "default" : "outline"} onClick={() => handleChangeView("dayGridMonth")}>Mês</Button>
-          </div>
-          {appointmentsQuery.error ? (
-            <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="text-sm text-red-200">Não foi possível carregar os agendamentos. {appointmentsQuery.error.message}</p>
-                <Button variant="outline" onClick={() => void appointmentsQuery.refetch()}>Tentar novamente</Button>
-              </div>
-            </div>
+      {isLoading ? <AppPageLoadingState description="Consolidando leitura macro do tempo da operação..." /> : null}
+      {hasError ? <AppPageErrorState description="Não foi possível carregar o calendário da operação." onAction={refetchAll} /> : null}
+
+      {!isLoading && !hasError ? (
+        <>
+          {filteredAppointments.length === 0 ? (
+            <AppPageEmptyState title="Sem eventos para este recorte" description="Ajuste filtros ou crie um novo agendamento para preencher vazios operacionais." />
           ) : (
-            <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4">
-              {appointmentsQuery.isLoading ? (
-                <CalendarSkeleton />
-              ) : (
-                <FullCalendar
-                  ref={calendarRef}
-                  plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-                  initialView={viewMode}
-                  headerToolbar={{ left: "prev,next today", center: "title", right: "dayGridMonth,timeGridWeek,timeGridDay" }}
-                  buttonText={{ today: "Hoje", month: "Mês", week: "Semana", day: "Dia" }}
-                  locale="pt-br"
-                  firstDay={0}
-                  slotMinTime="06:00:00"
-                  slotMaxTime="22:00:00"
-                  allDaySlot={false}
-                  editable
-                  selectable
-                  selectMirror
-                  dayMaxEvents
-                  weekends
-                  events={events}
-                  dateClick={handleDateClick}
-                  eventClick={handleEventClick}
-                  eventDrop={handleEventDrop}
-                  eventTimeFormat={{ hour: "2-digit", minute: "2-digit", meridiem: false, hour12: false }}
-                  height="auto"
-                  eventClassNames="cursor-pointer hover:opacity-90 transition-opacity"
-                />
-              )}
-            </div>
+            <>
+              <AppSectionBlock title="1) Leitura executiva do tempo" subtitle="Onde estão conflitos, sobrecarga e janelas de encaixe para reorganizar o dia.">
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3"><p className="text-xs text-[var(--text-muted)]">Conflitos detectados</p><p className="text-lg font-semibold text-[var(--text-primary)]">{executiveRead.conflicts}</p></div>
+                  <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3"><p className="text-xs text-[var(--text-muted)]">Sobrecarga próxima (1h)</p><p className="text-lg font-semibold text-[var(--text-primary)]">{executiveRead.overload}</p></div>
+                  <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3"><p className="text-xs text-[var(--text-muted)]">Buracos por cancelamento</p><p className="text-lg font-semibold text-[var(--text-primary)]">{executiveRead.canceled}</p></div>
+                  <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3"><p className="text-xs text-[var(--text-muted)]">Encaixes possíveis</p><p className="text-lg font-semibold text-[var(--text-primary)]">{executiveRead.possibleFits}</p></div>
+                </div>
+              </AppSectionBlock>
+
+              <div className="grid gap-4 xl:grid-cols-12">
+                <AppSectionBlock title="2) Grade principal" subtitle="Semana é o modo de trabalho padrão. Dia e mês para leitura complementar." className="xl:col-span-8">
+                  <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-2">
+                    <FullCalendar
+                      plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+                      initialView={viewMode}
+                      headerToolbar={false}
+                      events={events.filter(event => filteredAppointments.some(item => item.id === event.id))}
+                      eventClick={(arg: EventClickArg) => setSelectedId(arg.event.id)}
+                      height={640}
+                      editable={false}
+                      locale="pt-br"
+                      allDaySlot={false}
+                    />
+                  </div>
+                </AppSectionBlock>
+
+                <AppSectionBlock title="3) Contexto do evento" subtitle="Detalhe operacional do item selecionado para agir sem perder tempo." className="xl:col-span-4">
+                  {selected ? (
+                    <div className="space-y-3">
+                      <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3">
+                        <p className="text-sm font-semibold text-[var(--text-primary)]">{selected.customer?.name ?? "Cliente não identificado"}</p>
+                        <p className="text-xs text-[var(--text-muted)]">{selected.title ?? "Serviço não informado"}</p>
+                        <p className="mt-2 text-xs text-[var(--text-secondary)]">{new Date(selected.startsAt).toLocaleString("pt-BR")}</p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <AppStatusBadge label={STATUS_LABEL[selected.status]} />
+                          <AppStatusBadge label={new Date(selected.startsAt).getTime() - Date.now() < 45 * 60 * 1000 ? "Próximo do horário" : "Programado"} />
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Button size="sm" variant="outline" onClick={() => navigate(`/appointments?id=${selected.id}`)}>Abrir agendamento</Button>
+                        <Button size="sm" variant="outline" onClick={() => navigate(`/service-orders?appointmentId=${selected.id}`)}>Abrir O.S.</Button>
+                        <Button size="sm" variant="outline" onClick={() => selected.customerId && navigate(`/customers?id=${selected.customerId}`)}>Abrir cliente</Button>
+                      </div>
+                      <AppTimeline>
+                        <AppTimelineItem>
+                          <p className="text-sm text-[var(--text-primary)]">Status atual: {normalizeEventStatus(selected.status)}</p>
+                        </AppTimelineItem>
+                        <AppTimelineItem>
+                          <p className="text-sm text-[var(--text-primary)]">Estrutura pronta para detecção automática de conflito por equipe e intervalo.</p>
+                        </AppTimelineItem>
+                        <AppTimelineItem>
+                          <p className="text-sm text-[var(--text-primary)]">Preparado para sugestão de encaixe em janelas com ociosidade operacional.</p>
+                        </AppTimelineItem>
+                      </AppTimeline>
+                    </div>
+                  ) : (
+                    <AppPageEmptyState title="Selecione um evento" description="Clique em um agendamento na grade para abrir contexto, ação rápida e links de execução." />
+                  )}
+                </AppSectionBlock>
+              </div>
+            </>
           )}
-        </AppSectionBlock>
-
-        <AppSectionBlock title="Conflitos e sobrecarga" subtitle="Itens que pedem ajuste operacional" compact>
-          <AppListBlock
-            compact
-            items={conflictItems.length > 0 ? conflictItems : [{ title: "Sem conflitos críticos", subtitle: "No-show e cancelamentos estão controlados." }]}
-          />
-        </AppSectionBlock>
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-2">
-        <AppSectionBlock title="Agenda do dia" subtitle="Leitura rápida para execução imediata" compact>
-          <AppListBlock
-            compact
-            items={todayItems.length > 0 ? todayItems : [{ title: "Sem agenda para hoje", subtitle: "Use novo agendamento para preencher a rotina.", action: <Button size="sm" variant="outline" onClick={() => setCreateModal({ open: true, startStr: formatDateTimeLocalInput(new Date()), endStr: formatDateTimeLocalInput(new Date(Date.now() + 60*60*1000)) })}>Agendar</Button> }]}
-          />
-          <div className="mt-3 flex flex-wrap gap-2">
-            {([ ["SCHEDULED", "Agendado"], ["CONFIRMED", "Confirmado"], ["DONE", "Concluído"], ["CANCELED", "Cancelado"], ["NO_SHOW", "Não compareceu"] ] as const).map(([status, label]) => (
-              <span key={status} className="inline-flex items-center gap-1 text-xs text-[var(--text-muted)]">
-                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: STATUS_COLORS[status] }} />{label}
-              </span>
-            ))}
-          </div>
-        </AppSectionBlock>
-
-        <AppSectionBlock title="Vazios operacionais" subtitle="Dias sem agenda nos próximos 7 dias" compact>
-          <AppListBlock
-            compact
-            items={idleDays.length > 0 ? idleDays.map((day) => ({
-              title: day.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "2-digit" }),
-              subtitle: "Sem agendamentos. Pode absorver encaixes ou prevenção.",
-              action: <Button type="button" size="sm" variant="outline" onClick={() => navigate("/appointments?view=calendar_macro")}>Abrir agendamentos</Button>,
-            })) : [{ title: "Sem vazios na semana", subtitle: "A distribuição de agenda está preenchida." }]}
-          />
-        </AppSectionBlock>
-      </div>
+        </>
+      ) : null}
 
       <CreateAppointmentModal
-        isOpen={createModal.open}
-        onClose={() => setCreateModal({ open: false, startStr: "", endStr: "" })}
-        onSuccess={handleCreateSuccess}
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSuccess={refetchAll}
         customers={customers}
-        initialStartsAt={createModal.startStr}
-        initialEndsAt={createModal.endStr}
       />
-
-      <EventDetailModal
-        state={detailModal}
-        onClose={() => setDetailModal({ open: false, event: null })}
-        onUpdate={() => void appointmentsQuery.refetch()}
-        onOpenAppointment={handleOpenAppointment}
-        onOpenServiceOrder={handleOpenServiceOrder}
-        onOpenCustomer={handleOpenCustomer}
-      />
-    </PageWrapper>
+    </AppPageShell>
   );
 }
