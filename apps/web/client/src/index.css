@@ -1610,8 +1610,14 @@ html {
   .nexo-sidebar-item {
     position: relative;
     border-radius: 12px;
-    min-height: 40px;
+    min-height: 42px;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0 0.75rem;
     color: var(--text-secondary);
+    transition: background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease;
   }
 
   .nexo-sidebar-item:hover {
@@ -1653,8 +1659,8 @@ html {
     min-height: 72px;
     display: flex;
     align-items: center;
-    padding: 0.75rem 1rem;
-    gap: 0.5rem;
+    padding: 0.75rem 1.25rem;
+    gap: 0.75rem;
   }
 
   .nexo-sidebar-header {
@@ -1729,6 +1735,10 @@ html {
     background: var(--surface-contrast);
     color: var(--text-secondary);
     min-height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
     box-shadow: none;
   }
 
@@ -1776,6 +1786,17 @@ html {
 
   .nexo-data-table thead {
     background: var(--surface-contrast);
+  }
+
+  .nexo-data-table th {
+    height: 44px;
+    padding: 0 0.875rem;
+    vertical-align: middle;
+  }
+
+  .nexo-data-table td {
+    padding: 0.625rem 0.875rem;
+    vertical-align: middle;
   }
 
   .nexo-data-table tbody tr:hover {

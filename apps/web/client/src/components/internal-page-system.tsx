@@ -4,6 +4,9 @@ import {
   ArrowRight,
   ArrowUpRight,
   ChevronDown,
+  CircleCheck,
+  Inbox,
+  Loader2,
   Search,
   SlidersHorizontal,
   X,
@@ -639,11 +642,11 @@ export function AppListBlock({
   const normalizedItems = items.slice(0, maxItems).map((item, index) => ({
     ...item,
     subtitle: item.subtitle ?? "Ação operacional disponível para execução.",
-    action: item.action ?? (
-      <Button size="sm" variant="outline">
-        Executar
-      </Button>
-    ),
+      action: item.action ?? (
+        <Button size="sm" variant="outline">
+          Executar
+        </Button>
+      ),
     __key: `${item.title}-${index}`,
   }));
   while (showPlaceholders && normalizedItems.length < minItems) {
@@ -922,40 +925,46 @@ export function AppEmptyState({
 }
 
 export function AppPageLoadingState({
-  title = "Carregando",
-  description = "Carregando dados operacionais...",
+  title = "Carregando dados",
+  description = "Estamos preparando o contexto operacional desta tela.",
 }: {
   title?: string;
   description?: string;
 }) {
   return (
-    <AppSectionCard className="space-y-2">
+    <AppSectionCard className="space-y-3">
+      <div className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)]/65">
+        <Loader2 className="h-4 w-4 animate-spin text-[var(--text-secondary)]" />
+      </div>
       <p className="text-sm font-semibold text-[var(--text-primary)]">
         {title}
       </p>
-      <p className="text-sm text-[var(--text-secondary)]">{description}</p>
+      <p className="text-sm leading-6 text-[var(--text-secondary)]">{description}</p>
       <BaseLoadingState rows={4} />
     </AppSectionCard>
   );
 }
 
 export function AppPageErrorState({
-  title = "Falha ao carregar",
+  title = "Não foi possível carregar",
   description,
-  actionLabel,
+  actionLabel = "Tentar novamente",
   onAction,
 }: {
   title?: string;
   description: string;
-  actionLabel: string;
+  actionLabel?: string;
   onAction: () => void;
 }) {
   return (
     <AppSectionCard className="space-y-3">
+      <div className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--danger)]/30 bg-[var(--danger)]/10">
+        <TriangleAlert className="h-4 w-4 text-[var(--danger)]" />
+      </div>
       <p className="text-sm font-semibold text-[var(--text-primary)]">
         {title}
       </p>
-      <p className="text-sm text-[var(--text-secondary)]">{description}</p>
+      <p className="text-sm leading-6 text-[var(--text-secondary)]">{description}</p>
       <Button variant="outline" onClick={onAction}>
         {actionLabel}
       </Button>
@@ -970,7 +979,24 @@ export function AppPageEmptyState({
   title: string;
   description: string;
 }) {
-  return <AppBaseEmptyState title={title} description={description} />;
+  return (
+    <AppSectionCard className="flex flex-col items-center justify-center gap-2.5 p-8 text-center">
+      <div className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)]/65">
+        <Inbox className="h-4 w-4 text-[var(--text-secondary)]" />
+      </div>
+      <p className="text-sm font-semibold text-[var(--text-primary)]">{title}</p>
+      <p className="max-w-xl text-sm leading-6 text-[var(--text-secondary)]">{description}</p>
+    </AppSectionCard>
+  );
+}
+
+export function AppInlineSuccessState({ message }: { message: string }) {
+  return (
+    <div className="inline-flex items-center gap-2 rounded-lg border border-[var(--success)]/30 bg-[var(--success)]/10 px-2.5 py-1.5 text-xs font-medium text-[var(--success)]">
+      <CircleCheck className="h-3.5 w-3.5" />
+      {message}
+    </div>
+  );
 }
 
 export function AppSkeleton({

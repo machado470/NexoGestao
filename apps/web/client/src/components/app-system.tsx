@@ -80,7 +80,7 @@ export function AppToolbar({ className, ...props }: ComponentProps<"div">) {
   return (
     <div
       className={cn(
-        "nexo-card-informative flex flex-wrap items-center justify-between gap-2 rounded-xl p-3",
+        "nexo-card-informative flex flex-wrap items-center justify-between gap-2.5 rounded-xl p-3.5",
         className
       )}
       {...props}
@@ -134,11 +134,11 @@ export function AppEmptyState({
   action?: ReactNode;
 }) {
   return (
-    <section className="nexo-card-informative flex flex-col items-center justify-center gap-2 p-8 text-center">
-      <p className="text-base font-semibold text-[var(--text-primary)]">
+    <section className="nexo-card-informative flex flex-col items-center justify-center gap-2.5 p-8 text-center">
+      <p className="text-base font-semibold leading-tight text-[var(--text-primary)]">
         {title}
       </p>
-      <p className="max-w-xl text-sm text-[var(--text-muted)]">{description}</p>
+      <p className="max-w-xl text-sm leading-6 text-[var(--text-muted)]">{description}</p>
       {action ? <div className="pt-1">{action}</div> : null}
     </section>
   );

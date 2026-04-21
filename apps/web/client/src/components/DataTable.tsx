@@ -115,7 +115,7 @@ export function DataTable<T extends { id?: number | string }>({
                       {column.sortable ? (
                         <button
                           type="button"
-                          className="inline-flex items-center gap-1"
+                          className="inline-flex items-center gap-1 rounded-md px-1 py-0.5 text-left hover:bg-[var(--surface-elevated)]/55"
                           onClick={() => handleSort(column.key)}
                         >
                           {column.label}
@@ -128,7 +128,7 @@ export function DataTable<T extends { id?: number | string }>({
                       )}
                     </TableHead>
                   ))}
-                  {rowActions ? <TableHead>Ações</TableHead> : null}
+                  {rowActions ? <TableHead className="w-[132px] text-right">Ações</TableHead> : null}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -136,12 +136,12 @@ export function DataTable<T extends { id?: number | string }>({
                   <TableRow key={row.id || rowIndex}>
                     {visibleColumns.map((column) => (
                       <TableCell key={String(column.key)} className={`min-w-0 ${column.width || ""}`.trim()}>
-                        <span className="block min-w-0 nexo-text-wrap">
+                        <span className="block min-w-0 max-w-full truncate">
                           {column.render ? column.render(row[column.key], row) : String(row[column.key] ?? "—")}
                         </span>
                       </TableCell>
                     ))}
-                    {rowActions ? <TableCell className="min-w-[120px]">{rowActions(row)}</TableCell> : null}
+                    {rowActions ? <TableCell className="min-w-[120px] text-right">{rowActions(row)}</TableCell> : null}
                   </TableRow>
                 ))}
               </TableBody>
