@@ -111,8 +111,8 @@ const pageMeta: Record<string, { title: string; subtitle: string }> = {
     subtitle: "Times, distribuição de carga e capacidade operacional.",
   },
   "/billing": {
-    title: "Billing",
-    subtitle: "Plano, limites e saúde comercial da conta.",
+    title: "Planos",
+    subtitle: "Assinatura do Nexo, cobrança e método de pagamento da sua empresa.",
   },
   "/settings": {
     title: "Configurações",
@@ -146,7 +146,7 @@ interface MainLayoutProps {
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "nexo:app-shell:sidebar-collapsed";
 const SIDEBAR_EXPANDED_WIDTH = 286;
-const SIDEBAR_COLLAPSED_WIDTH = 88;
+const SIDEBAR_COLLAPSED_WIDTH = 96;
 
 export function MainLayout({ children }: MainLayoutProps) {
   // KPI/top-metrics são definidos por página (dashboard forte, módulos contextuais).
@@ -241,7 +241,7 @@ export function MainLayout({ children }: MainLayoutProps) {
         },
         {
           id: "billing",
-          label: "Billing",
+          label: "Planos",
           route: "/billing",
           icon: CreditCard,
           permissions: ["settings:manage"],

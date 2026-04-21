@@ -16,8 +16,9 @@ import { toast } from "sonner";
 import { Button } from "@/components/design-system";
 import {
   Plus,
-  MessageCircle,
+  UserRound,
   Briefcase,
+  CalendarCheck2,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
@@ -43,6 +44,7 @@ import {
   isConcurrentConflictError,
 } from "@/lib/concurrency";
 import { AppKpiRow, AppListBlock, AppSectionBlock, AppStatusBadge } from "@/components/internal-page-system";
+type CalendarViewMode = "timeGridDay" | "timeGridWeek" | "dayGridMonth";
 
 const STATUS_COLORS: Record<string, string> = {
   SCHEDULED: "#f97316",
@@ -137,14 +139,16 @@ function EventDetailModal({
   state,
   onClose,
   onUpdate,
-  onOpenExecution,
-  onOpenWhatsApp,
+  onOpenAppointment,
+  onOpenServiceOrder,
+  onOpenCustomer,
 }: {
   state: DetailModalState;
   onClose: () => void;
   onUpdate: () => void;
-  onOpenExecution: (customerId: string) => void;
-  onOpenWhatsApp: (customerId: string) => void;
+  onOpenAppointment: (appointmentId: string) => void;
+  onOpenServiceOrder: (appointmentId: string) => void;
+  onOpenCustomer: (customerId: string) => void;
 }) {
   const updateMutation = trpc.nexo.appointments.update.useMutation({
     onSuccess: () => {
@@ -183,7 +187,7 @@ function EventDetailModal({
             Detalhes do Agendamento
           </DialogTitle>
           <DialogDescription className="text-[var(--text-muted)]">
-            Atualize o status ou siga para execução e atendimento no WhatsApp.
+            Atualize o status e abra rapidamente agendamento, O.S. ou cliente.
           </DialogDescription>
         </DialogHeader>
 
@@ -255,10 +259,10 @@ function EventDetailModal({
             type="button"
             className="w-full"
             disabled={updateMutation.isPending}
-            onClick={() => onOpenExecution(event.customerId)}
+            onClick={() => onOpenAppointment(event.id)}
           >
-            <Briefcase className="mr-2 h-4 w-4" />
-            Abrir execução
+            <CalendarCheck2 className="mr-2 h-4 w-4" />
+            Abrir agendamento
           </Button>
 
           <Button
@@ -266,10 +270,21 @@ function EventDetailModal({
             variant="outline"
             className="w-full"
             disabled={updateMutation.isPending}
-            onClick={() => onOpenWhatsApp(event.customerId)}
+            onClick={() => onOpenServiceOrder(event.id)}
           >
-            <MessageCircle className="mr-2 h-4 w-4" />
-            Falar com cliente
+            <Briefcase className="mr-2 h-4 w-4" />
+            Abrir O.S.
+          </Button>
+
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            disabled={updateMutation.isPending}
+            onClick={() => onOpenCustomer(event.customerId)}
+          >
+            <UserRound className="mr-2 h-4 w-4" />
+            Ver cliente
           </Button>
 
           <Button
@@ -289,6 +304,7 @@ function EventDetailModal({
 export default function CalendarPage() {
   const calendarRef = useRef<FullCalendar>(null);
   const [, navigate] = useLocation();
+  const [viewMode, setViewMode] = useState<CalendarViewMode>("timeGridWeek");
   const [createModal, setCreateModal] = useState<CreateModalState>({
     open: false,
     startStr: "",
@@ -352,6 +368,12 @@ export default function CalendarPage() {
   const scheduledCount = rawAppointments.filter((item) => item.status === "SCHEDULED").length;
   const confirmedCount = rawAppointments.filter((item) => item.status === "CONFIRMED").length;
   const noShowCount = rawAppointments.filter((item) => item.status === "NO_SHOW").length;
+  const canceledCount = rawAppointments.filter((item) => item.status === "CANCELED").length;
+  const overloadCount = rawAppointments.filter((item) => {
+    const date = new Date(item.startsAt).toDateString();
+    const sameDay = rawAppointments.filter((candidate) => new Date(candidate.startsAt).toDateString() === date);
+    return sameDay.length >= 6;
+  }).length;
 
   const customers = useMemo(() => {
     const payload = customersQuery.data;
@@ -409,17 +431,25 @@ export default function CalendarPage() {
     void appointmentsQuery.refetch();
   }, [appointmentsQuery]);
 
-  const handleOpenExecution = useCallback(
-    (customerId: string) => {
-      navigate(`/customers?customerId=${customerId}`);
+  const handleOpenAppointment = useCallback(
+    (appointmentId: string) => {
+      navigate(`/appointments?id=${appointmentId}`);
       setDetailModal({ open: false, event: null });
     },
     [navigate]
   );
 
-  const handleOpenWhatsApp = useCallback(
+  const handleOpenServiceOrder = useCallback(
+    (appointmentId: string) => {
+      navigate(`/service-orders?appointmentId=${appointmentId}`);
+      setDetailModal({ open: false, event: null });
+    },
+    [navigate]
+  );
+
+  const handleOpenCustomer = useCallback(
     (customerId: string) => {
-      navigate(`/whatsapp?customerId=${customerId}`);
+      navigate(`/customers?customerId=${customerId}`);
       setDetailModal({ open: false, event: null });
     },
     [navigate]
@@ -439,12 +469,40 @@ export default function CalendarPage() {
       action: <Button type="button" size="sm" variant="outline" onClick={() => navigate(`/appointments?id=${item.id}`)}>Abrir</Button>,
     }));
 
+  const conflictItems = rawAppointments
+    .filter((item) => item.status === "NO_SHOW" || item.status === "CANCELED")
+    .slice(0, 5)
+    .map((item) => ({
+      title: item.customer?.name ?? "Cliente",
+      subtitle: `${new Date(item.startsAt).toLocaleString("pt-BR")} · ${getStatusLabel(item.status)}`,
+      right: <AppStatusBadge label={item.status === "NO_SHOW" ? "Conflito" : "Cancelado"} />,
+      action: (
+        <Button type="button" size="sm" variant="outline" onClick={() => setDetailModal({ open: true, event: item })}>
+          Analisar
+        </Button>
+      ),
+    }));
+
+  const idleDays = useMemo(() => {
+    const daysWithItems = new Set(rawAppointments.map((item) => new Date(item.startsAt).toDateString()));
+    return Array.from({ length: 7 }).map((_, offset) => {
+      const day = new Date();
+      day.setDate(day.getDate() + offset);
+      return day;
+    }).filter((day) => !daysWithItems.has(day.toDateString()));
+  }, [rawAppointments]);
+
+  const handleChangeView = (nextView: CalendarViewMode) => {
+    setViewMode(nextView);
+    calendarRef.current?.getApi().changeView(nextView);
+  };
+
   return (
     <PageWrapper title="Calendário" subtitle="Leitura visual da agenda operacional conectada à execução.">
       <OperationalTopCard
-        contextLabel="Direção de agenda"
+        contextLabel="Direção do tempo operacional"
         title="Calendário operacional"
-        description="Visão da rotina diária com ações diretas para cliente, agendamento e O.S."
+        description="Visão macro da semana para identificar conflitos, sobrecarga e vazios na operação."
         primaryAction={
           <Button
             onClick={() => {
@@ -463,13 +521,19 @@ export default function CalendarPage() {
         items={[
           { title: "Agendados", value: String(scheduledCount), hint: "aguardando confirmação" },
           { title: "Confirmados", value: String(confirmedCount), hint: "prontos para atendimento" },
-          { title: "Conflitos/No-show", value: String(noShowCount), hint: "pedem reação comercial" },
+          { title: "Conflitos", value: String(noShowCount + canceledCount), hint: "no-show e cancelamentos" },
+          { title: "Sobrecarga", value: String(overloadCount), hint: "itens em dias muito concentrados" },
         ]}
-        gridClassName="grid-cols-1 md:grid-cols-3"
+        gridClassName="grid-cols-1 md:grid-cols-2 xl:grid-cols-4"
       />
 
       <div className="grid gap-4 xl:grid-cols-3">
-        <AppSectionBlock title="Calendário da operação" subtitle="Agenda integrada ao fluxo de execução" className="xl:col-span-2">
+        <AppSectionBlock title="Calendário da operação" subtitle="Semana como visão principal, com dia e mês para apoio" className="xl:col-span-2">
+          <div className="mb-3 flex flex-wrap gap-2">
+            <Button type="button" size="sm" variant={viewMode === "timeGridDay" ? "default" : "outline"} onClick={() => handleChangeView("timeGridDay")}>Dia</Button>
+            <Button type="button" size="sm" variant={viewMode === "timeGridWeek" ? "default" : "outline"} onClick={() => handleChangeView("timeGridWeek")}>Semana</Button>
+            <Button type="button" size="sm" variant={viewMode === "dayGridMonth" ? "default" : "outline"} onClick={() => handleChangeView("dayGridMonth")}>Mês</Button>
+          </div>
           {appointmentsQuery.error ? (
             <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -485,7 +549,7 @@ export default function CalendarPage() {
                 <FullCalendar
                   ref={calendarRef}
                   plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-                  initialView="timeGridWeek"
+                  initialView={viewMode}
                   headerToolbar={{ left: "prev,next today", center: "title", right: "dayGridMonth,timeGridWeek,timeGridDay" }}
                   buttonText={{ today: "Hoje", month: "Mês", week: "Semana", day: "Dia" }}
                   locale="pt-br"
@@ -511,7 +575,16 @@ export default function CalendarPage() {
           )}
         </AppSectionBlock>
 
-        <AppSectionBlock title="Agenda do dia e conflitos" subtitle="Itens do dia para reação rápida" compact>
+        <AppSectionBlock title="Conflitos e sobrecarga" subtitle="Itens que pedem ajuste operacional" compact>
+          <AppListBlock
+            compact
+            items={conflictItems.length > 0 ? conflictItems : [{ title: "Sem conflitos críticos", subtitle: "No-show e cancelamentos estão controlados." }]}
+          />
+        </AppSectionBlock>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <AppSectionBlock title="Agenda do dia" subtitle="Leitura rápida para execução imediata" compact>
           <AppListBlock
             compact
             items={todayItems.length > 0 ? todayItems : [{ title: "Sem agenda para hoje", subtitle: "Use novo agendamento para preencher a rotina.", action: <Button size="sm" variant="outline" onClick={() => setCreateModal({ open: true, startStr: formatDateTimeLocalInput(new Date()), endStr: formatDateTimeLocalInput(new Date(Date.now() + 60*60*1000)) })}>Agendar</Button> }]}
@@ -523,6 +596,17 @@ export default function CalendarPage() {
               </span>
             ))}
           </div>
+        </AppSectionBlock>
+
+        <AppSectionBlock title="Vazios operacionais" subtitle="Dias sem agenda nos próximos 7 dias" compact>
+          <AppListBlock
+            compact
+            items={idleDays.length > 0 ? idleDays.map((day) => ({
+              title: day.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "2-digit" }),
+              subtitle: "Sem agendamentos. Pode absorver encaixes ou prevenção.",
+              action: <Button type="button" size="sm" variant="outline" onClick={() => navigate("/appointments?view=calendar_macro")}>Abrir agendamentos</Button>,
+            })) : [{ title: "Sem vazios na semana", subtitle: "A distribuição de agenda está preenchida." }]}
+          />
         </AppSectionBlock>
       </div>
 
@@ -539,8 +623,9 @@ export default function CalendarPage() {
         state={detailModal}
         onClose={() => setDetailModal({ open: false, event: null })}
         onUpdate={() => void appointmentsQuery.refetch()}
-        onOpenExecution={handleOpenExecution}
-        onOpenWhatsApp={handleOpenWhatsApp}
+        onOpenAppointment={handleOpenAppointment}
+        onOpenServiceOrder={handleOpenServiceOrder}
+        onOpenCustomer={handleOpenCustomer}
       />
     </PageWrapper>
   );

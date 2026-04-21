@@ -138,6 +138,16 @@ export default function BillingPage() {
 
   const currentPlan = String(status?.plan ?? limits?.plan ?? "FREE").toUpperCase();
   const subscriptionStatus = String(status?.status ?? "ACTIVE").toUpperCase();
+  const subscriptionStatusLabel =
+    subscriptionStatus === "ACTIVE"
+      ? "Ativo"
+      : subscriptionStatus === "TRIALING"
+        ? "Trial"
+        : subscriptionStatus === "PAST_DUE"
+          ? "Em atraso"
+          : subscriptionStatus === "CANCELED"
+            ? "Cancelado"
+            : subscriptionStatus;
   const stripeConfigured = readinessQuery.data?.integrations?.stripe === "configured";
   const isTrial = Boolean(limits?.trial?.isTrial);
   const blockedItems = usageItems.filter((item) => {
@@ -169,17 +179,17 @@ export default function BillingPage() {
 
   return (
     <PageWrapper
-      title="Assinatura e plano"
-      subtitle="Controle plano, limites e cobrança com leitura clara e previsível."
+      title="Planos"
+      subtitle="Como sua empresa paga para usar o Nexo, com visão simples e previsível."
     >
       <OperationalTopCard
-        contextLabel="Direção comercial"
-        title="Billing transparente"
-        description="Plano atual, status da assinatura e próxima cobrança com ações seguras."
+        contextLabel="Direção de assinatura"
+        title="Planos e cobrança do Nexo"
+        description="Esta área controla a assinatura da sua empresa no Nexo (não confundir com o Financeiro dos seus clientes)."
         chips={(
           <>
             <AppStatusBadge label={`Plano ${currentPlan}`} />
-            <AppStatusBadge label={`Assinatura ${subscriptionStatus}`} />
+            <AppStatusBadge label={`Assinatura ${subscriptionStatusLabel}`} />
             <AppStatusBadge label={`Integrações prontas ${stripeConfigured ? "1/1" : "0/1"}`} />
           </>
         )}
@@ -196,17 +206,22 @@ export default function BillingPage() {
 
       <AppKpiRow
         items={[
-          { title: "Plano atual", value: currentPlan, hint: "assinatura ativa" },
-          { title: "Status", value: subscriptionStatus, hint: "estado de cobrança" },
+          { title: "Plano atual", value: currentPlan, hint: "uso do Nexo" },
+          {
+            title: "Valor",
+            value: `${formatCurrency(PLAN_BASE_PRICE_CENTS[currentPlan as PlanName] ?? 0)}/mês`,
+            hint: "referência do plano",
+          },
+          { title: "Status", value: subscriptionStatusLabel, hint: "estado da assinatura" },
           {
             title: "Próxima cobrança",
             value: limits?.trial?.endsAt
               ? new Date(limits.trial.endsAt).toLocaleDateString("pt-BR")
               : "Não informada",
-            hint: "próximo marco financeiro",
+            hint: "próximo marco de assinatura",
           },
         ]}
-        gridClassName="grid-cols-1 md:grid-cols-3"
+        gridClassName="grid-cols-1 md:grid-cols-2 xl:grid-cols-4"
       />
 
       {!stripeConfigured ? (
@@ -249,15 +264,19 @@ export default function BillingPage() {
           </AppDataTable>
         </AppSectionBlock>
 
-        <AppSectionBlock title="Ações de gerenciamento" subtitle="Fluxo previsível de billing" compact>
+        <AppSectionBlock title="Forma de pagamento e ações" subtitle="Gestão direta da assinatura" compact>
           <AppListBlock
             compact
             minItems={4}
             items={[
               {
-                title: "Alterar plano",
-                subtitle: "Ajuste capacidade para manter receita sem bloqueio.",
-                action: <Button type="button" variant="outline" onClick={() => void handleUpgrade("PRO")}>Alterar</Button>,
+                title: "Forma de pagamento",
+                subtitle: stripeConfigured ? "Cartão via Stripe conectado." : "Checkout indisponível neste ambiente.",
+              },
+              {
+                title: "Trocar plano",
+                subtitle: "Ajuste capacidade sem interromper a operação.",
+                action: <Button type="button" variant="outline" onClick={() => void handleUpgrade("PRO")}>Trocar</Button>,
               },
               {
                 title: "Atualizar pagamento",
@@ -283,7 +302,37 @@ export default function BillingPage() {
         </AppSectionBlock>
       </div>
 
-      <AppSectionBlock title="Planos disponíveis" subtitle="Comparação clara para decisão" compact>
+      <AppSectionBlock title="Histórico de cobranças e faturas" subtitle="Registro para conferência rápida" compact>
+        <AppDataTable>
+          <table className="w-full min-w-[760px] text-sm">
+            <thead>
+              <tr className="border-b border-[var(--border-subtle)] text-left text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                <th className="px-3 py-2">Data</th>
+                <th className="px-3 py-2">Descrição</th>
+                <th className="px-3 py-2">Valor</th>
+                <th className="px-3 py-2">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(Array.isArray(status?.events) ? status.events : []).slice(0, 6).map((event: any, index: number) => (
+                <tr key={`${event?.id ?? event?.createdAt ?? index}`} className="border-b border-[var(--border-subtle)]/60">
+                  <td className="px-3 py-2">{event?.createdAt ? new Date(event.createdAt).toLocaleDateString("pt-BR") : "—"}</td>
+                  <td className="px-3 py-2 text-[var(--text-primary)]">{String(event?.description ?? event?.type ?? "Cobrança de assinatura")}</td>
+                  <td className="px-3 py-2">{event?.amountCents ? formatCurrency(Number(event.amountCents)) : "—"}</td>
+                  <td className="px-3 py-2"><AppStatusBadge label={String(event?.status ?? "Registrado")} /></td>
+                </tr>
+              ))}
+              {!Array.isArray(status?.events) || status.events.length === 0 ? (
+                <tr>
+                  <td className="px-3 py-3 text-[var(--text-muted)]" colSpan={4}>Ainda não há histórico disponível neste ambiente.</td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </AppDataTable>
+      </AppSectionBlock>
+
+      <AppSectionBlock title="Planos disponíveis" subtitle="Comparação para evolução da assinatura" compact>
         {queryState.shouldBlockForError ? (
           <EmptyState
             icon={<AlertTriangle className="h-7 w-7" />}
