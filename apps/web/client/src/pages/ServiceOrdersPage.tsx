@@ -12,6 +12,7 @@ import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedbackButton";
 import { AppOperationalModal } from "@/components/operating-system/AppOperationalModal";
 import { WorkspaceScaffold } from "@/components/operating-system/WorkspaceScaffold";
+import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import {
   EmptyActionState,
   explainOperationalError,
@@ -42,6 +43,10 @@ import {
   toSingleLineAction,
 } from "@/lib/operations/operational-list";
 import {
+  type OperationalSeverity,
+  getOperationalSeverityLabel,
+} from "@/lib/operations/operational-intelligence";
+import {
   buildCompactOperationalTimeline,
   getOperationalSignalToneClasses,
   type OperationalSignal,
@@ -56,6 +61,9 @@ type ServiceOrderTab =
   | "history";
 type WindowFilter = "all" | "today" | "next7" | "overdue";
 type PriorityFilter = "all" | "high" | "medium" | "low";
+type StatusFilter = "all" | "created" | "in_progress" | "done" | "canceled";
+type BillingFilter = "all" | "pending" | "generated";
+type DelayFilter = "all" | "overdue";
 const SERVICE_ORDERS_PER_PAGE = 8;
 
 type ServiceOrderActionIntent =
@@ -162,13 +170,13 @@ function getPaginationSlots(totalPages: number, currentPage: number) {
 
 function getPaginationButtonClass(active: boolean) {
   return active
-    ? "min-w-8 rounded-md border border-[var(--accent-primary)] bg-[var(--accent-soft)] px-2 py-1.5 text-xs font-semibold text-[var(--accent-primary)] shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--accent-primary)_24%,transparent)] transition-all"
+    ? "min-w-8 rounded-md border border-[var(--accent-primary)] bg-[var(--accent-soft)] px-2 py-1.5 text-xs font-semibold text-[var(--accent-primary)] transition-all"
     : "min-w-8 rounded-md border border-[var(--border-subtle)] px-2 py-1.5 text-xs font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-subtle)]";
 }
 
 function getOrderRowClass(active: boolean) {
   return active
-    ? "cursor-pointer border-t border-[var(--border-subtle)] bg-[var(--accent-soft)]/45 shadow-[inset_3px_0_0_0_var(--accent-primary)] transition-colors hover:bg-[var(--accent-soft)]/60 focus-within:bg-[var(--accent-soft)]/65"
+    ? "cursor-pointer border-t border-[var(--border-subtle)] bg-[var(--accent-soft)]/45 transition-colors hover:bg-[var(--accent-soft)]/60 focus-within:bg-[var(--accent-soft)]/65"
     : "cursor-pointer border-t border-[var(--border-subtle)] transition-colors hover:bg-[var(--surface-subtle)]/60 focus-within:bg-[var(--surface-subtle)]/70";
 }
 
@@ -280,6 +288,12 @@ function getOperationalSignals(order: any, timeline: any[]) {
   return signals;
 }
 
+function getOperationalRiskState(signals: OperationalSignal[]) {
+  if (signals.some(signal => signal.tone === "critical")) return "Crítico";
+  if (signals.some(signal => signal.tone === "warning")) return "Atenção";
+  return "Saudável";
+}
+
 export default function ServiceOrdersPage() {
   const [location, navigate] = useLocation();
   const [openCreate, setOpenCreate] = useState(false);
@@ -297,6 +311,22 @@ export default function ServiceOrdersPage() {
   );
   const [priorityFilter, setPriorityFilter] = useOperationalMemoryState<PriorityFilter>(
     "nexo.service-orders.priority-filter.v1",
+    "all"
+  );
+  const [statusFilter, setStatusFilter] = useOperationalMemoryState<StatusFilter>(
+    "nexo.service-orders.status-filter.v1",
+    "all"
+  );
+  const [responsibleFilter, setResponsibleFilter] = useOperationalMemoryState(
+    "nexo.service-orders.responsible-filter.v1",
+    "all"
+  );
+  const [billingFilter, setBillingFilter] = useOperationalMemoryState<BillingFilter>(
+    "nexo.service-orders.billing-filter.v1",
+    "all"
+  );
+  const [delayFilter, setDelayFilter] = useOperationalMemoryState<DelayFilter>(
+    "nexo.service-orders.delay-filter.v1",
     "all"
   );
   const [customerFilter, setCustomerFilter] = useOperationalMemoryState(
@@ -428,6 +458,37 @@ export default function ServiceOrdersPage() {
         return tier.toLowerCase() === priorityFilter;
       });
     }
+    if (statusFilter !== "all") {
+      base = base.filter(item => {
+        const status = normalizeStatus(item?.status);
+        if (statusFilter === "created") return ["OPEN", "ASSIGNED"].includes(status);
+        if (statusFilter === "in_progress") return status === "IN_PROGRESS";
+        if (statusFilter === "done") return status === "DONE";
+        return status === "CANCELED";
+      });
+    }
+    if (responsibleFilter !== "all") {
+      base = base.filter(
+        item => String(item?.assignedToPersonId ?? "") === responsibleFilter
+      );
+    }
+    if (billingFilter !== "all") {
+      base = base.filter(item =>
+        billingFilter === "pending"
+          ? !item?.financialSummary?.hasCharge
+          : Boolean(item?.financialSummary?.hasCharge)
+      );
+    }
+    if (delayFilter === "overdue") {
+      base = base.filter(item => {
+        const status = normalizeStatus(item?.status);
+        const scheduled = safeDate(item?.scheduledFor);
+        return (
+          Boolean(scheduled && scheduled < now) &&
+          ["OPEN", "ASSIGNED", "IN_PROGRESS"].includes(status)
+        );
+      });
+    }
 
     if (customerFilter !== "all") {
       base = base.filter(
@@ -449,15 +510,48 @@ export default function ServiceOrdersPage() {
       });
     }
 
-    return base;
+    return [...base].sort((a, b) => {
+      const score = (order: any) => {
+        const status = normalizeStatus(order?.status);
+        const scheduled = safeDate(order?.scheduledFor);
+        const overdue =
+          Boolean(scheduled && scheduled < now) &&
+          ["OPEN", "ASSIGNED", "IN_PROGRESS"].includes(status);
+        const blocked = ["BLOCKED", "ON_HOLD", "PAUSED"].includes(status);
+        const noOwner = !order?.assignedToPersonId;
+        const pendingCharge =
+          status === "DONE" && !Boolean(order?.financialSummary?.hasCharge);
+        const highPriority = Number(order?.priority ?? 0) >= 4;
+        const inExecution = status === "IN_PROGRESS";
+        return (
+          (overdue ? 100 : 0) +
+          (blocked ? 80 : 0) +
+          (pendingCharge ? 60 : 0) +
+          (noOwner ? 45 : 0) +
+          (inExecution ? 20 : 0) +
+          (highPriority ? 12 : 0) +
+          (Number(order?.priority ?? 0) || 0)
+        );
+      };
+      const diff = score(b) - score(a);
+      if (diff !== 0) return diff;
+      return (
+        (safeDate(b?.scheduledFor)?.getTime() ?? 0) -
+        (safeDate(a?.scheduledFor)?.getTime() ?? 0)
+      );
+    });
   }, [
     activeTab,
     customerFilter,
     next7End,
     now,
     orders,
+    billingFilter,
+    delayFilter,
     priorityFilter,
+    responsibleFilter,
     searchTerm,
+    statusFilter,
     todayWindow.end,
     todayWindow.start,
     windowFilter,
@@ -782,6 +876,36 @@ export default function ServiceOrdersPage() {
           customers.find(item => String(item?.id ?? "") === customerFilter)
             ?.name ?? "Cliente"
         );
+  const selectedResponsibleName =
+    responsibleFilter === "all"
+      ? ""
+      : String(
+          people.find(item => String(item?.id ?? "") === responsibleFilter)?.name ??
+            "Responsável"
+        );
+  const globalAlerts = useMemo(() => {
+    const delayed = filteredOrders.filter(item => {
+      const status = normalizeStatus(item?.status);
+      const scheduled = safeDate(item?.scheduledFor);
+      return Boolean(scheduled && scheduled < new Date()) && ["OPEN", "ASSIGNED", "IN_PROGRESS"].includes(status);
+    }).length;
+    const blocked = filteredOrders.filter(item =>
+      ["BLOCKED", "ON_HOLD", "PAUSED"].includes(normalizeStatus(item?.status))
+    ).length;
+    const noOwner = filteredOrders.filter(item => !item?.assignedToPersonId).length;
+    const withoutCharge = filteredOrders.filter(item => !item?.financialSummary?.hasCharge).length;
+    return [
+      { key: "delayed", label: "O.S. atrasadas", value: delayed, tone: "critical" as const, onAction: () => setDelayFilter("overdue") },
+      { key: "blocked", label: "O.S. paradas", value: blocked, tone: "critical" as const, onAction: () => setActiveTab("attention") },
+      { key: "no-owner", label: "Sem responsável", value: noOwner, tone: "warning" as const, onAction: () => setResponsibleFilter("all") },
+      { key: "without-charge", label: "Sem cobrança", value: withoutCharge, tone: "warning" as const, onAction: () => setBillingFilter("pending") },
+    ].filter(item => item.value > 0);
+  }, [filteredOrders]);
+  const pageSeverity = useMemo<OperationalSeverity>(() => {
+    if (globalAlerts.some(item => item.tone === "critical")) return "critical";
+    if (globalAlerts.some(item => item.tone === "warning")) return "pending";
+    return "healthy";
+  }, [globalAlerts]);
 
   return (
     <PageWrapper
@@ -818,6 +942,26 @@ export default function ServiceOrdersPage() {
               idleLabel={headerCta.label}
               onClick={headerCta.onClick}
             />
+          }
+          secondaryActions={
+            <div className="flex flex-wrap items-center gap-2">
+              <AppStatusBadge label={`Severidade: ${getOperationalSeverityLabel(pageSeverity)}`} />
+              <AppStatusBadge label={`${filteredOrders.length} em execução ativa`} />
+            </div>
+          }
+        />
+        <OperationalTopCard
+          title="Central de execução de O.S."
+          description="Da lista ao workspace, execute atendimento, comunicação e cobrança sem sair da rota."
+          primaryAction={
+            <SecondaryButton type="button" className="h-8 px-3 text-xs" onClick={() => setOpenCreate(true)}>
+              Criar O.S.
+            </SecondaryButton>
+          }
+          secondaryActions={
+            <SecondaryButton type="button" className="h-8 px-3 text-xs" onClick={() => navigate("/appointments")}>
+              Puxar do agendamento
+            </SecondaryButton>
           }
         />
 
@@ -874,6 +1018,22 @@ export default function ServiceOrdersPage() {
               </div>
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                  Status
+                </label>
+                <select
+                  className="h-9 w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-xs text-[var(--text-primary)]"
+                  value={statusFilter}
+                  onChange={event => setStatusFilter(event.target.value as StatusFilter)}
+                >
+                  <option value="all">Todos</option>
+                  <option value="created">Criadas</option>
+                  <option value="in_progress">Em andamento</option>
+                  <option value="done">Concluídas</option>
+                  <option value="canceled">Canceladas</option>
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
                   Prioridade
                 </label>
                 <select
@@ -887,6 +1047,23 @@ export default function ServiceOrdersPage() {
                   <option value="high">Alta</option>
                   <option value="medium">Média</option>
                   <option value="low">Baixa</option>
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                  Responsável
+                </label>
+                <select
+                  className="h-9 w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-xs text-[var(--text-primary)]"
+                  value={responsibleFilter}
+                  onChange={event => setResponsibleFilter(event.target.value)}
+                >
+                  <option value="all">Todos</option>
+                  {people.map(person => (
+                    <option key={String(person.id)} value={String(person.id)}>
+                      {String(person.name ?? "Responsável")}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div className="space-y-1.5">
@@ -906,9 +1083,26 @@ export default function ServiceOrdersPage() {
                   ))}
                 </select>
               </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                  Cobrança
+                </label>
+                <select
+                  className="h-9 w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-xs text-[var(--text-primary)]"
+                  value={billingFilter}
+                  onChange={event => setBillingFilter(event.target.value as BillingFilter)}
+                >
+                  <option value="all">Todos</option>
+                  <option value="pending">Pendente</option>
+                  <option value="generated">Gerada</option>
+                </select>
+              </div>
             </div>
           }
           activeFilterChips={[
+            ...(statusFilter !== "all"
+              ? [{ key: "status", label: `Status: ${statusFilter}`, onRemove: () => setStatusFilter("all") }]
+              : []),
             ...(windowFilter === "next7"
               ? [
                   {
@@ -942,13 +1136,54 @@ export default function ServiceOrdersPage() {
                   },
                 ]
               : []),
+            ...(responsibleFilter !== "all"
+              ? [{ key: "responsible", label: `Responsável: ${selectedResponsibleName}`, onRemove: () => setResponsibleFilter("all") }]
+              : []),
+            ...(billingFilter !== "all"
+              ? [{ key: "billing", label: `Cobrança: ${billingFilter === "pending" ? "Pendente" : "Gerada"}`, onRemove: () => setBillingFilter("all") }]
+              : []),
+            ...(delayFilter === "overdue"
+              ? [{ key: "delay", label: "Apenas atrasadas", onRemove: () => setDelayFilter("all") }]
+              : []),
           ]}
           onClearAllFilters={() => {
             setWindowFilter("all");
             setPriorityFilter("all");
+            setStatusFilter("all");
+            setResponsibleFilter("all");
             setCustomerFilter("all");
+            setBillingFilter("all");
+            setDelayFilter("all");
           }}
         />
+        {globalAlerts.length > 0 ? (
+          <AppSectionBlock
+            title="Alertas de execução"
+            subtitle="Priorize o que está travando operação e receita agora."
+            compact
+          >
+            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+              {globalAlerts.map(alert => (
+                <button
+                  key={alert.key}
+                  type="button"
+                  className={`rounded-lg border p-3 text-left transition-colors ${
+                    alert.tone === "critical"
+                      ? "border-[var(--dashboard-danger)]/35 bg-[var(--dashboard-danger-soft)]/50 hover:bg-[var(--dashboard-danger-soft)]/70"
+                      : "border-[var(--dashboard-warning)]/35 bg-[var(--dashboard-warning-soft)]/45 hover:bg-[var(--dashboard-warning-soft)]/65"
+                  }`}
+                  onClick={alert.onAction}
+                >
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                    {alert.label}
+                  </p>
+                  <p className="mt-1 text-lg font-semibold text-[var(--text-primary)]">{alert.value}</p>
+                  <p className="mt-1 text-xs text-[var(--text-muted)]">Atuar agora</p>
+                </button>
+              ))}
+            </div>
+          </AppSectionBlock>
+        ) : null}
 
         <div className="space-y-4">
           <AppSectionBlock
@@ -988,11 +1223,13 @@ export default function ServiceOrdersPage() {
                     <thead className="bg-[var(--surface-elevated)] text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
                       <tr>
                         <th className="w-[24%] px-4 py-2.5 text-left align-middle">Ordem</th>
-                        <th className="w-[22%] px-4 py-2.5 text-left align-middle">Cliente</th>
-                        <th className="w-[18%] px-4 py-2.5 text-left align-middle">Status</th>
-                        <th className="w-[12%] px-4 py-2.5 text-left align-middle">Prioridade</th>
-                        <th className="w-[18%] px-4 py-2.5 text-left align-middle">Próxima ação</th>
-                        <th className="w-[156px] px-4 py-2.5 text-right align-middle">Ações</th>
+                        <th className="w-[15%] px-4 py-2.5 text-left align-middle">Cliente</th>
+                        <th className="w-[14%] px-4 py-2.5 text-left align-middle">Status</th>
+                        <th className="w-[10%] px-4 py-2.5 text-left align-middle">Responsável</th>
+                        <th className="w-[12%] px-4 py-2.5 text-left align-middle">Prazo/valor</th>
+                        <th className="w-[10%] px-4 py-2.5 text-left align-middle">Prioridade</th>
+                        <th className="w-[13%] px-4 py-2.5 text-left align-middle">Próxima ação</th>
+                        <th className="w-[140px] px-4 py-2.5 text-right align-middle">Ações</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1027,6 +1264,16 @@ export default function ServiceOrdersPage() {
                           ? `Agendada: ${scheduledDate?.toLocaleDateString("pt-BR")}`
                           : "Sem data definida";
                         const shouldShowNextActionTitle = nextAction.length > 30;
+                        const assignedName = order?.assignedToPersonId
+                          ? String(
+                              people.find(
+                                person =>
+                                  String(person?.id ?? "") ===
+                                  String(order?.assignedToPersonId ?? "")
+                              )?.name ?? "Responsável"
+                            )
+                          : "Sem responsável";
+                        const riskState = getOperationalRiskState(rowSignals);
 
                         return (
                           <tr
@@ -1078,6 +1325,24 @@ export default function ServiceOrdersPage() {
                               </div>
                             </td>
                             <td className="px-4 py-3.5 align-top">
+                              <p className="text-xs font-medium text-[var(--text-primary)]">{assignedName}</p>
+                              <p className="mt-1 text-[11px] text-[var(--text-muted)]">{riskState}</p>
+                            </td>
+                            <td className="px-4 py-3.5 align-top">
+                              <p className="text-xs text-[var(--text-secondary)]">
+                                {scheduledDate
+                                  ? scheduledDate.toLocaleDateString("pt-BR")
+                                  : "Sem prazo"}
+                              </p>
+                              <p className="mt-1 text-[11px] text-[var(--text-muted)]">
+                                {order?.totalAmountCents
+                                  ? formatMoney(Number(order.totalAmountCents))
+                                  : order?.financialSummary?.chargeAmountCents
+                                    ? formatMoney(Number(order.financialSummary.chargeAmountCents))
+                                    : "Sem valor"}
+                              </p>
+                            </td>
+                            <td className="px-4 py-3.5 align-top">
                               <AppPriorityBadge label={priorityLabel} />
                             </td>
                             <td className="px-4 py-3.5 align-top">
@@ -1105,11 +1370,18 @@ export default function ServiceOrdersPage() {
                                   contentClassName="min-w-[240px]"
                                   items={[
                                     {
-                                      label: "Abrir cliente",
-                                      onSelect: () =>
-                                        navigate(
-                                          `/customers?customerId=${order.customerId}`
-                                        ),
+                                      label: "Iniciar",
+                                      onSelect: () => {
+                                        setFocusedOrderId(String(order?.id ?? ""));
+                                        void executeOrderStatus("IN_PROGRESS");
+                                      },
+                                    },
+                                    {
+                                      label: "Concluir",
+                                      onSelect: () => {
+                                        setFocusedOrderId(String(order?.id ?? ""));
+                                        void executeOrderStatus("DONE");
+                                      },
                                     },
                                     {
                                       label: "Abrir agendamentos",
@@ -1124,10 +1396,7 @@ export default function ServiceOrdersPage() {
                                     },
                                     {
                                       label: "Gerar cobrança",
-                                      onSelect: () =>
-                                        navigate(
-                                          `/finances?serviceOrderId=${order.id}`
-                                        ),
+                                      onSelect: () => navigate(`/finances?serviceOrderId=${order.id}`),
                                     },
                                     {
                                       label: "Enviar WhatsApp",
@@ -1135,6 +1404,13 @@ export default function ServiceOrdersPage() {
                                         navigate(
                                           `/whatsapp?customerId=${order.customerId}`
                                         ),
+                                    },
+                                    {
+                                      label: "Abrir detalhe",
+                                      onSelect: () => {
+                                        setFocusedOrderId(String(order?.id ?? ""));
+                                        setOpenOperationalModal(true);
+                                      },
                                     },
                                   ]}
                                 />
@@ -1280,6 +1556,23 @@ export default function ServiceOrdersPage() {
 
                     <section className="space-y-1.5 border-t border-[var(--border-subtle)] pt-3">
                       <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                        Bloco de execução
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        <SecondaryButton type="button" className="h-8 px-3 text-xs" onClick={() => void executeOrderStatus("IN_PROGRESS")}>
+                          Iniciar atendimento
+                        </SecondaryButton>
+                        <SecondaryButton type="button" className="h-8 px-3 text-xs" onClick={() => void executeOrderStatus("CANCELED")}>
+                          Pausar
+                        </SecondaryButton>
+                        <Button type="button" className="h-8 px-3 text-xs" onClick={() => void executeOrderStatus("DONE")}>
+                          Concluir
+                        </Button>
+                      </div>
+                    </section>
+
+                    <section className="space-y-1.5 border-t border-[var(--border-subtle)] pt-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
                         Contexto de execução
                       </p>
                       <p className="text-sm text-[var(--text-secondary)]">
@@ -1327,6 +1620,26 @@ export default function ServiceOrdersPage() {
                           </SecondaryButton>
                         ))}
                       </div>
+                    </section>
+
+                    <section className="space-y-1.5 border-t border-[var(--border-subtle)] pt-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                        Descrição e observações
+                      </p>
+                      <p className="text-sm text-[var(--text-secondary)]">
+                        {String(focusedOrder?.description ?? focusedOrder?.title ?? "Sem descrição operacional registrada.")}
+                      </p>
+                    </section>
+
+                    <section className="space-y-1.5 border-t border-[var(--border-subtle)] pt-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                        Checklist
+                      </p>
+                      <p className="text-xs text-[var(--text-muted)]">
+                        {Array.isArray(focusedOrder?.checklistItems) && focusedOrder.checklistItems.length > 0
+                          ? `${focusedOrder.checklistItems.filter((item: any) => item?.done).length}/${focusedOrder.checklistItems.length} etapas concluídas.`
+                          : "Sem checklist estruturado para esta O.S."}
+                      </p>
                     </section>
 
                     <section className="space-y-1.5 border-t border-[var(--border-subtle)] pt-3">
