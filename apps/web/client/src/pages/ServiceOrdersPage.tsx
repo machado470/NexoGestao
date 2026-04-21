@@ -11,6 +11,7 @@ import { AppRowActionsDropdown } from "@/components/app-system";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedbackButton";
 import { AppOperationalModal } from "@/components/operating-system/AppOperationalModal";
+import { WorkspaceScaffold } from "@/components/operating-system/WorkspaceScaffold";
 import {
   EmptyActionState,
   explainOperationalError,
@@ -32,7 +33,7 @@ import {
   AppSectionBlock,
   AppStatusBadge,
 } from "@/components/internal-page-system";
-import { SecondaryButton } from "@/components/design-system";
+import { Button, SecondaryButton } from "@/components/design-system";
 import { getDayWindow, inRange, safeDate } from "@/lib/operational/kpi";
 import {
   OPERATIONAL_NEXT_ACTION_CLASS,
@@ -143,8 +144,21 @@ function getPaginationButtonClass(active: boolean) {
 
 function getOrderRowClass(active: boolean) {
   return active
-    ? "cursor-pointer border-t border-[var(--border-subtle)] bg-[var(--accent-soft)]/45 transition-colors hover:bg-[var(--accent-soft)]/60 focus-within:bg-[var(--accent-soft)]/65"
+    ? "cursor-pointer border-t border-[var(--border-subtle)] bg-[var(--accent-soft)]/45 shadow-[inset_3px_0_0_0_var(--accent-primary)] transition-colors hover:bg-[var(--accent-soft)]/60 focus-within:bg-[var(--accent-soft)]/65"
     : "cursor-pointer border-t border-[var(--border-subtle)] transition-colors hover:bg-[var(--surface-subtle)]/60 focus-within:bg-[var(--surface-subtle)]/70";
+}
+
+function formatMoney(value: number) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(value / 100);
+}
+
+function formatDateLabel(value: unknown, fallback = "Sem data definida") {
+  const parsed = safeDate(value);
+  if (!parsed) return fallback;
+  return parsed.toLocaleString("pt-BR");
 }
 
 export default function ServiceOrdersPage() {
@@ -170,7 +184,9 @@ export default function ServiceOrdersPage() {
     "nexo.service-orders.customer-filter.v1",
     "all"
   );
-  const [focusedOrderId, setFocusedOrderId] = useState("");
+  const [focusedOrderId, setFocusedOrderId] = useOperationalMemoryState<
+    string | null
+  >("nexo.service-orders.active-id.v1", null);
   const [openOperationalModal, setOpenOperationalModal] = useState(false);
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
   const [actionFeedbackTone, setActionFeedbackTone] = useState<
@@ -322,12 +338,12 @@ export default function ServiceOrdersPage() {
 
   useEffect(() => {
     if (filteredOrders.length === 0) {
-      setFocusedOrderId("");
+      setFocusedOrderId(null);
       return;
     }
 
     const hasFocused = filteredOrders.some(
-      item => String(item?.id ?? "") === focusedOrderId
+      item => String(item?.id ?? "") === String(focusedOrderId ?? "")
     );
     if (!hasFocused) {
       setFocusedOrderId(String(filteredOrders[0]?.id ?? ""));
@@ -335,9 +351,31 @@ export default function ServiceOrdersPage() {
   }, [filteredOrders, focusedOrderId]);
 
   const focusedOrder =
-    filteredOrders.find(item => String(item?.id ?? "") === focusedOrderId) ??
+    filteredOrders.find(
+      item => String(item?.id ?? "") === String(focusedOrderId ?? "")
+    ) ??
     filteredOrders[0] ??
     null;
+
+  const focusedOrderStatus = normalizeStatus(focusedOrder?.status);
+  const focusedNextAction = focusedOrder ? getNextAction(focusedOrder) : "—";
+  const focusedPriorityLabel = getPriorityLabel(Number(focusedOrder?.priority ?? 2));
+  const focusedHasCharge = Boolean(focusedOrder?.financialSummary?.hasCharge);
+  const focusedScheduledDate = safeDate(focusedOrder?.scheduledFor);
+  const focusedIsOverdue = Boolean(
+    focusedScheduledDate &&
+      focusedScheduledDate < new Date() &&
+      ["OPEN", "ASSIGNED", "IN_PROGRESS"].includes(focusedOrderStatus)
+  );
+  const focusedNeedsNotification = focusedOrderStatus === "WAITING_CUSTOMER";
+  const focusedIsBlocked = ["BLOCKED", "ON_HOLD", "PAUSED"].includes(
+    focusedOrderStatus
+  );
+  const focusedChargeStatus = !focusedHasCharge
+    ? "Sem cobrança vinculada"
+    : focusedOrderStatus === "DONE"
+      ? "Cobrança vinculada"
+      : "Cobrança em preparação";
 
   const totalOrders = filteredOrders.length;
   const totalPages = Math.max(1, Math.ceil(totalOrders / SERVICE_ORDERS_PER_PAGE));
@@ -671,7 +709,8 @@ export default function ServiceOrdersPage() {
                             className={getOrderRowClass(isFocused)}
                             onClick={() => {
                               setFocusedOrderId(String(order?.id ?? ""));
-                              setOpenOperationalModal(true);
+                              setActionFeedback(null);
+                              setActionFeedbackTone("neutral");
                             }}
                           >
                             <td className="px-4 py-3.5 align-top">
@@ -681,6 +720,11 @@ export default function ServiceOrdersPage() {
                               <p className="mt-1 truncate text-[11px] text-[var(--text-muted)]">
                                 #{String(order?.id ?? "—")}
                               </p>
+                              {isFocused ? (
+                                <p className="mt-1 text-[11px] font-medium text-[var(--accent-primary)]">
+                                  Em foco no workspace
+                                </p>
+                              ) : null}
                             </td>
                             <td className="px-4 py-3.5 align-top">
                               <p
@@ -712,6 +756,11 @@ export default function ServiceOrdersPage() {
                               {status === "WAITING_CUSTOMER" ? (
                                 <p className="mt-1 truncate text-xs text-sky-500">
                                   Precisa notificar cliente
+                                </p>
+                              ) : null}
+                              {["BLOCKED", "ON_HOLD", "PAUSED"].includes(status) ? (
+                                <p className="mt-1 truncate text-xs text-[var(--dashboard-danger)]">
+                                  Bloqueio operacional
                                 </p>
                               ) : null}
                             </td>
@@ -834,15 +883,221 @@ export default function ServiceOrdersPage() {
           </AppSectionBlock>
 
           <AppSectionBlock
-            title="Detalhe operacional de O.S."
-            subtitle="Abra o modal operacional para resolver execução, cobrança e comunicação no mesmo contexto."
-            compact
+            title="Workspace operacional da O.S."
+            subtitle="Camada intermediária entre lista e modal para manter contexto de execução, cobrança e comunicação."
           >
-            <p className="text-xs text-[var(--text-muted)]">
-              {focusedOrder
-                ? `Em foco: ${String(focusedOrder?.title ?? "O.S. sem título")} · ${getNextAction(focusedOrder)}`
-                : "Selecione uma ordem para abrir a central operacional."}
-            </p>
+            {!focusedOrder ? (
+              <AppPageEmptyState
+                title="Selecione uma ordem"
+                description="Clique em uma linha para abrir o workspace da O.S. com contexto contínuo e ação principal."
+              />
+            ) : (
+              <WorkspaceScaffold
+                title={`Workspace · ${String(focusedOrder?.title ?? "O.S. sem título")}`}
+                subtitle={`Cliente: ${String(focusedOrder?.customer?.name ?? "Cliente")} · Status ${getStatusLabel(focusedOrderStatus)}`}
+                primaryAction={{
+                  label: resolveOperationalActionLabel(
+                    focusedNextAction,
+                    getPrimaryActionLabel(focusedOrder, focusedNextAction)
+                  ),
+                  onClick: () => setOpenOperationalModal(true),
+                }}
+                context={
+                  <div className="space-y-4">
+                    <section className="rounded-xl border border-[var(--border-subtle)]/80 bg-[var(--surface-subtle)]/35 p-3.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <h4 className="text-sm font-semibold text-[var(--text-primary)]">
+                          {String(focusedOrder?.title ?? "O.S. sem título")}
+                        </h4>
+                        <div className="flex items-center gap-2">
+                          <AppStatusBadge label={getStatusLabel(focusedOrderStatus)} />
+                          <AppPriorityBadge label={focusedPriorityLabel} />
+                        </div>
+                      </div>
+                      <p className="mt-1 text-xs text-[var(--text-muted)]">
+                        #{String(focusedOrder?.id ?? "—")} · {focusedChargeStatus}
+                      </p>
+                      <p className="mt-2 text-xs text-[var(--text-secondary)]">
+                        Agendada para {formatDateLabel(focusedOrder?.scheduledFor)} ·{" "}
+                        Responsável:{" "}
+                        {focusedOrder?.assignedToPersonId
+                          ? String(
+                              people.find(
+                                person =>
+                                  String(person?.id ?? "") ===
+                                  String(focusedOrder?.assignedToPersonId ?? "")
+                              )?.name ?? "Pessoa atribuída"
+                            )
+                          : "Sem técnico atribuído"}
+                      </p>
+                    </section>
+
+                    <OperationalNextAction
+                      title={focusedNextAction}
+                      reason="Ação sugerida com base no status atual, sinais de execução e vínculo financeiro."
+                      urgency={
+                        focusedIsBlocked || focusedIsOverdue
+                          ? "Urgente"
+                          : focusedNeedsNotification
+                            ? "Atenção"
+                            : "Prioridade operacional"
+                      }
+                      impact={
+                        !focusedHasCharge && focusedOrderStatus === "DONE"
+                          ? "Evitar perda de receita"
+                          : "Proteger continuidade da execução"
+                      }
+                    />
+
+                    <section className="space-y-1.5 border-t border-[var(--border-subtle)] pt-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                        Contexto de execução
+                      </p>
+                      <p className="text-sm text-[var(--text-secondary)]">
+                        Etapa atual: {getStatusLabel(focusedOrderStatus)} ·{" "}
+                        {focusedIsOverdue
+                          ? "Atrasada para execução."
+                          : "Dentro da janela operacional."}
+                      </p>
+                      <p className="text-xs text-[var(--text-muted)]">
+                        Última atualização: {formatDateLabel(focusedOrder?.updatedAt, "Sem atualização registrada")}.
+                      </p>
+                    </section>
+
+                    <section className="space-y-1.5 border-t border-[var(--border-subtle)] pt-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                        Metadados operacionais
+                      </p>
+                      <p className="text-sm text-[var(--text-secondary)]">
+                        Cliente #{String(focusedOrder?.customerId ?? "—")} · Agendamento{" "}
+                        {focusedOrder?.appointmentId
+                          ? `#${String(focusedOrder?.appointmentId)}`
+                          : "não vinculado"}
+                        .
+                      </p>
+                      <p className="text-xs text-[var(--text-muted)]">
+                        Automações: {focusedHasCharge ? "financeiro conectado" : "aguardando geração de cobrança"}.
+                      </p>
+                    </section>
+                  </div>
+                }
+                finance={
+                  <section className="rounded-xl border border-[var(--border-subtle)]/80 p-3.5">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                      Contexto financeiro
+                    </p>
+                    <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                      Situação: {focusedChargeStatus}.
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--text-muted)]">
+                      Valor:{" "}
+                      {focusedOrder?.financialSummary?.amountCents
+                        ? formatMoney(Number(focusedOrder.financialSummary.amountCents))
+                        : "sem valor consolidado"}.
+                    </p>
+                    <SecondaryButton
+                      type="button"
+                      className="mt-3 h-8 px-3 text-xs"
+                      onClick={() => navigate(`/finances?serviceOrderId=${focusedOrder?.id}`)}
+                    >
+                      Abrir financeiro
+                    </SecondaryButton>
+                  </section>
+                }
+                communication={
+                  <section className="rounded-xl border border-[var(--border-subtle)]/80 p-3.5">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                      Comunicação
+                    </p>
+                    <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                      {focusedNeedsNotification
+                        ? "Cliente aguardando retorno no WhatsApp."
+                        : "Sem pendência crítica de contato."}
+                    </p>
+                    <Button
+                      type="button"
+                      className="mt-3 h-8 px-3 text-xs"
+                      onClick={() =>
+                        navigate(`/whatsapp?customerId=${focusedOrder?.customerId}`)
+                      }
+                    >
+                      Abrir WhatsApp
+                    </Button>
+                  </section>
+                }
+                timeline={
+                  <section className="rounded-xl border border-[var(--border-subtle)]/80 p-3.5">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                      Timeline curta
+                    </p>
+                    <ul className="mt-2 space-y-1.5 text-xs text-[var(--text-secondary)]">
+                      <li>• O.S. criada em {formatDateLabel(focusedOrder?.createdAt, "data não registrada")}.</li>
+                      <li>
+                        • Status atual: {getStatusLabel(focusedOrderStatus)}{focusedIsBlocked ? " (requer destravar)." : "."}
+                      </li>
+                      <li>
+                        • Cobrança: {focusedHasCharge ? "vinculada ao fluxo." : "ainda não gerada."}
+                      </li>
+                    </ul>
+                  </section>
+                }
+              >
+                <div className="space-y-4">
+                  <OperationalFlowState
+                    steps={[
+                      { label: "Cliente", state: "done" },
+                      {
+                        label: "Agendamento",
+                        state: focusedOrder?.appointmentId ? "done" : "pending",
+                      },
+                      { label: "O.S.", state: "current" },
+                      {
+                        label: "Cobrança",
+                        state: focusedHasCharge ? "done" : "pending",
+                      },
+                      {
+                        label: "Pagamento",
+                        state: focusedHasCharge ? "current" : "pending",
+                      },
+                    ]}
+                  />
+                  <OperationalRelationSummary
+                    title="Entidades conectadas"
+                    items={[
+                      `Cliente vinculado: ${String(focusedOrder?.customer?.name ?? "não identificado")}.`,
+                      focusedOrder?.appointmentId
+                        ? `Origem no agendamento #${String(focusedOrder?.appointmentId)}.`
+                        : "Sem agendamento de origem.",
+                      focusedHasCharge
+                        ? "Cobrança conectada ao fluxo financeiro."
+                        : "Fluxo financeiro ainda pendente para esta O.S.",
+                    ]}
+                  />
+                  {!focusedHasCharge ? (
+                    <EmptyActionState
+                      title="Cobrança pendente"
+                      description="A ordem já existe no fluxo, mas ainda sem cobrança ativa vinculada."
+                      ctaLabel="Gerar cobrança"
+                      onCta={() =>
+                        navigate(`/finances?serviceOrderId=${focusedOrder?.id}`)
+                      }
+                    />
+                  ) : null}
+                  {actionFeedback ? (
+                    <OperationalInlineFeedback
+                      tone={actionFeedbackTone}
+                      nextStep={
+                        actionFeedbackTone === "success"
+                          ? "Validar o impacto na lista e seguir para o próximo passo sugerido."
+                          : undefined
+                      }
+                    >
+                      {actionFeedback}
+                    </OperationalInlineFeedback>
+                  ) : null}
+                </div>
+              </WorkspaceScaffold>
+            )}
           </AppSectionBlock>
         </div>
       </div>
