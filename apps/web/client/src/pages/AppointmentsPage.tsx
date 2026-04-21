@@ -6,7 +6,7 @@ import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
 import { useOperationalMemoryState } from "@/hooks/useOperationalMemory";
 import { CreateAppointmentModal } from "@/components/CreateAppointmentModal";
 import CreateServiceOrderModal from "@/components/CreateServiceOrderModal";
-import { AppRowActionsDropdown } from "@/components/app-system";
+import { AppRowActionsDropdown, AppSectionCard, AppTimeline, AppTimelineItem, AppToolbar } from "@/components/app-system";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedbackButton";
 import {
@@ -31,6 +31,7 @@ import {
   AppPageErrorState,
   AppPageHeader,
   AppPageLoadingState,
+  AppPageShell,
   appSelectionPillClasses,
   AppSectionBlock,
   AppPriorityBadge,
@@ -600,12 +601,38 @@ export default function AppointmentsPage() {
 
   return (
     <PageWrapper title="Agenda operacional" subtitle="Confirme, execute e avance para O.S. sem sair da agenda.">
-      <div className="space-y-4">
+      <AppPageShell className="space-y-4">
         <AppPageHeader
           title="Agendamentos · controle do tempo operacional"
           description={`Hoje: ${todayCount} compromissos · Semana: ${weekCount} · Saúde da agenda: ${agendaHealth}. O foco aqui é decidir rápido o que acontece agora, com quem e o que preparar.`}
           cta={<ActionFeedbackButton state="idle" idleLabel={headerCta.label} onClick={headerCta.onClick} />}
         />
+
+        <AppToolbar>
+          <div className="space-y-1">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">Período operacional</p>
+            <p className="text-sm font-medium text-[var(--text-primary)]">
+              {windowFilter === "today"
+                ? "Hoje"
+                : windowFilter === "tomorrow"
+                  ? "Amanhã"
+                  : windowFilter === "week"
+                    ? "Próximos 7 dias"
+                    : windowFilter === "overdue"
+                      ? "Atrasados"
+                      : "Todos"}
+              {" · "}
+              {dayStart.toLocaleDateString("pt-BR")} até{" "}
+              {weekEnd.toLocaleDateString("pt-BR")}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            <AppStatusBadge label={`${todayCount} hoje`} />
+            <AppStatusBadge label={`${unconfirmedCount} não confirmados`} />
+            <AppStatusBadge label={`${conflictCount} conflitos`} />
+            <AppStatusBadge label={`${delayedCount} atrasados`} />
+          </div>
+        </AppToolbar>
 
         <OperationalTopCard
           contextLabel="Entrada da execução"
@@ -620,12 +647,12 @@ export default function AppointmentsPage() {
         >
           <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
             {alertItems.map(alert => (
-              <button
-                key={alert.key}
-                type="button"
-                onClick={alert.action}
-                className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3 text-left transition hover:border-[var(--border-strong)]"
-              >
+              <AppSectionCard key={alert.key} className="rounded-lg p-0">
+                <button
+                  type="button"
+                  onClick={alert.action}
+                  className="w-full p-3 text-left transition hover:border-[var(--border-strong)]"
+                >
                 <p
                   className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${getOperationalSignalToneClasses(
                     alert.severity as OperationalSignal["tone"],
@@ -637,7 +664,8 @@ export default function AppointmentsPage() {
                 <p className="mt-1 text-xs font-semibold text-[var(--text-primary)]">{alert.title}</p>
                 <p className="mt-1 text-[11px] text-[var(--text-secondary)]">{alert.detail}</p>
                 <p className="mt-2 text-[11px] font-medium text-[var(--text-primary)]">{alert.actionLabel} →</p>
-              </button>
+                </button>
+              </AppSectionCard>
             ))}
           </div>
         </AppSectionBlock>
@@ -1211,17 +1239,22 @@ export default function AppointmentsPage() {
 
                 <section className="space-y-1.5 border-t border-[var(--border-subtle)] pt-4">
                   <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Timeline curta</p>
-                  <ul className="list-disc space-y-1 pl-4 text-xs text-[var(--text-secondary)]">
+                  <AppTimeline className="space-y-2">
                     {compactTimeline.length > 0 ? (
                       compactTimeline.map(event => (
-                        <li key={event.id}>
-                          {safeDate(event.occurredAt)?.toLocaleString("pt-BR") ?? "—"} · {event.summary}
-                        </li>
+                        <AppTimelineItem key={event.id} className="p-2.5">
+                          <p className="text-[11px] font-medium text-[var(--text-primary)]">
+                            {safeDate(event.occurredAt)?.toLocaleString("pt-BR") ?? "—"}
+                          </p>
+                          <p className="text-xs text-[var(--text-secondary)]">{event.summary}</p>
+                        </AppTimelineItem>
                       ))
                     ) : (
-                      <li>Sem eventos disponíveis. Use o status atual como referência operacional.</li>
+                      <AppTimelineItem className="p-2.5 text-xs text-[var(--text-secondary)]">
+                        Sem eventos disponíveis. Use o status atual como referência operacional.
+                      </AppTimelineItem>
                     )}
-                  </ul>
+                  </AppTimeline>
                 </section>
 
                 <OperationalRelationSummary
@@ -1261,7 +1294,7 @@ export default function AppointmentsPage() {
             </div>
           </AppSectionBlock>
         </div>
-      </div>
+      </AppPageShell>
 
       <CreateAppointmentModal
         isOpen={openCreate}
