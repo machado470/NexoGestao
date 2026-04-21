@@ -571,21 +571,21 @@ export function AppSectionBlock({
     <AppSectionCard
       className={cn(
         compact
-          ? "min-h-0 rounded-xl p-4"
-          : "min-h-0 rounded-xl p-4 md:p-5",
+          ? "min-h-0 rounded-2xl p-4"
+          : "min-h-0 rounded-2xl p-4 md:p-5",
         className
       )}
     >
-      <div className="mb-4 flex min-w-0 items-start justify-between gap-3 border-b border-[var(--border-subtle)]/70 pb-3">
+      <div className="mb-4 flex min-w-0 items-start justify-between gap-3 border-b border-[var(--border-subtle)]/60 pb-3.5">
         <div className="min-w-0 flex-1">
           <h3
-            className="truncate text-sm font-semibold tracking-tight text-[var(--text-primary)]"
+            className="truncate text-[15px] font-semibold tracking-tight text-[var(--text-primary)]"
             title={title}
           >
             {title}
           </h3>
           {subtitle ? (
-            <p className="mt-1 line-clamp-2 text-xs text-[var(--text-muted)]">
+            <p className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--text-muted)]">
               {subtitle}
             </p>
           ) : null}
@@ -610,7 +610,7 @@ export function AppSectionBlock({
 
 export function AppDataTable({ children }: { children: ReactNode }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)]">
+    <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)]/85 bg-[var(--surface-primary)] shadow-[0_8px_20px_-18px_rgba(15,23,42,0.45)]">
       {children}
     </div>
   );
