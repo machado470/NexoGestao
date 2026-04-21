@@ -88,7 +88,7 @@ export const governanceRouter = router({
         label: z.string().min(1),
         description: z.string().min(1),
         requiresConfirmation: z.boolean().optional(),
-        context: z.record(z.unknown()),
+        context: z.record(z.string(), z.unknown()),
       })
     )
     .mutation(async ({ ctx, input }) => {

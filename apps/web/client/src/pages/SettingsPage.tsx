@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { normalizeArrayPayload, normalizeObjectPayload } from "@/lib/query-helpers";
 import {
@@ -14,6 +15,7 @@ import { OperationalTopCard } from "@/components/operating-system/OperationalTop
 import { Button } from "@/components/ui/button";
 
 export default function SettingsPage() {
+  const [, navigate] = useLocation();
   const utils = trpc.useUtils();
   const settingsQuery = trpc.nexo.settings.get.useQuery(undefined, { retry: false });
   const membersQuery = trpc.nexo.invites.members.useQuery(undefined, { retry: false });
@@ -99,6 +101,18 @@ export default function SettingsPage() {
     },
   ];
 
+  const blockRoutes: Record<string, string> = {
+    Empresa: "/settings?section=empresa",
+    "Usuários e permissões": "/people",
+    Operação: "/service-orders",
+    Financeiro: "/finances",
+    "WhatsApp / comunicação": "/whatsapp",
+    Automações: "/governance?view=acoes",
+    "Governança / risco": "/governance",
+    Integrações: "/settings?section=integracoes",
+    Sistema: "/settings?section=sistema",
+  };
+
   return (
     <PageWrapper title="Configurações" subtitle="Central administrativa previsível e escaneável.">
       <OperationalTopCard
@@ -144,7 +158,15 @@ export default function SettingsPage() {
             {
               title: "Próxima ação",
               subtitle: integrationsReady === 2 ? "Revisar usuários e permissões." : "Concluir integrações pendentes.",
-              action: <Button size="sm" variant="outline">Revisar</Button>,
+              action: (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => navigate(integrationsReady === 2 ? "/people" : "/settings?section=integracoes")}
+                >
+                  Revisar
+                </Button>
+              ),
             },
           ]}
         />
@@ -169,7 +191,7 @@ export default function SettingsPage() {
           items={settingsBlocks.map((block) => ({
             title: block.title,
             subtitle: `${block.impact} ${block.action}`,
-            action: <Button size="sm" variant="outline">Abrir bloco</Button>,
+            action: <Button size="sm" variant="outline" onClick={() => navigate(blockRoutes[block.title] ?? "/settings")}>Abrir bloco</Button>,
           }))}
         />
       </AppSectionBlock>
@@ -181,7 +203,7 @@ export default function SettingsPage() {
             title: String(member?.name ?? member?.email ?? `Membro ${index + 1}`),
             subtitle: String(member?.role ?? "Sem papel definido"),
             right: <AppStatusBadge label={member?.active === false ? "Inativo" : "Ativo"} />,
-            action: <Button size="sm" variant="outline">Gerenciar</Button>,
+            action: <Button size="sm" variant="outline" onClick={() => navigate("/people")}>Gerenciar</Button>,
           }))}
         />
       </AppSectionBlock>
@@ -190,8 +212,8 @@ export default function SettingsPage() {
         <AppListBlock
           compact
           items={[
-            { title: "Stripe", subtitle: "Cobrança da assinatura em Planos", right: <AppStatusBadge label={readiness?.stripe?.configured ? "Concluído" : "Pendente"} />, action: <Button size="sm" variant="outline">Abrir</Button> },
-            { title: "WhatsApp/Twilio", subtitle: "Comunicação com clientes no fluxo operacional", right: <AppStatusBadge label={readiness?.twilio?.configured ? "Concluído" : "Pendente"} />, action: <Button size="sm" variant="outline">Abrir</Button> },
+            { title: "Stripe", subtitle: "Cobrança da assinatura em Planos", right: <AppStatusBadge label={readiness?.stripe?.configured ? "Concluído" : "Pendente"} />, action: <Button size="sm" variant="outline" onClick={() => navigate("/billing")}>Abrir</Button> },
+            { title: "WhatsApp/Twilio", subtitle: "Comunicação com clientes no fluxo operacional", right: <AppStatusBadge label={readiness?.twilio?.configured ? "Concluído" : "Pendente"} />, action: <Button size="sm" variant="outline" onClick={() => navigate("/whatsapp")}>Abrir</Button> },
           ]}
         />
       </AppSectionBlock>

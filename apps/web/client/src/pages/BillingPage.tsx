@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { AlertTriangle, CreditCard, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useProductAnalytics } from "@/hooks/useProductAnalytics";
 import { EmptyState } from "@/components/EmptyState";
@@ -47,6 +48,7 @@ function formatCurrency(cents: number) {
 }
 
 export default function BillingPage() {
+  const [, navigate] = useLocation();
   const { track } = useProductAnalytics();
   const plansQuery = trpc.billing.plans.useQuery(undefined, {
     retry: 1,
@@ -281,12 +283,25 @@ export default function BillingPage() {
               {
                 title: "Atualizar pagamento",
                 subtitle: stripeConfigured ? "Método ativo no Stripe." : "Checkout indisponível sem Stripe.",
-                action: <Button type="button" variant="outline" disabled={!stripeConfigured}>Atualizar</Button>,
+                action: (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={!stripeConfigured}
+                    onClick={() => navigate("/settings?section=integracoes")}
+                  >
+                    Atualizar
+                  </Button>
+                ),
               },
               {
                 title: "Ver histórico",
                 subtitle: "Consulte faturas e rastreie status de cobrança.",
-                action: <Button type="button" variant="outline">Histórico</Button>,
+                action: (
+                  <Button type="button" variant="outline" onClick={() => navigate("/finances?view=history")}>
+                    Histórico
+                  </Button>
+                ),
               },
               {
                 title: "Cancelar assinatura",
