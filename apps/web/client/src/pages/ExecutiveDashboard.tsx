@@ -25,6 +25,45 @@ const agendaSemConfirmacao = 3;
 const ordensComBloqueio = 1;
 const ordensAbertas = 18;
 const ordensConcluidas = 124;
+const cobrancasVencidas = 6;
+
+const fluxoOperacional = [
+  {
+    etapa: "Cliente",
+    estado: `${clientesSemRetorno} sem retorno`,
+    status: "risco",
+    actionLabel: "Ativar follow-up",
+    onClickPath: "/customers?segment=inactive",
+  },
+  {
+    etapa: "Agendamento",
+    estado: `${agendaSemConfirmacao} sem confirmação`,
+    status: "alerta",
+    actionLabel: "Confirmar agenda",
+    onClickPath: "/appointments?status=pending-confirmation",
+  },
+  {
+    etapa: "O.S.",
+    estado: `${ordensComBloqueio} bloqueada`,
+    status: "bloqueio",
+    actionLabel: "Destravar execução",
+    onClickPath: "/service-orders?status=attention",
+  },
+  {
+    etapa: "Cobrança",
+    estado: `${cobrancasVencidas} vencidas`,
+    status: "alerta",
+    actionLabel: "Cobrar carteira",
+    onClickPath: "/finances?view=charges&status=overdue",
+  },
+  {
+    etapa: "Pagamento",
+    estado: "Fluxo parcial",
+    status: "ok",
+    actionLabel: "Revisar caixa",
+    onClickPath: "/finances?view=cashflow",
+  },
+] as const;
 
 export default function ExecutiveDashboard() {
   useRenderWatchdog("ExecutiveDashboard");
@@ -83,129 +122,157 @@ export default function ExecutiveDashboard() {
         }
       />
 
-      <KpiErrorBoundary context="executive-dashboard:kpi">
-        <AppKpiRow
-          gridClassName="grid-cols-1 sm:grid-cols-2 xl:grid-cols-4"
-          items={[
-            {
-              label: "Receita",
-              value: "R$ 187,4k",
-              trend: 15.6,
-              context: "+2 hoje · últimos 30 dias",
-              onClick: () => navigate("/finances?view=revenue&period=30d"),
-            },
-            {
-              label: "Ordens abertas",
-              value: String(ordensAbertas),
-              trend: -3.2,
-              context: `${ordensComBloqueio} com bloqueio · últimos 7 dias`,
-              onClick: () =>
-                navigate("/service-orders?status=attention&period=7d"),
-            },
-            {
-              label: "SLA",
-              value: "92,8%",
-              trend: 2.1,
-              context: "estável · últimos 30 dias",
-              onClick: () => navigate("/service-orders?metric=sla&period=30d"),
-            },
-            {
-              label: "Ticket médio",
-              value: "R$ 1.511",
-              trend: 4.4,
-              context: "+1 hoje · últimos 30 dias",
-              onClick: () =>
-                navigate("/finances?metric=average_ticket&period=30d"),
-            },
-          ]}
-        />
-      </KpiErrorBoundary>
-
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+        <div className="space-y-4 xl:col-span-8">
+          <KpiErrorBoundary context="executive-dashboard:kpi">
+            <AppKpiRow
+              gridClassName="grid-cols-1 sm:grid-cols-2 xl:grid-cols-4"
+              items={[
+                {
+                  title: "Receita",
+                  value: "R$ 187,4k",
+                  delta: "+15,6%",
+                  trend: "up",
+                  hint: "crescimento sustentado · converter em caixa hoje",
+                  footer: "Impulso: cobranças vencidas seguram parte da alta.",
+                  ctaLabel: "Atuar no financeiro",
+                  onClick: () => navigate("/finances?view=revenue&period=30d"),
+                },
+                {
+                  title: "Ordens abertas",
+                  value: String(ordensAbertas),
+                  delta: "-3,2%",
+                  trend: "down",
+                  hint: `${ordensComBloqueio} com bloqueio · throughput sensível`,
+                  footer: "Risco: atraso em cadeia no turno se não destravar.",
+                  ctaLabel: "Destravar O.S.",
+                  onClick: () =>
+                    navigate("/service-orders?status=attention&period=7d"),
+                },
+                {
+                  title: "SLA",
+                  value: "92,8%",
+                  delta: "+2,1%",
+                  trend: "up",
+                  hint: "na meta, com pressão em confirmação de agenda",
+                  footer: "Ação: confirmar clientes críticos antes da próxima janela.",
+                  ctaLabel: "Proteger SLA",
+                  onClick: () =>
+                    navigate("/appointments?status=pending-confirmation"),
+                },
+                {
+                  title: "Ticket médio",
+                  value: "R$ 1.511",
+                  delta: "+4,4%",
+                  trend: "up",
+                  hint: "mix melhorando · manter conversão pós-serviço",
+                  footer: "Foco: recuperar clientes sem retorno para recompra.",
+                  ctaLabel: "Ativar carteira",
+                  onClick: () =>
+                    navigate("/finances?metric=average_ticket&period=30d"),
+                },
+              ]}
+            />
+          </KpiErrorBoundary>
+
+          <AppSectionBlock
+            title="Fluxo operacional do Nexo"
+            subtitle="Cliente → Agendamento → O.S. → Cobrança → Pagamento com ação direta por etapa."
+            ctaLabel="Abrir operação crítica"
+            onCtaClick={() => navigate("/dashboard/operations?filter=critical")}
+          >
+            <ul className="grid grid-cols-1 gap-2.5 md:grid-cols-5">
+              {fluxoOperacional.map(item => (
+                <li
+                  key={item.etapa}
+                  className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                      {item.etapa}
+                    </p>
+                    <AppStatusBadge
+                      label={
+                        item.status === "bloqueio"
+                          ? "BLOQUEIO"
+                          : item.status === "risco"
+                            ? "RISCO"
+                            : item.status === "alerta"
+                              ? "ATENÇÃO"
+                              : "OK"
+                      }
+                    />
+                  </div>
+                  <p className="mt-1.5 text-sm font-semibold text-[var(--text-primary)]">
+                    {item.estado}
+                  </p>
+                  <button
+                    type="button"
+                    className="mt-2 text-xs font-medium text-[var(--text-secondary)] underline-offset-2 hover:text-[var(--text-primary)] hover:underline"
+                    onClick={() => navigate(item.onClickPath)}
+                  >
+                    {item.actionLabel}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </AppSectionBlock>
+        </div>
+
         <AppSectionBlock
           title="Centro de decisão operacional"
-          subtitle="Prioridade imediata, gargalo principal, próximo passo e risco do turno atual."
-          className="xl:col-span-8"
-          ctaLabel="Abrir execução"
-          onCtaClick={() => navigate("/dashboard/operations?filter=critical")}
+          subtitle="Prioridade do turno com justificativa curta e execução imediata."
+          className="xl:col-span-4"
+          ctaLabel="Executar prioridade agora"
+          onCtaClick={() => navigate("/appointments?status=pending-confirmation")}
         >
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div className="space-y-3">
             <div className="rounded-lg border border-[var(--dashboard-danger)]/35 bg-[var(--surface-subtle)] p-3">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
-                  Prioridade agora
+                  Faça isso agora
                 </p>
-                <AppStatusBadge label="URGENTE" />
+                <AppStatusBadge label="CRÍTICO" />
               </div>
               <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
-                Confirmar {agendaSemConfirmacao} agendamentos antes do próximo
-                turno.
+                Confirmar {agendaSemConfirmacao} agendamentos antes do próximo lote de saída.
               </p>
               <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                Sem confirmação, a janela de execução perde previsibilidade e
-                pressiona SLA.
+                Sem confirmação, o time entra em rota ociosa e o SLA perde proteção nas próximas 4h.
               </p>
             </div>
-
-            <div className="rounded-lg border border-[var(--dashboard-warning)]/35 bg-[var(--surface-subtle)] p-3">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
-                  Gargalo atual
-                </p>
-                <AppStatusBadge label="ATENÇÃO" />
-              </div>
-              <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
-                {ordensComBloqueio} O.S. bloqueada em rota há mais de 2h.
+            <div className="rounded-lg border border-[var(--dashboard-warning)]/30 bg-[var(--surface-subtle)] p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                Próximo passo
               </p>
-              <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                Bloqueio impede fechamento de ordem e pode gerar atraso em
-                cadeia.
+              <p className="mt-1.5 text-sm font-semibold text-[var(--text-primary)]">
+                1) Confirmar agenda crítica → 2) Destravar {ordensComBloqueio} O.S. → 3) Acionar cobrança vencida.
               </p>
             </div>
-
-            <div className="rounded-lg border border-[var(--dashboard-info)]/35 bg-[var(--surface-subtle)] p-3">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
-                  Próxima melhor ação
-                </p>
-                <AppStatusBadge label="EXECUTAR" />
-              </div>
-              <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
-                Rebalancear equipe e disparar confirmação automática por
-                WhatsApp.
-              </p>
-              <div className="mt-2 flex items-center gap-2 text-xs text-[var(--text-secondary)]">
-                <ArrowRight className="h-3.5 w-3.5" />
-                <span>
-                  Impacto esperado: recuperar janela de atendimento da manhã.
-                </span>
-              </div>
-            </div>
-
-            <div className="rounded-lg border border-[var(--dashboard-danger)]/25 bg-[var(--surface-subtle)] p-3">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
-                  Risco crítico
-                </p>
-                <AppStatusBadge label="EM RISCO" />
-              </div>
-              <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
-                {clientesSemRetorno} clientes sem retorno pós-serviço em
-                carteira ativa.
-              </p>
-              <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                Risco direto de churn e queda de recompra no ciclo atual.
-              </p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                onClick={() => navigate("/appointments?status=pending-confirmation")}
+              >
+                Confirmar agenda
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => navigate("/service-orders?status=attention")}
+              >
+                Destravar O.S.
+              </Button>
             </div>
           </div>
         </AppSectionBlock>
 
         <AppSectionBlock
           title="Pulso executivo"
-          subtitle="Estado geral de execução no turno"
+          subtitle="Sinais rápidos por tipo de pressão operacional"
           className="xl:col-span-4"
-          ctaLabel="Abrir ordens"
-          onCtaClick={() => navigate("/service-orders?status=attention")}
+          ctaLabel="Abrir fila priorizada"
+          onCtaClick={() => navigate("/dashboard/operations?filter=critical")}
           compact
         >
           <div className="space-y-3">
@@ -213,11 +280,10 @@ export default function ExecutiveDashboard() {
               <CircleAlert className="mt-0.5 h-4 w-4 text-[var(--dashboard-warning)]" />
               <div>
                 <p className="text-xs font-semibold text-[var(--text-primary)]">
-                  Execução pressionada por confirmação
+                  Pressão de agenda
                 </p>
                 <p className="text-xs text-[var(--text-secondary)]">
-                  {agendaSemConfirmacao} clientes aguardando contato no horário
-                  crítico.
+                  {agendaSemConfirmacao} confirmações pendentes para janela crítica da manhã.
                 </p>
               </div>
             </div>
@@ -225,10 +291,10 @@ export default function ExecutiveDashboard() {
               <AlertTriangle className="mt-0.5 h-4 w-4 text-[var(--dashboard-danger)]" />
               <div>
                 <p className="text-xs font-semibold text-[var(--text-primary)]">
-                  Bloqueio impactando throughput
+                  Bloqueio de execução
                 </p>
                 <p className="text-xs text-[var(--text-secondary)]">
-                  {ordensComBloqueio} ordem aguardando destrava operacional.
+                  {ordensComBloqueio} O.S. parada há +2h com risco de atraso em cadeia.
                 </p>
               </div>
             </div>
@@ -236,11 +302,21 @@ export default function ExecutiveDashboard() {
               <ShieldAlert className="mt-0.5 h-4 w-4 text-[var(--dashboard-info)]" />
               <div>
                 <p className="text-xs font-semibold text-[var(--text-primary)]">
-                  Capacidade do time
+                  Risco financeiro
                 </p>
                 <p className="text-xs text-[var(--text-secondary)]">
-                  {ordensConcluidas} ordens concluídas de 140 previstas no
-                  ciclo.
+                  {cobrancasVencidas} cobranças vencidas segurando entrada de caixa.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
+              <ArrowRight className="mt-0.5 h-4 w-4 text-[var(--dashboard-info)]" />
+              <div>
+                <p className="text-xs font-semibold text-[var(--text-primary)]">
+                  Capacidade disponível
+                </p>
+                <p className="text-xs text-[var(--text-secondary)]">
+                  {ordensConcluidas} ordens concluídas de 140 previstas no ciclo.
                 </p>
               </div>
             </div>
