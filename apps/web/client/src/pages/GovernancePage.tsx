@@ -1,31 +1,47 @@
 import { useEffect, useMemo, useState } from "react";
-import { Line, LineChart, CartesianGrid, XAxis } from "recharts";
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { trpc } from "@/lib/trpc";
-import { normalizeArrayPayload, normalizeObjectPayload } from "@/lib/query-helpers";
+import { useLocation } from "wouter";
+import { ArrowUpRight, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
-import { Button } from "@/components/design-system";
 import {
-  AppChartPanel,
-  AppKpiRow,
   AppNextActionCard,
+  AppOperationalBar,
   AppPageEmptyState,
   AppPageErrorState,
+  AppPageHeader,
   AppPageLoadingState,
+  AppPageShell,
   AppPriorityBadge,
-  AppSecondaryTabs,
   AppSectionBlock,
   AppStatusBadge,
 } from "@/components/internal-page-system";
+import { trpc } from "@/lib/trpc";
+import { normalizeArrayPayload, normalizeObjectPayload } from "@/lib/query-helpers";
 import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
 import { useRenderWatchdog } from "@/hooks/useRenderWatchdog";
-import { formatDelta, percentDelta, trendFromDelta } from "@/lib/operational/kpi";
-import { safeChartData } from "@/lib/safeChartData";
-import { ChartErrorBoundary } from "@/components/ChartErrorBoundary";
-import { KpiErrorBoundary } from "@/components/KpiErrorBoundary";
-import { TrpcSectionErrorBoundary } from "@/components/TrpcSectionErrorBoundary";
 import { setBootPhase } from "@/lib/bootPhase";
+
+type GovernanceView = "visao" | "problemas" | "acoes" | "historico";
+type PriorityLevel = "critical" | "high" | "medium";
+type OperationalState = "healthy" | "attention" | "critical" | "empty" | "loading" | "error";
+
+type GovernanceProblem = {
+  id: string;
+  title: string;
+  context: string;
+  impact: string;
+  origin: string;
+  owner: string;
+  module: "customers" | "finances" | "service-orders" | "appointments" | "whatsapp" | "timeline";
+  priority: PriorityLevel;
+  count: number;
+  actionLabel: string;
+  actionPath: string;
+  timelinePath: string;
+  reason: string;
+  expectedImpact: string;
+};
 
 function metric(summary: Record<string, any>, ...keys: string[]) {
   for (const key of keys) {
@@ -35,288 +51,557 @@ function metric(summary: Record<string, any>, ...keys: string[]) {
   return 0;
 }
 
+function severityWeight(priority: PriorityLevel) {
+  if (priority === "critical") return 3;
+  if (priority === "high") return 2;
+  return 1;
+}
+
+function operationStateFromRisk(riskScore: number, hasCritical: boolean, hasAnyProblem: boolean): OperationalState {
+  if (!hasAnyProblem && riskScore <= 0) return "empty";
+  if (hasCritical || riskScore >= 70) return "critical";
+  if (riskScore >= 40 || hasAnyProblem) return "attention";
+  return "healthy";
+}
+
+function operationStateLabel(state: OperationalState) {
+  if (state === "critical") return "Crítico";
+  if (state === "attention") return "Atenção";
+  if (state === "healthy") return "Saudável";
+  if (state === "loading") return "Carregando";
+  if (state === "error") return "Falha";
+  return "Saudável";
+}
+
+function operationSummaryCopy(state: OperationalState, problemCount: number) {
+  if (state === "critical") {
+    return `Operação sob risco alto com ${problemCount} problema(s) prioritário(s) exigindo execução imediata.`;
+  }
+  if (state === "attention") {
+    return `Operação em atenção com ${problemCount} problema(s) que podem escalar ainda hoje.`;
+  }
+  if (state === "healthy") {
+    return "Operação saudável no momento. Governança deve manter monitoramento ativo.";
+  }
+  if (state === "empty") {
+    return "Sem desvios detectados. Este estado vazio indica operação saudável nesta janela.";
+  }
+  if (state === "loading") return "Lendo sinais operacionais para decisão automática.";
+  return "Não foi possível consolidar o estado operacional agora.";
+}
+
 export default function GovernancePage() {
   setBootPhase("PAGE:Governança");
   useRenderWatchdog("GovernancePage");
+
+  const [, navigate] = useLocation();
   const summaryQuery = trpc.governance.summary.useQuery(undefined, { retry: false });
   const runsQuery = trpc.governance.runs.useQuery({ limit: 12 }, { retry: false });
-  const [activeTab, setActiveTab] = useState<"overview" | "alerts" | "executions" | "history">("overview");
+
+  const [activeView, setActiveView] = useState<GovernanceView>("visao");
+  const [searchValue, setSearchValue] = useState("");
+  const [priorityFilter, setPriorityFilter] = useState<"all" | PriorityLevel>("all");
 
   const summary = useMemo(
     () => (normalizeObjectPayload<any>(summaryQuery.data) ?? {}) as Record<string, any>,
     [summaryQuery.data]
   );
   const runs = useMemo(() => normalizeArrayPayload<any>(runsQuery.data), [runsQuery.data]);
-  const hasRunsData = runs.length > 0;
   const hasSummaryData = Boolean(summaryQuery.data);
-  usePageDiagnostics({
-    page: "governance",
-    isLoading: (runsQuery.isLoading && !hasRunsData) || (summaryQuery.isLoading && !hasSummaryData),
-    hasError: Boolean((runsQuery.error && !hasRunsData) || (summaryQuery.error && !hasSummaryData)),
-    isEmpty:
-      !runsQuery.isLoading &&
-      !summaryQuery.isLoading &&
-      !runsQuery.error &&
-      !summaryQuery.error &&
-      runs.length === 0,
-    dataCount: runs.length,
-  });
-
-  const riskSeriesRaw = runs
-    .map((run, index) => ({
-      label: String(run?.createdAt ? new Date(String(run.createdAt)).toLocaleDateString("pt-BR") : `Execução ${index + 1}`),
-      score: Number(run?.riskScore ?? run?.score ?? run?.overallRisk ?? 0),
-    }))
-    .filter((item) => Number.isFinite(item.score));
-  const riskSeries = useMemo(
-    () => safeChartData<{ label: string; score: number }>(riskSeriesRaw, ["score"]),
-    [riskSeriesRaw]
-  );
+  const hasRunsData = runs.length > 0;
 
   const entitiesAtRisk = normalizeArrayPayload<any>(summary.entitiesAtRisk ?? summary.riskEntities ?? []);
   const recommendations = normalizeArrayPayload<any>(summary.recommendations ?? summary.nextActions ?? []);
-  const bottlenecks = normalizeArrayPayload<any>(summary.bottlenecks ?? summary.constraints ?? []);
   const failures = normalizeArrayPayload<any>(summary.operationalFailures ?? summary.failures ?? []);
   const institutionalPolicies = normalizeArrayPayload<any>(summary.policies ?? summary.institutionalPolicies ?? []);
-  const latestRisk = Number(riskSeries.data[riskSeries.data.length - 1]?.score ?? metric(summary, "riskScore", "overallRisk"));
-  const previousRisk = Number(riskSeries.data[riskSeries.data.length - 2]?.score ?? Number.NaN);
-  useEffect(() => {
-    // eslint-disable-next-line no-console
-    console.info("[RENDER PAGE] governance");
-  }, []);
-  useEffect(() => {
-    if (!summaryQuery.error && !runsQuery.error) return;
-    // eslint-disable-next-line no-console
-    console.error("[TRPC ERROR] governance_query_error", {
-      summary: summaryQuery.error?.message,
-      runs: runsQuery.error?.message,
+
+  const overdueServiceOrders = metric(summary, "overdueServiceOrders", "serviceOrdersOverdue", "lateServiceOrders", "overdueOs");
+  const overdueCharges = metric(summary, "overdueCharges", "chargesOverdue", "openOverdueCharges", "billingOverdue");
+  const unansweredCustomers = metric(summary, "unansweredCustomers", "customersWithoutResponse", "pendingCustomerReplies");
+  const communicationFailures = metric(summary, "communicationFailures", "failedMessages", "whatsappFailures", "failedNotifications");
+  const overloadedWorkload = metric(summary, "overloadedTeams", "workloadPressure", "teamOverload", "overloadCount");
+
+  const latestRisk = Number(
+    runs[0]?.riskScore ??
+      runs[0]?.score ??
+      runs[0]?.overallRisk ??
+      metric(summary, "riskScore", "overallRisk", "operationalRisk")
+  );
+
+  const detectedProblems = useMemo<GovernanceProblem[]>(() => {
+    const problems: GovernanceProblem[] = [];
+
+    if (overdueServiceOrders > 0) {
+      problems.push({
+        id: "problem-overdue-service-orders",
+        title: `${overdueServiceOrders} O.S. atrasadas`,
+        context: `${overdueServiceOrders} ordem(ns) estão fora do prazo e já impactam execução do turno.`,
+        impact: "Atraso em cadeia no atendimento e degradação de SLA.",
+        origin: "Timeline · eventos de O.S. sem conclusão no prazo.",
+        owner: "Operações",
+        module: "service-orders",
+        priority: overdueServiceOrders >= 5 ? "critical" : "high",
+        count: overdueServiceOrders,
+        actionLabel: "Redistribuir O.S.",
+        actionPath: "/service-orders?status=attention",
+        timelinePath: "/timeline?module=service_order&severity=critical",
+        reason: "O atraso já afeta a capacidade do time e compromete janelas seguintes.",
+        expectedImpact: "Reduz fila atrasada e estabiliza cronograma do dia.",
+      });
+    }
+
+    if (overdueCharges > 0) {
+      problems.push({
+        id: "problem-overdue-charges",
+        title: `${overdueCharges} cobrança(s) vencida(s)`,
+        context: `${overdueCharges} cobrança(s) já passaram do prazo de recebimento.`,
+        impact: "Risco direto de caixa e atraso no ciclo financeiro.",
+        origin: "Timeline · eventos de cobrança não quitada.",
+        owner: "Financeiro",
+        module: "finances",
+        priority: overdueCharges >= 4 ? "critical" : "high",
+        count: overdueCharges,
+        actionLabel: "Cobrar clientes vencidos",
+        actionPath: "/finances?view=charges&status=overdue",
+        timelinePath: "/timeline?module=finance&severity=critical",
+        reason: "Cobrança vencida aumenta exposição financeira a cada dia.",
+        expectedImpact: "Melhora caixa do dia e reduz inadimplência acumulada.",
+      });
+    }
+
+    if (unansweredCustomers > 0) {
+      problems.push({
+        id: "problem-unanswered-customers",
+        title: `${unansweredCustomers} cliente(s) sem resposta`,
+        context: `${unansweredCustomers} cliente(s) aguardam retorno e podem abandonar o fluxo.`,
+        impact: "Queda de conversão e risco de cancelamento.",
+        origin: "Timeline · eventos de follow-up sem resposta.",
+        owner: "Relacionamento",
+        module: "customers",
+        priority: unansweredCustomers >= 6 ? "high" : "medium",
+        count: unansweredCustomers,
+        actionLabel: "Responder pendências",
+        actionPath: "/customers?segment=needs-contact",
+        timelinePath: "/timeline?module=customer&severity=medium",
+        reason: "Cliente sem retorno perde confiança e tende a sair do funil.",
+        expectedImpact: "Recupera relacionamento e eleva chance de continuidade.",
+      });
+    }
+
+    if (communicationFailures > 0) {
+      problems.push({
+        id: "problem-communication-failures",
+        title: `${communicationFailures} falha(s) de comunicação`,
+        context: `${communicationFailures} envio(s) com erro em mensagens operacionais recentes.`,
+        impact: "Confirmações não chegam e aumenta ausência em agenda.",
+        origin: "Timeline · falhas em notificações e WhatsApp.",
+        owner: "Comunicação",
+        module: "whatsapp",
+        priority: communicationFailures >= 4 ? "high" : "medium",
+        count: communicationFailures,
+        actionLabel: "Reenviar mensagens",
+        actionPath: "/timeline?type=whatsapp-failure",
+        timelinePath: "/timeline?module=whatsapp&severity=high",
+        reason: "Sem comunicação entregue, o restante do fluxo perde previsibilidade.",
+        expectedImpact: "Recupera confirmações e reduz retrabalho de equipe.",
+      });
+    }
+
+    if (overloadedWorkload > 0) {
+      problems.push({
+        id: "problem-overloaded-workload",
+        title: "Equipe sobrecarregada hoje",
+        context: `${overloadedWorkload} sinal(is) de sobrecarga detectado(s) no turno atual.`,
+        impact: "Aumenta risco de atraso, erro operacional e queda de qualidade.",
+        origin: "Timeline · concentração de tarefas e bloqueios no fluxo.",
+        owner: "Coordenação operacional",
+        module: "appointments",
+        priority: overloadedWorkload >= 3 ? "high" : "medium",
+        count: overloadedWorkload,
+        actionLabel: "Ajustar agenda",
+        actionPath: "/appointments?view=calendar",
+        timelinePath: "/timeline?module=appointment&severity=high",
+        reason: "Carga excessiva compromete tempo de resposta e execução com qualidade.",
+        expectedImpact: "Distribui demanda e evita efeito cascata em O.S. e atendimento.",
+      });
+    }
+
+    entitiesAtRisk.slice(0, 2).forEach((entity, index) => {
+      const entityName = String(entity?.name ?? entity?.entityName ?? "Entidade em risco");
+      const entityLevel = String(entity?.level ?? entity?.riskLevel ?? "WARNING").toUpperCase();
+      problems.push({
+        id: `entity-risk-${index}`,
+        title: `${entityName} em risco`,
+        context: String(entity?.reason ?? entity?.context ?? "Entidade com comportamento fora do padrão operacional."),
+        impact: "Pode gerar bloqueio operacional se não houver resposta imediata.",
+        origin: "Timeline · alerta de governança por entidade.",
+        owner: String(entity?.owner ?? "Governança"),
+        module: "timeline",
+        priority: entityLevel === "CRITICAL" || entityLevel === "HIGH" ? "critical" : "medium",
+        count: 1,
+        actionLabel: "Ver origem na timeline",
+        actionPath: "/timeline?module=governance",
+        timelinePath: "/timeline?module=governance",
+        reason: "O alerta foi escalado pela governança e precisa de decisão.",
+        expectedImpact: "Evita propagação do risco para outros módulos.",
+      });
     });
-  }, [runsQuery.error, summaryQuery.error]);
+
+    return problems.sort((a, b) => {
+      const bySeverity = severityWeight(b.priority) - severityWeight(a.priority);
+      if (bySeverity !== 0) return bySeverity;
+      return b.count - a.count;
+    });
+  }, [
+    communicationFailures,
+    entitiesAtRisk,
+    overdueCharges,
+    overdueServiceOrders,
+    overloadedWorkload,
+    unansweredCustomers,
+  ]);
+
+  const filteredProblems = useMemo(() => {
+    const query = searchValue.trim().toLowerCase();
+    return detectedProblems.filter(problem => {
+      const matchesPriority = priorityFilter === "all" || problem.priority === priorityFilter;
+      if (!matchesPriority) return false;
+      if (!query) return true;
+      return (
+        problem.title.toLowerCase().includes(query) ||
+        problem.context.toLowerCase().includes(query) ||
+        problem.owner.toLowerCase().includes(query) ||
+        problem.impact.toLowerCase().includes(query)
+      );
+    });
+  }, [detectedProblems, priorityFilter, searchValue]);
+
+  const governanceActions = useMemo(
+    () => filteredProblems.map(problem => ({
+      id: `action-${problem.id}`,
+      title: problem.actionLabel,
+      description: `${problem.reason} Impacto esperado: ${problem.expectedImpact}`,
+      severity: (problem.priority === "critical" ? "critical" : problem.priority === "high" ? "high" : "medium") as "critical" | "high" | "medium",
+      path: problem.actionPath,
+      timelinePath: problem.timelinePath,
+      module: problem.module,
+    })),
+    [filteredProblems]
+  );
+
+  const hasCritical = detectedProblems.some(problem => problem.priority === "critical");
+  const effectiveState = operationStateFromRisk(latestRisk, hasCritical, detectedProblems.length > 0);
+
+  const pageState: OperationalState =
+    summaryQuery.isLoading && !hasSummaryData
+      ? "loading"
+      : summaryQuery.error && !hasSummaryData
+        ? "error"
+        : effectiveState;
+
+  usePageDiagnostics({
+    page: "governance",
+    isLoading: pageState === "loading" || (runsQuery.isLoading && !hasRunsData),
+    hasError: pageState === "error" || Boolean(runsQuery.error && !hasRunsData),
+    isEmpty: pageState === "empty",
+    dataCount: detectedProblems.length,
+  });
+
+  useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.info("[RENDER PAGE] governance-refactor-v1");
+  }, []);
 
   return (
-    <PageWrapper title="Governança e Risco" subtitle="Risco, alerta e contenção prática para manter operação e receita protegidas.">
+    <PageWrapper title="Governança · Centro de decisão" subtitle="Governança interpreta a Timeline e decide a reação operacional com execução assistida.">
       <OperationalTopCard
         contextLabel="Direção de governança"
-        title="Risco e contenção operacional"
-        description="Sinais reais de risco e ações de contenção operacional."
+        title="Leitura de risco e reação imediata"
+        description="Estado, prioridade e execução no mesmo fluxo para agir agora."
         primaryAction={(
           <Button
             type="button"
-            variant="outline"
             onClick={() => {
               void Promise.all([summaryQuery.refetch(), runsQuery.refetch()]);
             }}
           >
-            Recarregar sinais
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Atualizar leitura
           </Button>
         )}
       />
-
-      <KpiErrorBoundary context="governance:kpi">
-        <AppKpiRow
-        items={[
-          {
-            title: "Score de risco",
-            value: `${latestRisk}/100`,
-            delta: formatDelta(percentDelta(latestRisk, previousRisk)),
-            trend: trendFromDelta(percentDelta(latestRisk, previousRisk)),
-            hint: latestRisk >= 70 ? "alto impacto no fluxo operacional" : latestRisk >= 40 ? "atenção para evitar escalada" : "faixa controlada",
-            tone: latestRisk >= 70 ? "critical" : latestRisk >= 40 ? "important" : "default",
-          },
-          { title: "Entidades em risco", value: String(entitiesAtRisk.length), hint: entitiesAtRisk.length > 0 ? "podem travar execução e receita" : "sem travas críticas detectadas" },
-          { title: "Alertas abertos", value: String(metric(summary, "activeAlerts", "alertsCount")), hint: "urgência para contenção" },
-          { title: "Recomendações prioritárias", value: String(recommendations.length), hint: "próxima ação para reduzir risco" },
-        ]}
-      />
-      </KpiErrorBoundary>
-      <AppSecondaryTabs
-        items={[
-          { value: "overview", label: "Visão geral" },
-          { value: "alerts", label: "Alertas" },
-          { value: "executions", label: "Execuções" },
-          { value: "history", label: "Histórico" },
-        ]}
-        value={activeTab}
-        onChange={setActiveTab}
+      <AppPageShell>
+      <AppPageHeader
+        title="Governança · Centro de decisão"
+        description={(
+          <span>
+            {operationSummaryCopy(pageState, detectedProblems.length)}
+            <span className="ml-2 inline-flex">
+              <AppStatusBadge label={operationStateLabel(pageState)} />
+            </span>
+          </span>
+        )}
+        secondaryActions={
+          <Button variant="outline" onClick={() => navigate("/timeline?module=governance")}>Ver timeline</Button>
+        }
       />
 
-      {(activeTab === "overview" || activeTab === "alerts") ? (
-      <AppSectionBlock title="Estado operacional atual" subtitle="Por que a governança está neste estado e o que fazer agora" compact>
-        <div className="space-y-3 text-sm text-[var(--text-secondary)]">
-          <div className="flex flex-wrap items-center gap-2">
-            <span>Estado:</span>
-            <AppStatusBadge label={latestRisk >= 80 ? "SUSPENDED" : latestRisk >= 60 ? "RESTRICTED" : latestRisk >= 35 ? "WARNING" : "NORMAL"} />
-            <AppPriorityBadge label={latestRisk >= 80 ? "Alta" : latestRisk >= 60 ? "Média" : "Baixa"} />
-          </div>
-          <p>
-            Sinais principais: {entitiesAtRisk.length} entidades em risco, {metric(summary, "activeAlerts", "alertsCount")} alertas ativos e {recommendations.length} recomendações.
-          </p>
-          <p>Próximo passo recomendado: {recommendations[0] ? String(recommendations[0]?.title ?? recommendations[0]?.action ?? "Executar revisão de governança") : "Reexecutar governança para gerar plano de contenção"}.</p>
-        </div>
-      </AppSectionBlock>
-      ) : null}
+      <AppOperationalBar
+        tabs={[
+          { value: "visao", label: "Estado geral" },
+          { value: "problemas", label: "Problemas" },
+          { value: "acoes", label: "Ações" },
+          { value: "historico", label: "Histórico" },
+        ]}
+        activeTab={activeView}
+        onTabChange={setActiveView}
+        searchValue={searchValue}
+        onSearchChange={setSearchValue}
+        searchPlaceholder="Buscar problema, contexto ou responsável"
+        quickFilters={(
+          <>
+            <Button size="sm" variant={priorityFilter === "all" ? "default" : "outline"} onClick={() => setPriorityFilter("all")}>Todas</Button>
+            <Button size="sm" variant={priorityFilter === "critical" ? "default" : "outline"} onClick={() => setPriorityFilter("critical")}>Críticas</Button>
+            <Button size="sm" variant={priorityFilter === "high" ? "default" : "outline"} onClick={() => setPriorityFilter("high")}>Altas</Button>
+            <Button size="sm" variant={priorityFilter === "medium" ? "default" : "outline"} onClick={() => setPriorityFilter("medium")}>Médias</Button>
+          </>
+        )}
+      />
 
-      {(activeTab === "overview" || activeTab === "history") ? (
-      <div className="grid gap-3 xl:grid-cols-12">
-        <div className="xl:col-span-8">
-        <AppChartPanel title="Evolução do risco" description="Histórico compacto das últimas execuções.">
-          {runsQuery.isLoading && !hasRunsData ? (
-            <AppPageLoadingState description="Carregando histórico de risco..." />
-          ) : runsQuery.error && !hasRunsData ? (
-            <AppPageErrorState
-              description={runsQuery.error?.message ?? "Falha ao carregar histórico de risco."}
-              actionLabel="Tentar novamente"
-              onAction={() => void runsQuery.refetch()}
-            />
-          ) : !riskSeries.isValid ? (
-            <AppPageEmptyState title="Erro ao renderizar gráfico" description={riskSeries.reason ?? "Dados inválidos do gráfico."} />
-          ) : riskSeries.data.length === 0 ? (
-            <AppPageEmptyState title="Nenhum dado disponível ainda" description="Ação recomendada: rodar governança e acompanhar evolução." />
-          ) : (
-            <ChartErrorBoundary context="governance:risk-chart">
-              <ChartContainer className="h-[180px] w-full" config={{ score: { label: "Risco" } }}>
-                <LineChart data={riskSeries.data}>
-                  <CartesianGrid vertical={false} />
-                  <XAxis dataKey="label" tickLine={false} axisLine={false} />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Line dataKey="score" stroke="var(--brand-primary)" strokeWidth={3} />
-                </LineChart>
-              </ChartContainer>
-            </ChartErrorBoundary>
-          )}
-        </AppChartPanel>
-        </div>
-        <div className="space-y-3 xl:col-span-4">
-        <AppNextActionCard
-          title="Risco real agora"
-          description={entitiesAtRisk.length > 0
-            ? `${entitiesAtRisk.length} entidades podem travar operação e ${metric(summary, "activeAlerts", "alertsCount")} alertas podem afetar receita.`
-            : "Sem risco crítico aberto no momento, mas mantenha monitoramento ativo."}
-          severity={latestRisk >= 70 ? "critical" : latestRisk >= 40 ? "high" : "medium"}
-          metadata="contenção imediata"
-          action={{ label: "Agir agora", onClick: () => void summaryQuery.refetch() }}
-        />
-        <AppNextActionCard
-          title="Ação recomendada"
-          description={recommendations[0]
-            ? `${String(recommendations[0]?.title ?? recommendations[0]?.action ?? "Ação de contenção")} · área ${String(recommendations[0]?.area ?? "operacional")} · impacto esperado em estabilidade.`
-            : "Reexecutar governança para gerar próxima ação de contenção orientada a impacto."}
-          severity="high"
-          metadata="próximo passo"
-          action={{ label: "Aplicar ação", onClick: () => void Promise.all([summaryQuery.refetch(), runsQuery.refetch()]) }}
-        />
-        </div>
-      </div>
-      ) : null}
-
-      <TrpcSectionErrorBoundary context="governance:entity-recommendations">
-      {(activeTab === "overview" || activeTab === "alerts" || activeTab === "executions") ? (
-      <div className="grid gap-3 xl:grid-cols-12">
-        <AppSectionBlock title="Entidades em risco" subtitle="Itens reais apontados pela governança" className="xl:col-span-8">
-          {summaryQuery.isLoading && !hasSummaryData ? (
-            <AppPageLoadingState description="Carregando entidades em risco..." />
-          ) : summaryQuery.error && !hasSummaryData ? (
-            <AppPageErrorState
-              description={summaryQuery.error?.message ?? "Falha ao carregar entidades em risco."}
-              actionLabel="Tentar novamente"
-              onAction={() => void summaryQuery.refetch()}
-            />
-          ) : entitiesAtRisk.length === 0 ? (
-            <AppPageEmptyState title="Nenhuma entidade em risco" description="Sem desvios críticos detectados nesta organização." />
-          ) : (
-            <ul className="space-y-2">
-              {entitiesAtRisk.map((entity) => (
-                <li key={String(entity?.id ?? entity?.entityId)} className="flex items-center justify-between rounded-lg border border-[var(--border-subtle)] p-3">
-                  <div>
-                    <p className="text-sm font-medium text-[var(--text-primary)]">{String(entity?.name ?? entity?.entityName ?? "Entidade")}</p>
-                    <p className="text-xs text-[var(--text-muted)]">{String(entity?.reason ?? entity?.context ?? "Sem contexto detalhado")}</p>
-                  </div>
-                  <AppStatusBadge label={String(entity?.level ?? entity?.riskLevel ?? "WARNING")} />
-                </li>
-              ))}
-            </ul>
-          )}
-        </AppSectionBlock>
-
-        <AppSectionBlock title="Ações recomendadas" subtitle="Próximas ações úteis para reduzir risco" className="xl:col-span-4">
-          {summaryQuery.isLoading && !hasSummaryData ? (
-            <AppPageLoadingState description="Carregando recomendações..." />
-          ) : summaryQuery.error && !hasSummaryData ? (
-            <AppPageErrorState
-              description={summaryQuery.error?.message ?? "Falha ao carregar recomendações."}
-              actionLabel="Tentar novamente"
-              onAction={() => void summaryQuery.refetch()}
-            />
-          ) : recommendations.length === 0 ? (
-            <AppPageEmptyState title="Nenhuma recomendação disponível" description="Execute operações para gerar insights de governança." />
-          ) : (
-            <ul className="space-y-2">
-              {recommendations.map((item, index) => (
-                <li key={`${String(item?.id ?? item?.action ?? "rec")}-${index}`} className="rounded-lg border border-[var(--border-subtle)] p-3">
-                  <p className="text-sm font-medium text-[var(--text-primary)]">{String(item?.title ?? item?.action ?? "Ação recomendada")}</p>
-                  <p className="text-xs text-[var(--text-muted)]">{String(item?.description ?? item?.impact ?? "Sem descrição detalhada")}</p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </AppSectionBlock>
-      </div>
-      ) : null}
-      {(activeTab === "overview" || activeTab === "alerts") ? (
-      <div className="mt-3 grid gap-3 xl:grid-cols-3">
-        <AppSectionBlock title="Gargalos operacionais" subtitle="Onde a operação está travando">
-          {bottlenecks.length === 0 ? <AppPageEmptyState title="Sem gargalos críticos" description="Nenhum gargalo estrutural detectado na leitura atual." /> : (
-            <ul className="space-y-2">
-              {bottlenecks.slice(0, 5).map((item, index) => (
-                <li key={`${String(item?.id ?? "b")}-${index}`} className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm text-[var(--text-secondary)]">
-                  {String(item?.title ?? item?.name ?? item?.description ?? "Gargalo operacional identificado")}
-                </li>
-              ))}
-            </ul>
-          )}
-        </AppSectionBlock>
-        <AppSectionBlock title="Falhas operacionais" subtitle="Desvios que exigem correção">
-          {failures.length === 0 ? <AppPageEmptyState title="Sem falhas abertas" description="Nenhuma falha crítica registrada nesta janela." /> : (
-            <ul className="space-y-2">
-              {failures.slice(0, 5).map((item, index) => (
-                <li key={`${String(item?.id ?? "f")}-${index}`} className="rounded-lg border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-200">
-                  {String(item?.title ?? item?.description ?? "Falha operacional")}
-                </li>
-              ))}
-            </ul>
-          )}
-        </AppSectionBlock>
-        <AppSectionBlock title="Estado institucional" subtitle="Políticas e aderência">
-          {institutionalPolicies.length === 0 ? <AppPageEmptyState title="Sem políticas registradas" description="Backend não retornou políticas institucionais nesta organização." /> : (
-            <ul className="space-y-2">
-              {institutionalPolicies.slice(0, 5).map((policy, index) => (
-                <li key={`${String(policy?.id ?? "p")}-${index}`} className="rounded-lg border border-[var(--border-subtle)] p-3">
-                  <p className="text-sm font-medium text-[var(--text-primary)]">{String(policy?.title ?? policy?.name ?? "Política")}</p>
-                  <p className="text-xs text-[var(--text-muted)]">{String(policy?.status ?? "Sem status")}</p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </AppSectionBlock>
-      </div>
-      ) : null}
-      {(activeTab === "overview" || activeTab === "executions") ? (
-      <div className="mt-3">
-        <AppNextActionCard
-          title="Prioridade executiva"
-          description="Governança deve responder claramente o que está errado hoje e o próximo passo executivo."
-          severity={latestRisk >= 70 ? "critical" : latestRisk >= 40 ? "high" : "medium"}
-          metadata="governança"
-          action={{
-            label: latestRisk >= 70 ? "Executar contenção imediata" : "Revisar recomendações",
-            onClick: () => {
-              void Promise.all([summaryQuery.refetch(), runsQuery.refetch()]);
-            },
+      {pageState === "loading" ? <AppPageLoadingState description="Carregando leitura de risco, problemas e ações de governança..." /> : null}
+      {pageState === "error" ? (
+        <AppPageErrorState
+          description={summaryQuery.error?.message ?? "Falha ao carregar dados de governança."}
+          actionLabel="Tentar novamente"
+          onAction={() => {
+            void Promise.all([summaryQuery.refetch(), runsQuery.refetch()]);
           }}
         />
-      </div>
       ) : null}
-      </TrpcSectionErrorBoundary>
+
+      {pageState !== "loading" && pageState !== "error" ? (
+        <>
+          {(activeView === "visao" || activeView === "problemas") ? (
+            <AppSectionBlock
+              title="Estado geral da operação"
+              subtitle="Leitura instantânea de atrasos, inadimplência, comunicação e carga de trabalho"
+              className="mt-3"
+            >
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <AppStatusBadge label={operationStateLabel(pageState)} />
+                  <span className="text-sm text-[var(--text-secondary)]">Score de risco atual: {latestRisk}/100</span>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                  <div className="rounded-lg border border-[var(--border-subtle)] p-3">
+                    <p className="text-xs text-[var(--text-muted)]">Atrasos de O.S.</p>
+                    <p className="text-lg font-semibold text-[var(--text-primary)]">{overdueServiceOrders}</p>
+                  </div>
+                  <div className="rounded-lg border border-[var(--border-subtle)] p-3">
+                    <p className="text-xs text-[var(--text-muted)]">Cobranças vencidas</p>
+                    <p className="text-lg font-semibold text-[var(--text-primary)]">{overdueCharges}</p>
+                  </div>
+                  <div className="rounded-lg border border-[var(--border-subtle)] p-3">
+                    <p className="text-xs text-[var(--text-muted)]">Clientes sem resposta</p>
+                    <p className="text-lg font-semibold text-[var(--text-primary)]">{unansweredCustomers}</p>
+                  </div>
+                  <div className="rounded-lg border border-[var(--border-subtle)] p-3">
+                    <p className="text-xs text-[var(--text-muted)]">Falhas de comunicação</p>
+                    <p className="text-lg font-semibold text-[var(--text-primary)]">{communicationFailures}</p>
+                  </div>
+                </div>
+              </div>
+            </AppSectionBlock>
+          ) : null}
+
+          {(activeView === "visao" || activeView === "problemas") ? (
+            <AppSectionBlock
+              title="Problemas detectados"
+              subtitle="Lista priorizada do que está errado agora"
+              className="mt-3"
+            >
+              {filteredProblems.length === 0 ? (
+                <AppPageEmptyState
+                  title="Operação saudável"
+                  description="Sem problemas detectados. Estado vazio indica que não há reação urgente neste momento."
+                />
+              ) : (
+                <ul className="space-y-2">
+                  {filteredProblems.map(problem => (
+                    <li key={problem.id} className="rounded-lg border border-[var(--border-subtle)] p-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-semibold text-[var(--text-primary)]">{problem.title}</p>
+                        <AppPriorityBadge label={problem.priority} />
+                      </div>
+                      <p className="mt-1 text-sm text-[var(--text-secondary)]">{problem.context}</p>
+                      <p className="text-xs text-[var(--text-muted)]">Impacto: {problem.impact}</p>
+                      <p className="text-xs text-[var(--text-muted)]">Origem: {problem.origin}</p>
+                      <p className="text-xs text-[var(--text-muted)]">Responsável: {problem.owner}</p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <Button size="sm" variant="outline" onClick={() => navigate(problem.timelinePath)}>
+                          Ver origem na Timeline
+                        </Button>
+                        <Button size="sm" onClick={() => navigate(problem.actionPath)}>
+                          {problem.actionLabel}
+                        </Button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </AppSectionBlock>
+          ) : null}
+
+          {(activeView === "visao" || activeView === "acoes") ? (
+            <div className="mt-3 grid gap-3 xl:grid-cols-2">
+              <AppSectionBlock
+                title="Ações sugeridas"
+                subtitle="Decisão automatizada com motivo, impacto e execução imediata"
+              >
+                {governanceActions.length === 0 ? (
+                  <AppPageEmptyState title="Sem ações pendentes" description="Quando surgir risco, a governança sugerirá ações executáveis aqui." />
+                ) : (
+                  <div className="space-y-2">
+                    {governanceActions.slice(0, 6).map(action => (
+                      <AppNextActionCard
+                        key={action.id}
+                        title={action.title}
+                        description={action.description}
+                        severity={action.severity}
+                        metadata={action.module}
+                        action={{ label: "Executar agora", onClick: () => navigate(action.path) }}
+                      />
+                    ))}
+                  </div>
+                )}
+              </AppSectionBlock>
+
+              <AppSectionBlock
+                title="Execução direta"
+                subtitle="Ações assistidas sem sair do fluxo de governança"
+              >
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <Button onClick={() => navigate("/finances?view=charges&status=overdue")}>Cobrar</Button>
+                  <Button onClick={() => navigate("/service-orders?status=attention")}>Reatribuir O.S.</Button>
+                  <Button onClick={() => navigate("/service-orders/new")} variant="outline">Abrir O.S.</Button>
+                  <Button onClick={() => navigate("/customers?segment=needs-contact")} variant="outline">Enviar mensagem</Button>
+                  <Button onClick={() => navigate("/appointments?view=calendar")} variant="outline">Ajustar agenda</Button>
+                  <Button onClick={() => navigate("/timeline?module=governance")} variant="outline">Abrir Timeline</Button>
+                </div>
+              </AppSectionBlock>
+            </div>
+          ) : null}
+
+          {(activeView === "visao" || activeView === "historico") ? (
+            <div className="mt-3 grid gap-3 xl:grid-cols-12">
+              <AppSectionBlock
+                title="Histórico de governança"
+                subtitle="Decisões e execuções recentes conectadas com a Timeline"
+                className="xl:col-span-8"
+              >
+                {runsQuery.isLoading && !hasRunsData ? (
+                  <AppPageLoadingState description="Carregando execuções de governança..." />
+                ) : runsQuery.error && !hasRunsData ? (
+                  <AppPageErrorState
+                    description={runsQuery.error?.message ?? "Falha ao carregar execuções de governança."}
+                    actionLabel="Tentar novamente"
+                    onAction={() => void runsQuery.refetch()}
+                  />
+                ) : runs.length === 0 ? (
+                  <AppPageEmptyState title="Sem execuções registradas" description="Assim que a governança rodar, as decisões aparecerão aqui." />
+                ) : (
+                  <ul className="space-y-2">
+                    {runs.slice(0, 8).map((run, index) => {
+                      const runRisk = Number(run?.riskScore ?? run?.score ?? run?.overallRisk ?? 0);
+                      const runDate = run?.createdAt ? new Date(String(run.createdAt)).toLocaleString("pt-BR") : "Sem data";
+                      return (
+                        <li key={String(run?.id ?? `run-${index}`)} className="rounded-lg border border-[var(--border-subtle)] p-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-sm font-semibold text-[var(--text-primary)]">Execução {index + 1}</p>
+                            <AppStatusBadge label={runRisk >= 70 ? "Crítico" : runRisk >= 40 ? "Atenção" : "Saudável"} />
+                          </div>
+                          <p className="text-xs text-[var(--text-muted)]">Risco calculado: {runRisk}/100 · {runDate}</p>
+                          <Button size="sm" variant="outline" className="mt-2" onClick={() => navigate("/timeline?module=governance")}>Ver decisão na Timeline</Button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </AppSectionBlock>
+
+              <AppSectionBlock
+                title="Regras de governança"
+                subtitle="Condição → ação em linguagem simples"
+                className="xl:col-span-4"
+              >
+                {institutionalPolicies.length === 0 ? (
+                  <AppPageEmptyState
+                    title="Sem regras configuradas"
+                    description="Quando houver políticas publicadas, elas aparecerão como condição e ação nesta seção."
+                  />
+                ) : (
+                  <ul className="space-y-2">
+                    {institutionalPolicies.slice(0, 6).map((policy, index) => (
+                      <li key={String(policy?.id ?? `policy-${index}`)} className="rounded-lg border border-[var(--border-subtle)] p-3">
+                        <p className="text-sm font-medium text-[var(--text-primary)]">{String(policy?.title ?? policy?.name ?? "Regra")}</p>
+                        <p className="text-xs text-[var(--text-muted)]">{String(policy?.condition ?? policy?.trigger ?? "Condição não especificada")}</p>
+                        <p className="text-xs text-[var(--text-secondary)]">
+                          → {String(policy?.action ?? policy?.resolution ?? policy?.status ?? "Ação não especificada")}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </AppSectionBlock>
+            </div>
+          ) : null}
+
+          {(activeView === "visao" || activeView === "acoes") && recommendations.length > 0 ? (
+            <AppSectionBlock
+              title="Sugestões automáticas do motor"
+              subtitle="Ações complementares trazidas pelo backend de governança"
+              className="mt-3"
+            >
+              <ul className="space-y-2">
+                {recommendations.slice(0, 5).map((item, index) => (
+                  <li key={String(item?.id ?? `recommendation-${index}`)} className="rounded-lg border border-[var(--border-subtle)] p-3">
+                    <p className="text-sm font-medium text-[var(--text-primary)]">{String(item?.title ?? item?.action ?? "Ação recomendada")}</p>
+                    <p className="text-xs text-[var(--text-muted)]">{String(item?.description ?? item?.impact ?? "Sem descrição detalhada")}</p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="mt-2"
+                      onClick={() => navigate("/timeline?module=governance")}
+                    >
+                      Rastrear na Timeline
+                      <ArrowUpRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </AppSectionBlock>
+          ) : null}
+
+          {failures.length > 0 && (activeView === "visao" || activeView === "problemas") ? (
+            <AppSectionBlock
+              title="Falhas abertas de execução"
+              subtitle="Desvios operacionais ainda sem resolução"
+              className="mt-3"
+            >
+              <ul className="space-y-2">
+                {failures.slice(0, 6).map((failure, index) => (
+                  <li key={String(failure?.id ?? `failure-${index}`)} className="rounded-lg border border-rose-500/30 bg-rose-500/10 p-3">
+                    <p className="text-sm font-semibold text-[var(--text-primary)]">{String(failure?.title ?? "Falha operacional")}</p>
+                    <p className="text-xs text-[var(--text-secondary)]">{String(failure?.description ?? "Sem detalhe complementar")}</p>
+                    <Button size="sm" variant="outline" className="mt-2" onClick={() => navigate("/timeline?severity=critical")}>Resolver agora</Button>
+                  </li>
+                ))}
+              </ul>
+            </AppSectionBlock>
+          ) : null}
+        </>
+      ) : null}
+      </AppPageShell>
     </PageWrapper>
   );
 }
