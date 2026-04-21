@@ -610,7 +610,7 @@ export function AppSectionBlock({
 
 export function AppDataTable({ children }: { children: ReactNode }) {
   return (
-    <div className="overflow-x-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)]">
+    <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)]">
       {children}
     </div>
   );
