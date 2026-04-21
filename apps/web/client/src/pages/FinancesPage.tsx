@@ -11,7 +11,6 @@ import {
   AppDataTable,
   AppOperationalBar,
   AppFiltersBar,
-  AppKpiRow,
   AppPageEmptyState,
   AppPageErrorState,
   AppPageHeader,
@@ -21,7 +20,15 @@ import {
   AppSecondaryTabs,
   AppStatusBadge,
 } from "@/components/internal-page-system";
-import { AppRowActionsDropdown } from "@/components/app-system";
+import {
+  AppPageShell,
+  AppRowActionsDropdown,
+  AppSectionCard,
+  AppStatCard,
+  AppTimeline,
+  AppTimelineItem,
+  AppToolbar,
+} from "@/components/app-system";
 import { toast } from "sonner";
 import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
 import { useRenderWatchdog } from "@/hooks/useRenderWatchdog";
@@ -1066,12 +1073,21 @@ export default function FinancesPage() {
   return (
     <PageWrapper
       title="Financeiro"
-      subtitle="Operação de cobrança, risco e execução da carteira."
+      subtitle="Centro operacional de receita, cobrança e risco."
     >
-      <div className="space-y-4">
+      <AppPageShell className="space-y-4">
+        <div className="space-y-4">
         <AppPageHeader
-          title={modeContext.title}
-          description={modeContext.description}
+          title="Financeiro"
+          description={`Centro operacional de receita, cobrança e risco. Período ativo: ${
+            period === "7d"
+              ? "últimos 7 dias"
+              : period === "30d"
+                ? "últimos 30 dias"
+                : period === "90d"
+                  ? "últimos 90 dias"
+                  : "mês atual"
+          }.`}
           secondaryActions={
             <div className="flex items-center gap-1.5">
               <Button
@@ -1110,54 +1126,73 @@ export default function FinancesPage() {
             />
           }
         />
-        <AppKpiRow
-          gridClassName="grid-cols-1 md:grid-cols-2 xl:grid-cols-5"
-          items={[
-            {
-              title: "A receber (aberto)",
-              value: formatCurrency(openTotal),
-              hint: `${pendingCharges.length + overdueCharges.length} cobrança(s) em carteira`,
-              tone: openTotal > 0 ? "important" : "default",
-            },
-            {
-              title: "Em risco",
-              value: formatCurrency(overdueTotal),
-              delta: `${overdueDelta >= 0 ? "+" : ""}${overdueDelta.toFixed(1).replace(".", ",")}%`,
-              trend:
-                overdueDelta > 0 ? "up" : overdueDelta < 0 ? "down" : "neutral",
-              hint: `${overdueCharges.length} cobrança(s) vencida(s)`,
-              tone: overdueCharges.length > 0 ? "critical" : "default",
-            },
-            {
-              title: "Recebido (30 dias)",
-              value: formatCurrency(receivedCurrent),
-              delta: `${receivedDelta >= 0 ? "+" : ""}${receivedDelta.toFixed(1).replace(".", ",")}%`,
-              trend:
-                receivedDelta > 0
-                  ? "up"
-                  : receivedDelta < 0
-                    ? "down"
-                    : "neutral",
-              hint: `Período anterior ${formatCurrency(receivedPrevious)}`,
-            },
-            {
-              title: "Vence hoje/7 dias",
-              value: `${dueToday}/${dueSoon}`,
-              hint: "janela de atenção",
-              tone:
-                dueToday > 0
-                  ? "critical"
-                  : dueSoon > 0
-                    ? "important"
-                    : "default",
-            },
-            {
-              title: "Pagas no ciclo",
-              value: formatCurrency(receivedTotal),
-              hint: `${paidCharges.length} cobrança(s) confirmadas`,
-            },
-          ]}
-        />
+        <AppToolbar className="px-3 py-2.5">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--text-secondary)]">
+            <AppStatusBadge label={`Período: ${period.toUpperCase()}`} />
+            <AppStatusBadge
+              label={`Status geral: ${getOperationalSeverityLabel(pageSeverity)}`}
+            />
+            <span>
+              Foco: {activeStatusTab === "all" ? "todas as cobranças" : activeStatusTab}
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => setMode("pending")}>
+              Pendentes
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setMode("overdue")}>
+              Vencidas
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => handleRemind()}>
+              Cobrar agora
+            </Button>
+          </div>
+        </AppToolbar>
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
+          <AppStatCard
+            label="Receita recebida"
+            value={formatCurrency(receivedCurrent)}
+            helper={`Comparativo: ${receivedDelta >= 0 ? "+" : ""}${receivedDelta.toFixed(1).replace(".", ",")}% vs ciclo anterior.`}
+            delta={
+              <Button size="sm" variant="ghost" onClick={() => setMode("paid")}>
+                Ver pagamentos
+              </Button>
+            }
+          />
+          <AppStatCard
+            label="Cobranças pendentes"
+            value={formatCurrency(pendingTotal)}
+            helper={`${pendingCharges.length} cobrança(s) abertas; ${dueToday} vencem hoje.`}
+            delta={
+              <Button size="sm" variant="ghost" onClick={() => setMode("pending")}>
+                Cobrar pendentes
+              </Button>
+            }
+          />
+          <AppStatCard
+            label="Cobranças vencidas"
+            value={formatCurrency(overdueTotal)}
+            helper={`${overdueCharges.length} vencida(s) · ${overdueDelta >= 0 ? "+" : ""}${overdueDelta.toFixed(1).replace(".", ",")}% no ciclo.`}
+            delta={
+              <Button size="sm" variant="ghost" onClick={() => setMode("overdue")}>
+                Recuperar caixa
+              </Button>
+            }
+          />
+          <AppStatCard
+            label="Receita prevista"
+            value={formatCurrency(openTotal)}
+            helper={`${pendingCharges.length + overdueCharges.length} cobrança(s) em carteira ativa.`}
+            delta={
+              <Button size="sm" variant="ghost" onClick={() => setMode("overview")}>
+                Ver tendência
+              </Button>
+            }
+          />
+        </div>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--text-muted)]">
+          Nível 1 · Visão geral e controle
+        </p>
 
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
           <AppSectionBlock
@@ -1261,9 +1296,9 @@ export default function FinancesPage() {
           >
             <div className="space-y-2.5">
               {financialAlerts.map(alert => (
-                <div
+                <AppSectionCard
                   key={alert.key}
-                  className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/35 p-3"
+                  className="rounded-xl border-[var(--border-subtle)] bg-[var(--surface-base)]/35 p-3"
                 >
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-xs font-semibold text-[var(--text-primary)]">
@@ -1282,7 +1317,7 @@ export default function FinancesPage() {
                   <p className="mt-1 text-xs text-[var(--text-secondary)]">
                     {alert.detail}
                   </p>
-                </div>
+                </AppSectionCard>
               ))}
             </div>
           </AppSectionBlock>
@@ -1364,6 +1399,9 @@ export default function FinancesPage() {
             Limpar contexto
           </Button>
         </AppFiltersBar>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--text-muted)]">
+          Nível 2 · Lista operacional
+        </p>
         <AppSectionBlock
           title="Lista operacional de cobranças e pagamentos"
           subtitle="Aqui o time resolve o trabalho sem sair do Financeiro."
@@ -1575,6 +1613,9 @@ export default function FinancesPage() {
             </>
           }
         />
+        <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--text-muted)]">
+          Nível 3 · Detalhe financeiro
+        </p>
         <WorkspaceScaffold
           title={
             workspaceCharge
@@ -1677,11 +1718,17 @@ export default function FinancesPage() {
               subtitle="Feed curto para continuidade do caso."
               compact
             >
-              <ul className="space-y-1.5 text-xs text-[var(--text-secondary)]">
-                <li>• Última atualização: {workspaceCharge?.lastEventAt ?? "Sem evento recente"}</li>
-                <li>• Abertura da cobrança: {workspaceCharge?.openedAt ?? "Sem data"}</li>
-                <li>• Origem operacional: {workspaceCharge?.sourceLabel ?? "Não informada"}</li>
-              </ul>
+              <AppTimeline className="space-y-1.5 text-xs text-[var(--text-secondary)]">
+                <AppTimelineItem>
+                  Última atualização: {workspaceCharge?.lastEventAt ?? "Sem evento recente"}
+                </AppTimelineItem>
+                <AppTimelineItem>
+                  Abertura da cobrança: {workspaceCharge?.openedAt ?? "Sem data"}
+                </AppTimelineItem>
+                <AppTimelineItem>
+                  Origem operacional: {workspaceCharge?.sourceLabel ?? "Não informada"}
+                </AppTimelineItem>
+              </AppTimeline>
             </AppSectionBlock>
           }
           communication={
@@ -1982,7 +2029,8 @@ export default function FinancesPage() {
             ]);
           }}
         />
-      </div>
+        </div>
+      </AppPageShell>
     </PageWrapper>
   );
 }
