@@ -121,7 +121,7 @@ export function GlobalSearch() {
           placeholder={
             canQuery
               ? "Buscar clientes, agendamentos..."
-              : "Faça login para buscar"
+              : "Entre para pesquisar"
           }
           value={query}
           disabled={!canQuery}
@@ -184,7 +184,7 @@ export function GlobalSearch() {
             </div>
           ) : query.trim().length >= 2 ? (
             <div className="p-4 text-center text-sm text-[var(--text-muted)]">
-              Nenhum resultado encontrado
+              Nenhum resultado para essa busca.
             </div>
           ) : null}
         </div>

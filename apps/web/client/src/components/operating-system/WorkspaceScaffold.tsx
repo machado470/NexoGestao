@@ -49,8 +49,16 @@ export function WorkspaceScaffold({
       </header>
 
       <div className="grid gap-4 xl:grid-cols-12">
-        <div className="space-y-4 xl:col-span-7">{context}</div>
+        <div className="space-y-2 xl:col-span-7">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+            Resumo operacional
+          </p>
+          {context}
+        </div>
         <aside className="space-y-4 xl:col-span-5">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+            Contexto e próximos passos
+          </p>
           {timeline}
           {communication}
           {finance}

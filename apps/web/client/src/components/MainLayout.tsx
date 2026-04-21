@@ -145,8 +145,8 @@ interface MainLayoutProps {
 }
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "nexo:app-shell:sidebar-collapsed";
-const SIDEBAR_EXPANDED_WIDTH = 286;
-const SIDEBAR_COLLAPSED_WIDTH = 96;
+const SIDEBAR_EXPANDED_WIDTH = 292;
+const SIDEBAR_COLLAPSED_WIDTH = 92;
 
 export function MainLayout({ children }: MainLayoutProps) {
   // KPI/top-metrics são definidos por página (dashboard forte, módulos contextuais).
@@ -377,8 +377,8 @@ export function MainLayout({ children }: MainLayoutProps) {
             }`}
             style={!isMobile ? { width: `${desktopSidebarWidth}px` } : undefined}
           >
-            <div className="nexo-sidebar-header border-b border-[var(--border)] px-4">
-              <div className="flex items-center justify-between gap-3">
+            <div className="nexo-sidebar-header border-b border-[var(--border)] px-3.5 py-2">
+              <div className="flex items-center justify-between gap-2">
                 <button
                   type="button"
                   onClick={() => handleNavigate("/executive-dashboard")}
@@ -393,7 +393,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                     onClick={() => setSidebarCollapsed(prev => !prev)}
                     aria-label={sidebarCollapsed ? "Expandir menu lateral" : "Recolher menu lateral"}
                     title={sidebarCollapsed ? "Expandir menu lateral" : "Recolher menu lateral"}
-                    className="rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-muted)] transition hover:bg-[var(--accent-soft)] hover:text-[var(--text-primary)]"
+                    className="rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-muted)] transition hover:bg-[var(--accent-soft)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/35"
                   >
                     {sidebarCollapsed ? (
                       <ChevronRight className="h-4 w-4" />
@@ -405,7 +405,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                   <button
                     type="button"
                     onClick={() => setMobileMenuOpen(false)}
-                    className="rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-muted)] transition hover:bg-[var(--accent-soft)] hover:text-[var(--text-primary)]"
+                    className="rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-muted)] transition hover:bg-[var(--accent-soft)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/35"
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -413,7 +413,7 @@ export function MainLayout({ children }: MainLayoutProps) {
               </div>
             </div>
 
-            <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+            <nav className="min-h-0 flex-1 overflow-y-auto px-2.5 py-3">
               <div className="space-y-5">
                 {visibleSections.map(section => (
                   <section key={section.id} className="space-y-2">
@@ -512,11 +512,11 @@ export function MainLayout({ children }: MainLayoutProps) {
                     </div>
                   </div>
 
-                  <div className="nexo-topbar-search-slot min-w-0">
+                  <div className="nexo-topbar-search-slot min-w-0 self-center">
                     <GlobalSearch />
                   </div>
 
-                  <div className="flex items-center justify-end gap-2">
+                  <div className="flex items-center justify-end gap-1.5 md:gap-2">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <button
@@ -589,7 +589,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                       <DropdownMenuTrigger asChild>
                         <button
                           type="button"
-                          className="nexo-topbar-control h-[34px] px-2"
+                          className="nexo-topbar-control h-9 px-2.5"
                         >
                           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--surface-elevated)] text-[var(--text-primary)]">
                             <User className="h-4 w-4" />
