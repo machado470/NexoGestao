@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import CreateCustomerModal from "@/components/CreateCustomerModal";
@@ -18,7 +18,7 @@ import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
 import { useOperationalMemoryState } from "@/hooks/useOperationalMemory";
 import { Button, SecondaryButton } from "@/components/design-system";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
-import { AppOperationalModal } from "@/components/operating-system/AppOperationalModal";
+import { WorkspaceScaffold } from "@/components/operating-system/WorkspaceScaffold";
 import {
   EmptyActionState,
   OperationalAutomationNote,
@@ -35,6 +35,7 @@ import {
   AppPageErrorState,
   AppPageHeader,
   AppPageLoadingState,
+  AppPriorityBadge,
   AppSectionBlock,
   AppStatusBadge,
   appSelectionPillClasses,
@@ -116,10 +117,9 @@ function getContactUrgencyLabel(days: number, state: ContactState) {
 export default function CustomersPage() {
   const [, navigate] = useLocation();
   const [createOpen, setCreateOpen] = useState(false);
-  const [selectedCustomer, setSelectedCustomer] = useState<{
-    id: string;
-    name: string;
-  } | null>(null);
+  const [activeCustomerId, setActiveCustomerId] = useOperationalMemoryState<
+    string | null
+  >("nexo.customers.active-id.v1", null);
   const [activeFilter, setActiveFilter] = useOperationalMemoryState<OperationalFilter>(
     "nexo.customers.filter.v1",
     "all"
@@ -461,9 +461,32 @@ export default function CustomersPage() {
       selectedCustomerIds.includes(String(customer?.id ?? ""))
     );
 
+  useEffect(() => {
+    if (displayedCustomers.length === 0) {
+      if (activeCustomerId) setActiveCustomerId(null);
+      return;
+    }
+
+    if (
+      activeCustomerId &&
+      displayedCustomers.some(item => String(item?.id ?? "") === activeCustomerId)
+    ) {
+      return;
+    }
+
+    setActiveCustomerId(String(displayedCustomers[0]?.id ?? ""));
+  }, [activeCustomerId, displayedCustomers, setActiveCustomerId]);
+
+  const activeCustomer = useMemo(
+    () =>
+      customers.find(item => String(item?.id ?? "") === String(activeCustomerId ?? "")) ??
+      null,
+    [activeCustomerId, customers]
+  );
+
   const workspaceQuery = trpc.nexo.customers.workspace.useQuery(
-    { id: selectedCustomer?.id ?? "" },
-    { enabled: Boolean(selectedCustomer?.id), retry: false }
+    { id: activeCustomerId ?? "" },
+    { enabled: Boolean(activeCustomerId), retry: false }
   );
 
   const workspace = useMemo(
@@ -490,15 +513,15 @@ export default function CustomersPage() {
   const latestAppointment = workspaceAppointments[0];
   const latestServiceOrder = workspaceServiceOrders[0];
   const latestMessage = workspaceMessages[0];
-  const selectedSnapshot = snapshotByCustomerId.get(selectedCustomer?.id ?? "");
+  const selectedSnapshot = snapshotByCustomerId.get(activeCustomerId ?? "");
 
   const runCustomerPrimaryAction = () => {
-    if (!selectedCustomer?.id || !selectedSnapshot) return;
+    if (!activeCustomerId || !selectedSnapshot) return;
     setIsProcessingPrimaryAction(true);
     if (selectedSnapshot.primaryActionLabel.startsWith("Cobrar")) {
       setActionFeedbackTone("success");
       setActionFeedback("Abrindo cobrança do cliente...");
-      navigate(`/finances?customerId=${selectedCustomer.id}&filter=overdue`);
+      navigate(`/finances?customerId=${activeCustomerId}&filter=overdue`);
       setIsProcessingPrimaryAction(false);
       return;
     }
@@ -515,14 +538,14 @@ export default function CustomersPage() {
     ) {
       setActionFeedbackTone("success");
       setActionFeedback("Abrindo canal de comunicação...");
-      navigate(`/whatsapp?customerId=${selectedCustomer.id}`);
+      navigate(`/whatsapp?customerId=${activeCustomerId}`);
       setIsProcessingPrimaryAction(false);
       return;
     }
     if (selectedSnapshot.primaryActionLabel.startsWith("Gerar cobrança")) {
       setActionFeedbackTone("success");
       setActionFeedback("Abrindo financeiro para gerar cobrança...");
-      navigate(`/finances?customerId=${selectedCustomer.id}`);
+      navigate(`/finances?customerId=${activeCustomerId}`);
       setIsProcessingPrimaryAction(false);
       return;
     }
@@ -850,10 +873,9 @@ export default function CustomersPage() {
                             ),
                             onSelect: () => {
                               setTimelineExpanded(false);
-                              setSelectedCustomer({
-                                id: customerId,
-                                name: String(customer?.name ?? "Cliente"),
-                              });
+                              setActionFeedback(null);
+                              setActionFeedbackTone("neutral");
+                              setActiveCustomerId(customerId);
                             },
                           };
                         })();
@@ -868,10 +890,18 @@ export default function CustomersPage() {
                           <tr
                             key={customerId}
                             className={`border-t border-[var(--border-subtle)] transition-colors hover:bg-[var(--surface-subtle)]/60 focus-within:bg-[var(--surface-subtle)]/70 ${
-                              selectedCustomerIds.includes(customerId)
-                                ? "bg-[var(--accent-soft)]/40"
+                              activeCustomerId === customerId
+                                ? "bg-[var(--accent-soft)]/65 ring-1 ring-inset ring-[var(--accent-primary)]/35"
+                                : selectedCustomerIds.includes(customerId)
+                                  ? "bg-[var(--accent-soft)]/35"
                                 : ""
                             }`}
+                            onClick={() => {
+                              setTimelineExpanded(false);
+                              setActionFeedback(null);
+                              setActionFeedbackTone("neutral");
+                              setActiveCustomerId(customerId);
+                            }}
                           >
                             <td className="px-4 py-3.5 align-top">
                               <AppCheckbox
@@ -889,6 +919,7 @@ export default function CustomersPage() {
                                     );
                                   });
                                 }}
+                                onClick={event => event.stopPropagation()}
                                 aria-label={`Selecionar ${String(customer?.name ?? "cliente")}`}
                               />
                             </td>
@@ -898,10 +929,9 @@ export default function CustomersPage() {
                                 className="w-full text-left"
                                 onClick={() => {
                                   setTimelineExpanded(false);
-                                  setSelectedCustomer({
-                                    id: customerId,
-                                    name: String(customer?.name ?? "Cliente"),
-                                  });
+                                  setActionFeedback(null);
+                                  setActionFeedbackTone("neutral");
+                                  setActiveCustomerId(customerId);
                                 }}
                               >
                                 <p className="truncate text-sm font-semibold leading-5 text-[var(--text-primary)]">
@@ -929,6 +959,11 @@ export default function CustomersPage() {
                                 <span className="rounded-full bg-[var(--surface-subtle)] px-2 py-0.5 text-[10px] text-[var(--text-muted)]">
                                   Última interação: {snapshot.lastInteractionDays}d
                                 </span>
+                                {snapshot.status === "Em risco" ? (
+                                  <span className="rounded-full bg-rose-500/10 px-2 py-0.5 text-[10px] font-semibold text-rose-500">
+                                    Risco alto
+                                  </span>
+                                ) : null}
                               </div>
                             </td>
                             <td className="px-4 py-3.5 align-top">
@@ -973,12 +1008,9 @@ export default function CustomersPage() {
                                       label: "Abrir detalhe operacional",
                                       onSelect: () => {
                                         setTimelineExpanded(false);
-                                        setSelectedCustomer({
-                                          id: customerId,
-                                          name: String(
-                                            customer?.name ?? "Cliente"
-                                          ),
-                                        });
+                                        setActionFeedback(null);
+                                        setActionFeedbackTone("neutral");
+                                        setActiveCustomerId(customerId);
                                       },
                                     },
                                     {
@@ -1024,115 +1056,192 @@ export default function CustomersPage() {
             await customersQuery.refetch();
             if (created?.id) {
               setTimelineExpanded(false);
-              setSelectedCustomer({
-                id: created.id,
-                name: created.name ?? "Cliente",
-              });
+              setActionFeedback(null);
+              setActionFeedbackTone("neutral");
+              setActiveCustomerId(created.id);
             }
           }}
         />
-        <AppOperationalModal
-          open={Boolean(selectedCustomer)}
-          onOpenChange={open => {
-            if (!open) {
-              setSelectedCustomer(null);
-              setTimelineExpanded(false);
-              setActionFeedback(null);
-              setActionFeedbackTone("neutral");
-            }
-          }}
-          title={selectedCustomer?.name ?? "Cliente"}
-          subtitle="Central operacional de cliente para decidir, agir e acompanhar sem sair da carteira."
-          status={selectedSnapshot?.status}
-          priority={
-            selectedSnapshot ? `Prioridade ${selectedSnapshot.priorityScore}` : undefined
-          }
-          summary={[
-            {
-              label: "Financeiro",
-              value: workspaceQuery.isLoading ? "Carregando..." : `${workspaceCharges.length} cobranças`,
-            },
-            {
-              label: "Agenda",
-              value: workspaceQuery.isLoading ? "Carregando..." : `${workspaceAppointments.length} agendamentos`,
-            },
-            {
-              label: "O.S.",
-              value: workspaceQuery.isLoading ? "Carregando..." : `${workspaceServiceOrders.length} ordens`,
-            },
-            {
-              label: "WhatsApp",
-              value: workspaceQuery.isLoading ? "Carregando..." : `${workspaceMessages.length} interações`,
-            },
-          ]}
-          primaryAction={{
-            label: selectedSnapshot?.primaryActionLabel ?? "Abrir detalhe",
-            onClick: runCustomerPrimaryAction,
-            disabled: !selectedCustomer?.id,
-            processing: isProcessingPrimaryAction,
-          }}
-          secondaryAction={{
-            label: "Criar O.S.",
-            onClick: () => setOpenServiceOrderCreate(true),
-            disabled: !selectedCustomer?.id,
-          }}
-          quickActions={[
-            {
-              label: "Criar agendamento",
-              onClick: () => setOpenAppointmentCreate(true),
-              disabled: !selectedCustomer?.id || isProcessingPrimaryAction,
-            },
-            {
-              label: "Cobrança",
-              onClick: () =>
-                selectedCustomer?.id &&
-                navigate(`/finances?customerId=${selectedCustomer.id}&filter=overdue`),
-              disabled: !selectedCustomer?.id || isProcessingPrimaryAction,
-            },
-            {
-              label: "WhatsApp",
-              onClick: () =>
-                selectedCustomer?.id &&
-                navigate(`/whatsapp?customerId=${selectedCustomer.id}`),
-              disabled: !selectedCustomer?.id || isProcessingPrimaryAction,
-            },
-          ]}
-          feedback={actionFeedback}
-          feedbackTone={actionFeedbackTone}
-          contentLoading={workspaceQuery.isLoading}
-          loadingLabel="Carregando visão de cliente, agenda, execução e financeiro..."
+        <AppSectionBlock
+          title="Workspace operacional do cliente"
+          subtitle="Contexto vivo para decidir e agir sem sair da lista."
         >
-          <div className="space-y-4">
-            {workspaceQuery.error ? (
-              <p className="rounded-md border border-[var(--dashboard-danger)]/40 bg-[var(--dashboard-danger)]/10 p-3 text-sm text-[var(--dashboard-danger)]">
-                Não foi possível carregar o detalhe do cliente:{" "}
-                {workspaceQuery.error.message}
-              </p>
-            ) : (
-              <div className="space-y-4">
-                <section className="space-y-1.5">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
-                    Resumo e contexto
-                  </p>
-                  <p className="text-sm text-[var(--text-primary)]">
-                    {String(workspaceCustomer?.phone ?? "Sem telefone")} ·{" "}
-                    {String(workspaceCustomer?.email ?? "Sem e-mail")}
-                  </p>
-                  {selectedSnapshot ? (
-                    <p className="text-xs text-[var(--text-muted)]">
-                      {selectedSnapshot.segmentTag} ·{" "}
-                      {selectedSnapshot.behaviorLabel}
+          {!activeCustomerId || !activeCustomer ? (
+            <AppPageEmptyState
+              title="Selecione um cliente"
+              description="Clique em uma linha para abrir o workspace e continuar o fluxo operacional sem modal pesado."
+            />
+          ) : workspaceQuery.error ? (
+            <AppPageErrorState
+              description={`Não foi possível carregar o workspace: ${workspaceQuery.error.message}`}
+              actionLabel="Tentar novamente"
+              onAction={() => void workspaceQuery.refetch()}
+            />
+          ) : (
+            <WorkspaceScaffold
+              title={`Workspace · ${String(activeCustomer?.name ?? "Cliente")}`}
+              subtitle="Cliente, contexto financeiro, operação e comunicação no mesmo foco."
+              primaryAction={{
+                label: selectedSnapshot?.primaryActionLabel ?? "Executar próxima ação",
+                onClick: runCustomerPrimaryAction,
+              }}
+              context={
+                <div className="space-y-4">
+                  <section className="rounded-xl border border-[var(--border-subtle)]/80 bg-[var(--surface-subtle)]/35 p-3.5">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h4 className="text-sm font-semibold text-[var(--text-primary)]">
+                        {String(activeCustomer?.name ?? "Cliente")}
+                      </h4>
+                      <div className="flex items-center gap-2">
+                        <AppStatusBadge label={selectedSnapshot?.status ?? "Em acompanhamento"} />
+                        <AppPriorityBadge
+                          label={
+                            selectedSnapshot?.overdueCharges
+                              ? "Crítica"
+                              : selectedSnapshot?.status === "Atenção"
+                                ? "Média"
+                                : "Baixa"
+                          }
+                        />
+                      </div>
+                    </div>
+                    <p className="mt-1 text-xs text-[var(--text-muted)]">
+                      {selectedSnapshot?.contextLabel ?? "Sem contexto resumido"} ·{" "}
+                      {selectedSnapshot?.behaviorLabel ?? "Comportamento não classificado"}
                     </p>
+                    <p className="mt-2 text-xs text-[var(--text-secondary)]">
+                      {String(workspaceCustomer?.phone ?? "Sem telefone")} ·{" "}
+                      {String(workspaceCustomer?.email ?? "Sem e-mail")}
+                    </p>
+                  </section>
+                  {selectedSnapshot ? (
+                    <OperationalNextAction
+                      title={selectedSnapshot.primaryActionLabel}
+                      reason={selectedSnapshot.primaryActionReason}
+                      urgency={selectedSnapshot.primaryActionUrgency}
+                      impact={selectedSnapshot.primaryActionImpact}
+                    />
+                  ) : null}
+                  <section className="space-y-1.5 border-t border-[var(--border-subtle)] pt-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                      Contexto financeiro
+                    </p>
+                    <p className="text-sm text-[var(--text-secondary)]">
+                      {selectedSnapshot?.overdueCharges
+                        ? `${selectedSnapshot.overdueCharges} cobrança(s) vencida(s)`
+                        : selectedSnapshot?.pendingCharges
+                          ? `${selectedSnapshot.pendingCharges} cobrança(s) pendente(s)`
+                          : "Sem pendências de cobrança"}{" "}
+                      · pendente {selectedSnapshot ? formatMoney(selectedSnapshot.financialPendingCents) : "—"}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <SecondaryButton
+                        type="button"
+                        className="h-8 px-3 text-xs"
+                        onClick={() => navigate(`/finances?customerId=${activeCustomerId}`)}
+                      >
+                        Abrir financeiro
+                      </SecondaryButton>
+                    </div>
+                  </section>
+                  <section className="space-y-1.5 border-t border-[var(--border-subtle)] pt-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                      Contexto operacional
+                    </p>
+                    <p className="text-sm text-[var(--text-secondary)]">
+                      Próximo agendamento:{" "}
+                      {latestAppointment?.startsAt
+                        ? new Date(String(latestAppointment.startsAt)).toLocaleString("pt-BR")
+                        : "não registrado"}{" "}
+                      · O.S. em foco:{" "}
+                      {String(latestServiceOrder?.title ?? latestServiceOrder?.id ?? "não registrada")}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <SecondaryButton
+                        type="button"
+                        className="h-8 px-3 text-xs"
+                        onClick={() => navigate(`/appointments?customerId=${activeCustomerId}`)}
+                      >
+                        Ver agenda
+                      </SecondaryButton>
+                      <SecondaryButton
+                        type="button"
+                        className="h-8 px-3 text-xs"
+                        onClick={() => navigate(`/service-orders?customerId=${activeCustomerId}`)}
+                      >
+                        Ver O.S.
+                      </SecondaryButton>
+                    </div>
+                  </section>
+                </div>
+              }
+              communication={
+                <section className="rounded-xl border border-[var(--border-subtle)]/80 p-3.5">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                    Comunicação
+                  </p>
+                  <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                    WhatsApp: {latestMessage ? "Canal com histórico recente" : "Sem interação recente"}.
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--text-muted)]">
+                    Última interação: {selectedSnapshot?.contactLabel ?? "Sem retorno registrado"}.
+                  </p>
+                  <Button
+                    type="button"
+                    className="mt-3 h-8 px-3 text-xs"
+                    onClick={() => navigate(`/whatsapp?customerId=${activeCustomerId}`)}
+                  >
+                    Abrir WhatsApp
+                  </Button>
+                </section>
+              }
+              timeline={
+                <section className="rounded-xl border border-[var(--border-subtle)]/80 p-3.5">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                    Timeline recente
+                  </p>
+                  <ul className="mt-2 space-y-1.5 text-xs text-[var(--text-secondary)]">
+                    {visibleTimeline.length === 0 ? (
+                      <li>Sem eventos recentes.</li>
+                    ) : (
+                      visibleTimeline.map((event, index) => (
+                        <li key={`${String(event?.id ?? "event")}-${index}`}>
+                          • {String(event?.description ?? event?.title ?? event?.type ?? "Evento operacional")}
+                        </li>
+                      ))
+                    )}
+                  </ul>
+                  {workspaceTimeline.length > 3 ? (
+                    <button
+                      type="button"
+                      className="mt-2 text-left text-xs font-medium text-[var(--accent-primary)]"
+                      onClick={() => setTimelineExpanded(previous => !previous)}
+                    >
+                      {timelineExpanded ? "Ver menos timeline" : "Ver mais timeline"}
+                    </button>
                   ) : null}
                 </section>
-                {selectedSnapshot ? (
-                  <OperationalNextAction
-                    title={selectedSnapshot.primaryActionLabel}
-                    reason={selectedSnapshot.primaryActionReason}
-                    urgency={selectedSnapshot.primaryActionUrgency}
-                    impact={selectedSnapshot.primaryActionImpact}
-                  />
-                ) : null}
+              }
+              finance={
+                <section className="rounded-xl border border-[var(--border-subtle)]/80 p-3.5">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                    Financeiro resumido
+                  </p>
+                  <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                    Última cobrança:{" "}
+                    {selectedSnapshot
+                      ? formatMoney(selectedSnapshot.latestChargeCents)
+                      : latestCharge
+                        ? formatMoney(Number(latestCharge?.amountCents ?? 0))
+                        : "—"}
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--text-muted)]">
+                    Situação: {selectedSnapshot?.status === "Em risco" ? "Atraso impactando caixa." : "Fluxo financeiro monitorado."}
+                  </p>
+                </section>
+              }
+            >
+              <div className="space-y-4">
                 <OperationalFlowState
                   steps={[
                     { label: "Cliente", state: "done" },
@@ -1148,8 +1257,7 @@ export default function CustomersPage() {
                       label: "Cobrança",
                       state:
                         selectedSnapshot &&
-                        (selectedSnapshot.pendingCharges > 0 ||
-                          selectedSnapshot.overdueCharges > 0)
+                        (selectedSnapshot.pendingCharges > 0 || selectedSnapshot.overdueCharges > 0)
                           ? "current"
                           : workspaceCharges.length > 0
                             ? "done"
@@ -1180,27 +1288,6 @@ export default function CustomersPage() {
                     `Canal ativo: ${workspaceMessages.length} interação(ões) de WhatsApp registradas.`,
                   ]}
                 />
-                <section className="space-y-1.5 border-t border-[var(--border-subtle)] pt-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
-                    Financeiro e cobrança
-                  </p>
-                  <p className="text-sm text-[var(--text-secondary)]">
-                    Pendente:{" "}
-                    {selectedSnapshot
-                      ? formatMoney(selectedSnapshot.financialPendingCents)
-                      : "—"}{" "}
-                    · potencial:{" "}
-                    {selectedSnapshot
-                      ? formatMoney(selectedSnapshot.financialPotentialCents)
-                      : "—"}{" "}
-                    · última cobrança:{" "}
-                    {selectedSnapshot
-                      ? formatMoney(selectedSnapshot.latestChargeCents)
-                      : latestCharge
-                        ? formatMoney(Number(latestCharge?.amountCents ?? 0))
-                        : "—"}
-                  </p>
-                </section>
                 {workspaceServiceOrders.length === 0 ? (
                   <EmptyActionState
                     title="Nenhuma O.S. vinculada ainda"
@@ -1214,31 +1301,9 @@ export default function CustomersPage() {
                     title="Nenhuma cobrança gerada ainda"
                     description="Sem cobrança ativa por enquanto. Assim que houver O.S. concluída, o próximo passo é gerar cobrança para fechar o ciclo."
                     ctaLabel="Gerar cobrança"
-                    onCta={() =>
-                      selectedCustomer?.id &&
-                      navigate(`/finances?customerId=${selectedCustomer.id}`)
-                    }
+                    onCta={() => navigate(`/finances?customerId=${activeCustomerId}`)}
                   />
                 ) : null}
-                <section className="space-y-1.5 border-t border-[var(--border-subtle)] pt-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
-                    Agenda, O.S. e comunicação
-                  </p>
-                  <p className="text-sm text-[var(--text-secondary)]">
-                    Último agendamento:{" "}
-                    {latestAppointment?.startsAt
-                      ? new Date(
-                          String(latestAppointment.startsAt)
-                        ).toLocaleString("pt-BR")
-                      : "não registrado"}{" "}
-                    · última O.S.:{" "}
-                    {String(
-                      latestServiceOrder?.title ??
-                        latestServiceOrder?.id ??
-                        "não registrada"
-                    )}
-                  </p>
-                </section>
                 {actionFeedback ? (
                   <OperationalInlineFeedback
                     tone={actionFeedbackTone}
@@ -1251,21 +1316,10 @@ export default function CustomersPage() {
                     {actionFeedback}
                   </OperationalInlineFeedback>
                 ) : null}
-                {workspaceTimeline.length > 3 ? (
-                  <button
-                    type="button"
-                    className="text-left text-xs font-medium text-[var(--accent-primary)]"
-                    onClick={() => setTimelineExpanded(previous => !previous)}
-                  >
-                    {timelineExpanded
-                      ? "Ver menos timeline"
-                      : "Ver mais timeline"}
-                  </button>
-                ) : null}
               </div>
-            )}
-          </div>
-        </AppOperationalModal>
+            </WorkspaceScaffold>
+          )}
+        </AppSectionBlock>
         <CreateAppointmentModal
           isOpen={openAppointmentCreate}
           onClose={() => setOpenAppointmentCreate(false)}
@@ -1295,7 +1349,7 @@ export default function CustomersPage() {
             id: String(item.id),
             name: String(item.name ?? "Pessoa"),
           }))}
-          initialCustomerId={selectedCustomer?.id ?? null}
+          initialCustomerId={activeCustomerId ?? null}
         />
       </div>
     </PageWrapper>
