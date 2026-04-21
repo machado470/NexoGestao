@@ -34,6 +34,7 @@ import {
   FinanceTrendEngine,
 } from "@/components/finance-modes/FinanceTrendEngine";
 import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
+import { WorkspaceScaffold } from "@/components/operating-system/WorkspaceScaffold";
 import CreateExpenseModal from "@/components/CreateExpenseModal";
 import {
   type OperationalSeverity,
@@ -56,6 +57,11 @@ function toDayKey(date: Date) {
 
 function dayLabel(date: Date) {
   return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+}
+
+function formatDate(value: unknown) {
+  const date = safeDate(value);
+  return date ? date.toLocaleDateString("pt-BR") : "Sem data";
 }
 
 function getOverdueBand(days: number) {
@@ -83,11 +89,11 @@ function CashHealthMetric({
   helper: string;
 }) {
   return (
-    <article className="flex h-full min-h-[124px] min-w-0 flex-col rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/35 px-3.5 py-3.5">
+    <article className="flex h-full min-h-[116px] min-w-0 flex-col rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/35 px-3.5 py-3">
       <p className="truncate text-[11px] font-medium uppercase tracking-[0.02em] text-[var(--text-muted)]">
         {label}
       </p>
-      <div className="mt-2.5 flex min-h-[44px] items-end">
+      <div className="mt-2 flex min-h-[42px] items-end">
         <p
           className="w-full truncate text-[clamp(1.08rem,2.1vw,1.42rem)] font-semibold leading-[1.15] text-[var(--text-primary)] tabular-nums"
           title={value}
@@ -95,7 +101,7 @@ function CashHealthMetric({
           {value}
         </p>
       </div>
-      <p className="mt-2.5 line-clamp-2 min-h-[32px] text-[11px] leading-relaxed text-[var(--text-muted)]">
+      <p className="mt-2 line-clamp-2 min-h-[30px] text-[11px] leading-relaxed text-[var(--text-muted)]">
         {helper}
       </p>
     </article>
@@ -646,6 +652,52 @@ export default function FinancesPage() {
     );
   }, [filteredOverdueCharges, filteredPendingCharges]);
 
+  const workspaceCharge = useMemo(() => {
+    if (!priorityCharge) return null;
+    const status = String(priorityCharge?.status ?? "").toUpperCase();
+    const amount = Number(priorityCharge?.amountCents ?? 0);
+    const dueDate = safeDate(priorityCharge?.dueDate);
+    const paidAt = safeDate(priorityCharge?.paidAt ?? priorityCharge?.updatedAt);
+    const dayDelta = dueDate
+      ? Math.floor((Date.now() - dueDate.getTime()) / (1000 * 60 * 60 * 24))
+      : 0;
+    const statusLabel =
+      status === "OVERDUE" ? "Vencida" : status === "PAID" ? "Paga" : "Pendente";
+    const priorityLabel =
+      status === "OVERDUE" ? "Alta" : status === "PENDING" ? "Média" : "Baixa";
+    const summary =
+      status === "OVERDUE"
+        ? dayDelta > 0
+          ? `Atraso de ${dayDelta} dia(s) com impacto direto no caixa.`
+          : "Cobrança vence hoje e exige ação imediata."
+        : status === "PAID"
+          ? "Pagamento confirmado aguardando baixa e conciliação."
+          : "Cobrança em carteira ativa com janela preventiva.";
+    return {
+      id: String(priorityCharge?.id ?? "sem-id"),
+      customerName: String(priorityCharge?.customer?.name ?? "Cliente"),
+      statusLabel,
+      priorityLabel,
+      summary,
+      amountLabel: formatCurrency(amount),
+      dueDateLabel: dueDate?.toLocaleDateString("pt-BR") ?? "Sem data",
+      dueState:
+        status === "OVERDUE"
+          ? dayDelta > 0
+            ? `${dayDelta} dia(s) em atraso`
+            : "Vencida hoje"
+          : status === "PAID"
+            ? `Pago em ${paidAt?.toLocaleDateString("pt-BR") ?? "data não informada"}`
+            : `Vence ${dueDate?.toLocaleDateString("pt-BR") ?? "sem data"}`,
+      sourceLabel: String(priorityCharge?.source ?? "Fluxo operacional"),
+      billingMethod: String(priorityCharge?.paymentMethod ?? "Método não informado"),
+      customerId: String(priorityCharge?.customerId ?? priorityCharge?.customer?.id ?? "—"),
+      operationalLink: String(priorityCharge?.serviceOrderId ?? priorityCharge?.appointmentId ?? "Sem vínculo direto"),
+      openedAt: formatDate(priorityCharge?.createdAt),
+      lastEventAt: formatDate(priorityCharge?.updatedAt ?? priorityCharge?.paidAt ?? priorityCharge?.dueDate),
+    };
+  }, [priorityCharge]);
+
   const decisionCenter = useMemo(() => {
     if (mode === "overdue") {
       return {
@@ -806,31 +858,9 @@ export default function FinancesPage() {
           title={modeContext.title}
           description={modeContext.description}
           secondaryActions={
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() =>
-                setMode(mode === "reports" ? "overview" : "reports")
-              }
-            >
-              {mode === "reports" ? "Voltar à visão geral" : "Gerar relatório"}
-            </Button>
-          }
-          cta={
-            <div className="flex items-center gap-2">
-              <ActionFeedbackButton
-                state="idle"
-                idleLabel={
-                  mode === "reports" ? "Nova despesa" : modeContext.ctaLabel
-                }
-                onClick={
-                  mode === "reports"
-                    ? () => setOpenCreateExpense(true)
-                    : modeContext.onCta
-                }
-              />
+            <div className="flex items-center gap-1.5">
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
                 onClick={() =>
                   mode === "reports"
@@ -840,7 +870,29 @@ export default function FinancesPage() {
               >
                 {mode === "reports" ? "Nova cobrança" : "Nova despesa"}
               </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setMode(mode === "reports" ? "overview" : "reports")
+                }
+              >
+                {mode === "reports"
+                  ? "Voltar à visão geral"
+                  : "Abrir relatórios"}
+              </Button>
             </div>
+          }
+          cta={
+            <ActionFeedbackButton
+              state="idle"
+              idleLabel={mode === "reports" ? "Nova despesa" : modeContext.ctaLabel}
+              onClick={
+                mode === "reports"
+                  ? () => setOpenCreateExpense(true)
+                  : modeContext.onCta
+              }
+            />
           }
         />
         <AppKpiRow
@@ -849,16 +901,16 @@ export default function FinancesPage() {
             {
               title: "A receber (aberto)",
               value: formatCurrency(openTotal),
-              hint: `${pendingCharges.length + overdueCharges.length} cobrança(s) pendente(s)/vencida(s)`,
+              hint: `${pendingCharges.length + overdueCharges.length} cobrança(s) em carteira`,
               tone: openTotal > 0 ? "important" : "default",
             },
             {
-              title: "Em risco (vencidas)",
+              title: "Em risco",
               value: formatCurrency(overdueTotal),
               delta: `${overdueDelta >= 0 ? "+" : ""}${overdueDelta.toFixed(1).replace(".", ",")}%`,
               trend:
                 overdueDelta > 0 ? "up" : overdueDelta < 0 ? "down" : "neutral",
-              hint: `${overdueCharges.length} vencida(s) na carteira`,
+              hint: `${overdueCharges.length} cobrança(s) vencida(s)`,
               tone: overdueCharges.length > 0 ? "critical" : "default",
             },
             {
@@ -871,12 +923,12 @@ export default function FinancesPage() {
                   : receivedDelta < 0
                     ? "down"
                     : "neutral",
-              hint: `Anterior: ${formatCurrency(receivedPrevious)}`,
+              hint: `Período anterior ${formatCurrency(receivedPrevious)}`,
             },
             {
               title: "Vence hoje/7 dias",
               value: `${dueToday}/${dueSoon}`,
-              hint: "hoje / próximos 7 dias",
+              hint: "janela de atenção",
               tone:
                 dueToday > 0
                   ? "critical"
@@ -887,7 +939,7 @@ export default function FinancesPage() {
             {
               title: "Pagas no ciclo",
               value: formatCurrency(receivedTotal),
-              hint: `${paidCharges.length} cobrança(s) com pagamento confirmado`,
+              hint: `${paidCharges.length} cobrança(s) confirmadas`,
             },
           ]}
         />
@@ -895,29 +947,29 @@ export default function FinancesPage() {
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
           <AppSectionBlock
             title="Saúde do caixa"
-            subtitle="Leitura consolidada de estabilidade, risco e tendência para decisão imediata."
+            subtitle="Leitura executiva de estabilidade, risco e liquidez imediata."
             className="xl:col-span-8"
           >
-            <div className="grid items-stretch gap-3 pt-0.5 md:grid-cols-2 xl:grid-cols-4">
+            <div className="grid items-stretch gap-3 md:grid-cols-2 xl:grid-cols-4">
               <CashHealthMetric
                 label="Saúde geral"
                 value={`${healthyRatio.toFixed(0)}%`}
-                helper="Parcela da carteira aberta sem atraso."
+                helper="Carteira aberta ainda sem atraso."
               />
               <CashHealthMetric
                 label="A receber"
                 value={formatCurrency(openTotal)}
-                helper="Pendentes + vencidas no momento."
+                helper="Pendentes e vencidas no momento."
               />
               <CashHealthMetric
                 label="Valor em risco"
                 value={formatCurrency(overdueTotal)}
-                helper="Atrasos com impacto direto no caixa."
+                helper="Atrasos que drenam liquidez."
               />
               <CashHealthMetric
                 label="Recebido (30 dias)"
                 value={formatCurrency(receivedCurrent)}
-                helper="Entradas confirmadas no último ciclo."
+                helper="Entradas confirmadas no ciclo."
               />
             </div>
           </AppSectionBlock>
@@ -928,6 +980,14 @@ export default function FinancesPage() {
             compact
           >
             <div className="space-y-3.5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs font-medium text-[var(--text-secondary)]">
+                  {decisionCenter.title}
+                </p>
+                <p className="text-xs text-[var(--text-muted)]">
+                  {decisionCenter.reference}
+                </p>
+              </div>
               <div className="flex flex-wrap items-center gap-1.5">
                 <AppStatusBadge
                   label={getOperationalSeverityLabel(pageSeverity)}
@@ -946,12 +1006,14 @@ export default function FinancesPage() {
                 {decisionCenter.description}
               </p>
               <p className="text-xs text-[var(--text-muted)]">
-                {decisionCenter.reference}
+                {priorityCharge
+                  ? `Impacto imediato: ${formatCurrency(Number(priorityCharge?.amountCents ?? 0))} em ${String(priorityCharge?.customer?.name ?? "cliente prioritário")}.`
+                  : "Sem cobrança crítica no momento."}
               </p>
               <div className="grid gap-1.5 pt-0.5">
                 <ActionFeedbackButton
                   state="idle"
-                  idleLabel="Cobrar quem está vencido"
+                  idleLabel={pageSeverity === "critical" ? "Cobrar agora no vencido" : "Ativar ação prioritária"}
                   className="h-9 w-full justify-start text-xs font-semibold"
                   onClick={() => setMode("overdue")}
                 />
@@ -969,7 +1031,7 @@ export default function FinancesPage() {
                   className="h-8 justify-start px-2 text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
                   onClick={() => handleRemind()}
                 >
-                  Executar lembretes
+                  Executar lembretes preventivos
                 </Button>
               </div>
             </div>
@@ -987,9 +1049,9 @@ export default function FinancesPage() {
           value={mode}
           onChange={value => setMode(value as typeof mode)}
         />
-        <AppFiltersBar className="gap-2">
+        <AppFiltersBar className="gap-2.5">
           <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--text-secondary)]">
-            <span>Contexto ativo:</span>
+            <span className="font-medium">Contexto ativo</span>
             {focusedCustomerId ? (
               <AppStatusBadge
                 label={`Cliente ${focusedCustomerId.slice(0, 8)}…`}
@@ -1009,13 +1071,14 @@ export default function FinancesPage() {
             !focusedOverdueBand &&
             !focusedTrendPointKey ? (
               <span className="text-[var(--text-muted)]">
-                Sem filtros aplicados
+                Sem recortes aplicados
               </span>
             ) : null}
           </div>
           <Button
             variant="ghost"
             size="sm"
+            className="text-[var(--text-muted)]"
             onClick={() => {
               setFocusedCustomerId(null);
               setFocusedPendingWindow(null);
@@ -1050,6 +1113,150 @@ export default function FinancesPage() {
             </>
           }
         />
+        <WorkspaceScaffold
+          title={
+            workspaceCharge
+              ? `Workspace financeiro · ${workspaceCharge.customerName}`
+              : "Workspace financeiro · contexto inicial"
+          }
+          subtitle={
+            workspaceCharge
+              ? "Camada intermediária entre lista e modal para agir com continuidade operacional."
+              : "Selecione uma cobrança crítica para abrir o contexto operacional sem modal pesado."
+          }
+          primaryAction={{
+            label: workspaceCharge?.statusLabel === "Vencida" ? "Cobrar via WhatsApp" : "Executar ação financeira",
+            onClick: () => {
+              if (workspaceCharge?.statusLabel === "Vencida") {
+                handleCharge(priorityCharge);
+                return;
+              }
+              handleRemind(priorityCharge);
+            },
+          }}
+          context={
+            <div className="space-y-3">
+              <AppSectionBlock
+                title="Cabeçalho de contexto"
+                subtitle="Entidade em foco para decisão financeira operacional."
+                compact
+              >
+                <div className="space-y-2.5">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <AppStatusBadge label={workspaceCharge?.statusLabel ?? "Sem foco"} />
+                    <AppPriorityBadge label={workspaceCharge?.priorityLabel ?? "Baixa"} />
+                  </div>
+                  <p className="text-sm font-semibold text-[var(--text-primary)]">
+                    {workspaceCharge?.customerName ?? "Sem cobrança selecionada"}
+                  </p>
+                  <p className="text-xs text-[var(--text-secondary)]">
+                    {workspaceCharge?.summary ?? "A lista operacional mantém o foco e este workspace abre o próximo nível de contexto."}
+                  </p>
+                </div>
+              </AppSectionBlock>
+              <AppSectionBlock
+                title="Próxima ação operacional"
+                subtitle="Ação única dominante com impacto e urgência."
+                compact
+              >
+                <div className="space-y-2">
+                  <p className="text-xs text-[var(--text-secondary)]">
+                    {workspaceCharge
+                      ? `Impacto imediato: ${workspaceCharge.amountLabel} · ${workspaceCharge.dueState}`
+                      : "Sem impacto crítico imediato no recorte atual."}
+                  </p>
+                  <ActionFeedbackButton
+                    state="idle"
+                    idleLabel={
+                      workspaceCharge?.statusLabel === "Vencida"
+                        ? "Cobrar imediatamente"
+                        : "Disparar lembrete preventivo"
+                    }
+                    className="h-9 w-full justify-start text-xs font-semibold"
+                    onClick={() => {
+                      if (workspaceCharge?.statusLabel === "Vencida") {
+                        handleCharge(priorityCharge);
+                        return;
+                      }
+                      handleRemind(priorityCharge);
+                    }}
+                  />
+                </div>
+              </AppSectionBlock>
+            </div>
+          }
+          finance={
+            <AppSectionBlock
+              title="Contexto financeiro"
+              subtitle="Resumo de cobrança, vencimento e valor."
+              compact
+            >
+              <dl className="space-y-1.5 text-xs text-[var(--text-secondary)]">
+                <div className="flex items-center justify-between gap-2">
+                  <dt>Valor</dt>
+                  <dd className="font-medium text-[var(--text-primary)]">
+                    {workspaceCharge?.amountLabel ?? "—"}
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <dt>Vencimento</dt>
+                  <dd>{workspaceCharge?.dueDateLabel ?? "—"}</dd>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <dt>Situação</dt>
+                  <dd>{workspaceCharge?.dueState ?? "Sem cobrança em foco"}</dd>
+                </div>
+              </dl>
+            </AppSectionBlock>
+          }
+          timeline={
+            <AppSectionBlock
+              title="Timeline e atividade"
+              subtitle="Feed curto para continuidade do caso."
+              compact
+            >
+              <ul className="space-y-1.5 text-xs text-[var(--text-secondary)]">
+                <li>• Última atualização: {workspaceCharge?.lastEventAt ?? "Sem evento recente"}</li>
+                <li>• Abertura da cobrança: {workspaceCharge?.openedAt ?? "Sem data"}</li>
+                <li>• Origem operacional: {workspaceCharge?.sourceLabel ?? "Não informada"}</li>
+              </ul>
+            </AppSectionBlock>
+          }
+          communication={
+            <AppSectionBlock
+              title="Comunicação"
+              subtitle="Ponte com WhatsApp e follow-up de cobrança."
+              compact
+            >
+              <p className="text-xs text-[var(--text-secondary)]">
+                {workspaceCharge
+                  ? `Mensagem contextual para ${workspaceCharge.customerName}, alinhando cobrança e vínculo operacional.`
+                  : "Selecione uma cobrança para habilitar mensagem contextual sem sair da página."}
+              </p>
+            </AppSectionBlock>
+          }
+        >
+          <AppSectionBlock
+            title="Metadados operacionais"
+            subtitle="Cliente, vínculo e origem para auditoria rápida."
+            compact
+          >
+            <div className="grid gap-2 text-xs text-[var(--text-secondary)] md:grid-cols-3">
+              <p>
+                <span className="text-[var(--text-muted)]">Cliente:</span>{" "}
+                {workspaceCharge?.customerId ?? "—"}
+              </p>
+              <p>
+                <span className="text-[var(--text-muted)]">Vínculo:</span>{" "}
+                {workspaceCharge?.operationalLink ?? "—"}
+              </p>
+              <p>
+                <span className="text-[var(--text-muted)]">Método:</span>{" "}
+                {workspaceCharge?.billingMethod ?? "—"}
+              </p>
+            </div>
+          </AppSectionBlock>
+        </WorkspaceScaffold>
         {mode === "overview" || mode === "reports" ? (
           <>
             <FinanceTrendEngine
