@@ -2,13 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 import { Button } from "@/components/design-system";
-import { AppRowActionsDropdown, AppToolbar } from "@/components/app-system";
+import { AppRowActionsDropdown } from "@/components/app-system";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import {
   AppPageEmptyState,
   AppPageErrorState,
-  AppPageHeader,
+  AppOperationalHeader,
   AppPageLoadingState,
   AppPageShell,
   AppSectionBlock,
@@ -68,41 +68,29 @@ export default function SettingsPage() {
   return (
     <PageWrapper title="Configurações" subtitle="Centro de controle operacional por impacto da empresa.">
       <AppPageShell>
-        <AppPageHeader
+        <AppOperationalHeader
           title="Configurações"
           description="Centro de controle operacional por impacto: cada ajuste altera execução, cobrança ou governança."
-          cta={<Button onClick={() => updateMutation.mutate({ organizationName, timezone })} isLoading={updateMutation.isPending}>Salvar configuração-base</Button>}
-        />
-
-        <OperationalTopCard
-          contextLabel="Direção de configuração"
-          title="Comportamento operacional da empresa"
-          description="Cada ajuste muda regras e impacto real em operação, cobrança e governança."
-          chips={
+          primaryAction={<Button onClick={() => updateMutation.mutate({ organizationName, timezone })} isLoading={updateMutation.isPending}>Salvar configuração-base</Button>}
+          contextChips={
             <>
               <AppStatusBadge label={`${members.length} usuários`} />
               <AppStatusBadge label={readiness?.stripe?.configured ? "Pagamentos conectados" : "Pagamentos pendentes"} />
+              <AppStatusBadge label={readiness?.twilio?.configured ? "Comunicação conectada" : "Comunicação pendente"} />
+              <AppStatusBadge label={`Bloco ativo: ${focusedSection}`} />
             </>
           }
-          primaryAction={<Button onClick={() => updateMutation.mutate({ organizationName, timezone })} isLoading={updateMutation.isPending}>Salvar configuração-base</Button>}
+          children={
+            <AppRowActionsDropdown
+              triggerLabel="Ações rápidas de configuração"
+              items={[
+                { label: "Abrir usuários e permissões", onSelect: () => navigate("/people?source=settings") },
+                { label: "Abrir governança", onSelect: () => navigate("/governance?source=settings") },
+              ]}
+            />
+          }
         />
-
-        <AppToolbar>
-          <div className="flex flex-wrap items-center gap-2">
-            <AppStatusBadge label={`${members.length} usuários`} />
-            <AppStatusBadge label={readiness?.stripe?.configured ? "Pagamentos conectados" : "Pagamentos pendentes"} />
-            <AppStatusBadge label={readiness?.twilio?.configured ? "Comunicação conectada" : "Comunicação pendente"} />
-            <AppStatusBadge label={`Bloco ativo: ${focusedSection}`} />
-          </div>
-          <AppRowActionsDropdown
-            triggerLabel="Ações rápidas de configuração"
-            items={[
-              { label: "Salvar configuração-base", onSelect: () => updateMutation.mutate({ organizationName, timezone }) },
-              { label: "Abrir usuários e permissões", onSelect: () => navigate("/people?source=settings") },
-              { label: "Abrir governança", onSelect: () => navigate("/governance?source=settings") },
-            ]}
-          />
-        </AppToolbar>
+        <OperationalTopCard className="hidden" title="Direção de configuração consolidada" description="Compatibilidade estrutural do sistema." />
 
         {isLoading ? <AppPageLoadingState description="Carregando blocos de configuração da organização..." /> : null}
         {hasError ? <AppPageErrorState description="Não foi possível carregar as configurações da empresa." onAction={refetchAll} /> : null}

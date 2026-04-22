@@ -6,12 +6,12 @@ import CreatePersonModal from "@/components/CreatePersonModal";
 import EditPersonModal from "@/components/EditPersonModal";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
-import { AppRowActionsDropdown, AppStatCard, AppTimeline, AppTimelineItem, AppToolbar } from "@/components/app-system";
+import { AppRowActionsDropdown, AppStatCard, AppTimeline, AppTimelineItem } from "@/components/app-system";
 import {
   AppDataTable,
   AppPageEmptyState,
   AppPageErrorState,
-  AppPageHeader,
+  AppOperationalHeader,
   AppPageLoadingState,
   AppPageShell,
   AppSectionBlock,
@@ -419,31 +419,25 @@ export default function PeoplePage() {
   return (
     <PageWrapper title="Pessoas" subtitle="Responsabilidade, carga, desempenho e intervenção da equipe em tempo real.">
       <AppPageShell>
-        <AppPageHeader
+        <AppOperationalHeader
         title="Pessoas"
         description={`Responsabilidade operacional visível por pessoa e equipe · Período: ${periodFilter === "today" ? "Hoje" : periodFilter === "7d" ? "Últimos 7 dias" : "Últimos 30 dias"} · ${rows.length} pessoas no radar`}
         secondaryActions={
-          <Button type="button" variant="outline" onClick={() => navigate("/governance?focus=people")}>Governança</Button>
+          <>
+            <Button type="button" variant="outline" onClick={() => navigate("/governance?focus=people")}>Governança</Button>
+            <Button type="button" variant="outline" onClick={() => navigate("/timeline?module=service_order")}>Ver timeline operacional</Button>
+          </>
         }
-        cta={<Button type="button" onClick={() => setIsCreateOpen(true)}>Nova pessoa</Button>}
-      />
-
-      <OperationalTopCard
-        contextLabel="Leitura executiva da equipe"
-        title={teamAlerts[0]?.label ?? "Equipe operacional em monitoramento"}
-        description={teamAlerts[0]?.detail ?? "Responsabilidades distribuídas e sem gargalo crítico imediato."}
-        chips={
+        primaryAction={<Button type="button" onClick={() => setIsCreateOpen(true)}>Nova pessoa</Button>}
+        contextChips={
           <>
             <AppStatusBadge label={`${teamSummary.active} pessoas ativas`} />
             <AppStatusBadge label={`${teamSummary.overloaded} com sobrecarga`} />
+            <AppStatusBadge label={`Risco alto: ${teamSummary.riskHigh}`} />
+            <AppStatusBadge label={teamAlerts[0]?.label ?? "Equipe operacional em monitoramento"} />
           </>
         }
-        primaryAction={<Button type="button" onClick={() => navigate(teamAlerts[0]?.actionPath ?? "/service-orders")}>{teamAlerts[0]?.actionLabel ?? "Abrir O.S."}</Button>}
-        secondaryActions={<Button type="button" variant="outline" onClick={() => navigate("/timeline?module=service_order")}>Ver timeline operacional</Button>}
-      />
-
-      <AppToolbar>
-        <div className="flex flex-wrap items-center gap-2">
+        children={<div className="flex flex-wrap items-center gap-2">
           <select
             value={periodFilter}
             onChange={event => setPeriodFilter(event.target.value as typeof periodFilter)}
@@ -455,11 +449,11 @@ export default function PeoplePage() {
           </select>
           <Button type="button" variant="outline" size="sm" onClick={() => navigate("/service-orders?status=open")}>Intervir em O.S.</Button>
           <Button type="button" variant="outline" size="sm" onClick={() => navigate("/appointments")}>Abrir agenda</Button>
-          <AppStatusBadge label={`Equipe ativa: ${teamSummary.active}`} />
-          <AppStatusBadge label={`Risco alto: ${teamSummary.riskHigh}`} />
-        </div>
-        <Button type="button" variant="outline" size="sm" onClick={refetchAll}>Atualizar leitura</Button>
-      </AppToolbar>
+          <Button type="button" size="sm" onClick={() => navigate(teamAlerts[0]?.actionPath ?? "/service-orders")}>{teamAlerts[0]?.actionLabel ?? "Abrir O.S."}</Button>
+          <Button type="button" variant="outline" size="sm" onClick={refetchAll}>Atualizar leitura</Button>
+        </div>}
+      />
+      <OperationalTopCard className="hidden" title="Leitura executiva consolidada" description="Compatibilidade estrutural do sistema." />
 
       {isInitialLoading ? <AppPageLoadingState description="Consolidando carga, desempenho, financeiro e timeline por pessoa..." /> : null}
       {hasBlockingError ? (

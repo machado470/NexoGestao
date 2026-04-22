@@ -11,8 +11,8 @@ import { AppRowActionsDropdown } from "@/components/app-system";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedbackButton";
 import { AppOperationalModal } from "@/components/operating-system/AppOperationalModal";
-import { WorkspaceScaffold } from "@/components/operating-system/WorkspaceScaffold";
 import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
+import { WorkspaceScaffold } from "@/components/operating-system/WorkspaceScaffold";
 import {
   EmptyActionState,
   explainOperationalError,
@@ -27,14 +27,14 @@ import {
   AppDataTable,
   AppPageEmptyState,
   AppPageErrorState,
-  AppPageHeader,
+  AppOperationalHeader,
   AppPageLoadingState,
   AppPriorityBadge,
   appSelectionPillClasses,
   AppSectionBlock,
   AppStatusBadge,
 } from "@/components/internal-page-system";
-import { AppPageShell, AppSectionCard, AppTimeline, AppTimelineItem, AppToolbar } from "@/components/app-system";
+import { AppPageShell, AppSectionCard, AppTimeline, AppTimelineItem } from "@/components/app-system";
 import { Button, SecondaryButton } from "@/components/design-system";
 import { getDayWindow, inRange, safeDate } from "@/lib/operational/kpi";
 import {
@@ -925,7 +925,7 @@ export default function ServiceOrdersPage() {
         subtitle="Execute, destrave e converta O.S. em cobrança no mesmo fluxo."
       >
       <div className="space-y-4">
-        <AppPageHeader
+        <AppOperationalHeader
           title={
             activeTab === "execution"
               ? "Ordens em execução"
@@ -948,7 +948,7 @@ export default function ServiceOrdersPage() {
                     ? "Rastro de ordens encerradas e canceladas."
                     : "Núcleo de execução das ordens ativas."
           }
-          cta={
+          primaryAction={
             <ActionFeedbackButton
               state="idle"
               idleLabel={headerCta.label}
@@ -956,40 +956,31 @@ export default function ServiceOrdersPage() {
             />
           }
           secondaryActions={
+            <>
+              <SecondaryButton type="button" className="h-8 px-3 text-xs" onClick={() => setOpenCreate(true)}>
+                Criar O.S.
+              </SecondaryButton>
+              <SecondaryButton type="button" className="h-8 px-3 text-xs" onClick={() => navigate("/appointments")}>
+                Puxar do agendamento
+              </SecondaryButton>
+            </>
+          }
+          contextChips={
             <div className="flex flex-wrap items-center gap-2">
               <AppStatusBadge label={`Severidade: ${getOperationalSeverityLabel(pageSeverity)}`} />
               <AppStatusBadge label={`${filteredOrders.length} em execução ativa`} />
+              <AppStatusBadge label="Fluxo: Cliente → Agendamento → O.S. → Cobrança → Pagamento" />
+              <AppStatusBadge label={`Período: ${windowFilter === "next7" ? "próximos 7 dias" : windowFilter === "today" ? "hoje" : windowFilter === "overdue" ? "atrasadas" : "operação completa"}`} />
+              <SecondaryButton type="button" className="h-8 px-3 text-xs" onClick={() => navigate("/finances")}>
+                Financeiro
+              </SecondaryButton>
+              <SecondaryButton type="button" className="h-8 px-3 text-xs" onClick={() => navigate("/whatsapp")}>
+                WhatsApp
+              </SecondaryButton>
             </div>
           }
         />
-        <OperationalTopCard
-          title="Central de execução de O.S."
-          description="Executar, destravar e converter em cobrança."
-          primaryAction={
-            <SecondaryButton type="button" className="h-8 px-3 text-xs" onClick={() => setOpenCreate(true)}>
-              Criar O.S.
-            </SecondaryButton>
-          }
-          secondaryActions={
-            <SecondaryButton type="button" className="h-8 px-3 text-xs" onClick={() => navigate("/appointments")}>
-              Puxar do agendamento
-            </SecondaryButton>
-          }
-        />
-        <AppToolbar className="gap-2 px-3 py-2.5">
-          <div className="flex flex-wrap items-center gap-2">
-            <AppStatusBadge label="Fluxo: Cliente → Agendamento → O.S. → Cobrança → Pagamento" />
-            <AppStatusBadge label={`Período: ${windowFilter === "next7" ? "próximos 7 dias" : windowFilter === "today" ? "hoje" : windowFilter === "overdue" ? "atrasadas" : "operação completa"}`} />
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <SecondaryButton type="button" className="h-8 px-3 text-xs" onClick={() => navigate("/finances")}>
-              Financeiro
-            </SecondaryButton>
-            <SecondaryButton type="button" className="h-8 px-3 text-xs" onClick={() => navigate("/whatsapp")}>
-              WhatsApp
-            </SecondaryButton>
-          </div>
-        </AppToolbar>
+        <OperationalTopCard className="hidden" title="Execução consolidada" description="Compatibilidade estrutural do sistema." />
 
         <AppOperationalBar
           tabs={[

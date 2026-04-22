@@ -3,14 +3,13 @@ import { CheckCircle2, CreditCard } from "lucide-react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 import { Button } from "@/components/design-system";
-import { AppToolbar } from "@/components/app-system";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import {
   AppDataTable,
   AppPageEmptyState,
   AppPageErrorState,
-  AppPageHeader,
+  AppOperationalHeader,
   AppPageLoadingState,
   AppPageShell,
   AppSectionBlock,
@@ -131,32 +130,26 @@ export default function BillingPage() {
   return (
     <PageWrapper title="Planos" subtitle="Assinatura da sua empresa no Nexo: plano, recorrência, cobrança e acesso.">
       <AppPageShell>
-        <AppPageHeader title="Planos" description="Gerencie assinatura, limites e acesso da plataforma sem misturar com o financeiro operacional." />
-        <OperationalTopCard
-          contextLabel="Gestão de assinatura"
-          title="Planos da plataforma Nexo"
-          description="Aqui você decide capacidade, limites e evolução da sua operação no produto."
-          chips={
-            <>
-              <AppStatusBadge label={`Plano ${PLAN_META[currentPlan].title}`} />
-              <AppStatusBadge label={`Assinatura ${statusText(currentStatus)}`} />
-            </>
-          }
+        <AppOperationalHeader
+          title="Planos"
+          description="Gerencie assinatura, limites e acesso da plataforma sem misturar com o financeiro operacional."
           primaryAction={
             <Button onClick={() => upgrade(currentPlan === "STARTER" ? "PRO" : "STARTER")} disabled={checkoutMutation.isPending || !stripeConfigured}>
               <CreditCard className="mr-1.5 h-4 w-4" /> Trocar plano
             </Button>
           }
+          secondaryActions={<Button variant="outline" onClick={() => navigate("/settings?section=integracoes")}>Gerenciar pagamento</Button>}
+          contextChips={
+            <>
+              <AppStatusBadge label={`Plano ${PLAN_META[currentPlan].title}`} />
+              <AppStatusBadge label={`Assinatura ${statusText(currentStatus)}`} />
+              <AppStatusBadge label={`Plano atual: ${PLAN_META[currentPlan].title}`} />
+              <AppStatusBadge label={`Status: ${statusText(currentStatus)}`} />
+              <AppStatusBadge label={stripeConfigured ? "Pagamento automático ativo" : "Pagamento automático pendente"} />
+            </>
+          }
         />
-
-        <AppToolbar>
-          <div className="flex flex-wrap items-center gap-2">
-            <AppStatusBadge label={`Plano atual: ${PLAN_META[currentPlan].title}`} />
-            <AppStatusBadge label={`Status: ${statusText(currentStatus)}`} />
-            <AppStatusBadge label={stripeConfigured ? "Pagamento automático ativo" : "Pagamento automático pendente"} />
-          </div>
-          <Button variant="outline" onClick={() => navigate("/settings?section=integracoes")}>Gerenciar pagamento</Button>
-        </AppToolbar>
+        <OperationalTopCard className="hidden" title="Gestão de assinatura consolidada" description="Compatibilidade estrutural do sistema." />
 
         {isLoading ? <AppPageLoadingState description="Montando visão de planos, assinatura e recorrência..." /> : null}
         {hasError ? <AppPageErrorState description="Não foi possível carregar Planos neste momento." onAction={refetchAll} /> : null}
