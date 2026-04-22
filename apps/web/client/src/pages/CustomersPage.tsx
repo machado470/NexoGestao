@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
+import { MoreHorizontal } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import CreateCustomerModal from "@/components/CreateCustomerModal";
 import { CreateAppointmentModal } from "@/components/CreateAppointmentModal";
@@ -16,13 +17,12 @@ import {
 import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
 import { useOperationalMemoryState } from "@/hooks/useOperationalMemory";
 import { Button, SecondaryButton } from "@/components/design-system";
-import { ActionBarWrapper, PageWrapper } from "@/components/operating-system/Wrappers";
+import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { WorkspaceScaffold } from "@/components/operating-system/WorkspaceScaffold";
 import {
   AppSectionCard,
   AppTimeline,
   AppTimelineItem,
-  AppToolbar,
 } from "@/components/app-system";
 import {
   EmptyActionState,
@@ -33,12 +33,19 @@ import {
   OperationalRelationSummary,
 } from "@/components/operating-system/OperationalRefinementBlocks";
 import { AppRowActionsDropdown, AppCheckbox } from "@/components/app-system";
+import { AppStatCard } from "@/components/app-system";
 import {
-  AppOperationalBar,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AppFiltersBar,
   AppDataTable,
+  AppOperationalHeader,
   AppPageEmptyState,
   AppPageErrorState,
-  AppPageHeader,
   AppPageLoadingState,
   AppSectionBlock,
   AppStatusBadge,
@@ -179,9 +186,6 @@ export default function CustomersPage() {
     "neutral" | "success" | "error"
   >("neutral");
   const [isProcessingPrimaryAction, setIsProcessingPrimaryAction] = useState(false);
-  const [activeTab, setActiveTab] = useOperationalMemoryState<
-    "overview" | "agenda" | "service_orders" | "financial" | "history"
-  >("nexo.customers.tab.v1", "overview");
 
   const customersQuery = trpc.nexo.customers.list.useQuery(undefined, {
     retry: false,
@@ -441,23 +445,6 @@ export default function CustomersPage() {
       const snapshot = snapshotByCustomerId.get(customerId);
       if (!snapshot) return false;
 
-      if (activeTab === "agenda" && snapshot.hasFutureSchedule) return false;
-      if (
-        activeTab === "service_orders" &&
-        !snapshot.primaryActionLabel.includes("detalhe") &&
-        !snapshot.primaryActionLabel.includes("Confirmar")
-      ) {
-        return false;
-      }
-      if (
-        activeTab === "financial" &&
-        !(snapshot.overdueCharges > 0 || snapshot.pendingCharges > 0)
-      ) {
-        return false;
-      }
-      if (activeTab === "history" && snapshot.lastInteractionDays < 2)
-        return false;
-
       if (activeFilter === "risk" && snapshot.status !== "Em risco")
         return false;
       if (
@@ -533,7 +520,6 @@ export default function CustomersPage() {
   }, [
     activeFilter,
     activeSort,
-    activeTab,
     customers,
     minPendingAmountBand,
     searchTerm,
@@ -656,78 +642,56 @@ export default function CustomersPage() {
     { key: "no_schedule", label: "Sem agenda" },
     { key: "healthy", label: "Saudáveis" },
   ];
-  const quickFilterItems = filterItems.filter(item =>
-    ["all", "risk", "billing"].includes(item.key)
-  );
-  const advancedFilterItems = filterItems.filter(
-    item => !["all", "risk", "billing"].includes(item.key)
-  );
-  const sortLabels: Record<OperationalSort, string> = {
-    priority: "Prioridade",
-    financial: "Valor financeiro",
-    last_interaction: "Última interação",
-    name: "Nome",
-  };
-
-  const tabMeta = {
-    overview: {
-      title: "Visão geral da carteira",
-      description:
-        "Leitura da carteira com risco, prioridade e contexto para tomada de decisão.",
-      ctaLabel: "Novo cliente",
-      onCta: () => setCreateOpen(true),
-      sectionTitle: "Leitura da carteira e fila prioritária",
-      sectionSubtitle:
-        "Risco de clientes, continuidade operacional e próxima ação por prioridade.",
-      listTitle: "Fila prioritária da carteira",
-    },
-    agenda: {
-      title: "Agenda por cliente",
-      description:
-        "Foco operacional em clientes com compromisso e clientes sem agenda futura.",
-      ctaLabel: "Criar agendamento",
-      onCta: () => navigate("/appointments"),
-      sectionTitle: "Continuidade de agenda da carteira",
-      sectionSubtitle:
-        "Quem tem compromisso próximo, quem está sem agenda futura e onde agir primeiro.",
-      listTitle: "Fila de agenda por cliente",
-    },
-    service_orders: {
-      title: "Execução por cliente (O.S.)",
-      description:
-        "Foco em clientes com ordens abertas, travadas e concluídas.",
-      ctaLabel: "Criar O.S.",
-      onCta: () => navigate("/service-orders"),
-      sectionTitle: "Pipeline de execução por cliente",
-      sectionSubtitle:
-        "Clientes que precisam abrir execução, acelerar avanço ou destravar ordens.",
-      listTitle: "Fila de execução por cliente",
-    },
-    financial: {
-      title: "Financeiro por cliente",
-      description:
-        "Leitura de cobrança, pendência, atraso e impacto no caixa por cliente.",
-      ctaLabel: "Ir para cobrança",
+  const immediateAttention = [
+    {
+      key: "overdue",
+      severity: 3,
+      title: "Cobranças vencidas",
+      context: `${overdueCustomers} cliente(s) com atraso financeiro ativo.`,
+      impact: "Atraso de caixa e aumento de risco de inadimplência.",
+      ctaLabel: "Cobrar agora",
       onCta: () => navigate("/finances?filter=overdue"),
-      sectionTitle: "Cobrança e pendência da carteira",
-      sectionSubtitle:
-        "Priorização financeira por impacto pendente e atraso de recebimento.",
-      listTitle: "Fila financeira por cliente",
     },
-    history: {
-      title: "Histórico de relacionamento",
-      description:
-        "Timeline operacional de interações, recorrências e contexto histórico por cliente.",
-      ctaLabel: "Abrir timeline",
-      onCta: () => navigate("/timeline"),
-      sectionTitle: "Linha histórica de eventos da carteira",
-      sectionSubtitle:
-        "Recorrência de interação, padrões e sinais para prevenir novo risco.",
-      listTitle: "Clientes com maior histórico recente",
+    {
+      key: "no-response",
+      severity: 2,
+      title: "Sem resposta recente",
+      context: `${operationalSnapshots.filter(item => item.contactState !== "responded").length} cliente(s) sem confirmação recente.`,
+      impact: "Risco de no-show e retrabalho na agenda.",
+      ctaLabel: "Abrir WhatsApp",
+      onCta: () => navigate("/whatsapp"),
     },
-  } as const;
-
-  const activeMeta = tabMeta[activeTab];
+    {
+      key: "open-os",
+      severity: 1,
+      title: "O.S. em atraso operacional",
+      context: `${operationalSnapshots.filter(item => item.hasOpenServiceOrder).length} cliente(s) com O.S. aberta.`,
+      impact: "Pode travar execução e afetar recorrência.",
+      ctaLabel: "Ver O.S.",
+      onCta: () => navigate("/service-orders?status=attention"),
+    },
+  ];
+  const nextBestSnapshot = [...operationalSnapshots].sort(
+    (left, right) => right.priorityScore - left.priorityScore
+  )[0];
+  const nextBestCustomer = customers.find(
+    item => String(item?.id ?? "") === nextBestSnapshot?.customerId
+  );
+  const customersWithPending = operationalSnapshots.filter(
+    item => item.overdueCharges > 0 || item.pendingCharges > 0
+  ).length;
+  const customersAtRisk = operationalSnapshots.filter(
+    item => item.status === "Em risco"
+  ).length;
+  const activeCustomersCount = operationalSnapshots.filter(
+    item => item.status === "Seguro" || item.status === "Atenção"
+  ).length;
+  const averageTicketCents = operationalSnapshots.length
+    ? Math.round(
+        operationalSnapshots.reduce((acc, item) => acc + item.totalSpentCents, 0) /
+          operationalSnapshots.length
+      )
+    : 0;
 
   return (
     <PageWrapper
@@ -735,247 +699,152 @@ export default function CustomersPage() {
       subtitle="Centro operacional, financeiro e comunicação por cliente."
     >
       <div className="space-y-4">
-        <AppPageHeader
+        <AppOperationalHeader
           title="Clientes"
-          description={
-            <span>
-              Memória viva da operação para decidir e agir sem trocar de tela.
-              <span className="ml-2 inline-flex">
-                <AppStatusBadge
-                  label={`${customers.length} clientes · ${overdueCustomers} em risco · ${withoutFutureSchedule} sem agenda`}
-                />
-              </span>
-            </span>
-          }
-          cta={
-            <Button
-              type="button"
-              onClick={() => setCreateOpen(true)}
-              className="h-10 whitespace-nowrap px-4"
-            >
-              Novo cliente
-            </Button>
-          }
+          description="Acompanhe relacionamento, cobrança e operação por cliente."
+          primaryAction={<Button onClick={() => setCreateOpen(true)}>Novo cliente</Button>}
           secondaryActions={
-            <p className="max-w-2xl text-xs text-[var(--text-muted)]">
-              {activeMeta.description}
-            </p>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="icon" variant="outline" aria-label="Ações secundárias de clientes">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem onClick={() => navigate("/timeline?entity=customer")}>Abrir timeline</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate("/finances?filter=overdue")}>Cobranças críticas</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           }
-        />
-        <ActionBarWrapper
-          secondaryActions={
-            <AppToolbar className="w-full border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2">
-              <p className="text-xs font-medium text-[var(--text-secondary)]">
-                Centro operacional, financeiro e comunicação por cliente.
-              </p>
-              <div className="flex flex-wrap items-center gap-2">
-                <SecondaryButton
-                  type="button"
-                  className="h-8 px-3 text-xs"
-                  onClick={() => navigate("/service-orders")}
-                >
-                  Nova O.S.
-                </SecondaryButton>
-                <SecondaryButton
-                  type="button"
-                  className="h-8 px-3 text-xs"
-                  onClick={() => navigate("/appointments")}
-                >
-                  Novo agendamento
-                </SecondaryButton>
-                <SecondaryButton
-                  type="button"
-                  className="h-8 px-3 text-xs"
-                  onClick={() => navigate("/finances?filter=overdue")}
-                >
-                  Cobranças críticas
-                </SecondaryButton>
-              </div>
-            </AppToolbar>
-          }
-        />
+        >
+          <input
+            value={searchTerm}
+            onChange={event => setSearchTerm(event.target.value)}
+            placeholder="Buscar cliente por nome, telefone, e-mail ou ID"
+            className="h-9 w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm text-[var(--text-primary)]"
+          />
+        </AppOperationalHeader>
 
-        <AppOperationalBar
-          tabs={[
-            { value: "overview", label: "Visão geral" },
-            { value: "agenda", label: "Agenda" },
-            { value: "service_orders", label: "O.S." },
-            { value: "financial", label: "Financeiro" },
-            { value: "history", label: "Histórico" },
-          ]}
-          activeTab={activeTab}
-          onTabChange={value => {
-            setActiveTab(value);
-            if (value === "financial") setActiveFilter("billing");
-            else if (value === "agenda") setActiveFilter("no_schedule");
-            else if (value === "overview") setActiveFilter("all");
-          }}
-          searchValue={searchTerm}
-          onSearchChange={setSearchTerm}
-          searchPlaceholder="Buscar por nome, telefone, email ou ID"
-          quickFilters={
-            <div className="flex flex-wrap items-center gap-2">
-              {quickFilterItems.map(item => (
-                <button
-                  key={item.key}
-                  type="button"
-                  className={appSelectionPillClasses(activeFilter === item.key)}
-                  onClick={() => setActiveFilter(item.key)}
-                >
-                  {item.label}
-                </button>
+        <AppSectionBlock title="Atenção imediata" subtitle="Problemas críticos da carteira com ação direta.">
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+            {immediateAttention
+              .sort((left, right) => right.severity - left.severity)
+              .slice(0, 3)
+              .map(item => (
+                <article key={item.key} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)]/45 p-3.5">
+                  <p className="text-sm font-semibold text-[var(--text-primary)]">{item.title}</p>
+                  <p className="mt-1 text-xs text-[var(--text-secondary)]">{item.context}</p>
+                  <p className="mt-1 text-xs text-[var(--text-muted)]">Impacto: {item.impact}</p>
+                  <Button type="button" className="mt-3 h-8 px-3 text-xs" onClick={item.onCta}>
+                    {item.ctaLabel}
+                  </Button>
+                </article>
               ))}
+          </div>
+        </AppSectionBlock>
+
+        <AppSectionBlock title="Próxima melhor ação" subtitle="Recomendação contextual para agir agora.">
+          {nextBestSnapshot && nextBestCustomer ? (
+            <div className="space-y-3">
+              <OperationalNextAction
+                title={`${nextBestSnapshot.primaryActionLabel} — ${String(nextBestCustomer?.name ?? "Cliente")}`}
+                reason={`Motivo: ${nextBestSnapshot.primaryActionReason}`}
+                impact={nextBestSnapshot.primaryActionImpact ?? formatMoney(nextBestSnapshot.financialPendingCents)}
+              />
+              <Button
+                type="button"
+                className="h-8 px-3 text-xs"
+                onClick={() => {
+                  setActiveCustomerId(nextBestSnapshot.customerId);
+                  runCustomerPrimaryAction();
+                }}
+              >
+                {resolveOperationalActionLabel(nextBestSnapshot.primaryActionLabel, "Executar ação")}
+              </Button>
             </div>
-          }
-          advancedFiltersLabel="Mais filtros"
-          advancedFiltersContent={
-            <>
-              <div className="space-y-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                  Filtros de contexto
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {advancedFilterItems.map(item => (
-                    <button
-                      key={item.key}
-                      type="button"
-                      className={appSelectionPillClasses(activeFilter === item.key)}
-                      onClick={() => setActiveFilter(item.key)}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <label
-                  className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]"
-                  htmlFor="customers-sort"
-                >
-                  Ordenação
-                </label>
-                <select
-                  id="customers-sort"
-                  className="h-9 w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-xs text-[var(--text-primary)]"
-                  value={activeSort}
-                  onChange={event =>
-                    setActiveSort(event.target.value as OperationalSort)
-                  }
-                >
-                  <option value="priority">Prioridade</option>
-                  <option value="financial">Valor financeiro</option>
-                  <option value="last_interaction">Última interação</option>
-                  <option value="name">Nome</option>
-                </select>
-              </div>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <button
-                  type="button"
-                  className={appSelectionPillClasses(withPendingOnly)}
-                  onClick={() => setWithPendingOnly(prev => !prev)}
-                >
-                  Com cobrança pendente
-                </button>
-                <button
-                  type="button"
-                  className={appSelectionPillClasses(withOpenOsOnly)}
-                  onClick={() => setWithOpenOsOnly(prev => !prev)}
-                >
-                  Com O.S. aberta
-                </button>
-                <button
-                  type="button"
-                  className={appSelectionPillClasses(withoutRecentReplyOnly)}
-                  onClick={() => setWithoutRecentReplyOnly(prev => !prev)}
-                >
-                  Sem resposta recente
-                </button>
-                <select
-                  className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-xs text-[var(--text-primary)]"
-                  value={periodFilter}
-                  onChange={event =>
-                    setPeriodFilter(event.target.value as "all" | "7d" | "15d" | "30d")
-                  }
-                >
-                  <option value="all">Período: todos</option>
-                  <option value="7d">Período: até 7 dias</option>
-                  <option value="15d">Período: até 15 dias</option>
-                  <option value="30d">Período: até 30 dias</option>
-                </select>
-                <select
-                  className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-xs text-[var(--text-primary)] sm:col-span-2"
-                  value={minPendingAmountBand}
-                  onChange={event =>
-                    setMinPendingAmountBand(
-                      event.target.value as "all" | "10k" | "50k" | "100k"
-                    )
-                  }
-                >
-                  <option value="all">Valor pendente: qualquer faixa</option>
-                  <option value="10k">Valor pendente: acima de R$ 1.000</option>
-                  <option value="50k">Valor pendente: acima de R$ 5.000</option>
-                  <option value="100k">Valor pendente: acima de R$ 10.000</option>
-                </select>
-              </div>
-            </>
-          }
-          activeFilterChips={[
-            ...(!quickFilterItems.some(item => item.key === activeFilter) &&
-            activeFilter !== "all"
-              ? [
-                  {
-                    key: `filter-${activeFilter}`,
-                    label:
-                      filterItems.find(item => item.key === activeFilter)?.label ??
-                      activeFilter,
-                    onRemove: () => setActiveFilter("all"),
-                  },
-                ]
-              : []),
-            ...(activeSort !== "priority"
-              ? [
-                  {
-                    key: "sort",
-                    label: `Ordenação: ${sortLabels[activeSort]}`,
-                    onRemove: () => setActiveSort("priority"),
-                  },
-                ]
-              : []),
-            ...(withPendingOnly
-              ? [{ key: "pending-only", label: "Com cobrança pendente", onRemove: () => setWithPendingOnly(false) }]
-              : []),
-            ...(withOpenOsOnly
-              ? [{ key: "open-os-only", label: "Com O.S. aberta", onRemove: () => setWithOpenOsOnly(false) }]
-              : []),
-            ...(withoutRecentReplyOnly
-              ? [{ key: "no-reply-only", label: "Sem resposta recente", onRemove: () => setWithoutRecentReplyOnly(false) }]
-              : []),
-            ...(periodFilter !== "all"
-              ? [{ key: "period", label: `Período ${periodFilter}`, onRemove: () => setPeriodFilter("all") }]
-              : []),
-            ...(minPendingAmountBand !== "all"
-              ? [{ key: "value", label: `Faixa ${minPendingAmountBand}`, onRemove: () => setMinPendingAmountBand("all") }]
-              : []),
-          ]}
-          onClearAllFilters={() => {
-            setActiveFilter("all");
-            setActiveSort("priority");
-            setWithPendingOnly(false);
-            setWithOpenOsOnly(false);
-            setWithoutRecentReplyOnly(false);
-            setPeriodFilter("all");
-            setMinPendingAmountBand("all");
-          }}
-        />
+          ) : (
+            <AppPageEmptyState
+              title="Sem ação sugerida"
+              description="Quando houver clientes com prioridade operacional, a recomendação aparecerá aqui."
+            />
+          )}
+        </AppSectionBlock>
+
+        <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <AppStatCard label="Clientes ativos" value={activeCustomersCount} helper="Carteira com continuidade operacional" />
+          <AppStatCard label="Com cobrança pendente" value={customersWithPending} helper="Clientes com impacto financeiro ativo" />
+          <AppStatCard label="Em risco" value={customersAtRisk} helper="Sem resposta, com atraso ou com descontinuidade" />
+          <AppStatCard label="Ticket médio" value={formatMoney(averageTicketCents)} helper="Valor médio movimentado por cliente" />
+        </section>
+
+        <AppFiltersBar className="gap-2 border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-3">
+          <div className="flex flex-1 flex-wrap gap-2">
+            {filterItems.map(item => (
+              <button
+                key={item.key}
+                type="button"
+                className={appSelectionPillClasses(activeFilter === item.key)}
+                onClick={() => setActiveFilter(item.key)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className={appSelectionPillClasses(withPendingOnly)} onClick={() => setWithPendingOnly(prev => !prev)}>
+              Com cobrança pendente
+            </button>
+            <button type="button" className={appSelectionPillClasses(withOpenOsOnly)} onClick={() => setWithOpenOsOnly(prev => !prev)}>
+              Com O.S. aberta
+            </button>
+            <button type="button" className={appSelectionPillClasses(withoutRecentReplyOnly)} onClick={() => setWithoutRecentReplyOnly(prev => !prev)}>
+              Sem resposta recente
+            </button>
+            <select
+              className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-xs text-[var(--text-primary)]"
+              value={periodFilter}
+              onChange={event =>
+                setPeriodFilter(event.target.value as "all" | "7d" | "15d" | "30d")
+              }
+            >
+              <option value="all">Período: todos</option>
+              <option value="7d">Até 7 dias</option>
+              <option value="15d">Até 15 dias</option>
+              <option value="30d">Até 30 dias</option>
+            </select>
+            <select
+              className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-xs text-[var(--text-primary)]"
+              value={activeSort}
+              onChange={event =>
+                setActiveSort(event.target.value as OperationalSort)
+              }
+            >
+              <option value="priority">Ordenação: prioridade</option>
+              <option value="financial">Ordenação: financeiro</option>
+              <option value="last_interaction">Ordenação: última interação</option>
+              <option value="name">Ordenação: nome</option>
+            </select>
+            <select
+              className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-xs text-[var(--text-primary)]"
+              value={minPendingAmountBand}
+              onChange={event =>
+                setMinPendingAmountBand(
+                  event.target.value as "all" | "10k" | "50k" | "100k"
+                )
+              }
+            >
+              <option value="all">Valor pendente: qualquer faixa</option>
+              <option value="10k">Acima de R$ 1.000</option>
+              <option value="50k">Acima de R$ 5.000</option>
+              <option value="100k">Acima de R$ 10.000</option>
+            </select>
+          </div>
+        </AppFiltersBar>
 
         <div className="grid gap-4 2xl:grid-cols-[1.2fr_0.8fr]">
           <div className="space-y-4">
           <AppSectionBlock
-            title={
-              activeTab === "history"
-                ? "Histórico operacional da carteira"
-                : "Carteira de clientes"
-            }
+            title="Carteira de clientes"
             subtitle="Lista principal para operação diária da carteira"
           >
             {selectedCustomerIds.length > 0 ? (
