@@ -1,7 +1,13 @@
 import { useEffect, useMemo } from "react";
 import { useLocation } from "wouter";
-import { ArrowRight, Clock3, MessageSquareWarning, ShieldAlert, TrendingDown } from "lucide-react";
+import { Clock3, MessageSquareWarning, MoreHorizontal, ShieldAlert, TrendingDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { AppStatCard } from "@/components/app-system";
 import { useRunAction } from "@/hooks/useRunAction";
 import { useRenderWatchdog } from "@/hooks/useRenderWatchdog";
@@ -31,57 +37,34 @@ const immediateAttentionItems = [
     title: "Cobranças vencidas em lote crítico",
     context: "6 cobranças vencidas há +48h no fechamento do caixa.",
     impact: "Risco de estrangulamento de caixa e atraso de repasses.",
-    owner: "Financeiro · Ana",
     primaryCtaLabel: "Cobrar agora",
     primaryPath: "/finances?view=charges&status=overdue",
-    secondaryCtaLabel: "Ver carteira",
-    secondaryPath: "/finances?view=charges",
   },
   {
     severity: "critical" as const,
     title: "O.S. atrasadas em rota ativa",
     context: "2 O.S. paradas há mais de 2h após início previsto.",
     impact: "Degrada SLA e empurra atraso para os próximos slots.",
-    owner: "Operações · Bruno",
     primaryCtaLabel: "Destravar O.S.",
     primaryPath: "/service-orders?status=attention",
-    secondaryCtaLabel: "Ver timeline",
-    secondaryPath: "/timeline?severity=critical",
   },
   {
     severity: "high" as const,
     title: "Agendamentos sem confirmação",
     context: "4 clientes sem confirmação para a janela 10:00–12:00.",
     impact: "Risco de ociosidade operacional e quebra de previsibilidade.",
-    owner: "Agenda · Camila",
     primaryCtaLabel: "Confirmar agenda",
     primaryPath: "/appointments?status=pending-confirmation",
-    secondaryCtaLabel: "Ajustar agenda",
-    secondaryPath: "/appointments?view=calendar",
   },
   {
     severity: "high" as const,
     title: "Falhas em mensagens de confirmação",
     context: "5 mensagens de WhatsApp falharam na última hora.",
     impact: "Aumenta ausência em agendamento e retrabalho.",
-    owner: "Comunicação · Júlia",
     primaryCtaLabel: "Resolver falhas",
     primaryPath: "/timeline?type=whatsapp-failure",
-    secondaryCtaLabel: "Reenviar mensagens",
-    secondaryPath: "/customers?segment=needs-contact",
   },
-  {
-    severity: "medium" as const,
-    title: "Clientes sem resposta pós-serviço",
-    context: "3 clientes sem retorno após execução nas últimas 24h.",
-    impact: "Reduz recompra e confirmação futura.",
-    owner: "Relacionamento · Time CS",
-    primaryCtaLabel: "Responder cliente",
-    primaryPath: "/customers?segment=inactive",
-    secondaryCtaLabel: "Abrir detalhe",
-    secondaryPath: "/timeline?type=customer-follow-up",
-  },
-];
+] as const;
 
 const operationalPipeline = [
   {
@@ -112,32 +95,29 @@ const operationalPipeline = [
     action: "Cobrar carteira",
     path: "/finances?view=charges&status=overdue",
   },
+  {
+    stage: "Pagamento",
+    volume: 15,
+    microcontext: "Conversão abaixo da meta de 80%",
+    action: "Ver recebimentos",
+    path: "/finances?view=paid",
+  },
 ] as const;
-
-const operationalCriticalStage = {
-  stage: "Pagamento",
-  title: "Conversão abaixo da meta",
-  microcontext: "Meta 80% · Atenção",
-  action: "Ver recebimentos",
-  path: "/finances?view=paid",
-} as const;
 
 const operationalQueue = [
   {
-    type: "Cobrança",
-    entity: "COB-9021 · R$ 4.280",
+    type: "Cobrança vencida",
+    entity: "COB-9021 · R$ 4.280 · João Silva",
     status: "Urgente",
-    deadline: "11:00",
-    owner: "Financeiro",
-    actionLabel: "Cobrar",
+    deadline: "Hoje, 11:00",
+    actionLabel: "Enviar cobrança",
     path: "/finances?view=charges&status=overdue",
   },
   {
-    type: "O.S.",
-    entity: "OS-7841 · Cliente Acácia",
+    type: "O.S. atrasada",
+    entity: "OS-7841 · Clínica Acácia",
     status: "Atenção",
-    deadline: "09:30",
-    owner: "Equipe Campo 2",
+    deadline: "Hoje, 09:30",
     actionLabel: "Iniciar O.S.",
     path: "/service-orders?status=pending",
   },
@@ -145,40 +125,19 @@ const operationalQueue = [
     type: "Agendamento",
     entity: "AG-1992 · Clínica Viva",
     status: "Pendente",
-    deadline: "10:00",
-    owner: "Agenda",
+    deadline: "Hoje, 10:00",
     actionLabel: "Confirmar",
     path: "/appointments?status=pending-confirmation",
   },
   {
-    type: "Atendimento",
-    entity: "Marina Costa · sem retorno",
+    type: "Cliente sem resposta",
+    entity: "Marina Costa · pós-serviço",
     status: "Em risco",
-    deadline: "10:15",
-    owner: "Relacionamento",
+    deadline: "Hoje, 10:15",
     actionLabel: "Responder",
     path: "/customers?segment=needs-contact",
   },
-  {
-    type: "Comunicação",
-    entity: "Falha WhatsApp · lote 14",
-    status: "Atenção",
-    deadline: "11:30",
-    owner: "Comunicação",
-    actionLabel: "Resolver",
-    path: "/timeline?type=whatsapp-failure",
-  },
-];
-
-const contextualQuickActions = [
-  { label: "Clientes", path: "/customers" },
-  { label: "Agendamentos", path: "/appointments" },
-  { label: "O.S.", path: "/service-orders" },
-  { label: "Financeiro", path: "/finances" },
-  { label: "WhatsApp", path: "/timeline?type=whatsapp-failure" },
-  { label: "Timeline", path: "/timeline" },
-  { label: "Governança", path: "/governance" },
-];
+] as const;
 
 function resolveOperationalState(alertCount: number, criticalCount: number): DashboardState {
   if (criticalCount > 1) return "critical";
@@ -208,7 +167,7 @@ export default function ExecutiveDashboard() {
   }, [location]);
 
   const immediateAttention = useMemo(
-    () => [...immediateAttentionItems].sort((a, b) => severityWeight[b.severity] - severityWeight[a.severity]).slice(0, 5),
+    () => [...immediateAttentionItems].sort((a, b) => severityWeight[b.severity] - severityWeight[a.severity]).slice(0, 3),
     []
   );
 
@@ -228,25 +187,36 @@ export default function ExecutiveDashboard() {
   const operationalPeriodLabel = "Hoje · 22 de abril de 2026 · Turno 08:00–18:00";
 
   const nextBestAction = {
-    action: "Confirmar agora os 4 agendamentos pendentes da janela 10:00–12:00",
-    reason: "Esse ponto evita ociosidade de equipe e reduz o efeito cascata de atraso em O.S. e cobrança.",
-    impact: "Protege até 2h de capacidade de campo e melhora a conversão de agenda para execução ainda no turno.",
-    ctaLabel: "Executar confirmação",
-    ctaPath: "/appointments?status=pending-confirmation",
-    detailPath: "/dashboard/operations?filter=critical",
+    action: "Cobrar João Silva — R$ 4.280 vencido há 5 dias",
+    reason: "Maior valor em atraso e sem contato recente, com risco de contaminar o fechamento do dia.",
+    impact: "Libera caixa imediato, reduz risco operacional financeiro e destrava repasses do turno.",
+    ctaLabel: "Enviar cobrança",
+    ctaPath: "/finances?view=charges&status=overdue",
   };
 
   useEffect(() => {
     // eslint-disable-next-line no-console
-    console.info("[RENDER PAGE] executive-dashboard-v2-operational-center");
+    console.info("[RENDER PAGE] executive-dashboard-v3-operational-center");
   }, []);
 
   return (
     <AppPageShell>
       <AppOperationalHeader
-        title="Centro de decisão operacional"
-        description="Leitura rápida: atenção imediata, próxima ação e KPIs operacionais em uma passada."
-        secondaryActions={<Button variant="outline" onClick={() => navigate("/governance")}>Ver governança</Button>}
+        title="Operação hoje"
+        description="Acompanhe prioridades, gargalos e execução do dia."
+        secondaryActions={
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="icon" variant="outline" aria-label="Ações secundárias do dashboard">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuItem onClick={() => navigate("/governance")}>Ver governança</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate("/timeline")}>Abrir timeline</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        }
         primaryAction={
           <Button onClick={() => void runAction(async () => navigate("/dashboard/operations?filter=critical"))}>
             Abrir fila prioritária
@@ -283,148 +253,23 @@ export default function ExecutiveDashboard() {
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
           <AppSectionBlock
             title="Atenção imediata"
-            subtitle="Problemas urgentes com responsável e ação."
+            subtitle="O que está errado agora, por severidade, com ação objetiva."
             className="xl:col-span-12"
           >
-            <div className="space-y-2.5">
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
               {immediateAttention.map(item => (
                 <article
                   key={item.title}
-                  className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3"
+                  className="flex min-h-[188px] flex-col rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3.5"
                 >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-start justify-between gap-2">
                     <p className="text-sm font-semibold text-[var(--text-primary)]">{item.title}</p>
-                    <AppStatusBadge
-                      label={item.severity === "critical" ? "Urgente" : item.severity === "high" ? "Atenção" : "Monitorar"}
-                    />
+                    <AppStatusBadge label={item.severity === "critical" ? "Urgente" : "Atenção"} />
                   </div>
-                  <p className="mt-1 text-xs text-[var(--text-secondary)]">{item.context}</p>
-                  <p className="mt-1 text-[11px] uppercase tracking-[0.08em] text-[var(--text-muted)]">Responsável: {item.owner}</p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <Button size="sm" onClick={() => navigate(item.primaryPath)}>{item.primaryCtaLabel}</Button>
-                    <Button size="sm" variant="outline" onClick={() => navigate(item.secondaryPath)}>
-                      {item.secondaryCtaLabel}
-                    </Button>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </AppSectionBlock>
-
-          <AppSectionBlock
-            title="Próxima melhor ação"
-            subtitle="Ação dominante do turno."
-            className="xl:col-span-12"
-          >
-            <article className="rounded-lg border border-[var(--dashboard-danger)]/30 bg-[var(--surface-subtle)] p-3.5">
-              <p className="text-sm font-semibold text-[var(--text-primary)]">{nextBestAction.action}</p>
-              <p className="mt-1 text-xs text-[var(--text-secondary)]">Motivo: {nextBestAction.reason}</p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <Button size="sm" onClick={() => navigate(nextBestAction.ctaPath)}>{nextBestAction.ctaLabel}</Button>
-                <Button size="sm" variant="outline" onClick={() => navigate(nextBestAction.detailPath)}>
-                  Ver detalhe
-                </Button>
-              </div>
-            </article>
-          </AppSectionBlock>
-
-          <AppSectionBlock
-            title="KPIs operacionais"
-            subtitle="4 KPIs em uma linha, sem conteúdo espremido."
-            className="xl:col-span-12"
-          >
-            <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2 xl:grid-cols-4">
-              <AppStatCard
-                label="Receita do período"
-                value="R$ 187,4k"
-                helper="Inadimplência pressiona caixa."
-                delta={<Button size="sm" variant="ghost" onClick={() => navigate("/finances?view=revenue")}>Ver receita</Button>}
-              />
-              <AppStatCard
-                label="Ordens em aberto"
-                value="18"
-                helper="2 atrasadas com risco de SLA."
-                delta={<Button size="sm" variant="ghost" onClick={() => navigate("/service-orders?status=open")}>Abrir O.S.</Button>}
-              />
-              <AppStatCard
-                label="Agendamentos do dia"
-                value="42"
-                helper="4 pendentes de confirmação."
-                delta={<Button size="sm" variant="ghost" onClick={() => navigate("/appointments")}>Ver agenda</Button>}
-              />
-              <AppStatCard
-                label="SLA / atraso médio"
-                value="92,8% · 38min"
-                helper="2 rotas concentram atraso."
-                delta={<Button size="sm" variant="ghost" onClick={() => navigate("/service-orders?status=attention")}>Proteger SLA</Button>}
-              />
-            </div>
-          </AppSectionBlock>
-
-          <AppSectionBlock
-            title="Fluxo operacional"
-            subtitle="Pipeline operacional com leitura rápida de volume, gargalo e ação."
-            className="xl:col-span-12"
-          >
-            <div className="overflow-x-auto">
-              <div className="grid min-w-[920px] grid-cols-4 gap-3">
-                {operationalPipeline.map(step => (
-                  <article
-                    key={step.stage}
-                    className="flex h-full min-h-[186px] flex-col rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3.5"
-                  >
-                    <p className="text-xs font-semibold text-[var(--text-muted)]">{step.stage}</p>
-                    <p className="mt-2 text-3xl font-semibold leading-none text-[var(--text-primary)]">{step.volume}</p>
-                    <p className="mt-3 min-h-[40px] text-xs leading-5 text-[var(--text-secondary)]">{step.microcontext}</p>
-                    <Button
-                      size="sm"
-                      className="mt-auto w-full"
-                      onClick={() => navigate(step.path)}
-                    >
-                      {step.action}
-                    </Button>
-                  </article>
-                ))}
-              </div>
-            </div>
-            <article className="mt-3 rounded-lg border border-[var(--dashboard-danger)]/35 bg-[color-mix(in_srgb,var(--dashboard-danger)_8%,var(--surface-subtle))] px-3.5 py-3">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--dashboard-danger)]">
-                Etapa crítica consolidada · {operationalCriticalStage.stage}
-              </p>
-              <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
-                {operationalCriticalStage.title}
-              </p>
-              <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                {operationalCriticalStage.microcontext}
-              </p>
-              <Button
-                size="sm"
-                variant="outline"
-                className="mt-2"
-                onClick={() => navigate(operationalCriticalStage.path)}
-              >
-                {operationalCriticalStage.action}
-              </Button>
-            </article>
-            <p className="mt-2 text-xs text-[var(--text-secondary)]">Gargalo atual: Cobrança → Pagamento.</p>
-          </AppSectionBlock>
-
-          <AppSectionBlock
-            title="Fila operacional"
-            subtitle="Execução imediata."
-            className="xl:col-span-7"
-          >
-            <div className="space-y-2.5">
-              {operationalQueue.map(item => (
-                <article key={`${item.type}-${item.entity}`} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-sm font-semibold text-[var(--text-primary)]">{item.type}</p>
-                    <AppStatusBadge label={item.status} />
-                  </div>
-                  <p className="text-xs text-[var(--text-secondary)]">{item.entity}</p>
-                  <p className="mt-1 text-[11px] text-[var(--text-muted)]">Prazo: {item.deadline} · Responsável: {item.owner}</p>
-                  <Button className="mt-2" size="sm" variant="outline" onClick={() => navigate(item.path)}>
-                    {item.actionLabel}
+                  <p className="mt-2 text-xs text-[var(--text-secondary)]">{item.context}</p>
+                  <p className="mt-2 text-xs text-[var(--text-secondary)]">Impacto: {item.impact}</p>
+                  <Button className="mt-auto" size="sm" onClick={() => navigate(item.primaryPath)}>
+                    {item.primaryCtaLabel}
                   </Button>
                 </article>
               ))}
@@ -432,42 +277,126 @@ export default function ExecutiveDashboard() {
           </AppSectionBlock>
 
           <AppSectionBlock
-            title="Pulso da operação"
-            subtitle="Sinais do turno."
-            className="xl:col-span-5"
+            title="Próxima melhor ação"
+            subtitle="Recomendação principal para reduzir risco e acelerar execução agora."
+            className="xl:col-span-12"
           >
-            <div className="space-y-2.5">
-              <div className="flex items-start gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
-                <Clock3 className="mt-0.5 h-4 w-4 text-[var(--dashboard-warning)]" />
-                <p className="text-xs text-[var(--text-secondary)]">Atrasos em O.S. subiram e já pressionam a janela da manhã. Priorize destravar execução.</p>
-              </div>
-              <div className="flex items-start gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
-                <TrendingDown className="mt-0.5 h-4 w-4 text-[var(--dashboard-danger)]" />
-                <p className="text-xs text-[var(--text-secondary)]">A conversão de cobrança para pagamento caiu para 71,4%, abaixo da meta de 80%.</p>
-              </div>
-              <div className="flex items-start gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
-                <MessageSquareWarning className="mt-0.5 h-4 w-4 text-[var(--dashboard-danger)]" />
-                <p className="text-xs text-[var(--text-secondary)]">Falhas de mensagem aumentam no-show e pioram o tempo de resposta ao cliente.</p>
-              </div>
-              <div className="flex items-start gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
-                <ShieldAlert className="mt-0.5 h-4 w-4 text-[var(--dashboard-info)]" />
-                <p className="text-xs text-[var(--text-secondary)]">Risco operacional concentra em agenda e financeiro; governança deve acompanhar este turno.</p>
-              </div>
+            <article className="rounded-lg border border-[var(--dashboard-danger)]/35 bg-[color-mix(in_srgb,var(--dashboard-danger)_8%,var(--surface-subtle))] p-4">
+              <p className="text-sm font-semibold text-[var(--text-primary)]">{nextBestAction.action}</p>
+              <p className="mt-1.5 text-xs text-[var(--text-secondary)]">Motivo: {nextBestAction.reason}</p>
+              <p className="mt-1.5 text-xs text-[var(--text-secondary)]">Impacto esperado: {nextBestAction.impact}</p>
+              <Button className="mt-3" size="sm" onClick={() => navigate(nextBestAction.ctaPath)}>
+                {nextBestAction.ctaLabel}
+              </Button>
+            </article>
+          </AppSectionBlock>
+
+          <AppSectionBlock
+            title="KPIs operacionais"
+            subtitle="Quatro indicadores com leitura rápida, tendência e destino claro."
+            className="xl:col-span-12"
+          >
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <AppStatCard
+                label="Receita do período"
+                value="R$ 187,4k"
+                helper="↓ 4,2% vs. semana passada · inadimplência em alta."
+                delta={<Button size="sm" variant="ghost" onClick={() => navigate("/finances?view=revenue")}>Ver receita</Button>}
+              />
+              <AppStatCard
+                label="Ordens abertas"
+                value="18"
+                helper="2 atrasadas · SLA no limite do turno."
+                delta={<Button size="sm" variant="ghost" onClick={() => navigate("/service-orders?status=open")}>Abrir O.S.</Button>}
+              />
+              <AppStatCard
+                label="Cobranças pendentes"
+                value="21"
+                helper="6 vencidas · gargalo principal do fluxo."
+                delta={<Button size="sm" variant="ghost" onClick={() => navigate("/finances?view=charges&status=overdue")}>Cobranças</Button>}
+              />
+              <AppStatCard
+                label="Ticket médio"
+                value="R$ 892"
+                helper="↑ 3,1% vs. último ciclo · manter margem."
+                delta={<Button size="sm" variant="ghost" onClick={() => navigate("/finances?view=performance")}>Ver ticket</Button>}
+              />
             </div>
           </AppSectionBlock>
 
           <AppSectionBlock
-            title="Acessos rápidos contextuais"
-            subtitle="Atalhos enxutos para navegar por decisão, sem duplicar menu global."
+            title="Fluxo operacional"
+            subtitle="Cliente → Agendamento → O.S. → Cobrança → Pagamento com leitura contínua."
             className="xl:col-span-12"
           >
-            <div className="flex flex-wrap gap-2">
-              {contextualQuickActions.map(action => (
-                <Button key={action.label} size="sm" variant="outline" onClick={() => navigate(action.path)}>
-                  {action.label}
-                  <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
-                </Button>
+            <div className="grid grid-cols-1 gap-3 xl:grid-cols-5">
+              {operationalPipeline.map(step => (
+                <article
+                  key={step.stage}
+                  className="flex min-h-[178px] flex-col rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3.5"
+                >
+                  <p className="text-xs font-semibold uppercase tracking-[0.06em] text-[var(--text-muted)]">{step.stage}</p>
+                  <p className="mt-2 text-3xl font-semibold leading-none text-[var(--text-primary)]">{step.volume}</p>
+                  <p className="mt-3 text-xs leading-5 text-[var(--text-secondary)]">{step.microcontext}</p>
+                  <Button size="sm" className="mt-auto" variant="outline" onClick={() => navigate(step.path)}>
+                    {step.action}
+                  </Button>
+                </article>
               ))}
+            </div>
+            <p className="mt-3 text-xs text-[var(--text-secondary)]">
+              Gargalo principal: Cobrança → Pagamento. Ação sugerida: acelerar carteira vencida antes do fechamento.
+            </p>
+          </AppSectionBlock>
+
+          <AppSectionBlock
+            title="Fila operacional"
+            subtitle="Itens priorizados por urgência para execução imediata."
+            className="xl:col-span-8"
+          >
+            <div className="space-y-2.5">
+              {operationalQueue.map(item => (
+                <article key={`${item.type}-${item.entity}`} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3.5">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">{item.type}</p>
+                      <p className="text-sm font-semibold text-[var(--text-primary)]">{item.entity}</p>
+                    </div>
+                    <AppStatusBadge label={item.status} />
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs text-[var(--text-secondary)]">Prazo: {item.deadline}</p>
+                    <Button size="sm" variant="outline" onClick={() => navigate(item.path)}>
+                      {item.actionLabel}
+                    </Button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </AppSectionBlock>
+
+          <AppSectionBlock
+            title="Pulso da operação"
+            subtitle="Leitura interpretativa curta dos sinais do turno."
+            className="xl:col-span-4"
+          >
+            <div className="space-y-2.5">
+              <div className="flex items-start gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
+                <Clock3 className="mt-0.5 h-4 w-4 text-[var(--dashboard-warning)]" />
+                <p className="text-xs text-[var(--text-secondary)]">Atraso médio em O.S. subiu para 38min e já compromete a janela da manhã.</p>
+              </div>
+              <div className="flex items-start gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
+                <TrendingDown className="mt-0.5 h-4 w-4 text-[var(--dashboard-danger)]" />
+                <p className="text-xs text-[var(--text-secondary)]">Cobrança está travando conversão para pagamento no ponto final do fluxo.</p>
+              </div>
+              <div className="flex items-start gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
+                <MessageSquareWarning className="mt-0.5 h-4 w-4 text-[var(--dashboard-danger)]" />
+                <p className="text-xs text-[var(--text-secondary)]">Mensagens falhadas cresceram e elevam risco de no-show em agendamentos críticos.</p>
+              </div>
+              <div className="flex items-start gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
+                <ShieldAlert className="mt-0.5 h-4 w-4 text-[var(--dashboard-info)]" />
+                <p className="text-xs text-[var(--text-secondary)]">Risco operacional permanece concentrado em agenda e financeiro neste turno.</p>
+              </div>
             </div>
           </AppSectionBlock>
         </div>
