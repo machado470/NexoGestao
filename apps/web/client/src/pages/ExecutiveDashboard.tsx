@@ -83,53 +83,44 @@ const immediateAttentionItems = [
   },
 ];
 
-const operationalFlow = [
+const operationalPipeline = [
   {
     stage: "Cliente",
     volume: 138,
-    conversion: "→ Agendamento 30,4%",
-    bottleneck: "3 sem retorno",
-    status: "Atenção",
+    microcontext: "30,4% avançam para agendamento · 3 sem retorno",
     action: "Ativar follow-up",
     path: "/customers?segment=inactive",
   },
   {
     stage: "Agendamento",
     volume: 42,
-    conversion: "→ O.S. 66,7%",
-    bottleneck: "4 sem confirmação",
-    status: "Atenção",
+    microcontext: "66,7% avançam para O.S. · 4 sem confirmação",
     action: "Confirmar agenda",
     path: "/appointments?status=pending-confirmation",
   },
   {
     stage: "O.S.",
     volume: 28,
-    conversion: "→ Cobrança 75%",
-    bottleneck: "2 atrasadas",
-    status: "Em risco",
+    microcontext: "75% avançam para cobrança · 2 atrasadas",
     action: "Destravar execução",
     path: "/service-orders?status=attention",
   },
   {
     stage: "Cobrança",
     volume: 21,
-    conversion: "→ Pagamento 71,4%",
-    bottleneck: "6 vencidas",
-    status: "Crítico",
+    microcontext: "71,4% avançam para pagamento · 6 vencidas",
     action: "Cobrar carteira",
     path: "/finances?view=charges&status=overdue",
   },
-  {
-    stage: "Pagamento",
-    volume: 15,
-    conversion: "Meta 80%",
-    bottleneck: "Conversão abaixo da meta",
-    status: "Atenção",
-    action: "Ver recebimentos",
-    path: "/finances?view=paid",
-  },
 ] as const;
+
+const operationalCriticalStage = {
+  stage: "Pagamento",
+  title: "Conversão abaixo da meta",
+  microcontext: "Meta 80% · Atenção",
+  action: "Ver recebimentos",
+  path: "/finances?view=paid",
+} as const;
 
 const operationalQueue = [
   {
@@ -372,42 +363,47 @@ export default function ExecutiveDashboard() {
 
           <AppSectionBlock
             title="Fluxo operacional"
-            subtitle="Cliente → Agendamento → O.S. → Cobrança → Pagamento."
+            subtitle="Pipeline operacional com leitura rápida de volume, gargalo e ação."
             className="xl:col-span-12"
           >
-            <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2 xl:grid-cols-4">
-              {operationalFlow.slice(0, 4).map((step, index) => (
-                <article key={step.stage} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">{step.stage}</p>
-                  <p className="mt-1 text-lg font-semibold text-[var(--text-primary)]">{step.volume}</p>
-                  <p className="mt-1 text-xs text-[var(--text-secondary)]">{step.bottleneck}</p>
-                  <div className="mt-2 flex items-center justify-between gap-2">
-                    <AppStatusBadge label={step.conversion} />
-                    <Button size="sm" variant="ghost" onClick={() => navigate(step.path)}>
+            <div className="overflow-x-auto">
+              <div className="grid min-w-[920px] grid-cols-4 gap-3">
+                {operationalPipeline.map(step => (
+                  <article
+                    key={step.stage}
+                    className="flex h-full min-h-[186px] flex-col rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3.5"
+                  >
+                    <p className="text-xs font-semibold text-[var(--text-muted)]">{step.stage}</p>
+                    <p className="mt-2 text-3xl font-semibold leading-none text-[var(--text-primary)]">{step.volume}</p>
+                    <p className="mt-3 min-h-[40px] text-xs leading-5 text-[var(--text-secondary)]">{step.microcontext}</p>
+                    <Button
+                      size="sm"
+                      className="mt-auto w-full"
+                      onClick={() => navigate(step.path)}
+                    >
                       {step.action}
                     </Button>
-                  </div>
-                  {index < 3 ? <p className="mt-2 text-right text-xs text-[var(--text-muted)]">→</p> : null}
-                </article>
-              ))}
+                  </article>
+                ))}
+              </div>
             </div>
-            <article className="mt-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
-                Etapa crítica consolidada · {operationalFlow[4].stage}
+            <article className="mt-3 rounded-lg border border-[var(--dashboard-danger)]/35 bg-[color-mix(in_srgb,var(--dashboard-danger)_8%,var(--surface-subtle))] px-3.5 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--dashboard-danger)]">
+                Etapa crítica consolidada · {operationalCriticalStage.stage}
               </p>
               <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
-                {operationalFlow[4].bottleneck}
+                {operationalCriticalStage.title}
               </p>
               <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                {operationalFlow[4].conversion} · {operationalFlow[4].status}
+                {operationalCriticalStage.microcontext}
               </p>
               <Button
                 size="sm"
                 variant="outline"
                 className="mt-2"
-                onClick={() => navigate(operationalFlow[4].path)}
+                onClick={() => navigate(operationalCriticalStage.path)}
               >
-                {operationalFlow[4].action}
+                {operationalCriticalStage.action}
               </Button>
             </article>
             <p className="mt-2 text-xs text-[var(--text-secondary)]">Gargalo atual: Cobrança → Pagamento.</p>
