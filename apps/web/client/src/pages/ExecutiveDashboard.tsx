@@ -234,7 +234,7 @@ export default function ExecutiveDashboard() {
           ? "Carregando operação"
           : normalizeOperationalState(dashboardState);
 
-  const operationalPeriodLabel = "Hoje · 21 de abril de 2026 · Turno 08:00–18:00";
+  const operationalPeriodLabel = "Hoje · 22 de abril de 2026 · Turno 08:00–18:00";
 
   const nextBestAction = {
     action: "Confirmar agora os 4 agendamentos pendentes da janela 10:00–12:00",
@@ -254,7 +254,7 @@ export default function ExecutiveDashboard() {
     <AppPageShell>
       <AppPageHeader
         title="Centro de decisão operacional"
-        description="Resumo de prioridade para decidir em segundos: o que acontece agora, o que está errado e qual ação vem primeiro."
+        description="Leitura rápida: atenção imediata, próxima ação e KPIs operacionais em uma passada."
         secondaryActions={<Button variant="outline" onClick={() => navigate("/governance")}>Ver governança</Button>}
         cta={
           <Button onClick={() => void runAction(async () => navigate("/dashboard/operations?filter=critical"))}>
@@ -287,7 +287,7 @@ export default function ExecutiveDashboard() {
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
           <AppSectionBlock
             title="Atenção imediata"
-            subtitle="Problemas urgentes ordenados por severidade. Cada alerta já traz contexto, impacto e ação principal."
+            subtitle="Problemas urgentes com responsável e ação."
             className="xl:col-span-12"
           >
             <div className="space-y-2.5">
@@ -303,7 +303,6 @@ export default function ExecutiveDashboard() {
                     />
                   </div>
                   <p className="mt-1 text-xs text-[var(--text-secondary)]">{item.context}</p>
-                  <p className="mt-1 text-xs text-[var(--text-secondary)]">Impacto: {item.impact}</p>
                   <p className="mt-1 text-[11px] uppercase tracking-[0.08em] text-[var(--text-muted)]">Responsável: {item.owner}</p>
                   <div className="mt-2 flex flex-wrap gap-2">
                     <Button size="sm" onClick={() => navigate(item.primaryPath)}>{item.primaryCtaLabel}</Button>
@@ -318,13 +317,12 @@ export default function ExecutiveDashboard() {
 
           <AppSectionBlock
             title="Próxima melhor ação"
-            subtitle="Se só uma ação puder ser feita agora, execute esta recomendação."
-            className="xl:col-span-5"
+            subtitle="Ação dominante do turno."
+            className="xl:col-span-12"
           >
             <article className="rounded-lg border border-[var(--dashboard-danger)]/30 bg-[var(--surface-subtle)] p-3.5">
               <p className="text-sm font-semibold text-[var(--text-primary)]">{nextBestAction.action}</p>
               <p className="mt-1 text-xs text-[var(--text-secondary)]">Motivo: {nextBestAction.reason}</p>
-              <p className="mt-1 text-xs text-[var(--text-secondary)]">Impacto esperado: {nextBestAction.impact}</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <Button size="sm" onClick={() => navigate(nextBestAction.ctaPath)}>{nextBestAction.ctaLabel}</Button>
                 <Button size="sm" variant="outline" onClick={() => navigate(nextBestAction.detailPath)}>
@@ -336,14 +334,14 @@ export default function ExecutiveDashboard() {
 
           <AppSectionBlock
             title="KPIs operacionais"
-            subtitle="Poucos indicadores, cada um com consequência operacional e ação direta."
-            className="xl:col-span-7"
+            subtitle="4 KPIs em uma linha, sem conteúdo espremido."
+            className="xl:col-span-12"
           >
-            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2 xl:grid-cols-4">
               <AppStatCard
                 label="Receita do período"
                 value="R$ 187,4k"
-                helper="Ainda pressionada por inadimplência."
+                helper="Inadimplência pressiona caixa."
                 delta={<Button size="sm" variant="ghost" onClick={() => navigate("/finances?view=revenue")}>Ver receita</Button>}
               />
               <AppStatCard
@@ -361,7 +359,7 @@ export default function ExecutiveDashboard() {
               <AppStatCard
                 label="SLA / atraso médio"
                 value="92,8% · 38min"
-                helper="Atraso concentrado em 2 rotas."
+                helper="2 rotas concentram atraso."
                 delta={<Button size="sm" variant="ghost" onClick={() => navigate("/service-orders?status=attention")}>Proteger SLA</Button>}
               />
             </div>
@@ -369,33 +367,31 @@ export default function ExecutiveDashboard() {
 
           <AppSectionBlock
             title="Fluxo operacional"
-            subtitle="Cliente → Agendamento → O.S. → Cobrança → Pagamento com volume, passagem e gargalo principal."
+            subtitle="Cliente → Agendamento → O.S. → Cobrança → Pagamento."
             className="xl:col-span-12"
           >
             <div className="grid grid-cols-1 gap-2.5 md:grid-cols-5">
-              {operationalFlow.map(step => (
+              {operationalFlow.map((step, index) => (
                 <article key={step.stage} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">{step.stage}</p>
                   <p className="mt-1 text-lg font-semibold text-[var(--text-primary)]">{step.volume}</p>
-                  <p className="mt-1 text-xs text-[var(--text-secondary)]">{step.conversion}</p>
-                  <p className="mt-1 text-xs text-[var(--text-secondary)]">Gargalo: {step.bottleneck}</p>
+                  <p className="mt-1 text-xs text-[var(--text-secondary)]">{step.bottleneck}</p>
                   <div className="mt-2 flex items-center justify-between gap-2">
-                    <AppStatusBadge label={step.status} />
+                    <AppStatusBadge label={step.conversion} />
                     <Button size="sm" variant="ghost" onClick={() => navigate(step.path)}>
                       {step.action}
                     </Button>
                   </div>
+                  {index < operationalFlow.length - 1 ? <p className="mt-2 text-right text-xs text-[var(--text-muted)]">→</p> : null}
                 </article>
               ))}
             </div>
-            <p className="mt-3 text-xs text-[var(--text-secondary)]">
-              Gargalo principal: Cobrança → Pagamento. Etapa crítica atual: Cobrança vencida acima de 48h. Próxima ação sugerida: cobrança ativa antes de abrir novos serviços.
-            </p>
+            <p className="mt-2 text-xs text-[var(--text-secondary)]">Gargalo atual: Cobrança → Pagamento.</p>
           </AppSectionBlock>
 
           <AppSectionBlock
             title="Fila operacional"
-            subtitle="Itens priorizados para execução imediata, sem virar tabela gigante."
+            subtitle="Execução imediata."
             className="xl:col-span-7"
           >
             <div className="space-y-2.5">
@@ -417,7 +413,7 @@ export default function ExecutiveDashboard() {
 
           <AppSectionBlock
             title="Pulso da operação"
-            subtitle="Leitura interpretativa em linguagem humana para orientar decisão rápida."
+            subtitle="Sinais do turno."
             className="xl:col-span-5"
           >
             <div className="space-y-2.5">

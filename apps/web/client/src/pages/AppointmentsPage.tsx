@@ -601,17 +601,17 @@ export default function AppointmentsPage() {
 
   return (
     <PageWrapper title="Agenda operacional" subtitle="Confirme, execute e avance para O.S. sem sair da agenda.">
-      <AppPageShell className="space-y-4">
+      <AppPageShell className="space-y-3">
         <AppPageHeader
           title="Agendamentos · controle do tempo operacional"
-          description={`Hoje: ${todayCount} compromissos · Semana: ${weekCount} · Saúde da agenda: ${agendaHealth}. O foco aqui é decidir rápido o que acontece agora, com quem e o que preparar.`}
+          description={`Hoje ${todayCount} · Não confirmados ${unconfirmedCount} · Conflitos ${conflictCount} · Atrasados ${delayedCount}.`}
           cta={<ActionFeedbackButton state="idle" idleLabel={headerCta.label} onClick={headerCta.onClick} />}
         />
 
-        <AppToolbar>
-          <div className="space-y-1">
+        <AppToolbar className="gap-2.5 px-3 py-2">
+          <div className="space-y-0.5">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">Período operacional</p>
-            <p className="text-sm font-medium text-[var(--text-primary)]">
+            <p className="text-xs font-medium text-[var(--text-primary)]">
               {windowFilter === "today"
                 ? "Hoje"
                 : windowFilter === "tomorrow"
@@ -632,12 +632,17 @@ export default function AppointmentsPage() {
             <AppStatusBadge label={`${conflictCount} conflitos`} />
             <AppStatusBadge label={`${delayedCount} atrasados`} />
           </div>
+          <div className="ml-auto">
+            <SecondaryButton type="button" className="h-8 px-3 text-xs" onClick={() => navigate("/service-orders")}>
+              Converter em O.S.
+            </SecondaryButton>
+          </div>
         </AppToolbar>
 
         <OperationalTopCard
           contextLabel="Entrada da execução"
-          title="Cliente, agenda, O.S., comunicação e timeline em uma única decisão operacional."
-          description="Use a lista para puxar ação imediata, o workspace para decidir e os alertas para prevenir gargalo."
+          title="Agenda operacional do turno"
+          description="Confirmar, destravar conflito e converter em O.S. sem perder contexto."
         />
 
         <AppSectionBlock
