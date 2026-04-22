@@ -208,6 +208,7 @@ export default function WhatsAppPage() {
   const [selectedCustomerId, setSelectedCustomerId] = useOperationalMemoryState("nexo.whatsapp.selected-customer.v1", queryCustomerId || "");
   const [searchTerm, setSearchTerm] = useOperationalMemoryState("nexo.whatsapp.search.v1", "");
   const [activeFilter, setActiveFilter] = useOperationalMemoryState<ConversationFilter>("nexo.whatsapp.filter.v1", "all");
+  const [showContextPanel, setShowContextPanel] = useOperationalMemoryState("nexo.whatsapp.context-panel.v1", true);
   const [content, setContent] = useOperationalMemoryState("nexo.whatsapp.composer.v1", "");
 
   const selectedCustomer = customers.find(item => String(item?.id) === selectedCustomerId);
@@ -496,7 +497,7 @@ export default function WhatsAppPage() {
         </div>
       </AppSectionBlock>
 
-      <div className="grid min-h-[72vh] gap-4 xl:grid-cols-[360px_minmax(0,1fr)_340px]">
+      <div className="grid min-h-[72vh] gap-4 xl:grid-cols-[340px_minmax(0,1fr)]">
         <AppSectionBlock title="Lista de conversas" subtitle="Inbox inteligente, priorizada por consequência operacional." className="h-full">
           <AppToolbar className="mb-3 items-center gap-2 px-3 py-2">
             <p className="text-xs text-[var(--text-muted)]">{filteredConversations.length} conversa(s) neste recorte</p>
@@ -627,6 +628,11 @@ export default function WhatsAppPage() {
                     <p className="text-sm font-medium text-[var(--text-primary)]">{selectedConversation.bestAction.title}</p>
                     <p className="text-xs text-[var(--text-secondary)]">{selectedConversation.bestAction.description}</p>
                   </div>
+                  <div className="mt-2 flex justify-end">
+                    <Button type="button" size="sm" variant="outline" onClick={() => setShowContextPanel(!showContextPanel)}>
+                      {showContextPanel ? "Ocultar contexto" : "Mostrar contexto"}
+                    </Button>
+                  </div>
                 </header>
 
                 <div className="max-h-[44vh] space-y-3 overflow-y-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/60 p-3">
@@ -734,10 +740,11 @@ export default function WhatsAppPage() {
           </AppSectionBlock>
         </AppSectionCard>
 
+        {showContextPanel ? (
         <AppSectionBlock
           title="Contexto operacional"
-          subtitle="Cliente, agenda, O.S., financeiro e histórico em paralelo à conversa."
-          className="h-full"
+          subtitle="Apoio da conversa com cliente, agenda, O.S., financeiro e timeline."
+          className="h-full xl:col-span-2"
         >
           {!selectedConversation ? (
             <AppEmptyState
@@ -831,6 +838,7 @@ export default function WhatsAppPage() {
             </div>
           )}
         </AppSectionBlock>
+        ) : null}
       </div>
 
       <div className="grid gap-3 md:grid-cols-4">

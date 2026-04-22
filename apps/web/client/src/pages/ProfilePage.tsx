@@ -48,6 +48,9 @@ export default function ProfilePage() {
 
   const personId = String(me.personId ?? me.person?.id ?? "");
   const userId = String(me.id ?? me.userId ?? "");
+  const hasIdentifiedUser = String(me?.id ?? "") !== "" || String(me?.email ?? "") !== "";
+  const fallbackName = String(me?.name ?? me?.fullName ?? me?.email ?? "Usuário logado");
+  const fallbackRole = String(me?.role ?? "OPERACIONAL");
 
   const myOrders = serviceOrders.filter(item => {
     const assigned = String(item?.assignedToPersonId ?? item?.personId ?? "");
@@ -120,8 +123,20 @@ export default function ProfilePage() {
 
       {!isLoading && !hasError ? (
         <>
-          {String(me?.id ?? "") === "" ? (
-            <AppPageEmptyState title="Perfil indisponível" description="Não foi possível identificar o usuário atual para montar a visão individual." />
+          {!hasIdentifiedUser ? (
+            <AppSectionBlock title="Central individual (fallback operacional)" subtitle="Perfil mínimo para não quebrar a execução.">
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3"><p className="text-xs text-[var(--text-muted)]">Nome</p><p className="text-sm font-semibold text-[var(--text-primary)]">{fallbackName}</p></div>
+                <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3"><p className="text-xs text-[var(--text-muted)]">Função</p><p className="text-sm font-semibold text-[var(--text-primary)]">{fallbackRole}</p></div>
+                <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3"><p className="text-xs text-[var(--text-muted)]">Status</p><p className="text-sm font-semibold text-[var(--text-primary)]">{availability}</p></div>
+                <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3"><p className="text-xs text-[var(--text-muted)]">Disponibilidade</p><p className="text-sm font-semibold text-[var(--text-primary)]">Operacional</p></div>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button size="sm" onClick={() => navigate("/service-orders?scope=mine&source=profile")}>Minhas O.S.</Button>
+                <Button size="sm" variant="outline" onClick={() => navigate("/appointments?scope=mine&source=profile")}>Meus agendamentos</Button>
+                <Button size="sm" variant="outline" onClick={() => navigate("/timeline?scope=mine&source=profile")}>Minha timeline</Button>
+              </div>
+            </AppSectionBlock>
           ) : (
             <>
               <AppSectionBlock title="1) Resumo individual" subtitle="Quem você é na operação e qual seu estado atual de execução.">

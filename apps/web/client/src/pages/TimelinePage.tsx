@@ -327,9 +327,21 @@ export default function TimelinePage() {
 
   const groupedEvents = useMemo(() => {
     const groups = new Map<string, TimelineEvent[]>();
+    const today = new Date();
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
     filteredEvents.forEach(event => {
       const date = new Date(String(event?.createdAt ?? ""));
-      const key = Number.isNaN(date.getTime()) ? "Sem data" : date.toLocaleDateString("pt-BR");
+      let key = "Sem data";
+      if (!Number.isNaN(date.getTime())) {
+        const day = date.toDateString();
+        key =
+          day === today.toDateString()
+            ? "Hoje"
+            : day === yesterday.toDateString()
+              ? "Ontem"
+              : date.toLocaleDateString("pt-BR");
+      }
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key)?.push(event);
     });
@@ -502,7 +514,7 @@ export default function TimelinePage() {
       <div className="grid gap-3 xl:grid-cols-12">
         <AppSectionBlock
           title="Linha do tempo oficial"
-          subtitle="Ordem cronológica com contexto operacional, responsável, entidade e impacto."
+          subtitle="Leitura auditável por lotes com contexto operacional."
           className="xl:col-span-8"
         >
           {isInitialLoading ? (
@@ -575,9 +587,14 @@ export default function TimelinePage() {
                 </section>
               ))}
 
-              <Button type="button" variant="outline" onClick={loadMore} disabled={!hasMore || timelineQuery.isFetching}>
-                {timelineQuery.isFetching ? "Carregando..." : hasMore ? "Carregar mais eventos" : "Sem mais eventos"}
-              </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs text-[var(--text-muted)]">
+                  Exibindo {filteredEvents.length} evento(s) · lote de {PAGE_SIZE}.
+                </span>
+                <Button type="button" variant="outline" onClick={loadMore} disabled={!hasMore || timelineQuery.isFetching}>
+                  {timelineQuery.isFetching ? "Carregando..." : hasMore ? `Carregar mais ${PAGE_SIZE}` : "Sem mais eventos"}
+                </Button>
+              </div>
             </div>
           )}
         </AppSectionBlock>

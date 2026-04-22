@@ -939,14 +939,14 @@ export default function ServiceOrdersPage() {
           }
           description={
             activeTab === "execution"
-              ? "Foco em andamento, responsável e próxima ação."
+              ? "Execução ativa por responsável e prioridade."
               : activeTab === "attention"
-                ? "Foco em travadas, atrasadas e sem avanço."
+                ? "Ordens travadas, atrasadas ou sem avanço."
                 : activeTab === "done"
-                  ? "Ordens finalizadas prontas para cobrança e fechamento."
+                  ? "Ordens finalizadas para cobrança e fechamento."
                   : activeTab === "history"
-                    ? "Rastreabilidade de ordens encerradas, canceladas e passadas."
-                    : "Visão ampla do funil das ordens ativas."
+                    ? "Rastro de ordens encerradas e canceladas."
+                    : "Núcleo de execução das ordens ativas."
           }
           cta={
             <ActionFeedbackButton
@@ -964,7 +964,7 @@ export default function ServiceOrdersPage() {
         />
         <OperationalTopCard
           title="Central de execução de O.S."
-          description="Da lista ao workspace, execute atendimento, comunicação e cobrança sem sair da rota."
+          description="Executar, destravar e converter em cobrança."
           primaryAction={
             <SecondaryButton type="button" className="h-8 px-3 text-xs" onClick={() => setOpenCreate(true)}>
               Criar O.S.
