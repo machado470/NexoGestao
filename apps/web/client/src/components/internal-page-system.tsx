@@ -73,6 +73,54 @@ export function AppPageHeader({
   );
 }
 
+export function AppOperationalHeader({
+  title,
+  description,
+  primaryAction,
+  secondaryActions,
+  contextChips,
+  children,
+  className,
+}: {
+  title: ReactNode;
+  description?: ReactNode;
+  primaryAction?: ReactNode;
+  secondaryActions?: ReactNode;
+  contextChips?: ReactNode;
+  children?: ReactNode;
+  className?: string;
+}) {
+  return (
+    <section
+      className={cn(
+        "rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3.5 md:p-4",
+        className
+      )}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <h1 className="nexo-page-header-title">{title}</h1>
+          {description ? (
+            <p className="nexo-page-header-description mt-1">{description}</p>
+          ) : null}
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {secondaryActions}
+          {primaryAction}
+        </div>
+      </div>
+
+      {contextChips ? (
+        <div className="mt-3 flex flex-wrap items-center gap-2">{contextChips}</div>
+      ) : null}
+
+      {children ? (
+        <div className="mt-3 border-t border-[var(--border-subtle)] pt-3">{children}</div>
+      ) : null}
+    </section>
+  );
+}
+
 export function AppFiltersBar({
   children,
   className,
@@ -142,6 +190,7 @@ export function AppOperationalBar<T extends string>({
   advancedFiltersLabel = "Filtros",
   onClearAllFilters,
   className,
+  variant = "standalone",
 }: {
   tabs: Array<{ value: T; label: string }>;
   activeTab: T;
@@ -159,6 +208,7 @@ export function AppOperationalBar<T extends string>({
   advancedFiltersLabel?: string;
   onClearAllFilters?: () => void;
   className?: string;
+  variant?: "standalone" | "embedded";
 }) {
   const hasAdvancedFilters = Boolean(advancedFiltersContent);
   const hasActiveAdvancedFilters = (activeFilterChips?.length ?? 0) > 0;
@@ -174,7 +224,9 @@ export function AppOperationalBar<T extends string>({
   return (
     <section
       className={cn(
-        "rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]",
+        variant === "standalone"
+          ? "rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]"
+          : "bg-transparent",
         className
       )}
     >

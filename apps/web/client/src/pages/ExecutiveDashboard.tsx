@@ -2,13 +2,13 @@ import { useEffect, useMemo } from "react";
 import { useLocation } from "wouter";
 import { ArrowRight, Clock3, MessageSquareWarning, ShieldAlert, TrendingDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { AppStatCard, AppToolbar } from "@/components/app-system";
+import { AppStatCard } from "@/components/app-system";
 import { useRunAction } from "@/hooks/useRunAction";
 import { useRenderWatchdog } from "@/hooks/useRenderWatchdog";
 import {
   AppPageEmptyState,
   AppPageErrorState,
-  AppPageHeader,
+  AppOperationalHeader,
   AppPageLoadingState,
   AppPageShell,
   AppSectionBlock,
@@ -252,21 +252,26 @@ export default function ExecutiveDashboard() {
 
   return (
     <AppPageShell>
-      <AppPageHeader
+      <AppOperationalHeader
         title="Centro de decisão operacional"
         description="Leitura rápida: atenção imediata, próxima ação e KPIs operacionais em uma passada."
         secondaryActions={<Button variant="outline" onClick={() => navigate("/governance")}>Ver governança</Button>}
-        cta={
+        primaryAction={
           <Button onClick={() => void runAction(async () => navigate("/dashboard/operations?filter=critical"))}>
             Abrir fila prioritária
           </Button>
         }
+        contextChips={
+          <>
+            <span className="rounded-md border border-[var(--border-subtle)] px-2 py-1 text-xs text-[var(--text-muted)]">
+              {operationalPeriodLabel}
+            </span>
+            <span className="rounded-md border border-[var(--border-subtle)] px-2 py-1 text-xs text-[var(--text-muted)]">
+              Estado geral: {operationStateLabel}
+            </span>
+          </>
+        }
       />
-
-      <AppToolbar className="mb-4 gap-2.5 px-3 py-2.5 text-xs text-[var(--text-muted)]">
-        <span className="rounded-md border border-[var(--border-subtle)] px-2 py-1">{operationalPeriodLabel}</span>
-        <span className="rounded-md border border-[var(--border-subtle)] px-2 py-1">Estado geral: {operationStateLabel}</span>
-      </AppToolbar>
 
       {dashboardState === "loading" ? <AppPageLoadingState /> : null}
       {dashboardState === "error" ? (
@@ -370,8 +375,8 @@ export default function ExecutiveDashboard() {
             subtitle="Cliente → Agendamento → O.S. → Cobrança → Pagamento."
             className="xl:col-span-12"
           >
-            <div className="grid grid-cols-1 gap-2.5 md:grid-cols-5">
-              {operationalFlow.map((step, index) => (
+            <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2 xl:grid-cols-4">
+              {operationalFlow.slice(0, 4).map((step, index) => (
                 <article key={step.stage} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">{step.stage}</p>
                   <p className="mt-1 text-lg font-semibold text-[var(--text-primary)]">{step.volume}</p>
@@ -382,10 +387,29 @@ export default function ExecutiveDashboard() {
                       {step.action}
                     </Button>
                   </div>
-                  {index < operationalFlow.length - 1 ? <p className="mt-2 text-right text-xs text-[var(--text-muted)]">→</p> : null}
+                  {index < 3 ? <p className="mt-2 text-right text-xs text-[var(--text-muted)]">→</p> : null}
                 </article>
               ))}
             </div>
+            <article className="mt-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                Etapa crítica consolidada · {operationalFlow[4].stage}
+              </p>
+              <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
+                {operationalFlow[4].bottleneck}
+              </p>
+              <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                {operationalFlow[4].conversion} · {operationalFlow[4].status}
+              </p>
+              <Button
+                size="sm"
+                variant="outline"
+                className="mt-2"
+                onClick={() => navigate(operationalFlow[4].path)}
+              >
+                {operationalFlow[4].action}
+              </Button>
+            </article>
             <p className="mt-2 text-xs text-[var(--text-secondary)]">Gargalo atual: Cobrança → Pagamento.</p>
           </AppSectionBlock>
 

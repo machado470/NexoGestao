@@ -6,7 +6,7 @@ import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
 import { useOperationalMemoryState } from "@/hooks/useOperationalMemory";
 import { CreateAppointmentModal } from "@/components/CreateAppointmentModal";
 import CreateServiceOrderModal from "@/components/CreateServiceOrderModal";
-import { AppRowActionsDropdown, AppSectionCard, AppTimeline, AppTimelineItem, AppToolbar } from "@/components/app-system";
+import { AppRowActionsDropdown, AppSectionCard, AppTimeline, AppTimelineItem } from "@/components/app-system";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedbackButton";
 import {
@@ -29,7 +29,7 @@ import {
   AppDataTable,
   AppPageEmptyState,
   AppPageErrorState,
-  AppPageHeader,
+  AppOperationalHeader,
   AppPageLoadingState,
   AppPageShell,
   appSelectionPillClasses,
@@ -602,47 +602,38 @@ export default function AppointmentsPage() {
   return (
     <PageWrapper title="Agenda operacional" subtitle="Confirme, execute e avance para O.S. sem sair da agenda.">
       <AppPageShell className="space-y-3">
-        <AppPageHeader
+        <AppOperationalHeader
           title="Agendamentos · controle do tempo operacional"
           description={`Hoje ${todayCount} · Não confirmados ${unconfirmedCount} · Conflitos ${conflictCount} · Atrasados ${delayedCount}.`}
-          cta={<ActionFeedbackButton state="idle" idleLabel={headerCta.label} onClick={headerCta.onClick} />}
-        />
-
-        <AppToolbar className="gap-2.5 px-3 py-2">
-          <div className="space-y-0.5">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">Período operacional</p>
-            <p className="text-xs font-medium text-[var(--text-primary)]">
-              {windowFilter === "today"
-                ? "Hoje"
-                : windowFilter === "tomorrow"
-                  ? "Amanhã"
-                  : windowFilter === "week"
-                    ? "Próximos 7 dias"
-                    : windowFilter === "overdue"
-                      ? "Atrasados"
-                      : "Todos"}
-              {" · "}
-              {dayStart.toLocaleDateString("pt-BR")} até{" "}
-              {weekEnd.toLocaleDateString("pt-BR")}
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-1.5">
+          primaryAction={<ActionFeedbackButton state="idle" idleLabel={headerCta.label} onClick={headerCta.onClick} />}
+          contextChips={
+            <>
+              <AppStatusBadge
+                label={`Período: ${
+                  windowFilter === "today"
+                    ? "Hoje"
+                    : windowFilter === "tomorrow"
+                      ? "Amanhã"
+                      : windowFilter === "week"
+                        ? "Próximos 7 dias"
+                        : windowFilter === "overdue"
+                          ? "Atrasados"
+                          : "Todos"
+                } · ${dayStart.toLocaleDateString("pt-BR")} até ${weekEnd.toLocaleDateString("pt-BR")}`}
+              />
+            
             <AppStatusBadge label={`${todayCount} hoje`} />
             <AppStatusBadge label={`${unconfirmedCount} não confirmados`} />
             <AppStatusBadge label={`${conflictCount} conflitos`} />
             <AppStatusBadge label={`${delayedCount} atrasados`} />
-          </div>
-          <div className="ml-auto">
-            <SecondaryButton type="button" className="h-8 px-3 text-xs" onClick={() => navigate("/service-orders")}>
-              Converter em O.S.
-            </SecondaryButton>
-          </div>
-        </AppToolbar>
-
+            </>
+          }
+        />
         <OperationalTopCard
-          contextLabel="Entrada da execução"
-          title="Agenda operacional do turno"
-          description="Confirmar, destravar conflito e converter em O.S. sem perder contexto."
+          className="hidden"
+          contextLabel="Direção operacional"
+          title="Agenda operacional consolidada"
+          description="Compatibilidade estrutural do sistema."
         />
 
         <AppSectionBlock
