@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import {
@@ -37,8 +37,9 @@ import {
   AppEmptyState,
   AppPageEmptyState,
   AppPageErrorState,
-  AppPageHeader,
   AppPageLoadingState,
+  AppNextActionCard,
+  AppOperationalHeader,
   AppPriorityBadge,
   AppSectionBlock,
   AppStatusBadge,
@@ -208,7 +209,6 @@ export default function WhatsAppPage() {
   const [selectedCustomerId, setSelectedCustomerId] = useOperationalMemoryState("nexo.whatsapp.selected-customer.v1", queryCustomerId || "");
   const [searchTerm, setSearchTerm] = useOperationalMemoryState("nexo.whatsapp.search.v1", "");
   const [activeFilter, setActiveFilter] = useOperationalMemoryState<ConversationFilter>("nexo.whatsapp.filter.v1", "all");
-  const [showContextPanel, setShowContextPanel] = useOperationalMemoryState("nexo.whatsapp.context-panel.v1", true);
   const [content, setContent] = useOperationalMemoryState("nexo.whatsapp.composer.v1", "");
 
   const selectedCustomer = customers.find(item => String(item?.id) === selectedCustomerId);
@@ -257,6 +257,13 @@ export default function WhatsAppPage() {
         const hasFailed = customerId === selectedCustomerId && selectedFailedCount > 0;
         const isAwaitingReply = noReplyDays >= 2;
         const isResolved = !hasFailed && !hasOverdueCharge && !hasServiceOrderRisk && !isAwaitingReply;
+        const workflowStatus = hasFailed
+          ? "falha"
+          : isAwaitingReply
+            ? "aguardando resposta"
+            : isResolved
+              ? "resolvido"
+              : "sem ação";
 
         const priorityScore =
           Number(hasFailed) * 7 +
@@ -290,6 +297,7 @@ export default function WhatsAppPage() {
           lastMessageAt: lastMessage?.createdAt ?? customer?.lastContactAt,
           lastStatus: lastMessage?._deliveryStatus ?? "unknown",
           contextType,
+          workflowStatus,
           severity,
           priorityScore,
           isAwaitingReply,
@@ -392,6 +400,12 @@ export default function WhatsAppPage() {
     return `Hoje · ${total} conversas monitoradas · ${pending} pendências · ${critical} críticas`;
   }, [conversations]);
 
+  const selectedNextActionSeverity = selectedConversation?.severity === "critical"
+    ? "critical"
+    : selectedConversation?.severity === "attention"
+      ? "high"
+      : "medium";
+
   usePageDiagnostics({
     page: "whatsapp",
     isLoading: customersQuery.isLoading,
@@ -459,11 +473,17 @@ export default function WhatsAppPage() {
 
   return (
     <AppPageShell>
-      <AppPageHeader
+      <AppOperationalHeader
         title="WhatsApp"
         description="Camada de execução da comunicação operacional: prioridade, contexto e ação em um único fluxo."
-        secondaryActions={<p className="text-xs text-[var(--text-muted)]">{conversationPeriodLabel}</p>}
-        cta={
+        contextChips={
+          <>
+            <AppStatusBadge label={conversationPeriodLabel} />
+            <AppStatusBadge label={`${conversations.filter(item => item.workflowStatus === "aguardando resposta").length} aguardando resposta`} />
+            <AppStatusBadge label={`${conversations.filter(item => item.workflowStatus === "falha").length} falha(s)`} />
+          </>
+        }
+        primaryAction={
           <Button
             type="button"
             onClick={() => setContent("Olá! Iniciando atendimento operacional contextual pelo Nexo.")}
@@ -473,7 +493,7 @@ export default function WhatsAppPage() {
         }
       />
 
-      <AppSectionBlock title="Alertas e prioridade" subtitle="Curto, acionável e orientado à execução." compact>
+      <AppSectionBlock title="Atenção imediata" subtitle="Curto, acionável e orientado à execução." compact>
         <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
           {communicationAlerts.map(alert => (
             <article
@@ -497,7 +517,25 @@ export default function WhatsAppPage() {
         </div>
       </AppSectionBlock>
 
-      <div className="grid min-h-[72vh] gap-4 xl:grid-cols-[340px_minmax(0,1fr)]">
+      <AppSectionBlock title="Próxima melhor ação" subtitle="Resposta recomendada para destravar comunicação e ciclo operacional." compact>
+        {selectedConversation ? (
+          <AppNextActionCard
+            title={selectedConversation.bestAction.title}
+            description={selectedConversation.bestAction.description}
+            severity={selectedNextActionSeverity}
+            metadata={selectedConversation.contextType}
+            automationStatus={selectedConversation.hasFailed ? "Automação alerta falha ativa" : "Automação pronta para follow-up e priorização"}
+            action={{
+              label: selectedConversation.bestAction.cta,
+              onClick: () => void sendMessage(selectedConversation.bestAction.description),
+            }}
+          />
+        ) : (
+          <p className="text-sm text-[var(--text-muted)]">Selecione uma conversa para recomendar a próxima execução.</p>
+        )}
+      </AppSectionBlock>
+
+      <div className="grid min-h-[72vh] gap-4 xl:grid-cols-[320px_minmax(0,1fr)_320px]">
         <AppSectionBlock title="Lista de conversas" subtitle="Inbox inteligente, priorizada por consequência operacional." className="h-full">
           <AppToolbar className="mb-3 items-center gap-2 px-3 py-2">
             <p className="text-xs text-[var(--text-muted)]">{filteredConversations.length} conversa(s) neste recorte</p>
@@ -579,17 +617,15 @@ export default function WhatsAppPage() {
                   </div>
 
                   <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <AppStatusBadge label={conversation.contextType} />
-                    <AppStatusBadge
-                      label={conversation.hasFailed ? "Falha de envio" : conversation.isAwaitingReply ? "Sem resposta" : "Em dia"}
-                    />
+                    <AppStatusBadge label={`Tipo: ${conversation.contextType}`} />
+                    <AppStatusBadge label={`Status: ${conversation.workflowStatus}`} />
                     {conversation.hasOverdueCharge ? <AppStatusBadge label="Cobrança ignorada" /> : null}
                     {conversation.hasScheduled ? <AppStatusBadge label="Confirmação pendente" /> : null}
                   </div>
 
                   <p className="mt-2 line-clamp-2 text-xs text-[var(--text-secondary)]">{conversation.snippet}</p>
                   <div className="mt-2 flex items-center justify-between gap-2">
-                    <p className="text-[11px] text-[var(--text-muted)]">Próxima ação: {conversation.bestAction.title}</p>
+                    <p className="text-[11px] text-[var(--text-muted)]">Tempo: {fmtTime(conversation.lastMessageAt)} · Prioridade: {riskLabel(conversation.severity)}</p>
                     <span className="text-[11px] font-medium text-[var(--text-secondary)]">{conversation.bestAction.cta}</span>
                   </div>
                 </button>
@@ -598,7 +634,7 @@ export default function WhatsAppPage() {
           </div>
         </AppSectionBlock>
 
-        <AppSectionCard className="space-y-3 p-0">
+        <AppSectionCard className="space-y-3 p-0 xl:col-span-1">
           <AppSectionBlock
             title="Área de conversa"
             subtitle="Menos chat, mais execução contextual com status de envio e CTA operacional."
@@ -627,11 +663,6 @@ export default function WhatsAppPage() {
                     <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Próxima melhor ação</p>
                     <p className="text-sm font-medium text-[var(--text-primary)]">{selectedConversation.bestAction.title}</p>
                     <p className="text-xs text-[var(--text-secondary)]">{selectedConversation.bestAction.description}</p>
-                  </div>
-                  <div className="mt-2 flex justify-end">
-                    <Button type="button" size="sm" variant="outline" onClick={() => setShowContextPanel(!showContextPanel)}>
-                      {showContextPanel ? "Ocultar contexto" : "Mostrar contexto"}
-                    </Button>
                   </div>
                 </header>
 
@@ -740,11 +771,10 @@ export default function WhatsAppPage() {
           </AppSectionBlock>
         </AppSectionCard>
 
-        {showContextPanel ? (
         <AppSectionBlock
           title="Contexto operacional"
           subtitle="Apoio da conversa com cliente, agenda, O.S., financeiro e timeline."
-          className="h-full xl:col-span-2"
+          className="h-full"
         >
           {!selectedConversation ? (
             <AppEmptyState
@@ -803,6 +833,9 @@ export default function WhatsAppPage() {
                   Vencimento mais próximo: {fmtDateTime(selectedConversation.overdueCharges[0]?.dueDate ?? selectedConversation.pendingCharges[0]?.dueDate)}
                 </p>
                 <div className="mt-2 flex flex-wrap gap-2">
+                  <Button type="button" size="sm" variant="outline" onClick={() => void sendMessage("Olá! Estou cuidando do seu atendimento agora e sigo no mesmo fio para resolver hoje.")}>Responder</Button>
+                  <Button type="button" size="sm" variant="outline" onClick={() => void sendMessage("Olá! Posso confirmar sua presença no agendamento para mantermos a execução no horário?")}>Confirmar</Button>
+                  <Button type="button" size="sm" variant="outline" onClick={() => void sendMessage("Olá! Temos pendência em aberto e posso te apoiar no pagamento agora por este link.")}>Cobrar</Button>
                   <Button type="button" size="sm" variant="outline" onClick={() => void sendMessage("Olá! Reforçando a pendência em aberto. Posso te apoiar com o pagamento agora?")}>Reenviar link</Button>
                   <Button type="button" size="sm" variant="outline" onClick={() => navigate("/finances")}>Abrir financeiro</Button>
                 </div>
@@ -838,8 +871,28 @@ export default function WhatsAppPage() {
             </div>
           )}
         </AppSectionBlock>
-        ) : null}
       </div>
+
+      <AppSectionBlock title="Automações operacionais" subtitle="Sugestão de resposta, follow-up, alerta de falha e priorização automática." compact>
+        <div className="grid gap-3 md:grid-cols-4">
+          <article className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)]/55 p-3">
+            <p className="text-xs font-semibold text-[var(--text-primary)]">Sugestão de resposta</p>
+            <p className="mt-1 text-xs text-[var(--text-secondary)]">Templates orientados por contexto de agenda, O.S. e financeiro.</p>
+          </article>
+          <article className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)]/55 p-3">
+            <p className="text-xs font-semibold text-[var(--text-primary)]">Follow-up automático</p>
+            <p className="mt-1 text-xs text-[var(--text-secondary)]">Conversas sem retorno entram em fila priorizada após 48h.</p>
+          </article>
+          <article className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)]/55 p-3">
+            <p className="text-xs font-semibold text-[var(--text-primary)]">Alerta de falha</p>
+            <p className="mt-1 text-xs text-[var(--text-secondary)]">Falhas de entrega sobem para atenção imediata com retry direto.</p>
+          </article>
+          <article className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)]/55 p-3">
+            <p className="text-xs font-semibold text-[var(--text-primary)]">Priorização automática</p>
+            <p className="mt-1 text-xs text-[var(--text-secondary)]">Fila ordenada por risco combinado de resposta, execução e caixa.</p>
+          </article>
+        </div>
+      </AppSectionBlock>
 
       <div className="grid gap-3 md:grid-cols-4">
         <Button type="button" variant="outline" onClick={() => setActiveFilter("all")} className="justify-start">
