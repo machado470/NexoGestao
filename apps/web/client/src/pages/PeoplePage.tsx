@@ -1,9 +1,7 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useLocation } from "wouter";
 import { AlertTriangle, ArrowRight } from "lucide-react";
 import { Button } from "@/components/design-system";
-import CreatePersonModal from "@/components/CreatePersonModal";
-import EditPersonModal from "@/components/EditPersonModal";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import { AppRowActionsDropdown, AppStatCard, AppTimeline, AppTimelineItem } from "@/components/app-system";
@@ -93,8 +91,6 @@ export default function PeoplePage() {
   const [, navigate] = useLocation();
   const { isAuthenticated, isInitializing } = useAuth();
 
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [editingPersonId, setEditingPersonId] = useState<string | null>(null);
   const [selectedPersonId, setSelectedPersonId] = useOperationalMemoryState<string | null>("nexo.people.selected-person.v1", null);
 
   const [periodFilter, setPeriodFilter] = useOperationalMemoryState<"today" | "7d" | "30d">("nexo.people.period-filter.v1", "7d");
@@ -104,6 +100,7 @@ export default function PeoplePage() {
   const [delayFilter, setDelayFilter] = useOperationalMemoryState<"all" | "com-atraso">("nexo.people.delay-filter.v1", "all");
   const [riskFilter, setRiskFilter] = useOperationalMemoryState<"all" | "alto-risco">("nexo.people.risk-filter.v1", "all");
   const [searchValue, setSearchValue] = useOperationalMemoryState("nexo.people.search-filter.v1", "");
+  const [workStateFilter, setWorkStateFilter] = useOperationalMemoryState<"all" | "sobrecarregado" | "parado">("nexo.people.work-state-filter.v1", "all");
 
   const canLoadPeople = isAuthenticated;
 
@@ -252,10 +249,12 @@ export default function PeoplePage() {
       if (loadFilter === "baixa" && row.workload >= 4) return false;
       if (delayFilter === "com-atraso" && row.delays === 0) return false;
       if (riskFilter === "alto-risco" && row.riskLevel !== "alto") return false;
+      if (workStateFilter === "sobrecarregado" && row.workload < 8) return false;
+      if (workStateFilter === "parado" && !row.isInactive) return false;
       if (!query) return true;
       return [row.name, row.email].join(" ").toLowerCase().includes(query);
     });
-  }, [delayFilter, loadFilter, riskFilter, roleFilter, rows, searchValue, statusFilter]);
+  }, [delayFilter, loadFilter, riskFilter, roleFilter, rows, searchValue, statusFilter, workStateFilter]);
 
   const sortedByPriority = useMemo(
     () => [...filteredRows].sort((a, b) => (b.riskLevel === "alto" ? 3 : b.riskLevel === "medio" ? 2 : 1) - (a.riskLevel === "alto" ? 3 : a.riskLevel === "medio" ? 2 : 1) || b.workload - a.workload),
@@ -277,7 +276,8 @@ export default function PeoplePage() {
       ? `${rows.filter(row => row.pendingServiceOrders > 0).length}/${rows.length} pessoas com responsabilidade ativa`
       : "Sem pessoas ativas";
 
-    return { active, overloaded, delayed, unassignedOrders, riskHigh, responsibility };
+    const idle = rows.filter(row => row.isInactive).length;
+    return { active, overloaded, delayed, unassignedOrders, riskHigh, responsibility, idle };
   }, [rows, serviceOrders]);
 
   const teamAlerts = useMemo(() => {
@@ -336,6 +336,47 @@ export default function PeoplePage() {
 
     return alerts.slice(0, 5);
   }, [rows, teamSummary.delayed, teamSummary.overloaded, teamSummary.unassignedOrders]);
+
+  const nextBestAction = useMemo(() => {
+    if (teamSummary.unassignedOrders > 0) {
+      return {
+        label: "Assumir tarefas sem dono",
+        detail: `${teamSummary.unassignedOrders} O.S. estão sem responsável definido.`,
+        actionLabel: "Distribuir agora",
+        actionPath: "/service-orders?responsible=unassigned",
+      };
+    }
+    if (teamSummary.overloaded > 0) {
+      return {
+        label: "Redistribuir carga crítica",
+        detail: `${teamSummary.overloaded} pessoa(s) estão sobrecarregadas.`,
+        actionLabel: "Balancear equipe",
+        actionPath: "/governance?focus=workload",
+      };
+    }
+    if (teamSummary.delayed > 0) {
+      return {
+        label: "Atacar atrasos ativos",
+        detail: `${teamSummary.delayed} pessoa(s) com atraso no período atual.`,
+        actionLabel: "Ver atrasos",
+        actionPath: "/timeline?module=service_order&severity=high",
+      };
+    }
+    if (teamSummary.idle > 0) {
+      return {
+        label: "Reengajar pessoas paradas",
+        detail: `${teamSummary.idle} pessoa(s) sem atividade recente.`,
+        actionLabel: "Abrir agenda",
+        actionPath: "/appointments",
+      };
+    }
+    return {
+      label: "Operação estável",
+      detail: "Sem intervenção imediata. Continue monitorando execução.",
+      actionLabel: "Atualizar leitura",
+      actionPath: "",
+    };
+  }, [teamSummary.delayed, teamSummary.idle, teamSummary.overloaded, teamSummary.unassignedOrders]);
 
   const personTimeline = useMemo(() => {
     if (!selectedPerson) return [];
@@ -421,20 +462,20 @@ export default function PeoplePage() {
       <AppPageShell>
         <AppOperationalHeader
         title="Pessoas"
-        description={`Responsabilidade operacional visível por pessoa e equipe · Período: ${periodFilter === "today" ? "Hoje" : periodFilter === "7d" ? "Últimos 7 dias" : "Últimos 30 dias"} · ${rows.length} pessoas no radar`}
+        description={`Controle operacional da equipe por execução real · Período: ${periodFilter === "today" ? "Hoje" : periodFilter === "7d" ? "Últimos 7 dias" : "Últimos 30 dias"} · ${rows.length} pessoas no radar`}
         secondaryActions={
           <>
             <Button type="button" variant="outline" onClick={() => navigate("/governance?focus=people")}>Governança</Button>
             <Button type="button" variant="outline" onClick={() => navigate("/timeline?module=service_order")}>Ver timeline operacional</Button>
           </>
         }
-        primaryAction={<Button type="button" onClick={() => setIsCreateOpen(true)}>Nova pessoa</Button>}
+        primaryAction={<Button type="button" onClick={() => navigate("/service-orders?status=open&source=people")}>Intervir na execução</Button>}
         contextChips={
           <>
             <AppStatusBadge label={`${teamSummary.active} pessoas ativas`} />
             <AppStatusBadge label={`${teamSummary.overloaded} com sobrecarga`} />
+            <AppStatusBadge label={`${teamSummary.idle} sem atividade`} />
             <AppStatusBadge label={`Risco alto: ${teamSummary.riskHigh}`} />
-            <AppStatusBadge label={teamAlerts[0]?.label ?? "Equipe operacional em monitoramento"} />
           </>
         }
         children={<div className="flex flex-wrap items-center gap-2">
@@ -449,7 +490,7 @@ export default function PeoplePage() {
           </select>
           <Button type="button" variant="outline" size="sm" onClick={() => navigate("/service-orders?status=open")}>Intervir em O.S.</Button>
           <Button type="button" variant="outline" size="sm" onClick={() => navigate("/appointments")}>Abrir agenda</Button>
-          <Button type="button" size="sm" onClick={() => navigate(teamAlerts[0]?.actionPath ?? "/service-orders")}>{teamAlerts[0]?.actionLabel ?? "Abrir O.S."}</Button>
+          <Button type="button" size="sm" onClick={() => nextBestAction.actionPath ? navigate(nextBestAction.actionPath) : refetchAll()}>{nextBestAction.actionLabel}</Button>
           <Button type="button" variant="outline" size="sm" onClick={refetchAll}>Atualizar leitura</Button>
         </div>}
       />
@@ -469,19 +510,8 @@ export default function PeoplePage() {
             />
           ) : (
             <>
-              <AppSectionBlock title="1) Visão de equipe · leitura executiva" subtitle="Saúde do time em segundos: sobrecarga, falhas, distribuição e próxima ação.">
-                <div className="grid gap-3 xl:grid-cols-5">
-                  <AppStatCard label="Equipe ativa" value={`${teamSummary.active}`} helper="Pessoas em execução operacional." />
-                  <AppStatCard label="Sobrecarga" value={`${teamSummary.overloaded}`} helper="Colaboradores com carga acima do limite." />
-                  <AppStatCard label="Atraso/Falha" value={`${teamSummary.delayed}`} helper="Pessoas com atraso recorrente no período." />
-                  <AppStatCard label="Responsabilidade" value={teamSummary.responsibility} helper="Distribuição atual de donos da execução." />
-                  <AppStatCard
-                    label="Próxima ação"
-                    value={teamAlerts[0]?.label ?? "Operação estável"}
-                    helper={teamAlerts[0]?.detail ?? "Sem intervenção urgente no momento."}
-                  />
-                </div>
-                <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-5">
+              <AppSectionBlock title="2) Atenção imediata" subtitle="Onde a operação está quebrando agora: sobrecarga, atraso, inatividade e tarefas sem dono.">
+                <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
                   {teamAlerts.length > 0 ? teamAlerts.map(alert => (
                     <button
                       key={alert.id}
@@ -506,7 +536,29 @@ export default function PeoplePage() {
                 </div>
               </AppSectionBlock>
 
-              <AppSectionBlock title="2) Lista operacional de pessoas" subtitle="Quem faz o quê, quem está travando e onde agir sem abrir detalhe.">
+              <AppSectionBlock title="3) Próxima melhor ação" subtitle="Um passo operacional direto para destravar a execução agora.">
+                <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4">
+                  <p className="text-base font-semibold text-[var(--text-primary)]">{nextBestAction.label}</p>
+                  <p className="mt-1 text-sm text-[var(--text-secondary)]">{nextBestAction.detail}</p>
+                  <div className="mt-3">
+                    <Button type="button" size="sm" onClick={() => nextBestAction.actionPath ? navigate(nextBestAction.actionPath) : refetchAll()}>
+                      {nextBestAction.actionLabel}
+                    </Button>
+                  </div>
+                </div>
+              </AppSectionBlock>
+
+              <AppSectionBlock title="4) KPIs de equipe" subtitle="Leitura rápida de responsabilidade, desempenho e distribuição de trabalho.">
+                <div className="grid gap-3 xl:grid-cols-5">
+                  <AppStatCard label="Equipe ativa" value={`${teamSummary.active}`} helper="Pessoas em execução operacional." />
+                  <AppStatCard label="Parados" value={`${teamSummary.idle}`} helper="Pessoas sem atividade no período." />
+                  <AppStatCard label="Sobrecarga" value={`${teamSummary.overloaded}`} helper="Colaboradores com carga acima do limite." />
+                  <AppStatCard label="Atraso/Falha" value={`${teamSummary.delayed}`} helper="Pessoas com atraso recorrente no período." />
+                  <AppStatCard label="Responsabilidade" value={teamSummary.responsibility} helper="Distribuição atual de donos da execução." />
+                </div>
+              </AppSectionBlock>
+
+              <AppSectionBlock title="5) Filtros" subtitle="Refine para identificar rápido quem está sobrecarregado, parado ou com atraso.">
                 <div className="mb-3 grid gap-2 md:grid-cols-3 xl:grid-cols-7">
                   <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as typeof statusFilter)} className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm">
                     <option value="all">Status: todos</option>
@@ -534,6 +586,11 @@ export default function PeoplePage() {
                     <option value="all">Risco: todos</option>
                     <option value="alto-risco">Alto risco</option>
                   </select>
+                  <select value={workStateFilter} onChange={e => setWorkStateFilter(e.target.value as typeof workStateFilter)} className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm">
+                    <option value="all">Execução: todos</option>
+                    <option value="sobrecarregado">Sobrecarregados</option>
+                    <option value="parado">Parados</option>
+                  </select>
                   <input
                     value={searchValue}
                     onChange={event => setSearchValue(event.target.value)}
@@ -546,10 +603,13 @@ export default function PeoplePage() {
                     setLoadFilter("all");
                     setDelayFilter("all");
                     setRiskFilter("all");
+                    setWorkStateFilter("all");
                     setSearchValue("");
                   }}>Limpar filtros</Button>
                 </div>
+              </AppSectionBlock>
 
+              <AppSectionBlock title="6) Lista de pessoas" subtitle="Quem está fazendo o quê, como está performando e onde agir em um clique.">
                 {sortedByPriority.length === 0 ? (
                   <AppPageEmptyState
                     title="Nenhuma pessoa encontrada"
@@ -561,12 +621,12 @@ export default function PeoplePage() {
                       <thead>
                         <tr className="border-b border-[var(--border-subtle)] text-left text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">
                           <th className="px-3 py-2">Pessoa</th>
-                          <th className="px-3 py-2">Função / status</th>
-                          <th className="px-3 py-2">Carga atual</th>
-                          <th className="px-3 py-2">Atraso / risco</th>
-                          <th className="px-3 py-2">Última atividade</th>
-                          <th className="px-3 py-2">Responsabilidade</th>
-                          <th className="px-3 py-2">Ação</th>
+                          <th className="px-3 py-2">Função</th>
+                          <th className="px-3 py-2">Status</th>
+                          <th className="px-3 py-2">Tarefas</th>
+                          <th className="px-3 py-2">Atrasos</th>
+                          <th className="px-3 py-2">Carga</th>
+                          <th className="px-3 py-2">Ações</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -578,28 +638,30 @@ export default function PeoplePage() {
                             </td>
                             <td className="px-3 py-2">
                               <p className="text-sm text-[var(--text-secondary)]">{row.roleLabel}</p>
+                            </td>
+                            <td className="px-3 py-2">
                               <AppStatusBadge label={row.statusLabel} />
                             </td>
                             <td className="px-3 py-2 text-[var(--text-secondary)]">
-                              <p>{row.workload} itens ativos</p>
-                              <p className="text-xs text-[var(--text-muted)]">{row.pendingServiceOrders} O.S. pendentes · {row.appointmentsToday} agendamentos hoje</p>
+                              <p>{row.pendingServiceOrders} O.S. pendentes</p>
+                              <p className="text-xs text-[var(--text-muted)]">{row.appointmentsToday} agenda(s) hoje</p>
                             </td>
                             <td className="px-3 py-2">
                               <p className="text-sm text-[var(--text-secondary)]">{row.delays} atraso(s)</p>
-                              <AppStatusBadge label={`Risco ${row.riskLevel}`} />
                             </td>
-                            <td className="px-3 py-2 text-xs text-[var(--text-secondary)]">{row.lastActivityLabel}</td>
-                            <td className="px-3 py-2 text-xs text-[var(--text-secondary)]">{row.governanceSummary}</td>
+                            <td className="px-3 py-2">
+                              <p className="text-sm text-[var(--text-secondary)]">{row.workload} itens</p>
+                              <p className="text-xs text-[var(--text-muted)]">{row.performanceLabel}</p>
+                            </td>
                             <td className="px-3 py-2">
                               <div className="flex items-center gap-2">
-                                <Button type="button" size="sm" variant="outline" onClick={() => setSelectedPersonId(row.id)}>Ver detalhe</Button>
+                                <Button type="button" size="sm" variant="outline" onClick={() => navigate(`/service-orders?personId=${row.id}&source=people`)}>Ver tarefas</Button>
                                 <AppRowActionsDropdown
                                   triggerLabel={`Ações para ${row.name}`}
                                   items={[
                                     { label: "Atribuir tarefa", onSelect: () => navigate(`/service-orders?assignTo=${row.id}&source=people`) },
-                                    { label: "Alterar status", onSelect: () => setEditingPersonId(row.id) },
-                                    { label: "Ajustar permissão", onSelect: () => navigate(`/governance?personId=${row.id}&source=people`) },
-                                    { label: "Ver timeline", onSelect: () => navigate(`/timeline?personId=${row.id}&source=people`) },
+                                    { label: "Mensagem", onSelect: () => navigate(`/timeline?personId=${row.id}&source=people&action=message`) },
+                                    { label: "Ver detalhe", onSelect: () => setSelectedPersonId(row.id) },
                                   ]}
                                 />
                               </div>
@@ -612,7 +674,7 @@ export default function PeoplePage() {
                 )}
               </AppSectionBlock>
 
-              <AppSectionBlock title="3) Detalhe da pessoa" subtitle="Execução, desempenho, impacto financeiro e intervenção direta por responsável.">
+              <AppSectionBlock title="7) Detalhe" subtitle="Responsável selecionado com execução, desempenho e intervenção imediata.">
                 {selectedPerson ? (
                   <div className="grid gap-3 xl:grid-cols-12">
                     <div className="space-y-3 xl:col-span-4">
@@ -666,7 +728,7 @@ export default function PeoplePage() {
                         <p className="mt-2 text-xs text-[var(--text-secondary)]">Função: {selectedPerson.roleLabel}</p>
                         <p className="text-xs text-[var(--text-secondary)]">Estado de acesso: {selectedPerson.statusLabel}</p>
                         <div className="mt-2 flex flex-wrap gap-2">
-                          <Button type="button" size="sm" variant="outline" onClick={() => setEditingPersonId(selectedPerson.id)}>Ajustar permissão</Button>
+                          <Button type="button" size="sm" variant="outline" onClick={() => navigate(`/governance?personId=${selectedPerson.id}&source=people`)}>Ajustar permissão</Button>
                           <Button type="button" size="sm" variant="outline" onClick={() => navigate(`/governance?personId=${selectedPerson.id}`)}>Ver risco</Button>
                         </div>
                       </div>
@@ -723,24 +785,6 @@ export default function PeoplePage() {
         </>
       ) : null}
 
-      <CreatePersonModal
-        open={isCreateOpen}
-        onClose={() => setIsCreateOpen(false)}
-        onSaved={() => {
-          setIsCreateOpen(false);
-          refetchAll();
-        }}
-      />
-
-      <EditPersonModal
-        open={Boolean(editingPersonId)}
-        personId={editingPersonId}
-        onClose={() => setEditingPersonId(null)}
-        onSaved={() => {
-          setEditingPersonId(null);
-          refetchAll();
-        }}
-      />
       </AppPageShell>
     </PageWrapper>
   );
