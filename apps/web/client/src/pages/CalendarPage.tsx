@@ -4,20 +4,20 @@ import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import FullCalendar from "@fullcalendar/react";
 import timeGridPlugin from "@fullcalendar/timegrid";
-import { Plus } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock3, MessageSquare, Plus, RefreshCcw } from "lucide-react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/design-system";
 import { AppToolbar, AppTimeline, AppTimelineItem } from "@/components/app-system";
 import { CreateAppointmentModal } from "@/components/CreateAppointmentModal";
 import {
+  AppOperationalHeader,
   AppPageEmptyState,
   AppPageErrorState,
-  AppPageHeader,
   AppPageLoadingState,
   AppPageShell,
   AppSectionBlock,
-  AppStatusBadge,
   AppPriorityBadge,
+  AppStatusBadge,
 } from "@/components/internal-page-system";
 import { trpc } from "@/lib/trpc";
 import { normalizeArrayPayload } from "@/lib/query-helpers";
@@ -75,6 +75,7 @@ export default function CalendarPage() {
   const appointmentsQuery = trpc.nexo.appointments.list.useQuery(undefined, { retry: false });
   const customersQuery = trpc.nexo.customers.list.useQuery(undefined, { retry: false });
   const peopleQuery = trpc.people.list.useQuery(undefined, { retry: false });
+  const updateAppointment = trpc.nexo.appointments.update.useMutation();
 
   const appointments = useMemo(
     () => normalizeArrayPayload<Appointment>(appointmentsQuery.data),
@@ -86,22 +87,6 @@ export default function CalendarPage() {
   );
   const people = useMemo(() => normalizeArrayPayload<any>(peopleQuery.data), [peopleQuery.data]);
 
-  const events = useMemo<EventInput[]>(() => {
-    return appointments.map(item => ({
-      id: item.id,
-      title: `${item.customer?.name ?? "Cliente"} · ${item.title ?? "Serviço"}`,
-      start: item.startsAt,
-      end: item.endsAt ?? undefined,
-      backgroundColor: STATUS_COLOR[item.status],
-      borderColor: STATUS_COLOR[item.status],
-      extendedProps: {
-        status: item.status,
-        customerName: item.customer?.name ?? "Cliente",
-        serviceName: item.title ?? "Serviço",
-      },
-    }));
-  }, [appointments]);
-
   const filteredAppointments = useMemo(() => {
     return appointments.filter(item => {
       const teamOk = teamFilter === "all" || String(item.assignedToPersonId ?? "") === teamFilter;
@@ -112,37 +97,127 @@ export default function CalendarPage() {
     });
   }, [appointments, customerFilter, serviceFilter, statusFilter, teamFilter]);
 
+  const now = Date.now();
+
+  const conflictIds = useMemo(() => {
+    const byOwner = new Map<string, Appointment[]>();
+    filteredAppointments.forEach(item => {
+      const ownerKey = String(item.assignedToPersonId ?? "unassigned");
+      const group = byOwner.get(ownerKey) ?? [];
+      group.push(item);
+      byOwner.set(ownerKey, group);
+    });
+
+    const ids = new Set<string>();
+    byOwner.forEach(group => {
+      const sorted = [...group].sort(
+        (a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()
+      );
+      for (let index = 1; index < sorted.length; index++) {
+        const previous = sorted[index - 1];
+        const current = sorted[index];
+        const previousEnd = new Date(previous.endsAt ?? previous.startsAt).getTime();
+        const currentStart = new Date(current.startsAt).getTime();
+        if (currentStart < previousEnd) {
+          ids.add(previous.id);
+          ids.add(current.id);
+        }
+      }
+    });
+    return ids;
+  }, [filteredAppointments]);
+
+  const delayedIds = useMemo(() => {
+    return new Set(
+      filteredAppointments
+        .filter(item => {
+          const status = String(item.status).toUpperCase();
+          return new Date(item.startsAt).getTime() < now && ["SCHEDULED", "CONFIRMED"].includes(status);
+        })
+        .map(item => item.id)
+    );
+  }, [filteredAppointments, now]);
+
+  const events = useMemo<EventInput[]>(() => {
+    return filteredAppointments.map(item => {
+      const hasConflict = conflictIds.has(item.id);
+      const isDelayed = delayedIds.has(item.id);
+      const signal = hasConflict ? "Conflito" : isDelayed ? "Atraso" : STATUS_LABEL[item.status];
+      return {
+        id: item.id,
+        title: `${item.customer?.name ?? "Cliente"} • ${item.title ?? "Serviço"}`,
+        start: item.startsAt,
+        end: item.endsAt ?? undefined,
+        backgroundColor: hasConflict ? "#ef4444" : isDelayed ? "#ea580c" : STATUS_COLOR[item.status],
+        borderColor: hasConflict ? "#b91c1c" : isDelayed ? "#c2410c" : STATUS_COLOR[item.status],
+        textColor: "#ffffff",
+        extendedProps: {
+          status: item.status,
+          customerName: item.customer?.name ?? "Cliente",
+          serviceName: item.title ?? "Serviço",
+          signal,
+          timeLabel: new Date(item.startsAt).toLocaleTimeString("pt-BR", {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+        },
+      };
+    });
+  }, [filteredAppointments, conflictIds, delayedIds]);
+
   const selected = filteredAppointments.find(item => item.id === selectedId) ?? null;
 
   const executiveRead = useMemo(() => {
-    const now = Date.now();
     const oneHour = 60 * 60 * 1000;
-    const conflictByPerson = new Map<string, number>();
-    const sorted = [...filteredAppointments].sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
-
-    for (let i = 1; i < sorted.length; i++) {
-      const current = sorted[i];
-      const previous = sorted[i - 1];
-      const sameAssignee = String(current.assignedToPersonId ?? "") && current.assignedToPersonId === previous.assignedToPersonId;
-      if (!sameAssignee) continue;
-      const currentStart = new Date(current.startsAt).getTime();
-      const previousEnd = new Date(previous.endsAt ?? previous.startsAt).getTime();
-      if (currentStart < previousEnd) {
-        const key = String(current.assignedToPersonId);
-        conflictByPerson.set(key, (conflictByPerson.get(key) ?? 0) + 1);
-      }
-    }
-
-    const conflicts = [...conflictByPerson.values()].reduce((acc, value) => acc + value, 0);
+    const conflicts = conflictIds.size;
     const overload = filteredAppointments.filter(item => {
       const start = new Date(item.startsAt).getTime();
       return start - now <= oneHour && start - now > 0;
     }).length;
-    const canceled = filteredAppointments.filter(item => item.status === "CANCELED").length;
+    const confirmed = filteredAppointments.filter(item => item.status === "CONFIRMED").length;
+    const inProgress = 0;
     const possibleFits = Math.max(0, 12 - filteredAppointments.length);
 
-    return { conflicts, overload, canceled, possibleFits };
-  }, [filteredAppointments]);
+    return { conflicts, overload, confirmed, inProgress, possibleFits };
+  }, [filteredAppointments, conflictIds, now]);
+
+  const immediateAttention = useMemo(() => {
+    return filteredAppointments
+      .map(item => {
+        const hasConflict = conflictIds.has(item.id);
+        const isDelayed = delayedIds.has(item.id);
+        if (!hasConflict && !isDelayed) return null;
+        return {
+          item,
+          tone: hasConflict ? "critical" : "warning",
+          label: hasConflict ? "Conflito de horário" : "Atraso operacional",
+        };
+      })
+      .filter(Boolean)
+      .slice(0, 4) as Array<{ item: Appointment; tone: "critical" | "warning"; label: string }>;
+  }, [filteredAppointments, conflictIds, delayedIds]);
+
+  const nextBestAction = useMemo(() => {
+    const dueToConfirm = filteredAppointments.find(item => item.status === "SCHEDULED");
+    if (dueToConfirm) {
+      return {
+        title: "Confirmar agendamento pendente",
+        description: `${dueToConfirm.customer?.name ?? "Cliente"} às ${new Date(dueToConfirm.startsAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`,
+        appointmentId: dueToConfirm.id,
+        intent: "confirm" as const,
+      };
+    }
+    const delayed = filteredAppointments.find(item => delayedIds.has(item.id));
+    if (delayed) {
+      return {
+        title: "Remarcar atendimento atrasado",
+        description: `${delayed.customer?.name ?? "Cliente"} em atraso desde ${new Date(delayed.startsAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`,
+        appointmentId: delayed.id,
+        intent: "reschedule" as const,
+      };
+    }
+    return null;
+  }, [filteredAppointments, delayedIds]);
 
   const isLoading = appointmentsQuery.isLoading || customersQuery.isLoading || peopleQuery.isLoading;
   const hasError = appointmentsQuery.isError || customersQuery.isError || peopleQuery.isError;
@@ -151,19 +226,52 @@ export default function CalendarPage() {
     void Promise.all([appointmentsQuery.refetch(), customersQuery.refetch(), peopleQuery.refetch()]);
   };
 
+  const handleConfirm = async (appointmentId: string) => {
+    await updateAppointment.mutateAsync({ id: appointmentId, status: "CONFIRMED" });
+    refetchAll();
+  };
+
   return (
     <AppPageShell>
-      <AppPageHeader
-        title="Calendário"
-        description="Visão estratégica de distribuição do tempo, conflitos, vazios e sobrecarga operacional."
-        cta={
+      <AppOperationalHeader
+        title="Calendário operacional"
+        description="Leitura rápida da distribuição do tempo para enxergar conflito, atraso e capacidade sem virar tela de execução."
+        primaryAction={
           <Button type="button" onClick={() => setShowCreateModal(true)}>
             <Plus className="mr-1.5 h-4 w-4" /> Novo agendamento
           </Button>
         }
-      />
+        secondaryActions={<Button variant="outline" size="sm" onClick={refetchAll}>Atualizar leitura</Button>}
+        contextChips={
+          <>
+            <AppStatusBadge label={`${executiveRead.conflicts} conflitos`} />
+            <AppStatusBadge label={`${executiveRead.overload} próximos (1h)`} />
+            <AppPriorityBadge label={executiveRead.inProgress > 0 ? `${executiveRead.inProgress} em andamento` : "Sem execução ativa"} />
+          </>
+        }
+      >
+        {nextBestAction ? (
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-sm font-semibold text-[var(--text-primary)]">Próxima melhor ação: {nextBestAction.title}</p>
+              <p className="text-xs text-[var(--text-secondary)]">{nextBestAction.description}</p>
+            </div>
+            {nextBestAction.intent === "confirm" ? (
+              <Button size="sm" onClick={() => void handleConfirm(nextBestAction.appointmentId)}>
+                Confirmar sem sair
+              </Button>
+            ) : (
+              <Button size="sm" variant="outline" onClick={() => navigate(`/appointments?id=${nextBestAction.appointmentId}&action=reschedule&source=calendar`)}>
+                Remarcar no fluxo
+              </Button>
+            )}
+          </div>
+        ) : (
+          <p className="text-sm text-[var(--text-secondary)]">Sem ação crítica imediata. Calendário saudável para o recorte selecionado.</p>
+        )}
+      </AppOperationalHeader>
 
-      <AppToolbar>
+      <AppToolbar className="mt-4">
         <div className="flex flex-wrap items-center gap-2">
           <select className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm" value={viewMode} onChange={event => setViewMode(event.target.value as ViewMode)}>
             <option value="timeGridDay">Dia</option>
@@ -192,7 +300,6 @@ export default function CalendarPage() {
             {customers.map(customer => <option key={customer.id} value={customer.id}>{customer.name}</option>)}
           </select>
         </div>
-        <Button variant="outline" size="sm" onClick={refetchAll}>Atualizar leitura</Button>
       </AppToolbar>
 
       {isLoading ? <AppPageLoadingState description="Consolidando leitura macro do tempo da operação..." /> : null}
@@ -204,24 +311,58 @@ export default function CalendarPage() {
             <AppPageEmptyState title="Sem eventos para este recorte" description="Ajuste filtros ou crie um novo agendamento para preencher vazios operacionais." />
           ) : (
             <>
-              <AppSectionBlock title="1) Leitura executiva do tempo" subtitle="Onde estão conflitos, sobrecarga e janelas de encaixe para reorganizar o dia.">
+              <AppSectionBlock title="1) Atenção imediata" subtitle="Sinais operacionais que pedem decisão agora.">
+                {immediateAttention.length > 0 ? (
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {immediateAttention.map(({ item, tone, label }) => (
+                      <div key={item.id} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-semibold text-[var(--text-primary)]">{item.customer?.name ?? "Cliente"}</p>
+                          <AppStatusBadge label={label} />
+                        </div>
+                        <p className="mt-1 text-xs text-[var(--text-secondary)]">{item.title ?? "Serviço não informado"} · {new Date(item.startsAt).toLocaleString("pt-BR")}</p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <Button size="sm" variant="outline" onClick={() => void handleConfirm(item.id)}>Confirmar</Button>
+                          <Button size="sm" variant="outline" onClick={() => navigate(`/appointments?id=${item.id}&action=reschedule&source=calendar`)}>Remarcar</Button>
+                        </div>
+                        <div className="mt-2 flex items-center gap-1 text-xs text-[var(--text-muted)]">
+                          {tone === "critical" ? <AlertTriangle className="h-3.5 w-3.5 text-red-500" /> : <Clock3 className="h-3.5 w-3.5 text-amber-500" />}
+                          <span>{tone === "critical" ? "Conflito visível para a equipe." : "Atraso detectado no horário planejado."}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <AppPageEmptyState title="Sem pontos críticos" description="Nenhum conflito ou atraso no recorte atual do calendário." />
+                )}
+              </AppSectionBlock>
+
+              <AppSectionBlock title="2) KPIs leves" subtitle="Pulso rápido da distribuição de carga.">
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                   <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3"><p className="text-xs text-[var(--text-muted)]">Conflitos detectados</p><p className="text-lg font-semibold text-[var(--text-primary)]">{executiveRead.conflicts}</p></div>
                   <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3"><p className="text-xs text-[var(--text-muted)]">Sobrecarga próxima (1h)</p><p className="text-lg font-semibold text-[var(--text-primary)]">{executiveRead.overload}</p></div>
-                  <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3"><p className="text-xs text-[var(--text-muted)]">Buracos por cancelamento</p><p className="text-lg font-semibold text-[var(--text-primary)]">{executiveRead.canceled}</p></div>
-                  <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3"><p className="text-xs text-[var(--text-muted)]">Encaixes possíveis</p><p className="text-lg font-semibold text-[var(--text-primary)]">{executiveRead.possibleFits}</p></div>
+                  <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3"><p className="text-xs text-[var(--text-muted)]">Confirmados</p><p className="text-lg font-semibold text-[var(--text-primary)]">{executiveRead.confirmed}</p></div>
+                  <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3"><p className="text-xs text-[var(--text-muted)]">Capacidade de encaixe</p><p className="text-lg font-semibold text-[var(--text-primary)]">{executiveRead.possibleFits}</p></div>
                 </div>
               </AppSectionBlock>
 
               <div className="grid gap-4 xl:grid-cols-12">
-                <AppSectionBlock title="2) Grade principal" subtitle="Semana é o modo de trabalho padrão. Dia e mês para leitura complementar." className="xl:col-span-8">
+                <AppSectionBlock title="3) Calendário visual" subtitle="Grade de leitura com evento legível: cliente, horário, serviço e status." className="xl:col-span-8">
                   <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-2">
                     <FullCalendar
                       plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
                       initialView={viewMode}
+                      viewDidMount={view => setViewMode(view.view.type as ViewMode)}
                       headerToolbar={false}
-                      events={events.filter(event => filteredAppointments.some(item => item.id === event.id))}
+                      events={events}
                       eventClick={(arg: EventClickArg) => setSelectedId(arg.event.id)}
+                      eventContent={(eventInfo) => (
+                        <div className="space-y-0.5 p-0.5 text-[11px] leading-tight">
+                          <p className="truncate font-semibold">{eventInfo.event.extendedProps.timeLabel} · {eventInfo.event.extendedProps.customerName}</p>
+                          <p className="truncate">{eventInfo.event.extendedProps.serviceName}</p>
+                          <p className="truncate opacity-90">{eventInfo.event.extendedProps.signal}</p>
+                        </div>
+                      )}
                       height={640}
                       editable={false}
                       locale="pt-br"
@@ -230,7 +371,7 @@ export default function CalendarPage() {
                   </div>
                 </AppSectionBlock>
 
-                <AppSectionBlock title="3) Contexto do evento" subtitle="Detalhe operacional do item selecionado para agir sem perder tempo." className="xl:col-span-4">
+                <AppSectionBlock title="4) Ação sem troca de tela" subtitle="Contexto mínimo para decidir e acionar rápido." className="xl:col-span-4">
                   {selected ? (
                     <div className="space-y-3">
                       <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3">
@@ -240,23 +381,32 @@ export default function CalendarPage() {
                         <div className="mt-2 flex flex-wrap gap-2">
                           <AppStatusBadge label={STATUS_LABEL[selected.status]} />
                           <AppPriorityBadge label={new Date(selected.startsAt).getTime() - Date.now() < 45 * 60 * 1000 ? "Alta" : "Média"} />
-                          <AppStatusBadge label={new Date(selected.startsAt).getTime() - Date.now() < 45 * 60 * 1000 ? "Próximo do horário" : "Programado"} />
+                          <AppStatusBadge label={conflictIds.has(selected.id) ? "Conflito" : delayedIds.has(selected.id) ? "Atraso" : "Programado"} />
                         </div>
                       </div>
                       <div className="flex flex-wrap gap-2">
+                        <Button size="sm" onClick={() => void handleConfirm(selected.id)}>
+                          <CheckCircle2 className="mr-1 h-3.5 w-3.5" /> Confirmar
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => navigate(`/appointments?id=${selected.id}&action=reschedule&source=calendar`)}>
+                          <RefreshCcw className="mr-1 h-3.5 w-3.5" /> Remarcar
+                        </Button>
                         <Button size="sm" variant="outline" onClick={() => navigate(`/appointments?id=${selected.id}&source=calendar&mode=operational_list`)}>Abrir agendamento</Button>
                         <Button size="sm" variant="outline" onClick={() => navigate(`/service-orders?appointmentId=${selected.id}`)}>Abrir O.S.</Button>
                         <Button size="sm" variant="outline" onClick={() => selected.customerId && navigate(`/customers?id=${selected.customerId}&source=calendar`)}>Abrir cliente</Button>
+                        <Button size="sm" variant="outline" onClick={() => navigate(`/whatsapp?customerId=${selected.customerId}&source=calendar`)}>
+                          <MessageSquare className="mr-1 h-3.5 w-3.5" /> Mensagem
+                        </Button>
                       </div>
                       <AppTimeline>
                         <AppTimelineItem>
                           <p className="text-sm text-[var(--text-primary)]">Status atual: {normalizeEventStatus(selected.status)}</p>
                         </AppTimelineItem>
                         <AppTimelineItem>
-                          <p className="text-sm text-[var(--text-primary)]">Estrutura pronta para detecção automática de conflito por equipe e intervalo.</p>
+                          <p className="text-sm text-[var(--text-primary)]">Conexão direta com Agendamentos para execução detalhada.</p>
                         </AppTimelineItem>
                         <AppTimelineItem>
-                          <p className="text-sm text-[var(--text-primary)]">Preparado para sugestão de encaixe em janelas com ociosidade operacional.</p>
+                          <p className="text-sm text-[var(--text-primary)]">Calendário mantém leitura de distribuição e não substitui a fila operacional.</p>
                         </AppTimelineItem>
                       </AppTimeline>
                     </div>
